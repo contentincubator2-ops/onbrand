@@ -8,6 +8,10 @@ import { tenantMarkets } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { TARGET_MARKETS, CONTENT_LANGUAGES } from "../../../../shared/globalization";
 
+// STAB-5: Build allowlists from canonical shared constants (validated at module load time)
+const validMarketIds = TARGET_MARKETS.map((m) => m.value);
+const validLanguageCodes = CONTENT_LANGUAGES.map((l) => l.value);
+
 export const marketRouter = router({
   /** List available markets */
   listMarkets: protectedProcedure.query(() => TARGET_MARKETS),
@@ -26,10 +30,19 @@ export const marketRouter = router({
   setMarket: protectedProcedure
     .input(
       z.object({
-        marketId: z.string(),
-        contentLanguage: z.string(),
+        // STAB-5: Validate marketId against canonical TARGET_MARKETS allowlist
+        marketId: z.string().refine((v) => validMarketIds.includes(v), {
+          message: "Invalid market ID",
+        }),
+        // STAB-5: Validate contentLanguage against canonical CONTENT_LANGUAGES allowlist
+        contentLanguage: z.string().refine((v) => validLanguageCodes.includes(v), {
+          message: "Invalid language code",
+        }),
         isDefault: z.boolean().default(true),
-        complianceFlags: z.array(z.string()).default([]),
+        // STAB-5: Restrict complianceFlags to known enum values only
+        complianceFlags: z
+          .array(z.enum(["GDPR", "FTC", "PDPA", "PIPL", "APPI"]))
+          .default([]),
       })
     )
     .mutation(async ({ ctx, input }) => {

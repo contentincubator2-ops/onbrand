@@ -11,7 +11,7 @@ import { rateLimit } from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength } from "./llmWithBilling";
-import { closeDb, pingDb } from "./db";
+import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
 
 const app = express();
@@ -41,13 +41,14 @@ app.use("/api", limiter);
 
 // ─── Health check ────────────────────────────────────────────────────────────
 app.get("/health", async (_req, res) => {
-  const dbOk = await pingDb();
+  const [dbOk, soworkDbOk] = await Promise.all([pingDb(), pingSoworkDb()]);
   const billingQueueLength = getBillingRetryQueueLength();
   res.json({
-    status:  dbOk && billingQueueLength === 0 ? "ok" : "degraded",
+    status:  dbOk && soworkDbOk && billingQueueLength === 0 ? "ok" : "degraded",
     service: "ai-talent",
     version: "0.1.0",
     db:      dbOk ? "connected" : "unreachable",
+    soworkDb: soworkDbOk ? "connected" : "unreachable",
     billingQueueLength,          // monitor: alert if > 10
     ts:      new Date().toISOString(),
   });

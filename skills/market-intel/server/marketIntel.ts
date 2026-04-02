@@ -1,6 +1,12 @@
 /**
  * Market Intelligence Service
  * Queries sowork_db.market_data for real-time competitor news and trending topics
+ *
+ * DEPENDENCY NOTE: This module imports getSoworkDb from the ai-talent skill.
+ * The relative path `../../ai-talent/server/db` is fragile — if the directory
+ * structure changes, this import must be updated. Sprint 3 should migrate to a
+ * monorepo workspace reference (e.g. `@sowork/ai-talent/db`).
+ * See: skills/ai-talent/server/db.ts
  */
 
 import { getSoworkDb } from "../../ai-talent/server/db";
@@ -15,9 +21,29 @@ export interface MarketIntelResult {
   relevanceScore: number;
 }
 
+// ─── Allowlists ───────────────────────────────────────────────────────────────
+
+const VALID_INDUSTRIES = [
+  "ecommerce", "saas", "beauty", "finance",
+  "food_bev", "health", "creator",
+] as const;
+
 /**
- * Fetch relevant market intelligence for a brand/task context
- * Uses sowork_db.market_data (93K+ entries, updated daily)
+ * Sanitize a single keyword: strip SQL special chars, truncate, trim.
+ * Extracted as a pure function for testability (QUAL-1).
+ */
+export function sanitizeKeyword(k: string): string {
+  return k
+    .replace(/[%_\\'";\-\/\*]/g, "") // strip SQL-dangerous chars
+    .slice(0, 50)
+    .trim();
+}
+
+/**
+ * Fetch relevant market intelligence for a brand/task context.
+ * Uses sowork_db.market_data (93K+ entries, updated daily).
+ *
+ * Security (INJ-4): keywords are sanitized before interpolation.
  */
 export async function fetchMarketIntel(opts: {
   keywords: string[];
@@ -28,17 +54,28 @@ export async function fetchMarketIntel(opts: {
   const db = await getSoworkDb();
   const { keywords, types, days = 7, limit = 10 } = opts;
 
-  if (!keywords.length) return [];
-
-  const typeFilter = types?.length
-    ? `AND dataType IN (${types.map((t) => `'${t}'`).join(",")})`
-    : "AND dataType IN ('competitor_news', 'trending_topic')";
-
-  const keywordConditions = keywords
+  // INJ-4: Sanitize keywords — strip SQL special chars, enforce max length/count
+  const safeKeywords = keywords
     .slice(0, 5) // cap at 5 keywords for performance
+    .map(sanitizeKeyword)
+    .filter((k) => k.length >= 2); // ignore very short/empty keywords after sanitization
+
+  if (!safeKeywords.length) return [];
+
+  // Validate days and limit (numeric range clamping)
+  const safeDays = Math.min(Math.max(1, Math.floor(days)), 90);
+  const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 50);
+
+  const typeFilter =
+    types?.length
+      ? `AND dataType IN (${types.map((t) => `'${t}'`).join(",")})`
+      : "AND dataType IN ('competitor_news', 'trending_topic')";
+
+  // safeKeywords have been sanitized — interpolation is safe here
+  const keywordConditions = safeKeywords
     .map(
       (k) =>
-        `(title LIKE '%${k.replace(/'/g, "''")}%' OR content LIKE '%${k.replace(/'/g, "''")}%')`
+        `(title LIKE '%${k}%' OR content LIKE '%${k}%')`
     )
     .join(" OR ");
 
@@ -47,10 +84,10 @@ export async function fetchMarketIntel(opts: {
     FROM market_data
     WHERE (${keywordConditions})
       ${typeFilter}
-      AND (publishedAt IS NULL OR publishedAt >= DATE_SUB(NOW(), INTERVAL ${days} DAY))
+      AND (publishedAt IS NULL OR publishedAt >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY))
       AND (expiresAt IS NULL OR expiresAt > NOW())
     ORDER BY relevanceScore DESC, publishedAt DESC
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `))) as any[];
 
   return rows.map((r: any) => ({
@@ -93,7 +130,13 @@ export function formatMarketIntelForPrompt(results: MarketIntelResult[]): string
 }
 
 /**
- * Get creative cases from sowork_db for inspiration
+ * Get creative cases from sowork_db for inspiration.
+ *
+ * Security (INJ-5): industry is validated against an allowlist.
+ * Performance (STAB-6): ORDER BY RAND() does a full table scan on large tables.
+ *   TODO STAB-6: Replace with keyset-based random sampling for production
+ *   (e.g. WHERE id >= FLOOR(RAND() * (SELECT MAX(id) FROM creative_cases)))
+ *   Deferred to Sprint 4 — current table size (~93K rows) is acceptable for now.
  */
 export async function getCreativeCases(opts: {
   industry?: string;
@@ -102,8 +145,17 @@ export async function getCreativeCases(opts: {
   const db = await getSoworkDb();
   const { industry, limit = 5 } = opts;
 
-  const industryFilter = industry
-    ? `WHERE industry = '${industry.replace(/'/g, "''")}'`
+  // INJ-5: Validate industry against allowlist
+  const safeIndustry =
+    industry && (VALID_INDUSTRIES as readonly string[]).includes(industry)
+      ? industry
+      : null;
+
+  // safeLimit: clamp to prevent excessive queries
+  const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 20);
+
+  const industryFilter = safeIndustry
+    ? `WHERE industry = '${safeIndustry}'` // safeIndustry is enum-validated, safe to interpolate
     : "WHERE 1=1";
 
   const rows = (await db.execute(sql.raw(`
@@ -111,8 +163,10 @@ export async function getCreativeCases(opts: {
     FROM creative_cases
     ${industryFilter}
     ORDER BY RAND()
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `))) as any[];
+  // TODO STAB-6: ORDER BY RAND() is a full-table-scan on large tables.
+  // Sprint 4: Replace with keyset random for production performance.
 
   return rows.map((r: any) => ({
     title: r.title ?? "",

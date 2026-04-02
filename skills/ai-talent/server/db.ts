@@ -87,6 +87,17 @@ export async function getSoworkDb(): Promise<ReturnType<typeof drizzle>> {
   return soworkDb;
 }
 
+// STAB-7: Health check for sowork_db — mirrors pingDb() for main DB
+export async function pingSoworkDb(): Promise<boolean> {
+  try {
+    const database = await getSoworkDb();
+    await database.execute(sql`SELECT 1`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // DEBT-2: Graceful shutdown — drain pool before process exits
 export async function closeDb(): Promise<void> {
   const closing: Promise<void>[] = [];
