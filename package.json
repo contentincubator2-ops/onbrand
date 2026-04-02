@@ -1,0 +1,13 @@
+{
+  "name": "sowork-marketing-enterprise",
+  "version": "0.1.0",
+  "description": "SoWork Marketing Enterprise — AI 行銷團隊平台，基於 OpenClaw",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "keywords": ["openclaw", "ai", "marketing", "enterprise"],
+  "author": "SoWork AI Team <cjwang@sowork.tw>"
+}
