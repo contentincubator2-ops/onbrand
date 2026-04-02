@@ -33,7 +33,7 @@ export default function ChatInput({ onSend, placeholder = "輸入訊息…", dis
   };
 
   return (
-    <div className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm focus-within:border-[#FF6B35]/50 focus-within:shadow-[0_0_0_3px_rgba(255,107,53,0.08)] transition-all">
+    <div className="flex items-end gap-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl px-4 py-3 shadow-sm focus-within:border-[#FF6B35]/50 focus-within:shadow-[0_0_0_3px_rgba(255,107,53,0.08)] transition-all">
       <textarea
         ref={ref}
         rows={1}
@@ -43,7 +43,7 @@ export default function ChatInput({ onSend, placeholder = "輸入訊息…", dis
         onInput={onInput}
         placeholder={placeholder}
         disabled={disabled}
-        className="flex-1 resize-none bg-transparent outline-none text-sm text-gray-800 placeholder-gray-400 leading-relaxed"
+        className="flex-1 resize-none bg-transparent outline-none text-sm text-gray-800 dark:text-white placeholder-gray-400 leading-relaxed"
       />
       <button
         onClick={submit}

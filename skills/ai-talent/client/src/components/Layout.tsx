@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { getUserId } from "../lib/utils";
 
@@ -15,16 +16,38 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const userId = getUserId();
+  const [dark, setDark] = useState(() => {
+    return localStorage.getItem("theme") === "dark" ||
+      (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (dark) {
+      root.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      root.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [dark]);
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-700">
+      <aside className="w-64 bg-gray-900 dark:bg-gray-950 text-white flex flex-col">
+        {/* Logo + theme toggle */}
+        <div className="p-6 border-b border-gray-700 flex items-center justify-between">
           <h1 className="text-xl font-bold text-white tracking-wide">
             SoWork <span className="text-indigo-400">Enterprise</span>
           </h1>
+          <button
+            onClick={() => setDark(d => !d)}
+            title={dark ? "切換淺色模式" : "切換深色模式"}
+            className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-base transition-colors"
+          >
+            {dark ? "☀️" : "🌙"}
+          </button>
         </div>
 
         {/* Nav */}
@@ -56,7 +79,7 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto dark:bg-gray-900">
         <div className="p-8">{children}</div>
       </main>
     </div>
