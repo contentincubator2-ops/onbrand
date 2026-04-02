@@ -8,9 +8,11 @@
 import express from "express";
 import cors from "cors";
 import { rateLimit } from "express-rate-limit";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength } from "./llmWithBilling";
 import { closeDb, pingDb } from "./db";
+import { appRouter } from "./routers";
 
 const app = express();
 
@@ -51,10 +53,19 @@ app.get("/health", async (_req, res) => {
   });
 });
 
-// TODO Sprint 2: mount tRPC router
-// import { appRouter } from "./routers";
-// import { createExpressMiddleware } from "@trpc/server/adapters/express";
-// app.use("/trpc", createExpressMiddleware({ router: appRouter }));
+// Mount tRPC router (Sprint 2)
+app.use(
+  "/trpc",
+  createExpressMiddleware({
+    router: appRouter,
+    createContext: ({ req }) => {
+      // Sprint 3: Replace with real JWT parsing via getJwtSecret()
+      // For now: read userId from header (dev/testing only)
+      const userId = parseInt((req.headers["x-user-id"] as string) ?? "0");
+      return { user: userId ? { id: userId } : null };
+    },
+  })
+);
 
 const PORT = ENV.PORT;
 app.listen(PORT, () => {

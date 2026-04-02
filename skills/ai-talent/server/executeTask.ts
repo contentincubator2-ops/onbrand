@@ -438,6 +438,30 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
     // RAG is optional; continue without it
   }
 
+  // 2f. Agent Knowledge Base: Inject from sowork_db.agent_knowledge_base
+  let agentKbContext = "";
+  try {
+    const { getAgentKnowledge } = await import("./agentMatcher");
+    agentKbContext = await getAgentKnowledge(
+      task.agentId ?? 0,
+      ["methodology_own", "brand_client", "methodology_tool"],
+      3
+    );
+  } catch {
+    // agent knowledge is optional
+  }
+
+  // 2g. Market Intelligence: Inject real-time data from sowork_db.market_data
+  let marketIntelContext = "";
+  try {
+    const { fetchMarketIntel, formatMarketIntelForPrompt } = await import("../../../market-intel/server/marketIntel");
+    const keywords = [task.title, ...(task.description?.split(" ").slice(0, 3) ?? [])].filter(Boolean);
+    const intel = await fetchMarketIntel({ keywords, limit: 5 });
+    marketIntelContext = formatMarketIntelForPrompt(intel);
+  } catch {
+    // market intel is optional
+  }
+
   // 3. Build system prompt
   let agentPersona = AGENT_SYSTEM_PROMPTS[task.agentSlug ?? ""] ?? "";
   if (!agentPersona && task.agentName) {
@@ -488,7 +512,7 @@ ${task.agentIndustries ?? ""}`;
   const userPrompt = `【任務需求】
 任務標題：${task.title}
 ${task.description ? `任務說明：${task.description}` : ""}
-${brandContext}${memoriesContext}${fbInsightsContext}${ragContext}${learningContext}${parentTaskContext}
+${brandContext}${memoriesContext}${fbInsightsContext}${ragContext}${agentKbContext}${marketIntelContext}${learningContext}${parentTaskContext}
 
 ${outputFormatInstruction}
 

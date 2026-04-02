@@ -58,11 +58,43 @@ export async function pingDb(): Promise<boolean> {
   }
 }
 
+// sowork_db read-only connection (for agents, market_data, agent_knowledge_base)
+let soworkDb: ReturnType<typeof drizzle> | null = null;
+let soworkPool: Pool | null = null;
+
+export async function getSoworkDb(): Promise<ReturnType<typeof drizzle>> {
+  if (soworkDb) return soworkDb;
+
+  const host = process.env.SOWORK_DB_HOST ?? process.env.DB_HOST;
+  const user = process.env.SOWORK_DB_USER ?? process.env.DB_USER;
+  const password = process.env.SOWORK_DB_PASSWORD ?? process.env.DB_PASSWORD;
+
+  if (!host || !user || !password) {
+    throw new Error("[db] Missing sowork DB connection vars");
+  }
+
+  soworkPool = createPool({
+    host,
+    user,
+    password,
+    database: "sowork_db",
+    ssl: { rejectUnauthorized: true },
+    connectionLimit: 5,
+    waitForConnections: true,
+  });
+
+  soworkDb = drizzle(soworkPool, { mode: "default" });
+  return soworkDb;
+}
+
 // DEBT-2: Graceful shutdown — drain pool before process exits
 export async function closeDb(): Promise<void> {
-  if (pool) {
-    await pool.end();
-    db = null;
-    pool = null;
-  }
+  const closing: Promise<void>[] = [];
+  if (pool) closing.push(pool.end());
+  if (soworkPool) closing.push(soworkPool.end());
+  await Promise.all(closing);
+  db = null;
+  pool = null;
+  soworkDb = null;
+  soworkPool = null;
 }
