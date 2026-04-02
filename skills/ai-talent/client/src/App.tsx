@@ -1,3 +1,4 @@
+import ChatInterface from "./pages/ChatInterface";
 import { Navigate, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -26,7 +27,8 @@ export default function App() {
           <RequireAuth>
             <Layout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/chat" element={<RequireAuth><ChatInterface /></RequireAuth>} />
+          <Route path="/" element={<Dashboard />} />
                 <Route path="/brand" element={<BrandAnalysis />} />
                 <Route path="/campaigns" element={<Campaigns />} />
                 <Route path="/credits" element={<Credits />} />
