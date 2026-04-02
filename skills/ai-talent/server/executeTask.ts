@@ -475,7 +475,7 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
   // 2f. Agent Knowledge Base: Inject from sowork_db.agent_knowledge_base
   let agentKbContext = "";
   try {
-    const { getAgentKnowledge } = await import("./agentMatcher");
+    const { getAgentKnowledge } = await import("./agentMatcher.ts");
     agentKbContext = await getAgentKnowledge(
       task.agentId ?? 0,
       ["methodology_own", "brand_client", "methodology_tool"],
@@ -488,7 +488,7 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
   // 2g. Market Intelligence: Inject real-time data from sowork_db.market_data
   let marketIntelContext = "";
   try {
-    const { fetchMarketIntel, formatMarketIntelForPrompt } = await import("../../../market-intel/server/marketIntel");
+    const { fetchMarketIntel, formatMarketIntelForPrompt } = await import("../../../market-intel/server/marketIntel.ts");
     const keywords = [task.title, ...(task.description?.split(" ").slice(0, 3) ?? [])].filter(Boolean);
     const intel = await fetchMarketIntel({ keywords, limit: 5 });
     marketIntelContext = formatMarketIntelForPrompt(intel);

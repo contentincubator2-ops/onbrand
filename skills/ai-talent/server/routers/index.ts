@@ -1,7 +1,7 @@
 import { router } from "../_core/trpc";
 import { workflowRouter } from "./workflow";
 import { marketRouter } from "./marketRouter";
-import { brandRouter } from "../../../brand-engine/server/routers/brandRouter.ts";
+import { brandRouter } from "./brandRouter.ts";
 
 export const appRouter = router({
   workflow: workflowRouter,
