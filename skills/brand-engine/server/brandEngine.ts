@@ -4,8 +4,6 @@
  */
 
 import { invokeLLMWithBilling } from "../../ai-talent/server/llmWithBilling";
-import { getSoworkDb } from "../../ai-talent/server/db";
-import { sql } from "drizzle-orm";
 
 export interface BrandAnalysisInput {
   userId: number;
