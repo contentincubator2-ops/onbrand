@@ -483,6 +483,85 @@ async function buildTaskContext(
   };
 }
 
+
+// ── Exported Prompt Builders ──────────────────────────────────────────────────
+
+/**
+ * Build the system prompt for an agent.
+ * Combines agent persona, methodology instruction, and output format rules.
+ */
+export function buildSystemPrompt(agent: {
+  slug?: string | null;
+  name?: string | null;
+  title?: string | null;
+  bio?: string | null;
+  experience?: string | null;
+  specialty?: string | null;
+  industries?: string | null;
+}): string {
+  let agentPersona = AGENT_SYSTEM_PROMPTS[agent.slug ?? ""] ?? "";
+  if (!agentPersona && agent.name) {
+    agentPersona = `你是 ${agent.name}，${agent.title ?? "AI 行銷專家"}。\n【你的背景與專業】\n${agent.bio ?? ""}\n【你的工作經歷與知識庫】\n${agent.experience ?? ""}\n【你的核心專長】\n${agent.specialty ?? ""}\n【你服務的產業】\n${agent.industries ?? ""}`;
+  }
+  if (!agentPersona) agentPersona = DEFAULT_SYSTEM_PROMPT;
+
+  const methodologyInstruction = agent.specialty
+    ? `\n\n【你的個人方法論（必須在產出中明確體現）】\n你的核心專長是：${agent.specialty}\n你的知識庫來源：${agent.bio ?? ""}`
+    : "";
+
+  return `${agentPersona}${methodologyInstruction}
+
+【絕對禁止規則（違反將導致產出無效）】
+- 嚴格禁止：在 thinking 或 publishable_content 中以任何問候語開場
+- 嚴格禁止：publishable_content 的內容是 JSON 格式或程式碼區塊
+
+【重要輸出規則】
+1. 以繁體中文回應
+2. 輸出 JSON 格式，包含 thinking、publishable_content、content_type
+3. thinking：直接從分析框架或核心論點開始
+4. publishable_content：直接從標題或核心內容開始，可直接複製發布`;
+}
+
+/**
+ * Build the user prompt for a task.
+ * Combines task requirements and all context (brand, memories, RAG, market intel).
+ */
+export function buildUserPrompt(task: {
+  title: string;
+  description?: string | null;
+  taskType?: string | null;
+  brandContext?: string;
+  memoriesContext?: string;
+  ragContext?: string;
+  agentKbContext?: string;
+  marketIntelContext?: string;
+  learningContext?: string;
+  parentTaskContext?: string;
+}): string {
+  const taskType = inferTaskType(task.title, task.description, task.taskType);
+  const outputFormatInstruction = OUTPUT_FORMAT_INSTRUCTIONS[taskType] ??
+    "【publishable_content 格式】直接輸出完整的行銷產出內容。";
+
+  const ctx = [
+    task.brandContext,
+    task.memoriesContext,
+    task.ragContext,
+    task.agentKbContext,
+    task.marketIntelContext,
+    task.learningContext,
+    task.parentTaskContext,
+  ].filter(Boolean).join("\n");
+
+  return `【任務需求】
+任務標題：${task.title}
+${task.description ? `任務說明：${task.description}` : ""}
+${ctx}
+
+${outputFormatInstruction}
+
+請以 JSON 格式輸出，包含 thinking（策略思考）和 publishable_content（可發布產出）。`;
+}
+
 // ── Sub-function 2: Build prompts ─────────────────────────────────────────────
 
 interface PromptsResult {
