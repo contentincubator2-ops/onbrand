@@ -99,7 +99,7 @@ export async function matchAgents(req: AgentMatchRequest): Promise<AgentMatch[]>
       COALESCE(a.pricePerTask, 0) as pricePerTask,
       COALESCE(a.priceMonthly, 0) as priceMonthly,
       -- Affinity score from agent_user_affinity (if exists)
-      COALESCE(aff.affinity_score, 50) as affinityScore,
+      COALESCE(aff.affinity_score, 50.0) as affinityScore,
       -- Match score: title match(40) + rating(30) + hire count(20) + affinity(10)
       (
         CASE WHEN a.title IN (${titleList}) THEN 40 ELSE
@@ -174,13 +174,13 @@ export async function updateAgentAffinity(
   const delta = taskSuccess ? (userRating ? (userRating - 3) * 5 : 5) : -10;
 
   await db.execute(sql.raw(`
-    INSERT INTO agent_user_affinity (userId, agentId, affinity_score, interaction_count, success_count, updated_at)
-    VALUES (${userId}, ${agentId}, GREATEST(0, LEAST(100, 50 + ${delta})), 1, ${taskSuccess ? 1 : 0}, NOW())
+    INSERT INTO agent_user_affinity (slack_user_id, agent_id, affinity_score, interaction_count, task_success_count, last_used_at)
+    VALUES (CAST(${userId} AS CHAR), ${agentId}, GREATEST(0, LEAST(100, 50 + ${delta})), 1, ${taskSuccess ? 1 : 0}, NOW())
     ON DUPLICATE KEY UPDATE
       affinity_score = GREATEST(0, LEAST(100, affinity_score + ${delta})),
       interaction_count = interaction_count + 1,
-      success_count = success_count + ${taskSuccess ? 1 : 0},
-      updated_at = NOW()
+      task_success_count = task_success_count + ${taskSuccess ? 1 : 0},
+      last_used_at = NOW()
   `));
 }
 
