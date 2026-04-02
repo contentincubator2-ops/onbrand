@@ -1,33 +1,70 @@
-export const ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
-  databaseUrl: process.env.DATABASE_URL ?? "",
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-  isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  // Twitter OAuth 2.0
-  twitterClientId: process.env.TWITTER_CLIENT_ID ?? "",
-  twitterClientSecret: process.env.TWITTER_CLIENT_SECRET ?? "",
-  // Google OAuth 2.0 (YouTube + Google Ads)
-  googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
-  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-  // Meta (Facebook + Instagram)
-  metaAppId: process.env.META_APP_ID ?? "",
-  metaAppSecret: process.env.META_APP_SECRET ?? "",
-  // Shopify
-  shopifyClientId: process.env.SHOPIFY_CLIENT_ID ?? "",
-  shopifyClientSecret: process.env.SHOPIFY_CLIENT_SECRET ?? "",
-  // Zhipu AI (GLM-4)
-  zhipuApiKey: process.env.ZHIPU_API_KEY ?? "",
-  // Resend (Email)
-  resendApiKey: process.env.RESEND_API_KEY ?? "",
-  // Multi-model AI providers
-  qwenApiKey: process.env.QWEN_API_KEY ?? "",
-  perplexityApiKey: process.env.PERPLEXITY_API_KEY ?? "",
-  googleAiApiKey: process.env.GOOGLE_AI_API_KEY ?? "",
-  cohereApiKey: process.env.COHERE_API_KEY ?? "",
-  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
-  tavilyApiKey: process.env.TAVILY_API_KEY ?? "",
-};
+/**
+ * env.ts — Runtime environment validation via zod
+ * SEC-3: Validates all required env vars at startup; exits with clear errors if any are missing.
+ */
+
+import { z } from "zod";
+
+const envSchema = z.object({
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
+
+  // DB — all required; no defaults
+  DB_HOST:     z.string().min(1),
+  DB_USER:     z.string().min(1),
+  DB_PASSWORD: z.string().min(1),
+  DB_NAME:     z.string().min(1),
+
+  // JWT — required and minimum length enforced
+  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),
+
+  // LLM providers — at least one should be set (validated at runtime when needed)
+  BUILT_IN_FORGE_API_KEY: z.string().optional(),
+  BUILT_IN_FORGE_API_URL: z.string().optional(),
+  ZHIPU_API_KEY:          z.string().optional(),
+  QWEN_API_KEY:           z.string().optional(),
+  PERPLEXITY_API_KEY:     z.string().optional(),
+  GOOGLE_AI_API_KEY:      z.string().optional(),
+  COHERE_API_KEY:         z.string().optional(),
+  OPENAI_API_KEY:         z.string().optional(),
+
+  // Azure Search
+  AZURE_SEARCH_ENDPOINT:   z.string().url().optional(),
+  AZURE_SEARCH_API_KEY:    z.string().optional(),
+  AZURE_SEARCH_INDEX_NAME: z.string().default("brand-knowledge"),
+
+  // OAuth — optional for deployments that don't use them
+  OAUTH_SERVER_URL:    z.string().optional(),
+  OWNER_OPEN_ID:       z.string().optional(),
+  VITE_APP_ID:         z.string().optional(),
+
+  // Social OAuth — optional
+  TWITTER_CLIENT_ID:     z.string().optional(),
+  TWITTER_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID:      z.string().optional(),
+  GOOGLE_CLIENT_SECRET:  z.string().optional(),
+  META_APP_ID:           z.string().optional(),
+  META_APP_SECRET:       z.string().optional(),
+  SHOPIFY_CLIENT_ID:     z.string().optional(),
+  SHOPIFY_CLIENT_SECRET: z.string().optional(),
+
+  // External services — optional
+  RESEND_API_KEY: z.string().optional(),
+  TAVILY_API_KEY: z.string().optional(),
+
+  // App
+  PORT: z.coerce.number().default(3001),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error(
+    "[env] Invalid environment variables:\n",
+    parsed.error.flatten().fieldErrors
+  );
+  process.exit(1);
+}
+
+export const ENV = parsed.data;

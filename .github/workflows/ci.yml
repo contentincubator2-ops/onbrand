@@ -13,4 +13,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: echo "CI setup - tests will be added as skills are migrated"
+          cache: 'npm'
+          cache-dependency-path: skills/ai-talent/package-lock.json
+      - run: npm ci --prefix skills/ai-talent
+      - run: npm run lint --prefix skills/ai-talent
+      - run: npm run test --prefix skills/ai-talent

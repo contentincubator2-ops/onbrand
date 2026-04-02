@@ -5,8 +5,11 @@
  *  1. Execute the LLM call
  *  2. Parse token usage from the response
  *  3. Calculate raw USD cost and credits to charge
- *  4. Insert a token usage log record
+ *  4. Insert a token usage log record (with retry + in-memory fallback)
  *  5. Deduct credits from the user's balance
+ *
+ * DEBT-5: Billing failures now use exponential-backoff retry + in-memory queue
+ *         to prevent silent loss of billing records.
  *
  * Usage:
  *   const result = await invokeLLMWithBilling({
@@ -20,6 +23,7 @@ import {
   insertTokenLog,
   calcCostFromTokens,
   usdToCredits,
+  type TokenLogInput,
 } from "./tokenLedger";
 
 export interface InvokeLLMWithBillingOptions extends InvokeParams {
@@ -60,6 +64,65 @@ export interface LLMWithBillingResult {
   latencyMs: number;
 }
 
+// ─── DEBT-5: Billing retry with in-memory fallback queue ─────────────────────
+
+/** In-memory buffer for billing records that failed all DB retries. */
+const billingRetryQueue: TokenLogInput[] = [];
+
+/**
+ * Attempt to insert a token log with exponential-backoff retries.
+ * On final failure, enqueue to in-memory buffer for deferred retry.
+ */
+async function tryInsertWithRetry(
+  input: TokenLogInput,
+  retries = 3
+): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await insertTokenLog(input);
+      return;
+    } catch (err) {
+      if (i === retries - 1) {
+        // Exhausted retries — park in memory so it isn't silently lost
+        billingRetryQueue.push(input);
+        console.error(
+          "[billing] Failed to write token log after retries, queued for retry:",
+          err
+        );
+        return;
+      }
+      // Exponential back-off: 1s, 2s, 3s …
+      await new Promise<void>(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
+/**
+ * Flush the in-memory retry queue (call periodically, e.g. every minute).
+ * Returns number of records successfully flushed.
+ */
+export async function flushBillingRetryQueue(): Promise<number> {
+  if (billingRetryQueue.length === 0) return 0;
+  const pending = billingRetryQueue.splice(0, billingRetryQueue.length);
+  let flushed = 0;
+  for (const item of pending) {
+    try {
+      await insertTokenLog(item);
+      flushed++;
+    } catch {
+      billingRetryQueue.push(item); // re-enqueue on failure
+    }
+  }
+  return flushed;
+}
+
+/** Read-only inspection of the retry queue length (for monitoring). */
+export function getBillingRetryQueueLength(): number {
+  return billingRetryQueue.length;
+}
+
+// ─── Token usage parser ───────────────────────────────────────────────────────
+
 /**
  * Parse token usage from an LLM response.
  * Handles different provider response shapes.
@@ -73,19 +136,14 @@ function parseTokenUsage(response: InvokeResult): {
   const usage = (response as any)?.usage;
   if (usage) {
     const promptTokens =
-      usage.prompt_tokens ??
-      usage.promptTokens ??
-      usage.input_tokens ??
-      0;
+      usage.prompt_tokens ?? usage.promptTokens ?? usage.input_tokens ?? 0;
     const completionTokens =
       usage.completion_tokens ??
       usage.completionTokens ??
       usage.output_tokens ??
       0;
     const totalTokens =
-      usage.total_tokens ??
-      usage.totalTokens ??
-      promptTokens + completionTokens;
+      usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens;
     return { promptTokens, completionTokens, totalTokens };
   }
 
@@ -101,11 +159,13 @@ function parseTokenUsage(response: InvokeResult): {
     };
   }
 
-  // Fallback: estimate from text length (rough heuristic, ~4 chars / token)
+  // Fallback: estimate from text length (~4 chars / token)
   const text = (response as any)?.content ?? (response as any)?.text ?? "";
   const estimated = Math.ceil(text.length / 4);
   return { promptTokens: 0, completionTokens: estimated, totalTokens: estimated };
 }
+
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
  * Call an LLM and automatically record billing + deduct credits.
@@ -127,11 +187,10 @@ export async function invokeLLMWithBilling(
   } = options;
 
   const startMs = Date.now();
-  const response = await invokeLLM(llmOptions);
+  const response = await invokeLLM({ ...llmOptions, provider: provider as any, model });
   const latencyMs = Date.now() - startMs;
 
   const usage = parseTokenUsage(response);
-
   const rawCostUsd = calcCostFromTokens(
     provider,
     usage.promptTokens,
@@ -140,24 +199,26 @@ export async function invokeLLMWithBilling(
   const creditsCharged = usdToCredits(rawCostUsd);
 
   if (!skipBilling) {
-    // Fire-and-forget: don't let billing failures block the LLM response
+    // Fire-and-forget with retry: don't let billing failures block the LLM response
+    const billingInput: TokenLogInput = {
+      userId,
+      userApiKey,
+      tenantId,
+      taskId,
+      agentId,
+      actionType,
+      provider,
+      model,
+      promptTokens:     usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens:      usage.totalTokens,
+      rawCostUsd,
+      creditsCharged,
+      latencyMs,
+    };
+
     Promise.all([
-      insertTokenLog({
-        userId,
-        userApiKey,
-        tenantId,
-        taskId,
-        agentId,
-        actionType,
-        provider,
-        model,
-        promptTokens: usage.promptTokens,
-        completionTokens: usage.completionTokens,
-        totalTokens: usage.totalTokens,
-        rawCostUsd,
-        creditsCharged,
-        latencyMs,
-      }),
+      tryInsertWithRetry(billingInput),
       creditsCharged > 0
         ? deductCredits({
             userId,
@@ -167,9 +228,9 @@ export async function invokeLLMWithBilling(
             description: `LLM: ${provider}/${model} (${usage.totalTokens} tokens)`,
           })
         : Promise.resolve(),
-    ]).catch((err) => {
-      // Log but don't throw — billing failure should not fail the request
-      console.error("[llmWithBilling] billing error:", err);
+    ]).catch(err => {
+      // Deduct credits failure — log but do not throw
+      console.error("[llmWithBilling] credits deduction error:", err);
     });
   }
 

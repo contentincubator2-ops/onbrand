@@ -2,14 +2,20 @@
  * Token Usage Ledger
  * Records every LLM API call with provider, tokens used, and cost.
  * Central billing source-of-truth for SoWork Marketing Enterprise.
+ *
+ * SEC-5: SELECT queries migrated to Drizzle ORM query builder (no raw SQL).
  */
 
 import { getDb } from "./db";
 import { tokenUsageLogs } from "../drizzle/schema";
+import { sql, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 // Provider cost per 1K tokens (USD)
-export const PROVIDER_COST_PER_1K: Record<string, { input: number; output: number }> = {
+export const PROVIDER_COST_PER_1K: Record<
+  string,
+  { input: number; output: number }
+> = {
   openai:     { input: 0.0025,   output: 0.010  },
   zhipu:      { input: 0.0010,   output: 0.0010 },
   qwen:       { input: 0.0008,   output: 0.0020 },
@@ -34,8 +40,12 @@ export function calcCostFromTokens(
   promptTokens: number,
   completionTokens: number
 ): number {
-  const cost = PROVIDER_COST_PER_1K[provider] ?? PROVIDER_COST_PER_1K.openai;
-  return (promptTokens / 1000) * cost.input + (completionTokens / 1000) * cost.output;
+  const cost =
+    PROVIDER_COST_PER_1K[provider] ?? PROVIDER_COST_PER_1K["openai"]!;
+  return (
+    (promptTokens / 1000) * cost.input +
+    (completionTokens / 1000) * cost.output
+  );
 }
 
 /**
@@ -69,7 +79,6 @@ export interface TokenLogInput {
  */
 export async function insertTokenLog(input: TokenLogInput): Promise<void> {
   const db = await getDb();
-  if (!db) return;
 
   await db.insert(tokenUsageLogs).values({
     id:               randomUUID(),
@@ -93,53 +102,55 @@ export async function insertTokenLog(input: TokenLogInput): Promise<void> {
 
 /**
  * Return a per-provider breakdown of token usage for a user over the last N days.
+ * SEC-5: Uses Drizzle ORM query builder — no raw SQL string interpolation.
  */
 export async function getUserTokenSummary(userId: number, days = 30) {
   const db = await getDb();
   if (!db) return [];
 
-  const rows = await db.execute(
-    `SELECT
-       provider,
-       model,
-       SUM(promptTokens)     AS totalPromptTokens,
-       SUM(completionTokens) AS totalCompletionTokens,
-       SUM(totalTokens)      AS totalTokens,
-       SUM(rawCostUsd)       AS totalCostUsd,
-       SUM(creditsCharged)   AS totalCreditsCharged,
-       COUNT(*)              AS callCount
-     FROM token_usage_logs
-     WHERE userId = ?
-       AND createdAt >= DATE_SUB(NOW(), INTERVAL ? DAY)
-     GROUP BY provider, model
-     ORDER BY totalCreditsCharged DESC`,
-    [userId, days]
-  );
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  return rows as any[];
+  return db
+    .select({
+      provider:              tokenUsageLogs.provider,
+      model:                 tokenUsageLogs.model,
+      totalPromptTokens:     sql<number>`SUM(${tokenUsageLogs.promptTokens})`,
+      totalCompletionTokens: sql<number>`SUM(${tokenUsageLogs.completionTokens})`,
+      totalTokens:           sql<number>`SUM(${tokenUsageLogs.totalTokens})`,
+      totalCostUsd:          sql<number>`SUM(${tokenUsageLogs.rawCostUsd})`,
+      totalCreditsCharged:   sql<number>`SUM(${tokenUsageLogs.creditsCharged})`,
+      callCount:             sql<number>`COUNT(*)`,
+    })
+    .from(tokenUsageLogs)
+    .where(
+      sql`${tokenUsageLogs.userId} = ${userId} AND ${tokenUsageLogs.createdAt} >= ${since}`
+    )
+    .groupBy(tokenUsageLogs.provider, tokenUsageLogs.model)
+    .orderBy(desc(sql`SUM(${tokenUsageLogs.creditsCharged})`));
 }
 
 /**
  * Return daily aggregated usage for a user (for charts/dashboards).
+ * SEC-5: Uses Drizzle ORM query builder — no raw SQL string interpolation.
  */
 export async function getUserDailyUsage(userId: number, days = 30) {
   const db = await getDb();
   if (!db) return [];
 
-  const rows = await db.execute(
-    `SELECT
-       DATE(createdAt)      AS date,
-       SUM(totalTokens)     AS totalTokens,
-       SUM(rawCostUsd)      AS totalCostUsd,
-       SUM(creditsCharged)  AS totalCreditsCharged,
-       COUNT(*)             AS callCount
-     FROM token_usage_logs
-     WHERE userId = ?
-       AND createdAt >= DATE_SUB(NOW(), INTERVAL ? DAY)
-     GROUP BY DATE(createdAt)
-     ORDER BY date ASC`,
-    [userId, days]
-  );
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  return rows as any[];
+  return db
+    .select({
+      date:                sql<string>`DATE(${tokenUsageLogs.createdAt})`,
+      totalTokens:         sql<number>`SUM(${tokenUsageLogs.totalTokens})`,
+      totalCostUsd:        sql<number>`SUM(${tokenUsageLogs.rawCostUsd})`,
+      totalCreditsCharged: sql<number>`SUM(${tokenUsageLogs.creditsCharged})`,
+      callCount:           sql<number>`COUNT(*)`,
+    })
+    .from(tokenUsageLogs)
+    .where(
+      sql`${tokenUsageLogs.userId} = ${userId} AND ${tokenUsageLogs.createdAt} >= ${since}`
+    )
+    .groupBy(sql`DATE(${tokenUsageLogs.createdAt})`)
+    .orderBy(sql`DATE(${tokenUsageLogs.createdAt})`);
 }
