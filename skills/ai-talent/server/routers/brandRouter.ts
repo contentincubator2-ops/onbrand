@@ -32,7 +32,7 @@ export const brandRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const userApiKey = await getUserApiKey(ctx.user.id);
-      return analyzeBrandPositioning({ ...input, userId: ctx.user.id, userApiKey });
+      return analyzeBrandPositioning({ ...input, userId: ctx.user.id, userApiKey } as any);
     }),
 
   generateCampaign: protectedProcedure
@@ -49,6 +49,6 @@ export const brandRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const userApiKey = await getUserApiKey(ctx.user.id);
-      return generateCampaignPositioning({ ...input, userId: ctx.user.id, userApiKey });
+      return generateCampaignPositioning({ ...input, userId: ctx.user.id, userApiKey } as any);
     }),
 });

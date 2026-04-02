@@ -80,7 +80,7 @@ export default function Dashboard() {
         ) : tasks && tasks.length > 0 ? (
           <div className="space-y-2">
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
+              task.id ? <TaskCard key={task.id} task={task} /> : null
             ))}
           </div>
         ) : (

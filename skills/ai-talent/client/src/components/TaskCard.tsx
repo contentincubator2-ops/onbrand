@@ -2,11 +2,11 @@ import { formatDate } from "../lib/utils";
 
 interface TaskCardProps {
   task: {
-    id: number;
-    title: string;
-    status: string;
+    id?: number;
+    title?: string;
+    status?: string;
     taskType?: string | null;
-    createdAt: Date | string;
+    createdAt?: Date | string | null;
     completedAt?: Date | string | null;
   };
 }
