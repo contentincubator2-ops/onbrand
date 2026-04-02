@@ -14,8 +14,11 @@ export interface TRPCContext {
 export async function createContext({ req }: { req: Request }): Promise<TRPCContext> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
-    // Dev fallback: allow x-user-id header in non-production
-    if (process.env.NODE_ENV !== "production") {
+    // Dev fallback: allow x-user-id header ONLY when ALLOW_DEV_AUTH=true AND not production
+    const devAuthAllowed =
+      process.env.ALLOW_DEV_AUTH === "true" &&
+      process.env.NODE_ENV !== "production";
+    if (devAuthAllowed) {
       const devUserId = parseInt((req.headers["x-user-id"] as string) ?? "0");
       if (devUserId > 0) return { user: { id: devUserId } };
     }
@@ -33,8 +36,15 @@ export async function createContext({ req }: { req: Request }): Promise<TRPCCont
         email: typeof payload.email === "string" ? payload.email : undefined,
       },
     };
-  } catch {
-    return { user: null };
+  } catch (err) {
+    // P1-7: Structured logging for JWT verification failures (no token content)
+    console.warn("[auth] JWT verification failed:", {
+      ip: req.ip,
+      path: req.path,
+      reason: err instanceof Error ? err.message : "unknown",
+      ts: new Date().toISOString(),
+    });
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired token" });
   }
 }
 

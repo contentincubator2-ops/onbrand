@@ -10,7 +10,7 @@ import cors from "cors";
 import { rateLimit } from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { ENV } from "./_core/env";
-import { getBillingRetryQueueLength } from "./llmWithBilling";
+import { getBillingRetryQueueLength, flushBillingRetryQueue } from "./llmWithBilling";
 import { createContext } from "./_core/trpc";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
@@ -19,10 +19,17 @@ const app = express();
 
 // SEC-8: Trust reverse-proxy headers (Nginx / Azure Front Door / Cloudflare).
 // Required for rate limiter to see the real client IP instead of the proxy IP.
-// Set TRUST_PROXY=1 in production; leave unset in local dev.
-app.set("trust proxy", process.env.TRUST_PROXY ?? 1);
+// Only enabled when TRUST_PROXY=1 is explicitly set in environment.
+if (process.env.TRUST_PROXY === "1") {
+  app.set("trust proxy", 1);
+}
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map(s => s.trim())
+    : ["http://localhost:5173", "http://localhost:3000"],
+  credentials: true,
+}));
 app.use(express.json());
 
 // DEBT-3: Request logging — minimal, no PII logged
@@ -39,6 +46,7 @@ const limiter = rateLimit({
   legacyHeaders:   false,
 });
 app.use("/api", limiter);
+app.use("/trpc", limiter);
 
 // ─── Health check ────────────────────────────────────────────────────────────
 app.get("/health", async (_req, res) => {
@@ -65,21 +73,51 @@ app.use(
 );
 
 const PORT = ENV.PORT;
-app.listen(PORT, () => {
-  console.log(`[ai-talent] listening on :${PORT}`);
+
+// P1-2: Periodic billing retry queue flush (every 60s)
+setInterval(async () => {
+  try {
+    const flushed = await flushBillingRetryQueue();
+    if (flushed > 0) console.log(`[billing] flushed ${flushed} queued records`);
+  } catch (err) {
+    console.error("[billing] flush error:", err);
+  }
+}, 60_000);
+
+const server = app.listen(PORT, () => {
+  console.log(`[server] sowork-enterprise listening on port ${PORT}`);
+  console.log(`[server] health: http://localhost:${PORT}/health`);
 });
 
-// DEBT-3: Graceful shutdown — drain DB pool before exiting
-process.on("SIGTERM", async () => {
-  console.log("[server] SIGTERM received, shutting down...");
-  await closeDb();
-  process.exit(0);
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`[server] FATAL: Port ${PORT} already in use. Set PORT env to a different port.`);
+    process.exit(1);
+  }
+  throw err;
 });
 
-process.on("SIGINT", async () => {
-  console.log("[server] SIGINT received, shutting down...");
-  await closeDb();
-  process.exit(0);
+// Graceful shutdown handler
+const shutdown = async (signal: string) => {
+  console.log(`[server] ${signal} received, shutting down gracefully...`);
+  server.close(async () => {
+    try {
+      await closeDb();
+      console.log("[server] DB connections closed");
+    } catch { /* silent */ }
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10_000); // 10s force exit
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("uncaughtException", (err) => {
+  console.error("[server] uncaughtException:", err);
+  shutdown("uncaughtException");
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] unhandledRejection:", reason);
 });
 
 export default app;

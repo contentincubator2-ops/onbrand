@@ -9,7 +9,7 @@
  * See: skills/ai-talent/server/db.ts
  */
 
-import { getSoworkDb } from "../../ai-talent/server/db.ts";
+import { getSoworkDb } from "../../ai-talent/server/db";
 import { sql } from "drizzle-orm";
 
 export interface MarketIntelResult {
@@ -45,14 +45,22 @@ export function sanitizeKeyword(k: string): string {
  *
  * Security (INJ-4): keywords are sanitized before interpolation.
  */
+const VALID_DATA_TYPES = ["competitor_news", "trending_topic", "social_trend", "market_data", "consumer_insight"] as const;
+type ValidDataType = typeof VALID_DATA_TYPES[number];
+
 export async function fetchMarketIntel(opts: {
   keywords: string[];
-  types?: ("competitor_news" | "trending_topic" | "social_trend")[];
+  types?: ("competitor_news" | "trending_topic" | "social_trend" | "market_data" | "consumer_insight")[];
   days?: number;
   limit?: number;
 }): Promise<MarketIntelResult[]> {
   const db = await getSoworkDb();
   const { keywords, types, days = 7, limit = 10 } = opts;
+
+  // P1-5: Validate types against allowlist to prevent injection via enum bypass
+  const sanitizedTypes = (types ?? []).filter(
+    (t): t is ValidDataType => VALID_DATA_TYPES.includes(t as ValidDataType)
+  );
 
   // INJ-4: Sanitize keywords — strip SQL special chars, enforce max length/count
   const safeKeywords = keywords
@@ -66,9 +74,10 @@ export async function fetchMarketIntel(opts: {
   const safeDays = Math.min(Math.max(1, Math.floor(days)), 90);
   const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 50);
 
+  // Use sanitizedTypes (enum-validated) instead of raw types to prevent injection
   const typeFilter =
-    types?.length
-      ? `AND dataType IN (${types.map((t) => `'${t}'`).join(",")})`
+    sanitizedTypes.length
+      ? `AND dataType IN (${sanitizedTypes.map((t) => `'${t}'`).join(",")})`
       : "AND dataType IN ('competitor_news', 'trending_topic')";
 
   // safeKeywords have been sanitized — interpolation is safe here

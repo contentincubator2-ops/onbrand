@@ -271,23 +271,66 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
   }
 
   // ── Step 2: Deduct from personal wallet (planCredits → extraCredits) ─────────
+  // P1-1: Atomic deduction using UPDATE WHERE to prevent race conditions.
+  // The condition ensures we only deduct if sufficient credits remain.
   let newUsedCredits = wallet.usedCredits;
   let newExtraCredits = wallet.extraCredits;
 
   if (remainingCost > 0) {
     const planRemaining = Math.max(0, wallet.planCredits - wallet.usedCredits);
+
     if (planRemaining >= remainingCost) {
+      // Deduct entirely from plan credits atomically
+      const result = await db
+        .update(userCredits)
+        .set({ usedCredits: sql`usedCredits + ${remainingCost}` })
+        .where(
+          and(
+            eq(userCredits.userId, userId),
+            sql`(${userCredits.planCredits} - usedCredits) >= ${remainingCost}`
+          )
+        );
+      if ((result as any).rowsAffected === 0 && (result as any)[0]?.affectedRows === 0) {
+        throw new Error("Insufficient credits or concurrent update conflict");
+      }
       newUsedCredits += remainingCost;
-    } else {
+    } else if (planRemaining > 0) {
+      // Use remaining plan credits first, then extra credits
+      const extraNeeded = remainingCost - planRemaining;
+      const result = await db
+        .update(userCredits)
+        .set({
+          usedCredits: sql`usedCredits + ${planRemaining}`,
+          extraCredits: sql`extraCredits - ${extraNeeded}`,
+        })
+        .where(
+          and(
+            eq(userCredits.userId, userId),
+            sql`extraCredits >= ${extraNeeded}`
+          )
+        );
+      if ((result as any).rowsAffected === 0 && (result as any)[0]?.affectedRows === 0) {
+        throw new Error("Insufficient credits or concurrent update conflict");
+      }
       newUsedCredits += planRemaining;
-      newExtraCredits -= remainingCost - planRemaining;
+      newExtraCredits -= extraNeeded;
+    } else {
+      // Deduct entirely from extra credits atomically
+      const result = await db
+        .update(userCredits)
+        .set({ extraCredits: sql`extraCredits - ${remainingCost}` })
+        .where(
+          and(
+            eq(userCredits.userId, userId),
+            sql`extraCredits >= ${remainingCost}`
+          )
+        );
+      if ((result as any).rowsAffected === 0 && (result as any)[0]?.affectedRows === 0) {
+        throw new Error("Insufficient credits or concurrent update conflict");
+      }
+      newExtraCredits -= remainingCost;
     }
     remainingCost = 0;
-
-    await db
-      .update(userCredits)
-      .set({ usedCredits: newUsedCredits, extraCredits: newExtraCredits })
-      .where(eq(userCredits.userId, userId));
   }
 
   // ── Step 3: Log to creditsUsageLog ───────────────────────────────────────────

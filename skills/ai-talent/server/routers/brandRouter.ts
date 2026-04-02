@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc.ts";
-import { analyzeBrandPositioning, generateCampaignPositioning } from "../brand/brandEngine.ts";
-import { getDb } from "../db.ts";
-import { userApiKeys } from "../../drizzle/schema.ts";
+import { router, protectedProcedure } from "../_core/trpc";
+import { analyzeBrandPositioning, generateCampaignPositioning } from "../brand/brandEngine";
+import { getDb } from "../db";
+import { userApiKeys } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 
 // Helper to get user's API key

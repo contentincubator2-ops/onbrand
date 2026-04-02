@@ -76,6 +76,9 @@ export interface LLMWithBillingResult {
 /** In-memory buffer for billing records that failed all DB retries. */
 const billingRetryQueue: TokenLogInput[] = [];
 
+/** Maximum queue size before falling back to disk-only log to prevent memory exhaustion. */
+const MAX_BILLING_QUEUE_SIZE = 500;
+
 // STABLE-4: Disk fallback path — configure via env for production persistence.
 const BILLING_FALLBACK_LOG =
   process.env.BILLING_FALLBACK_LOG ?? "/tmp/billing-retry.jsonl";
@@ -95,6 +98,16 @@ async function tryInsertWithRetry(
     } catch (err) {
       if (i === retries - 1) {
         // Exhausted retries — park in memory so it isn't silently lost
+        if (billingRetryQueue.length >= MAX_BILLING_QUEUE_SIZE) {
+          console.error("[billing] retryQueue full, writing to fallback log only");
+          try {
+            appendFileSync(
+              BILLING_FALLBACK_LOG,
+              JSON.stringify({ ...input, reason: "queue_full", failedAt: new Date().toISOString() }) + "\n"
+            );
+          } catch { /* silent */ }
+          return;
+        }
         billingRetryQueue.push(input);
         // STABLE-4: Persist to disk so records survive process restarts.
         try {
@@ -222,7 +235,7 @@ export async function invokeLLMWithBilling(
     // Fire-and-forget with retry: don't let billing failures block the LLM response
     const billingInput: TokenLogInput = {
       userId,
-      userApiKey: hashApiKey(userApiKey), // SEC-6: hash before storing in memory/disk/DB
+      userApiKey: userApiKey, // SEC-6: insertTokenLog (tokenLedger.ts) handles hashing — do NOT pre-hash here to avoid double-hash
       tenantId,
       taskId,
       agentId,
