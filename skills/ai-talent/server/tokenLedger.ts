@@ -5,6 +5,8 @@
  */
 
 import { getDb } from "./db";
+import { tokenUsageLogs } from "../drizzle/schema";
+import { randomUUID } from "crypto";
 
 // Provider cost per 1K tokens (USD)
 export const PROVIDER_COST_PER_1K: Record<string, { input: number; output: number }> = {
@@ -69,33 +71,24 @@ export async function insertTokenLog(input: TokenLogInput): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
-  const { randomUUID } = await import("crypto");
-
-  await db.execute(
-    `INSERT INTO token_usage_logs
-      (id, userId, userApiKey, tenantId, taskId, agentId, actionType,
-       provider, model, promptTokens, completionTokens, totalTokens,
-       rawCostUsd, markupFactor, creditsCharged, latencyMs, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-    [
-      randomUUID(),
-      input.userId,
-      input.userApiKey,
-      input.tenantId ?? null,
-      input.taskId ?? null,
-      input.agentId ?? null,
-      input.actionType,
-      input.provider,
-      input.model,
-      input.promptTokens,
-      input.completionTokens,
-      input.totalTokens,
-      input.rawCostUsd.toFixed(6),
-      MARKUP_FACTOR,
-      input.creditsCharged,
-      input.latencyMs ?? null,
-    ]
-  );
+  await db.insert(tokenUsageLogs).values({
+    id:               randomUUID(),
+    userId:           input.userId,
+    userApiKey:       input.userApiKey,
+    tenantId:         input.tenantId    ?? null,
+    taskId:           input.taskId      ?? null,
+    agentId:          input.agentId     ?? null,
+    actionType:       input.actionType,
+    provider:         input.provider    as any, // enum validated at DB level
+    model:            input.model,
+    promptTokens:     input.promptTokens,
+    completionTokens: input.completionTokens,
+    totalTokens:      input.totalTokens,
+    rawCostUsd:       input.rawCostUsd.toFixed(6),
+    markupFactor:     String(MARKUP_FACTOR),
+    creditsCharged:   input.creditsCharged,
+    latencyMs:        input.latencyMs   ?? null,
+  });
 }
 
 /**

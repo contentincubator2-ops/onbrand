@@ -14,7 +14,7 @@
  *   });
  */
 
-import { invokeLLM, type InvokeLLMOptions, type LLMResponse } from "./_core/llm";
+import { invokeLLM, type InvokeParams, type InvokeResult } from "./_core/llm";
 import { deductCredits } from "./deductCredits";
 import {
   insertTokenLog,
@@ -22,7 +22,11 @@ import {
   usdToCredits,
 } from "./tokenLedger";
 
-export interface InvokeLLMWithBillingOptions extends InvokeLLMOptions {
+export interface InvokeLLMWithBillingOptions extends InvokeParams {
+  /** LLM provider (e.g. "openai", "google", "zhipu") */
+  provider: string;
+  /** Model name (e.g. "gpt-4o", "gemini-2.5-flash") */
+  model: string;
   /** Authenticated user ID */
   userId: number;
   /** The API key used to authenticate this request (for audit log) */
@@ -41,7 +45,7 @@ export interface InvokeLLMWithBillingOptions extends InvokeLLMOptions {
 
 export interface LLMWithBillingResult {
   /** Raw LLM response */
-  response: LLMResponse;
+  response: InvokeResult;
   /** Token counts from the API response */
   usage: {
     promptTokens: number;
@@ -60,7 +64,7 @@ export interface LLMWithBillingResult {
  * Parse token usage from an LLM response.
  * Handles different provider response shapes.
  */
-function parseTokenUsage(response: LLMResponse): {
+function parseTokenUsage(response: InvokeResult): {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
@@ -117,6 +121,8 @@ export async function invokeLLMWithBilling(
     agentId,
     actionType,
     skipBilling = false,
+    provider = "openai",
+    model = "gpt-4o",
     ...llmOptions
   } = options;
 
@@ -125,8 +131,6 @@ export async function invokeLLMWithBilling(
   const latencyMs = Date.now() - startMs;
 
   const usage = parseTokenUsage(response);
-  const provider = llmOptions.provider ?? "openai";
-  const model = llmOptions.model ?? "gpt-4o";
 
   const rawCostUsd = calcCostFromTokens(
     provider,
@@ -155,13 +159,12 @@ export async function invokeLLMWithBilling(
         latencyMs,
       }),
       creditsCharged > 0
-        ? deductCredits(userId, creditsCharged, {
-            actionType,
-            taskId,
+        ? deductCredits({
+            userId,
+            cost: creditsCharged,
             agentId,
-            inputTokens: usage.promptTokens,
-            outputTokens: usage.completionTokens,
-            description: `LLM call: ${provider}/${model} (${usage.totalTokens} tokens)`,
+            actionType,
+            description: `LLM: ${provider}/${model} (${usage.totalTokens} tokens)`,
           })
         : Promise.resolve(),
     ]).catch((err) => {
