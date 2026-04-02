@@ -22,17 +22,16 @@ import { createHash } from "crypto";
 import { invokeLLM, type InvokeParams, type InvokeResult } from "./_core/llm";
 import { deductCredits } from "./deductCredits";
 import {
-
-/** Hash an API key before storing it — prevents plaintext key storage in logs/DB/disk */
-function hashApiKey(apiKey: string): string {
-  return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
-}
-
   insertTokenLog,
   calcCostFromTokens,
   usdToCredits,
   type TokenLogInput,
 } from "./tokenLedger";
+
+/** Hash an API key before storing it — prevents plaintext key storage in logs/DB/disk */
+function hashApiKey(apiKey: string): string {
+  return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+}
 
 export interface InvokeLLMWithBillingOptions extends InvokeParams {
   /** LLM provider (e.g. "openai", "google", "zhipu") */
