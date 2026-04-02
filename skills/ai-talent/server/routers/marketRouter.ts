@@ -6,11 +6,15 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { tenantMarkets } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { TARGET_MARKETS, CONTENT_LANGUAGES } from "../../../../shared/globalization.ts";
+// Market/language allowlists inlined to avoid cross-package import issues
+const VALID_MARKET_IDS = ['TW','HK','CN','SG','MY','JP','KR','TH','PH','ID','VN','US','GB'];
+const VALID_LANGUAGE_CODES = ['zh-TW','zh-CN','zh-HK','en','ja','ko','th','vi','id','ms','tl','fr','de','es','pt','ar'];
+const TARGET_MARKETS = VALID_MARKET_IDS.map(code => ({ code, value: code }));
+const CONTENT_LANGUAGES = VALID_LANGUAGE_CODES.map(code => ({ code, value: code }));
 
 // STAB-5: Build allowlists from canonical shared constants (validated at module load time)
-const validMarketIds = TARGET_MARKETS.map((m) => m.code);
-const validLanguageCodes = CONTENT_LANGUAGES.map((l) => l.code);
+const validMarketIds = VALID_MARKET_IDS;
+const validLanguageCodes = VALID_LANGUAGE_CODES;
 
 export const marketRouter = router({
   /** List available markets */
