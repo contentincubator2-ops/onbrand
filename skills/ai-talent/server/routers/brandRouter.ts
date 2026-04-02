@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
-import { analyzeBrandPositioning, generateCampaignPositioning } from "../brand/brandEngine";
+import {
+  analyzeBrandPositioning,
+  generateCampaignPositioning,
+  generateBrandContentCalendar,
+  analyzeBrandCompetitors,
+} from "../brand/brandEngine";
 import { getDb } from "../db";
 import { userApiKeys } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -33,6 +38,35 @@ export const brandRouter = router({
     .mutation(async ({ ctx, input }) => {
       const userApiKey = await getUserApiKey(ctx.user.id);
       return analyzeBrandPositioning({ ...input, userId: ctx.user.id, userApiKey } as any);
+    }),
+
+  generateContentCalendar: protectedProcedure
+    .input(
+      z.object({
+        brandName: z.string().min(1),
+        weeks: z.number().min(1).max(12).default(4),
+        platforms: z.array(z.string()).default(["Facebook", "Instagram"]),
+        targetMarket: z.string().optional(),
+        contentLanguage: z.string().default("zh-TW"),
+        userApiKey: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return generateBrandContentCalendar({ ...input as any, userId: ctx.user!.id });
+    }),
+
+  analyzeCompetitors: protectedProcedure
+    .input(
+      z.object({
+        brandName: z.string().min(1),
+        industry: z.string().optional(),
+        competitors: z.array(z.string()).default([]),
+        contentLanguage: z.string().default("zh-TW"),
+        userApiKey: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return analyzeBrandCompetitors({ ...input as any, userId: ctx.user!.id });
     }),
 
   generateCampaign: protectedProcedure

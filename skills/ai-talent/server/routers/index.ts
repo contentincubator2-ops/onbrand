@@ -5,6 +5,7 @@ import { brandRouter } from "./brandRouter";
 import { creditsRouter } from "./creditsRouter";
 import { notificationRouter } from "./notificationRouter";
 import { taskRouter } from "./taskRouter";
+import { a2aRouter } from "./a2aRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -13,6 +14,7 @@ export const appRouter = router({
   credits:       creditsRouter,
   notifications: notificationRouter,
   task:          taskRouter,
+  a2a:           a2aRouter,
 });
 
 export type AppRouter = typeof appRouter;
