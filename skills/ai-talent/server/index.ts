@@ -9,6 +9,7 @@ import express from "express";
 import cors from "cors";
 import { rateLimit } from "express-rate-limit";
 import { ENV } from "./_core/env";
+import { getBillingRetryQueueLength } from "./llmWithBilling";
 import { closeDb, pingDb } from "./db";
 
 const app = express();
@@ -39,11 +40,13 @@ app.use("/api", limiter);
 // ─── Health check ────────────────────────────────────────────────────────────
 app.get("/health", async (_req, res) => {
   const dbOk = await pingDb();
+  const billingQueueLength = getBillingRetryQueueLength();
   res.json({
-    status:  dbOk ? "ok" : "degraded",
+    status:  dbOk && billingQueueLength === 0 ? "ok" : "degraded",
     service: "ai-talent",
     version: "0.1.0",
     db:      dbOk ? "connected" : "unreachable",
+    billingQueueLength,          // monitor: alert if > 10
     ts:      new Date().toISOString(),
   });
 });

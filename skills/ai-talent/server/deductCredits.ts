@@ -218,6 +218,22 @@ async function tryDeductFromEnterprisePool(
 
 /**
  * Main deduction function. Call this instead of manually updating userCredits.
+ *
+ * ⚠️  RACE CONDITION WARNING (Sprint 4):
+ * The multi-step read-modify-write pattern here (read wallet → check balance → update)
+ * is NOT atomic and can double-spend under high concurrency.
+ *
+ * Sprint 4 fix: wrap the entire deduction in a MySQL transaction + SELECT ... FOR UPDATE:
+ *   await db.transaction(async (tx) => {
+ *     const wallet = await tx.select().from(userCredits)
+ *       .where(eq(userCredits.userId, userId))
+ *       .for("update")  // row-level lock
+ *       .limit(1);
+ *     // ... rest of deduction logic
+ *   });
+ *
+ * Until then: acceptable for low-concurrency (<100 req/s). Do NOT go to high-traffic
+ * production without the transaction fix.
  */
 export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductCreditsResult> {
   const db = await getDb();

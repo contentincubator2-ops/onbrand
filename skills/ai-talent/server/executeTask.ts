@@ -17,10 +17,9 @@
  */
 
 import { getDb } from "./db";
-import { tasks, taskExecutions, agents, brands, subscriptions } from "../drizzle/schema";
+import { tasks, taskExecutions, agents, brands, subscriptions, userApiKeys } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { invokeLLMWithBilling } from "./llmWithBilling";
-import { userApiKeys } from "../drizzle/schema";
 import { notifyUser } from "./notificationService";
 import { searchBrandKnowledge } from "./rag";
 import { saveLearning, getRelevantLearnings, formatLearningsForPrompt } from "./learning";
