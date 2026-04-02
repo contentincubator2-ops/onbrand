@@ -25,6 +25,13 @@ import { searchBrandKnowledge } from "./rag";
 import { saveLearning, getRelevantLearnings, formatLearningsForPrompt } from "./learning";
 import { triggerWorkflowsForTask } from "./triggerWorkflows";
 
+// ── Type declarations for cross-package imports ──────────────────────────────
+
+type MarketIntelModule = {
+  fetchMarketIntel: (params: Record<string, unknown>) => Promise<unknown>;
+  formatMarketIntelForPrompt: (intel: unknown) => string;
+};
+
 // ── Output format instructions by task type ──────────────────────────────────
 const OUTPUT_FORMAT_INSTRUCTIONS: Record<string, string> = {
   press_release: `
@@ -279,19 +286,45 @@ const JSON_OUTPUT_SCHEMA = {
   }
 };
 
-// ── Main execution function ───────────────────────────────────────────────────
+// ── Sub-function 1: Build task context ───────────────────────────────────────
 
-export async function executeTask(taskId: number, userId: number, brandId?: number): Promise<{
-  executionId: number;
-  success: boolean;
-  output?: string;
-  error?: string;
-  triggeredWorkflows?: { triggered: boolean; workflows: Array<{ workflowId: number; workflowName: string; createdTaskIds: number[]; createdTaskCount: number }>; totalCreatedTasks: number };
-}> {
+interface TaskRow {
+  id: number;
+  title: string;
+  description: string | null;
+  taskType: string | null;
+  agentId: number | null;
+  agentSlug: string | null;
+  agentName: string | null;
+  agentTitle: string | null;
+  agentBio: string | null;
+  agentSpecialty: string | null;
+  agentIndustries: string | null;
+  agentExperience: string | null;
+}
+
+interface TaskContext {
+  task: TaskRow;
+  subscriptionPlan: "per_task" | "monthly" | "team";
+  brandContext: string;
+  brandContextObj: Record<string, unknown> | null;
+  memoriesContext: string;
+  ragContext: string;
+  agentKbContext: string;
+  marketIntelContext: string;
+  learningContext: string;
+  parentTaskContext: string;
+}
+
+async function buildTaskContext(
+  taskId: number,
+  userId: number,
+  brandId?: number
+): Promise<TaskContext | null> {
   const db = await getDb();
-  if (!db) return { executionId: 0, success: false, error: "Database not available" };
+  if (!db) return null;
 
-  // 1. Load task + agent info
+  // Load task + agent info
   const taskRows = await db
     .select({
       id: tasks.id,
@@ -313,11 +346,10 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
     .limit(1);
 
   const task = taskRows[0];
-  if (!task) return { executionId: 0, success: false, error: "Task not found" };
+  if (!task) return null;
 
-  // 1b. If this is a forwarded task, load parent task's output
-  let parentTaskOutput = "";
-  let parentTaskTitle = "";
+  // Load parent task output (forwarded tasks)
+  let parentTaskContext = "";
   try {
     const parentIdRows = await db
       .select({ parentTaskId: tasks.parentTaskId, forwardNote: tasks.forwardNote })
@@ -325,7 +357,6 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
       .where(eq(tasks.id, taskId))
       .limit(1);
     const parentTaskId = parentIdRows[0]?.parentTaskId;
-    const forwardNote = parentIdRows[0]?.forwardNote;
     if (parentTaskId) {
       const parentRows = await db
         .select({ title: tasks.title, result: tasks.result })
@@ -333,107 +364,59 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
         .where(eq(tasks.id, parentTaskId))
         .limit(1);
       if (parentRows[0]) {
-        parentTaskTitle = parentRows[0].title;
-        const rawParentOutput = parentRows[0].result ?? "";
-        // Try to extract publishable_content from JSON output
+        const parentTitle = parentRows[0].title;
+        let parentOutput = parentRows[0].result ?? "";
         try {
-          const parsed = JSON.parse(rawParentOutput);
-          parentTaskOutput = parsed.publishable_content ?? rawParentOutput;
-        } catch {
-          parentTaskOutput = rawParentOutput;
-        }
-        if (parentTaskOutput.length > 3000) {
-          parentTaskOutput = parentTaskOutput.slice(0, 3000) + "...（摘錄）";
-        }
+          const parsed = JSON.parse(parentOutput);
+          parentOutput = parsed.publishable_content ?? parentOutput;
+        } catch { /* keep as-is */ }
+        if (parentOutput.length > 3000) parentOutput = parentOutput.slice(0, 3000) + "...（摘錄）";
+        parentTaskContext = `\n\n【上游任務產出（請以此為基礎繼續執行）】\n來源任務：${parentTitle}\n---\n${parentOutput}\n---`;
       }
     }
-  } catch {
-    // Parent task lookup is optional
-  }
+  } catch { /* optional */ }
 
-  // 2. Load subscription plan for this agent (determines learning privacy)
+  // Load subscription plan
   let subscriptionPlan: "per_task" | "monthly" | "team" = "per_task";
   try {
     const subRows = await db
       .select({ plan: subscriptions.plan })
       .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.userId, userId),
-          eq(subscriptions.agentId, task.agentId ?? 0),
-          eq(subscriptions.status, "active")
-        )
-      )
+      .where(and(eq(subscriptions.userId, userId), eq(subscriptions.agentId, task.agentId ?? 0), eq(subscriptions.status, "active")))
       .limit(1);
     if (subRows[0]?.plan) subscriptionPlan = subRows[0].plan;
-  } catch {
-    // Default to per_task if subscription lookup fails
-  }
+  } catch { /* default per_task */ }
 
-  // 2b + 3. Load brand context (merged: brandId takes priority, fallback to isDefault)
+  // Load brand context
   let brandContext = "";
   let brandContextObj: Record<string, unknown> | null = null;
   try {
     const brandRows = await db
-      .select({
-        name: brands.name,
-        description: brands.description,
-        tagline: brands.tagline,
-        targetAudience: brands.targetAudience,
-        brandVoice: brands.brandVoice,
-      })
+      .select({ name: brands.name, description: brands.description, tagline: brands.tagline, targetAudience: brands.targetAudience, brandVoice: brands.brandVoice })
       .from(brands)
-      .where(
-        brandId
-          ? and(eq(brands.userId, userId), eq(brands.id, brandId))
-          : and(eq(brands.userId, userId), eq(brands.isDefault, true))
-      )
+      .where(brandId ? and(eq(brands.userId, userId), eq(brands.id, brandId)) : and(eq(brands.userId, userId), eq(brands.isDefault, true)))
       .limit(1);
     const brand = brandRows[0];
     if (brand) {
-      brandContext = `\n\n【品牌背景（請在所有產出中貫徹此品牌定位）】
-品牌名稱：${brand.name}
-品牌描述：${brand.description ?? ""}
-品牌標語：${brand.tagline ?? ""}
-目標受眾：${brand.targetAudience ?? ""}
-品牌語調：${brand.brandVoice ?? ""}`;
+      brandContext = `\n\n【品牌背景（請在所有產出中貫徹此品牌定位）】\n品牌名稱：${brand.name}\n品牌描述：${brand.description ?? ""}\n品牌標語：${brand.tagline ?? ""}\n目標受眾：${brand.targetAudience ?? ""}\n品牌語調：${brand.brandVoice ?? ""}`;
       brandContextObj = brand as Record<string, unknown>;
     }
-  } catch {
-    // Brand context is optional; continue without it
-  }
+  } catch { /* optional */ }
 
-  // 2c. Inject relevant historical learnings for this agent
-  let learningContext = "";
-  try {
-    const learnings = await getRelevantLearnings(
-      task.agentId ?? 0,
-      brandId ?? null,
-      subscriptionPlan,
-      5
-    );
-    learningContext = formatLearningsForPrompt(learnings);
-  } catch {
-    // Learning context is optional; continue without it
-  }
-
-  // 2d. Agent Memories: Inject user-defined training memories for this agent
+  // Load agent memories
   let memoriesContext = "";
   try {
     const memRows = await db
       .select()
       .from(agentMemories)
-      .where(
-        and(
-          eq(agentMemories.userId, userId),
-          eq(agentMemories.agentSlug, task.agentSlug ?? ""),
-          ...(brandId ? [eq(agentMemories.brandId, brandId)] : []),
-          eq(agentMemories.isActive, true)
-        )
-      )
+      .where(and(
+        eq(agentMemories.userId, userId),
+        eq(agentMemories.agentSlug, task.agentSlug ?? ""),
+        ...(brandId ? [eq(agentMemories.brandId, brandId)] : []),
+        eq(agentMemories.isActive, true)
+      ))
       .orderBy(agentMemories.createdAt)
       .limit(20);
-
     if (memRows.length > 0) {
       const memByType: Record<string, string[]> = {};
       for (const mem of memRows) {
@@ -447,19 +430,11 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
       if (memByType.audience?.length) parts.push(`【目標受眾指引】\n${memByType.audience.join("\n")}`);
       if (memByType.style?.length) parts.push(`【風格指引】\n${memByType.style.join("\n")}`);
       if (memByType.other?.length) parts.push(`【其他指引】\n${memByType.other.join("\n")}`);
-      if (parts.length > 0) {
-        memoriesContext = `\n\n【用戶訓練指令（高優先級，必須遵守）】\n${parts.join("\n\n")}`;
-      }
+      if (parts.length > 0) memoriesContext = `\n\n【用戶訓練指令（高優先級，必須遵守）】\n${parts.join("\n\n")}`;
     }
-  } catch {
-    // memories context is optional
-  }
+  } catch { /* optional */ }
 
-  // TODO Sprint 3: Facebook Insights integration
-  // Requires: brandIntegrations table + fbGraphApi.ts
-  const fbInsightsContext = "";
-
-  // 2e. RAG: Search brand knowledge base for relevant documents
+  // RAG: search brand knowledge base
   let ragContext = "";
   try {
     const query = `${task.title} ${task.description ?? ""}`;
@@ -468,54 +443,67 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
       ragContext = `\n\n【品牌知識庫（相關文件摘錄，請在產出中參考）】\n` +
         chunks.map((c, i) => `[文件 ${i + 1}：${c.filename}]\n${c.content.slice(0, 1000)}`).join("\n\n");
     }
-  } catch {
-    // RAG is optional; continue without it
-  }
+  } catch { /* optional */ }
 
-  // 2f. Agent Knowledge Base: Inject from sowork_db.agent_knowledge_base
+  // Agent knowledge base
   let agentKbContext = "";
   try {
     const { getAgentKnowledge } = await import("./agentMatcher");
-    agentKbContext = await getAgentKnowledge(
-      task.agentId ?? 0,
-      ["methodology_own", "brand_client", "methodology_tool"],
-      3
-    );
-  } catch {
-    // agent knowledge is optional
-  }
+    agentKbContext = await getAgentKnowledge(task.agentId ?? 0, ["methodology_own", "brand_client", "methodology_tool"], 3);
+  } catch { /* optional */ }
 
-  // 2g. Market Intelligence: Inject real-time data from sowork_db.market_data
+  // Market intelligence
   let marketIntelContext = "";
   try {
-    const { fetchMarketIntel, formatMarketIntelForPrompt } = // @ts-ignore: cross-package import resolved at runtime by tsx
-    await import("../../../market-intel/server/marketIntel");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const marketIntelMod = (await import("../../../market-intel/server/marketIntel.ts" as any)) as MarketIntelModule;
     const keywords = [task.title, ...(task.description?.split(" ").slice(0, 3) ?? [])].filter(Boolean);
-    const intel = await fetchMarketIntel({ keywords, limit: 5 });
-    marketIntelContext = formatMarketIntelForPrompt(intel);
-  } catch {
-    // market intel is optional
-  }
+    const intel = await marketIntelMod.fetchMarketIntel({ keywords, limit: 5 });
+    marketIntelContext = marketIntelMod.formatMarketIntelForPrompt(intel);
+  } catch { /* optional */ }
 
-  // 3. Build system prompt
+  // Historical learnings
+  let learningContext = "";
+  try {
+    const learnings = await getRelevantLearnings(task.agentId ?? 0, brandId ?? null, subscriptionPlan, 5);
+    learningContext = formatLearningsForPrompt(learnings);
+  } catch { /* optional */ }
+
+  return {
+    task: task as TaskRow,
+    subscriptionPlan,
+    brandContext,
+    brandContextObj,
+    memoriesContext,
+    ragContext,
+    agentKbContext,
+    marketIntelContext,
+    learningContext,
+    parentTaskContext,
+  };
+}
+
+// ── Sub-function 2: Build prompts ─────────────────────────────────────────────
+
+interface PromptsResult {
+  systemPrompt: string;
+  userPrompt: string;
+  taskType: string;
+}
+
+function buildPrompts(ctx: TaskContext): PromptsResult {
+  const { task, brandContext, memoriesContext, ragContext, agentKbContext, marketIntelContext, learningContext, parentTaskContext } = ctx;
+
+  // Build agent persona
   let agentPersona = AGENT_SYSTEM_PROMPTS[task.agentSlug ?? ""] ?? "";
   if (!agentPersona && task.agentName) {
-    agentPersona = `你是 ${task.agentName}，${task.agentTitle ?? "AI 行銷專家"}。
-【你的背景與專業】
-${task.agentBio ?? ""}
-【你的工作經歷與知識庫】
-${task.agentExperience ?? ""}
-【你的核心專長】
-${task.agentSpecialty ?? ""}
-【你服務的產業】
-${task.agentIndustries ?? ""}`;
+    agentPersona = `你是 ${task.agentName}，${task.agentTitle ?? "AI 行銷專家"}。\n【你的背景與專業】\n${task.agentBio ?? ""}\n【你的工作經歷與知識庫】\n${task.agentExperience ?? ""}\n【你的核心專長】\n${task.agentSpecialty ?? ""}\n【你服務的產業】\n${task.agentIndustries ?? ""}`;
   }
   if (!agentPersona) agentPersona = DEFAULT_SYSTEM_PROMPT;
 
-  // Build methodology injection based on agent's specialty and knowledge sources
   const methodologyInstruction = task.agentSpecialty
-    ? `\n\n【你的個人方法論（必須在產出中明確體現）】\n你的核心專長是：${task.agentSpecialty}\n你的知識庫來源：${Array.isArray(task.agentIndustries) ? '' : ''}${task.agentBio ?? ''}\n\n在本次任務的 publishable_content 中，你必須：\n- 使用你專業背景特有的分析框架和術語\n- 引用你知識庫中的具體方法論（不是泛用行銷框架）\n- 讓產出的結構和視角明顯反映你的專業背景\n- 例如：若你是 META 廣告策略 PM，競品分析必須包含各競品的廣告投放策略對比；若你是短影音策略 PM，活動企劃必須包含短影音傳播設計`
-    : '';
+    ? `\n\n【你的個人方法論（必須在產出中明確體現）】\n你的核心專長是：${task.agentSpecialty}\n你的知識庫來源：${task.agentBio ?? ""}\n\n在本次任務的 publishable_content 中，你必須：\n- 使用你專業背景特有的分析框架和術語\n- 引用你知識庫中的具體方法論（不是泛用行銷框架）\n- 讓產出的結構和視角明顯反映你的專業背景\n- 例如：若你是 META 廣告策略 PM，競品分析必須包含各競品的廣告投放策略對比；若你是短影音策略 PM，活動企劃必須包含短影音傳播設計`
+    : "";
 
   const systemPrompt = `${agentPersona}${methodologyInstruction}
 
@@ -532,278 +520,283 @@ ${task.agentIndustries ?? ""}`;
 4. publishable_content：直接從標題或核心內容開始，不得包含任何思考過程、問候語、自我介紹、JSON 格式。用戶可以直接複製這個欄位的內容發布。
 5. 根據任務類型，publishable_content 要有對應的格式結構`;
 
-  // 4. Determine task type and output format
   const taskType = inferTaskType(task.title, task.description, task.taskType);
   const outputFormatInstruction = OUTPUT_FORMAT_INSTRUCTIONS[taskType] ?? `
 【publishable_content 格式】直接輸出完整的行銷產出內容，依任務需求決定格式。
 【thinking 格式】說明你的策略思考與方法論選擇。`;
 
-  // 5. Build user prompt
-  // If this is a forwarded task, inject parent task output as context
-  const parentTaskContext = parentTaskOutput
-    ? `\n\n【上游任務產出（請以此為基礎繼續執行）】\n來源任務：${parentTaskTitle}\n---\n${parentTaskOutput}\n---`
-    : "";
-
   const userPrompt = `【任務需求】
 任務標題：${task.title}
 ${task.description ? `任務說明：${task.description}` : ""}
-${brandContext}${memoriesContext}${fbInsightsContext}${ragContext}${agentKbContext}${marketIntelContext}${learningContext}${parentTaskContext}
+${brandContext}${memoriesContext}${ragContext}${agentKbContext}${marketIntelContext}${learningContext}${parentTaskContext}
 
 ${outputFormatInstruction}
 
 請以 JSON 格式輸出，包含 thinking（策略思考）和 publishable_content（可發布產出）。`;
 
-  // 5b. Fetch user's API key for billing context
-  const apiKeyRows = await db
-    .select({ apiKey: userApiKeys.apiKey })
+  return { systemPrompt, userPrompt, taskType };
+}
+
+// ── Sub-function 3: Parse LLM output ─────────────────────────────────────────
+
+interface ParsedOutput {
+  structuredOutput: {
+    thinking?: string;
+    publishable_content?: string;
+    image_suggestion?: string;
+    content_type?: string;
+  } | null;
+  output: string;
+}
+
+function parseLLMOutput(rawContent: string | undefined): ParsedOutput {
+  if (typeof rawContent !== "string") {
+    return { structuredOutput: null, output: "抱歉，AI 員工目前無法回應，請稍後再試。" };
+  }
+
+  let structuredOutput: ParsedOutput["structuredOutput"] = null;
+  let output: string;
+
+  try {
+    structuredOutput = JSON.parse(rawContent);
+    // Detect and fix double-JSON: if publishable_content is itself a JSON string or code block
+    if (structuredOutput && typeof structuredOutput.publishable_content === "string") {
+      const pc = structuredOutput.publishable_content.trim();
+      if (pc.startsWith("{") && pc.endsWith("}")) {
+        try {
+          const inner = JSON.parse(pc);
+          if (inner.publishable_content) {
+            structuredOutput.publishable_content = inner.publishable_content;
+            if (!structuredOutput.thinking || structuredOutput.thinking === "（解析失敗）") {
+              structuredOutput.thinking = inner.thinking ?? structuredOutput.thinking;
+            }
+          }
+        } catch { /* not valid JSON, keep as-is */ }
+      }
+      const jsonBlockMatch = pc.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/m);
+      if (jsonBlockMatch) {
+        try {
+          const inner = JSON.parse(jsonBlockMatch[1]!);
+          if (inner.publishable_content) {
+            structuredOutput.publishable_content = inner.publishable_content;
+            if (!structuredOutput.thinking || structuredOutput.thinking === "（解析失敗）") {
+              structuredOutput.thinking = inner.thinking ?? structuredOutput.thinking;
+            }
+          }
+        } catch { /* not valid JSON, keep as-is */ }
+      }
+    }
+    output = JSON.stringify(structuredOutput);
+  } catch {
+    output = rawContent;
+  }
+
+  return { structuredOutput, output };
+}
+
+// ── Sub-function 4: Post-execution side effects ──────────────────────────────
+
+interface PostExecutionOptions {
+  taskId: number;
+  userId: number;
+  agentId: number | null;
+  agentSlug: string;
+  agentName: string | null;
+  taskTitle: string;
+  taskType: string;
+  taskDescription: string | null;
+  brandId?: number;
+  brandContextObj: Record<string, unknown> | null;
+  subscriptionPlan: "per_task" | "monthly" | "team";
+  executionId: number;
+  output: string;
+  structuredOutput: ParsedOutput["structuredOutput"];
+  durationMs: number;
+}
+
+async function handlePostExecution(opts: PostExecutionOptions): Promise<{
+  triggered: boolean;
+  workflows: Array<{ workflowId: number; workflowName: string; createdTaskIds: number[]; createdTaskCount: number }>;
+  totalCreatedTasks: number;
+}> {
+  const db = await getDb();
+  if (!db) return { triggered: false, workflows: [], totalCreatedTasks: 0 };
+
+  const {
+    taskId, userId, agentId, agentSlug, agentName, taskTitle, taskType, taskDescription,
+    brandId, brandContextObj, subscriptionPlan, executionId, output, structuredOutput, durationMs,
+  } = opts;
+
+  // Update execution record (completed)
+  await db.update(taskExecutions)
+    .set({ status: "completed", output, completedAt: new Date(), durationMs })
+    .where(eq(taskExecutions.id, executionId));
+
+  // Update task to completed
+  const summaryText = structuredOutput?.publishable_content ?? output;
+  const resultSummary = summaryText.length > 200
+    ? summaryText.substring(0, 200).replace(/\n/g, " ").trim() + "..."
+    : summaryText;
+  await db.update(tasks)
+    .set({ status: "completed", result: resultSummary, completedAt: new Date() })
+    .where(eq(tasks.id, taskId));
+
+  // Save learning (async, non-blocking)
+  const publishableContent = structuredOutput?.publishable_content ?? output;
+  saveLearning({
+    agentId: agentId ?? 0,
+    userId,
+    brandId: brandId ?? null,
+    taskId,
+    subscriptionPlan,
+    taskTitle,
+    taskDescription: taskDescription ?? null,
+    taskType,
+    outputSummary: publishableContent.slice(0, 600),
+    fullOutput: publishableContent,
+    brandContext: brandContextObj,
+  }).catch((e) => console.error("[Learning] Failed to save learning:", e));
+
+  // Trigger matching workflows
+  const workflowTriggerResult = await triggerWorkflowsForTask(taskId, agentSlug, userId, brandId)
+    .catch((e) => { console.error("[triggerWorkflows] Error:", e); return { triggered: false, workflows: [], totalCreatedTasks: 0 }; });
+
+  if (workflowTriggerResult.triggered) {
+    await db.update(tasks).set({ triggeredWorkflows: workflowTriggerResult }).where(eq(tasks.id, taskId))
+      .catch((e) => console.error("[triggerWorkflows] Failed to save result:", e));
+  }
+
+  // Milestone check
+  try {
+    const completedCount = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), eq(tasks.agentId, agentId ?? 0), eq(tasks.status, "completed")));
+    const count = Number(completedCount[0]?.count ?? 0);
+    if ([10, 20, 50, 100].includes(count)) {
+      const { notifyOwner } = await import("./_core/notification");
+      await notifyOwner({
+        title: `🎉 ${agentName ?? "AI 員工"} 達成里程碑！`,
+        content: `${agentName ?? "AI 員工"} 已為你完成第 ${count} 個任務！持續訓練他，讓他更了解你的品牌。`,
+      }).catch(() => {});
+    }
+  } catch { /* optional */ }
+
+  // Notify owner: task completed
+  try {
+    const { notifyOwner } = await import("./_core/notification");
+    const rawOutput = structuredOutput?.publishable_content ?? output;
+    const outputPreview = rawOutput.replace(/\n{3,}/g, "\n\n").trim().slice(0, 400);
+    const previewSuffix = rawOutput.length > 400 ? "\n\n...（點擊任務頁查看完整產出）" : "";
+    const workflowLine = workflowTriggerResult.triggered ? `\n\n🔄 自動觸發 ${workflowTriggerResult.totalCreatedTasks} 個下游工作流程任務。` : "";
+    const durationSec = Math.round(durationMs / 1000);
+    await notifyOwner({
+      title: `✅ ${agentName ?? "AI 員工"} 完成任務：${taskTitle}`,
+      content: `**員工**：${agentName ?? "AI 員工"}\n**任務**：${taskTitle}\n**耗時**：${durationSec} 秒\n\n---\n\n**產出摘要**：\n${outputPreview}${previewSuffix}${workflowLine}`,
+    }).catch(() => {});
+  } catch { /* optional */ }
+
+  // Notify user
+  const workflowNotice = workflowTriggerResult.triggered ? ` 已自動建立 ${workflowTriggerResult.totalCreatedTasks} 個下游任務。` : "";
+  notifyUser({
+    userId,
+    type: "task_completed",
+    title: `任務完成：${taskTitle}`,
+    body: `${agentName ?? "AI 員工"}已完成任務，點擊查看產出結果。${workflowNotice}`,
+    taskId,
+    agentId: agentId ?? undefined,
+  }).catch((e) => console.error("[notifyUser] completed error:", e));
+
+  return workflowTriggerResult;
+}
+
+// ── Main execution function ───────────────────────────────────────────────────
+
+export async function executeTask(taskId: number, userId: number, brandId?: number): Promise<{
+  executionId: number;
+  success: boolean;
+  output?: string;
+  error?: string;
+  triggeredWorkflows?: { triggered: boolean; workflows: Array<{ workflowId: number; workflowName: string; createdTaskIds: number[]; createdTaskCount: number }>; totalCreatedTasks: number };
+}> {
+  const db = await getDb();
+  if (!db) return { executionId: 0, success: false, error: "Database not available" };
+
+  // 1. Build task context
+  const ctx = await buildTaskContext(taskId, userId, brandId);
+  if (!ctx) return { executionId: 0, success: false, error: "Task not found" };
+
+  // 2. Build prompts
+  const { systemPrompt, userPrompt, taskType } = buildPrompts(ctx);
+
+  // Fetch billing API key
+  const apiKeyRows = await db.select({ apiKey: userApiKeys.apiKey })
     .from(userApiKeys)
     .where(and(eq(userApiKeys.userId, userId), eq(userApiKeys.isActive, true)))
     .limit(1)
     .catch(() => []);
   const billingApiKey = apiKeyRows[0]?.apiKey ?? `internal-${userId}`;
 
-  // 6. Create execution record (status: running)
-  const insertResult = await db.insert(taskExecutions).values({
-    taskId,
-    userId,
-    agentId: task.agentId,
-    status: "running",
-    prompt: userPrompt,
-    startedAt: new Date(),
+  // Create execution record
+  const insertResult = await (db.insert(taskExecutions) as any).values({
+    taskId, userId, status: "running", prompt: userPrompt, startedAt: new Date(),
   });
   const executionId = (insertResult as any)[0]?.insertId ?? (insertResult as any).insertId ?? 0;
-
-  // Update task status to in_progress
-  await db
-    .update(tasks)
-    .set({ status: "in_progress" })
-    .where(eq(tasks.id, taskId));
+  await db.update(tasks).set({ status: "in_progress" }).where(eq(tasks.id, taskId));
 
   const startTime = Date.now();
 
   try {
-    // 7. Call LLM with structured JSON output (billing-aware)
+    // 3. Call LLM
     const billingResult = await invokeLLMWithBilling({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       response_format: JSON_OUTPUT_SCHEMA,
       provider: "forge",
       model: "gemini-2.5-flash",
       userId,
       userApiKey: billingApiKey,
       taskId,
-      agentId: task.agentId ?? undefined,
+      agentId: ctx.task.agentId ?? undefined,
       actionType: "manual_task",
     });
-    const response = billingResult.response;
+    const rawContentRaw = billingResult.response.choices?.[0]?.message?.content;
+    const rawContent = typeof rawContentRaw === "string" ? rawContentRaw : undefined;
 
-    const rawContent = response.choices?.[0]?.message?.content;
-    let output: string;
-    let structuredOutput: {
-      thinking?: string;
-      publishable_content?: string;
-      image_suggestion?: string;
-      content_type?: string;
-    } | null = null;
+    // 4. Parse output
+    const { structuredOutput, output } = parseLLMOutput(rawContent);
 
-    if (typeof rawContent === "string") {
-      try {
-        structuredOutput = JSON.parse(rawContent);
-        // Detect and fix double-JSON: if publishable_content is itself a JSON string or code block
-        if (structuredOutput && typeof structuredOutput.publishable_content === 'string') {
-          const pc = structuredOutput.publishable_content.trim();
-          // Case 1: publishable_content is a raw JSON string
-          if (pc.startsWith('{') && pc.endsWith('}')) {
-            try {
-              const inner = JSON.parse(pc);
-              if (inner.publishable_content) {
-                structuredOutput.publishable_content = inner.publishable_content;
-                if (!structuredOutput.thinking || structuredOutput.thinking === '（解析失敗）') {
-                  structuredOutput.thinking = inner.thinking ?? structuredOutput.thinking;
-                }
-              }
-            } catch { /* not valid JSON, keep as-is */ }
-          }
-          // Case 2: publishable_content is a ```json code block
-          const jsonBlockMatch = pc.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/m);
-          if (jsonBlockMatch) {
-            try {
-              const inner = JSON.parse(jsonBlockMatch[1]!);
-              if (inner.publishable_content) {
-                structuredOutput.publishable_content = inner.publishable_content;
-                if (!structuredOutput.thinking || structuredOutput.thinking === '（解析失敗）') {
-                  structuredOutput.thinking = inner.thinking ?? structuredOutput.thinking;
-                }
-              }
-            } catch { /* not valid JSON, keep as-is */ }
-          }
-        }
-        // Re-serialize the (possibly fixed) structured output
-        output = JSON.stringify(structuredOutput);
-      } catch {
-        // Fallback: treat as plain text
-        output = rawContent;
-      }
-    } else {
-      output = "抱歉，AI 員工目前無法回應，請稍後再試。";
-    }
-
+    // 5. Handle post-execution side effects
     const durationMs = Date.now() - startTime;
-
-    // 8. Update execution record (completed)
-    await db
-      .update(taskExecutions)
-      .set({
-        status: "completed",
-        output,
-        completedAt: new Date(),
-        durationMs,
-      })
-      .where(eq(taskExecutions.id, executionId));
-
-    // 9. Update task status to completed + save result summary
-    const summaryText = structuredOutput?.publishable_content ?? output;
-    const resultSummary = summaryText.length > 200
-      ? summaryText.substring(0, 200).replace(/\n/g, " ").trim() + "..."
-      : summaryText;
-
-    await db
-      .update(tasks)
-      .set({
-        status: "completed",
-        result: resultSummary,
-        completedAt: new Date(),
-      })
-      .where(eq(tasks.id, taskId));
-
-    // 10. Save learning record (async, non-blocking)
-    const publishableContent = structuredOutput?.publishable_content ?? output;
-    saveLearning({
-      agentId: task.agentId ?? 0,
-      userId,
-      brandId: brandId ?? null,
-      taskId,
-      subscriptionPlan,
-      taskTitle: task.title,
-      taskDescription: task.description ?? null,
-      taskType: taskType,
-      outputSummary: publishableContent.slice(0, 600),
-      fullOutput: publishableContent,
-      brandContext: brandContextObj,
-    }).catch((e) => console.error("[Learning] Failed to save learning:", e));
-
-    // 11. Auto-trigger matching workflows (async, non-blocking)
-    const agentSlugForTrigger = task.agentSlug ?? "";
-    const workflowTriggerResult = await triggerWorkflowsForTask(
-      taskId,
-      agentSlugForTrigger,
-      userId,
-      brandId
-    ).catch((e) => {
-      console.error("[triggerWorkflows] Error:", e);
-      return { triggered: false, workflows: [], totalCreatedTasks: 0 };
+    const triggeredWorkflows = await handlePostExecution({
+      taskId, userId,
+      agentId: ctx.task.agentId,
+      agentSlug: ctx.task.agentSlug ?? "",
+      agentName: ctx.task.agentName,
+      taskTitle: ctx.task.title,
+      taskType,
+      taskDescription: ctx.task.description,
+      brandId,
+      brandContextObj: ctx.brandContextObj,
+      subscriptionPlan: ctx.subscriptionPlan,
+      executionId,
+      output,
+      structuredOutput,
+      durationMs,
     });
 
-    // 11b. Save workflow trigger result to task record
-    if (workflowTriggerResult.triggered) {
-      await db
-        .update(tasks)
-        .set({ triggeredWorkflows: workflowTriggerResult })
-        .where(eq(tasks.id, taskId))
-        .catch((e) => console.error("[triggerWorkflows] Failed to save result:", e));
-    }
-
-    // 11c. Milestone check: notify owner when agent reaches 10/20/50 completed tasks
-    try {
-      const completedCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(tasks)
-        .where(
-          and(
-            eq(tasks.userId, userId),
-            eq(tasks.agentId, task.agentId ?? 0),
-            eq(tasks.status, "completed")
-          )
-        );
-      const count = Number(completedCount[0]?.count ?? 0);
-      const milestones = [10, 20, 50, 100];
-      if (milestones.includes(count)) {
-        const { notifyOwner } = await import("./_core/notification");
-        await notifyOwner({
-          title: `🎉 ${task.agentName ?? "AI 員工"} 達成里程碑！`,
-          content: `${task.agentName ?? "AI 員工"} 已為你完成第 ${count} 個任務！持續訓練他，讓他更了解你的品牌。`,
-        }).catch(() => {});
-      }
-    } catch {
-      // milestone check is optional
-    }
-
-    // 11d. Notify owner: task completed (every time, not just milestones)
-    try {
-      const { notifyOwner } = await import("./_core/notification");
-      const agentDisplayName = task.agentName ?? "AI 員工";
-      const rawOutput = structuredOutput?.publishable_content ?? output;
-      const outputPreview = rawOutput
-        .replace(/\n{3,}/g, "\n\n")
-        .trim()
-        .slice(0, 400);
-      const previewSuffix = rawOutput.length > 400 ? "\n\n...（點擊任務頁查看完整產出）" : "";
-      const workflowLine = workflowTriggerResult.triggered
-        ? `\n\n🔄 自動觸發 ${workflowTriggerResult.totalCreatedTasks} 個下游工作流程任務。`
-        : "";
-      const durationSec = Math.round(durationMs / 1000);
-      await notifyOwner({
-        title: `✅ ${agentDisplayName} 完成任務：${task.title}`,
-        content: `**員工**：${agentDisplayName}\n**任務**：${task.title}\n**耗時**：${durationSec} 秒\n\n---\n\n**產出摘要**：\n${outputPreview}${previewSuffix}${workflowLine}`,
-      }).catch(() => {});
-    } catch {
-      // owner notification is optional, never block task completion
-    }
-
-    // 12. Notify user: task completed
-    const workflowNotice = workflowTriggerResult.triggered
-      ? ` 已自動建立 ${workflowTriggerResult.totalCreatedTasks} 個下游任務。`
-      : "";
-    notifyUser({
-      userId,
-      type: "task_completed",
-      title: `任務完成：${task.title}`,
-      body: `${task.agentName ?? "AI 員工"}已完成任務，點擊查看產出結果。${workflowNotice}`,
-      taskId,
-      agentId: task.agentId,
-    }).catch((e) => console.error("[notifyUser] completed error:", e));
-    return { executionId, success: true, output, triggeredWorkflows: workflowTriggerResult };
+    return { executionId, success: true, output, triggeredWorkflows };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     const durationMs = Date.now() - startTime;
 
-    await db
-      .update(taskExecutions)
-      .set({
-        status: "failed",
-        errorMessage,
-        completedAt: new Date(),
-        durationMs,
-      })
+    await db.update(taskExecutions)
+      .set({ status: "failed", errorMessage, completedAt: new Date(), durationMs })
       .where(eq(taskExecutions.id, executionId));
-
-    await db
-      .update(tasks)
-      .set({ status: "pending" })
-      .where(eq(tasks.id, taskId));
+    await db.update(tasks).set({ status: "pending" }).where(eq(tasks.id, taskId));
 
     console.error(`[executeTask] Task ${taskId} failed:`, err);
-
-    notifyUser({
-      userId,
-      type: "task_failed",
-      title: `任務失敗：${task.title}`,
-      body: `任務執行時發生錯誤，請重試。`,
-      taskId,
-      agentId: task.agentId,
-    }).catch((e) => console.error("[notifyUser] failed error:", e));
+    notifyUser({ userId, type: "task_failed", title: `任務失敗：${ctx.task.title}`, body: `任務執行時發生錯誤，請重試。`, taskId, agentId: ctx.task.agentId ?? undefined })
+      .catch((e) => console.error("[notifyUser] failed error:", e));
 
     return { executionId, success: false, error: errorMessage };
   }
@@ -858,7 +851,6 @@ export function parseTaskOutput(rawOutput: string): {
   } catch {
     // Not JSON
   }
-  // Fallback for old plain text outputs
   return {
     thinking: "",
     publishable_content: rawOutput,

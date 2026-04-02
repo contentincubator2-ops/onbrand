@@ -465,7 +465,7 @@ export const brandIntegrations = mysqlTable("brand_integrations", {
   brandId: int("brandId"),
   integrationType: varchar("integrationType", { length: 50 }).notNull(), // 'facebook_pages' | 'google_ads' | 'instagram'
   status: mysqlEnum("status", ["connected", "disconnected", "error"]).default("disconnected"),
-  accessToken: text("accessToken"),                    // encrypted in Sprint 4
+  accessToken: text("accessToken"),                    // SEC-3: encrypt/decrypt via server/_core/encryption.ts (encrypt() before write, decrypt() after read)
   selectedResourceId: varchar("selectedResourceId", { length: 255 }),
   authorizedResources: json("authorizedResources"),
   connectedAt: timestamp("connectedAt"),

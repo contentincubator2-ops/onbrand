@@ -9,8 +9,37 @@
  * See: skills/ai-talent/server/db.ts
  */
 
-import { getSoworkDb } from "../../ai-talent/server/db";
 import { sql } from "drizzle-orm";
+
+// ── Circular dependency fix ───────────────────────────────────────────────────
+// Previously: import { getSoworkDb } from "../../ai-talent/server/db"  ← caused
+// ai-talent → market-intel → ai-talent circular dependency.
+//
+// Fix: use a factory pattern so the db is injected, with a lazy singleton fallback
+// that uses a dynamic import to break the static circular reference.
+
+type SoworkDb = Awaited<ReturnType<typeof lazyGetSoworkDb>>;
+
+async function lazyGetSoworkDb() {
+  const { getSoworkDb } = await import("../../ai-talent/server/db");
+  return getSoworkDb();
+}
+
+// Injectable factory — preferred for testing and DI contexts
+export function createMarketIntelService(db: any) {
+  return {
+    fetchMarketIntel: (opts: Parameters<typeof fetchMarketIntelWithDb>[1]) =>
+      fetchMarketIntelWithDb(db, opts),
+    formatMarketIntelForPrompt,
+  };
+}
+
+// Lazy-init singleton for backward-compatible named exports
+let _db: any = null;
+async function getDb() {
+  if (!_db) _db = await lazyGetSoworkDb();
+  return _db;
+}
 
 export interface MarketIntelResult {
   type: "competitor_news" | "trending_topic" | "social_trend";
@@ -48,13 +77,13 @@ export function sanitizeKeyword(k: string): string {
 const VALID_DATA_TYPES = ["competitor_news", "trending_topic", "social_trend", "market_data", "consumer_insight"] as const;
 type ValidDataType = typeof VALID_DATA_TYPES[number];
 
-export async function fetchMarketIntel(opts: {
+/** Internal implementation that accepts an injected db instance. */
+async function fetchMarketIntelWithDb(db: any, opts: {
   keywords: string[];
   types?: ("competitor_news" | "trending_topic" | "social_trend" | "market_data" | "consumer_insight")[];
   days?: number;
   limit?: number;
 }): Promise<MarketIntelResult[]> {
-  const db = await getSoworkDb();
   const { keywords, types, days = 7, limit = 10 } = opts;
 
   // P1-5: Validate types against allowlist to prevent injection via enum bypass
@@ -110,6 +139,20 @@ export async function fetchMarketIntel(opts: {
 }
 
 /**
+ * Backward-compatible named export — uses lazy dynamic import to avoid the
+ * ai-talent → market-intel → ai-talent circular dependency.
+ */
+export async function fetchMarketIntel(opts: {
+  keywords: string[];
+  types?: ("competitor_news" | "trending_topic" | "social_trend" | "market_data" | "consumer_insight")[];
+  days?: number;
+  limit?: number;
+}): Promise<MarketIntelResult[]> {
+  const db = await getDb();
+  return fetchMarketIntelWithDb(db, opts);
+}
+
+/**
  * Format market intel for LLM prompt injection
  */
 export function formatMarketIntelForPrompt(results: MarketIntelResult[]): string {
@@ -151,7 +194,7 @@ export async function getCreativeCases(opts: {
   industry?: string;
   limit?: number;
 }): Promise<Array<{ title: string; content: string; industry: string }>> {
-  const db = await getSoworkDb();
+  const db = await getDb();
   const { industry, limit = 5 } = opts;
 
   // INJ-5: Validate industry against allowlist

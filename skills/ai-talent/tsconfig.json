@@ -17,7 +17,11 @@
       "../drizzle/*": [
         "./drizzle/*"
       ]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./server/@types"
+    ]
   },
   "include": [
     "server/**/*",
