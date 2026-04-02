@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../ai-talent/server/_core/trpc";
-import { analyzeBrandPositioning, generateCampaignPositioning } from "../brandEngine";
-import { getDb } from "../../../ai-talent/server/db";
-import { userApiKeys } from "../../../ai-talent/drizzle/schema";
+import { router, protectedProcedure } from "../../../ai-talent/server/_core/trpc.ts";
+import { analyzeBrandPositioning, generateCampaignPositioning } from "../brandEngine.ts";
+import { getDb } from "../../../ai-talent/server/db.ts";
+import { userApiKeys } from "../../../ai-talent/drizzle/schema.ts";
 import { eq, and } from "drizzle-orm";
 
 // Helper to get user's API key

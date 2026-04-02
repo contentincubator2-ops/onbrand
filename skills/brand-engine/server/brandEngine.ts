@@ -3,7 +3,7 @@
  * Extracted from sowork-ai-v2, adapted for OpenClaw skill architecture
  */
 
-import { invokeLLMWithBilling } from "../../ai-talent/server/llmWithBilling";
+import { invokeLLMWithBilling } from "../../ai-talent/server/llmWithBilling.ts";
 
 export interface BrandAnalysisInput {
   userId: number;

@@ -9,7 +9,7 @@
  * See: skills/ai-talent/server/db.ts
  */
 
-import { getSoworkDb } from "../../ai-talent/server/db";
+import { getSoworkDb } from "../../ai-talent/server/db.ts";
 import { sql } from "drizzle-orm";
 
 export interface MarketIntelResult {
