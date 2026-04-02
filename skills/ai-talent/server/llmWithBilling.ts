@@ -18,9 +18,16 @@
  */
 
 import { appendFileSync } from "fs";
+import { createHash } from "crypto";
 import { invokeLLM, type InvokeParams, type InvokeResult } from "./_core/llm";
 import { deductCredits } from "./deductCredits";
 import {
+
+/** Hash an API key before storing it — prevents plaintext key storage in logs/DB/disk */
+function hashApiKey(apiKey: string): string {
+  return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+}
+
   insertTokenLog,
   calcCostFromTokens,
   usdToCredits,
@@ -216,7 +223,7 @@ export async function invokeLLMWithBilling(
     // Fire-and-forget with retry: don't let billing failures block the LLM response
     const billingInput: TokenLogInput = {
       userId,
-      userApiKey,
+      userApiKey: hashApiKey(userApiKey), // SEC-6: hash before storing in memory/disk/DB
       tenantId,
       taskId,
       agentId,
