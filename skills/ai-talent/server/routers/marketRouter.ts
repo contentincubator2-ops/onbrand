@@ -6,7 +6,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { tenantMarkets } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { TARGET_MARKETS, CONTENT_LANGUAGES } from "../../../../shared/globalization";
+import { TARGET_MARKETS, CONTENT_LANGUAGES } from "../../../../shared/globalization.ts";
 
 // STAB-5: Build allowlists from canonical shared constants (validated at module load time)
 const validMarketIds = TARGET_MARKETS.map((m) => m.code);
