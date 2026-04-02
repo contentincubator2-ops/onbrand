@@ -40,10 +40,10 @@ export default function TaskCard({ task }: TaskCardProps) {
         </div>
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-            statusColor[task.status] ?? "bg-gray-100 text-gray-600"
+            (task.status ? statusColor[task.status] : undefined) ?? "bg-gray-100 text-gray-600"
           }`}
         >
-          {statusLabel[task.status] ?? task.status}
+          {(task.status ? statusLabel[task.status] : undefined) ?? task.status}
         </span>
       </div>
     </div>

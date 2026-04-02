@@ -30,6 +30,7 @@ export async function getDb(): Promise<DB> {
   }
 
   // SEC-2: Use connection pool instead of single connection
+  // STAB-2: keepAlive prevents silent connection drops on idle pools
   pool = createPool({
     host,
     user,
@@ -41,6 +42,8 @@ export async function getDb(): Promise<DB> {
     queueLimit: 0,
     connectTimeout: 10_000,
     idleTimeout: 60_000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10_000,
   });
 
   db = drizzle(pool, { schema, mode: "default" });

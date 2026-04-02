@@ -9,8 +9,9 @@ export const trpcClient = trpc.createClient({
     httpBatchLink({
       url: "/trpc",
       headers() {
-        const userId = localStorage.getItem("userId");
-        return userId ? { "x-user-id": userId } : {};
+        // SEC-1: Use Bearer token from JWT login flow
+        const token = localStorage.getItem("authToken");
+        return token ? { authorization: `Bearer ${token}` } : {};
       },
     }),
   ],

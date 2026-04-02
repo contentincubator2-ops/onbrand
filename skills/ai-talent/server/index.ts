@@ -12,8 +12,9 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { join } from "path";
 import { existsSync } from "fs";
 import { ENV } from "./_core/env";
-import { getBillingRetryQueueLength, flushBillingRetryQueue } from "./llmWithBilling";
+import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./llmWithBilling";
 import { createContext } from "./_core/trpc";
+import { authRouter } from "./auth/authRouter";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
 
@@ -68,14 +69,20 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 app.use("/trpc", limiter);
 
-// ─── Health check ────────────────────────────────────────────────────────────
-app.get("/health", async (_req, res) => {
+// SEC-7: Separate, more lenient rate limiter for /health (no version info leaked)
+const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true });
+
+// ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
+app.use("/api/auth", authRouter);
+
+// ─── Health check (SEC-7: no version number) ────────────────────────────────
+app.get("/health", healthLimiter, async (_req, res) => {
   const [dbOk, soworkDbOk] = await Promise.all([pingDb(), pingSoworkDb()]);
   const billingQueueLength = getBillingRetryQueueLength();
   res.json({
     status:  dbOk && soworkDbOk && billingQueueLength === 0 ? "ok" : "degraded",
     service: "ai-talent",
-    version: "0.1.0",
+    // SEC-7: version intentionally omitted
     db:      dbOk ? "connected" : "unreachable",
     soworkDb: soworkDbOk ? "connected" : "unreachable",
     billingQueueLength,          // monitor: alert if > 10
@@ -104,9 +111,14 @@ setInterval(async () => {
   }
 }, 60_000);
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`[server] sowork-enterprise listening on port ${PORT}`);
   console.log(`[server] health: http://localhost:${PORT}/health`);
+  // STAB-3: Recover any billing records persisted to disk during previous crash
+  const recovered = await loadBillingFallbackLog();
+  if (recovered > 0) {
+    console.log(`[server] recovered ${recovered} billing records from fallback log`);
+  }
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {

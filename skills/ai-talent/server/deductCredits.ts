@@ -219,21 +219,8 @@ async function tryDeductFromEnterprisePool(
 /**
  * Main deduction function. Call this instead of manually updating userCredits.
  *
- * ⚠️  RACE CONDITION WARNING (Sprint 4):
- * The multi-step read-modify-write pattern here (read wallet → check balance → update)
- * is NOT atomic and can double-spend under high concurrency.
- *
- * Sprint 4 fix: wrap the entire deduction in a MySQL transaction + SELECT ... FOR UPDATE:
- *   await db.transaction(async (tx) => {
- *     const wallet = await tx.select().from(userCredits)
- *       .where(eq(userCredits.userId, userId))
- *       .for("update")  // row-level lock
- *       .limit(1);
- *     // ... rest of deduction logic
- *   });
- *
- * Until then: acceptable for low-concurrency (<100 req/s). Do NOT go to high-traffic
- * production without the transaction fix.
+ * SEC-4 / STAB-1: The deduction from the personal wallet is wrapped in a MySQL
+ * transaction with SELECT ... FOR UPDATE to prevent race conditions / double-spend.
  */
 export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductCreditsResult> {
   const db = await getDb();
@@ -241,20 +228,12 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
 
   const { userId, cost, agentId, actionType = "manual_task", proposalId, description, knowledgeDepthFactor } = opts;
 
-  // Load wallet
-  const walletRows = await db
-    .select()
-    .from(userCredits)
-    .where(eq(userCredits.userId, userId))
-    .limit(1);
-
-  if (walletRows.length === 0) {
-    // Auto-create trial wallet for new users
+  // Auto-create trial wallet if needed (outside transaction — idempotent insert)
+  const existing = await db.select().from(userCredits).where(eq(userCredits.userId, userId)).limit(1);
+  if (existing.length === 0) {
     const autoWallet = await ensureWallet(userId);
     if (!autoWallet) throw new Error("用戶點數錢包不存在");
-    walletRows.push(autoWallet);
   }
-  const wallet = walletRows[0];
 
   let remainingCost = cost;
   let usedEnterprisePool = false;
@@ -270,67 +249,56 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
     }
   }
 
-  // ── Step 2: Deduct from personal wallet (planCredits → extraCredits) ─────────
-  // P1-1: Atomic deduction using UPDATE WHERE to prevent race conditions.
-  // The condition ensures we only deduct if sufficient credits remain.
-  let newUsedCredits = wallet!.usedCredits;
-  let newExtraCredits = wallet!.extraCredits;
+  // ── Step 2: Deduct from personal wallet inside a transaction w/ row lock ─────
+  let newUsedCredits = 0;
+  let newExtraCredits = 0;
 
   if (remainingCost > 0) {
-    const planRemaining = Math.max(0, wallet!.planCredits - wallet!.usedCredits);
+    await db.transaction(async (tx) => {
+      // Lock the row to prevent concurrent double-spend
+      const lockResult = await tx.execute(
+        sql`SELECT planCredits, usedCredits, extraCredits FROM userCredits WHERE userId = ${userId} FOR UPDATE`
+      );
+      const rows = (lockResult as any)[0] as Array<{ planCredits: number; usedCredits: number; extraCredits: number }>;
+      const wallet = rows[0];
+      if (!wallet) throw new Error("Insufficient credits");
 
-    if (planRemaining >= remainingCost) {
-      // Deduct entirely from plan credits atomically
-      const result = await db
-        .update(userCredits)
-        .set({ usedCredits: sql`usedCredits + ${remainingCost}` })
-        .where(
-          and(
-            eq(userCredits.userId, userId),
-            sql`(${userCredits.planCredits} - usedCredits) >= ${remainingCost}`
-          )
-        );
-      if ((result as any).rowsAffected === 0 && (result as any)[0]?.affectedRows === 0) {
-        throw new Error("Insufficient credits or concurrent update conflict");
+      const planRemaining = Math.max(0, (wallet.planCredits ?? 0) - (wallet.usedCredits ?? 0));
+      const extraAvailable = wallet.extraCredits ?? 0;
+      const totalAvailable = planRemaining + extraAvailable;
+
+      if (totalAvailable < remainingCost) {
+        throw new Error("Insufficient credits");
       }
-      newUsedCredits += remainingCost;
-    } else if (planRemaining > 0) {
-      // Use remaining plan credits first, then extra credits
-      const extraNeeded = remainingCost - planRemaining;
-      const result = await db
+
+      const planDeduct = Math.min(remainingCost, planRemaining);
+      const extraDeduct = remainingCost - planDeduct;
+
+      const result = await tx
         .update(userCredits)
         .set({
-          usedCredits: sql`usedCredits + ${planRemaining}`,
-          extraCredits: sql`extraCredits - ${extraNeeded}`,
+          usedCredits: sql`usedCredits + ${planDeduct}`,
+          extraCredits: sql`extraCredits - ${extraDeduct}`,
+          updatedAt: new Date(),
         })
-        .where(
-          and(
-            eq(userCredits.userId, userId),
-            sql`extraCredits >= ${extraNeeded}`
-          )
-        );
-      if ((result as any).rowsAffected === 0 && (result as any)[0]?.affectedRows === 0) {
+        .where(eq(userCredits.userId, userId));
+
+      // SEC-4 / STAB-1: Correctly read affectedRows from mysql2 ResultSetHeader
+      const affectedRows = (result as any)[0]?.affectedRows ?? (result as any).rowsAffected ?? 0;
+      if (affectedRows === 0) {
         throw new Error("Insufficient credits or concurrent update conflict");
       }
-      newUsedCredits += planRemaining;
-      newExtraCredits -= extraNeeded;
-    } else {
-      // Deduct entirely from extra credits atomically
-      const result = await db
-        .update(userCredits)
-        .set({ extraCredits: sql`extraCredits - ${remainingCost}` })
-        .where(
-          and(
-            eq(userCredits.userId, userId),
-            sql`extraCredits >= ${remainingCost}`
-          )
-        );
-      if ((result as any).rowsAffected === 0 && (result as any)[0]?.affectedRows === 0) {
-        throw new Error("Insufficient credits or concurrent update conflict");
-      }
-      newExtraCredits -= remainingCost;
-    }
+
+      newUsedCredits = (wallet.usedCredits ?? 0) + planDeduct;
+      newExtraCredits = (wallet.extraCredits ?? 0) - extraDeduct;
+    });
     remainingCost = 0;
+  } else {
+    // Enterprise pool covered the full cost — read current values for return
+    const walletRows = await db.select().from(userCredits).where(eq(userCredits.userId, userId)).limit(1);
+    const w = walletRows[0];
+    newUsedCredits = w?.usedCredits ?? 0;
+    newExtraCredits = w?.extraCredits ?? 0;
   }
 
   // ── Step 3: Log to creditsUsageLog ───────────────────────────────────────────
@@ -344,7 +312,10 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
     description: description ?? `消耗 ${cost} 點${usedEnterprisePool ? "（企業池）" : ""}`,
   });
 
-  const newRemaining = getRemainingCredits(wallet!.planCredits, newUsedCredits, newExtraCredits);
+  // Re-read planCredits for the remaining calculation (not changed by deduction)
+  const finalWalletRows = await db.select({ planCredits: userCredits.planCredits }).from(userCredits).where(eq(userCredits.userId, userId)).limit(1);
+  const planCredits = finalWalletRows[0]?.planCredits ?? 0;
+  const newRemaining = getRemainingCredits(planCredits, newUsedCredits, newExtraCredits);
 
   return {
     success: true,

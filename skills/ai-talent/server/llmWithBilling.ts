@@ -17,7 +17,7 @@
  *   });
  */
 
-import { appendFileSync } from "fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
 import { invokeLLM, type InvokeParams, type InvokeResult } from "./_core/llm";
 import { deductCredits } from "./deductCredits";
@@ -152,6 +152,42 @@ export async function flushBillingRetryQueue(): Promise<number> {
 /** Read-only inspection of the retry queue length (for monitoring). */
 export function getBillingRetryQueueLength(): number {
   return billingRetryQueue.length;
+}
+
+/**
+ * STAB-3: Load billing records persisted to disk during a previous crash/restart.
+ * Called once at server startup — re-enqueues records for retry and clears the log.
+ * Returns the number of records successfully loaded.
+ */
+export async function loadBillingFallbackLog(): Promise<number> {
+  if (!existsSync(BILLING_FALLBACK_LOG)) return 0;
+  try {
+    const lines = readFileSync(BILLING_FALLBACK_LOG, "utf8")
+      .split("\n")
+      .filter(Boolean);
+    let loaded = 0;
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as TokenLogInput & { reason?: string; failedAt?: string };
+        // Strip metadata fields added during persistence
+        delete (entry as any).reason;
+        delete (entry as any).failedAt;
+        if (billingRetryQueue.length < MAX_BILLING_QUEUE_SIZE) {
+          billingRetryQueue.push(entry);
+          loaded++;
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    // Clear the fallback log after loading
+    if (loaded > 0) {
+      writeFileSync(BILLING_FALLBACK_LOG, "");
+      console.log(`[billing] loaded ${loaded} records from fallback log`);
+    }
+    return loaded;
+  } catch (err) {
+    console.error("[billing] failed to load fallback log:", err);
+    return 0;
+  }
 }
 
 // ─── Token usage parser ───────────────────────────────────────────────────────
