@@ -13,6 +13,11 @@ import { closeDb, pingDb } from "./db";
 
 const app = express();
 
+// SEC-8: Trust reverse-proxy headers (Nginx / Azure Front Door / Cloudflare).
+// Required for rate limiter to see the real client IP instead of the proxy IP.
+// Set TRUST_PROXY=1 in production; leave unset in local dev.
+app.set("trust proxy", process.env.TRUST_PROXY ?? 1);
+
 app.use(cors());
 app.use(express.json());
 

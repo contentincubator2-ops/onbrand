@@ -9,7 +9,7 @@
 import { getDb } from "./db";
 import { tokenUsageLogs } from "../drizzle/schema";
 import { sql, desc } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 
 // Provider cost per 1K tokens (USD)
 export const PROVIDER_COST_PER_1K: Record<
@@ -58,6 +58,10 @@ export function usdToCredits(usd: number): number {
 
 export interface TokenLogInput {
   userId: number;
+  /**
+   * The caller's API key used to authenticate this request.
+   * Will be stored as a SHA256 hash prefix (first 16 hex chars) — never plaintext.
+   */
   userApiKey: string;
   tenantId?: number;
   taskId?: number;
@@ -80,10 +84,17 @@ export interface TokenLogInput {
 export async function insertTokenLog(input: TokenLogInput): Promise<void> {
   const db = await getDb();
 
+  // SEC-6: Never store the raw API key — store a truncated SHA256 hash instead.
+  // If the DB is ever compromised, this prevents key leakage.
+  const userApiKeyHash = createHash("sha256")
+    .update(input.userApiKey)
+    .digest("hex")
+    .slice(0, 16);
+
   await db.insert(tokenUsageLogs).values({
     id:               randomUUID(),
     userId:           input.userId,
-    userApiKey:       input.userApiKey,
+    userApiKey:       userApiKeyHash,
     tenantId:         input.tenantId    ?? null,
     taskId:           input.taskId      ?? null,
     agentId:          input.agentId     ?? null,

@@ -231,6 +231,13 @@ export function getRemainingCredits(planCredits: number, usedCredits: number, ex
   return Math.max(0, planCredits - usedCredits + extraCredits);
 }
 
+/**
+ * Pure function — checks if credits are sufficient WITHOUT querying the database.
+ * Use this for quick client-side validation or pre-execution estimates.
+ *
+ * For the authoritative server-side check (including enterprise pool balance),
+ * use `checkEnoughCredits()` from `deductCredits.ts`.
+ */
 export function hasEnoughCredits(
   planCredits: number,
   usedCredits: number,

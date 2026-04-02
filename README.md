@@ -32,6 +32,29 @@ SoWork Enterprise Skills
 Data Layer（RAG + Brand DB + Learning）
 ```
 
+## Architecture — LLM Call Chain
+
+Every AI call within `skill-ai-talent` follows this strict top-to-bottom path:
+
+```
+User Message (Slack / LINE / Telegram)
+    ↓ OpenClaw Gateway
+chiefOfStaff.ts       — intent detection, agent matching
+    ↓
+executeTask.ts        — task lifecycle orchestration
+    ↓
+llmWithBilling.ts     — billing wrapper (token ledger + credits deduction)
+    ↓                    ← ALL billable LLM calls flow through here
+multiModelRouter.ts   — task-type based provider selection (wraps invokeLLM)
+    ↓
+llm.ts                — raw HTTP call to AI provider (PROVIDER_CONFIG lives here)
+    ↓
+AI Provider API       — OpenAI / Zhipu / Qwen / Google / Cohere / Forge
+```
+
+**Key principle:** every billable LLM call flows through `llmWithBilling.ts`.
+Direct calls to `invokeLLM()` are reserved for internal/admin/non-billable operations only.
+
 ## Skill 模組說明
 
 ### `skill-ai-talent`

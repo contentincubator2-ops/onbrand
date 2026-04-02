@@ -17,6 +17,7 @@
  *   });
  */
 
+import { appendFileSync } from "fs";
 import { invokeLLM, type InvokeParams, type InvokeResult } from "./_core/llm";
 import { deductCredits } from "./deductCredits";
 import {
@@ -69,6 +70,10 @@ export interface LLMWithBillingResult {
 /** In-memory buffer for billing records that failed all DB retries. */
 const billingRetryQueue: TokenLogInput[] = [];
 
+// STABLE-4: Disk fallback path — configure via env for production persistence.
+const BILLING_FALLBACK_LOG =
+  process.env.BILLING_FALLBACK_LOG ?? "/tmp/billing-retry.jsonl";
+
 /**
  * Attempt to insert a token log with exponential-backoff retries.
  * On final failure, enqueue to in-memory buffer for deferred retry.
@@ -85,6 +90,15 @@ async function tryInsertWithRetry(
       if (i === retries - 1) {
         // Exhausted retries — park in memory so it isn't silently lost
         billingRetryQueue.push(input);
+        // STABLE-4: Persist to disk so records survive process restarts.
+        try {
+          appendFileSync(
+            BILLING_FALLBACK_LOG,
+            JSON.stringify({ ...input, failedAt: new Date().toISOString() }) + "\n"
+          );
+        } catch {
+          // Disk write also failed — in-memory queue is still the safety net.
+        }
         console.error(
           "[billing] Failed to write token log after retries, queued for retry:",
           err

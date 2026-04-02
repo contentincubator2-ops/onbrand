@@ -1,9 +1,14 @@
 /**
  * Multi-Model AI Router
  * Automatically selects the best AI model based on task type and available API keys.
+ *
+ * BUG-2 fix: No longer duplicates provider config or calls fetch directly.
+ * All LLM calls now go through invokeLLM() from llm.ts, which owns the
+ * single source-of-truth PROVIDER_CONFIG routing table.
  */
 
 import { ENV } from "./env";
+import { invokeLLM } from "./llm";
 
 export type TaskType =
   | "chinese_content"
@@ -23,67 +28,12 @@ export type ModelProvider =
   | "openai"
   | "forge";
 
-interface ModelConfig {
-  provider: ModelProvider;
-  baseUrl: string;
-  apiKey: string;
-  model: string;
-  available: boolean;
+export interface MultiModelMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
 }
 
-function getModelConfigs(): Record<ModelProvider, ModelConfig> {
-  return {
-    qwen: {
-      provider: "qwen",
-      baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-      apiKey: ENV.qwenApiKey,
-      model: "qwen-plus",
-      available: !!ENV.qwenApiKey,
-    },
-    zhipu: {
-      provider: "zhipu",
-      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-      apiKey: ENV.zhipuApiKey,
-      model: "glm-4-flash",
-      available: !!ENV.zhipuApiKey,
-    },
-    perplexity: {
-      provider: "perplexity",
-      baseUrl: "https://api.perplexity.ai",
-      apiKey: ENV.perplexityApiKey,
-      model: "llama-3.1-sonar-large-128k-online",
-      available: !!ENV.perplexityApiKey,
-    },
-    google: {
-      provider: "google",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      apiKey: ENV.googleAiApiKey,
-      model: "gemini-2.0-flash",
-      available: !!ENV.googleAiApiKey,
-    },
-    cohere: {
-      provider: "cohere",
-      baseUrl: "https://api.cohere.com/compatibility/v1",
-      apiKey: ENV.cohereApiKey,
-      model: "command-r-plus",
-      available: !!ENV.cohereApiKey,
-    },
-    openai: {
-      provider: "openai",
-      baseUrl: "https://api.openai.com/v1",
-      apiKey: ENV.openaiApiKey,
-      model: "gpt-4o-mini",
-      available: !!ENV.openaiApiKey,
-    },
-    forge: {
-      provider: "forge",
-      baseUrl: ENV.forgeApiUrl + "/llm/v1",
-      apiKey: ENV.forgeApiKey,
-      model: "default",
-      available: !!ENV.forgeApiKey,
-    },
-  };
-}
+// ─── Task-type detection ──────────────────────────────────────────────────────
 
 export function detectTaskType(content: string): TaskType {
   const lower = content.toLowerCase();
@@ -118,100 +68,107 @@ export function detectTaskType(content: string): TaskType {
   return "general";
 }
 
-export function selectModel(taskType: TaskType): ModelConfig {
-  const configs = getModelConfigs();
+// ─── Provider selection ───────────────────────────────────────────────────────
 
-  const priorityMap: Record<TaskType, ModelProvider[]> = {
-    chinese_content: ["qwen", "zhipu", "openai", "forge"],
-    creative_writing: ["zhipu", "qwen", "openai", "forge"],
-    search_realtime: ["perplexity", "google", "openai", "forge"],
-    analysis: ["google", "openai", "cohere", "qwen", "forge"],
-    classification: ["cohere", "openai", "google", "forge"],
-    coding: ["openai", "google", "forge"],
-    general: ["openai", "qwen", "google", "forge"],
+const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
+  chinese_content: ["qwen", "zhipu", "openai", "forge"],
+  creative_writing: ["zhipu", "qwen", "openai", "forge"],
+  search_realtime: ["perplexity", "google", "openai", "forge"],
+  analysis: ["google", "openai", "cohere", "qwen", "forge"],
+  classification: ["cohere", "openai", "google", "forge"],
+  coding: ["openai", "google", "forge"],
+  general: ["openai", "qwen", "google", "forge"],
+};
+
+const DEFAULT_MODELS: Record<ModelProvider, string> = {
+  qwen: "qwen-plus",
+  zhipu: "glm-4-flash",
+  perplexity: "llama-3.1-sonar-large-128k-online",
+  google: "gemini-2.0-flash",
+  cohere: "command-r-plus",
+  openai: "gpt-4o-mini",
+  forge: "gemini-2.5-flash",
+};
+
+/**
+ * Determine which providers are available based on configured API keys.
+ * BUG-1 fix: references SCREAMING_SNAKE_CASE keys from the zod-validated ENV.
+ */
+function getAvailabilityMap(): Record<ModelProvider, boolean> {
+  return {
+    qwen:       !!ENV.QWEN_API_KEY,
+    zhipu:      !!ENV.ZHIPU_API_KEY,
+    perplexity: !!ENV.PERPLEXITY_API_KEY,
+    google:     !!ENV.GOOGLE_AI_API_KEY,
+    cohere:     !!ENV.COHERE_API_KEY,
+    openai:     !!ENV.OPENAI_API_KEY,
+    forge:      !!ENV.BUILT_IN_FORGE_API_KEY,
   };
+}
 
-  const priorities = priorityMap[taskType];
-  for (const provider of priorities) {
-    const config = configs[provider];
-    if (config.available) {
-      return config;
-    }
+/**
+ * Select the highest-priority available provider for the given task type.
+ * Falls back to "forge" if no other provider is configured.
+ */
+function selectProvider(taskType: TaskType): ModelProvider {
+  const availability = getAvailabilityMap();
+  for (const provider of TASK_PRIORITY_MAP[taskType]) {
+    if (availability[provider]) return provider;
   }
-
-  return configs.forge;
+  return "forge";
 }
 
-export interface MultiModelMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
+/**
+ * @internal Exposed for testing / introspection.
+ * Returns the resolved (provider, model) pair for a given task type.
+ */
+export function selectModel(taskType: TaskType): { provider: ModelProvider; model: string } {
+  const provider = selectProvider(taskType);
+  return { provider, model: DEFAULT_MODELS[provider] };
 }
 
+// ─── Main call function ───────────────────────────────────────────────────────
+
+/**
+ * Call the best available AI model for a given set of messages.
+ *
+ * Provider selection priority is driven by task type. Override with
+ * `preferredProvider` when the caller has a specific requirement.
+ *
+ * BUG-2 fix: delegates all HTTP/auth logic to invokeLLM() — no duplicate
+ * fetch calls or provider config here.
+ */
 export async function callModel(
   messages: MultiModelMessage[],
   taskType?: TaskType,
   preferredProvider?: ModelProvider
 ): Promise<{ content: string; provider: ModelProvider; model: string }> {
-  const configs = getModelConfigs();
+  const availability = getAvailabilityMap();
 
-  let config: ModelConfig;
-  if (preferredProvider && configs[preferredProvider].available) {
-    config = configs[preferredProvider];
+  // Resolve provider + model
+  let provider: ModelProvider;
+  let model: string;
+
+  if (preferredProvider && availability[preferredProvider]) {
+    provider = preferredProvider;
+    model = DEFAULT_MODELS[provider];
   } else {
-    const type = taskType ?? detectTaskType(
-      messages.map(m => m.content).join(" ")
-    );
-    config = selectModel(type);
+    const type = taskType ?? detectTaskType(messages.map(m => m.content).join(" "));
+    provider = selectProvider(type);
+    model = DEFAULT_MODELS[provider];
   }
 
-  const payload = {
-    model: config.model,
+  // Delegate to the single authoritative LLM invoker
+  const result = await invokeLLM({
+    provider,
+    model,
     messages,
-    temperature: 0.7,
-    max_tokens: 4096,
-  };
-
-  const response = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(60000),
   });
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "unknown error");
-    if (config.provider !== "forge") {
-      console.warn(`[MultiModelRouter] ${config.provider} failed (${response.status}), falling back to forge`);
-      const forgeConfig = configs.forge;
-      const forgeResponse = await fetch(`${forgeConfig.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${forgeConfig.apiKey}`,
-        },
-        body: JSON.stringify({ ...payload, model: "default" }),
-        signal: AbortSignal.timeout(60000),
-      });
-      if (!forgeResponse.ok) {
-        throw new Error(`All models failed. Last error: ${errText}`);
-      }
-      const forgeData = await forgeResponse.json() as { choices: Array<{ message: { content: string } }> };
-      return {
-        content: forgeData.choices[0].message.content,
-        provider: "forge",
-        model: "default",
-      };
-    }
-    throw new Error(`Model call failed: ${response.status} ${errText}`);
+  const content = result.choices[0]?.message?.content;
+  if (typeof content !== "string") {
+    throw new Error("[multiModelRouter] Unexpected response structure from LLM");
   }
 
-  const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-  return {
-    content: data.choices[0].message.content,
-    provider: config.provider,
-    model: config.model,
-  };
+  return { content, provider, model };
 }

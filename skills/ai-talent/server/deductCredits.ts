@@ -297,7 +297,11 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
 }
 
 /**
- * Check if user has enough credits (personal + enterprise pool combined).
+ * Authoritative server-side credit check — queries the database AND enterprise pool.
+ * Use this before executing any billable action.
+ *
+ * For quick non-DB estimation (e.g. client-side preview), use
+ * `hasEnoughCredits()` from `creditsCalculator.ts` instead.
  */
 export async function checkEnoughCredits(userId: number, cost: number): Promise<{
   enough: boolean;

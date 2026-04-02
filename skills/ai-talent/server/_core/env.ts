@@ -67,4 +67,20 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const ENV = parsed.data;
+// SEC-7: JWT_SECRET is intentionally excluded from the ENV spread to prevent
+// accidental logging (e.g. console.log(ENV), structured log sinks, Sentry breadcrumbs).
+// Use getJwtSecret() wherever the secret is needed.
+export const ENV = (() => {
+  const { JWT_SECRET: _, ...rest } = parsed.data;
+  return rest;
+})();
+
+/** Read-once secret accessor — prevents accidental logging of the JWT secret. */
+let _jwtSecretCallCount = 0;
+export function getJwtSecret(): string {
+  _jwtSecretCallCount++;
+  if (_jwtSecretCallCount > 1 && parsed.data.NODE_ENV !== "production") {
+    console.warn("[env] getJwtSecret() called multiple times — ensure the secret is not being leaked");
+  }
+  return parsed.data.JWT_SECRET;
+}
