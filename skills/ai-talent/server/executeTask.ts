@@ -19,7 +19,8 @@
 import { getDb } from "./db";
 import { tasks, taskExecutions, agents, brands, subscriptions } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { invokeLLM } from "./_core/llm";
+import { invokeLLMWithBilling } from "./llmWithBilling";
+import { userApiKeys } from "../drizzle/schema";
 import { notifyUser } from "./notificationService";
 import { searchBrandKnowledge } from "./rag";
 import { saveLearning, getRelevantLearnings, formatLearningsForPrompt } from "./learning";
@@ -370,7 +371,7 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
     // Default to per_task if subscription lookup fails
   }
 
-  // 3. Load user's default brand context (optional)
+  // 2b + 3. Load brand context (merged: brandId takes priority, fallback to isDefault)
   let brandContext = "";
   let brandContextObj: Record<string, unknown> | null = null;
   try {
@@ -383,9 +384,12 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
         brandVoice: brands.brandVoice,
       })
       .from(brands)
-      .where(and(eq(brands.userId, userId), eq(brands.isDefault, true)))
+      .where(
+        brandId
+          ? and(eq(brands.userId, userId), eq(brands.id, brandId))
+          : and(eq(brands.userId, userId), eq(brands.isDefault, true))
+      )
       .limit(1);
-
     const brand = brandRows[0];
     if (brand) {
       brandContext = `\n\n【品牌背景（請在所有產出中貫徹此品牌定位）】
@@ -394,27 +398,10 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
 品牌標語：${brand.tagline ?? ""}
 目標受眾：${brand.targetAudience ?? ""}
 品牌語調：${brand.brandVoice ?? ""}`;
+      brandContextObj = brand as Record<string, unknown>;
     }
   } catch {
     // Brand context is optional; continue without it
-  }
-
-  // 2b. Capture brand context as object for learning record
-  try {
-    const brandRows2 = await db
-      .select({
-        name: brands.name,
-        description: brands.description,
-        tagline: brands.tagline,
-        targetAudience: brands.targetAudience,
-        brandVoice: brands.brandVoice,
-      })
-      .from(brands)
-      .where(brandId ? and(eq(brands.userId, userId), eq(brands.id, brandId)) : and(eq(brands.userId, userId), eq(brands.isDefault, true)))
-      .limit(1);
-    if (brandRows2[0]) brandContextObj = brandRows2[0] as Record<string, unknown>;
-  } catch {
-    // optional
   }
 
   // 2c. Inject relevant historical learnings for this agent
@@ -431,82 +418,13 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
     // Learning context is optional; continue without it
   }
 
-  // 2d. Agent Memories: Inject user-defined training memories for this agent
-  let memoriesContext = "";
-  try {
-    const { agentMemories } = await import("../drizzle/schema");
-    const memRows = await db
-      .select()
-      .from(agentMemories)
-      .where(
-        and(
-          eq(agentMemories.userId, userId),
-          eq(agentMemories.agentSlug, task.agentSlug ?? ""),
-          ...(brandId ? [eq(agentMemories.brandId, brandId)] : []),
-          eq(agentMemories.isActive, true)
-        )
-      )
-      .orderBy(agentMemories.createdAt)
-      .limit(20);
+  // TODO Sprint 3: Agent Memories — user-defined training instructions per agent
+  // Requires: agentMemories table in schema + migration
+  const memoriesContext = "";
 
-    if (memRows.length > 0) {
-      const typeLabels: Record<string, string> = {
-        preference: "偏好設定",
-        forbidden: "禁用規則",
-        audience: "目標受眾",
-        style: "風格要求",
-        other: "其他指示",
-      };
-      const grouped: Record<string, string[]> = {};
-      for (const m of memRows) {
-        const t = m.memoryType ?? "other";
-        if (!grouped[t]) grouped[t] = [];
-        grouped[t].push(m.content);
-      }
-      const lines: string[] = [];
-      for (const [type, contents] of Object.entries(grouped)) {
-        lines.push(`【${typeLabels[type] ?? type}】`);
-        contents.forEach(c => lines.push(`- ${c}`));
-      }
-      memoriesContext = `\n\n【老闆的訓練指示（必須嚴格遵守）】\n${lines.join("\n")}`;
-    }
-  } catch {
-    // memories context is optional
-  }
-
-  // 2e. FB Insights: Inject real Facebook Page data if available
-  let fbInsightsContext = "";
-  try {
-    const { brandIntegrations } = await import("../drizzle/schema");
-    const { getPageInsights, formatInsightsForPrompt } = await import("./fbGraphApi");
-    const integrationRows = await db
-      .select()
-      .from(brandIntegrations)
-      .where(
-        and(
-          eq(brandIntegrations.userId, userId),
-          eq(brandIntegrations.integrationType, "facebook_pages"),
-          ...(brandId ? [eq(brandIntegrations.brandId, brandId)] : [])
-        )
-      )
-      .limit(1);
-    const integration = integrationRows[0];
-    if (
-      integration &&
-      integration.status === "connected" &&
-      integration.selectedResourceId &&
-      integration.accessToken
-    ) {
-      // 找到 Page-level token
-      const resources = (integration.authorizedResources as any[]) ?? [];
-      const pageResource = resources.find((r: any) => r.id === integration.selectedResourceId);
-      const pageAccessToken = pageResource?.pageAccessToken ?? integration.accessToken;
-      const insights = await getPageInsights(integration.selectedResourceId, pageAccessToken);
-      fbInsightsContext = formatInsightsForPrompt(insights);
-    }
-  } catch {
-    // FB insights are optional; continue without them
-  }
+  // TODO Sprint 3: Facebook Insights integration
+  // Requires: brandIntegrations table + fbGraphApi.ts
+  const fbInsightsContext = "";
 
   // 2e. RAG: Search brand knowledge base for relevant documents
   let ragContext = "";
@@ -577,6 +495,15 @@ ${outputFormatInstruction}
 
 請以 JSON 格式輸出，包含 thinking（策略思考）和 publishable_content（可發布產出）。`;
 
+  // 5b. Fetch user's API key for billing context
+  const apiKeyRows = await db
+    .select({ apiKey: userApiKeys.apiKey })
+    .from(userApiKeys)
+    .where(and(eq(userApiKeys.userId, userId), eq(userApiKeys.isActive, true)))
+    .limit(1)
+    .catch(() => []);
+  const billingApiKey = apiKeyRows[0]?.apiKey ?? `internal-${userId}`;
+
   // 6. Create execution record (status: running)
   const insertResult = await db.insert(taskExecutions).values({
     taskId,
@@ -597,14 +524,22 @@ ${outputFormatInstruction}
   const startTime = Date.now();
 
   try {
-    // 7. Call LLM with structured JSON output
-    const response = await invokeLLM({
+    // 7. Call LLM with structured JSON output (billing-aware)
+    const billingResult = await invokeLLMWithBilling({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       response_format: JSON_OUTPUT_SCHEMA,
+      provider: "forge",
+      model: "gemini-2.5-flash",
+      userId,
+      userApiKey: billingApiKey,
+      taskId,
+      agentId: task.agentId ?? undefined,
+      actionType: "manual_task",
     });
+    const response = billingResult.response;
 
     const rawContent = response.choices?.[0]?.message?.content;
     let output: string;

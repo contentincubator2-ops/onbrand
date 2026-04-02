@@ -376,3 +376,69 @@ export const tenantMarkets = mysqlTable("tenant_markets", {
 });
 export type TenantMarket = typeof tenantMarkets.$inferSelect;
 export type InsertTenantMarket = typeof tenantMarkets.$inferInsert;
+
+// ─── Enterprise Credits Allocation (成員月度配額) ───────────────────────────
+export const enterpriseCreditsAllocation = mysqlTable("enterprise_credits_allocation", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  memberId: int("memberId").notNull(),
+  allocatedCredits: int("allocatedCredits").default(0).notNull(),
+  usedCredits: int("usedCredits").default(0).notNull(),
+  monthlyLimit: int("monthlyLimit").default(0).notNull(), // 0 = use pool default
+  cycleStart: timestamp("cycleStart"),
+  cycleEnd: timestamp("cycleEnd"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EnterpriseCreditsAllocation = typeof enterpriseCreditsAllocation.$inferSelect;
+export type InsertEnterpriseCreditsAllocation = typeof enterpriseCreditsAllocation.$inferInsert;
+
+// ─── Enterprise Credits Transactions (企業池流水帳) ───────────────────────────
+export const enterpriseCreditsTx = mysqlTable("enterprise_credits_tx", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  memberId: int("memberId"),
+  type: mysqlEnum("type", ["topup", "deduct", "adjust"]).notNull(),
+  amount: int("amount").notNull(), // positive=add, negative=deduct
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EnterpriseCreditsTx = typeof enterpriseCreditsTx.$inferSelect;
+export type InsertEnterpriseCreditsTx = typeof enterpriseCreditsTx.$inferInsert;
+
+// ─── Notifications (站內通知) ──────────────────────────────────────────────────
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  taskId: int("taskId"),
+  agentId: int("agentId"),
+  isRead: boolean("isRead").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+// ─── Notification Preferences (通知偏好設定) ──────────────────────────────────
+export const notificationPreferences = mysqlTable("notification_preferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  inAppEnabled: boolean("inAppEnabled").default(true).notNull(),
+  emailEnabled: boolean("emailEnabled").default(false).notNull(),
+  lineEnabled: boolean("lineEnabled").default(false).notNull(),
+  lineToken: varchar("lineToken", { length: 255 }),
+  telegramEnabled: boolean("telegramEnabled").default(false).notNull(),
+  telegramBotToken: varchar("telegramBotToken", { length: 255 }),
+  telegramChatId: varchar("telegramChatId", { length: 100 }),
+  whatsappEnabled: boolean("whatsappEnabled").default(false).notNull(),
+  whatsappWebhookUrl: varchar("whatsappWebhookUrl", { length: 500 }),
+  notifyOnTaskCompleted: boolean("notifyOnTaskCompleted").default(true).notNull(),
+  notifyOnTaskFailed: boolean("notifyOnTaskFailed").default(true).notNull(),
+  notifyOnTaskStarted: boolean("notifyOnTaskStarted").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;

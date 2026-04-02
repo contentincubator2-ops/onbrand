@@ -15,20 +15,22 @@
  */
 
 import { invokeLLM } from "./_core/llm";
+import { ENV } from "./_core/env";
 import { SearchIndexClient, AzureKeyCredential } from "@azure/search-documents";
 
-const AZURE_SEARCH_ENDPOINT = process.env.AZURE_SEARCH_ENDPOINT ?? "";
-const AZURE_SEARCH_API_KEY = process.env.AZURE_SEARCH_API_KEY ?? "";
-const AZURE_SEARCH_INDEX_NAME = process.env.AZURE_SEARCH_INDEX_NAME ?? "brand-knowledge";
+// Lazy accessor — avoids reading process.env at module load and bypassing zod validation
+const getAzureConfig = () => ({
+  endpoint: ENV.AZURE_SEARCH_ENDPOINT ?? "",
+  apiKey: ENV.AZURE_SEARCH_API_KEY ?? "",
+  indexName: ENV.AZURE_SEARCH_INDEX_NAME,
+});
 
 // ─── 懶初始化索引建立 ─────────────────────────────────────────────────────────
 let _indexInitialized = false;
 
 async function ensureIndexExists(): Promise<void> {
   if (_indexInitialized) return;
-  const endpoint = AZURE_SEARCH_ENDPOINT;
-  const apiKey = AZURE_SEARCH_API_KEY;
-  const indexName = AZURE_SEARCH_INDEX_NAME;
+  const { endpoint, apiKey, indexName } = getAzureConfig();
   if (!endpoint || !apiKey) return;
 
   try {
@@ -58,8 +60,10 @@ async function ensureIndexExists(): Promise<void> {
 // 非阻塞式初始化
 void ensureIndexExists();
 
-const isAzureSearchConfigured = () =>
-  Boolean(AZURE_SEARCH_ENDPOINT && AZURE_SEARCH_API_KEY);
+const isAzureSearchConfigured = () => {
+  const { endpoint, apiKey } = getAzureConfig();
+  return Boolean(endpoint && apiKey);
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -101,6 +105,7 @@ export async function searchBrandKnowledge(
   }
 
   try {
+    const { endpoint, apiKey, indexName } = getAzureConfig();
     // Build filter: always filter by userId, optionally by brandId and/or agentId
     let filter = `userId eq ${userId}`;
     if (brandId != null) {
@@ -120,12 +125,12 @@ export async function searchBrandKnowledge(
     };
 
     const response = await fetch(
-      `${AZURE_SEARCH_ENDPOINT}/indexes/${AZURE_SEARCH_INDEX_NAME}/docs/search?api-version=2023-11-01`,
+      `${endpoint}/indexes/${indexName}/docs/search?api-version=2023-11-01`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "api-key": AZURE_SEARCH_API_KEY,
+          "api-key": apiKey,
         },
         body: JSON.stringify(searchBody),
       }
@@ -163,6 +168,7 @@ export async function indexBrandDocument(input: IndexDocumentInput): Promise<boo
   }
 
   try {
+    const { endpoint, apiKey, indexName } = getAzureConfig();
     const docId = `${input.userId}-${input.fileKey.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
 
     const indexBody = {
@@ -183,12 +189,12 @@ export async function indexBrandDocument(input: IndexDocumentInput): Promise<boo
     };
 
     const response = await fetch(
-      `${AZURE_SEARCH_ENDPOINT}/indexes/${AZURE_SEARCH_INDEX_NAME}/docs/index?api-version=2023-11-01`,
+      `${endpoint}/indexes/${indexName}/docs/index?api-version=2023-11-01`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "api-key": AZURE_SEARCH_API_KEY,
+          "api-key": apiKey,
         },
         body: JSON.stringify(indexBody),
       }
@@ -215,6 +221,7 @@ export async function deleteBrandDocument(userId: number, fileKey: string): Prom
   if (!isAzureSearchConfigured()) return false;
 
   try {
+    const { endpoint, apiKey, indexName } = getAzureConfig();
     const docId = `${userId}-${fileKey.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
 
     const deleteBody = {
@@ -222,12 +229,12 @@ export async function deleteBrandDocument(userId: number, fileKey: string): Prom
     };
 
     const response = await fetch(
-      `${AZURE_SEARCH_ENDPOINT}/indexes/${AZURE_SEARCH_INDEX_NAME}/docs/index?api-version=2023-11-01`,
+      `${endpoint}/indexes/${indexName}/docs/index?api-version=2023-11-01`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "api-key": AZURE_SEARCH_API_KEY,
+          "api-key": apiKey,
         },
         body: JSON.stringify(deleteBody),
       }
