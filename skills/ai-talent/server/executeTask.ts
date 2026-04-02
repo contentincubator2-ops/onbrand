@@ -17,7 +17,7 @@
  */
 
 import { getDb } from "./db";
-import { tasks, taskExecutions, agents, brands, subscriptions, userApiKeys } from "../drizzle/schema";
+import { tasks, taskExecutions, agents, brands, subscriptions, userApiKeys, agentMemories } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { invokeLLMWithBilling } from "./llmWithBilling";
 import { notifyUser } from "./notificationService";
@@ -417,9 +417,43 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
     // Learning context is optional; continue without it
   }
 
-  // TODO Sprint 3: Agent Memories — user-defined training instructions per agent
-  // Requires: agentMemories table in schema + migration
-  const memoriesContext = "";
+  // 2d. Agent Memories: Inject user-defined training memories for this agent
+  let memoriesContext = "";
+  try {
+    const memRows = await db
+      .select()
+      .from(agentMemories)
+      .where(
+        and(
+          eq(agentMemories.userId, userId),
+          eq(agentMemories.agentSlug, task.agentSlug ?? ""),
+          ...(brandId ? [eq(agentMemories.brandId, brandId)] : []),
+          eq(agentMemories.isActive, true)
+        )
+      )
+      .orderBy(agentMemories.createdAt)
+      .limit(20);
+
+    if (memRows.length > 0) {
+      const memByType: Record<string, string[]> = {};
+      for (const mem of memRows) {
+        const t = mem.memoryType ?? "other";
+        if (!memByType[t]) memByType[t] = [];
+        memByType[t].push(mem.content);
+      }
+      const parts: string[] = [];
+      if (memByType.preference?.length) parts.push(`【偏好設定】\n${memByType.preference.join("\n")}`);
+      if (memByType.forbidden?.length) parts.push(`【禁止事項】\n${memByType.forbidden.join("\n")}`);
+      if (memByType.audience?.length) parts.push(`【目標受眾指引】\n${memByType.audience.join("\n")}`);
+      if (memByType.style?.length) parts.push(`【風格指引】\n${memByType.style.join("\n")}`);
+      if (memByType.other?.length) parts.push(`【其他指引】\n${memByType.other.join("\n")}`);
+      if (parts.length > 0) {
+        memoriesContext = `\n\n【用戶訓練指令（高優先級，必須遵守）】\n${parts.join("\n\n")}`;
+      }
+    }
+  } catch {
+    // memories context is optional
+  }
 
   // TODO Sprint 3: Facebook Insights integration
   // Requires: brandIntegrations table + fbGraphApi.ts

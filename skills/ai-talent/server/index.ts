@@ -11,6 +11,7 @@ import { rateLimit } from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength } from "./llmWithBilling";
+import { createContext } from "./_core/trpc";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
 
@@ -54,17 +55,12 @@ app.get("/health", async (_req, res) => {
   });
 });
 
-// Mount tRPC router (Sprint 2)
+// Mount tRPC router
 app.use(
   "/trpc",
   createExpressMiddleware({
     router: appRouter,
-    createContext: ({ req }) => {
-      // Sprint 3: Replace with real JWT parsing via getJwtSecret()
-      // For now: read userId from header (dev/testing only)
-      const userId = parseInt((req.headers["x-user-id"] as string) ?? "0");
-      return { user: userId ? { id: userId } : null };
-    },
+    createContext,
   })
 );
 

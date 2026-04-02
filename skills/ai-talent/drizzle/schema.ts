@@ -442,3 +442,35 @@ export const notificationPreferences = mysqlTable("notification_preferences", {
 });
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
+
+// ─── Agent Memories (Sprint 3: user-defined training per agent) ────────────
+export const agentMemories = mysqlTable("agent_memories", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  agentSlug: varchar("agentSlug", { length: 64 }).notNull(),
+  brandId: int("brandId"),
+  memoryType: mysqlEnum("memoryType", ["preference", "forbidden", "audience", "style", "other"]).default("other"),
+  content: text("content").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AgentMemory = typeof agentMemories.$inferSelect;
+export type InsertAgentMemory = typeof agentMemories.$inferInsert;
+
+// ─── Brand Integrations (Sprint 3: platform connections per brand) ──────────
+export const brandIntegrations = mysqlTable("brand_integrations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  integrationType: varchar("integrationType", { length: 50 }).notNull(), // 'facebook_pages' | 'google_ads' | 'instagram'
+  status: mysqlEnum("status", ["connected", "disconnected", "error"]).default("disconnected"),
+  accessToken: text("accessToken"),                    // encrypted in Sprint 4
+  selectedResourceId: varchar("selectedResourceId", { length: 255 }),
+  authorizedResources: json("authorizedResources"),
+  connectedAt: timestamp("connectedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type BrandIntegration = typeof brandIntegrations.$inferSelect;
+export type InsertBrandIntegration = typeof brandIntegrations.$inferInsert;
