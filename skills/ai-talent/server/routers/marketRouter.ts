@@ -9,8 +9,8 @@ import { eq, and } from "drizzle-orm";
 import { TARGET_MARKETS, CONTENT_LANGUAGES } from "../../../../shared/globalization";
 
 // STAB-5: Build allowlists from canonical shared constants (validated at module load time)
-const validMarketIds = TARGET_MARKETS.map((m) => m.value);
-const validLanguageCodes = CONTENT_LANGUAGES.map((l) => l.value);
+const validMarketIds = TARGET_MARKETS.map((m) => m.code);
+const validLanguageCodes = CONTENT_LANGUAGES.map((l) => l.code);
 
 export const marketRouter = router({
   /** List available markets */
