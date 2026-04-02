@@ -9,6 +9,8 @@ import express from "express";
 import cors from "cors";
 import { rateLimit } from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { join } from "path";
+import { existsSync } from "fs";
 import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength, flushBillingRetryQueue } from "./llmWithBilling";
 import { createContext } from "./_core/trpc";
@@ -37,6 +39,24 @@ app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
+
+// ─── Serve frontend build (SPA static files) ─────────────────────────────────
+// Client builds to ../public (relative to server/ CWD = skills/ai-talent)
+const publicDir = join(process.cwd(), "public");
+if (existsSync(publicDir)) {
+  app.use(express.static(publicDir));
+  // SPA fallback — serve index.html for any non-API route
+  app.get("*", (req, res, next) => {
+    if (
+      req.path.startsWith("/trpc") ||
+      req.path.startsWith("/api") ||
+      req.path === "/health"
+    ) {
+      return next();
+    }
+    res.sendFile(join(publicDir, "index.html"));
+  });
+}
 
 // DEBT-3: Rate limiting — 100 req/min per IP on all /api routes
 const limiter = rateLimit({
