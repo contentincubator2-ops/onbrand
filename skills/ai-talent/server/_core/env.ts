@@ -79,8 +79,8 @@ export const ENV = (() => {
 let _jwtSecretCallCount = 0;
 export function getJwtSecret(): string {
   _jwtSecretCallCount++;
-  if (_jwtSecretCallCount > 1 && parsed.data.NODE_ENV !== "production") {
+  if (_jwtSecretCallCount > 1 && parsed.data!.NODE_ENV !== "production") {
     console.warn("[env] getJwtSecret() called multiple times — ensure the secret is not being leaked");
   }
-  return parsed.data.JWT_SECRET;
+  return parsed.data!.JWT_SECRET;
 }

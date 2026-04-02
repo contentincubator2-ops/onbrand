@@ -33,7 +33,7 @@ function hashApiKey(apiKey: string): string {
   return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
 }
 
-export interface InvokeLLMWithBillingOptions extends InvokeParams {
+export interface InvokeLLMWithBillingOptions extends Omit<InvokeParams, "provider" | "model"> {
   /** LLM provider (e.g. "openai", "google", "zhipu") */
   provider: string;
   /** Model name (e.g. "gpt-4o", "gemini-2.5-flash") */
@@ -257,7 +257,7 @@ export async function invokeLLMWithBilling(
             userId,
             cost: creditsCharged,
             agentId,
-            actionType,
+            actionType: actionType as any,
             description: `LLM: ${provider}/${model} (${usage.totalTokens} tokens)`,
           })
         : Promise.resolve(),

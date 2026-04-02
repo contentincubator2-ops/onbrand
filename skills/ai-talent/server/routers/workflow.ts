@@ -205,7 +205,7 @@ export const workflowRouter = router({
         return { triggered: false, workflowName: null, createdTaskIds: [] };
       }
 
-      const workflow = matchingWorkflows[0];
+      const workflow = matchingWorkflows[0]!;
       const steps = (workflow.steps as WorkflowStep[]) ?? [];
       const createdTaskIds: number[] = [];
 

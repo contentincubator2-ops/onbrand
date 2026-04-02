@@ -25,7 +25,7 @@ export async function createUserApiKey(
 ): Promise<string> {
   const db = await getDb();
   const apiKey = generateApiKey();
-  await db.insert(userApiKeys).values({ userId, apiKey, label });
+  await db.insert(userApiKeys).values({ userId, apiKey, label: label ?? null });
   return apiKey;
 }
 

@@ -354,7 +354,7 @@ ${agentList}
   });
 
   try {
-    const content = response.choices[0].message.content;
+    const content = response.choices[0]!.message.content;
     const parsed = JSON.parse(typeof content === "string" ? content : "{}") as { tasks: DelegationTask[] };
     return parsed.tasks ?? [];
   } catch {

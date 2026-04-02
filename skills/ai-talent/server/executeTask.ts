@@ -488,7 +488,8 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
   // 2g. Market Intelligence: Inject real-time data from sowork_db.market_data
   let marketIntelContext = "";
   try {
-    const { fetchMarketIntel, formatMarketIntelForPrompt } = await import("../../../market-intel/server/marketIntel");
+    const { fetchMarketIntel, formatMarketIntelForPrompt } = // @ts-ignore: cross-package import resolved at runtime by tsx
+    await import("../../../market-intel/server/marketIntel");
     const keywords = [task.title, ...(task.description?.split(" ").slice(0, 3) ?? [])].filter(Boolean);
     const intel = await fetchMarketIntel({ keywords, limit: 5 });
     marketIntelContext = formatMarketIntelForPrompt(intel);
@@ -629,7 +630,7 @@ ${outputFormatInstruction}
           const jsonBlockMatch = pc.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/m);
           if (jsonBlockMatch) {
             try {
-              const inner = JSON.parse(jsonBlockMatch[1]);
+              const inner = JSON.parse(jsonBlockMatch[1]!);
               if (inner.publishable_content) {
                 structuredOutput.publishable_content = inner.publishable_content;
                 if (!structuredOutput.thinking || structuredOutput.thinking === '（解析失敗）') {

@@ -190,8 +190,8 @@ const normalizeMessage = (message: Message) => {
   const contentParts = ensureArray(message.content).map(normalizeContentPart);
 
   // Collapse single text content to plain string for wider API compatibility
-  if (contentParts.length === 1 && contentParts[0].type === "text") {
-    return { role, name, content: contentParts[0].text };
+  if (contentParts.length === 1 && contentParts[0]!.type === "text") {
+    return { role, name, content: (contentParts[0] as any).text as string };
   }
 
   return { role, name, content: contentParts };
@@ -216,7 +216,7 @@ const normalizeToolChoice = (
         "tool_choice 'required' needs a single tool or specify the tool name explicitly"
       );
     }
-    return { type: "function", function: { name: tools[0].function.name } };
+    return { type: "function", function: { name: tools[0]!.function.name } };
   }
 
   if ("name" in toolChoice) {

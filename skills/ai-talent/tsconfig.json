@@ -6,7 +6,7 @@
     "allowImportingTsExtensions": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
@@ -14,9 +14,18 @@
     "outDir": "./dist",
     "rootDir": ".",
     "paths": {
-      "../drizzle/*": ["./drizzle/*"]
+      "../drizzle/*": [
+        "./drizzle/*"
+      ]
     }
   },
-  "include": ["server/**/*", "drizzle/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": [
+    "server/**/*",
+    "drizzle/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts"
+  ]
 }

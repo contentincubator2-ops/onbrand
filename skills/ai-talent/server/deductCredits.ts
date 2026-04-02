@@ -94,7 +94,7 @@ async function tryDeductFromEnterprisePool(
     .limit(1);
 
   if (membership.length === 0) return { deducted: 0 };
-  const { ownerId } = membership[0];
+  const { ownerId } = membership[0]!;
 
   // 2. Does the workspace have a pool with enough balance?
   const poolRows = await db
@@ -105,7 +105,7 @@ async function tryDeductFromEnterprisePool(
 
   if (poolRows.length === 0) return { deducted: 0 };
   const pool = poolRows[0];
-  const poolAvailable = pool.totalCredits - pool.usedCredits;
+  const poolAvailable = pool!.totalCredits - pool!.usedCredits;
   if (poolAvailable <= 0) return { deducted: 0 };
 
   // 3. Check per-member monthly limit
@@ -125,7 +125,7 @@ async function tryDeductFromEnterprisePool(
   const effectiveLimit =
     alloc?.monthlyLimit && alloc.monthlyLimit > 0
       ? alloc.monthlyLimit
-      : pool.memberMonthlyLimit;
+      : pool!.memberMonthlyLimit;
 
   const memberUsed = alloc?.usedCredits ?? 0;
 
@@ -273,11 +273,11 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
   // ── Step 2: Deduct from personal wallet (planCredits → extraCredits) ─────────
   // P1-1: Atomic deduction using UPDATE WHERE to prevent race conditions.
   // The condition ensures we only deduct if sufficient credits remain.
-  let newUsedCredits = wallet.usedCredits;
-  let newExtraCredits = wallet.extraCredits;
+  let newUsedCredits = wallet!.usedCredits;
+  let newExtraCredits = wallet!.extraCredits;
 
   if (remainingCost > 0) {
-    const planRemaining = Math.max(0, wallet.planCredits - wallet.usedCredits);
+    const planRemaining = Math.max(0, wallet!.planCredits - wallet!.usedCredits);
 
     if (planRemaining >= remainingCost) {
       // Deduct entirely from plan credits atomically
@@ -344,7 +344,7 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
     description: description ?? `消耗 ${cost} 點${usedEnterprisePool ? "（企業池）" : ""}`,
   });
 
-  const newRemaining = getRemainingCredits(wallet.planCredits, newUsedCredits, newExtraCredits);
+  const newRemaining = getRemainingCredits(wallet!.planCredits, newUsedCredits, newExtraCredits);
 
   return {
     success: true,
@@ -356,7 +356,7 @@ export async function deductCredits(opts: DeductCreditsOptions): Promise<DeductC
 }
 
 /**
- * Authoritative server-side credit check — queries the database AND enterprise pool.
+ * Authoritative server-side credit check — queries the database AND enterprise pool!.
  * Use this before executing any billable action.
  *
  * For quick non-DB estimation (e.g. client-side preview), use
@@ -383,7 +383,7 @@ export async function checkEnoughCredits(userId: number, cost: number): Promise<
     wallet = await ensureWallet(userId) ?? undefined as any;
   }
   const personalRemaining = wallet
-    ? Math.max(0, wallet.planCredits - wallet.usedCredits) + Math.max(0, wallet.extraCredits)
+    ? Math.max(0, wallet!.planCredits - wallet!.usedCredits) + Math.max(0, wallet!.extraCredits)
     : 0;
 
   // Check pool
@@ -398,11 +398,11 @@ export async function checkEnoughCredits(userId: number, cost: number): Promise<
     const poolRows = await db
       .select()
       .from(enterpriseCreditsPool)
-      .where(eq(enterpriseCreditsPool.ownerId, membership[0].ownerId))
+      .where(eq(enterpriseCreditsPool.ownerId, membership[0]!.ownerId))
       .limit(1);
     if (poolRows.length > 0) {
       const pool = poolRows[0];
-      poolAvailable = Math.max(0, pool.totalCredits - pool.usedCredits);
+      poolAvailable = Math.max(0, pool!.totalCredits - pool!.usedCredits);
     }
   }
 
