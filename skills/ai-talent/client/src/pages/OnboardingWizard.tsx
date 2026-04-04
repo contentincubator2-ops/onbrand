@@ -297,11 +297,11 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
         }
 
         if (wantMix) {
-          addMsg("ai", "融合方案：結合 A 的專業可信賴 + B 的有溫度語調。
+          addMsg("ai", `融合方案：結合 A 的專業可信賴 + B 的有溫度語調。
 
 Tagline：「用 AI 讓每個品牌被看見」
 
-這樣可以嗎？（輸入「確定」儲存）");
+這樣可以嗎？（輸入「確定」儲存）`);
           break;
         }
 
