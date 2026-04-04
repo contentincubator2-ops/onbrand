@@ -830,7 +830,7 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
     const billingResult = await invokeLLMWithBilling({
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       response_format: JSON_OUTPUT_SCHEMA,
-      provider: "forge",
+      provider: "openrouter",
       model: "gemini-2.5-flash",
       userId,
       userApiKey: billingApiKey,
