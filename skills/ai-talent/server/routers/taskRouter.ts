@@ -55,4 +55,40 @@ export const taskRouter = router({
       }
       return result[0];
     }),
+
+  /** 建立並執行任務（呼叫 LLM via model router） */
+  createAndExecute: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1),
+      description: z.string().optional(),
+      brandId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      const userId = ctx.user.id;
+
+      const insertResult = await (db.insert(tasks) as any).values({
+        userId,
+        brandId: input.brandId ?? null,
+        title: input.title,
+        description: input.description ?? null,
+        status: "pending",
+        createdAt: new Date(),
+      });
+      const taskId = (insertResult as any)[0]?.insertId ?? (insertResult as any).insertId ?? 0;
+      if (!taskId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create task" });
+
+      const { executeTask } = await import("../executeTask");
+      const result = await executeTask(taskId, userId, input.brandId);
+
+      return {
+        taskId,
+        executionId: result.executionId,
+        success: result.success,
+        output: result.output ?? "",
+        error: result.error ?? null,
+      };
+    }),
 });
