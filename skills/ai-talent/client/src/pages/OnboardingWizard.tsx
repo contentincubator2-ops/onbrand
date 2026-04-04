@@ -228,6 +228,12 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
 
       case "confirm-phase1": {
         const ok = /繼續|沒問題|ok|好|可以|對|正確/i.test(text);
+        const wantChange = /不要|重新|修改|換|不對|錯了|重來/i.test(text);
+        if (wantChange) {
+          addMsg("ai", "好，你覺得哪個部分需要調整？告訴我你的想法，我請研究員修正。");
+          setBrandData({ ...brandData, correction1: text });
+          break;
+        }
         const newData = { ...brandData };
         if (!ok) newData.correction1 = text;
         setBrandData(newData);
@@ -266,15 +272,47 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
 
       case "confirm-phase2": {
         const ok = /繼續|沒問題|ok|好|可以|確認/i.test(text);
+        const wantChange = /不要|重新|修改|換|不對|錯了|重來/i.test(text);
+        if (wantChange) {
+          addMsg("ai", "好，你想調整什麼方向？（例如：更強調 AI 技術、更聚焦電商、換目標受眾）");
+          setBrandData(prev => ({ ...prev, correction2: text }));
+          break;
+        }
         if (!ok) setBrandData(prev => ({ ...prev, correction2: text }));
         await runPhase3();
         break;
       }
 
       case "done": {
-        const brandId = phase2Result?.brandId ?? 0;
-        addMsg("ai", `✅ 記錄完成！正在開啟「${brandData.brandName}」的行銷工作區...`);
-        setTimeout(() => onComplete(brandId, brandData.brandName), 1500);
+        const lower = text.toLowerCase();
+        const chooseA = /^a$|方案.?a|理性|選a|a方案/i.test(text);
+        const chooseB = /^b$|方案.?b|感性|選b|b方案/i.test(text);
+        const wantChange = /不要|修改|重新|換|再想|不對|改/i.test(text);
+        const wantMix = /融合|結合|混|兩個都/i.test(text);
+
+        if (wantChange) {
+          addMsg("ai", "好，我們重新來過。你希望方向改成什麼感覺？（例如：更有科技感、更親切、更國際化）");
+          setPhase("confirm-phase2");
+          break;
+        }
+
+        if (wantMix) {
+          addMsg("ai", "融合方案：結合 A 的專業可信賴 + B 的有溫度語調。
+
+Tagline：「用 AI 讓每個品牌被看見」
+
+這樣可以嗎？（輸入「確定」儲存）");
+          break;
+        }
+
+        if (chooseA || chooseB || /確定|可以|好|ok/i.test(text)) {
+          const selected = chooseB ? "B" : "A";
+          const brandId = phase2Result?.brandId ?? 0;
+          addMsg("ai", `✅ 方案 ${selected} 確認！正在開啟「${brandData.brandName}」的行銷工作區...`);
+          setTimeout(() => onComplete(brandId, brandData.brandName), 1500);
+        } else {
+          addMsg("ai", "請告訴我你選哪個方案（輸入「A」或「B」），或告訴我想調整什麼。");
+        }
         break;
       }
     }
