@@ -57,7 +57,7 @@ export type Agent = typeof agents.$inferSelect;
 export type InsertAgent = typeof agents.$inferInsert;
 
 //  Brands
-export const brands = mysqlTable("brands", {
+export const brands = mysqlTable("enterprise_brands", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   name: varchar("name", { length: 128 }).notNull(),
