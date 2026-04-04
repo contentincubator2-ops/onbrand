@@ -280,7 +280,7 @@ const JSON_OUTPUT_SCHEMA = {
           description: "產出類型，必須是以下之一：facebook_post / instagram_post / press_release / ab_test / competitor_analysis / ad_copy / strategy / video_script / general"
         }
       },
-      required: ["thinking", "publishable_content", "content_type"],
+      required: ["thinking", "publishable_content", "image_suggestion", "content_type"],
       additionalProperties: false
     }
   }
