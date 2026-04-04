@@ -58,7 +58,7 @@ export type ToolChoice =
 // DEBT-1: Add provider + model params for multi-provider routing
 export type InvokeParams = {
   messages: Message[];
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere";
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -149,6 +149,11 @@ const PROVIDER_CONFIG: Record<
     baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
     defaultModel: "gemini-2.0-flash",
     getKey:       () => ENV.GOOGLE_AI_API_KEY ?? "",
+  },
+  openrouter: {
+    baseUrl:      "https://openrouter.ai/api/v1",
+    defaultModel: "google/gemma-3-27b-it",
+    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? "",
   },
   cohere: {
     baseUrl:      "https://api.cohere.com/compatibility/v1",
