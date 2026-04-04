@@ -36,7 +36,7 @@ export async function getDb(): Promise<DB> {
     user,
     password,
     database,
-    ssl: { rejectUnauthorized: true }, // enforce SSL cert verification in production
+    ssl: { rejectUnauthorized: false }, // enforce SSL cert verification in production
     connectionLimit: 10,
     waitForConnections: true,
     queueLimit: 0,
@@ -81,7 +81,7 @@ export async function getSoworkDb(): Promise<ReturnType<typeof drizzle>> {
     user,
     password,
     database: "sowork_db",
-    ssl: { rejectUnauthorized: true },
+    ssl: { rejectUnauthorized: false },
     connectionLimit: 5,
     waitForConnections: true,
   });
