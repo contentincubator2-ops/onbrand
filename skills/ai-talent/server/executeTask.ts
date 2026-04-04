@@ -831,7 +831,7 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       response_format: JSON_OUTPUT_SCHEMA,
       provider: "openrouter",
-      model: "gemini-2.5-flash",
+      model: "anthropic/claude-sonnet-4-6",
       userId,
       userApiKey: billingApiKey,
       taskId,

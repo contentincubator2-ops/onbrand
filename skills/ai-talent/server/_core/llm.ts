@@ -58,7 +58,7 @@ export type ToolChoice =
 // DEBT-1: Add provider + model params for multi-provider routing
 export type InvokeParams = {
   messages: Message[];
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter";
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -152,8 +152,13 @@ const PROVIDER_CONFIG: Record<
   },
   openrouter: {
     baseUrl:      "https://openrouter.ai/api/v1",
-    defaultModel: "google/gemma-3-27b-it",
+    defaultModel: "anthropic/claude-sonnet-4-6",
     getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? "",
+  },
+  anthropic: {
+    baseUrl:      "https://api.anthropic.com/v1",
+    defaultModel: "claude-sonnet-4-6",
+    getKey:       () => (ENV as any).ANTHROPIC_API_KEY ?? "",
   },
   cohere: {
     baseUrl:      "https://api.cohere.com/compatibility/v1",
