@@ -30,6 +30,23 @@ const IconChevron = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="
 const IconLogout = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 const IconPlus = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 
+// P3: 格式化 AI 訊息內容
+function renderContent(raw: string): { main: string; thinking: string } {
+  try {
+    const d = JSON.parse(raw);
+    if (d.publishable_content) {
+      return { main: d.publishable_content, thinking: d.thinking || "" };
+    }
+  } catch {}
+  return { main: raw, thinking: "" };
+}
+
+function formatText(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n/g, "<br/>");
+}
+
 export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -39,14 +56,23 @@ export default function ChatPage() {
   const [brandMenuOpen, setBrandMenuOpen] = useState(false);
   const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  // P2: 多輪對話上下文
+  const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const createAndExecute = trpc.task.createAndExecute.useMutation();
+  const saveMessage = trpc.conversation.saveMessage.useMutation();
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
 
   const brands = brandsQuery.data ?? [];
   const active = conversations.find(c => c.id === activeId) ?? null;
   const activeBrand = brands.find(b => b.id === activeBrandId) ?? brands[0] ?? null;
+
+  // P1: 載入對話歷史
+  const historyQuery = trpc.conversation.list.useQuery(
+    { brandId: activeBrandId ?? undefined },
+    { enabled: !!activeBrandId, refetchOnWindowFocus: false }
+  );
 
   // 初始化：沒有品牌 → Onboarding
   useEffect(() => {
@@ -58,6 +84,38 @@ export default function ChatPage() {
       setActiveBrandId(def.id);
     }
   }, [brandsQuery.isSuccess, brands.length]);
+
+  // P1: 將 DB 歷史載入到對話列表（僅首次）
+  useEffect(() => {
+    if (!historyQuery.data || historyQuery.data.length === 0) return;
+    if (conversations.length > 0) return; // 已有對話，不覆蓋
+    const msgs: Msg[] = historyQuery.data.map((row: any) => {
+      const parsed = renderContent(row.content);
+      return {
+        id: `db-${row.id}`,
+        role: row.role as "user" | "assistant",
+        content: parsed.main,
+        thinking: parsed.thinking,
+        taskId: row.taskId ?? undefined,
+        ts: new Date(row.createdAt).getTime(),
+      };
+    });
+    if (msgs.length > 0) {
+      const convId = `conv-history-${activeBrandId}`;
+      setConversations([{
+        id: convId,
+        title: "歷史對話",
+        messages: msgs,
+        brandId: activeBrandId ?? undefined,
+        brandName: activeBrand?.name,
+        createdAt: msgs[0].ts,
+      }]);
+      setActiveId(convId);
+      // P2: 恢復 conversationHistory（最近 5 則）
+      const histMsgs = msgs.slice(-5).map(m => ({ role: m.role, content: m.content }));
+      setConversationHistory(histMsgs);
+    }
+  }, [historyQuery.data]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -74,6 +132,7 @@ export default function ChatPage() {
     }, ...prev]);
     setActiveId(id);
     setBrandMenuOpen(false);
+    setConversationHistory([]); // 新對話重置 history
   };
 
   const handleSend = async () => {
@@ -103,18 +162,26 @@ export default function ChatPage() {
         : c
     ));
 
-    try {
-      // 帶入品牌 context
-      const brandCtx = activeBrand
-        ? `[品牌：${activeBrand.name}${activeBrand.targetAudience ? `，目標客群：${activeBrand.targetAudience}` : ""}] `
-        : "";
+    // P1: 儲存 user 訊息
+    saveMessage.mutate({ brandId: activeBrand?.id, role: "user", content: text });
 
+    try {
+      // P4: 品牌 context 注入
+      let description = text;
+      if (activeBrand) {
+        const soworkAnalysis = activeBrand.soworkAnalysis as Record<string, unknown> | null | undefined;
+        description = text + `\n\n[品牌背景：${activeBrand.name}，目標受眾：${(activeBrand as any).targetAudience || ''}，品牌定位：${soworkAnalysis?.positioning as string || ''}]`;
+      }
+
+      // P2: 帶入對話歷史
       const result = await createAndExecute.mutateAsync({
         title: text,
-        description: brandCtx + text,
+        description,
         brandId: activeBrand?.id,
+        conversationHistory: conversationHistory.slice(-5),
       });
 
+      // P3: 解析格式化內容
       let content = "", thinking = "", contentType = "general", imageSuggestion = "";
       if (result.output) {
         try {
@@ -136,6 +203,22 @@ export default function ChatPage() {
       setConversations(prev => prev.map(c =>
         c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c
       ));
+
+      // P1: 儲存 AI 回覆
+      saveMessage.mutate({
+        brandId: activeBrand?.id,
+        role: "assistant",
+        content: result.output ?? content,
+        taskId: result.taskId,
+      });
+
+      // P2: 更新 conversationHistory
+      setConversationHistory(prev => [
+        ...prev,
+        { role: "user", content: text },
+        { role: "assistant", content },
+      ].slice(-10)); // 保留最近 10 則（5 輪）
+
     } catch (err: any) {
       setConversations(prev => prev.map(c =>
         c.id === convId ? { ...c, messages: [...c.messages, {
@@ -317,21 +400,27 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div className={`flex flex-col gap-2 max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                    {/* P3: 可摺疊的 thinking */}
                     {msg.role === "assistant" && msg.thinking && (
                       <details className="w-full">
                         <summary className="text-xs text-neutral-400 dark:text-neutral-600 cursor-pointer hover:text-neutral-600 dark:hover:text-neutral-400 select-none">策略思考過程</summary>
-                        <div className="mt-2 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed whitespace-pre-wrap border border-neutral-200 dark:border-neutral-700">
-                          {msg.thinking}
-                        </div>
+                        <div className="mt-2 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed border border-neutral-200 dark:border-neutral-700"
+                          dangerouslySetInnerHTML={{ __html: formatText(msg.thinking) }}
+                        />
                       </details>
                     )}
-                    <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 rounded-br-md"
-                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 rounded-bl-md"
-                    }`} style={{ whiteSpace: "pre-wrap" }}>
-                      {msg.content}
-                    </div>
+                    {/* P3: 卡片式顯示 publishable_content */}
+                    {msg.role === "assistant" ? (
+                      <div className="w-full rounded-2xl rounded-bl-md bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+                        <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100"
+                          dangerouslySetInnerHTML={{ __html: formatText(msg.content) }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl rounded-br-md px-4 py-3 text-sm leading-relaxed bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900" style={{ whiteSpace: "pre-wrap" }}>
+                        {msg.content}
+                      </div>
+                    )}
                     {msg.imageSuggestion && (
                       <p className="text-xs text-neutral-400 px-1">配圖：{msg.imageSuggestion}</p>
                     )}

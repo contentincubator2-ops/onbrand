@@ -62,6 +62,7 @@ export const taskRouter = router({
       title: z.string().min(1),
       description: z.string().optional(),
       brandId: z.number().optional(),
+      conversationHistory: z.array(z.object({ role: z.string(), content: z.string() })).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -81,7 +82,7 @@ export const taskRouter = router({
       if (!taskId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create task" });
 
       const { executeTask } = await import("../executeTask");
-      const result = await executeTask(taskId, userId, input.brandId);
+      const result = await executeTask(taskId, userId, input.brandId, input.conversationHistory);
 
       return {
         taskId,

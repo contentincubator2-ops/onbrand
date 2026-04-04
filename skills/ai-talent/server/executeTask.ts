@@ -814,7 +814,7 @@ async function handlePostExecution(opts: PostExecutionOptions): Promise<{
 
 // ── Main execution function ───────────────────────────────────────────────────
 
-export async function executeTask(taskId: number, userId: number, brandId?: number): Promise<{
+export async function executeTask(taskId: number, userId: number, brandId?: number, conversationHistory?: Array<{ role: string; content: string }>): Promise<{
   executionId: number;
   success: boolean;
   output?: string;
@@ -851,7 +851,11 @@ export async function executeTask(taskId: number, userId: number, brandId?: numb
   try {
     // 3. Call LLM
     const billingResult = await invokeLLMWithBilling({
-      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...(conversationHistory ?? []).slice(-5).map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
+        { role: "user", content: userPrompt },
+      ],
       response_format: JSON_OUTPUT_SCHEMA,
       provider: "openrouter",
       model: "anthropic/claude-sonnet-4-6",

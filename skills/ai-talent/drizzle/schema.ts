@@ -443,6 +443,19 @@ export const notificationPreferences = mysqlTable("notification_preferences", {
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
 
+// ─── Chat Messages (對話歷史持久化) ───────────────────────────────────────────
+export const chatMessages = mysqlTable("chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  role: varchar("role", { length: 10 }).notNull(),
+  content: text("content").notNull(),
+  taskId: int("taskId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
 // ─── Agent Memories (Sprint 3: user-defined training per agent) ────────────
 export const agentMemories = mysqlTable("agent_memories", {
   id: int("id").autoincrement().primaryKey(),
