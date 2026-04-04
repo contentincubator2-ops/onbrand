@@ -187,4 +187,61 @@ export const brandRouter = router({
       return { brandId: null, analysis };
     }),
 
+
+  /**
+   * 從 sowork_db 即時匹配適合 Onboarding 的 Agents
+   * 根據任務類型（research / strategy / copywriting）選最佳人選
+   */
+  matchAgentsForOnboarding: protectedProcedure
+    .input(z.object({
+      brandName: z.string(),
+      industry: z.string().optional(),
+      taskTypes: z.array(z.enum(["research", "strategy", "copywriting", "ads", "seo", "pr"])).default(["research", "strategy", "copywriting"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        // fallback 靜態資料
+        return [
+          { id: 29, name: "蘇雅玲", title: "公關策略師", specialty: "品牌定位、PR策略", layer: "strategy", taskType: "research" },
+          { id: 26, name: "吳佳穎", title: "META廣告策略師", specialty: "品牌廣告、受眾策略", layer: "strategy", taskType: "strategy" },
+          { id: 32, name: "許雅芳", title: "文案撰寫師", specialty: "廣告文案、品牌語調", layer: "execution", taskType: "copywriting" },
+        ];
+      }
+
+      const mysql2 = require("mysql2/promise");
+      const pool = await mysql2.createPool({
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        ssl: { rejectUnauthorized: false },
+      });
+
+      const matched: any[] = [];
+      const industry = input.industry ?? "";
+
+      // 每個任務類型找最適合的 agent
+      const taskQueries: Record<string, string> = {
+        research: `SELECT id, name, title, specialty, layer FROM agents WHERE isAvailable=1 AND layer='strategy' AND (specialty LIKE '%定位%' OR specialty LIKE '%研究%' OR specialty LIKE '%PR%' OR specialty LIKE '%品牌%') ORDER BY rating DESC LIMIT 1`,
+        strategy: `SELECT id, name, title, specialty, layer FROM agents WHERE isAvailable=1 AND layer='strategy' AND specialty LIKE '%策略%' ORDER BY rating DESC LIMIT 1`,
+        copywriting: `SELECT id, name, title, specialty, layer FROM agents WHERE isAvailable=1 AND (layer='execution') AND (specialty LIKE '%文案%' OR specialty LIKE '%腳本%' OR specialty LIKE '%撰寫%') ORDER BY rating DESC LIMIT 1`,
+        ads: `SELECT id, name, title, specialty, layer FROM agents WHERE isAvailable=1 AND specialty LIKE '%廣告%' ORDER BY rating DESC LIMIT 1`,
+        seo: `SELECT id, name, title, specialty, layer FROM agents WHERE isAvailable=1 AND specialty LIKE '%SEO%' ORDER BY rating DESC LIMIT 1`,
+        pr: `SELECT id, name, title, specialty, layer FROM agents WHERE isAvailable=1 AND specialty LIKE '%公關%' ORDER BY rating DESC LIMIT 1`,
+      };
+
+      for (const taskType of input.taskTypes) {
+        const q = taskQueries[taskType];
+        if (!q) continue;
+        const [rows] = await pool.query(q) as any;
+        if (rows.length > 0) {
+          matched.push({ ...rows[0], taskType });
+        }
+      }
+
+      await pool.end();
+      return matched;
+    }),
+
 });
