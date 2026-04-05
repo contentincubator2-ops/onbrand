@@ -53,6 +53,11 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
 
+  // AI Video Generation
+  FAL_API_KEY:          z.string().optional(), // fal.ai — Seedance 2.0
+  ELEVENLABS_API_KEY:   z.string().optional(), // ElevenLabs TTS
+  CREATOMATE_API_KEY:   z.string().optional(), // Creatomate video composition
+
   // App
   PORT: z.coerce.number().default(3001),
 });

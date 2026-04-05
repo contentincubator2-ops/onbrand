@@ -7,6 +7,7 @@ import { notificationRouter } from "./notificationRouter";
 import { taskRouter } from "./taskRouter";
 import { a2aRouter } from "./a2aRouter";
 import { conversationRouter } from "./conversationRouter";
+import { videoRouter } from "./videoRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   task:          taskRouter,
   a2a:           a2aRouter,
   conversation:  conversationRouter,
+  video:         videoRouter,
 });
 
 export type AppRouter = typeof appRouter;

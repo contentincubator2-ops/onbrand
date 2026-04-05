@@ -487,3 +487,28 @@ export const brandIntegrations = mysqlTable("brand_integrations", {
 });
 export type BrandIntegration = typeof brandIntegrations.$inferSelect;
 export type InsertBrandIntegration = typeof brandIntegrations.$inferInsert;
+
+// ─── Video Jobs ──────────────────────────────────────────────────────────────
+
+export const videoJobs = mysqlTable("video_jobs", {
+  id:           int("id").primaryKey().autoincrement(),
+  userId:       int("userId").notNull(),
+  brandId:      int("brandId"),
+  topic:        varchar("topic", { length: 500 }).notNull(),
+  platform:     mysqlEnum("platform", ["youtube", "instagram", "tiktok", "facebook"]).notNull().default("youtube"),
+  language:     mysqlEnum("language", ["zh-TW", "zh-CN", "en"]).notNull().default("zh-TW"),
+  duration:     int("duration").notNull().default(60),           // seconds
+  style:        varchar("style", { length: 50 }).notNull().default("professional"),
+  status:       mysqlEnum("status", ["pending", "processing", "completed", "failed"]).notNull().default("pending"),
+  progress:     int("progress").notNull().default(0),            // 0–100
+  script:       json("script"),                                  // VideoScript object
+  videoUrl:     text("videoUrl"),                                // Final MP4 URL
+  thumbnailUrl: text("thumbnailUrl"),                            // Preview image
+  falRequestId: varchar("falRequestId", { length: 255 }),        // fal.ai request tracking
+  errorMessage: text("errorMessage"),
+  createdAt:    timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:    timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type VideoJob = typeof videoJobs.$inferSelect;
+export type InsertVideoJob = typeof videoJobs.$inferInsert;
