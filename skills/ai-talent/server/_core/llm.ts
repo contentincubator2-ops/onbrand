@@ -147,8 +147,8 @@ const PROVIDER_CONFIG: Record<
   },
   google: {
     baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
-    defaultModel: "gemini-2.0-flash",
-    getKey:       () => ENV.GOOGLE_AI_API_KEY ?? "",
+    defaultModel: "gemini-2.5-flash",
+    getKey:       () => (ENV as any).GOOGLE_AI_API_KEY ?? "",
   },
   openrouter: {
     baseUrl:      "https://openrouter.ai/api/v1",
@@ -176,8 +176,8 @@ const PROVIDER_CONFIG: Record<
   },
   // Google Vertex AI — OpenAI-compatible endpoint
   "google-vertex": {
-    baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sowork-ai/locations/us-central1/endpoints/openapi",
-    defaultModel: "google/gemini-2.0-flash",
+    baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/ecommerce-483415/locations/us-central1/endpoints/openapi",
+    defaultModel: "google/gemini-2.5-flash",
     getKey:       () => (ENV as any).GOOGLE_VERTEX_API_KEY ?? "",
   },
 };
@@ -296,15 +296,67 @@ const normalizeResponseFormat = ({
   };
 };
 
+// ─── Google Service Account token helper ─────────────────────────────────────
+
+let _googleTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getGoogleServiceAccountToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (_googleTokenCache && _googleTokenCache.expiresAt > now + 60) {
+    return _googleTokenCache.token;
+  }
+
+  const credPath = (process.env.GOOGLE_APPLICATION_CREDENTIALS ?? "");
+  if (!credPath) throw new Error("GOOGLE_APPLICATION_CREDENTIALS not set");
+
+  const fs = await import("fs");
+  const sa = JSON.parse(fs.readFileSync(credPath, "utf8"));
+
+  const crypto = await import("crypto");
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/generative-language",
+    aud: "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now,
+  })).toString("base64url");
+
+  const msg = `${header}.${payload}`;
+  const sign = crypto.createSign("RSA-SHA256");
+  sign.update(msg);
+  const sig = sign.sign(sa.private_key, "base64url");
+  const jwt = `${msg}.${sig}`;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  const data = await res.json() as { access_token: string };
+  _googleTokenCache = { token: data.access_token, expiresAt: now + 3600 };
+  return data.access_token;
+}
+
 // ─── Main invoke function ─────────────────────────────────────────────────────
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // DEBT-1: Real multi-provider routing
-  const providerKey = params.provider ?? "forge";
+  const providerKey = params.provider ?? "openrouter";
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
-  const apiKey = config.getKey();
+  // For Google provider, use service account token if available
+  let apiKey: string;
+  if (providerKey === "google" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken();
+  } else {
+    apiKey = config.getKey();
+  }
   // SEC-4: Obfuscate error — don't leak key names in logs/responses
   if (!apiKey) throw new Error("LLM provider not configured");
 
