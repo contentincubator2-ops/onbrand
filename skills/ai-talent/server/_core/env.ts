@@ -28,6 +28,8 @@ const envSchema = z.object({
   GOOGLE_AI_API_KEY:      z.string().optional(),
   COHERE_API_KEY:         z.string().optional(),
   OPENAI_API_KEY:         z.string().optional(),
+  OPENROUTER_API_KEY:     z.string().optional(),
+  ANTHROPIC_API_KEY:      z.string().optional(),
 
   // Azure Search
   AZURE_SEARCH_ENDPOINT:   z.string().url().optional(),

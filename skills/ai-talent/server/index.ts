@@ -65,12 +65,15 @@ const limiter = rateLimit({
   max:             100,       // max requests per window per IP
   standardHeaders: true,
   legacyHeaders:   false,
+  // SEC-8: validate=false suppresses the X-Forwarded-For warning when
+  // running behind Traefik/Nginx reverse proxy with trust proxy enabled.
+  validate:        false,
 });
 app.use("/api", limiter);
 app.use("/trpc", limiter);
 
 // SEC-7: Separate, more lenient rate limiter for /health (no version info leaked)
-const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true });
+const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, validate: false });
 
 // ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
