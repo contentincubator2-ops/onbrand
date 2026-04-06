@@ -44,8 +44,8 @@ export async function callOpenAI(
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
     ],
-    provider: "openai",
-    model: "gpt-4o",
+    provider: "openrouter",
+    model: "anthropic/claude-sonnet-4-6",
     ...params,
   });
   const msg = result.choices[0]?.message?.content; return typeof msg === "string" ? msg : "";
