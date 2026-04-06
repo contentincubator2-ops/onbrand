@@ -250,8 +250,8 @@ export async function invokeLLMWithBilling(
     agentId,
     actionType,
     skipBilling = false,
-    provider = "openai",
-    model = "gpt-4o",
+    provider = "openrouter",
+    model = "anthropic/claude-sonnet-4-6",
     ...llmOptions
   } = options;
 
