@@ -174,11 +174,11 @@ const PROVIDER_CONFIG: Record<
     defaultModel: "gpt-4o-mini",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
-  // Google Vertex AI — OpenAI-compatible endpoint
+  // Google Vertex AI — OpenAI-compatible endpoint (uses service account)
   "google-vertex": {
     baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/ecommerce-483415/locations/us-central1/endpoints/openapi",
     defaultModel: "google/gemini-2.5-flash",
-    getKey:       () => (ENV as any).GOOGLE_VERTEX_API_KEY ?? "",
+    getKey:       () => "service-account", // sentinel: token fetched dynamically
   },
 };
 
@@ -300,7 +300,7 @@ const normalizeResponseFormat = ({
 
 let _googleTokenCache: { token: string; expiresAt: number } | null = null;
 
-async function getGoogleServiceAccountToken(): Promise<string> {
+async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/auth/cloud-platform"): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (_googleTokenCache && _googleTokenCache.expiresAt > now + 60) {
     return _googleTokenCache.token;
@@ -316,7 +316,7 @@ async function getGoogleServiceAccountToken(): Promise<string> {
   const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(JSON.stringify({
     iss: sa.client_email,
-    scope: "https://www.googleapis.com/auth/generative-language",
+    scope,
     aud: "https://oauth2.googleapis.com/token",
     exp: now + 3600,
     iat: now,
@@ -350,10 +350,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
-  // For Google provider, use service account token if available
+  // For Google providers, use service account token if available
   let apiKey: string;
   if (providerKey === "google" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    apiKey = await getGoogleServiceAccountToken();
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/generative-language");
+  } else if (providerKey === "google-vertex" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/cloud-platform");
   } else {
     apiKey = config.getKey();
   }
