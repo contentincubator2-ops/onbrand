@@ -58,7 +58,7 @@ export type ToolChoice =
 // DEBT-1: Add provider + model params for multi-provider routing
 export type InvokeParams = {
   messages: Message[];
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic";
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -164,6 +164,21 @@ const PROVIDER_CONFIG: Record<
     baseUrl:      "https://api.cohere.com/compatibility/v1",
     defaultModel: "command-r-plus",
     getKey:       () => ENV.COHERE_API_KEY ?? "",
+  },
+  // Azure AI Foundry — project-level OpenAI-compatible endpoint
+  // Endpoint: https://{hub}.services.ai.azure.com/api/projects/{project}/openai/v1
+  "azure-foundry": {
+    baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
+      ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
+      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
+    defaultModel: "gpt-4o-mini",
+    getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+  },
+  // Google Vertex AI — OpenAI-compatible endpoint
+  "google-vertex": {
+    baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sowork-ai/locations/us-central1/endpoints/openapi",
+    defaultModel: "google/gemini-2.0-flash",
+    getKey:       () => (ENV as any).GOOGLE_VERTEX_API_KEY ?? "",
   },
 };
 
