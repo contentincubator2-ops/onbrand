@@ -10,6 +10,8 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { A2AWorkflowDef } from "./a2aOrchestrator";
+import { executeTask } from "../executeTask";
+import { executeA2AWorkflow } from "./a2aOrchestrator";
 
 // ── Mock executeTask & getDb ──────────────────────────────────────────────────
 
@@ -27,11 +29,6 @@ vi.mock("../db", () => ({
     })),
   })),
 }));
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { executeTask } = require("../executeTask") as { executeTask: ReturnType<typeof vi.fn> };
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { executeA2AWorkflow } = require("./a2aOrchestrator") as typeof import("./a2aOrchestrator");
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
