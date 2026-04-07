@@ -93,7 +93,7 @@ describe("marketIntel keyword sanitizer", () => {
     k.replace(/[%_\\'";\-\/\*]/g, "").slice(0, 50).trim();
 
   it("removes SQL special chars from keywords", () => {
-    expect(sanitize("'; DROP TABLE--")).toBe(" DROP TABLE");
+    expect(sanitize("'; DROP TABLE--")).toBe("DROP TABLE");
     expect(sanitize("normal keyword")).toBe("normal keyword");
     expect(sanitize("%_\\")).toBe("");
     expect(sanitize("hello'world")).toBe("helloworld");
