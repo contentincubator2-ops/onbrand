@@ -23,6 +23,7 @@ import { authRouter } from "./auth/authRouter";
 import { streamRouter } from "./routes/streamRoute";
 import { exportRouter } from "./routes/exportRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
+import { slackOAuthRouter } from "./routes/slackOAuthRoute";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
 
@@ -88,6 +89,9 @@ app.use("/api/auth", authRouter);
 app.use("/api/stream", streamRouter);
 app.use("/api/export", exportRouter);
 app.use("/api/a2a", a2aStreamRouter);
+
+// ─── Slack OAuth + Events ─────────────────────────────────────────────────────
+app.use("/slack", slackOAuthRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 app.get("/health", healthLimiter, async (_req, res) => {
