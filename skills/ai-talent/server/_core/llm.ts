@@ -422,3 +422,77 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   return (await response.json()) as InvokeResult;
 }
+
+
+// ─── Streaming invoke function ──────────────────────────────────────────────
+export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<string> {
+  const providerKey = params.provider ?? "openrouter";
+  const config = PROVIDER_CONFIG[providerKey];
+  if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
+
+  let apiKey: string;
+  if (providerKey === "google" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/generative-language");
+  } else if (providerKey === "google-vertex" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/cloud-platform");
+  } else {
+    apiKey = config.getKey();
+  }
+  if (!apiKey) throw new Error("LLM provider not configured");
+
+  const model = params.model ?? config.defaultModel;
+  const apiUrl = `${config.baseUrl}/chat/completions`;
+
+  const { messages, tools, toolChoice, tool_choice } = params;
+  const payload: Record<string, unknown> = {
+    model,
+    messages: messages.map(normalizeMessage),
+    max_tokens: params.maxTokens ?? params.max_tokens ?? 8192,
+    stream: true,
+  };
+
+  if (tools && tools.length > 0) {
+    payload.tools = tools;
+  }
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
+  if (normalizedToolChoice) {
+    payload.tool_choice = normalizedToolChoice;
+  }
+
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`LLM stream failed: ${response.status} ${response.statusText} – ${errorText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "data: [DONE]") continue;
+      if (!trimmed.startsWith("data: ")) continue;
+      try {
+        const json = JSON.parse(trimmed.slice(6)) as any;
+        const delta = json.choices?.[0]?.delta?.content;
+        if (delta) yield delta;
+      } catch { /* skip malformed SSE lines */ }
+    }
+  }
+}
