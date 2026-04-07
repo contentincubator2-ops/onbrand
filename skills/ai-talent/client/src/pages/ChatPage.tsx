@@ -1,6 +1,20 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "../lib/trpc";
 import OnboardingWizard from "./OnboardingWizard";
+import TaskProgressTracker, { type TaskStep } from "../components/chat/TaskProgressTracker";
+
+// ── A2A intent detection ──────────────────────────────────────────────────────
+const A2A_PATTERNS: { regex: RegExp; workflowId: string }[] = [
+  { regex: /品牌上市|brand.launch|全套.*行銷|行銷.*全套|完整.*上市|上市.*計劃|上市.*策略/i, workflowId: "brand-launch-v1" },
+  { regex: /市場調研|市場研究|market.research|競品.*分析.*消費者|消費者.*洞察.*報告/i, workflowId: "market-research-v1" },
+];
+
+function detectA2AWorkflow(text: string): string | null {
+  for (const p of A2A_PATTERNS) {
+    if (p.regex.test(text)) return p.workflowId;
+  }
+  return null;
+}
 
 interface Msg {
   id: string;
@@ -58,6 +72,11 @@ export default function ChatPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   // P2: 多輪對話上下文
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
+  // A2A tracker state
+  const [a2aSteps, setA2aSteps] = useState<TaskStep[]>([]);
+  const [a2aProgress, setA2aProgress] = useState(0);
+  const [a2aTaskName, setA2aTaskName] = useState<string | undefined>(undefined);
+  const sseRef = useRef<EventSource | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const createAndExecute = trpc.task.createAndExecute.useMutation();
@@ -164,6 +183,71 @@ export default function ChatPage() {
 
     // P1: 儲存 user 訊息
     saveMessage.mutate({ brandId: activeBrand?.id, role: "user", content: text });
+
+    // ── A2A intent detection ────────────────────────────────────────────────
+    const workflowId = detectA2AWorkflow(text);
+    if (workflowId) {
+      // Close any existing SSE
+      sseRef.current?.close();
+      setA2aSteps([]);
+      setA2aProgress(0);
+      setA2aTaskName(undefined);
+
+      const token = localStorage.getItem("authToken");
+      const url = `/api/a2a/stream?workflowId=${workflowId}${activeBrand?.id ? `&brandId=${activeBrand.id}` : ""}`;
+      const sse = new EventSource(url + (token ? `&_token=${encodeURIComponent(token)}` : ""));
+      sseRef.current = sse;
+
+      // For SSE with auth header (EventSource doesn't support headers natively),
+      // we use the fetch-based approach via a small workaround: send token as query param
+      // The server reads it from ?_token if present
+      sse.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          if (event.type === "workflow_start") {
+            setA2aTaskName(event.name);
+            const steps: TaskStep[] = [];
+            setA2aSteps(steps);
+          } else if (event.type === "node_start") {
+            setA2aSteps(prev => {
+              const exists = prev.find(s => s.id === event.step);
+              if (exists) return prev.map(s => s.id === event.step ? { ...s, status: "running" } : s);
+              return [...prev, { id: event.step, label: event.nodeName, status: "running" }];
+            });
+            setA2aProgress(Math.round(((event.step - 1) / event.total) * 100));
+          } else if (event.type === "node_done") {
+            setA2aSteps(prev => prev.map(s => s.id === event.step ? { ...s, status: "done" } : s));
+            setA2aProgress(Math.round((event.step / event.total) * 100));
+          } else if (event.type === "node_error") {
+            setA2aSteps(prev => prev.map(s => s.label === event.nodeName ? { ...s, status: "error" } : s));
+          } else if (event.type === "workflow_done") {
+            setA2aProgress(100);
+          } else if (event.type === "result") {
+            // Compose final summary message
+            const outputs = Object.entries(event.result.nodeResults as Record<string, any>)
+              .filter(([, v]) => v.output)
+              .map(([nodeId, v]) => `**${nodeId.replace(/-/g, " ")}**\n${v.output?.slice(0, 400)}...`)
+              .join("\n\n---\n\n");
+            const content = outputs || "工作流已完成";
+            const aMsg: Msg = { id: `a2a-${Date.now()}`, role: "assistant", content, ts: Date.now() };
+            setConversations(prev => prev.map(c => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
+            saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
+            sse.close();
+            setLoading(false);
+          } else if (event.type === "error") {
+            const aMsg: Msg = { id: `e-${Date.now()}`, role: "assistant", content: `A2A 錯誤：${event.message}`, ts: Date.now() };
+            setConversations(prev => prev.map(c => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
+            sse.close();
+            setLoading(false);
+          }
+        } catch { /* parse error, skip */ }
+      };
+      sse.onerror = () => {
+        sse.close();
+        setLoading(false);
+      };
+      return; // Don't fall through to single-agent path
+    }
 
     try {
       // P4: 品牌 context 注入
@@ -296,6 +380,7 @@ export default function ChatPage() {
       )}
 
       {/* ═══ MAIN ═══ */}
+      <div className="flex-1 flex overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Header */}
@@ -375,15 +460,16 @@ export default function ChatPage() {
               </div>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                 {[
-                  "寫一則 Facebook 廣告文案",
-                  "分析競品的品牌定位差異",
-                  "設計社群媒體月曆",
-                  "撰寫 PR 新聞稿",
-                  "建議 A/B 測試方案",
+                  { label: "🚀 品牌上市完整工作流", text: "幫我執行品牌上市完整工作流" },
+                  { label: "🔍 市場調研工作流", text: "幫我做市場調研分析報告" },
+                  { label: "寫 Facebook 廣告文案", text: "寫一則 Facebook 廣告文案" },
+                  { label: "競品定位分析", text: "分析競品的品牌定位差異" },
+                  { label: "社群媒體月曆", text: "設計社群媒體月曆" },
+                  { label: "PR 新聞稿", text: "撰寫 PR 新聞稿" },
                 ].map(s => (
-                  <button key={s} onClick={() => setInput(s)}
+                  <button key={s.label} onClick={() => setInput(s.text)}
                     className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
-                    {s}
+                    {s.label}
                   </button>
                 ))}
               </div>
@@ -470,6 +556,17 @@ export default function ChatPage() {
             <p className="text-xs text-neutral-400 dark:text-neutral-600 text-center mt-2">Enter 送出　·　Shift+Enter 換行</p>
           </div>
         </div>
+      </div>
+
+      {/* ═══ A2A TASK TRACKER (right sidebar, visible when A2A running) ═══ */}
+      {(a2aSteps.length > 0 || loading) && (
+        <TaskProgressTracker
+          taskName={a2aTaskName}
+          steps={a2aSteps}
+          progress={a2aProgress}
+          onComplete={() => { /* keep visible until user closes */ }}
+        />
+      )}
       </div>
     </div>
   );

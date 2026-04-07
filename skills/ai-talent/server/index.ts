@@ -5,6 +5,11 @@
  * DEBT-3: Added rate limiting, request logging, and graceful shutdown.
  */
 
+// Load .env before any other imports (dotenv must come first)
+import { config as dotenvConfig } from "dotenv";
+import { resolve } from "path";
+dotenvConfig({ path: resolve(process.cwd(), ".env") });
+
 import express from "express";
 import cors from "cors";
 import { rateLimit } from "express-rate-limit";
@@ -15,6 +20,9 @@ import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./llmWithBilling";
 import { createContext } from "./_core/trpc";
 import { authRouter } from "./auth/authRouter";
+import { streamRouter } from "./routes/streamRoute";
+import { exportRouter } from "./routes/exportRoute";
+import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
 
@@ -77,6 +85,9 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: tr
 
 // ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
+app.use("/api/stream", streamRouter);
+app.use("/api/export", exportRouter);
+app.use("/api/a2a", a2aStreamRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 app.get("/health", healthLimiter, async (_req, res) => {

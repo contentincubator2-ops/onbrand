@@ -38,6 +38,15 @@ export interface A2AExecutionResult {
   completedAt: Date;
 }
 
+export type A2AEventType =
+  | { type: "workflow_start"; workflowId: string; name: string; totalNodes: number }
+  | { type: "node_start"; nodeId: string; nodeName: string; step: number; total: number }
+  | { type: "node_done"; nodeId: string; nodeName: string; step: number; total: number; taskId?: number }
+  | { type: "node_error"; nodeId: string; nodeName: string; error: string }
+  | { type: "workflow_done"; status: string };
+
+export type A2AEventCallback = (event: A2AEventType) => void;
+
 // ── Topology helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -121,11 +130,13 @@ async function createTaskForNode(
  * Execute an A2A workflow.
  * Resolves node dependencies and executes in correct order.
  * Parallel-capable: nodes with the same depth level run concurrently.
+ * Optional onEvent callback fires SSE events to the frontend in real time.
  */
 export async function executeA2AWorkflow(
   workflow: A2AWorkflowDef,
   userId: number,
-  brandId?: number
+  brandId?: number,
+  onEvent?: A2AEventCallback
 ): Promise<A2AExecutionResult> {
   const nodeResults: A2AExecutionResult["nodeResults"] = {};
 
@@ -135,11 +146,17 @@ export async function executeA2AWorkflow(
   }
 
   const layers = buildExecutionLayers(workflow.nodes);
+  const totalNodes = workflow.nodes.length;
+  let stepCounter = 0;
+
+  onEvent?.({ type: "workflow_start", workflowId: workflow.workflowId, name: workflow.name, totalNodes });
 
   for (const layer of layers) {
     // Execute all nodes in this layer concurrently
     await Promise.all(
       layer.map(async (node) => {
+        const step = ++stepCounter;
+        onEvent?.({ type: "node_start", nodeId: node.nodeId, nodeName: node.taskTitle, step, total: totalNodes });
         try {
           // Collect upstream output if inputFrom is specified
           let priorOutput: string | undefined;
@@ -155,6 +172,7 @@ export async function executeA2AWorkflow(
               status: "failed",
               error: "Failed to create task record",
             };
+            onEvent?.({ type: "node_error", nodeId: node.nodeId, nodeName: node.taskTitle, error: "Failed to create task record" });
             return;
           }
 
@@ -168,12 +186,14 @@ export async function executeA2AWorkflow(
               status: "completed",
               output: result.output,
             };
+            onEvent?.({ type: "node_done", nodeId: node.nodeId, nodeName: node.taskTitle, step, total: totalNodes, taskId });
           } else {
             nodeResults[node.nodeId] = {
               taskId,
               status: "failed",
               error: result.error,
             };
+            onEvent?.({ type: "node_error", nodeId: node.nodeId, nodeName: node.taskTitle, error: result.error ?? "unknown" });
           }
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
@@ -181,6 +201,7 @@ export async function executeA2AWorkflow(
             status: "failed",
             error: errMsg,
           };
+          onEvent?.({ type: "node_error", nodeId: node.nodeId, nodeName: node.taskTitle, error: errMsg });
         }
       })
     );
@@ -194,9 +215,12 @@ export async function executeA2AWorkflow(
   const allCompleted = statuses.every((s) => s === "completed");
   const allFailed = statuses.every((s) => s === "failed");
 
+  const overallStatus = allCompleted ? "completed" : allFailed ? "failed" : "partial";
+  onEvent?.({ type: "workflow_done", status: overallStatus });
+
   return {
     workflowId: workflow.workflowId,
-    status: allCompleted ? "completed" : allFailed ? "failed" : "partial",
+    status: overallStatus,
     nodeResults,
     completedAt: new Date(),
   };
