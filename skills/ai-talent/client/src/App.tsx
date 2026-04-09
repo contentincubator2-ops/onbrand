@@ -5,6 +5,7 @@ import Campaigns from "./pages/Campaigns";
 import BrandAnalysis from "./pages/BrandAnalysis";
 import Credits from "./pages/Credits";
 import Settings from "./pages/Settings";
+import AgentWorkspace from "./pages/AgentWorkspace";
 import Layout from "./components/Layout";
 import { Navigate, Routes, Route } from "react-router-dom";
 
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="brand-analysis" element={<BrandAnalysis />} />
         <Route path="credits" element={<Credits />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="agents" element={<AgentWorkspace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

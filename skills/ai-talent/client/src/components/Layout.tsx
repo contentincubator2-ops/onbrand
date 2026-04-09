@@ -38,6 +38,15 @@ const navSections = [
         ),
       },
       {
+        to: "/agents",
+        label: "Agent Workspace",
+        icon: (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/><path d="M9 14s1 1 3 1 3-1 3-1"/>
+          </svg>
+        ),
+      },
+      {
         to: "/brand-analysis",
         label: "Brand Analysis",
         icon: (
