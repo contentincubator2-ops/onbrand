@@ -39,6 +39,20 @@ export const taskRouter = router({
         .limit(input.limit);
     }),
 
+  /** 最近任務列表（含 agent 資訊，供 Dashboard 使用） */
+  listRecent: protectedProcedure
+    .input(z.object({ limit: z.number().default(10) }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.userId, ctx.user.id))
+        .orderBy(desc(tasks.createdAt))
+        .limit(input.limit);
+    }),
+
   /** 查詢單一任務 */
   get: protectedProcedure
     .input(z.object({ taskId: z.number() }))
