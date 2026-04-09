@@ -143,7 +143,22 @@ function TeamAssemblyPanel({ state }: { state: TeamAssemblyState }) {
           </div>
         </div>
 
-        {/* Agents */}
+        {/* Agents — graceful fallback if no agents returned */}
+        {state.agents.length === 0 && state.phase !== "analyzing" && (
+          <div className="px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">策</div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-800">策略總監</p>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">策略層</span>
+                </div>
+                <p className="text-xs text-gray-500">CMO / 首席行銷官</p>
+              </div>
+              <span className="text-green-500 text-sm ml-auto">✓</span>
+            </div>
+          </div>
+        )}
         {state.agents.length > 0 && (
           <div className="px-5 py-4 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">本次任務團隊</p>

@@ -41,8 +41,8 @@ function StatusBadge({ status }: { status: string }) {
 // ── A2A Architecture Diagram ───────────────────────────────────────────────
 function A2ADiagram() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <h2 className="text-base font-semibold text-gray-700 mb-5">🤖 A2A 多代理架構</h2>
+    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+      <h2 className="text-base font-semibold text-gray-700 dark:text-neutral-200 mb-5">🤖 A2A 多代理架構</h2>
       <div className="flex items-center justify-center gap-0 overflow-x-auto pb-2">
         {/* CMO Node */}
         <div className="flex flex-col items-center">
@@ -50,7 +50,7 @@ function A2ADiagram() {
             <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center text-lg mx-auto mb-2">👔</div>
             <p className="text-xs font-bold text-purple-700">CMO</p>
             <p className="text-[10px] text-purple-500 mt-0.5">策略層</p>
-            <p className="text-[10px] text-gray-500 mt-1 leading-tight">制定目標<br/>分配任務</p>
+            <p className="text-[10px] text-gray-500 dark:text-neutral-400 mt-1 leading-tight">制定目標<br/>分配任務</p>
           </div>
         </div>
 
@@ -69,7 +69,7 @@ function A2ADiagram() {
             <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg mx-auto mb-2">🧭</div>
             <p className="text-xs font-bold text-blue-700">策略 PM</p>
             <p className="text-[10px] text-blue-500 mt-0.5">執行層</p>
-            <p className="text-[10px] text-gray-500 mt-1 leading-tight">拆解任務<br/>協調執行</p>
+            <p className="text-[10px] text-gray-500 dark:text-neutral-400 mt-1 leading-tight">拆解任務<br/>協調執行</p>
           </div>
         </div>
 
@@ -97,7 +97,7 @@ function A2ADiagram() {
           ))}
         </div>
       </div>
-      <p className="text-center text-xs text-gray-400 mt-4">
+      <p className="text-center text-xs text-gray-400 dark:text-neutral-500 mt-4">
         OpenClaw 自動編排 · 任務完成後觸發下一步 · 全程可追蹤
       </p>
     </div>
@@ -116,12 +116,12 @@ export default function Dashboard() {
   const runningCount = recentTasks?.filter((t) => t.status === "in_progress").length ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-gray-900 dark:text-neutral-100">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Mission Control 🚀</h1>
-          <p className="text-gray-500 mt-1 text-sm">SoWork Enterprise AI 行銷指揮中心</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Mission Control 🚀</h1>
+          <p className="text-gray-500 dark:text-neutral-400 mt-1 text-sm">SoWork Enterprise AI 行銷指揮中心</p>
         </div>
         <button
           onClick={() => navigate("/chat")}
@@ -134,8 +134,8 @@ export default function Dashboard() {
       {/* Top stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Credits */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-500 mb-1">可用 Credits</p>
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">可用 Credits</p>
           {balanceLoading ? <LoadingSpinner size="sm" /> : (
             <>
               <p className="text-2xl font-bold text-indigo-600">
@@ -147,19 +147,19 @@ export default function Dashboard() {
         </div>
 
         {/* Total agents */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-500 mb-1">AI 人才總數</p>
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">AI 人才總數</p>
           {agentLoading ? <LoadingSpinner size="sm" /> : (
             <>
-              <p className="text-2xl font-bold text-gray-900">{agentCounts?.total ?? 0}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{agentCounts?.total ?? 0}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">可用 agents</p>
             </>
           )}
         </div>
 
         {/* Running tasks */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-500 mb-1">執行中任務</p>
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">執行中任務</p>
           <p className="text-2xl font-bold text-yellow-600">{runningCount}</p>
           <p className="text-[10px] text-gray-400 mt-0.5">
             {runningCount > 0 ? "OpenClaw 自動執行中" : "目前無進行中"}
@@ -167,16 +167,16 @@ export default function Dashboard() {
         </div>
 
         {/* System status */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-500 mb-1">系統狀態</p>
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4">
+          <p className="text-xs text-gray-500 dark:text-neutral-400 mb-1">系統狀態</p>
           <p className="text-2xl font-bold text-green-600">正常</p>
           <p className="text-[10px] text-gray-400 mt-0.5">所有服務運行中</p>
         </div>
       </div>
 
       {/* Agent layer breakdown */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-base font-semibold text-gray-700 mb-4">
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+        <h2 className="text-base font-semibold text-gray-700 dark:text-neutral-200 mb-4">
           <span className="mr-2">👥</span>AI 人才層級分佈
         </h2>
         {agentLoading ? <LoadingSpinner message="載入人才數據..." /> : (
@@ -185,19 +185,19 @@ export default function Dashboard() {
               <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center text-base mx-auto mb-2">👔</div>
               <p className="text-2xl font-bold text-purple-700">{agentCounts?.strategy ?? 0}</p>
               <p className="text-xs font-semibold text-purple-600 mt-1">策略層</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">CMO / 策略總監</p>
+              <p className="text-[10px] text-gray-500 dark:text-neutral-400 mt-0.5">CMO / 策略總監</p>
             </div>
             <div className="rounded-lg bg-blue-50 border border-blue-100 p-4 text-center">
               <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-base mx-auto mb-2">🧭</div>
               <p className="text-2xl font-bold text-blue-700">{agentCounts?.execution ?? 0}</p>
               <p className="text-xs font-semibold text-blue-600 mt-1">執行層</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">PM / 執行主管</p>
+              <p className="text-[10px] text-gray-500 dark:text-neutral-400 mt-0.5">PM / 執行主管</p>
             </div>
             <div className="rounded-lg bg-green-50 border border-green-100 p-4 text-center">
               <div className="w-10 h-10 rounded-full bg-green-600 text-white flex items-center justify-center text-base mx-auto mb-2">✍️</div>
               <p className="text-2xl font-bold text-green-700">{agentCounts?.training ?? 0}</p>
               <p className="text-xs font-semibold text-green-600 mt-1">訓練層</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">文案 / 數據 / 創意</p>
+              <p className="text-[10px] text-gray-500 dark:text-neutral-400 mt-0.5">文案 / 數據 / 創意</p>
             </div>
           </div>
         )}
@@ -207,9 +207,9 @@ export default function Dashboard() {
       <A2ADiagram />
 
       {/* OpenClaw autonomous task status */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-gray-700">
+          <h2 className="text-base font-semibold text-gray-700 dark:text-neutral-200">
             <span className="mr-2">⚡</span>OpenClaw 自動任務紀錄
           </h2>
           {runningCount > 0 && (
@@ -225,11 +225,11 @@ export default function Dashboard() {
           <div className="space-y-2">
             {recentTasks.map((task) =>
               task?.id ? (
-                <div key={task.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-colors">
+                <div key={task.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-50 dark:bg-neutral-700 border border-gray-100 dark:border-neutral-600 hover:bg-gray-100 dark:hover:bg-neutral-600 transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm flex-shrink-0">🤖</div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{task.title}</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-neutral-100 truncate">{task.title}</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">
                         {task.createdAt ? new Date(task.createdAt).toLocaleDateString("zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
                       </p>
@@ -251,7 +251,7 @@ export default function Dashboard() {
 
       {/* Quick action cards */}
       <div>
-        <h2 className="text-base font-semibold text-gray-700 mb-3">快速操作</h2>
+        <h2 className="text-base font-semibold text-gray-700 dark:text-neutral-200 mb-3">快速操作</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             {
@@ -279,15 +279,15 @@ export default function Dashboard() {
             <button
               key={card.path}
               onClick={() => navigate(card.path)}
-              className={`text-left bg-white rounded-xl border border-gray-200 p-5 hover:border-${card.color}-300 hover:shadow-md transition-all group`}
+              className={`text-left bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 hover:border-${card.color}-300 hover:shadow-md transition-all group`}
             >
               <div className={`w-10 h-10 rounded-lg bg-${card.color}-100 text-${card.color}-600 flex items-center justify-center mb-3 group-hover:bg-${card.color}-600 group-hover:text-white transition-colors`}>
                 {card.icon}
               </div>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="font-semibold text-gray-800 text-sm">{card.title}</p>
-                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{card.desc}</p>
+                  <p className="font-semibold text-gray-800 dark:text-neutral-100 text-sm">{card.title}</p>
+                  <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1 leading-relaxed">{card.desc}</p>
                 </div>
                 <span className="text-gray-300 group-hover:text-indigo-500 transition-colors mt-0.5">
                   <IconArrow />
@@ -300,7 +300,7 @@ export default function Dashboard() {
 
       {/* Recent tasks (existing) */}
       <div>
-        <h2 className="text-base font-semibold text-gray-700 mb-3">最近任務</h2>
+        <h2 className="text-base font-semibold text-gray-700 dark:text-neutral-200 mb-3">最近任務</h2>
         {tasksLoading ? (
           <LoadingSpinner message="載入任務中..." />
         ) : tasks && tasks.length > 0 ? (
@@ -310,7 +310,7 @@ export default function Dashboard() {
             )}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-400 bg-white rounded-xl border border-gray-200">
+          <div className="text-center py-8 text-gray-400 dark:text-neutral-500 bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700">
             <p className="text-4xl mb-2">📭</p>
             <p>目前沒有任務</p>
           </div>

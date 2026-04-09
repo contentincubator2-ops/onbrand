@@ -1,33 +1,11 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getSoworkDb } from "../db";
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import { matchAgents } from "../agentMatcher";
-import {
-  mysqlTable,
-  int,
-  varchar,
-  text,
-  decimal,
-  boolean,
-  mysqlEnum,
-} from "drizzle-orm/mysql-core";
 
-// ── sowork_db.agents schema ────────────────────────────────────────────────
-const soworkAgents = mysqlTable("agents", {
-  id:           int("id").primaryKey(),
-  slug:         varchar("slug", { length: 64 }).notNull(),
-  name:         varchar("name", { length: 64 }).notNull(),
-  title:        varchar("title", { length: 128 }).notNull(),
-  layer:        mysqlEnum("layer", ["strategy", "execution", "training"]).notNull(),
-  specialty:    text("specialty"),
-  bio:          text("bio"),
-  rating:       decimal("rating", { precision: 3, scale: 2 }),
-  hireCount:    int("hireCount").default(0),
-  pricePerTask: decimal("pricePerTask", { precision: 10, scale: 2 }),
-  priceMonthly: decimal("priceMonthly", { precision: 10, scale: 2 }),
-  isAvailable:  boolean("isAvailable").default(true),
-});
+// ── Shared schema (single source of truth — no duplication) ───────────────
+import { soworkAgents } from "../_schemas/soworkAgents";
 
 // ── Task type detection ────────────────────────────────────────────────────
 function detectTaskType(description: string): string {
@@ -55,17 +33,15 @@ export const agentRouter = router({
     .query(async ({ input }) => {
       const db = await getSoworkDb();
       if (!db) return [];
-      const rows = await db
+      // Fix: filter by BOTH isAvailable AND layer when layer is provided
+      const whereClause = input.layer
+        ? and(eq(soworkAgents.isAvailable, true), eq(soworkAgents.layer, input.layer))
+        : eq(soworkAgents.isAvailable, true);
+      return db
         .select()
         .from(soworkAgents)
-        .where(
-          input.layer
-            ? eq(soworkAgents.isAvailable, true)
-            : eq(soworkAgents.isAvailable, true)
-        )
+        .where(whereClause)
         .limit(input.limit);
-      // filter by layer in JS if provided (avoids extra and() import)
-      return input.layer ? rows.filter((r) => r.layer === input.layer) : rows;
     }),
 
   /** Count agents grouped by layer */
@@ -112,7 +88,29 @@ export const agentRouter = router({
         "品質審核，優化最終輸出",
       ];
 
-      const plan = agents.slice(0, 3).map((a, i) => ({
+      // Fix: graceful fallback when 0 agents returned — use a default CMO agent
+      const effectiveAgents =
+        agents.length > 0
+          ? agents
+          : [
+              {
+                id: 0,
+                slug: "cmo-default",
+                name: "策略總監",
+                title: "CMO / 首席行銷官",
+                layer: "strategy" as const,
+                specialty: "品牌策略、行銷規劃、任務統籌",
+                bio: "預設 AI 策略代理人",
+                rating: 5,
+                hireCount: 0,
+                pricePerTask: 0,
+                priceMonthly: 0,
+                matchScore: 100,
+                matchReasons: ["fallback agent"],
+              },
+            ];
+
+      const plan = effectiveAgents.slice(0, 3).map((a, i) => ({
         step:       i + 1,
         agentName:  a.name,
         agentTitle: a.title,
@@ -120,6 +118,6 @@ export const agentRouter = router({
         action:     STEP_ACTIONS[i] ?? "執行任務",
       }));
 
-      return { agents, plan, taskType };
+      return { agents: effectiveAgents, plan, taskType };
     }),
 });
