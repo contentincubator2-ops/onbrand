@@ -512,3 +512,40 @@ export const videoJobs = mysqlTable("video_jobs", {
 
 export type VideoJob = typeof videoJobs.$inferSelect;
 export type InsertVideoJob = typeof videoJobs.$inferInsert;
+
+// ─── Missions (Sprint 2: workspace mission context) ──────────────────────────
+// Each mission represents a specific campaign/project within a workspace channel.
+// Workspace (e.g. Facebook, LinkedIn) > Mission > Task Units
+export const missions = mysqlTable("missions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  workspace: varchar("workspace", { length: 50 }).notNull(), // 'facebook' | 'linkedin' | 'youtube' | 'pr' | 'event' | 'instore'
+  title: varchar("title", { length: 255 }).notNull(),
+  objective: text("objective"),
+  audience: text("audience"),
+  offer: text("offer"),
+  successMetrics: text("successMetrics"),
+  constraints: text("constraints"),
+  methodology: text("methodology"), // e.g. "Brand Positioning v2"
+  status: mysqlEnum("status", ["active", "completed", "archived"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Mission = typeof missions.$inferSelect;
+export type InsertMission = typeof missions.$inferInsert;
+
+// ─── Mission Task Units (Sprint 2: task breakdown within a mission) ──────────
+export const missionTaskUnits = mysqlTable("mission_task_units", {
+  id: int("id").autoincrement().primaryKey(),
+  missionId: int("missionId").notNull(),
+  agentId: int("agentId"), // assigned AI agent (null = unassigned)
+  label: varchar("label", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["not_started", "running", "needs_input", "review", "approved"]).default("not_started").notNull(),
+  sortOrder: int("sortOrder").default(0),
+  taskId: int("taskId"), // link to tasks table when execution starts
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MissionTaskUnit = typeof missionTaskUnits.$inferSelect;
+export type InsertMissionTaskUnit = typeof missionTaskUnits.$inferInsert;
