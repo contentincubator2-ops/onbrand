@@ -26,6 +26,7 @@ export const soworkAgents = mysqlTable("agents", {
   pricePerTask: decimal("pricePerTask", { precision: 10, scale: 2 }),
   priceMonthly: decimal("priceMonthly", { precision: 10, scale: 2 }),
   isAvailable:  boolean("isAvailable").default(true),
+  workspace:    varchar("workspace", { length: 32 }),  // facebook | linkedin | youtube | pr | event | instore
 });
 
 export const agentKnowledgeBase = mysqlTable("agent_knowledge_base", {
