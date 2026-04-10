@@ -1,6 +1,8 @@
 /**
- * ChatInput — Message input with Enter to send, Shift+Enter for newline.
+ * ChatInput — Sprint 3
+ * Message input with Enter to send, Shift+Enter for newline.
  * Auto-expands textarea up to 5 rows.
+ * Claude-style warm design with amber send button.
  */
 import { useState, useRef, type KeyboardEvent } from "react";
 
@@ -10,7 +12,7 @@ interface Props {
   disabled?: boolean;
 }
 
-export default function ChatInput({ onSend, placeholder = "輸入訊息…", disabled }: Props) {
+export default function ChatInput({ onSend, placeholder = "告訴我你想為「SoWork.ai」完成什麼任務...", disabled }: Props) {
   const [value, setValue] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -33,7 +35,7 @@ export default function ChatInput({ onSend, placeholder = "輸入訊息…", dis
   };
 
   return (
-    <div className="flex items-end gap-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl px-4 py-3 shadow-sm focus-within:border-[#FF6B35]/50 focus-within:shadow-[0_0_0_3px_rgba(255,107,53,0.08)] transition-all">
+    <div className="flex items-end gap-3 bg-white border border-[#e0dbd5] rounded-2xl px-4 py-3 shadow-sm focus-within:border-[#c9823a]/50 focus-within:shadow-[0_0_0_3px_rgba(201,130,58,0.08)] transition-all">
       <textarea
         ref={ref}
         rows={1}
@@ -43,12 +45,12 @@ export default function ChatInput({ onSend, placeholder = "輸入訊息…", dis
         onInput={onInput}
         placeholder={placeholder}
         disabled={disabled}
-        className="flex-1 resize-none bg-transparent outline-none text-sm text-gray-800 dark:text-white placeholder-gray-400 leading-relaxed"
+        className="flex-1 resize-none bg-transparent outline-none text-sm text-[#3d3530] placeholder-[#b8b0a8] leading-relaxed"
       />
       <button
         onClick={submit}
         disabled={!value.trim() || disabled}
-        className="w-9 h-9 rounded-xl bg-[#FF6B35] text-white flex items-center justify-center disabled:opacity-30 hover:bg-[#e85a28] active:scale-95 transition-all flex-shrink-0"
+        className="w-9 h-9 rounded-xl bg-[#c9823a] text-white flex items-center justify-center disabled:opacity-30 hover:bg-[#b87332] active:scale-95 transition-all flex-shrink-0"
         aria-label="Send"
       >
         <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 rotate-90">
