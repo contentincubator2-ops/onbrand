@@ -1,12 +1,13 @@
 /**
- * WorkspacePage.tsx
+ * WorkspacePage.tsx — Sprint 2
  * Three-column workspace layout: Left (MissionContext) | Center (Chat/Execution) | Right (Team/Artifacts/Review)
  *
- * FIXES applied:
- * - h-screen → h-full (avoid double full-height since Layout already sets h-screen)
- * - Pass activeWorkspace to MissionContextRail so left rail shows workspace name
- * - Collapsible left/right rails for more chat space
- * - Improved top bar layout
+ * Sprint 2 wiring:
+ * - mission.getActive tRPC query loads real mission data from DB
+ * - mission.create mutation for new missions
+ * - Top bar shows active mission title with loading spinner
+ * - MissionContextRail receives live DB data
+ * - Collapsible left/right rails
  */
 import { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
@@ -48,13 +49,43 @@ export default function WorkspacePage() {
     }
   }, [brands, activeBrandId]);
 
-  // Mission context — populated with workspace name by default
-  const [mission, setMission] = useState<MissionContext | null>(null);
+  // ---- Sprint 2: Live mission data from DB ----
+  const activeMissionQuery = trpc.mission.getActive.useQuery(
+    { workspace: activeWorkspace, brandId: activeBrand?.id },
+    { enabled: !!activeBrand, refetchOnWindowFocus: false }
+  );
+  const activeMissionData = activeMissionQuery.data ?? null;
 
-  // Right panel state
-  const [team, setTeam] = useState<TeamMember[]>([]);
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  // Transform DB mission into MissionContext shape for the rail
+  const mission: MissionContext | null = activeMissionData
+    ? {
+        workspace: activeMissionData.workspace,
+        objective: activeMissionData.objective ?? "",
+        audience: activeMissionData.audience ?? "",
+        offer: activeMissionData.offer ?? "",
+        successMetrics: activeMissionData.successMetrics ?? "",
+        constraints: activeMissionData.constraints ?? "",
+        methodology: activeMissionData.methodology ?? "",
+        taskUnits: (activeMissionData.taskUnits ?? []).map((u: any) => ({
+          id: u.id,
+          label: u.label,
+          status: u.status ?? "not_started",
+        })),
+      }
+    : null;
+
+  // Create mission mutation
+  const utils = trpc.useUtils();
+  const createMission = trpc.mission.create.useMutation({
+    onSuccess: () => {
+      utils.mission.getActive.invalidate({ workspace: activeWorkspace });
+    },
+  });
+
+  // Right panel state (static for now, will wire in Sprint 3)
+  const [team] = useState<TeamMember[]>([]);
+  const [artifacts] = useState<Artifact[]>([]);
+  const [reviews] = useState<ReviewItem[]>([]);
 
   const currentWorkspace = WORKSPACES.find(w => w.id === activeWorkspace)!;
 
@@ -66,24 +97,34 @@ export default function WorkspacePage() {
     return () => document.removeEventListener('click', handler);
   }, [showWorkspaceMenu]);
 
+  // Handler: create a new mission for current workspace
+  const handleNewMission = () => {
+    if (!activeBrand) return;
+    const title = prompt("輸入新任務名稱：");
+    if (!title?.trim()) return;
+    createMission.mutate({
+      workspace: activeWorkspace,
+      brandId: activeBrand.id,
+      title: title.trim(),
+    });
+  };
+
   return (
     <div className="flex h-full bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-
       {/* ===== LEFT RAIL ===== */}
       {!leftCollapsed && (
         <MissionContextRail
           brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
           mission={mission}
           workspaceName={currentWorkspace.label}
+          onEditMission={handleNewMission}
         />
       )}
 
       {/* ===== CENTER: Top bar + Chat ===== */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
         {/* Top bar */}
         <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#212121]">
-
           {/* Left section: collapse + workspace selector */}
           <div className="flex items-center gap-2">
             {/* Toggle left rail */}
@@ -113,7 +154,6 @@ export default function WorkspacePage() {
                 {currentWorkspace.label}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
-
               {showWorkspaceMenu && (
                 <div className="absolute left-0 top-full mt-1 w-52 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-xl overflow-hidden z-50">
                   <div className="px-3 py-2 border-b border-neutral-100 dark:border-neutral-800">
@@ -143,17 +183,34 @@ export default function WorkspacePage() {
             </div>
 
             <span className="text-neutral-300 dark:text-neutral-700">|</span>
-            <span className="text-xs text-neutral-400 dark:text-neutral-500">Mission workspace</span>
+
+            {/* Mission title or placeholder */}
+            <span className="text-xs text-neutral-400 dark:text-neutral-500 truncate max-w-[200px]">
+              {activeMissionData ? activeMissionData.title : 'Mission workspace'}
+            </span>
+            {activeMissionQuery.isLoading && (
+              <span className="w-3 h-3 border border-neutral-300 border-t-indigo-400 rounded-full animate-spin" />
+            )}
           </div>
 
-          {/* Right: brand switcher + collapse right rail */}
+          {/* Right: brand switcher + new mission + collapse right */}
           <div className="flex items-center gap-2">
+            {/* New mission button */}
+            <button
+              onClick={handleNewMission}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-600 text-neutral-500 dark:text-neutral-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors"
+              title="建立新任務"
+            >
+              + 新任務
+            </button>
+
             {activeBrand && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400">
                 <div className="w-4 h-4 rounded-full bg-neutral-800 dark:bg-neutral-200 shrink-0" />
                 <span className="max-w-[140px] truncate">{activeBrand.name}</span>
               </div>
             )}
+
             {/* Toggle right rail */}
             <button
               onClick={() => setRightCollapsed(c => !c)}
@@ -171,7 +228,7 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* Chat area — renders existing ChatPage */}
+        {/* Chat area */}
         <div className="flex-1 overflow-hidden">
           <ChatPage />
         </div>
