@@ -1,15 +1,8 @@
 /**
- * Layout.tsx — New minimal shell
- * 
- * Replaces the old 7-item sidebar navigation.
- * Now just a thin icon rail (56px) on the far left for:
- *   - Logo / brand identity
- *   - Dark mode toggle
- *   - Settings (opens overlay)
- *   - Logout
- * 
- * The three-column workspace (MissionContextRail | Chat | ArtifactReviewPanel)
- * lives inside WorkspacePage, which renders via <Outlet />.
+ * Layout.tsx — Sprint 3 Claude warm shell
+ *
+ * Minimal icon rail (56px) with warm neutral palette.
+ * Claude design: #faf9f7 bg, amber accents (#c9823a), refined spacing.
  */
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
@@ -30,14 +23,20 @@ export default function Layout() {
   const logout = () => { localStorage.removeItem("authToken"); navigate("/login"); };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-[#212121] overflow-hidden">
-      {/* ===== Thin icon rail ===== */}
-      <aside className="shrink-0 flex flex-col items-center justify-between w-14 border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 py-3">
+    <div className="flex h-screen overflow-hidden" style={{ background: dark ? '#1a1918' : '#faf9f7' }}>
+      {/* ===== Thin icon rail — Claude warm ===== */}
+      <aside className="shrink-0 flex flex-col items-center justify-between w-14 py-3"
+        style={{
+          borderRight: `1px solid ${dark ? '#2d2b28' : '#e8e5e0'}`,
+          background: dark ? '#1f1e1c' : '#f5f2ed',
+        }}
+      >
         {/* Top: Logo */}
         <div className="flex flex-col items-center gap-4">
           <button
             onClick={() => navigate("/")}
-            className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
+            className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
+            style={{ background: '#c9823a' }}
             title="SoWork Home"
           >
             <span className="text-white text-sm font-bold">S</span>
@@ -49,7 +48,10 @@ export default function Layout() {
           {/* Settings */}
           <button
             onClick={() => navigate("/settings")}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition-colors"
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+            style={{ color: dark ? '#9b8fa0' : '#9b8fa0' }}
+            onMouseEnter={e => { e.currentTarget.style.color = dark ? '#e8e5e0' : '#5a4f47'; e.currentTarget.style.background = dark ? '#2d2b28' : '#ece8e2'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#9b8fa0'; e.currentTarget.style.background = 'transparent'; }}
             title="Settings"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -60,7 +62,10 @@ export default function Layout() {
           {/* Dark mode */}
           <button
             onClick={() => setDark(d => !d)}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition-colors"
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+            style={{ color: '#9b8fa0' }}
+            onMouseEnter={e => { e.currentTarget.style.color = dark ? '#e8e5e0' : '#5a4f47'; e.currentTarget.style.background = dark ? '#2d2b28' : '#ece8e2'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#9b8fa0'; e.currentTarget.style.background = 'transparent'; }}
             title={dark ? "Light mode" : "Dark mode"}
           >
             {dark ? (
@@ -77,7 +82,10 @@ export default function Layout() {
           {/* Logout */}
           <button
             onClick={logout}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+            style={{ color: '#9b8fa0' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#c9523a'; e.currentTarget.style.background = dark ? '#2d2020' : '#fdf0ed'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#9b8fa0'; e.currentTarget.style.background = 'transparent'; }}
             title="Logout"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
