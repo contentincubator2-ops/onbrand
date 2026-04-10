@@ -28,7 +28,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/onboarding" element={<RequireAuth><OnboardingWizard /></RequireAuth>} />
+      <Route path="/onboarding" element={<RequireAuth><OnboardingWizard onComplete={() => window.location.href = "/"} /></RequireAuth>} />
 
       {/* Authenticated shell */}
       <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>

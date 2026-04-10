@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { trpc } from "../lib/trpc";
-import BrandCard from "../components/BrandCard";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -193,7 +192,10 @@ export default function BrandAnalysis() {
             </div>
           )}
           {positioningMutation.isSuccess && positioningMutation.data && (
-            <BrandCard result={positioningMutation.data as any} brandName={posForm.brandName} />
+            <div className="mt-4 p-4 rounded-xl border border-neutral-200 bg-white dark:bg-neutral-800">
+              <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">{posForm.brandName} — 定位分析結果</h3>
+              <pre className="text-xs text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap">{typeof (positioningMutation.data as any) === 'string' ? (positioningMutation.data as any) : JSON.stringify(positioningMutation.data as any, null, 2)}</pre>
+            </div>
           )}
         </div>
       )}
