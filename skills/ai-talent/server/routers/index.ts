@@ -10,6 +10,7 @@ import { conversationRouter } from "./conversationRouter";
 import { videoRouter } from "./videoRouter";
 import { agentRouter } from "./agentRouter";
 import { campaignRouter } from "./campaignRouter";
+import { missionRouter } from "./missionRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -22,6 +23,7 @@ export const appRouter = router({
   conversation:  conversationRouter,
   video:         videoRouter,
   agent:         agentRouter,
+    mission:     missionRouter,
   campaign:      campaignRouter,
 });
 
