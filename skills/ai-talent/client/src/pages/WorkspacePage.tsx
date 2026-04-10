@@ -3,40 +3,42 @@
  * Three-column workspace layout: Left (MissionContext) | Center (Chat/Execution) | Right (Team/Artifacts/Review)
  *
  * Sprint 3 wiring:
- * - agent.list tRPC query loads real agents from DB → Team tab
+ * - agent.list tRPC query loads real agents from DB → Team tab + Left rail
  * - Workspace-to-layer mapping: facebook/linkedin/youtube → execution, pr/event/instore → strategy
  * - Claude-style design: warm neutrals (#faf9f7 bg), amber accents (#c9823a), refined spacing
  * - ArtifactReviewPanel receives live agent data as team members
- * - agentsLoading prop passed for skeleton state in right panel
+ * - MissionContextRail receives agents + agentsLoading for left rail roster
  */
 import { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import ChatPage from "./ChatPage";
-import MissionContextRail, { type MissionContext } from "../components/chat/MissionContextRail";
+import MissionContextRail, { type MissionContext, type AgentEntry } from "../components/chat/MissionContextRail";
 import ArtifactReviewPanel, { type TeamMember, type Artifact, type ReviewItem } from "../components/chat/ArtifactReviewPanel";
 
 // ---- Workspace config with layer mapping ----
 const WORKSPACES = [
-  { id: 'facebook',  label: 'Facebook',  icon: 'f',  color: 'bg-blue-500',    layer: 'execution' as const },
-  { id: 'linkedin',  label: 'LinkedIn',  icon: 'in', color: 'bg-sky-600',     layer: 'execution' as const },
-  { id: 'youtube',   label: 'YouTube',   icon: 'yt', color: 'bg-red-500',     layer: 'execution' as const },
-  { id: 'pr',        label: 'PR',        icon: 'pr', color: 'bg-emerald-500', layer: 'strategy'  as const },
-  { id: 'event',     label: 'Event',     icon: 'ev', color: 'bg-amber-500',   layer: 'strategy'  as const },
-  { id: 'instore',   label: 'In-store',  icon: 'is', color: 'bg-violet-500',  layer: 'strategy'  as const },
+  { id: 'facebook', label: 'Facebook', icon: 'f',  color: 'bg-blue-500',    layer: 'execution' as const },
+  { id: 'linkedin', label: 'LinkedIn', icon: 'in', color: 'bg-sky-600',     layer: 'execution' as const },
+  { id: 'youtube',  label: 'YouTube',  icon: 'yt', color: 'bg-red-500',     layer: 'execution' as const },
+  { id: 'pr',       label: 'PR',       icon: 'pr', color: 'bg-emerald-500', layer: 'strategy' as const },
+  { id: 'event',    label: 'Event',    icon: 'ev', color: 'bg-amber-500',   layer: 'strategy' as const },
+  { id: 'instore',  label: 'In-store', icon: 'is', color: 'bg-violet-500',  layer: 'strategy' as const },
 ] as const;
+
 type WorkspaceId = typeof WORKSPACES[number]['id'];
 
 export default function WorkspacePage() {
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('facebook');
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
-  const [leftCollapsed, setLeftCollapsed]   = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
   // ── Brand ──────────────────────────────────────────────────────────────────
-  const brandsQuery  = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
-  const brands       = brandsQuery.data ?? [];
+  const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
+  const brands = brandsQuery.data ?? [];
   const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
-  const activeBrand  = brands.find((b: any) => b.id === activeBrandId) ?? brands[0] ?? null;
+  const activeBrand = brands.find((b: any) => b.id === activeBrandId) ?? brands[0] ?? null;
+
   useEffect(() => {
     if (brands.length > 0 && !activeBrandId) {
       const def = brands.find((b: any) => b.isDefault) ?? brands[0];
@@ -50,42 +52,52 @@ export default function WorkspacePage() {
     { enabled: !!activeBrand, refetchOnWindowFocus: false }
   );
   const activeMissionData = activeMissionQuery.data ?? null;
+
   const mission: MissionContext | null = activeMissionData ? {
-    workspace:     activeMissionData.workspace,
-    objective:     activeMissionData.objective     ?? "",
-    audience:      activeMissionData.audience      ?? "",
-    offer:         activeMissionData.offer         ?? "",
-    successMetrics:activeMissionData.successMetrics?? "",
-    constraints:   activeMissionData.constraints   ?? "",
-    methodology:   activeMissionData.methodology   ?? "",
-    taskUnits: (activeMissionData.taskUnits ?? []).map((u: any) => ({
-      id: u.id, label: u.label, status: u.status ?? "not_started",
-    })),
+    workspace: activeMissionData.workspace,
+    objective: activeMissionData.objective ?? "",
+    audience: activeMissionData.audience ?? "",
+    offer: activeMissionData.offer ?? "",
+    successMetrics: activeMissionData.successMetrics ?? "",
+    constraints: activeMissionData.constraints ?? "",
+    methodology: activeMissionData.methodology ?? "",
   } : null;
 
-  const utils        = trpc.useUtils();
+  const utils = trpc.useUtils();
   const createMission = trpc.mission.create.useMutation({
     onSuccess: () => utils.mission.getActive.invalidate({ workspace: activeWorkspace }),
   });
 
-  // ── Sprint 3: Live agents → Team panel ────────────────────────────────────
+  // ── Sprint 3: Live agents → Team panel + Left rail ──────────────────────────
   const currentWorkspace = WORKSPACES.find(w => w.id === activeWorkspace)!;
   const agentsQuery = trpc.agent.list.useQuery(
     { layer: currentWorkspace.layer, limit: 20 },
     { refetchOnWindowFocus: false }
   );
+
+  // Map for right panel (TeamMember[])
   const team: TeamMember[] = (agentsQuery.data ?? []).map((a: any) => ({
-    id:     a.id,
-    name:   a.name,
-    title:  a.specialty ?? a.role ?? currentWorkspace.label + ' Agent',
-    layer:  (a.layer ?? currentWorkspace.layer) as TeamMember['layer'],
+    id: a.id,
+    name: a.name,
+    title: a.specialty ?? a.role ?? currentWorkspace.label + ' Agent',
+    layer: (a.layer ?? currentWorkspace.layer) as TeamMember['layer'],
     status: 'standby' as const,
-    owns:   currentWorkspace.label,
+    owns: currentWorkspace.label,
+  }));
+
+  // Map for left rail (AgentEntry[])
+  const leftAgents: AgentEntry[] = (agentsQuery.data ?? []).map((a: any) => ({
+    id: a.id,
+    name: a.name,
+    specialty: a.specialty ?? a.role ?? currentWorkspace.label + ' Agent',
+    workspace: activeWorkspace,
+    layer: (a.layer ?? currentWorkspace.layer) as AgentEntry['layer'],
+    status: 'idle' as const,
   }));
 
   // Artifacts & Reviews — Sprint 4
   const [artifacts] = useState<Artifact[]>([]);
-  const [reviews]   = useState<ReviewItem[]>([]);
+  const [reviews] = useState<ReviewItem[]>([]);
 
   // Close workspace menu on outside click
   useEffect(() => {
@@ -105,12 +117,13 @@ export default function WorkspacePage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full overflow-hidden" style={{ background: '#faf9f7', fontFamily: "'Inter', system-ui, sans-serif" }}>
-
       {/* LEFT RAIL */}
       {!leftCollapsed && (
         <MissionContextRail
           brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
           mission={mission}
+          agents={leftAgents}
+          agentsLoading={agentsQuery.isLoading}
           workspaceName={currentWorkspace.label}
           onEditMission={handleNewMission}
         />
@@ -118,11 +131,9 @@ export default function WorkspacePage() {
 
       {/* CENTER */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
         {/* Top bar — Claude warm style */}
         <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-[#e8e5e0] bg-[#faf9f7]">
           <div className="flex items-center gap-2">
-
             {/* Toggle left rail */}
             <button
               onClick={() => setLeftCollapsed(c => !c)}
@@ -149,6 +160,7 @@ export default function WorkspacePage() {
                 {currentWorkspace.label}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
+
               {showWorkspaceMenu && (
                 <div className="absolute left-0 top-full mt-1 w-52 bg-[#fdfcfa] border border-[#e0dbd5] rounded-xl shadow-lg overflow-hidden z-50">
                   <div className="px-3 py-2 border-b border-[#f0ece8]">
