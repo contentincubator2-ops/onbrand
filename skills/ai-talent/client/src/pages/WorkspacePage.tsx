@@ -1,37 +1,38 @@
 /**
  * WorkspacePage.tsx
  * Three-column workspace layout: Left (MissionContext) | Center (Chat/Execution) | Right (Team/Artifacts/Review)
- * This replaces the old single-column ChatPage as the primary workspace experience.
- * 
- * The existing ChatPage logic (A2A, TeamAssembly, SSE, relay) is preserved in ChatPage.tsx.
- * This page composes the three-column shell around it and adds workspace-level state.
+ *
+ * FIXES applied:
+ * - h-screen → h-full (avoid double full-height since Layout already sets h-screen)
+ * - Pass activeWorkspace to MissionContextRail so left rail shows workspace name
+ * - Collapsible left/right rails for more chat space
+ * - Improved top bar layout
  */
-
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import ChatPage from "./ChatPage";
 import MissionContextRail, { type MissionContext, type TaskUnit } from "../components/chat/MissionContextRail";
 import ArtifactReviewPanel, { type TeamMember, type Artifact, type ReviewItem } from "../components/chat/ArtifactReviewPanel";
 
 // ---- Workspace types ----
-
 const WORKSPACES = [
-  { id: 'facebook',  label: 'Facebook',  icon: 'f' },
-  { id: 'linkedin',  label: 'LinkedIn',  icon: 'in' },
-  { id: 'youtube',   label: 'YouTube',   icon: 'yt' },
-  { id: 'pr',        label: 'PR',        icon: 'pr' },
-  { id: 'event',     label: 'Event',     icon: 'ev' },
-  { id: 'instore',   label: 'In-store',  icon: 'is' },
+  { id: 'facebook', label: 'Facebook', icon: 'f',  color: 'bg-blue-500' },
+  { id: 'linkedin', label: 'LinkedIn', icon: 'in', color: 'bg-sky-600' },
+  { id: 'youtube',  label: 'YouTube',  icon: 'yt', color: 'bg-red-500' },
+  { id: 'pr',       label: 'PR',       icon: 'pr', color: 'bg-emerald-500' },
+  { id: 'event',    label: 'Event',    icon: 'ev', color: 'bg-amber-500' },
+  { id: 'instore',  label: 'In-store', icon: 'is', color: 'bg-violet-500' },
 ] as const;
 
 type WorkspaceId = typeof WORKSPACES[number]['id'];
 
 // ---- Component ----
-
 export default function WorkspacePage() {
   // Workspace selector
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('facebook');
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
 
   // Brand from existing trpc
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
@@ -40,43 +41,73 @@ export default function WorkspacePage() {
   const activeBrand = brands.find((b: any) => b.id === activeBrandId) ?? brands[0] ?? null;
 
   // Set default brand
-  if (brands.length > 0 && !activeBrandId) {
-    const def = brands.find((b: any) => b.isDefault) ?? brands[0];
-    setActiveBrandId(def.id);
-  }
+  useEffect(() => {
+    if (brands.length > 0 && !activeBrandId) {
+      const def = brands.find((b: any) => b.isDefault) ?? brands[0];
+      setActiveBrandId(def.id);
+    }
+  }, [brands, activeBrandId]);
 
-  // Mission context — will be populated by ChatPage callbacks in future
+  // Mission context — populated with workspace name by default
   const [mission, setMission] = useState<MissionContext | null>(null);
 
-  // Right panel state — will be populated by ChatPage's TeamAssembly in future
+  // Right panel state
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
 
   const currentWorkspace = WORKSPACES.find(w => w.id === activeWorkspace)!;
 
+  // Close workspace menu on click outside
+  useEffect(() => {
+    if (!showWorkspaceMenu) return;
+    const handler = () => setShowWorkspaceMenu(false);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [showWorkspaceMenu]);
+
   return (
-    <div className="flex h-screen bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="flex h-full bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
       {/* ===== LEFT RAIL ===== */}
-      <MissionContextRail
-        brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
-        mission={mission}
-      />
+      {!leftCollapsed && (
+        <MissionContextRail
+          brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
+          mission={mission}
+          workspaceName={currentWorkspace.label}
+        />
+      )}
 
       {/* ===== CENTER: Top bar + Chat ===== */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Top bar */}
-        <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#212121]">
-          {/* Left: workspace selector */}
-          <div className="flex items-center gap-3">
-            <div className="relative">
+        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#212121]">
+
+          {/* Left section: collapse + workspace selector */}
+          <div className="flex items-center gap-2">
+            {/* Toggle left rail */}
+            <button
+              onClick={() => setLeftCollapsed(c => !c)}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:hover:text-neutral-300 transition-colors"
+              title={leftCollapsed ? "展開左欄" : "收起左欄"}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {leftCollapsed ? (
+                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 9 17 12 14 15"/></>
+                ) : (
+                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 15 11 12 14 9"/></>
+                )}
+              </svg>
+            </button>
+
+            {/* Workspace selector */}
+            <div className="relative" onClick={e => e.stopPropagation()}>
               <button
                 onClick={() => setShowWorkspaceMenu(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:border-indigo-300 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors"
               >
-                <span className="w-5 h-5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] font-bold">
+                <span className={`w-5 h-5 rounded ${currentWorkspace.color} text-white flex items-center justify-center text-[10px] font-bold`}>
                   {currentWorkspace.icon}
                 </span>
                 {currentWorkspace.label}
@@ -84,24 +115,27 @@ export default function WorkspacePage() {
               </button>
 
               {showWorkspaceMenu && (
-                <div className="absolute left-0 top-full mt-1 w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-lg overflow-hidden z-50">
+                <div className="absolute left-0 top-full mt-1 w-52 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-xl overflow-hidden z-50">
                   <div className="px-3 py-2 border-b border-neutral-100 dark:border-neutral-800">
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Workspaces</p>
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">切換 Workspace</p>
                   </div>
                   {WORKSPACES.map(ws => (
                     <button
                       key={ws.id}
                       onClick={() => { setActiveWorkspace(ws.id); setShowWorkspaceMenu(false); }}
-                      className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                      className={`w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                         activeWorkspace === ws.id
                           ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 font-medium'
                           : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800'
                       }`}
                     >
-                      <span className="w-5 h-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-[10px] font-bold text-neutral-500">
+                      <span className={`w-5 h-5 rounded ${ws.color} text-white flex items-center justify-center text-[10px] font-bold`}>
                         {ws.icon}
                       </span>
                       {ws.label}
+                      {activeWorkspace === ws.id && (
+                        <svg className="ml-auto w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -112,7 +146,7 @@ export default function WorkspacePage() {
             <span className="text-xs text-neutral-400 dark:text-neutral-500">Mission workspace</span>
           </div>
 
-          {/* Right: brand switcher */}
+          {/* Right: brand switcher + collapse right rail */}
           <div className="flex items-center gap-2">
             {activeBrand && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400">
@@ -120,21 +154,37 @@ export default function WorkspacePage() {
                 <span className="max-w-[140px] truncate">{activeBrand.name}</span>
               </div>
             )}
+            {/* Toggle right rail */}
+            <button
+              onClick={() => setRightCollapsed(c => !c)}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:hover:text-neutral-300 transition-colors"
+              title={rightCollapsed ? "展開右欄" : "收起右欄"}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {rightCollapsed ? (
+                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/><polyline points="10 15 7 12 10 9"/></>
+                ) : (
+                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/><polyline points="10 9 13 12 10 15"/></>
+                )}
+              </svg>
+            </button>
           </div>
         </div>
 
         {/* Chat area — renders existing ChatPage */}
-        <div className="flex-1 overflow-hidden" onClick={() => setShowWorkspaceMenu(false)}>
+        <div className="flex-1 overflow-hidden">
           <ChatPage />
         </div>
       </div>
 
       {/* ===== RIGHT RAIL ===== */}
-      <ArtifactReviewPanel
-        team={team}
-        artifacts={artifacts}
-        reviews={reviews}
-      />
+      {!rightCollapsed && (
+        <ArtifactReviewPanel
+          team={team}
+          artifacts={artifacts}
+          reviews={reviews}
+        />
+      )}
     </div>
   );
 }
