@@ -1,10 +1,14 @@
-// ArtifactReviewPanel.tsx
-// Right rail: Team / Artifacts / Review tabs
-
+/**
+ * ArtifactReviewPanel.tsx — Sprint 3
+ * Right rail: Team (live agents) / Artifacts / Review tabs
+ *
+ * Sprint 3 changes:
+ * - agentsLoading skeleton for Team tab
+ * - Claude-style warm neutrals, amber accents
+ */
 import { useState } from "react";
 
 // ---- Types ----
-
 export interface TeamMember {
   id: number;
   name: string;
@@ -35,6 +39,7 @@ interface Props {
   team: TeamMember[];
   artifacts: Artifact[];
   reviews: ReviewItem[];
+  agentsLoading?: boolean;
   onApproveReview?: (id: string) => void;
   onRejectReview?: (id: string) => void;
   onPinArtifact?: (id: string) => void;
@@ -44,11 +49,10 @@ interface Props {
 type Tab = 'team' | 'artifacts' | 'review';
 
 // ---- Sub-components ----
-
 const LAYER_COLORS: Record<string, string> = {
-  strategy:  'bg-purple-600',
+  strategy: 'bg-purple-600',
   execution: 'bg-blue-600',
-  training:  'bg-green-600',
+  training: 'bg-green-600',
 };
 
 const STATUS_BADGE: Record<string, { cls: string; label: string }> = {
@@ -66,11 +70,30 @@ const REVIEW_STATUS: Record<string, { cls: string; label: string }> = {
   blocked:      { cls: 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500', label: '封鎖中' },
 };
 
-function TeamTab({ team }: { team: TeamMember[] }) {
+function TeamSkeleton() {
+  return (
+    <div className="space-y-3 py-3">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-neutral-700 animate-pulse shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-28 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+            <div className="h-2.5 w-20 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TeamTab({ team, loading }: { team: TeamMember[]; loading?: boolean }) {
+  if (loading) return <TeamSkeleton />;
   if (team.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-2">
-        <div className="w-10 h-10 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-xl">👥</div>
+        <div className="w-10 h-10 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-400"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
         <p className="text-xs text-neutral-400">尚未組建團隊</p>
       </div>
     );
@@ -103,7 +126,9 @@ function ArtifactsTab({ artifacts, onPin, onExport }: { artifacts: Artifact[]; o
   if (artifacts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-2">
-        <div className="w-10 h-10 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-xl">📄</div>
+        <div className="w-10 h-10 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-400"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
         <p className="text-xs text-neutral-400">尚無可交付物</p>
       </div>
     );
@@ -119,12 +144,12 @@ function ArtifactsTab({ artifacts, onPin, onExport }: { artifacts: Artifact[]; o
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 line-clamp-2">{art.content.slice(0, 120)}{art.content.length > 120 ? '...' : ''}</p>
           <div className="flex gap-2 mt-2">
             {onPin && (
-              <button onClick={() => onPin(art.id)} className="text-[10px] text-indigo-500 hover:text-indigo-700">
+              <button onClick={() => onPin(art.id)} className="text-[10px] text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300">
                 {art.pinned ? 'Unpin' : 'Pin'}
               </button>
             )}
             {onExport && (
-              <button onClick={() => onExport(art.id)} className="text-[10px] text-indigo-500 hover:text-indigo-700">
+              <button onClick={() => onExport(art.id)} className="text-[10px] text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300">
                 Export
               </button>
             )}
@@ -139,7 +164,9 @@ function ReviewTab({ reviews, onApprove, onReject }: { reviews: ReviewItem[]; on
   if (reviews.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-2">
-        <div className="w-10 h-10 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-xl">✅</div>
+        <div className="w-10 h-10 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-400"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
         <p className="text-xs text-neutral-400">無待審項目</p>
       </div>
     );
@@ -160,7 +187,7 @@ function ReviewTab({ reviews, onApprove, onReject }: { reviews: ReviewItem[]; on
             {(item.status === 'ready' || item.status === 'waiting_user') && (
               <div className="flex gap-2 mt-2">
                 {onApprove && (
-                  <button onClick={() => onApprove(item.id)} className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors">
+                  <button onClick={() => onApprove(item.id)} className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors">
                     Approve
                   </button>
                 )}
@@ -179,18 +206,17 @@ function ReviewTab({ reviews, onApprove, onReject }: { reviews: ReviewItem[]; on
 }
 
 // ---- Main Panel ----
-
-export default function ArtifactReviewPanel({ team, artifacts, reviews, onApproveReview, onRejectReview, onPinArtifact, onExportArtifact }: Props) {
+export default function ArtifactReviewPanel({ team, artifacts, reviews, agentsLoading, onApproveReview, onRejectReview, onPinArtifact, onExportArtifact }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('team');
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: 'team',      label: 'Team',      count: team.length },
+    { key: 'team', label: 'Team', count: team.length },
     { key: 'artifacts', label: 'Artifacts', count: artifacts.length },
-    { key: 'review',    label: 'Review',    count: reviews.filter(r => r.status === 'ready' || r.status === 'waiting_user').length },
+    { key: 'review', label: 'Review', count: reviews.filter(r => r.status === 'ready' || r.status === 'waiting_user').length },
   ];
 
   return (
-    <aside className="w-[352px] shrink-0 h-full flex flex-col border-l border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1e1e1e] overflow-hidden">
+    <aside className="w-[352px] shrink-0 h-full flex flex-col border-l border-neutral-200 dark:border-neutral-800 bg-[#faf9f7] dark:bg-[#1e1e1e] overflow-hidden">
       {/* Tabs */}
       <div className="flex border-b border-neutral-200 dark:border-neutral-800">
         {tabs.map(tab => (
@@ -199,7 +225,7 @@ export default function ArtifactReviewPanel({ team, artifacts, reviews, onApprov
             onClick={() => setActiveTab(tab.key)}
             className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
               activeTab === tab.key
-                ? 'text-indigo-600 dark:text-indigo-400'
+                ? 'text-amber-700 dark:text-amber-400'
                 : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300'
             }`}
           >
@@ -210,7 +236,7 @@ export default function ArtifactReviewPanel({ team, artifacts, reviews, onApprov
               </span>
             )}
             {activeTab === tab.key && (
-              <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
+              <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-amber-500 dark:bg-amber-400 rounded-full" />
             )}
           </button>
         ))}
@@ -218,9 +244,9 @@ export default function ArtifactReviewPanel({ team, artifacts, reviews, onApprov
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4">
-        {activeTab === 'team'      && <TeamTab team={team} />}
+        {activeTab === 'team' && <TeamTab team={team} loading={agentsLoading} />}
         {activeTab === 'artifacts' && <ArtifactsTab artifacts={artifacts} onPin={onPinArtifact} onExport={onExportArtifact} />}
-        {activeTab === 'review'    && <ReviewTab reviews={reviews} onApprove={onApproveReview} onReject={onRejectReview} />}
+        {activeTab === 'review' && <ReviewTab reviews={reviews} onApprove={onApproveReview} onReject={onRejectReview} />}
       </div>
     </aside>
   );
