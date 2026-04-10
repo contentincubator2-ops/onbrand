@@ -28,15 +28,17 @@ export const agentRouter = router({
       z.object({
         layer: z.enum(["strategy", "execution", "training"]).optional(),
         limit: z.number().default(50),
+        workspace: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
       const db = await getSoworkDb();
       if (!db) return [];
-      // Fix: filter by BOTH isAvailable AND layer when layer is provided
-      const whereClause = input.layer
-        ? and(eq(soworkAgents.isAvailable, true), eq(soworkAgents.layer, input.layer))
-        : eq(soworkAgents.isAvailable, true);
+            // Build dynamic where: isAvailable + optional layer + optional workspace
+      const conditions = [eq(soworkAgents.isAvailable, true)];
+      if (input.layer) conditions.push(eq(soworkAgents.layer, input.layer));
+      if (input.workspace) conditions.push(eq(soworkAgents.workspace, input.workspace));
+      const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
       return db
         .select()
         .from(soworkAgents)
