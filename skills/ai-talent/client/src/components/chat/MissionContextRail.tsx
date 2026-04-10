@@ -26,6 +26,7 @@ export interface AgentEntry {
   workspace: string;       // facebook | linkedin | youtube | pr | event | instore
   layer: 'execution' | 'strategy';
   status: 'idle' | 'running' | 'review' | 'done';
+    aiModel?: string;    // e.g. "claude-sonnet-4-20250514", "gpt-4o"
 }
 
 interface Props {
@@ -91,7 +92,7 @@ function AgentCard({ agent }: { agent: AgentEntry }) {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-neutral-800 dark:text-neutral-100 truncate">{agent.name}</p>
-        <p className="text-[10px] text-neutral-400 truncate">{agent.specialty}</p>
+        <p className="text-[10px] text-neutral-400 truncate">{agent.specialty}</p>         {agent.aiModel && (           <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium mt-0.5">             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/></svg>             {agent.aiModel.replace('claude-', '').replace('gpt-', 'GPT-').replace('-20250514', '').slice(0, 16)}           </span>         )}
       </div>
       {/* Status dot */}
       <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[agent.status]}`} title={STATUS_LABEL[agent.status]} />
