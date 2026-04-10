@@ -1,4 +1,5 @@
 import ChatPage from "./pages/ChatPage";
+import WorkspacePage from "./pages/WorkspacePage";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Campaigns from "./pages/Campaigns";
@@ -21,6 +22,10 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Dashboard />} />
+        {/* NEW: /workspace uses three-column layout */}
+        <Route path="workspace" element={<WorkspacePage />} />
+        <Route path="workspace/:workspaceId" element={<WorkspacePage />} />
+        {/* Legacy /chat still works */}
         <Route path="chat" element={<ChatPage />} />
         <Route path="chat/:conversationId" element={<ChatPage />} />
         <Route path="campaigns" element={<Campaigns />} />
@@ -29,7 +34,6 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="agents" element={<AgentWorkspace />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
