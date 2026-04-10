@@ -1,47 +1,42 @@
 /**
- * WorkspacePage.tsx — Sprint 2
+ * WorkspacePage.tsx — Sprint 3
  * Three-column workspace layout: Left (MissionContext) | Center (Chat/Execution) | Right (Team/Artifacts/Review)
  *
- * Sprint 2 wiring:
- * - mission.getActive tRPC query loads real mission data from DB
- * - mission.create mutation for new missions
- * - Top bar shows active mission title with loading spinner
- * - MissionContextRail receives live DB data
- * - Collapsible left/right rails
+ * Sprint 3 wiring:
+ * - agent.list tRPC query loads real agents from DB → Team tab
+ * - Workspace-to-layer mapping: facebook/linkedin/youtube → execution, pr/event/instore → strategy
+ * - Claude-style design: warm neutrals (#faf9f7 bg), amber accents (#c9823a), refined spacing
+ * - ArtifactReviewPanel receives live agent data as team members
+ * - agentsLoading prop passed for skeleton state in right panel
  */
 import { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import ChatPage from "./ChatPage";
-import MissionContextRail, { type MissionContext, type TaskUnit } from "../components/chat/MissionContextRail";
+import MissionContextRail, { type MissionContext } from "../components/chat/MissionContextRail";
 import ArtifactReviewPanel, { type TeamMember, type Artifact, type ReviewItem } from "../components/chat/ArtifactReviewPanel";
 
-// ---- Workspace types ----
+// ---- Workspace config with layer mapping ----
 const WORKSPACES = [
-  { id: 'facebook', label: 'Facebook', icon: 'f',  color: 'bg-blue-500' },
-  { id: 'linkedin', label: 'LinkedIn', icon: 'in', color: 'bg-sky-600' },
-  { id: 'youtube',  label: 'YouTube',  icon: 'yt', color: 'bg-red-500' },
-  { id: 'pr',       label: 'PR',       icon: 'pr', color: 'bg-emerald-500' },
-  { id: 'event',    label: 'Event',    icon: 'ev', color: 'bg-amber-500' },
-  { id: 'instore',  label: 'In-store', icon: 'is', color: 'bg-violet-500' },
+  { id: 'facebook',  label: 'Facebook',  icon: 'f',  color: 'bg-blue-500',    layer: 'execution' as const },
+  { id: 'linkedin',  label: 'LinkedIn',  icon: 'in', color: 'bg-sky-600',     layer: 'execution' as const },
+  { id: 'youtube',   label: 'YouTube',   icon: 'yt', color: 'bg-red-500',     layer: 'execution' as const },
+  { id: 'pr',        label: 'PR',        icon: 'pr', color: 'bg-emerald-500', layer: 'strategy'  as const },
+  { id: 'event',     label: 'Event',     icon: 'ev', color: 'bg-amber-500',   layer: 'strategy'  as const },
+  { id: 'instore',   label: 'In-store',  icon: 'is', color: 'bg-violet-500',  layer: 'strategy'  as const },
 ] as const;
-
 type WorkspaceId = typeof WORKSPACES[number]['id'];
 
-// ---- Component ----
 export default function WorkspacePage() {
-  // Workspace selector
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('facebook');
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [leftCollapsed, setLeftCollapsed]   = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
-  // Brand from existing trpc
-  const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
-  const brands = brandsQuery.data ?? [];
+  // ── Brand ──────────────────────────────────────────────────────────────────
+  const brandsQuery  = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
+  const brands       = brandsQuery.data ?? [];
   const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
-  const activeBrand = brands.find((b: any) => b.id === activeBrandId) ?? brands[0] ?? null;
-
-  // Set default brand
+  const activeBrand  = brands.find((b: any) => b.id === activeBrandId) ?? brands[0] ?? null;
   useEffect(() => {
     if (brands.length > 0 && !activeBrandId) {
       const def = brands.find((b: any) => b.isDefault) ?? brands[0];
@@ -49,47 +44,50 @@ export default function WorkspacePage() {
     }
   }, [brands, activeBrandId]);
 
-  // ---- Sprint 2: Live mission data from DB ----
+  // ── Sprint 2: Mission data ─────────────────────────────────────────────────
   const activeMissionQuery = trpc.mission.getActive.useQuery(
     { workspace: activeWorkspace, brandId: activeBrand?.id },
     { enabled: !!activeBrand, refetchOnWindowFocus: false }
   );
   const activeMissionData = activeMissionQuery.data ?? null;
+  const mission: MissionContext | null = activeMissionData ? {
+    workspace:     activeMissionData.workspace,
+    objective:     activeMissionData.objective     ?? "",
+    audience:      activeMissionData.audience      ?? "",
+    offer:         activeMissionData.offer         ?? "",
+    successMetrics:activeMissionData.successMetrics?? "",
+    constraints:   activeMissionData.constraints   ?? "",
+    methodology:   activeMissionData.methodology   ?? "",
+    taskUnits: (activeMissionData.taskUnits ?? []).map((u: any) => ({
+      id: u.id, label: u.label, status: u.status ?? "not_started",
+    })),
+  } : null;
 
-  // Transform DB mission into MissionContext shape for the rail
-  const mission: MissionContext | null = activeMissionData
-    ? {
-        workspace: activeMissionData.workspace,
-        objective: activeMissionData.objective ?? "",
-        audience: activeMissionData.audience ?? "",
-        offer: activeMissionData.offer ?? "",
-        successMetrics: activeMissionData.successMetrics ?? "",
-        constraints: activeMissionData.constraints ?? "",
-        methodology: activeMissionData.methodology ?? "",
-        taskUnits: (activeMissionData.taskUnits ?? []).map((u: any) => ({
-          id: u.id,
-          label: u.label,
-          status: u.status ?? "not_started",
-        })),
-      }
-    : null;
-
-  // Create mission mutation
-  const utils = trpc.useUtils();
+  const utils        = trpc.useUtils();
   const createMission = trpc.mission.create.useMutation({
-    onSuccess: () => {
-      utils.mission.getActive.invalidate({ workspace: activeWorkspace });
-    },
+    onSuccess: () => utils.mission.getActive.invalidate({ workspace: activeWorkspace }),
   });
 
-  // Right panel state (static for now, will wire in Sprint 3)
-  const [team] = useState<TeamMember[]>([]);
-  const [artifacts] = useState<Artifact[]>([]);
-  const [reviews] = useState<ReviewItem[]>([]);
-
+  // ── Sprint 3: Live agents → Team panel ────────────────────────────────────
   const currentWorkspace = WORKSPACES.find(w => w.id === activeWorkspace)!;
+  const agentsQuery = trpc.agent.list.useQuery(
+    { layer: currentWorkspace.layer, limit: 20 },
+    { refetchOnWindowFocus: false }
+  );
+  const team: TeamMember[] = (agentsQuery.data ?? []).map((a: any) => ({
+    id:     a.id,
+    name:   a.name,
+    title:  a.specialty ?? a.role ?? currentWorkspace.label + ' Agent',
+    layer:  (a.layer ?? currentWorkspace.layer) as TeamMember['layer'],
+    status: 'standby' as const,
+    owns:   currentWorkspace.label,
+  }));
 
-  // Close workspace menu on click outside
+  // Artifacts & Reviews — Sprint 4
+  const [artifacts] = useState<Artifact[]>([]);
+  const [reviews]   = useState<ReviewItem[]>([]);
+
+  // Close workspace menu on outside click
   useEffect(() => {
     if (!showWorkspaceMenu) return;
     const handler = () => setShowWorkspaceMenu(false);
@@ -97,21 +95,18 @@ export default function WorkspacePage() {
     return () => document.removeEventListener('click', handler);
   }, [showWorkspaceMenu]);
 
-  // Handler: create a new mission for current workspace
   const handleNewMission = () => {
     if (!activeBrand) return;
     const title = prompt("輸入新任務名稱：");
     if (!title?.trim()) return;
-    createMission.mutate({
-      workspace: activeWorkspace,
-      brandId: activeBrand.id,
-      title: title.trim(),
-    });
+    createMission.mutate({ workspace: activeWorkspace, brandId: activeBrand.id, title: title.trim() });
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {/* ===== LEFT RAIL ===== */}
+    <div className="flex h-full overflow-hidden" style={{ background: '#faf9f7', fontFamily: "'Inter', system-ui, sans-serif" }}>
+
+      {/* LEFT RAIL */}
       {!leftCollapsed && (
         <MissionContextRail
           brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
@@ -121,24 +116,24 @@ export default function WorkspacePage() {
         />
       )}
 
-      {/* ===== CENTER: Top bar + Chat ===== */}
+      {/* CENTER */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top bar */}
-        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#212121]">
-          {/* Left section: collapse + workspace selector */}
+
+        {/* Top bar — Claude warm style */}
+        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-[#e8e5e0] bg-[#faf9f7]">
           <div className="flex items-center gap-2">
+
             {/* Toggle left rail */}
             <button
               onClick={() => setLeftCollapsed(c => !c)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:hover:text-neutral-300 transition-colors"
-              title={leftCollapsed ? "展開左欄" : "收起左欄"}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-[#9b8fa0] hover:text-[#6b5f70] hover:bg-[#f0ece8] transition-colors"
+              title={leftCollapsed ? '展開左欄' : '收起左欄'}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {leftCollapsed ? (
-                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 9 17 12 14 15"/></>
-                ) : (
-                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 15 11 12 14 9"/></>
-                )}
+                {leftCollapsed
+                  ? <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 9 17 12 14 15"/></>
+                  : <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 15 11 12 14 9"/></>
+                }
               </svg>
             </button>
 
@@ -146,18 +141,18 @@ export default function WorkspacePage() {
             <div className="relative" onClick={e => e.stopPropagation()}>
               <button
                 onClick={() => setShowWorkspaceMenu(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#e0dbd5] text-sm font-medium text-[#3d3530] hover:border-[#c9a96e] hover:bg-[#fdf6ed] transition-colors"
               >
                 <span className={`w-5 h-5 rounded ${currentWorkspace.color} text-white flex items-center justify-center text-[10px] font-bold`}>
                   {currentWorkspace.icon}
                 </span>
                 {currentWorkspace.label}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               {showWorkspaceMenu && (
-                <div className="absolute left-0 top-full mt-1 w-52 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-xl overflow-hidden z-50">
-                  <div className="px-3 py-2 border-b border-neutral-100 dark:border-neutral-800">
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">切換 Workspace</p>
+                <div className="absolute left-0 top-full mt-1 w-52 bg-[#fdfcfa] border border-[#e0dbd5] rounded-xl shadow-lg overflow-hidden z-50">
+                  <div className="px-3 py-2 border-b border-[#f0ece8]">
+                    <p className="text-[10px] font-semibold text-[#9b8fa0] uppercase tracking-wider">切換 Workspace</p>
                   </div>
                   {WORKSPACES.map(ws => (
                     <button
@@ -165,16 +160,14 @@ export default function WorkspacePage() {
                       onClick={() => { setActiveWorkspace(ws.id); setShowWorkspaceMenu(false); }}
                       className={`w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                         activeWorkspace === ws.id
-                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 font-medium'
-                          : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                          ? 'bg-[#fdf3e3] text-[#92622a] font-medium'
+                          : 'text-[#5a4f47] hover:bg-[#f5f1ec]'
                       }`}
                     >
-                      <span className={`w-5 h-5 rounded ${ws.color} text-white flex items-center justify-center text-[10px] font-bold`}>
-                        {ws.icon}
-                      </span>
+                      <span className={`w-5 h-5 rounded ${ws.color} text-white flex items-center justify-center text-[10px] font-bold shrink-0`}>{ws.icon}</span>
                       {ws.label}
                       {activeWorkspace === ws.id && (
-                        <svg className="ml-auto w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <svg className="ml-auto w-4 h-4 text-[#c9823a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                       )}
                     </button>
                   ))}
@@ -182,64 +175,57 @@ export default function WorkspacePage() {
               )}
             </div>
 
-            <span className="text-neutral-300 dark:text-neutral-700">|</span>
-
-            {/* Mission title or placeholder */}
-            <span className="text-xs text-neutral-400 dark:text-neutral-500 truncate max-w-[200px]">
+            <span className="text-[#d4cdc6]">|</span>
+            <span className="text-xs text-[#9b8fa0] truncate max-w-[200px]">
               {activeMissionData ? activeMissionData.title : 'Mission workspace'}
             </span>
             {activeMissionQuery.isLoading && (
-              <span className="w-3 h-3 border border-neutral-300 border-t-indigo-400 rounded-full animate-spin" />
+              <span className="w-3 h-3 border border-[#d4cdc6] border-t-[#c9823a] rounded-full animate-spin" />
             )}
           </div>
 
-          {/* Right: brand switcher + new mission + collapse right */}
           <div className="flex items-center gap-2">
-            {/* New mission button */}
             <button
               onClick={handleNewMission}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-600 text-neutral-500 dark:text-neutral-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors"
-              title="建立新任務"
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-[#d4cdc6] text-[#9b8fa0] hover:border-[#c9823a] hover:text-[#c9823a] hover:bg-[#fdf6ed] transition-colors"
             >
               + 新任務
             </button>
-
             {activeBrand && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400">
-                <div className="w-4 h-4 rounded-full bg-neutral-800 dark:bg-neutral-200 shrink-0" />
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#e0dbd5] text-sm text-[#5a4f47] bg-white">
+                <div className="w-4 h-4 rounded-full bg-[#3d3530] shrink-0" />
                 <span className="max-w-[140px] truncate">{activeBrand.name}</span>
               </div>
             )}
-
             {/* Toggle right rail */}
             <button
               onClick={() => setRightCollapsed(c => !c)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:hover:text-neutral-300 transition-colors"
-              title={rightCollapsed ? "展開右欄" : "收起右欄"}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-[#9b8fa0] hover:text-[#6b5f70] hover:bg-[#f0ece8] transition-colors"
+              title={rightCollapsed ? '展開右欄' : '收起右欄'}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {rightCollapsed ? (
-                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/><polyline points="10 15 7 12 10 9"/></>
-                ) : (
-                  <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/><polyline points="10 9 13 12 10 15"/></>
-                )}
+                {rightCollapsed
+                  ? <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/><polyline points="10 15 7 12 10 9"/></>
+                  : <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/><polyline points="10 9 13 12 10 15"/></>
+                }
               </svg>
             </button>
           </div>
         </div>
 
-        {/* Chat area */}
+        {/* Chat */}
         <div className="flex-1 overflow-hidden">
           <ChatPage />
         </div>
       </div>
 
-      {/* ===== RIGHT RAIL ===== */}
+      {/* RIGHT RAIL */}
       {!rightCollapsed && (
         <ArtifactReviewPanel
           team={team}
           artifacts={artifacts}
           reviews={reviews}
+          agentsLoading={agentsQuery.isLoading}
         />
       )}
     </div>
