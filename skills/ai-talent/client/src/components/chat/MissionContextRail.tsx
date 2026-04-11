@@ -29,13 +29,56 @@ export interface AgentEntry {
     aiModel?: string;    // e.g. "claude-sonnet-4-20250514", "gpt-4o"
 }
 
+export interface TaskUnit {
+  id: string;
+  label: string;
+  status: 'not_started' | 'running' | 'needs_input' | 'ready_review' | 'approved';
+}
+
 interface Props {
   brand: { name: string; id: number } | null;
   mission: MissionContext | null;
   agents: AgentEntry[];
+  taskUnits?: TaskUnit[];
   agentsLoading?: boolean;
   workspaceName?: string;
   onEditMission?: () => void;
+}
+
+const TASK_STATUS_CFG: Record<string, { icon: string; cls: string }> = {
+  not_started: { icon: '\u25CB', cls: 'text-neutral-400' },
+  running: { icon: '\u25D4', cls: 'text-blue-600 animate-pulse' },
+  needs_input: { icon: '\u26A0', cls: 'text-amber-500' },
+  ready_review: { icon: '\u25C9', cls: 'text-purple-600' },
+  approved: { icon: '\u2713', cls: 'text-green-600' },
+};
+
+function TaskUnitList({ units }: { units: TaskUnit[] }) {
+  if (!units || units.length === 0) return null;
+  const done = units.filter(u => u.status === 'approved').length;
+  const pct = Math.round((done / units.length) * 100);
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <SectionLabel>Task Progress</SectionLabel>
+        <span className="text-[10px] text-neutral-400">{done}/{units.length}</span>
+      </div>
+      <div className="w-full h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-full mb-2 overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-amber-400 to-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="space-y-0.5">
+        {units.map(u => {
+          const s = (TASK_STATUS_CFG as any)[u.status] || TASK_STATUS_CFG.not_started;
+          return (
+            <div key={u.id} className={`flex items-center gap-2 px-2 py-1 rounded-md ${u.status === 'running' ? 'bg-blue-50/80 dark:bg-blue-900/20' : u.status === 'needs_input' ? 'bg-amber-50/80 dark:bg-amber-900/20' : ''}`}>
+              <span className={`text-[11px] ${s.cls}`}>{s.icon}</span>
+              <span className={`text-[11px] flex-1 ${u.status === 'approved' ? 'text-neutral-400 line-through' : 'text-neutral-700 dark:text-neutral-300'}`}>{u.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 const STATUS_DOT: Record<AgentEntry['status'], string> = {
@@ -107,6 +150,7 @@ export default function MissionContextRail({
   agentsLoading,
   workspaceName,
   onEditMission,
+  taskUnits,
 }: Props) {
   const displayName = mission?.workspace ?? workspaceName ?? 'No workspace';
 
@@ -170,6 +214,8 @@ export default function MissionContextRail({
           </div>
         )}
 
+        {/* Task Units */}
+        {taskUnits && taskUnits.length > 0 && <TaskUnitList units={taskUnits} />}
         {/* Divider */}
         <div className="pt-2 pb-1">
           <div className="h-px bg-neutral-200 dark:bg-neutral-800" />

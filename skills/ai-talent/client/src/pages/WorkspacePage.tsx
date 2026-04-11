@@ -97,6 +97,17 @@ export default function WorkspacePage() {
         aiModel: a.aiModel,
   }));
 
+  // Task Units - Sprint 4
+  const [taskUnits] = useState<{ id: string; label: string; status: string }[]>([
+    { id: '1', label: 'Brief locked', status: 'approved' },
+    { id: '2', label: 'Audience defined', status: 'approved' },
+    { id: '3', label: 'Angle exploration', status: 'running' },
+    { id: '4', label: 'Copy drafting', status: 'not_started' },
+    { id: '5', label: 'Creative suggestions', status: 'not_started' },
+    { id: '6', label: 'Approval', status: 'not_started' },
+    { id: '7', label: 'Export', status: 'not_started' },
+  ]);
+
   // Artifacts & Reviews — Sprint 4
   const [artifacts] = useState<Artifact[]>([]);
   const [reviews] = useState<ReviewItem[]>([]);
@@ -128,6 +139,7 @@ export default function WorkspacePage() {
           agentsLoading={agentsQuery.isLoading}
           workspaceName={currentWorkspace.label}
           onEditMission={handleNewMission}
+              taskUnits={taskUnits as any}
         />
       )}
 
