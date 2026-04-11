@@ -71,7 +71,7 @@ export default function WorkspacePage() {
   // ── Sprint 3: Live agents → Team panel + Left rail ──────────────────────────
   const currentWorkspace = WORKSPACES.find(w => w.id === activeWorkspace)!;
   const agentsQuery = trpc.agent.list.useQuery(
-    { layer: currentWorkspace.layer, limit: 20 },
+    { layer: currentWorkspace.layer, workspace: activeWorkspace, limit: 20 },
     { refetchOnWindowFocus: false }
   );
 
