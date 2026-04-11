@@ -82,6 +82,7 @@ export default function WorkspacePage() {
     title: a.specialty ?? a.role ?? currentWorkspace.label + ' Agent',
     layer: (a.layer ?? currentWorkspace.layer) as TeamMember['layer'],
     status: 'standby' as const,
+        aiModel: a.aiModel,
     owns: currentWorkspace.label,
   }));
 
@@ -93,6 +94,7 @@ export default function WorkspacePage() {
     workspace: activeWorkspace,
     layer: (a.layer ?? currentWorkspace.layer) as AgentEntry['layer'],
     status: 'idle' as const,
+        aiModel: a.aiModel,
   }));
 
   // Artifacts & Reviews — Sprint 4
