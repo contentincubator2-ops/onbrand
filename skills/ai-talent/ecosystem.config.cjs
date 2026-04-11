@@ -11,8 +11,23 @@ module.exports = {
     max_memory_restart: '512M',
     env: {
       NODE_ENV: 'production',
+      SKILLS_PATH: '/home/azureuser/A2A-Marketing-Claw/skills',
       PORT: '3101',
       TRUST_PROXY: '1',
+      DB_HOST: 'ytcreator-ai-server.mysql.database.azure.com',
+      DB_PORT: '3306',
+      DB_USER: 'openclaw',
+      DB_PASSWORD: 'u40d6d070db7e92982940a62ee40c4261',
+      DB_NAME: 'sowork_db',
+      DB_SSL: 'true',
+      JWT_SECRET: 'mos-enterprise-jwt-secret-2026-sowork-ai',
+      GOOGLE_GEMINI_API_KEY: 'AIzaSyAGOLFGqgCBSMy_mAKd0YOULgJLGMdPPiA',
+      SESSION_SECRET: 'mos-enterprise-secret-2026',
+      LOCAL_DB_HOST: 'localhost',
+      LOCAL_DB_PORT: '3306',
+      LOCAL_DB_USER: 'mos_user',
+      LOCAL_DB_PASSWORD: 'mos_secure_2026',
+      LOCAL_DB_NAME: 'mos_db',
     },
     error_file: '/home/azureuser/logs/sowork-enterprise-error.log',
     out_file: '/home/azureuser/logs/sowork-enterprise-out.log',
@@ -20,7 +35,5 @@ module.exports = {
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     autorestart: true,
     watch: false,
-    // NOTE: DB_PASSWORD, JWT_SECRET, and other secrets must be set in the
-    // VM-local ecosystem.config.cjs env block — never commit secrets to repo.
   }]
 };

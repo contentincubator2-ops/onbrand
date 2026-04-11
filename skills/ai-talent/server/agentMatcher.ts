@@ -9,6 +9,7 @@
  */
 
 import { getSoworkDb } from "./db";
+import localPool from "./localDb";
 import { sql, like, eq, or, and, desc } from "drizzle-orm";
 
 // ─── Shared schema (single source of truth) ───────────────────────────────────
@@ -92,6 +93,21 @@ const VALID_KNOWLEDGE_TYPES = [
   "industry", "brand_market", "brand_employer",
 ];
 
+// ─── Marketing taskTypes (stored in local MySQL) ──────────────────────────────
+const MARKETING_TASK_TYPES = new Set([
+  "content-text","ads","ecommerce","email","seo","social-channel","kol",
+  "video-content","b2b","pr","brand","analytics","affiliate","crm-marketing",
+  "data-driven-marketing","mobile-marketing","sem-ppc","live-commerce",
+  "ooh-marketing","traditional-media","trade-marketing","dtc-marketing",
+  "esg-marketing","sports-marketing","cvs-marketing","wom-ugc","event-marketing",
+  "programmatic","localization","cs-marketing",
+  "content-text-enterprise","seo-enterprise","social-channel-enterprise",
+  "ads-enterprise","email-enterprise","analytics-enterprise","ecommerce-enterprise",
+  "b2b-enterprise","brand-enterprise","kol-enterprise",
+  "content-text-smb","ads-smb","seo-smb","social-channel-smb",
+  "output-design-center","seo-startup","ads-startup","content-text-startup","social-channel-startup"
+]);
+
 // ─── matchAgents (INJ-1, BUG-3 fixed) ────────────────────────────────────────
 
 /**
@@ -112,6 +128,39 @@ export async function matchAgents(req: AgentMatchRequest): Promise<AgentMatch[]>
   const safeMarket =
     req.market && VALID_MARKETS.includes(req.market) ? req.market : undefined;
 
+  // ── 本地 MySQL 優先查詢（行銷 agents，17000+ 筆）────────────────────────
+  if (MARKETING_TASK_TYPES.has(req.taskType)) {
+    try {
+      const [localRows] = await localPool.query<any[]>(
+        `SELECT id, slug, name, title, layer, specialty, bio, rating, hireCount,
+                pricePerTask, priceMonthly
+         FROM agents
+         WHERE taskType = ? AND isAvailable = 1
+         ORDER BY hireCount DESC LIMIT ?`,
+        [req.taskType, safeLimit]
+      );
+      if (Array.isArray(localRows) && localRows.length > 0) {
+        return (localRows as any[]).map((agent: any, i: number) => ({
+          id: agent.id,
+          slug: agent.slug ?? "",
+          name: agent.name,
+          title: agent.title ?? "",
+          layer: agent.layer ?? "execution",
+          specialty: agent.specialty ?? "",
+          bio: agent.bio ?? "",
+          rating: Number(agent.rating ?? 4.5),
+          hireCount: Number(agent.hireCount ?? 0),
+          pricePerTask: Number(agent.pricePerTask ?? 5),
+          priceMonthly: Number(agent.priceMonthly ?? 99),
+          matchScore: Math.max(60, 90 - i * 5),
+          matchReasons: [`本地 DB 行銷 agent：${req.taskType}`],
+        }));
+      }
+    } catch (localErr) {
+      console.warn("[localDb] 查詢失敗，fallback 到 Azure MySQL:", localErr);
+    }
+  }
+  // ── Fallback: Azure MySQL via Drizzle ORM ─────────────────────────────────
   // ── Build Drizzle query conditions (SQL-injection safe) ──────────────────
   const db = await getSoworkDb();
   const taskConfig = TASK_AGENT_MAP[safeTaskType]!;
