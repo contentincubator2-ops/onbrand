@@ -101,6 +101,9 @@ function TeamTab({ team, loading }: { team: TeamMember[]; loading?: boolean }) {
   }
   return (
     <div className="space-y-2.5 py-3">
+      <div className="px-2 py-2 mb-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-700/40">
+        <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed">📋 Workspace agent pool — mission team will be assembled after task planning.</p>
+      </div>
       {team.map(member => {
         const badge = STATUS_BADGE[member.status];
         return (

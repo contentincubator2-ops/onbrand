@@ -178,7 +178,7 @@ export default function MissionContextRail({
         {/* Agents section */}
         <div className="pt-1">
           <div className="flex items-center justify-between mb-2">
-            <SectionLabel>本站 Agents</SectionLabel>
+            <SectionLabel>Workspace Agents</SectionLabel>
             {!agentsLoading && (
               <span className="text-[10px] text-neutral-400">{agents.length} 位</span>
             )}
