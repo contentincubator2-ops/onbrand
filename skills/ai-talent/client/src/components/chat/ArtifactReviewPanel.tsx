@@ -16,6 +16,7 @@ export interface TeamMember {
   layer: 'strategy' | 'execution' | 'training';
   status: 'active' | 'waiting' | 'complete' | 'standby';
   owns: string;
+    aiModel?: string;
 }
 
 export interface Artifact {
@@ -114,6 +115,7 @@ function TeamTab({ team, loading }: { team: TeamMember[]; loading?: boolean }) {
               </div>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{member.title}</p>
               <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">Owns: {member.owns}</p>
+                            {member.aiModel && <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full mt-0.5">{member.aiModel}</span>}
             </div>
           </div>
         );
