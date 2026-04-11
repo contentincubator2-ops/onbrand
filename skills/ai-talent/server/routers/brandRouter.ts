@@ -1,6 +1,8 @@
+import { getBrandPositioning, getBrandPositioningById } from "../positioningBridge";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
+import { executeTenStepAnalysis, getLatestJobForBrand } from "../positioning";
 import {
   analyzeBrandPositioning,
   generateCampaignPositioning,
@@ -244,5 +246,76 @@ export const brandRouter = router({
       await pool.end();
       return matched;
     }),
+
+
+  /**
+   * 品牌定位分析 — Positioning Bridge
+   * 查 DB 快取 → 若無則 AI 生成（5步驟簡化版）
+   */
+  startPositioningAnalysis: protectedProcedure
+    .input(z.object({
+      brandName: z.string().min(1).max(128),
+      industry: z.string().optional(),
+      description: z.string().optional(),
+      targetMarket: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userApiKey = await getUserApiKey(ctx.user.id);
+      const result = await getBrandPositioning({
+        userId: ctx.user.id,
+        userApiKey,
+        brandName: input.brandName,
+        industry: input.industry,
+        description: input.description,
+        targetMarket: input.targetMarket,
+      });
+      return result;
+    }),
+
+  /**
+   * 根據 brandId 取得定位上下文
+   */
+  getPositioningById: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      return getBrandPositioningById(input.brandId, ctx.user.id);
+    }),
+
+  /**
+   * 本地十步驟品牌定位分析（Marketing OS 自有引擎）
+   * 不依賴 app.sowork.ai，完全在本 VM 執行
+   */
+  runLocalPositioningAnalysis: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      brandName: z.string().min(1).max(128),
+      industry: z.string().optional(),
+      description: z.string().optional(),
+      targetMarket: z.string().optional(),
+      contentLanguage: z.string().default("zh-TW"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { jobId, result } = await executeTenStepAnalysis({
+        brandId: input.brandId,
+        userId: String(ctx.user?.id ?? "mos-user"),
+        brandName: input.brandName,
+        industry: input.industry,
+        description: input.description,
+        targetMarket: input.targetMarket ?? null,
+        contentLanguage: input.contentLanguage,
+      });
+      return { success: true, jobId, result };
+    }),
+
+  /**
+   * 取得定位分析進度 / 結果
+   */
+  getLocalAnalysisStatus: publicProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ input }) => {
+      const job = await getLatestJobForBrand(input.brandId);
+      return job ?? null;
+    }),
+
 
 });

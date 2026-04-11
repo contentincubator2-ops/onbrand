@@ -17,12 +17,12 @@ import ArtifactReviewPanel, { type TeamMember, type Artifact, type ReviewItem } 
 
 // ---- Workspace config with layer mapping ----
 const WORKSPACES = [
-  { id: 'facebook', label: 'Facebook', icon: 'f',  color: 'bg-blue-500',    layer: 'execution' as const },
-  { id: 'linkedin', label: 'LinkedIn', icon: 'in', color: 'bg-sky-600',     layer: 'execution' as const },
-  { id: 'youtube',  label: 'YouTube',  icon: 'yt', color: 'bg-red-500',     layer: 'execution' as const },
-  { id: 'pr',       label: 'PR',       icon: 'pr', color: 'bg-emerald-500', layer: 'strategy' as const },
-  { id: 'event',    label: 'Event',    icon: 'ev', color: 'bg-amber-500',   layer: 'strategy' as const },
-  { id: 'instore',  label: 'In-store', icon: 'is', color: 'bg-violet-500',  layer: 'strategy' as const },
+  { id: 'facebook', label: 'Facebook', icon: 'f',  color: 'bg-gray-600',    layer: 'execution' as const },
+  { id: 'linkedin', label: 'LinkedIn', icon: 'in', color: 'bg-gray-600',     layer: 'execution' as const },
+  { id: 'youtube',  label: 'YouTube',  icon: 'yt', color: 'bg-gray-600',     layer: 'execution' as const },
+  { id: 'pr',       label: 'PR',       icon: 'pr', color: 'bg-gray-600', layer: 'strategy' as const },
+  { id: 'event',    label: 'Event',    icon: 'ev', color: 'bg-gray-600',   layer: 'strategy' as const },
+  { id: 'instore',  label: 'In-store', icon: 'is', color: 'bg-gray-600',  layer: 'strategy' as const },
 ] as const;
 
 type WorkspaceId = typeof WORKSPACES[number]['id'];
@@ -129,7 +129,7 @@ export default function WorkspacePage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: '#faf9f7', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="flex h-full overflow-hidden" style={{ background: '#FFFFFF', fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* LEFT RAIL */}
       {!leftCollapsed && (
         <MissionContextRail
@@ -146,12 +146,12 @@ export default function WorkspacePage() {
       {/* CENTER */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top bar — Claude warm style */}
-        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-[#e8e5e0] bg-[#faf9f7]">
+        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-2">
             {/* Toggle left rail */}
             <button
               onClick={() => setLeftCollapsed(c => !c)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-[#9b8fa0] hover:text-[#6b5f70] hover:bg-[#f0ece8] transition-colors"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               title={leftCollapsed ? '展開左欄' : '收起左欄'}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -166,7 +166,7 @@ export default function WorkspacePage() {
             <div className="relative" onClick={e => e.stopPropagation()}>
               <button
                 onClick={() => setShowWorkspaceMenu(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#e0dbd5] text-sm font-medium text-[#3d3530] hover:border-[#c9a96e] hover:bg-[#fdf6ed] transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-[#3d3530] hover:border-[#c9a96e] hover:bg-gray-100 transition-colors"
               >
                 <span className={`w-5 h-5 rounded ${currentWorkspace.color} text-white flex items-center justify-center text-[10px] font-bold`}>
                   {currentWorkspace.icon}
@@ -176,9 +176,9 @@ export default function WorkspacePage() {
               </button>
 
               {showWorkspaceMenu && (
-                <div className="absolute left-0 top-full mt-1 w-52 bg-[#fdfcfa] border border-[#e0dbd5] rounded-xl shadow-lg overflow-hidden z-50">
-                  <div className="px-3 py-2 border-b border-[#f0ece8]">
-                    <p className="text-[10px] font-semibold text-[#9b8fa0] uppercase tracking-wider">切換 Workspace</p>
+                <div className="absolute left-0 top-full mt-1 w-52 bg-[#fdfcfa] border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+                  <div className="px-3 py-2 border-b border-gray-100">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">切換 Workspace</p>
                   </div>
                   {WORKSPACES.map(ws => (
                     <button
@@ -187,13 +187,13 @@ export default function WorkspacePage() {
                       className={`w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                         activeWorkspace === ws.id
                           ? 'bg-[#fdf3e3] text-[#92622a] font-medium'
-                          : 'text-[#5a4f47] hover:bg-[#f5f1ec]'
+                          : 'text-[#5a4f47] hover:bg-gray-50'
                       }`}
                     >
                       <span className={`w-5 h-5 rounded ${ws.color} text-white flex items-center justify-center text-[10px] font-bold shrink-0`}>{ws.icon}</span>
                       {ws.label}
                       {activeWorkspace === ws.id && (
-                        <svg className="ml-auto w-4 h-4 text-[#c9823a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <svg className="ml-auto w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                       )}
                     </button>
                   ))}
@@ -201,24 +201,24 @@ export default function WorkspacePage() {
               )}
             </div>
 
-            <span className="text-[#d4cdc6]">|</span>
-            <span className="text-xs text-[#9b8fa0] truncate max-w-[200px]">
+            <span className="text-[#D1D5DB]">|</span>
+            <span className="text-xs text-gray-400 truncate max-w-[200px]">
               {activeMissionData ? activeMissionData.title : 'Mission workspace'}
             </span>
             {activeMissionQuery.isLoading && (
-              <span className="w-3 h-3 border border-[#d4cdc6] border-t-[#c9823a] rounded-full animate-spin" />
+              <span className="w-3 h-3 border border-[#D1D5DB] border-t-gray-600 rounded-full animate-spin" />
             )}
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleNewMission}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-[#d4cdc6] text-[#9b8fa0] hover:border-[#c9823a] hover:text-[#c9823a] hover:bg-[#fdf6ed] transition-colors"
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-[#D1D5DB] text-gray-400 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
             >
               + 新任務
             </button>
             {activeBrand && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#e0dbd5] text-sm text-[#5a4f47] bg-white">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-[#5a4f47] bg-white">
                 <div className="w-4 h-4 rounded-full bg-[#3d3530] shrink-0" />
                 <span className="max-w-[140px] truncate">{activeBrand.name}</span>
               </div>
@@ -226,7 +226,7 @@ export default function WorkspacePage() {
             {/* Toggle right rail */}
             <button
               onClick={() => setRightCollapsed(c => !c)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-[#9b8fa0] hover:text-[#6b5f70] hover:bg-[#f0ece8] transition-colors"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               title={rightCollapsed ? '展開右欄' : '收起右欄'}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

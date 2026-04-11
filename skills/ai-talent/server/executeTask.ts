@@ -415,13 +415,30 @@ async function buildTaskContext(
   let brandContextObj: Record<string, unknown> | null = null;
   try {
     const brandRows = await db
-      .select({ name: brands.name, description: brands.description, tagline: brands.tagline, targetAudience: brands.targetAudience, brandVoice: brands.brandVoice })
+      .select({ name: brands.name, description: brands.description, tagline: brands.tagline, targetAudience: brands.targetAudience, brandVoice: brands.brandVoice, soworkAnalysis: brands.soworkAnalysis })
       .from(brands)
       .where(brandId ? and(eq(brands.userId, userId), eq(brands.id, brandId)) : and(eq(brands.userId, userId), eq(brands.isDefault, true)))
       .limit(1);
     const brand = brandRows[0];
     if (brand) {
-      brandContext = `\n\n【品牌背景（請在所有產出中貫徹此品牌定位）】\n品牌名稱：${brand.name}\n品牌描述：${brand.description ?? ""}\n品牌標語：${brand.tagline ?? ""}\n目標受眾：${brand.targetAudience ?? ""}\n品牌語調：${brand.brandVoice ?? ""}`;
+      const baseCtx = `品牌名稱：${brand.name}\n品牌描述：${brand.description ?? ''}\n品牌標語：${brand.tagline ?? ''}\n目標受眾：${brand.targetAudience ?? ''}\n品牌語調：${brand.brandVoice ?? ''}`;
+      let positioningCtx = '';
+      if (brand.soworkAnalysis) {
+        const pa = brand.soworkAnalysis as Record<string, unknown>;
+        const parts: string[] = [];
+        const usp = (pa.usp as string) ?? '';
+        const vp = (pa.valueProposition as string) ?? '';
+        const gc = pa.goldenCircle as Record<string, string> | undefined;
+        const diffs = (pa.differentiators as string[]) ?? [];
+        const pillars = (pa.messagingPillars as string[]) ?? [];
+        if (usp) parts.push(`核心 USP：${usp}`);
+        if (vp) parts.push(`核心價值主張：${vp}`);
+        if (gc?.why) parts.push(`品牌 Why：${gc.why}`);
+        if (diffs.length) parts.push(`差異化優勢：${diffs.slice(0, 3).join(' | ')}`);
+        if (pillars.length) parts.push(`溝通支柱：${pillars.slice(0, 3).join(' / ')}`);
+        positioningCtx = parts.join('\n');
+      }
+      brandContext = `\n\n【品牌定位（請在所有產出中貫徹此品牌定位）】\n${baseCtx}${positioningCtx ? '\n' + positioningCtx : ''}`;
       brandContextObj = brand as Record<string, unknown>;
     }
   } catch { /* optional */ }

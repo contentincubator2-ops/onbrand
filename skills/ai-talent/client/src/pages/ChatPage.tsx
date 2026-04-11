@@ -20,6 +20,16 @@ function isTaskLike(text: string): boolean {
   return /幫我|請|做一份|產出|撰寫|分析|規劃|設計|研究|執行|建立|生成|整理|報告|文案|策略|campaign|seo|廣告/i.test(text);
 }
 
+function detectTaskType(text: string): string {
+  if (/文案|copywriting|廣告.*文字|copy/i.test(text)) return 'copywriting';
+  if (/社群|social|instagram|facebook|linkedin|twitter/i.test(text)) return 'social_media';
+  if (/seo|搜尋|關鍵字|keyword/i.test(text)) return 'seo';
+  if (/email|郵件|電子報|newsletter/i.test(text)) return 'email';
+  if (/分析|analysis|報告|report|調研/i.test(text)) return 'analysis';
+  if (/策略|strategy|規劃|plan/i.test(text)) return 'strategy';
+  return 'general';
+}
+
 interface Msg {
   id: string;
   role: "user" | "assistant";
@@ -94,9 +104,9 @@ function formatText(text: string): string {
 
 function LayerBadge({ layer }: { layer: string }) {
   const map: Record<string, string> = {
-    strategy: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-    execution: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-    training: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+    strategy: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
+    execution: "bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-200",
+    training: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
   };
   const label: Record<string, string> = {
     strategy: "策略層",
@@ -107,7 +117,7 @@ function LayerBadge({ layer }: { layer: string }) {
 }
 
 function AgentAvatar({ name, layer }: { name: string; layer: string }) {
-  const colors: Record<string, string> = { strategy: "bg-purple-600", execution: "bg-blue-600", training: "bg-green-600" };
+  const colors: Record<string, string> = { strategy: "bg-gray-700", execution: "bg-gray-600", training: "bg-gray-500" };
   return <div className={`w-9 h-9 rounded-full ${colors[layer] ?? "bg-gray-500"} text-white flex items-center justify-center text-sm font-bold flex-shrink-0`}>{name.charAt(0)}</div>;
 }
 
@@ -128,10 +138,10 @@ function TeamAssemblyPanel({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-4">
-      <div className="bg-white dark:bg-neutral-900 border border-indigo-200 dark:border-indigo-900/40 rounded-2xl overflow-hidden shadow-sm">
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-4">
+      <div className="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg">
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-lg">
               {state.phase === "analyzing" ? "🔍" : state.phase === "assembling" ? "🧩" : state.phase === "proposal" ? "📋" : state.phase === "executing" ? "⚙️" : "✅"}
             </div>
             <div>
@@ -142,7 +152,7 @@ function TeamAssemblyPanel({
                 {state.phase === "executing" && "自主代理接力執行中"}
                 {state.phase === "done" && "任務已由 AI 團隊完成"}
               </p>
-              <p className="text-indigo-200 text-xs mt-0.5">Autonomous Agent Operations</p>
+              <p className="text-gray-300 text-xs mt-0.5">Autonomous Agent Operations</p>
             </div>
             {(state.phase === "analyzing" || state.phase === "assembling") && (
               <div className="ml-auto flex gap-1">{[0,150,300].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}</div>
@@ -157,10 +167,10 @@ function TeamAssemblyPanel({
               <p className="text-xs text-gray-400 dark:text-neutral-500">{completedCount}/{relaySteps.length} steps</p>
             </div>
             <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+              <div className="h-full bg-gradient-to-r from-gray-600 to-gray-800 transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
             {activeStep && (
-              <p className="text-xs text-indigo-600 dark:text-indigo-300 mt-2 font-medium">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 font-medium">
                 目前由 {activeStep.agentName} 執行：{activeStep.label}
               </p>
             )}
@@ -195,7 +205,7 @@ function TeamAssemblyPanel({
               {state.phase === "proposal" && (
                 <button
                   onClick={onApprove}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
+                  className="px-4 py-2 rounded-xl bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold transition-colors"
                 >
                   開始執行
                 </button>
@@ -205,7 +215,7 @@ function TeamAssemblyPanel({
               {relaySteps.map((step, i) => (
                 <div key={step.id} className="relative pl-10">
                   {i < relaySteps.length - 1 && <div className="absolute left-[15px] top-8 bottom-[-14px] w-px bg-gray-200 dark:bg-neutral-700" />}
-                  <div className={`absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step.status === "done" ? "bg-green-600 text-white" : step.status === "running" ? "bg-indigo-600 text-white animate-pulse" : "bg-gray-200 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300"}`}>
+                  <div className={`absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step.status === "done" ? "bg-gray-500 text-white" : step.status === "running" ? "bg-gray-700 text-white animate-pulse" : "bg-gray-200 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300"}`}>
                     {step.status === "done" ? "✓" : step.id}
                   </div>
                   <div className="rounded-xl border border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-800/70 px-4 py-3">
@@ -214,7 +224,7 @@ function TeamAssemblyPanel({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold text-gray-800 dark:text-neutral-100">Step {step.id}. {step.label}</p>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${step.status === "done" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : step.status === "running" ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" : "bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-300"}`}>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${step.status === "done" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : step.status === "running" ? "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300" : "bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-300"}`}>
                             {step.status === "done" ? "已完成" : step.status === "running" ? "正在執行..." : "待執行"}
                           </span>
                           <span className="text-[10px] text-gray-400 dark:text-neutral-500">ETA {step.eta}</span>
@@ -222,7 +232,7 @@ function TeamAssemblyPanel({
                         <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">{step.agentName} · {step.agentTitle}</p>
                         {step.summary && (
                           <div className="mt-2">
-                            <button onClick={() => onToggleSummary(step.id)} className="text-xs text-indigo-600 dark:text-indigo-300 hover:underline">
+                            <button onClick={() => onToggleSummary(step.id)} className="text-xs text-gray-600 dark:text-gray-400 hover:underline">
                               {step.expanded ? "收合摘要" : "查看摘要"}
                             </button>
                             {step.expanded && (
@@ -242,8 +252,8 @@ function TeamAssemblyPanel({
         )}
 
         {state.phase === "proposal" && (
-          <div className="px-5 py-4 bg-indigo-50/60 dark:bg-indigo-950/20">
-            <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">批准後，AI 團隊會一棒接一棒自動完成任務。</p>
+          <div className="px-5 py-4 bg-gray-50 dark:bg-gray-900/20">
+            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">批准後，AI 團隊會一棒接一棒自動完成任務。</p>
           </div>
         )}
       </div>
@@ -271,6 +281,41 @@ export default function ChatPage() {
   const sseRef = useRef<EventSource | null>(null);
 
   const createAndExecute = trpc.task.createAndExecute.useMutation();
+  const workflowStart = trpc.workflow.start.useMutation();
+
+  // BullMQ 輪詢：每 2 秒查一次，最多等 60 秒
+  // 直接呼叫 tRPC HTTP 避免 React hook 限制
+  const pollWorkflowResult = async (jobId: string): Promise<any> => {
+    const token = localStorage.getItem('authToken');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const res = await fetch(
+          `/trpc/workflow.status?input=${encodeURIComponent(JSON.stringify({ json: { jobId } }))}`,
+          { headers }
+        );
+        const data = await res.json();
+        const status = data?.result?.data?.json ?? data?.result?.data;
+        if (!status) continue;
+        if (status.status === 'completed' && status.result) {
+          setA2aProgress(100);
+          return status.result;
+        }
+        if (status.status === 'failed') {
+          throw new Error(status.error || 'Workflow task failed');
+        }
+        const pct = typeof status.progress === 'number' ? status.progress : Math.min((i + 1) * 5, 90);
+        setA2aProgress(pct);
+      } catch (pollErr: any) {
+        if (pollErr?.message?.includes('failed')) throw pollErr;
+        // 網路錯誤繼續重試
+      }
+    }
+    throw new Error('Workflow timeout after 60 seconds');
+  };
   const saveMessage = trpc.conversation.saveMessage.useMutation();
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
   const matchQuery = trpc.agent.matchForTask.useQuery(
@@ -429,39 +474,74 @@ export default function ChatPage() {
     }
 
     try {
-      let description = text;
-      if (activeBrand) {
-        const soworkAnalysis = activeBrand.soworkAnalysis as Record<string, unknown> | null | undefined;
-        description = text + `\n\n[品牌背景：${activeBrand.name}，目標受眾：${(activeBrand as any).targetAudience || ""}，品牌定位：${soworkAnalysis?.positioning as string || ""}]`;
-      }
-
-      const result = await createAndExecute.mutateAsync({
-        title: text,
-        description,
-        brandId: activeBrand?.id,
-        conversationHistory: conversationHistory.slice(-5),
+      // ── A2A BullMQ workflow.start 路徑 ────────────────────────────────────
+      const { jobId } = await workflowStart.mutateAsync({
+        userRequest: text,
+        brand: activeBrand?.name,
+        industry: (activeBrand as any)?.industry,
+        taskType: detectTaskType(text),
       });
 
-      let content = "", thinking = "", contentType = "general", imageSuggestion = "";
-      if (result.output) {
+      if (!jobId) throw new Error('No jobId returned from workflow.start');
+
+      // 輪詢得到結果
+      const workflowResult = await pollWorkflowResult(jobId as string);
+
+      let content = "";
+      let thinking = "";
+      if (workflowResult && typeof workflowResult === 'object') {
+        content = workflowResult.publishable_content
+          ?? workflowResult.output
+          ?? workflowResult.result
+          ?? JSON.stringify(workflowResult);
+        thinking = workflowResult.thinking ?? "";
+      } else if (typeof workflowResult === 'string') {
         try {
-          const p = JSON.parse(result.output);
-          content = p.publishable_content ?? result.output;
+          const p = JSON.parse(workflowResult);
+          content = p.publishable_content ?? workflowResult;
           thinking = p.thinking ?? "";
-          contentType = p.content_type ?? "general";
-          imageSuggestion = p.image_suggestion ?? "";
-        } catch { content = result.output; }
-      } else if (result.error) {
-        content = `很抱歉，發生錯誤：${result.error}`;
+        } catch { content = workflowResult; }
+      } else {
+        content = '任務已完成，但未有產出內容';
       }
 
-      const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, contentType, imageSuggestion, taskId: result.taskId, ts: Date.now() };
+      const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now() };
       setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
-      saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content: result.output ?? content, taskId: result.taskId });
+      saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
       setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content }].slice(-10));
       setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
     } catch (err: any) {
-      setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, { id: `e-${Date.now()}`, role: "assistant" as const, content: `很抱歉，發生錯誤：${err?.message ?? "未知錯誤"}`, ts: Date.now() }] } : c));
+      // Fallback: 如果 workflow.start 失敗，回退到 createAndExecute
+      try {
+        let description = text;
+        if (activeBrand) {
+          const soworkAnalysis = activeBrand.soworkAnalysis as Record<string, unknown> | null | undefined;
+          description = text + `\n\n[品牌背景：${activeBrand.name}，目標受眾：${(activeBrand as any).targetAudience || ""}，品牌定位：${soworkAnalysis?.positioning as string || ""}]`;
+        }
+        const result = await createAndExecute.mutateAsync({
+          title: text,
+          description,
+          brandId: activeBrand?.id,
+          conversationHistory: conversationHistory.slice(-5),
+        });
+        let content = "", thinking = "";
+        if (result.output) {
+          try {
+            const p = JSON.parse(result.output);
+            content = p.publishable_content ?? result.output;
+            thinking = p.thinking ?? "";
+          } catch { content = result.output; }
+        } else if (result.error) {
+          content = `很抱歉，發生錯誤：${result.error}`;
+        }
+        const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now() };
+        setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
+        saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
+        setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content }].slice(-10));
+        setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
+      } catch (fallbackErr: any) {
+        setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, { id: `e-${Date.now()}`, role: "assistant" as const, content: `很抱歉，發生錯誤：${fallbackErr?.message ?? "未知錯誤"}`, ts: Date.now() }] } : c));
+      }
     } finally {
       setLoading(false);
     }
@@ -526,9 +606,9 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-indigo-600">🤖 Autonomous Agent Ops</span>
+            <span className="text-sm font-semibold text-gray-700">🤖 Autonomous Agent Ops</span>
             {loading && <span className="text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded-full font-medium animate-pulse">執行中…</span>}
-            {awaitingApproval && <span className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full font-medium">等待批准</span>}
+            {awaitingApproval && <span className="text-xs text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full font-medium">等待批准</span>}
           </div>
 
           <div className="relative">
@@ -558,7 +638,7 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto" onClick={() => setBrandMenuOpen(false)}>
           {(!active || active.messages.length === 0) && !loading && !teamAssembly ? (
             <div className="h-full flex flex-col items-center justify-center gap-6 px-6 py-12">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl">🤖</div>
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-2xl">🤖</div>
               <div className="text-center">
                 <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200 mb-1">{activeBrand ? `${activeBrand.name} 的自主代理團隊` : "啟動自主代理任務"}</h2>
                 <p className="text-sm text-neutral-500 dark:text-neutral-500">輸入任務後，系統會先提案團隊與執行計劃，再接力式自動完成。</p>
@@ -570,7 +650,7 @@ export default function ChatPage() {
                   { label: "🔍 市場調研分析", text: "幫我做市場調研分析報告" },
                   { label: "📅 社群內容規劃", text: "幫我規劃社群媒體月曆" },
                 ].map((s) => (
-                  <button key={s.label} onClick={() => setInput(s.text)} className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-colors">{s.label}</button>
+                  <button key={s.label} onClick={() => setInput(s.text)} className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 hover:border-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">{s.label}</button>
                 ))}
               </div>
             </div>

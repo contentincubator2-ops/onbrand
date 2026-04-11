@@ -2,7 +2,7 @@
  * Layout.tsx — Sprint 3 Claude warm shell
  *
  * Minimal icon rail (56px) with warm neutral palette.
- * Claude design: #faf9f7 bg, amber accents (#c9823a), refined spacing.
+ * Claude design: #faf9f7 bg, amber accents (#111827), refined spacing.
  */
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
@@ -23,12 +23,12 @@ export default function Layout() {
   const logout = () => { localStorage.removeItem("authToken"); navigate("/login"); };
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: dark ? '#1a1918' : '#faf9f7' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: dark ? '#111827' : '#FFFFFF' }}>
       {/* ===== Thin icon rail — Claude warm ===== */}
       <aside className="shrink-0 flex flex-col items-center justify-between w-14 py-3"
         style={{
-          borderRight: `1px solid ${dark ? '#2d2b28' : '#e8e5e0'}`,
-          background: dark ? '#1f1e1c' : '#f5f2ed',
+          borderRight: `1px solid ${dark ? '#374151' : '#E5E7EB'}`,
+          background: dark ? '#1f2937' : '#F9FAFB',
         }}
       >
         {/* Top: Logo */}
@@ -36,7 +36,7 @@ export default function Layout() {
           <button
             onClick={() => navigate("/")}
             className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
-            style={{ background: '#c9823a' }}
+            style={{ background: '#111827' }}
             title="SoWork Home"
           >
             <span className="text-white text-sm font-bold">S</span>
@@ -84,7 +84,7 @@ export default function Layout() {
             onClick={logout}
             className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
             style={{ color: '#9b8fa0' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#c9523a'; e.currentTarget.style.background = dark ? '#2d2020' : '#fdf0ed'; }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#374151'; e.currentTarget.style.background = dark ? '#1f2937' : '#F9FAFB'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#9b8fa0'; e.currentTarget.style.background = 'transparent'; }}
             title="Logout"
           >
