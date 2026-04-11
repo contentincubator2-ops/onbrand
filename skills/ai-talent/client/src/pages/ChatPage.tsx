@@ -261,7 +261,7 @@ function TeamAssemblyPanel({
   );
 }
 
-export default function ChatPage() {
+export default function ChatPage({ initialBrandId }: { initialBrandId?: number | null } = {}) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -294,7 +294,7 @@ export default function ChatPage() {
       await new Promise(r => setTimeout(r, 2000));
       try {
         const res = await fetch(
-          `/trpc/workflow.status?input=${encodeURIComponent(JSON.stringify({ json: { jobId } }))}`,
+          `/trpc/workflow.status?input=${encodeURIComponent(JSON.stringify({ jobId }))}`,
           { headers }
         );
         const data = await res.json();
@@ -334,10 +334,14 @@ export default function ChatPage() {
   useEffect(() => {
     if (brandsQuery.isSuccess && brands.length === 0) setShowOnboarding(true);
     if (brands.length > 0 && !activeBrandId) {
-      const def = brands.find((b: any) => b.isDefault) ?? brands[0];
+      // Prefer initialBrandId from parent (WorkspacePage) if provided
+      const preferred = initialBrandId
+        ? brands.find((b: any) => b.id === initialBrandId)
+        : null;
+      const def = preferred ?? brands.find((b: any) => b.isDefault) ?? brands[0];
       setActiveBrandId(def.id);
     }
-  }, [brandsQuery.isSuccess, brands.length, activeBrandId, brands]);
+  }, [brandsQuery.isSuccess, brands.length, activeBrandId, brands, initialBrandId]);
 
   useEffect(() => {
     if (!historyQuery.data || historyQuery.data.length === 0) return;

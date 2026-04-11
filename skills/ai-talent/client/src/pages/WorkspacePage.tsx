@@ -108,8 +108,33 @@ export default function WorkspacePage() {
     { id: '7', label: 'Export', status: 'not_started' },
   ]);
 
-  // Artifacts & Reviews — Sprint 4
-  const [artifacts] = useState<Artifact[]>([]);
+  // Artifacts — Sprint 5: Load from task.listRecent
+  const recentTasksQuery = trpc.task.listRecent.useQuery(
+    { limit: 10 },
+    { refetchOnWindowFocus: false, refetchInterval: 30000 }
+  );
+
+  const artifacts: Artifact[] = (recentTasksQuery.data ?? [])
+    .filter((t: any) => t.status === 'completed' && t.result)
+    .map((t: any) => ({
+      id: String(t.id),
+      type: 'other' as const,
+      label: t.title ?? '任務產出',
+      version: 1,
+      content: (() => {
+        try {
+          const r = t.result ?? t.description ?? '';
+          // Try to extract publishable_content from JSON
+          const parsed = JSON.parse(r);
+          return (parsed.publishable_content ?? r).slice(0, 500);
+        } catch {
+          return (t.result ?? '').slice(0, 500);
+        }
+      })(),
+      createdAt: new Date(t.createdAt).getTime(),
+      pinned: false,
+    }));
+
   const [reviews] = useState<ReviewItem[]>([]);
 
   // Close workspace menu on outside click
@@ -241,7 +266,7 @@ export default function WorkspacePage() {
 
         {/* Chat */}
         <div className="flex-1 overflow-hidden">
-          <ChatPage />
+          <ChatPage initialBrandId={activeBrand?.id} />
         </div>
       </div>
 
