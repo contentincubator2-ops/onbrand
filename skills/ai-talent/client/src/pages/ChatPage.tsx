@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import OnboardingWizard from "./OnboardingWizard";
 import TaskProgressTracker, { type TaskStep } from "../components/chat/TaskProgressTracker";
+import TypedThreadCard from "../components/chat/TypedThreadCard";
 
 const A2A_PATTERNS: { regex: RegExp; workflowId: string }[] = [
   { regex: /品牌上市|brand.launch|全套.*行銷|行銷.*全套|完整.*上市|上市.*計劃|上市.*策略/i, workflowId: "brand-launch-v1" },
@@ -597,6 +598,25 @@ export default function ChatPage() {
               ))}
 
               {teamAssembly && <div className="-mx-4"><TeamAssemblyPanel state={teamAssembly} relaySteps={relaySteps} onApprove={approveExecution} onToggleSummary={toggleSummary} /></div>}
+
+            {/* Sprint 5: Typed Thread Cards */}
+            {relaySteps.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <h4 className="text-xs font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">Execution Thread</h4>
+                {relaySteps.filter(s => s.status === 'done').map((step, i) => (
+                  <TypedThreadCard
+                    key={step.id}
+                    cardType={i === 0 ? 'pm_agent' : 'specialist'}
+                    agentName={step.agentName}
+                    label={step.label}
+                    status={step.status}
+                    content={step.summary || ''}
+                    stepIndex={i + 1}
+                    totalSteps={relaySteps.length}
+                  />
+                ))}
+              </div>
+            )}
 
               {loading && !teamAssembly && (
                 <div className="flex gap-4">
