@@ -13,7 +13,6 @@ dotenvConfig({ path: resolve(process.cwd(), ".env") });
 import express from "express";
 import cors from "cors";
 import { rateLimit } from "express-rate-limit";
-import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -37,21 +36,6 @@ const app = express();
 if (process.env.TRUST_PROXY === "1") {
   app.set("trust proxy", 1);
 }
-
-// SEC-9: Helmet — HTTP security headers
-// Sprint 4: add HTTP security hardening headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://marketing-os.sowork.ai"],
-    },
-  },
-  crossOriginEmbedderPolicy: false,  // allow SPA iframe embeds if needed
-}));
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN

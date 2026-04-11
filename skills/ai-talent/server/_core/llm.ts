@@ -404,17 +404,51 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
+  // Azure Foundry uses api-key header, others use Bearer token
+  const authHeaders: Record<string, string> = providerKey === "azure-foundry"
+    ? { "api-key": apiKey }
+    : { authorization: `Bearer ${apiKey}` };
+
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
+      ...authHeaders,
     },
     body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
+    // Auto-fallback: if azure-foundry returns DeploymentNotFound, retry with openrouter
+    if (
+      providerKey === "azure-foundry" &&
+      (response.status === 404 || errorText.includes("DeploymentNotFound"))
+    ) {
+      console.warn("[LLM] Azure Foundry deployment not found, falling back to openrouter");
+      const fallbackConfig = PROVIDER_CONFIG["openrouter"]!;
+      const fallbackKey = fallbackConfig.getKey();
+      if (fallbackKey) {
+        const fallbackModel = (params.model && !params.model.includes("/"))
+          ? "openai/" + params.model
+          : "openai/gpt-4o-mini";
+        const fallbackUrl = fallbackConfig.baseUrl + "/chat/completions";
+        const fallbackResp = await fetch(fallbackUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "authorization": "Bearer " + fallbackKey,
+          },
+          body: JSON.stringify({ ...payload, model: fallbackModel }),
+        });
+        if (fallbackResp.ok) {
+          console.warn("[LLM] Fallback to openrouter/" + fallbackModel + " succeeded");
+          return (await fallbackResp.json()) as InvokeResult;
+        }
+        const fallbackErr = await fallbackResp.text();
+        throw new Error("LLM fallback failed: " + fallbackResp.status + " – " + fallbackErr);
+      }
+    }
     throw new Error(
       `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
     );
@@ -459,11 +493,16 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
     payload.tool_choice = normalizedToolChoice;
   }
 
+  // Azure Foundry uses api-key header, others use Bearer token
+  const streamAuthHeaders: Record<string, string> = providerKey === "azure-foundry"
+    ? { "api-key": apiKey }
+    : { authorization: `Bearer ${apiKey}` };
+
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
+      ...streamAuthHeaders,
     },
     body: JSON.stringify(payload),
   });

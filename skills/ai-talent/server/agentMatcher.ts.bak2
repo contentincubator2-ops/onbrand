@@ -9,7 +9,6 @@
  */
 
 import { getSoworkDb } from "./db";
-import localPool from "./localDb";
 import { sql, like, eq, or, and, desc } from "drizzle-orm";
 
 // ─── Shared schema (single source of truth) ───────────────────────────────────
@@ -20,7 +19,6 @@ import { soworkAgents, agentKnowledgeBase } from "./_schemas/soworkAgents";
 export interface AgentMatchRequest {
   userId: number;
   taskType: string; // 'brand_positioning' | 'ad_copy' | 'competitor_analysis' | 'press_release' | 'social_content'
-  taskDescription?: string; // free-text task description for smart inference
   industry?: string; // 'ecommerce' | 'saas' | 'beauty' | 'finance' | 'food_bev' | 'health'
   market?: string; // 'Taiwan' | 'Japan' | 'Germany' | 'Singapore' | ...
   layer?: "strategy" | "execution" | "training";
@@ -94,95 +92,6 @@ const VALID_KNOWLEDGE_TYPES = [
   "industry", "brand_market", "brand_employer",
 ];
 
-// ─── Marketing taskTypes (stored in local MySQL) ──────────────────────────────
-const MARKETING_TASK_TYPES = new Set([
-  "content-text","ads","ecommerce","email","seo","social-channel","kol",
-  "video-content","b2b","pr","brand","analytics","affiliate","crm-marketing",
-  "data-driven-marketing","mobile-marketing","sem-ppc","live-commerce",
-  "ooh-marketing","traditional-media","trade-marketing","dtc-marketing",
-  "esg-marketing","sports-marketing","cvs-marketing","wom-ugc","event-marketing",
-  "programmatic","localization","cs-marketing",
-  "content-text-enterprise","seo-enterprise","social-channel-enterprise",
-  "ads-enterprise","email-enterprise","analytics-enterprise","ecommerce-enterprise",
-  "b2b-enterprise","brand-enterprise","kol-enterprise",
-  "content-text-smb","ads-smb","seo-smb","social-channel-smb",
-  "output-design-center","seo-startup","ads-startup","content-text-startup","social-channel-startup"
-]);
-
-// ─── Intelligent task type inference from description + industry ──────────────
-
-/**
- * Infer one or more local DB taskTypes from free-text description + industry.
- * Returns an ordered list (most relevant first).
- */
-export function inferTaskTypeFromDescription(description: string, industry?: string): string[] {
-  const text = description.toLowerCase();
-  const taskTypes: string[] = [];
-
-  // 市場研究 / 競品分析
-  if (/市場研究|市場分析|競品|競爭對手|market research|competitor|industry analysis|產業分析/.test(text)) {
-    taskTypes.push('analytics', 'b2b', 'analytics-enterprise');
-  }
-  // SEO
-  if (/seo|搜尋排名|關鍵字|organic|自然流量/.test(text)) {
-    taskTypes.push('seo', 'seo-enterprise', 'seo-smb');
-  }
-  // 社群媒體
-  if (/facebook|instagram|社群|貼文|linkedin|twitter|tiktok|抖音/.test(text)) {
-    taskTypes.push('social-channel', 'social-channel-enterprise', 'content-text');
-  }
-  // 廣告投放
-  if (/廣告|投放|google ads|meta ads|fb ads|ppc|sem/.test(text)) {
-    taskTypes.push('ads', 'sem-ppc', 'ads-enterprise');
-  }
-  // 內容/文案
-  if (/文案|content|寫作|copywriting|部落格|blog|文章|article/.test(text)) {
-    taskTypes.push('content-text', 'content-text-enterprise');
-  }
-  // Email 行銷
-  if (/email|電子報|newsletter|edm|郵件/.test(text)) {
-    taskTypes.push('email', 'email-enterprise');
-  }
-  // KOL / 網紅
-  if (/kol|網紅|influencer|代言|直播/.test(text)) {
-    taskTypes.push('kol', 'kol-enterprise');
-  }
-  // 電商
-  if (/電商|ecommerce|shopee|蝦皮|momo|pchome|商城|購物/.test(text)) {
-    taskTypes.push('ecommerce', 'ecommerce-enterprise', 'live-commerce');
-  }
-  // 品牌定位
-  if (/品牌定位|品牌策略|brand|品牌故事|slogan|標語/.test(text)) {
-    taskTypes.push('brand', 'brand-enterprise');
-  }
-  // B2B
-  if (/b2b|企業客戶|business|銷售策略|sales|lead/.test(text)) {
-    taskTypes.push('b2b', 'b2b-enterprise');
-  }
-  // PR / 公關
-  if (/公關|新聞稿|press release|媒體報導/.test(text)) {
-    taskTypes.push('pr');
-  }
-
-  // 根據產業加權（unshift = 優先）
-  if (industry) {
-    const ind = industry.toLowerCase();
-    if (/retail|零售|居家|diy|特力屋|ikea|裝潢/.test(ind)) {
-      taskTypes.unshift('trade-marketing', 'analytics', 'ecommerce');
-    } else if (/tech|科技|saas|software/.test(ind)) {
-      taskTypes.unshift('b2b', 'content-text', 'seo');
-    } else if (/beauty|美妝|化妝品/.test(ind)) {
-      taskTypes.unshift('kol', 'social-channel', 'ecommerce');
-    } else if (/food|食品|飲料|fmcg/.test(ind)) {
-      taskTypes.unshift('wom-ugc', 'social-channel', 'ecommerce');
-    }
-  }
-
-  // 去重，默認 content-text + analytics
-  const unique = [...new Set(taskTypes)];
-  return unique.length > 0 ? unique : ['content-text', 'analytics'];
-}
-
 // ─── matchAgents (INJ-1, BUG-3 fixed) ────────────────────────────────────────
 
 /**
@@ -203,55 +112,6 @@ export async function matchAgents(req: AgentMatchRequest): Promise<AgentMatch[]>
   const safeMarket =
     req.market && VALID_MARKETS.includes(req.market) ? req.market : undefined;
 
-  // ── 本地 MySQL 優先查詢（行銷 agents，17000+ 筆）────────────────────────
-  // 智能推斷 taskType 列表（支援多個 taskType IN 查詢）
-  const inferredTypes = req.taskDescription
-    ? (req.taskType
-        ? [req.taskType, ...inferTaskTypeFromDescription(req.taskDescription, req.industry)]
-        : inferTaskTypeFromDescription(req.taskDescription, req.industry))
-    : req.taskType
-      ? [req.taskType]
-      : ['content-text', 'analytics'];
-
-  const candidateTypes = [...new Set(inferredTypes)].filter(t => MARKETING_TASK_TYPES.has(t)).slice(0, 5);
-  console.log(`[agentMatcher] candidateTypes:`, candidateTypes, 'for:', req.taskDescription?.slice(0, 50));
-
-  if (candidateTypes.length > 0) {
-    try {
-      const placeholders = candidateTypes.map(() => '?').join(',');
-      const orderPlaceholders = candidateTypes.map(() => '?').join(',');
-      const [localRows] = await localPool.query<any[]>(
-        `SELECT id, slug, name, title, layer, specialty, bio, rating, hireCount,
-                pricePerTask, priceMonthly, taskType
-         FROM agents
-         WHERE taskType IN (${placeholders}) AND isAvailable = 1
-         ORDER BY FIELD(taskType, ${orderPlaceholders}), rating DESC, hireCount DESC
-         LIMIT ?`,
-        [...candidateTypes, ...candidateTypes, safeLimit]
-      );
-      if (Array.isArray(localRows) && localRows.length > 0) {
-        return (localRows as any[]).map((agent: any, i: number) => ({
-          id: agent.id,
-          slug: agent.slug ?? "",
-          name: agent.name,
-          title: agent.title ?? "",
-          layer: agent.layer ?? "execution",
-          specialty: agent.specialty ?? "",
-          bio: agent.bio ?? "",
-          rating: Number(agent.rating ?? 4.5),
-          hireCount: Number(agent.hireCount ?? 0),
-          pricePerTask: Number(agent.pricePerTask ?? 5),
-          priceMonthly: Number(agent.priceMonthly ?? 99),
-          matchScore: Math.max(60, 90 - i * 5),
-          taskType: agent.taskType,
-          matchReasons: [`智能匹配：${agent.taskType}（推斷自任務描述）`],
-        }));
-      }
-    } catch (localErr) {
-      console.warn("[localDb] 查詢失敗，fallback 到 Azure MySQL:", localErr);
-    }
-  }
-  // ── Fallback: Azure MySQL via Drizzle ORM ─────────────────────────────────
   // ── Build Drizzle query conditions (SQL-injection safe) ──────────────────
   const db = await getSoworkDb();
   const taskConfig = TASK_AGENT_MAP[safeTaskType]!;

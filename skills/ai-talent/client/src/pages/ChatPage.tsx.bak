@@ -39,9 +39,6 @@ interface Msg {
   imageSuggestion?: string;
   taskId?: number;
   ts: number;
-  model?: string;   // AI model used (e.g. 'DeepSeek V3', 'Claude 3.5')
-  agentName?: string;  // agent name for this message
-  agentTitle?: string; // agent title for this message
 }
 
 interface Conversation {
@@ -264,7 +261,7 @@ function TeamAssemblyPanel({
   );
 }
 
-export default function ChatPage({ initialBrandId }: { initialBrandId?: number | null } = {}) {
+export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -285,7 +282,6 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
 
   const createAndExecute = trpc.task.createAndExecute.useMutation();
   const workflowStart = trpc.workflow.start.useMutation();
-  const pmChat = trpc.workflow.pmChat.useMutation();
 
   // BullMQ 輪詢：每 2 秒查一次，最多等 60 秒
   // 直接呼叫 tRPC HTTP 避免 React hook 限制
@@ -338,14 +334,10 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
   useEffect(() => {
     if (brandsQuery.isSuccess && brands.length === 0) setShowOnboarding(true);
     if (brands.length > 0 && !activeBrandId) {
-      // Prefer initialBrandId from parent (WorkspacePage) if provided
-      const preferred = initialBrandId
-        ? brands.find((b: any) => b.id === initialBrandId)
-        : null;
-      const def = preferred ?? brands.find((b: any) => b.isDefault) ?? brands[0];
+      const def = brands.find((b: any) => b.isDefault) ?? brands[0];
       setActiveBrandId(def.id);
     }
-  }, [brandsQuery.isSuccess, brands.length, activeBrandId, brands, initialBrandId]);
+  }, [brandsQuery.isSuccess, brands.length, activeBrandId, brands]);
 
   useEffect(() => {
     if (!historyQuery.data || historyQuery.data.length === 0) return;
@@ -497,32 +489,23 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
 
       let content = "";
       let thinking = "";
-      let resultModel = "";
-      let resultAgentName = "";
-      let resultAgentTitle = "";
       if (workflowResult && typeof workflowResult === 'object') {
         content = workflowResult.publishable_content
           ?? workflowResult.output
           ?? workflowResult.result
           ?? JSON.stringify(workflowResult);
         thinking = workflowResult.thinking ?? "";
-        resultModel = workflowResult.model ?? "";
-        resultAgentName = workflowResult.agent?.name ?? "";
-        resultAgentTitle = workflowResult.agent?.title ?? "";
       } else if (typeof workflowResult === 'string') {
         try {
           const p = JSON.parse(workflowResult);
           content = p.publishable_content ?? workflowResult;
           thinking = p.thinking ?? "";
-          resultModel = p.model ?? "";
-          resultAgentName = p.agent?.name ?? "";
-          resultAgentTitle = p.agent?.title ?? "";
         } catch { content = workflowResult; }
       } else {
         content = '任務已完成，但未有產出內容';
       }
 
-      const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now(), model: resultModel || undefined, agentName: resultAgentName || undefined, agentTitle: resultAgentTitle || undefined };
+      const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now() };
       setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
       saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
       setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content }].slice(-10));
@@ -685,13 +668,6 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
                     )}
                     {msg.role === "assistant" ? (
                       <div className="w-full rounded-2xl rounded-bl-md bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-                        {(msg.agentName || msg.model) && (
-                          <div className="px-4 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-700">
-                            {msg.agentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{msg.agentName}</span>}
-                            {msg.agentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500">{msg.agentTitle}</span>}
-                            {msg.model && <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-auto">· {msg.model}</span>}
-                          </div>
-                        )}
                         <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content) }} />
                       </div>
                     ) : (

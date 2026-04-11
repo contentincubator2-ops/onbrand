@@ -1,7 +1,11 @@
 /**
  * modelRouter.ts — 多層模型路由系統
- * Layer 1 (PM): Gemma 4
- * Layer 2 (Specialist): 依任務類型路由到最適合的模型
+ * Primary: Azure AI Foundry (OpenAI compatible)
+ * Fallback: OpenRouter (when Azure models not deployed)
+ *
+ * Azure AI Foundry 目前未部署模型（DeploymentNotFound），
+ * 所以暫時用 openrouter 作為 fallback。
+ * 當 Azure 部署好模型後，把 provider 改回 'azure-foundry' 即可。
  */
 
 import { ENV } from "./env";
@@ -21,49 +25,52 @@ export interface ModelConfig {
   reason: string;
 }
 
+// Azure AI Foundry 是否可用（有 API key 才啟用）
+const AZURE_AVAILABLE = !!(ENV as any).AZURE_FOUNDRY_API_KEY;
+
 export const TASK_MODEL_MAP: Record<TaskType, ModelConfig> = {
   brand_onboarding: {
-    provider: "openrouter",
-    model: "anthropic/claude-sonnet-4-6",
-    label: "Claude Sonnet 4.6",
+    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
+    model: AZURE_AVAILABLE ? "gpt-4o" : "anthropic/claude-sonnet-4-6",
+    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "Claude Sonnet 4.6 (OpenRouter)",
     reason: "最佳品牌策略分析、長文輸出、結構化報告",
   },
   market_analysis: {
-    provider: "openrouter",
-    model: "openai/gpt-4o",
-    label: "GPT-4o (OpenRouter)",
+    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
+    model: AZURE_AVAILABLE ? "gpt-4o" : "openai/gpt-4o",
+    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "GPT-4o (OpenRouter)",
     reason: "市場數據分析、結構化輸出",
   },
   content_generation: {
-    provider: "openrouter",
-    model: "deepseek/deepseek-chat",
-    label: "DeepSeek V3",
-    reason: "中文內容最佳、成本低",
+    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
+    model: AZURE_AVAILABLE ? "gpt-4o-mini" : "deepseek/deepseek-chat",
+    label: AZURE_AVAILABLE ? "GPT-4o Mini (Azure Foundry)" : "DeepSeek V3 (OpenRouter)",
+    reason: "內容生成、中文輸出",
   },
   data_analysis: {
-    provider: "openrouter",
-    model: "openai/gpt-4o",
-    label: "GPT-4o (OpenRouter)",
+    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
+    model: AZURE_AVAILABLE ? "gpt-4o" : "openai/gpt-4o",
+    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "GPT-4o (OpenRouter)",
     reason: "數據分析、計算、A/B test 設計",
   },
   campaign_planning: {
-    provider: "openrouter",
-    model: "anthropic/claude-sonnet-4-6",
-    label: "Claude Sonnet 4.6",
+    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
+    model: AZURE_AVAILABLE ? "gpt-4o" : "anthropic/claude-sonnet-4-6",
+    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "Claude Sonnet 4.6 (OpenRouter)",
     reason: "廣告活動創意策略",
   },
   general: {
-    provider: "openrouter",
-    model: "google/gemma-3-27b-it",
-    label: "Gemma 4",
+    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
+    model: AZURE_AVAILABLE ? "gpt-4o-mini" : "google/gemma-3-27b-it",
+    label: AZURE_AVAILABLE ? "GPT-4o Mini (Azure Foundry)" : "Gemma 4 (OpenRouter)",
     reason: "輕量任務、成本最低",
   },
 };
 
 export const PM_MODEL: ModelConfig = {
-  provider: "openrouter",
-  model: "google/gemma-3-27b-it",
-  label: "Gemma 4 (PM)",
+  provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
+  model: AZURE_AVAILABLE ? "gpt-4o-mini" : "google/gemma-3-27b-it",
+  label: AZURE_AVAILABLE ? "GPT-4o Mini (Azure Foundry)" : "Gemma 4 (OpenRouter)",
   reason: "任務理解、分類、路由",
 };
 

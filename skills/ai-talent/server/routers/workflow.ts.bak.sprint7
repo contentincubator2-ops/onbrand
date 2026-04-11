@@ -429,7 +429,7 @@ export const workflowRouter = router({
     }),
 
   /**
-   * runSquadWorkflow — 多 agent 協作（Sprint 3 後半段）- kept for backward compat
+   * runSquadWorkflow — 多 agent 協作（Sprint 3 後半段）
    */
   runSquadWorkflow: protectedProcedure
     .input(z.object({
@@ -439,64 +439,7 @@ export const workflowRouter = router({
       industry: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      return { message: "Use workflow.runSquad for Squad A2A execution", status: "deprecated" };
-    }),
-
-  /**
-   * recommendSquads — 根據用戶需求推薦適合的 Squad（Sprint 7）
-   */
-  recommendSquads: publicProcedure
-    .input(z.object({
-      userRequest: z.string().min(1),
-      brand: z.string().optional(),
-      industry: z.string().optional(),
-    }))
-    .query(async ({ input }) => {
-      const { recommendSquads } = await import('../squad/squadRecommender');
-      return recommendSquads({ ...input, limit: 3 });
-    }),
-
-  /**
-   * runSquad — 執行 Squad Leader A2A Workflow（Sprint 7）
-   */
-  runSquad: publicProcedure
-    .input(z.object({
-      squadId: z.number(),
-      userRequest: z.string().min(1),
-      brand: z.string().optional(),
-      industry: z.string().optional(),
-      userId: z.number().optional(),
-    }))
-    .mutation(async ({ input }) => {
-      const { squadQueue } = await import('../queue/squadLeaderWorker');
-      const jobId = ;
-      const job = await squadQueue.add('squad-task', {
-        jobId,
-        ...input,
-      }, {
-        attempts: 2,
-        backoff: { type: 'exponential', delay: 3000 },
-      });
-      return { jobId: job.id, status: 'queued' };
-    }),
-
-  /**
-   * squadStatus — 查詢 Squad 任務狀態（Sprint 7）
-   */
-  squadStatus: publicProcedure
-    .input(z.object({ jobId: z.string() }))
-    .query(async ({ input }) => {
-      const { squadQueue } = await import('../queue/squadLeaderWorker');
-      const job = await squadQueue.getJob(input.jobId);
-      if (!job) return { status: 'not_found' };
-      const state = await job.getState();
-      return {
-        jobId: input.jobId,
-        status: state,
-        progress: job.progress,
-        result: state === 'completed' ? job.returnvalue : null,
-        error: state === 'failed' ? job.failedReason : null,
-      };
+      return { message: "Squad workflow coming in Sprint 3B", status: "pending" };
     }),
 
   // PM Agent — 個人專屬 PM，帶對話記憶

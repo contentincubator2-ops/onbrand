@@ -1,0 +1,234 @@
+import { Worker, Job, Queue } from 'bullmq';
+import { connection } from './marketingQueue';
+import { invokeLLM } from '../_core/llm';
+import localPool from '../localDb';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const SKILLS_PATH = process.env.SKILLS_PATH || '/home/azureuser/A2A-Marketing-Claw/skills';
+
+export interface SquadJobData {
+  jobId: string;
+  squadId: number;
+  userRequest: string;
+  brand?: string;
+  industry?: string;
+  userId?: number;
+}
+
+export interface SquadMemberOutput {
+  agentName: string;
+  agentTitle: string;
+  taskType: string;
+  subTask: string;
+  content: string;
+}
+
+export interface SquadJobResult {
+  squadName: string;
+  leader: string;
+  leaderTitle: string;
+  memberOutputs: SquadMemberOutput[];
+  integratedOutput: string;
+  model: string;
+  executionTimeMs: number;
+}
+
+export const squadQueue = new Queue('squad-jobs', { connection });
+
+function loadSkillMd(taskType: string): string {
+  try {
+    const skillFile = path.join(SKILLS_PATH, taskType, 'SKILL.md');
+    if (fs.existsSync(skillFile)) {
+      return fs.readFileSync(skillFile, 'utf-8').slice(0, 800);
+    }
+  } catch {}
+  return '';
+}
+
+export function startSquadLeaderWorker() {
+  const worker = new Worker<SquadJobData, SquadJobResult>(
+    'squad-jobs',
+    async (job: Job<SquadJobData>) => {
+      const startTime = Date.now();
+      const { squadId, userRequest, brand, industry } = job.data;
+      console.log(`[Squad Worker] Processing squad ${squadId}: ${userRequest.slice(0, 60)}`);
+
+      await job.updateProgress(5);
+
+      // 1. Get squad info from agent_squads
+      const [squadRows] = await localPool.query(
+        'SELECT id, name, squad_size, description FROM agent_squads WHERE id = ? AND is_active = 1',
+        [squadId]
+      ) as any[];
+      const squad = (squadRows as any[])[0];
+      if (!squad) throw new Error(`Squad ${squadId} not found or inactive`);
+
+      // 2. Get leader from squad_members
+      const [leaderRows] = await localPool.query(
+        `SELECT a.id, a.name, a.title, a.specialty, a.taskType, a.bio
+         FROM agents a
+         JOIN squad_members sm ON a.id = sm.agent_id
+         WHERE sm.squad_id = ? AND sm.is_lead = 1
+         LIMIT 1`,
+        [squadId]
+      ) as any[];
+      const leader = (leaderRows as any[])[0] || { name: 'Squad Leader', title: '專案負責人', specialty: '行銷策略', taskType: 'brand' };
+
+      // 3. Get members
+      const [memberRows] = await localPool.query(
+        `SELECT a.id, a.name, a.title, a.specialty, a.taskType, a.bio
+         FROM agents a
+         JOIN squad_members sm ON a.id = sm.agent_id
+         WHERE sm.squad_id = ? AND sm.is_lead = 0
+         ORDER BY sm.order_index
+         LIMIT 4`,
+        [squadId]
+      ) as any[];
+      const members = memberRows as any[];
+
+      await job.updateProgress(15);
+
+      console.log(`[Squad Worker] Squad: ${squad.name}, Leader: ${leader.name}, Members: ${members.length}`);
+
+      // 4. Leader analyzes task and creates breakdown plan
+      const leaderSystemPrompt = `你是「${squad.name}」的 Squad Leader：${leader.name}（${leader.title}）。
+專長：${leader.specialty || '行銷策略規劃'}
+Squad 描述：${squad.description || squad.name}
+
+你的 Squad 成員：
+${members.map((m: any, i: number) => `${i + 1}. ${m.name}（${m.title}）- 專長：${m.specialty || m.taskType}`).join('\n')}
+
+品牌：${brand || '未指定'}
+產業：${industry || '未指定'}
+
+你的職責：分析用戶任務，為每個成員分配具體的子任務，然後整合所有產出。
+請輸出 JSON 格式的任務分配計劃。`;
+
+      const leaderResponse = await invokeLLM({
+        model: 'anthropic/claude-sonnet-4-6',
+        provider: 'openrouter',
+        messages: [
+          { role: 'system', content: leaderSystemPrompt },
+          { role: 'user', content: `用戶任務：${userRequest}\n\n請分析任務並為每位成員分配子任務，輸出 JSON：\n{"taskBreakdown":[{"memberName":"名稱","subTask":"具體子任務","priority":1}],"integrationPlan":"整合策略說明"}` }
+        ],
+        max_tokens: 800,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+      });
+
+      let taskPlan: { taskBreakdown: Array<{ memberName: string; subTask: string; priority: number }>; integrationPlan: string } = {
+        taskBreakdown: [],
+        integrationPlan: '整合所有成員的專業產出，形成完整的行銷策略方案'
+      };
+
+      try {
+        const parsed = JSON.parse(leaderResponse.content || '{}');
+        if (parsed.taskBreakdown) taskPlan = parsed;
+      } catch {
+        console.warn('[Squad Worker] Leader JSON parse failed, using fallback');
+      }
+
+      await job.updateProgress(35);
+
+      // 5. Members execute in parallel (max 3 concurrent)
+      const activeMembers = members.slice(0, 3);
+      const execPromises = activeMembers.map(async (member: any, i: number) => {
+        const breakdown = taskPlan.taskBreakdown.find((b) => b.memberName === member.name)
+          || taskPlan.taskBreakdown[i]
+          || { subTask: userRequest, priority: i + 1 };
+
+        const skillContent = loadSkillMd(member.taskType || 'content-text');
+
+        const memberResponse = await invokeLLM({
+          model: 'deepseek/deepseek-chat',
+          provider: 'openrouter',
+          messages: [
+            {
+              role: 'system',
+              content: `你是 ${member.name}（${member.title}）。
+專長：${member.specialty || member.taskType}
+${skillContent ? `工作指南摘要：\n${skillContent.slice(0, 400)}` : ''}
+
+品牌：${brand || '未指定'}
+產業：${industry || '未指定'}
+
+請直接產出可用的行銷內容，不需解釋你的角色，直接輸出成果。`
+            },
+            { role: 'user', content: breakdown.subTask || userRequest }
+          ],
+          max_tokens: 700,
+          temperature: 0.7,
+        });
+
+        return {
+          agentName: member.name,
+          agentTitle: member.title,
+          taskType: member.taskType || '',
+          subTask: breakdown.subTask || userRequest,
+          content: memberResponse.content || `（${member.name} 產出待整合）`,
+        };
+      });
+
+      const memberOutputs = await Promise.all(execPromises);
+      await job.updateProgress(80);
+
+      // 6. Leader integrates all outputs
+      const integrationPrompt = `你是「${squad.name}」的 Squad Leader：${leader.name}（${leader.title}）。
+
+原始任務：${userRequest}
+品牌：${brand || '未指定'}
+產業：${industry || '未指定'}
+
+Squad 成員的工作產出：
+${memberOutputs.map((o, i) => `【成員 ${i + 1}：${o.agentName}（${o.agentTitle}）】
+子任務：${o.subTask}
+產出：
+${o.content}`).join('\n\n' + '─'.repeat(40) + '\n\n')}
+
+整合策略：${taskPlan.integrationPlan}
+
+請作為 Squad Leader，將以上成員的所有產出整合成一份完整、連貫、可直接交付給客戶使用的行銷方案。
+格式要清晰，保留各成員的專業貢獻，並確保整體策略的一致性。`;
+
+      const integratedResponse = await invokeLLM({
+        model: 'anthropic/claude-sonnet-4-6',
+        provider: 'openrouter',
+        messages: [
+          { role: 'system', content: integrationPrompt },
+          { role: 'user', content: '請整合所有成員的產出，形成完整的行銷方案。' }
+        ],
+        max_tokens: 2000,
+        temperature: 0.5,
+      });
+
+      await job.updateProgress(100);
+
+      return {
+        squadName: squad.name,
+        leader: leader.name,
+        leaderTitle: leader.title,
+        memberOutputs,
+        integratedOutput: integratedResponse.content || '',
+        model: 'Claude Sonnet 4.6 (Leader + Integration) + DeepSeek (Members)',
+        executionTimeMs: Date.now() - startTime,
+      };
+    },
+    { connection, concurrency: 3 }
+  );
+
+  worker.on('completed', (job) => {
+    console.log(`[Squad Worker] ✅ Squad job ${job.id} completed`);
+  });
+
+  worker.on('failed', (job, err) => {
+    console.error(`[Squad Worker] ❌ Squad job ${job?.id} failed:`, err.message);
+  });
+
+  worker.on('error', (err) => {
+    console.error('[Squad Worker] Worker error:', err.message);
+  });
+
+  console.log('[Squad Worker] Squad Leader Worker started (concurrency: 3)');
+  return worker;
+}
