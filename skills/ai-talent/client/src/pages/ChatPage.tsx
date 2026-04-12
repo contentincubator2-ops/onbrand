@@ -93,6 +93,23 @@ const IconSend = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="non
 const IconChevron = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
 const IconPlus = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 
+function formatModelName(raw: string): string {
+  if (!raw) return '';
+  const r = raw.toLowerCase();
+  if (r.includes('claude') && r.includes('sonnet') && (r.includes('4') || r.includes('3-7') || r.includes('3.7'))) return 'Claude Sonnet 4';
+  if (r.includes('claude') && r.includes('opus')) return 'Claude Opus 4';
+  if (r.includes('claude') && r.includes('haiku')) return 'Claude Haiku 3.5';
+  if (r.includes('claude')) return 'Claude';
+  if (r.includes('gpt-4o')) return 'GPT-4o';
+  if (r.includes('gpt-4')) return 'GPT-4';
+  if (r.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+  if (r.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
+  if (r.includes('gemini')) return 'Gemini';
+  if (r.includes('deepseek')) return 'DeepSeek V3';
+  if (r.includes('llama')) return 'Llama 3';
+  return raw;
+}
+
 function renderContent(raw: string): { main: string; thinking: string } {
   try {
     const d = JSON.parse(raw);
@@ -694,7 +711,7 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
                           <div className="px-4 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-700">
                             {msg.agentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{msg.agentName}</span>}
                             {msg.agentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500">{msg.agentTitle}</span>}
-                            {/* model name hidden for cleaner UX */}
+                            {msg.model && <span className="text-[10px] text-neutral-400 dark:text-neutral-500 ml-auto bg-neutral-200 dark:bg-neutral-700 px-1.5 py-0.5 rounded-full">{formatModelName(msg.model)}</span>}
                           </div>
                         )}
                         <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content || (msg.thinking ? "✅ 分析完成，請查看策略思考過程" : "（無輸出內容）")) }} />

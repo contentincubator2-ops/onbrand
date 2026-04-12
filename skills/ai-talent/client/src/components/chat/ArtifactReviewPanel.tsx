@@ -105,7 +105,26 @@ function TeamTab({ team, loading }: { team: TeamMember[]; loading?: boolean }) {
         <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed">📋 Agent 團隊池 — 任務規劃完成後將自動組成執行團隊。</p>
       </div>
       {team.map(member => {
-        const badge = STATUS_BADGE[member.status];
+        
+function formatModel(raw: string): string {
+  if (!raw) return '';
+  const r = raw.toLowerCase();
+  if (r.includes('claude') && r.includes('sonnet') && (r.includes('4') || r.includes('3-7') || r.includes('3.7'))) return 'Claude Sonnet 4';
+  if (r.includes('claude') && r.includes('opus')) return 'Claude Opus 4';
+  if (r.includes('claude') && r.includes('haiku')) return 'Claude Haiku 3.5';
+  if (r.includes('claude')) return 'Claude';
+  if (r.includes('gpt-4o')) return 'GPT-4o';
+  if (r.includes('gpt-4')) return 'GPT-4';
+  if (r.includes('gpt-3.5')) return 'GPT-3.5';
+  if (r.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+  if (r.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
+  if (r.includes('gemini')) return 'Gemini';
+  if (r.includes('deepseek')) return 'DeepSeek V3';
+  if (r.includes('llama')) return 'Llama 3';
+  return raw;
+}
+
+const badge = STATUS_BADGE[member.status];
         return (
           <div key={member.id} className="flex items-start gap-3">
             <div className={`w-8 h-8 rounded-full ${LAYER_COLORS[member.layer] ?? 'bg-neutral-500'} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
@@ -118,7 +137,7 @@ function TeamTab({ team, loading }: { team: TeamMember[]; loading?: boolean }) {
               </div>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{member.title}</p>
               <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">Owns: {member.owns}</p>
-                            {/* aiModel hidden for cleaner UX */}
+                            {member.aiModel && <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full mt-0.5">{formatModel(member.aiModel)}</span>}
             </div>
           </div>
         );
