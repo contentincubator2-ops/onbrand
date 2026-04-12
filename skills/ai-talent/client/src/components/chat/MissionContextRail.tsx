@@ -1,13 +1,11 @@
 /**
- * MissionContextRail.tsx — Sprint 3
- * Left rail: mission context + live agent roster for this workspace
+ * MissionContextRail.tsx — Sprint 1 (Mission Workspace Completion)
+ * Left rail: Mission Context only — Brand, Workspace, Objective, Audience, Offer,
+ * KPI, Methodology, Constraints, Mission Stages
  *
- * Sprint 3 wiring:
- * - Accepts `agents` prop (from agent.list tRPC via WorkspacePage)
- * - Shows agent avatars, specialties, workspace layer tag
- * - Keeps MissionContext type (used by WorkspacePage state)
- * - TaskUnit type removed — tasks now tracked via agent status
+ * Removed: agents / agentsLoading props (agents now live in right ArtifactReviewPanel Team tab)
  */
+import React from 'react';
 
 export interface MissionContext {
   workspace: string;       // e.g. "Facebook"
@@ -19,14 +17,15 @@ export interface MissionContext {
   methodology: string;     // e.g. "Brand Positioning v2"
 }
 
+// AgentEntry kept for external consumers (WorkspacePage maps leftAgents for right panel)
 export interface AgentEntry {
   id: number;
   name: string;
   specialty: string;
-  workspace: string;       // facebook | linkedin | youtube | pr | event | instore
+  workspace: string;
   layer: 'execution' | 'strategy';
   status: 'idle' | 'running' | 'review' | 'done';
-    aiModel?: string;    // e.g. "claude-sonnet-4-20250514", "gpt-4o"
+  aiModel?: string;
 }
 
 export interface TaskUnit {
@@ -38,67 +37,12 @@ export interface TaskUnit {
 interface Props {
   brand: { name: string; id: number } | null;
   mission: MissionContext | null;
-  agents: AgentEntry[];
   taskUnits?: TaskUnit[];
-  agentsLoading?: boolean;
   workspaceName?: string;
   onEditMission?: () => void;
 }
 
-const TASK_STATUS_CFG: Record<string, { icon: string; cls: string }> = {
-  not_started: { icon: '\u25CB', cls: 'text-neutral-400' },
-  running: { icon: '\u25D4', cls: 'text-blue-600 animate-pulse' },
-  needs_input: { icon: '\u26A0', cls: 'text-amber-500' },
-  ready_review: { icon: '\u25C9', cls: 'text-purple-600' },
-  approved: { icon: '\u2713', cls: 'text-green-600' },
-};
-
-function TaskUnitList({ units }: { units: TaskUnit[] }) {
-  if (!units || units.length === 0) return null;
-  const done = units.filter(u => u.status === 'approved').length;
-  const pct = Math.round((done / units.length) * 100);
-  return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <SectionLabel>Task Progress</SectionLabel>
-        <span className="text-[10px] text-neutral-400">{done}/{units.length}</span>
-      </div>
-      <div className="w-full h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-full mb-2 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-amber-400 to-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      <div className="space-y-0.5">
-        {units.map(u => {
-          const s = (TASK_STATUS_CFG as any)[u.status] || TASK_STATUS_CFG.not_started;
-          return (
-            <div key={u.id} className={`flex items-center gap-2 px-2 py-1 rounded-md ${u.status === 'running' ? 'bg-blue-50/80 dark:bg-blue-900/20' : u.status === 'needs_input' ? 'bg-amber-50/80 dark:bg-amber-900/20' : ''}`}>
-              <span className={`text-[11px] ${s.cls}`}>{s.icon}</span>
-              <span className={`text-[11px] flex-1 ${u.status === 'approved' ? 'text-neutral-400 line-through' : 'text-neutral-700 dark:text-neutral-300'}`}>{u.label}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-const STATUS_DOT: Record<AgentEntry['status'], string> = {
-  idle:    'bg-neutral-300 dark:bg-neutral-600',
-  running: 'bg-indigo-500 animate-pulse',
-  review:  'bg-amber-400',
-  done:    'bg-green-500',
-};
-
-const STATUS_LABEL: Record<AgentEntry['status'], string> = {
-  idle:    '待命',
-  running: '執行中',
-  review:  '待審',
-  done:    '完成',
-};
-
-const LAYER_COLOR: Record<AgentEntry['layer'], string> = {
-  execution: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  strategy:  'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-};
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -106,6 +50,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       {children}
     </p>
   );
+}
+
+function Divider() {
+  return <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-3" />;
 }
 
 function ContextRow({ label, value }: { label: string; value: string }) {
@@ -118,54 +66,91 @@ function ContextRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AgentCard({ agent }: { agent: AgentEntry }) {
-  const initials = agent.name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+// Mission Stages — numbered 01/02/03 with status colours
+const STAGE_STATUS: Record<string, { dot: string; text: string; bg: string }> = {
+  not_started:  { dot: 'bg-neutral-300 dark:bg-neutral-600',      text: 'text-neutral-400',                   bg: '' },
+  running:      { dot: 'bg-amber-500 animate-pulse',               text: 'text-neutral-800 dark:text-neutral-100', bg: 'bg-amber-50/60 dark:bg-amber-900/20' },
+  needs_input:  { dot: 'bg-amber-400',                             text: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50/60 dark:bg-amber-900/20' },
+  ready_review: { dot: 'bg-indigo-500',                            text: 'text-neutral-700 dark:text-neutral-300', bg: '' },
+  approved:     { dot: 'bg-green-500',                             text: 'text-neutral-400 line-through',      bg: '' },
+};
+
+function MissionStages({ units }: { units: TaskUnit[] }) {
+  if (!units || units.length === 0) return null;
+  const done = units.filter(u => u.status === 'approved').length;
+  const pct  = Math.round((done / units.length) * 100);
 
   return (
-    <div className="flex items-center gap-2 py-1.5">
-      {/* Avatar */}
-      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-        {initials}
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <SectionLabel>Mission Stages</SectionLabel>
+        <span className="text-[10px] text-neutral-400">{done}/{units.length}</span>
       </div>
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-neutral-800 dark:text-neutral-100 truncate">{agent.name}</p>
-        <p className="text-[10px] text-neutral-400 truncate">{agent.specialty}</p>         {agent.aiModel && (           <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium mt-0.5">             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/></svg>             {agent.aiModel.replace('claude-', '').replace('gpt-', 'GPT-').replace('-20250514', '').slice(0, 16)}           </span>         )}
+      {/* Progress bar */}
+      <div className="w-full h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full mb-3 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-400 to-green-500 rounded-full transition-all"
+          style={{ width: `${pct}%` }}
+        />
       </div>
-      {/* Status dot */}
-      <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[agent.status]}`} title={STATUS_LABEL[agent.status]} />
+      <div className="space-y-0.5">
+        {units.map((u, idx) => {
+          const s = STAGE_STATUS[u.status] ?? STAGE_STATUS.not_started;
+          const num = String(idx + 1).padStart(2, '0');
+          return (
+            <div
+              key={u.id}
+              className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md ${s.bg}`}
+            >
+              <span className="text-[10px] font-mono text-neutral-300 dark:text-neutral-600 shrink-0 w-5">{num}</span>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.dot}`} />
+              <span className={`text-[11px] flex-1 ${s.text}`}>{u.label}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function MissionContextRail({
   brand,
   mission,
-  agents,
-  agentsLoading,
+  taskUnits,
   workspaceName,
   onEditMission,
-  taskUnits,
 }: Props) {
-  const displayName = mission?.workspace ?? workspaceName ?? 'No workspace';
-
-  // Group agents by layer
-  const executionAgents = agents.filter((a) => a.layer === 'execution');
-  const strategyAgents  = agents.filter((a) => a.layer === 'strategy');
+  const displayWorkspace = mission?.workspace ?? workspaceName ?? 'No workspace';
 
   return (
-    <aside className="w-[280px] shrink-0 h-full flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-[#faf9f7] dark:bg-[#1a1a1a] overflow-hidden">
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-neutral-200 dark:border-neutral-800">
+    <aside
+      className="w-[280px] shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-[#faf9f7] dark:bg-[#1a1a1a] flex flex-col overflow-hidden"
+      style={{ position: 'sticky', top: 0, height: '100vh' }}
+    >
+      {/* ── Header ── */}
+      <div className="px-4 pt-4 pb-3 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
+        {/* Brand */}
+        {brand ? (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center text-[12px] font-bold text-white shrink-0">
+              {brand.name.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 dark:text-neutral-500">Brand</p>
+              <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100 truncate">{brand.name}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm font-semibold text-neutral-400 mb-2">— No Brand —</p>
+        )}
+
+        {/* Workspace + Edit */}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 dark:text-neutral-500">Workspace</p>
-            <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100 mt-0.5">{displayName}</p>
+            <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mt-0.5">{displayWorkspace}</p>
           </div>
           {onEditMission && (
             <button
@@ -176,100 +161,79 @@ export default function MissionContextRail({
             </button>
           )}
         </div>
-        {brand && (
-          <div className="mt-2 flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-              {brand.name.charAt(0)}
-            </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{brand.name}</p>
-          </div>
-        )}
       </div>
 
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-        {/* Mission context fields */}
+      {/* ── Scrollable body ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
         {mission ? (
           <>
-            <ContextRow label="目標" value={mission.objective} />
-            <ContextRow label="受眾" value={mission.audience} />
-            <ContextRow label="主張 / Offer" value={mission.offer} />
-            <ContextRow label="成效指標" value={mission.successMetrics} />
-            <ContextRow label="限制條件" value={mission.constraints} />
+            {/* 1. Objective */}
+            <ContextRow label="目標 Objective" value={mission.objective} />
+
+            {/* 2. Audience */}
+            <ContextRow label="受眾 Audience" value={mission.audience} />
+
+            {/* 3. Offer */}
+            <ContextRow label="提案 / 產品 Offer" value={mission.offer} />
+
+            {/* 4. KPI / Success Metrics — amber badge list */}
+            {mission.successMetrics && (
+              <div className="mb-3">
+                <SectionLabel>KPI / 成功指標</SectionLabel>
+                <div className="flex flex-wrap gap-1">
+                  {mission.successMetrics.split(/[,，；;、\n]+/).filter(Boolean).map((m, i) => (
+                    <span
+                      key={i}
+                      className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium"
+                    >
+                      {m.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 5. Methodology */}
             {mission.methodology && (
-              <div className="mb-4">
-                <SectionLabel>方法論</SectionLabel>
+              <div className="mb-3">
+                <SectionLabel>方法論 Methodology</SectionLabel>
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">{mission.methodology}</p>
                 </div>
               </div>
             )}
+
+            {/* 6. Constraints */}
+            <ContextRow label="限制條件 Constraints" value={mission.constraints} />
+
+            {/* Divider */}
+            {taskUnits && taskUnits.length > 0 && <Divider />}
+
+            {/* Mission Stages */}
+            {taskUnits && <MissionStages units={taskUnits} />}
           </>
         ) : (
-          <div className="mb-4 p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800/50">
-            <p className="text-xs text-neutral-400 text-center leading-relaxed">
-              在聊天區輸入任務指令，<br />任務脈絡會顯示在這裡。
+          /* Empty state */
+          <div className="flex flex-col items-center justify-center h-full text-center py-12 gap-3">
+            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-400">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="9" y1="9" x2="15" y2="9"/>
+                <line x1="9" y1="13" x2="13" y2="13"/>
+                <line x1="12" y1="17" x2="15" y2="17"/>
+              </svg>
+            </div>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              尚未建立任務<br />
+              <span className="text-neutral-300">點擊 <strong className="text-amber-500">+ 新任務</strong> 開始</span>
             </p>
           </div>
         )}
-
-        {/* Task Units */}
-        {taskUnits && taskUnits.length > 0 && <TaskUnitList units={taskUnits} />}
-        {/* Divider */}
-        <div className="pt-2 pb-1">
-          <div className="h-px bg-neutral-200 dark:bg-neutral-800" />
-        </div>
-
-        {/* Agents section */}
-        <div className="pt-1">
-          <div className="flex items-center justify-between mb-2">
-            <SectionLabel>Workspace Agents</SectionLabel>
-            {!agentsLoading && (
-              <span className="text-[10px] text-neutral-400">{agents.length} 位</span>
-            )}
-          </div>
-
-          {agentsLoading ? (
-            // Skeleton
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-2 py-1">
-                  <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
-                  <div className="flex-1 space-y-1">
-                    <div className="h-2.5 w-24 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
-                    <div className="h-2 w-16 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : agents.length === 0 ? (
-            <p className="text-xs text-neutral-400 text-center py-4">尚無 Agents 分配</p>
-          ) : (
-            <div className="space-y-0">
-              {executionAgents.length > 0 && (
-                <div className="mb-3">
-                  <div className="mb-1">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LAYER_COLOR.execution}`}>執行層</span>
-                  </div>
-                  {executionAgents.map((a) => <AgentCard key={a.id} agent={a} />)}
-                </div>
-              )}
-              {strategyAgents.length > 0 && (
-                <div>
-                  <div className="mb-1">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LAYER_COLOR.strategy}`}>策略層</span>
-                  </div>
-                  {strategyAgents.map((a) => <AgentCard key={a.id} agent={a} />)}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800">
+      {/* ── Footer ── */}
+      <div className="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
         <div className="flex gap-2">
           <button className="flex-1 text-xs py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
             + 新增限制條件
