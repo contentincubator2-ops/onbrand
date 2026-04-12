@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'sowork-enterprise',
+    name: 'marketing-os',
     script: './node_modules/.bin/tsx',
     args: 'server/index.ts',
     cwd: '/home/azureuser/sowork-marketing-enterprise/skills/ai-talent',
@@ -34,8 +34,8 @@ module.exports = {
       LOCAL_DB_PASSWORD: 'mos_secure_2026',
       LOCAL_DB_NAME: 'mos_db',
     },
-    error_file: '/home/azureuser/logs/sowork-enterprise-error.log',
-    out_file: '/home/azureuser/logs/sowork-enterprise-out.log',
+    error_file: '/home/azureuser/logs/marketing-os-error.log',
+    out_file: '/home/azureuser/logs/marketing-os-out.log',
     merge_logs: true,
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     autorestart: true,
