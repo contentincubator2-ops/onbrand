@@ -288,12 +288,10 @@ function TeamAssemblyPanel({
 
 export default function ChatPage({
   initialBrandId,
-  activeMissionId,
   preselectedAgent,
   onClearAgent,
 }: {
   initialBrandId?: number | null;
-  activeMissionId?: number | null;
   preselectedAgent?: { id: number; name: string; title?: string; type: 'agent' | 'squad' } | null;
   onClearAgent?: () => void;
 } = {}) {
@@ -354,10 +352,6 @@ export default function ChatPage({
   };
   const saveMessage = trpc.conversation.saveMessage.useMutation();
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
-  const missionDataQuery = trpc.mission.getById.useQuery(
-    { id: activeMissionId! },
-    { enabled: !!activeMissionId, refetchOnWindowFocus: false }
-  );
   const matchQuery = trpc.agent.matchForTask.useQuery(
     { taskDescription: pendingTask },
     { enabled: pendingTask.length > 0, refetchOnWindowFocus: false }
@@ -387,52 +381,6 @@ export default function ChatPage({
   useEffect(() => {
     if (preselectedAgent) setTimeout(() => chatInputRef.current?.focus(), 150);
   }, [preselectedAgent]);
-
-  // Show welcome message when activeMissionId changes and conversation is empty
-  useEffect(() => {
-    if (!activeMissionId || !missionDataQuery.data) return;
-    const missionData = missionDataQuery.data;
-    if (!missionData.welcomeMessage) return;
-
-    // Create or find a conversation for this mission
-    const missionConvId = `conv-mission-${activeMissionId}`;
-
-    setConversations((prev) => {
-      const existing = prev.find((c) => c.id === missionConvId);
-      // Only show welcome message if conversation doesn't exist or has no messages
-      if (existing && existing.messages.length > 0) return prev;
-
-      const welcomeMsg: Msg = {
-        id: `welcome-${activeMissionId}`,
-        role: "assistant",
-        content: missionData.welcomeMessage!,
-        ts: Date.now(),
-      };
-
-      if (existing) {
-        // Conversation exists but is empty — add welcome message
-        return prev.map((c) =>
-          c.id === missionConvId ? { ...c, messages: [welcomeMsg] } : c
-        );
-      }
-
-      // Create new conversation with welcome message
-      const newConv: Conversation = {
-        id: missionConvId,
-        title: missionData.title,
-        messages: [welcomeMsg],
-        createdAt: Date.now(),
-      };
-      return [newConv, ...prev];
-    });
-
-    setActiveId(missionConvId);
-    setConversationHistory([]);
-    setTeamAssembly(null);
-    setRelaySteps([]);
-    setPendingTask("");
-    setAwaitingApproval(false);
-  }, [activeMissionId, missionDataQuery.data]);
 
   useEffect(() => {
     if (!historyQuery.data || historyQuery.data.length === 0) return;
@@ -557,7 +505,7 @@ export default function ChatPage({
             const content = outputs || "工作流已完成";
             const aMsg: Msg = { id: `a2a-${Date.now()}`, role: "assistant", content, ts: Date.now() };
             setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
-            saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "assistant", content });
+            saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
             sse.close();
             setLoading(false);
             setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
@@ -611,7 +559,7 @@ export default function ChatPage({
 
       const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now(), model: resultModel || undefined, agentName: resultAgentName || undefined, agentTitle: resultAgentTitle || undefined };
       setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
-      saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "assistant", content });
+      saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
       setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content }].slice(-10));
       setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
     } catch (err: any) {
@@ -640,7 +588,7 @@ export default function ChatPage({
         }
         const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now() };
         setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
-        saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "assistant", content });
+        saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
         setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content }].slice(-10));
         setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
       } catch (fallbackErr: any) {
@@ -680,7 +628,7 @@ export default function ChatPage({
 
     const userMsg: Msg = { id: `u-${Date.now()}`, role: "user", content: text, ts: Date.now() };
     setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, title: c.messages.length === 0 ? text.slice(0, 32) : c.title, messages: [...c.messages, userMsg] } : c));
-    saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "user", content: text });
+    saveMessage.mutate({ brandId: activeBrand?.id, role: "user", content: text });
 
     if (isTaskLike(text)) {
       setTeamAssembly({ phase: "analyzing", agents: [], plan: [], taskText: text });

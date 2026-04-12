@@ -10,7 +10,7 @@ import {
   analyzeBrandCompetitors,
 } from "../brand/brandEngine";
 import { getDb } from "../db";
-import { userApiKeys } from "../../drizzle/schema";
+import { userApiKeys, missions } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 // Helper to get user's API key
@@ -138,6 +138,28 @@ export const brandRouter = router({
         isDefault: false,
       });
       const brandId = (result as any)[0]?.insertId ?? (result as any).insertId;
+
+      // Auto-seed 6 onboarding missions for this brand
+      const ONBOARDING_MISSIONS = [
+        { workspace: 'strategy', title: '品牌定位', isRecurring: false, recurringSchedule: null as string|null, squadSlug: 'tw-b2b-saas-gtm', welcomeMessage: '👋 嗨！請告訴我你的品牌名稱和主要目標，我們馬上開始品牌定位分析！' },
+        { workspace: 'strategy', title: '競品每日情報', isRecurring: true, recurringSchedule: 'daily' as string|null, squadSlug: 'mkt-analytics-attribution', welcomeMessage: '👋 嗨！請告訴我要追蹤哪些競品，我們每天為你提供情報摘要！' },
+        { workspace: 'website',  title: '官網文案調整', isRecurring: false, recurringSchedule: null as string|null, squadSlug: 'tw-website-rebuild', welcomeMessage: '👋 嗨！請提供你的官網連結，我們幫你分析並優化文案！' },
+        { workspace: 'website',  title: '每周長文', isRecurring: true, recurringSchedule: 'weekly' as string|null, squadSlug: 'mkt-seo-growth', welcomeMessage: '👋 嗨！請告訴我你的主題方向和目標關鍵字，我們每週為你產出 SEO 長文！' },
+        { workspace: 'facebook', title: '固定品牌貼文', isRecurring: true, recurringSchedule: 'weekly' as string|null, squadSlug: 'mkt-content-engine', welcomeMessage: '👋 嗨！請告訴我你的品牌風格和目標受眾，我們定期為你產出品牌社群貼文！' },
+        { workspace: 'facebook', title: '廣告投放優化', isRecurring: false, recurringSchedule: null as string|null, squadSlug: 'tw-ecom-full-funnel', welcomeMessage: '👋 嗨！請提供你的廣告帳號數據，我們幫你分析改善方向！' },
+      ];
+      for (const m of ONBOARDING_MISSIONS) {
+        try {
+          await db.execute(
+            sql`INSERT INTO missions (userId, brandId, workspace, title, squadSlug, welcomeMessage, isRecurring, recurringSchedule, status)
+                VALUES (${ctx.user.id}, ${brandId}, ${m.workspace}, ${m.title}, ${m.squadSlug},
+                       ${m.welcomeMessage}, ${m.isRecurring ? 1 : 0}, ${m.recurringSchedule ?? null}, 'active')`
+          );
+        } catch (err) {
+          console.error('[brand.create] mission seed failed:', m.title, err);
+        }
+      }
+
       return { id: brandId, name: input.name };
     }),
 

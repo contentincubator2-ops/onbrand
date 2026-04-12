@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { chatMessages } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export const conversationRouter = router({
   /** 儲存一則對話訊息 */
@@ -10,6 +10,8 @@ export const conversationRouter = router({
     .input(
       z.object({
         brandId: z.number().optional(),
+        missionId: z.number().optional(),
+        conversationTitle: z.string().optional(),
         role: z.string(),
         content: z.string(),
         taskId: z.number().optional(),
@@ -22,6 +24,8 @@ export const conversationRouter = router({
       await (db.insert(chatMessages) as any).values({
         userId,
         brandId: input.brandId ?? null,
+        missionId: input.missionId ?? null,
+        conversationTitle: input.conversationTitle ?? null,
         role: input.role,
         content: input.content,
         taskId: input.taskId ?? null,
@@ -35,6 +39,7 @@ export const conversationRouter = router({
     .input(
       z.object({
         brandId: z.number().optional(),
+        missionId: z.number().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -45,6 +50,9 @@ export const conversationRouter = router({
       if (input.brandId !== undefined) {
         conditions.push(eq(chatMessages.brandId, input.brandId));
       }
+      if (input.missionId !== undefined) {
+        conditions.push(eq((chatMessages as any).missionId, input.missionId));
+      }
       const rows = await db
         .select()
         .from(chatMessages)
@@ -53,5 +61,33 @@ export const conversationRouter = router({
         .limit(50);
       // 反轉成時間正序
       return rows.reverse();
+    }),
+
+  /** 列出某 missionId 底下所有不重複的 conversationTitle + 最新訊息時間 */
+  listConversations: protectedProcedure
+    .input(
+      z.object({
+        missionId: z.number(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const userId = ctx.user.id;
+      const rows = await (db as any)
+        .select({
+          conversationTitle: (chatMessages as any).conversationTitle,
+          latestAt: sql<string>`MAX(${chatMessages.createdAt})`,
+        })
+        .from(chatMessages)
+        .where(
+          and(
+            eq(chatMessages.userId, userId),
+            eq((chatMessages as any).missionId, input.missionId)
+          )
+        )
+        .groupBy((chatMessages as any).conversationTitle)
+        .orderBy(sql`MAX(${chatMessages.createdAt}) DESC`);
+      return rows as { conversationTitle: string | null; latestAt: string }[];
     }),
 });

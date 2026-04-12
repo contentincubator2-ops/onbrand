@@ -42,6 +42,19 @@ export const missionRouter = router({
       return { ...mission, taskUnits: units };
     }),
 
+  // Get single mission by ID (includes squadSlug, welcomeMessage)
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [mission] = await db.select().from(missions)
+        .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)))
+        .limit(1);
+      if (!mission) return null;
+      return mission;
+    }),
+
   // Create a new mission
   create: protectedProcedure
     .input(z.object({
@@ -54,6 +67,8 @@ export const missionRouter = router({
       successMetrics: z.string().optional(),
       constraints: z.string().optional(),
       methodology: z.string().optional(),
+      squadSlug: z.string().max(64).optional(),
+      welcomeMessage: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -69,6 +84,8 @@ export const missionRouter = router({
         successMetrics: input.successMetrics ?? "",
         constraints: input.constraints ?? "",
         methodology: input.methodology ?? "",
+        squadSlug: input.squadSlug ?? null,
+        welcomeMessage: input.welcomeMessage ?? null,
         status: "active",
       });
       return { id: result.insertId };

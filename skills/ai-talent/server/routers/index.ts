@@ -11,6 +11,8 @@ import { videoRouter } from "./videoRouter";
 import { agentRouter } from "./agentRouter";
 import { campaignRouter } from "./campaignRouter";
 import { missionRouter } from "./missionRouter";
+import { workspaceRouter } from "./workspaceRouter";
+import { companyRouter } from "./companyRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -23,8 +25,10 @@ export const appRouter = router({
   conversation:  conversationRouter,
   video:         videoRouter,
   agent:         agentRouter,
-    mission:     missionRouter,
+  mission:       missionRouter,
   campaign:      campaignRouter,
+  workspace:     workspaceRouter,
+  company:       companyRouter,
 });
 
 export type AppRouter = typeof appRouter;
