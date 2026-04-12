@@ -115,18 +115,28 @@ export const brandRouter = router({
     .input(z.object({
       name: z.string().min(1).max(128),
       website: z.string().optional(),
-      targetAudience: z.string().optional(),   // 目標消費者
-      competitors: z.string().optional(),       // 競爭者（逗號分隔）
-      targetMarket: z.string().optional(),      // 目標市場
-      contentLanguage: z.string().optional(),   // 使用語言
+      targetAudience: z.string().optional(),
+      competitors: z.string().optional(),
+      targetMarket: z.string().optional(),
+      contentLanguage: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const result = await db.execute(
-        sql`INSERT INTO brands (userId, name, website, targetAudience, competitors, targetMarket, contentLanguage)
-         VALUES (${ctx.user.id}, ${input.name}, ${input.website ?? null}, ${input.targetAudience ?? null}, ${input.competitors ?? null}, ${input.targetMarket ?? 'Taiwan'}, ${input.contentLanguage ?? 'zh-TW'})`
-      );
+      const { brands } = await import("../../drizzle/schema");
+      const result = await (db.insert(brands) as any).values({
+        userId: ctx.user.id,
+        name: input.name,
+        websiteUrl: input.website ?? null,
+        targetAudience: input.targetAudience ?? null,
+        soworkAnalysis: {
+          competitors: input.competitors ?? null,
+          targetMarket: input.targetMarket ?? 'Taiwan',
+          contentLanguage: input.contentLanguage ?? 'zh-TW',
+        },
+        dataSource: 'manual',
+        isDefault: false,
+      });
       const brandId = (result as any)[0]?.insertId ?? (result as any).insertId;
       return { id: brandId, name: input.name };
     }),
@@ -136,9 +146,8 @@ export const brandRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db.execute(
-        sql`DELETE FROM brands WHERE id = ${input.id} AND userId = ${ctx.user.id}`
-      );
+      const { brands } = await import("../../drizzle/schema");
+      await db.delete(brands).where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id)));
       return { success: true };
     }),
 

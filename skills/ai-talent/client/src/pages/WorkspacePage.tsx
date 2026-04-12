@@ -77,15 +77,15 @@ export default function WorkspacePage() {
   });
 
   // ── Brand ──────────────────────────────────────────────────────────────────
-  const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
+  const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 0 });
   const brands = brandsQuery.data ?? [];
   const createBrandMutation = trpc.brand.create.useMutation({
-    onSuccess: (data: any) => {
-      brandsQuery.refetch();
-      setActiveBrandId(data.id);
+    onSuccess: async (data: any) => {
       setCreateBrandModalOpen(false);
       setBrandForm({ name: '', website: '', targetAudience: '', competitors: '', targetMarket: 'Taiwan', contentLanguage: 'zh-TW' });
       setCreatingBrand(false);
+      await utils.brand.list.invalidate();
+      setActiveBrandId(data.id);
     },
     onError: () => setCreatingBrand(false),
   });
