@@ -597,13 +597,9 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
   };
 
   const handleSend = async () => {
-    const rawText = input.trim();
-    if (!rawText || loading) return;
-    const text = preselectedAgent
-      ? `[指定${preselectedAgent.type === 'agent' ? 'Agent' : 'Squad'}：${preselectedAgent.name}] ${rawText}`
-      : rawText;
+    const text = input.trim();
+    if (!text || loading) return;
     setInput("");
-    if (preselectedAgent && onClearAgent) onClearAgent();
 
     let convId = activeId;
     if (!convId) {
@@ -763,11 +759,10 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
           <div className="max-w-3xl mx-auto">
             <div className="flex items-end gap-3 bg-neutral-100 dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 px-4 py-3">
               <textarea
-                ref={chatInputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={preselectedAgent ? `告訴 ${preselectedAgent.name} 你要完成的任務…` : (activeBrand ? `告訴我你想為「${activeBrand.name}」完成什麼任務…` : "選擇品牌後開始輸入任務…")}
+                placeholder={activeBrand ? `告訴我你想為「${activeBrand.name}」完成什麼任務…` : "選擇品牌後開始輸入任務…"}
                 rows={1}
                 disabled={loading}
                 className="flex-1 resize-none bg-transparent text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-600 outline-none"

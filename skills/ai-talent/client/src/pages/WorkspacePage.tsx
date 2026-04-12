@@ -153,31 +153,47 @@ export default function WorkspacePage() {
   };
 
 
-  // ── AI Search ────────────────────────────────────────────────────────────
+  // ── AI Vector Search ──────────────────────────────────────────────────────
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTab, setSearchTab] = useState<'agents' | 'squads'>('agents');
   const [searchInput, setSearchInput] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [lastQuery, setLastQuery] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState<{ id: number; name: string; title?: string; type: 'agent' | 'squad' } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
   const runSearch = useCallback(async (query: string, tab: 'agents' | 'squads') => {
     if (!query.trim()) return;
-    setSearching(true); setLastQuery(query);
+    setSearching(true);
+    setLastQuery(query);
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(tab === 'agents' ? '/api/agents/search' : '/api/squads/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { authorization: 'Bearer ' + token } : {}),
+        },
         body: JSON.stringify({ query, limit: 12 }),
       });
       const data = await res.json();
       setSearchResults(data.results ?? []);
-    } catch { setSearchResults([]); } finally { setSearching(false); }
+    } catch (e) {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
   }, []);
-  const handleSearchSubmit = (e: React.FormEvent) => { e.preventDefault(); runSearch(searchInput, searchTab); };
-  const openSearch = () => { setSearchOpen(true); setTimeout(() => searchInputRef.current?.focus(), 80); };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    runSearch(searchInput, searchTab);
+  };
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 80);
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -187,11 +203,9 @@ export default function WorkspacePage() {
         <MissionContextRail
           brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
           mission={mission}
-
-
           workspaceName={currentWorkspace.label}
           onEditMission={handleNewMission}
-              taskUnits={taskUnits as any}
+          taskUnits={taskUnits as any}
         />
       )}
 
@@ -263,11 +277,14 @@ export default function WorkspacePage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* AI Search */}
             <button
               onClick={openSearch}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+              title="AI 搜尋 Agent / Squad"
             >
-              🔍 AI 搜尋
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              AI 搜尋
             </button>
             <button
               onClick={handleNewMission}
@@ -309,72 +326,84 @@ export default function WorkspacePage() {
           team={team}
           artifacts={artifacts}
           reviews={reviews}
-
+          agentsLoading={agentsQuery.isLoading}
         />
       )}
-      {/* AI Search Modal */}
+    </div>
+  );
+      {/* ── AI Search Modal ── */}
       {searchOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4"
-          style={{ background: "rgba(0,0,0,0.4)" }} onClick={() => setSearchOpen(false)}>
-          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4"
+          style={{ background: 'rgba(0,0,0,0.35)' }}
+          onClick={() => setSearchOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-gray-100">
               <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs shrink-0">
-                <button type="button" onClick={() => setSearchTab("agents")}
-                  className={`px-3 py-1.5 font-medium ${searchTab === "agents" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
-                  Agent
+                <button type="button" onClick={() => setSearchTab('agents')}
+                  className={`px-3 py-1.5 font-medium transition-colors ${searchTab === 'agents' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                  🤖 Agent
                 </button>
-                <button type="button" onClick={() => setSearchTab("squads")}
-                  className={`px-3 py-1.5 font-medium ${searchTab === "squads" ? "bg-orange-500 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
-                  Squad
+                <button type="button" onClick={() => setSearchTab('squads')}
+                  className={`px-3 py-1.5 font-medium transition-colors ${searchTab === 'squads' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                  👥 Squad
                 </button>
               </div>
               <form onSubmit={handleSearchSubmit} className="flex-1 flex gap-2">
-                <input ref={searchInputRef} type="text" value={searchInput}
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder={searchTab === "agents" ? "例如：電商 SEO 策略師…" : "例如：美妝品牌行銷團隊…"}
-                  className="flex-1 text-sm px-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-gray-50" />
+                  placeholder={searchTab === 'agents' ? '例如：電商 SEO 策略師、品牌定位顧問…' : '例如：美妝品牌行銷團隊、B2B SaaS 成長組…'}
+                  className="flex-1 text-sm px-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-gray-50"
+                />
                 <button type="submit" disabled={searching || !searchInput.trim()}
-                  className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white text-sm rounded-lg shrink-0">
-                  {searching ? "搜尋中…" : "搜尋"}
+                  className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white text-sm font-medium rounded-lg transition-colors shrink-0">
+                  {searching ? '搜尋中…' : '搜尋'}
                 </button>
               </form>
-              <button onClick={() => setSearchOpen(false)} className="text-gray-400 hover:text-gray-600 px-1">✕</button>
+              <button onClick={() => setSearchOpen(false)} className="text-gray-400 hover:text-gray-600 text-sm px-1">✕</button>
             </div>
+
             <div className="p-4 max-h-96 overflow-y-auto">
               {searching ? (
-                <p className="text-center py-8 text-gray-400 text-sm">AI 向量搜尋中…</p>
+                <div className="text-center py-8 text-gray-400 text-sm">⟳ AI 向量搜尋中…</div>
               ) : searchResults.length === 0 && lastQuery ? (
-                <p className="text-center py-8 text-gray-400 text-sm">沒有找到相關結果</p>
+                <div className="text-center py-8 text-gray-400 text-sm">沒有找到相關結果</div>
               ) : searchResults.length === 0 ? (
                 <div className="text-center py-8 text-gray-400 text-sm">
-                  <div className="text-4xl mb-3">🔍</div>
-                  <p>輸入任務需求，AI 幫你找最適合的 {searchTab === "agents" ? "Agent" : "Squad"}</p>
+                  <div className="text-3xl mb-2">🔍</div>
+                  輸入任務需求，AI 幫你找最適合的 {searchTab === 'agents' ? 'Agent' : 'Squad'}
                 </div>
               ) : (
                 <div>
-                  <p className="text-xs text-gray-400 mb-3">找到 {searchResults.length} 個結果</p>
+                  <p className="text-xs text-gray-400 mb-3">「{lastQuery}」找到 {searchResults.length} 個結果</p>
                   <div className="grid grid-cols-2 gap-2">
                     {searchResults.map((r: any) => (
-                      <div key={r.id} className="flex items-start gap-2.5 p-3 rounded-xl border border-gray-100 hover:border-orange-300 hover:bg-orange-50 cursor-pointer"
-                        onClick={() => {
-                          setSelectedAgent({ id: r.id, name: r.name, title: r.title ?? r.name_en, type: searchTab === 'agents' ? 'agent' : 'squad' as 'agent' | 'squad' });
-                          setSearchOpen(false);
-                        }}>
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
-                          style={{ background: searchTab === "agents" ? "#fff3e0" : "#e3f2fd", color: searchTab === "agents" ? "#c9823a" : "#1976d2" }}>
-                          {searchTab === "agents" ? (r.name?.slice(0,1) ?? "?") : "S"}
+                      <div key={r.id}
+                        className="flex items-start gap-2.5 p-3 rounded-xl border border-gray-100 hover:border-orange-300 hover:bg-orange-50 transition-colors cursor-pointer"
+                        onClick={() => setSearchOpen(false)}
+                      >
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
+                          style={{ background: searchTab === 'agents' ? '#fff3e0' : '#e3f2fd', color: searchTab === 'agents' ? '#c9823a' : '#1976d2' }}
+                        >
+                          {searchTab === 'agents' ? (r.name?.slice(0, 1) ?? '?') : '👥'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-gray-800 truncate">{r.name}</p>
                           <p className="text-xs text-gray-500 truncate">{r.title ?? r.name_en}</p>
                           <div className="flex items-center gap-1.5 mt-1">
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                              Math.round(r.score*100) >= 60 ? "bg-emerald-100 text-emerald-700" :
-                              Math.round(r.score*100) >= 40 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
-                              {Math.round(r.score*100)}% match
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${Math.round(r.score * 100) >= 60 ? 'bg-emerald-100 text-emerald-700' : Math.round(r.score * 100) >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {Math.round(r.score * 100)}% match
                             </span>
-                            {r.member_count ? <span className="text-xs text-gray-400">{r.member_count} 人</span> : null}
+                            {r.member_count && <span className="text-xs text-gray-400">{r.member_count} 人</span>}
+                            {r.pricePerTask > 0 && <span className="text-xs text-gray-400">${r.pricePerTask}/任務</span>}
                           </div>
                         </div>
                       </div>
@@ -387,6 +416,4 @@ export default function WorkspacePage() {
         </div>
       )}
 
-    </div>
-  );
 }
