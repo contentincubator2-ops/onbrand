@@ -76,6 +76,7 @@ interface AgentRow {
   bio: string;
   specialty: string;
   layer: string;
+  aiModel: string | null;
 }
 
 // ── Step definitions per squadSlug ───────────────────────────────────────────
@@ -206,6 +207,24 @@ squadChatRouter.post("/squad-chat", async (req: Request, res: Response) => {
   }, 15_000);
 
   try {
+    // 0. 換 Squad 請求偵測
+    const isSquadSwitch = /我想換一支.*squad|換小組|换squad|改用其他squad/i.test(userMessage);
+    if (isSquadSwitch) {
+      const pool = getSquadPool();
+      const [allSquads] = await pool.execute(
+        "SELECT slug, name FROM agent_squads WHERE isAvailable=1 ORDER BY sortOrder LIMIT 10"
+      ) as [mysql.RowDataPacket[], mysql.FieldPacket[]];
+      const squadList = (allSquads as any[]).map((s: any, i: number) => `${i + 1}. **${s.name}** (${s.slug})`).join('\n');
+      send("agent", { agentName: "PM Agent", agentTitle: "專案調度", agentRole: "orchestrator", step: currentStep, totalSteps: 10 });
+      send("start", { message: "查詢可用 Squad..." });
+      const msg = `目前可選擇的 Squad\uff1a\n\n${squadList}\n\n回覆數字（如「3」）或輸入 slug 即可切換。\n小提示：切換後步驟會從開頭重新執行。`;
+      send("delta", { text: msg });
+      send("done", { step: currentStep, totalSteps: 10, isComplete: false, isSquadList: true, squads: allSquads });
+      clearInterval(keepalive);
+      res.end();
+      return;
+    }
+
     // 1. Load squad from DB
     const pool = getSquadPool();
     const [squadRows] = await pool.execute(
@@ -246,7 +265,7 @@ squadChatRouter.post("/squad-chat", async (req: Request, res: Response) => {
     try {
       const placeholders = agentIds.map(() => "?").join(",");
       const [agentRows] = await pool.execute(
-        `SELECT id, name, title, COALESCE(bio,'') as bio, COALESCE(specialty,'') as specialty, COALESCE(layer,'execution') as layer
+        `SELECT id, name, title, COALESCE(bio,'') as bio, COALESCE(specialty,'') as specialty, COALESCE(layer,'execution') as layer, COALESCE(aiModel,'') as aiModel
          FROM agents WHERE id IN (${placeholders}) LIMIT ${agentIds.length}`,
         agentIds
       ) as [mysql.RowDataPacket[], mysql.FieldPacket[]];
@@ -261,12 +280,29 @@ squadChatRouter.post("/squad-chat", async (req: Request, res: Response) => {
     const agentTitle = agentRow?.title ?? stepMember.role;
     const agentBio = agentRow?.bio ?? "";
     const agentSpecialty = agentRow?.specialty ?? "";
+    const agentAiModel = (agentRow?.aiModel && agentRow.aiModel !== "") ? agentRow.aiModel : null;
+
+    // Map agentAiModel to OpenRouter provider/model
+    function resolveProviderModel(rawModel: string | null): { provider: "openrouter"; model: string } {
+      const modelMap: Record<string, string> = {
+        "gpt-4o": "openai/gpt-4o",
+        "claude-sonnet-4-20250514": "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-sonnet-4-6": "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-opus-4-5": "anthropic/claude-opus-4-5",
+        "deepseek-r1": "deepseek/deepseek-r1",
+        "gemini-2.0-flash": "google/gemini-2.0-flash-001",
+      };
+      const m = rawModel ?? "anthropic/claude-sonnet-4-6";
+      return { provider: "openrouter", model: modelMap[m] ?? m };
+    }
+    const { provider: llmProvider, model: llmModel } = resolveProviderModel(agentAiModel);
 
     // Emit agent info immediately
     send("agent", {
       agentName,
       agentTitle,
       agentRole: stepMember.role,
+      agentModel: agentAiModel,
       step: thisStep,
       totalSteps,
     });
@@ -384,7 +420,7 @@ ${isLastStep
     send("start", { message: `${agentName} 正在分析...` });
 
     let fullContent = "";
-    for await (const delta of invokeLLMStream({ messages, provider: "openrouter" })) {
+    for await (const delta of invokeLLMStream({ messages, provider: llmProvider, model: llmModel })) {
       fullContent += delta;
       send("delta", { text: delta });
     }
@@ -412,6 +448,7 @@ ${isLastStep
       totalSteps,
       agentName,
       agentTitle,
+      agentModel: agentAiModel,
       isComplete: isLastStep,
       nextStepHint: isLastStep ? null : steps[thisStep] ?? null,
     });

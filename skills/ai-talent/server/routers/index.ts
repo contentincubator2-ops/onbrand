@@ -13,6 +13,10 @@ import { campaignRouter } from "./campaignRouter";
 import { missionRouter } from "./missionRouter";
 import { workspaceRouter } from "./workspaceRouter";
 import { companyRouter } from "./companyRouter";
+import { sopRouter } from "./sopRouter";
+import { outputRouter } from "./outputRouter";
+import { knowledgeRouter } from "./knowledgeRouter";
+import { reviewRouter } from "./reviewRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -29,6 +33,10 @@ export const appRouter = router({
   campaign:      campaignRouter,
   workspace:     workspaceRouter,
   company:       companyRouter,
+  sop:           sopRouter,
+  output:        outputRouter,
+  knowledge:     knowledgeRouter,
+  review:        reviewRouter,
 });
 
 export type AppRouter = typeof appRouter;

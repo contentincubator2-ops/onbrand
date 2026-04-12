@@ -78,7 +78,7 @@ export default function BrandAnalysis() {
   // ── A2A tab ──
   const [a2aWorkflowId, setA2aWorkflowId] = useState<"brand-launch-v1" | "market-research-v1">("brand-launch-v1");
   const a2aMutation = trpc.a2a.executeWorkflow.useMutation();
-  const templatesQuery = trpc.a2a.listTemplates.useQuery();
+  const templatesQuery = (trpc as any).a2a.listTemplates.useQuery();
 
   // ── Handlers ──
   const handlePosSubmit = (e: React.FormEvent) => {
@@ -426,7 +426,7 @@ export default function BrandAnalysis() {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">選擇工作流模板</label>
               <div className="grid grid-cols-1 gap-2">
-                {templatesQuery.data?.map((t) => (
+                {(templatesQuery.data as any[])?.map((t: any) => (
                   <button
                     key={t.id}
                     onClick={() => setA2aWorkflowId(t.id as any)}

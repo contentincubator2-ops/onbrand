@@ -39,6 +39,10 @@ interface Msg {
   imageSuggestion?: string;
   taskId?: number;
   ts: number;
+  model?: string;   // AI model used (e.g. 'DeepSeek V3', 'Claude 3.5')
+  agentName?: string;  // agent name for this message
+  agentTitle?: string; // agent title for this message
+  agentModel?: string | null; // raw aiModel from DB
 }
 
 interface Conversation {
@@ -86,20 +90,138 @@ interface RelayStepState {
   expanded?: boolean;
 }
 
+// Squad-chat 步驟狀態
+interface SquadStepState {
+  currentStep: number;
+  totalSteps: number;
+  agentName?: string;
+  agentTitle?: string;
+  agentRole?: string;
+  isComplete: boolean;
+}
+
 const IconSend = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
 const IconChevron = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
 const IconPlus = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 
+function formatModelName(raw: string): string {
+  if (!raw) return '';
+  const r = raw.toLowerCase();
+  if (r.includes('claude') && r.includes('sonnet') && (r.includes('4') || r.includes('3-7') || r.includes('3.7'))) return 'Claude Sonnet 4';
+  if (r.includes('claude') && r.includes('opus')) return 'Claude Opus 4';
+  if (r.includes('claude') && r.includes('haiku')) return 'Claude Haiku 3.5';
+  if (r.includes('claude')) return 'Claude';
+  if (r.includes('gpt-4o')) return 'GPT-4o';
+  if (r.includes('gpt-4')) return 'GPT-4';
+  if (r.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+  if (r.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
+  if (r.includes('gemini')) return 'Gemini';
+  if (r.includes('deepseek')) return 'DeepSeek R1';
+  if (r.includes('llama')) return 'Llama 3';
+  return raw;
+}
+
+// ── Mission Steps Rail ──────────────────────────────────────────────────────
+const MISSION_STEPS_FRONTEND: Record<string, string[]> = {
+  "tw-b2b-saas-gtm": ["品牌基礎研究","競品分析","目標受眾","差異化優勢","價值主張草稿","品牌個性與語調","訊息策略","通路策略","定位方案 A","定位方案 B"],
+  "mkt-analytics-attribution": ["確認追蹤競品清單","競品動態搜尋","情報分析與威脅評級","行動建議","報告格式確認"],
+  "tw-website-rebuild": ["官網現況分析","競品官網比較","Hero 文案優化","CTA 與 Value Prop","完整文案交付"],
+  "mkt-seo-growth": ["關鍵字研究","競品文章分析","文章大綱","草稿（前半）","完整長文交付"],
+  "mkt-content-engine": ["本週話題研究","品牌語調確認","一週排期規劃","貼文草稿前3篇","完整版貼文"],
+  "tw-ecom-full-funnel": ["廣告現況診斷","競品廣告研究","受眾策略優化","素材與文案建議","完整優化方案"],
+};
+
+function MissionStepsRail({ squadSlug, currentStep, totalSteps }: { squadSlug: string; currentStep: number; totalSteps: number }) {
+  const steps = MISSION_STEPS_FRONTEND[squadSlug] ?? Array.from({ length: totalSteps }, (_, i) => `Step ${i + 1}`);
+  return (
+    <div className="w-64 shrink-0 border-l border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
+        <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">任務進度</p>
+        <p className="text-xs text-neutral-400 mt-0.5">{currentStep}/{steps.length} 完成</p>
+      </div>
+      <div className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+        {steps.map((label, i) => {
+          const stepNum = i + 1;
+          const isDone = stepNum < currentStep;
+          const isActive = stepNum === currentStep;
+          const isPending = stepNum > currentStep;
+          return (
+            <div key={i} className={`flex items-start gap-2.5 px-2 py-2 rounded-lg transition-colors ${
+              isActive ? 'bg-neutral-200 dark:bg-neutral-700' : isDone ? '' : ''
+            }`}>
+              <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5 ${
+                isDone ? 'bg-green-500 text-white' :
+                isActive ? 'bg-neutral-800 dark:bg-neutral-100 text-white dark:text-neutral-900 ring-2 ring-neutral-400' :
+                'bg-neutral-200 dark:bg-neutral-700 text-neutral-400'
+              }`}>
+                {isDone ? '✓' : stepNum}
+              </div>
+              <span className={`text-xs leading-relaxed ${
+                isActive ? 'text-neutral-800 dark:text-neutral-100 font-semibold' :
+                isDone ? 'text-neutral-400 dark:text-neutral-500 line-through' :
+                'text-neutral-400 dark:text-neutral-500'
+              }`}>{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function renderContent(raw: string): { main: string; thinking: string } {
   try {
     const d = JSON.parse(raw);
+    // Case 1: has publishable_content
     if (d.publishable_content) return { main: d.publishable_content, thinking: d.thinking || "" };
+    // Case 2: only has thinking (strip it, show nothing or a placeholder)
+    if (d.thinking && !d.content && !d.output) return { main: "", thinking: d.thinking };
+    // Case 3: has content or output field
+    if (d.content || d.output) return { main: d.content || d.output, thinking: d.thinking || "" };
   } catch {}
   return { main: raw, thinking: "" };
 }
 
 function formatText(text: string): string {
-  return text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>");
+  if (!text) return '';
+  // Full markdown renderer
+  let html = text
+    // Headers
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:0.95em;font-weight:700;margin:1em 0 0.3em;color:inherit">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:1.05em;font-weight:700;margin:1.2em 0 0.4em;color:inherit">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="font-size:1.15em;font-weight:700;margin:1.2em 0 0.4em;color:inherit">$1</h1>')
+    // Tables — convert | col | col | rows to HTML table
+    .replace(/((?:\|.+\|\n?)+)/g, (block) => {
+      const rows = block.trim().split('\n').filter(r => r.trim());
+      const isHeader = rows[1]?.replace(/[\s|:-]/g, '') === '';
+      let table = '<table style="border-collapse:collapse;width:100%;margin:0.5em 0;font-size:0.85em">';
+      rows.forEach((row, i) => {
+        if (isHeader && i === 1) return; // skip separator
+        const cells = row.split('|').filter((_, ci) => ci > 0 && ci < row.split('|').length - 1);
+        const tag = (isHeader && i === 0) ? 'th' : 'td';
+        const style = tag === 'th'
+          ? 'background:#f5f5f5;font-weight:600;padding:4px 8px;border:1px solid #ddd;text-align:left'
+          : 'padding:4px 8px;border:1px solid #ddd;vertical-align:top';
+        table += '<tr>' + cells.map(c => `<${tag} style="${style}">${c.trim()}</${tag}>`).join('') + '</tr>';
+      });
+      table += '</table>';
+      return table;
+    })
+    // Bold & italic
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Horizontal rule
+    .replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid #e5e5e5;margin:0.8em 0">')
+    // Unordered lists
+    .replace(/^[\-\*] (.+)$/gm, '<li style="margin:0.2em 0 0.2em 1.2em;list-style:disc">$1</li>')
+    // Ordered lists
+    .replace(/^\d+\. (.+)$/gm, '<li style="margin:0.2em 0 0.2em 1.5em;list-style:decimal">$1</li>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace">$1</code>')
+    // Newlines (after block elements handled)
+    .replace(/\n\n/g, '</p><p style="margin:0.5em 0">')
+    .replace(/\n/g, '<br/>');
+  return `<p style="margin:0">${html}</p>`;
 }
 
 function LayerBadge({ layer }: { layer: string }) {
@@ -261,7 +383,17 @@ function TeamAssemblyPanel({
   );
 }
 
-export default function ChatPage() {
+export default function ChatPage({
+  initialBrandId,
+  activeMissionId,
+  preselectedAgent,
+  onClearAgent,
+}: {
+  initialBrandId?: number | null;
+  activeMissionId?: number | null;
+  preselectedAgent?: { id: number; name: string; title?: string; type: 'agent' | 'squad' } | null;
+  onClearAgent?: () => void;
+} = {}) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -277,11 +409,15 @@ export default function ChatPage() {
   const [relaySteps, setRelaySteps] = useState<RelayStepState[]>([]);
   const [pendingTask, setPendingTask] = useState("");
   const [awaitingApproval, setAwaitingApproval] = useState(false);
+  const [squadStep, setSquadStep] = useState<SquadStepState>({ currentStep: 0, totalSteps: 10, isComplete: false });
+  const [streamingAgentName, setStreamingAgentName] = useState<string | null>(null);
+  const [streamingAgentTitle, setStreamingAgentTitle] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
 
   const createAndExecute = trpc.task.createAndExecute.useMutation();
   const workflowStart = trpc.workflow.start.useMutation();
+  const pmChat = trpc.workflow.pmChat.useMutation();
 
   // BullMQ 輪詢：每 2 秒查一次，最多等 60 秒
   // 直接呼叫 tRPC HTTP 避免 React hook 限制
@@ -318,13 +454,20 @@ export default function ChatPage() {
   };
   const saveMessage = trpc.conversation.saveMessage.useMutation();
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
+  const missionDataQuery = trpc.mission.getById.useQuery(
+    { id: activeMissionId! },
+    { enabled: !!activeMissionId, refetchOnWindowFocus: false }
+  );
   const matchQuery = trpc.agent.matchForTask.useQuery(
     { taskDescription: pendingTask },
     { enabled: pendingTask.length > 0, refetchOnWindowFocus: false }
   );
+  // When mission active → load mission history; else load brand history
   const historyQuery = trpc.conversation.list.useQuery(
-    { brandId: activeBrandId ?? undefined },
-    { enabled: !!activeBrandId, refetchOnWindowFocus: false }
+    activeMissionId
+      ? ({ missionId: activeMissionId } as any)
+      : { brandId: activeBrandId ?? undefined },
+    { enabled: activeMissionId ? !!activeMissionId : !!activeBrandId, refetchOnWindowFocus: false }
   );
 
   const brands = brandsQuery.data ?? [];
@@ -334,12 +477,177 @@ export default function ChatPage() {
   useEffect(() => {
     if (brandsQuery.isSuccess && brands.length === 0) setShowOnboarding(true);
     if (brands.length > 0 && !activeBrandId) {
-      const def = brands.find((b: any) => b.isDefault) ?? brands[0];
+      // Prefer initialBrandId from parent (WorkspacePage) if provided
+      const preferred = initialBrandId
+        ? brands.find((b: any) => b.id === initialBrandId)
+        : null;
+      const def = preferred ?? brands.find((b: any) => b.isDefault) ?? brands[0];
       setActiveBrandId(def.id);
     }
-  }, [brandsQuery.isSuccess, brands.length, activeBrandId, brands]);
+  }, [brandsQuery.isSuccess, brands.length, activeBrandId, brands, initialBrandId]);
+
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (preselectedAgent) setTimeout(() => chatInputRef.current?.focus(), 150);
+  }, [preselectedAgent]);
+
+  // Mission 切換：自動啟動 Agent（__AUTO_START__ 模式）或顯示靜態歡迎詞
+  const autoStartedRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
+    if (!activeMissionId || !missionDataQuery.data) return;
+    const missionData = missionDataQuery.data as any;
+    if (!missionData.welcomeMessage) return;
+
+    const missionConvId = `conv-mission-${activeMissionId}`;
+    const isAutoStart = missionData.welcomeMessage === "__AUTO_START__";
+    const squadSlug: string = missionData.squadSlug ?? "";
+
+    // Reset state
+    setActiveId(missionConvId);
+    setConversationHistory([]);
+    setTeamAssembly(null);
+    setRelaySteps([]);
+    setPendingTask("");
+    setAwaitingApproval(false);
+    setSquadStep({ currentStep: 0, totalSteps: 10, isComplete: false });
+    setStreamingAgentName(null);
+    setStreamingAgentTitle(null);
+
+    // Init conversation if not exists
+    setConversations((prev) => {
+      const existing = prev.find((c) => c.id === missionConvId);
+      if (existing) return prev;
+      return [{ id: missionConvId, title: missionData.title, messages: [], createdAt: Date.now() }, ...prev];
+    });
+
+    // Auto-start: trigger Agent immediately without user input
+    if (isAutoStart && squadSlug && !autoStartedRef.current.has(activeMissionId)) {
+      autoStartedRef.current.add(activeMissionId);
+
+      // Small delay to let conversation state settle
+      setTimeout(async () => {
+        const token = localStorage.getItem("authToken");
+        if (!token) return;
+
+        // Auto-trigger message (invisible to user, just starts the flow)
+        const autoMsg = "開始";
+        setLoading(true);
+        setStreamingAgentName(null);
+        setStreamingAgentTitle(null);
+
+        let streamBuffer = "";
+        const streamMsgId = `auto-${Date.now()}`;
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === missionConvId
+              ? { ...c, messages: [...c.messages, { id: streamMsgId, role: "assistant" as const, content: "", ts: Date.now() }] }
+              : c
+          )
+        );
+
+        try {
+          const brandCtx = {
+            name: activeBrand?.name,
+            industry: (activeBrand as any)?.industry ?? (activeBrand as any)?.soworkAnalysis?.industry,
+            website: (activeBrand as any)?.websiteUrl,
+            targetAudience: (activeBrand as any)?.targetAudience,
+            description: (activeBrand as any)?.description,
+          };
+
+          const resp = await fetch("/api/stream/squad-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              squadSlug,
+              missionId: activeMissionId,
+              userMessage: autoMsg,
+              conversationHistory: [],
+              brandContext: brandCtx,
+              currentStep: 0,
+            }),
+          });
+
+          if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          let lastAgentName: string | undefined;
+          let lastAgentTitle: string | undefined;
+          let lastAgentModel: string | null = null;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split(String.fromCharCode(10));
+            buf = lines.pop() ?? "";
+            let curEvent = "";
+            for (const line of lines) {
+              if (line.startsWith("event: ")) curEvent = line.slice(7).trim();
+              else if (line.startsWith("data: ")) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (curEvent === "agent") {
+                    lastAgentName = data.agentName;
+                    lastAgentTitle = data.agentTitle;
+                    lastAgentModel = data.agentModel ?? null;
+                    setStreamingAgentName(data.agentName);
+                    setStreamingAgentTitle(data.agentTitle);
+                    setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle }));
+                  } else if (curEvent === "delta") {
+                    streamBuffer += data.text;
+                    setConversations((prev) =>
+                      prev.map((c) =>
+                        c.id === missionConvId
+                          ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
+                          : c
+                      )
+                    );
+                  } else if (curEvent === "done") {
+                    lastAgentModel = data.agentModel ?? lastAgentModel;
+                    setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
+                  }
+                } catch { /* ignore */ }
+              }
+            }
+          }
+
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === missionConvId
+                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（分析完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
+                : c
+            )
+          );
+          setConversationHistory([{ role: "assistant", content: streamBuffer }]);
+        } catch (err: any) {
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === missionConvId
+                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `⚠️ 自動啟動失敗：${err?.message}` } : m) }
+                : c
+            )
+          );
+        } finally {
+          setLoading(false);
+        }
+      }, 400);
+    } else if (!isAutoStart) {
+      // Static welcome message
+      setConversations((prev) => {
+        const existing = prev.find((c) => c.id === missionConvId);
+        if (existing && existing.messages.length > 0) return prev;
+        const welcomeMsg: Msg = { id: `welcome-${activeMissionId}`, role: "assistant", content: missionData.welcomeMessage!, ts: Date.now() };
+        if (existing) return prev.map((c) => c.id === missionConvId ? { ...c, messages: [welcomeMsg] } : c);
+        return [{ id: missionConvId, title: missionData.title, messages: [welcomeMsg], createdAt: Date.now() }, ...prev.filter(c => c.id !== missionConvId)];
+      });
+    }
+  }, [activeMissionId, missionDataQuery.data]);
+
+  useEffect(() => {
+    // If mission is active, auto-start will handle conversation init — skip history load
+    if (activeMissionId) return;
     if (!historyQuery.data || historyQuery.data.length === 0) return;
     if (conversations.length > 0) return;
     const msgs: Msg[] = historyQuery.data.map((row: any) => {
@@ -422,6 +730,141 @@ export default function ChatPage() {
     });
   };
 
+  const executeSquadChat = async (text: string, convId: string): Promise<boolean> => {
+    const missionData = missionDataQuery.data as any;
+    const squadSlug: string = missionData?.squadSlug ?? "";
+    if (!squadSlug) return false;
+    const token = localStorage.getItem("authToken");
+    if (!token) return false;
+
+    // ── 用戶反遈偵測：負面評價 / 要求重做 ──
+    const isNegativeFeedback = /不對|不好|不滳意|不喜歡|不要這個|不是這樣|重做|重新|撤销|差太遠|跟我想的不一樣|no|wrong|redo|again/i.test(text);
+    if (isNegativeFeedback) {
+      // 立即回應返回與確認問題
+      const clarifyMsgId = `clarify-${Date.now()}`;
+      const currentAgent = streamingAgentName ?? missionData?.title ?? "Agent";
+      const clarifyContent = `我聽到了，你對這個方向不满意。讓我确認一下：
+
+**不满意的地方是？**（請選擇其一）
+1️⃣ 內容方向不對，請告訴我你想要的方向
+2️⃣ 分析結果不準確，我重新搜尋資料
+3️⃣ 說明風格不對，我調整语調重做
+4️⃣ 完全不對，用其他 Agent 重新分析
+
+單純回覆數字或告訴我具體哪裡不對，我马上重做。`;
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: [...c.messages, { id: clarifyMsgId, role: "assistant" as const, content: clarifyContent, agentName: currentAgent, ts: Date.now() }] }
+            : c
+        )
+      );
+      return true;
+    }
+
+    setLoading(true);
+    setStreamingAgentName(null);
+    setStreamingAgentTitle(null);
+
+    let streamBuffer = "";
+    let lastAgentModel: string | null = null;
+    const streamMsgId = `squad-stream-${Date.now()}`;
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === convId
+          ? { ...c, messages: [...c.messages, { id: streamMsgId, role: "assistant" as const, content: "", ts: Date.now() }] }
+          : c
+      )
+    );
+
+    try {
+      const brandCtx = {
+        name: (activeBrand as any)?.name,
+        industry: (activeBrand as any)?.industry,
+        website: (activeBrand as any)?.websiteUrl,
+        targetAudience: (activeBrand as any)?.targetAudience,
+        description: (activeBrand as any)?.description,
+      };
+      const resp = await fetch("/api/stream/squad-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          squadSlug,
+          missionId: activeMissionId,
+          userMessage: text,
+          conversationHistory: conversationHistory.slice(-12),
+          brandContext: brandCtx,
+          currentStep: squadStep.currentStep,
+        }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`squad-chat HTTP ${resp.status}`);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let lastAgentName: string | undefined;
+      let lastAgentTitle: string | undefined;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        let curEvent = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            curEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (curEvent === "agent") {
+                lastAgentName = data.agentName;
+                lastAgentTitle = data.agentTitle;
+                lastAgentModel = data.agentModel ?? null;
+                setStreamingAgentName(data.agentName);
+                setStreamingAgentTitle(data.agentTitle);
+                setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle, agentRole: data.agentRole }));
+              } else if (curEvent === "delta") {
+                streamBuffer += data.text;
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === convId
+                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
+                      : c
+                  )
+                );
+              } else if (curEvent === "done") {
+                lastAgentModel = data.agentModel ?? lastAgentModel;
+                setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
+              }
+            } catch { /* ignore */ }
+          }
+        }
+      }
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（Agent 回覆完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
+            : c
+        )
+      );
+      setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: streamBuffer }].slice(-14));
+      setLoading(false);
+      return true;
+    } catch (err: any) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `⚠️ Squad chat 錯誤：${err?.message ?? "未知"}，切換一般模式...` } : m) }
+            : c
+        )
+      );
+      setLoading(false);
+      return false;
+    }
+  };
+
   const executeTask = async (text: string, convId: string) => {
     const workflowId = detectA2AWorkflow(text);
     if (workflowId) {
@@ -462,7 +905,7 @@ export default function ChatPage() {
             const content = outputs || "工作流已完成";
             const aMsg: Msg = { id: `a2a-${Date.now()}`, role: "assistant", content, ts: Date.now() };
             setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
-            saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
+            saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "assistant", content });
             sse.close();
             setLoading(false);
             setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
@@ -489,25 +932,34 @@ export default function ChatPage() {
 
       let content = "";
       let thinking = "";
+      let resultModel = "";
+      let resultAgentName = "";
+      let resultAgentTitle = "";
       if (workflowResult && typeof workflowResult === 'object') {
         content = workflowResult.publishable_content
           ?? workflowResult.output
           ?? workflowResult.result
           ?? JSON.stringify(workflowResult);
         thinking = workflowResult.thinking ?? "";
+        resultModel = workflowResult.model ?? "";
+        resultAgentName = workflowResult.agent?.name ?? "";
+        resultAgentTitle = workflowResult.agent?.title ?? "";
       } else if (typeof workflowResult === 'string') {
         try {
           const p = JSON.parse(workflowResult);
           content = p.publishable_content ?? workflowResult;
           thinking = p.thinking ?? "";
+          resultModel = p.model ?? "";
+          resultAgentName = p.agent?.name ?? "";
+          resultAgentTitle = p.agent?.title ?? "";
         } catch { content = workflowResult; }
       } else {
         content = '任務已完成，但未有產出內容';
       }
 
-      const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now() };
+      const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now(), model: resultModel || undefined, agentName: resultAgentName || undefined, agentTitle: resultAgentTitle || undefined };
       setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
-      saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
+      saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "assistant", content });
       setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content }].slice(-10));
       setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
     } catch (err: any) {
@@ -536,7 +988,7 @@ export default function ChatPage() {
         }
         const aMsg: Msg = { id: `a-${Date.now()}`, role: "assistant", content, thinking, ts: Date.now() };
         setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, messages: [...c.messages, aMsg] } : c));
-        saveMessage.mutate({ brandId: activeBrand?.id, role: "assistant", content });
+        saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "assistant", content });
         setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content }].slice(-10));
         setTeamAssembly((prev) => prev ? { ...prev, phase: "done" } : prev);
       } catch (fallbackErr: any) {
@@ -558,9 +1010,13 @@ export default function ChatPage() {
   };
 
   const handleSend = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
+    const rawText = input.trim();
+    if (!rawText || loading) return;
+    const text = preselectedAgent
+      ? `[指定${preselectedAgent.type === 'agent' ? 'Agent' : 'Squad'}：${preselectedAgent.name}] ${rawText}`
+      : rawText;
     setInput("");
+    if (preselectedAgent && onClearAgent) onClearAgent();
 
     let convId = activeId;
     if (!convId) {
@@ -572,7 +1028,13 @@ export default function ChatPage() {
 
     const userMsg: Msg = { id: `u-${Date.now()}`, role: "user", content: text, ts: Date.now() };
     setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, title: c.messages.length === 0 ? text.slice(0, 32) : c.title, messages: [...c.messages, userMsg] } : c));
-    saveMessage.mutate({ brandId: activeBrand?.id, role: "user", content: text });
+    saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "user", content: text });
+
+    const missionSlug = (missionDataQuery.data as any)?.squadSlug;
+    if (activeMissionId && missionSlug) {
+      const handled = await executeSquadChat(text, convId);
+      if (handled) return;
+    }
 
     if (isTaskLike(text)) {
       setTeamAssembly({ phase: "analyzing", agents: [], plan: [], taskText: text });
@@ -604,36 +1066,45 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-700">🤖 Autonomous Agent Ops</span>
+        {/* Squad 步驟進度條 + 換 Squad 按鈕 */}
+        {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
+          <div className="px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800 shrink-0 bg-neutral-50 dark:bg-neutral-900/60">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  {streamingAgentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 truncate">{streamingAgentName}</span>}
+                  {streamingAgentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500 truncate hidden sm:inline">· {streamingAgentTitle}</span>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500 tabular-nums">
+                    Step {squadStep.currentStep}/{squadStep.totalSteps}{squadStep.isComplete ? " ✅" : ""}
+                  </span>
+                  {/* 換小組按鈕 */}
+                  <button
+                    onClick={() => {
+                      const msg = `我想換一支不同的小組來執行這個任務，請列出可選的 Squad 選項`;
+                      setInput(msg);
+                    }}
+                    className="text-[10px] text-neutral-400 hover:text-neutral-600 bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 px-2 py-0.5 rounded-full transition-colors"
+                  >
+                    換 Squad
+                  </button>
+                </div>
+              </div>
+              <div className="w-full h-1 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                <div className="h-full rounded-full bg-neutral-700 dark:bg-neutral-300 transition-all duration-500"
+                  style={{ width: `${Math.round((squadStep.currentStep / squadStep.totalSteps) * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Status badges */}
+        {(loading || awaitingApproval) && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-neutral-100 dark:border-neutral-800 shrink-0">
             {loading && <span className="text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded-full font-medium animate-pulse">執行中…</span>}
             {awaitingApproval && <span className="text-xs text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full font-medium">等待批准</span>}
           </div>
-
-          <div className="relative">
-            <button onClick={() => setBrandMenuOpen((o) => !o)} className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 bg-white dark:bg-neutral-900 transition-colors">
-              <div className="w-4 h-4 rounded-full bg-neutral-800 dark:bg-neutral-200 shrink-0" />
-              <span className="max-w-[140px] truncate">{activeBrand?.name ?? "選擇品牌"}</span>
-              <IconChevron />
-            </button>
-            {brandMenuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-56 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-lg overflow-hidden z-50">
-                <div className="px-3 py-2 border-b border-neutral-100 dark:border-neutral-800"><p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">我的品牌</p></div>
-                {brands.map((b: any) => (
-                  <button key={b.id} onClick={() => { setActiveBrandId(b.id); setBrandMenuOpen(false); }} className={`w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${activeBrandId === b.id ? "bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-medium" : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"}`}>
-                    <div className="w-6 h-6 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-xs font-bold text-neutral-500">{b.name.charAt(0)}</div>
-                    <span className="truncate">{b.name}</span>
-                    {b.isDefault && <span className="ml-auto text-xs text-neutral-400">預設</span>}
-                  </button>
-                ))}
-                <div className="border-t border-neutral-100 dark:border-neutral-800">
-                  <button onClick={() => { setShowOnboarding(true); setBrandMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800 hover:text-neutral-700 transition-colors"><IconPlus /> 新增品牌</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
 
         <div className="flex-1 overflow-y-auto" onClick={() => setBrandMenuOpen(false)}>
           {(!active || active.messages.length === 0) && !loading && !teamAssembly ? (
@@ -668,7 +1139,18 @@ export default function ChatPage() {
                     )}
                     {msg.role === "assistant" ? (
                       <div className="w-full rounded-2xl rounded-bl-md bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-                        <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content) }} />
+                        {(msg.agentName || msg.model || msg.agentModel) && (
+                          <div className="px-4 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-700">
+                            {msg.agentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{msg.agentName}</span>}
+                            {msg.agentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500">{msg.agentTitle}</span>}
+                            {(msg.agentModel || msg.model) && (
+                              <span className="text-[10px] text-indigo-500 dark:text-indigo-400 ml-auto bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 px-1.5 py-0.5 rounded-full font-medium">
+                                {formatModelName(msg.agentModel ?? msg.model ?? "")}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content || (msg.thinking ? "✅ 分析完成，請查看策略思考過程" : "（無輸出內容）")) }} />
                       </div>
                     ) : (
                       <div className="rounded-2xl rounded-br-md px-4 py-3 text-sm leading-relaxed bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900" style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
@@ -711,12 +1193,22 @@ export default function ChatPage() {
 
         <div className="shrink-0 px-4 pb-6 pt-3" onClick={() => setBrandMenuOpen(false)}>
           <div className="max-w-3xl mx-auto">
+            {preselectedAgent && (
+              <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-orange-50 border border-orange-200 text-sm">
+                <span className="text-orange-500">{preselectedAgent.type === 'agent' ? '🤖' : '👥'}</span>
+                <span className="font-medium text-orange-700">{preselectedAgent.name}</span>
+                {preselectedAgent.title && <span className="text-orange-500 text-xs">· {preselectedAgent.title}</span>}
+                <span className="text-xs text-orange-400 ml-1">已選擇，輸入你的任務 👇</span>
+                <button onClick={onClearAgent} className="ml-auto text-orange-300 hover:text-orange-500 text-xs">✕</button>
+              </div>
+            )}
             <div className="flex items-end gap-3 bg-neutral-100 dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 px-4 py-3">
               <textarea
+                ref={chatInputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={activeBrand ? `告訴我你想為「${activeBrand.name}」完成什麼任務…` : "選擇品牌後開始輸入任務…"}
+                placeholder={preselectedAgent ? `告訴 ${preselectedAgent.name} 你要完成的任務…` : (activeBrand ? `告訴我你想為「${activeBrand.name}」完成什麼任務…` : "選擇品牌後開始輸入任務…")}
                 rows={1}
                 disabled={loading}
                 className="flex-1 resize-none bg-transparent text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-600 outline-none"
@@ -731,6 +1223,15 @@ export default function ChatPage() {
 
       {(a2aSteps.length > 0 || (loading && a2aSteps.length > 0)) && (
         <TaskProgressTracker taskName={a2aTaskName} steps={a2aSteps} progress={a2aProgress} onComplete={() => {}} />
+      )}
+
+      {/* 右側任務流程 Rail — 只在 Squad 任務內顯示 */}
+      {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.totalSteps > 0 && (
+        <MissionStepsRail
+          squadSlug={(missionDataQuery.data as any).squadSlug}
+          currentStep={squadStep.currentStep}
+          totalSteps={squadStep.totalSteps}
+        />
       )}
     </div>
   );

@@ -414,7 +414,7 @@ export default function WorkspacePage() {
 
         {/* Chat */}
         <div className="flex-1 overflow-hidden">
-          <ChatPage key={activeMissionId ?? "no-mission"} initialBrandId={activeBrand?.id} activeMissionId={activeMissionId} preselectedAgent={selectedAgent} onClearAgent={() => setSelectedAgent(null)} />
+          <ChatPage key={`${activeMissionId ?? "no-mission"}-${activeBrandId ?? "no-brand"}`} initialBrandId={activeBrand?.id} activeMissionId={activeMissionId} preselectedAgent={selectedAgent} onClearAgent={() => setSelectedAgent(null)} />
         </div>
       </div>
 
@@ -425,6 +425,7 @@ export default function WorkspacePage() {
           artifacts={artifacts}
           reviews={reviews}
           agentsLoading={agentsQuery.isLoading}
+          missionId={activeMissionId}
         />
       )}
 

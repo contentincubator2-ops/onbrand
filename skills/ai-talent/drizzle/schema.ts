@@ -637,3 +637,118 @@ export const mosCompanyAgents = mysqlTable("mos_company_agents", {
 });
 export type MosCompanyAgent = typeof mosCompanyAgents.$inferSelect;
 export type InsertMosCompanyAgent = typeof mosCompanyAgents.$inferInsert;
+
+// ─── Mission SOPs ────────────────────────────────────────────────────────────
+export const missionSops = mysqlTable("mission_sops", {
+  id: int("id").autoincrement().primaryKey(),
+  missionId: int("missionId").notNull(),
+  brandId: int("brandId"),
+  title: varchar("title", { length: 255 }).notNull(),
+  version: int("version").default(1),
+  isGlobal: int("isGlobal").default(0),
+  sourceType: mysqlEnum("sourceType", ["auto_learned","manual","imported"]).default("manual"),
+  importSource: mysqlEnum("importSource", ["text","pdf","url"]),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MissionSop = typeof missionSops.$inferSelect;
+export type InsertMissionSop = typeof missionSops.$inferInsert;
+
+export const missionSopSteps = mysqlTable("mission_sop_steps", {
+  id: int("id").autoincrement().primaryKey(),
+  sopId: int("sopId").notNull(),
+  stepOrder: int("stepOrder").notNull(),
+  stepType: mysqlEnum("stepType", ["sequential","parallel","conditional"]).default("sequential"),
+  parallelGroupId: varchar("parallelGroupId", { length: 64 }),
+  conditionJson: json("conditionJson"),
+  agentSlug: varchar("agentSlug", { length: 64 }),
+  label: varchar("label", { length: 255 }).notNull(),
+  promptSnapshot: text("promptSnapshot"),
+  outputSummary: text("outputSummary"),
+  durationEstimate: varchar("durationEstimate", { length: 32 }),
+  abResult: mysqlEnum("abResult", ["a_wins","b_wins","tie","pending"]).default("pending"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MissionSopStep = typeof missionSopSteps.$inferSelect;
+export type InsertMissionSopStep = typeof missionSopSteps.$inferInsert;
+
+export const missionOutputs = mysqlTable("mission_outputs", {
+  id: int("id").autoincrement().primaryKey(),
+  missionId: int("missionId").notNull(),
+  conversationId: int("conversationId"),
+  messageId: int("messageId"),
+  platform: mysqlEnum("platform", ["facebook","instagram","linkedin","youtube","google_ads","email","ppt","doc","script","other"]).default("other"),
+  outputType: mysqlEnum("outputType", ["post","story","reel","ad_copy","email_html","slide","script","product_desc","report","other"]).default("other"),
+  title: varchar("title", { length: 255 }),
+  content: longtext("content"),
+  previewHtml: longtext("previewHtml"),
+  metadata: json("metadata"),
+  status: mysqlEnum("status", ["draft","pending_review","approved","scheduled","published","archived"]).default("draft"),
+  version: int("version").default(1),
+  parentOutputId: int("parentOutputId"),
+  scheduledAt: timestamp("scheduledAt"),
+  publishedAt: timestamp("publishedAt"),
+  isUrgent: int("isUrgent").default(0),
+  deadlineAt: timestamp("deadlineAt"),
+  batchGroupId: varchar("batchGroupId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MissionOutput = typeof missionOutputs.$inferSelect;
+export type InsertMissionOutput = typeof missionOutputs.$inferInsert;
+
+export const missionKnowledgeFiles = mysqlTable("mission_knowledge_files", {
+  id: int("id").autoincrement().primaryKey(),
+  missionId: int("missionId").notNull(),
+  brandId: int("brandId"),
+  userId: int("userId").notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  originalName: varchar("originalName", { length: 255 }),
+  fileType: mysqlEnum("fileType", ["pdf","docx","xlsx","csv","txt","url","other"]).default("other"),
+  fileUrl: text("fileUrl"),
+  fileSize: int("fileSize"),
+  chunkCount: int("chunkCount").default(0),
+  embeddedAt: timestamp("embeddedAt"),
+  embeddingStatus: mysqlEnum("embeddingStatus", ["pending","processing","completed","failed"]).default("pending"),
+  usageCount: int("usageCount").default(0),
+  autoInject: int("autoInject").default(0),
+  isForSopOnly: int("isForSopOnly").default(0),
+  isSensitive: int("isSensitive").default(0),
+  allowedRoles: json("allowedRoles").$type<string[]>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MissionKnowledgeFile = typeof missionKnowledgeFiles.$inferSelect;
+export type InsertMissionKnowledgeFile = typeof missionKnowledgeFiles.$inferInsert;
+
+export const missionKnowledgeChunks = mysqlTable("mission_knowledge_chunks", {
+  id: int("id").autoincrement().primaryKey(),
+  fileId: int("fileId").notNull(),
+  missionId: int("missionId").notNull(),
+  chunkIndex: int("chunkIndex").notNull(),
+  content: text("content").notNull(),
+  embedding: json("embedding"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MissionKnowledgeChunk = typeof missionKnowledgeChunks.$inferSelect;
+export type InsertMissionKnowledgeChunk = typeof missionKnowledgeChunks.$inferInsert;
+
+export const missionReviewQueue = mysqlTable("mission_review_queue", {
+  id: int("id").autoincrement().primaryKey(),
+  missionId: int("missionId").notNull(),
+  outputId: int("outputId").notNull(),
+  requestedBy: int("requestedBy").notNull(),
+  reviewType: mysqlEnum("reviewType", ["internal","external","legal","client"]).default("internal"),
+  status: mysqlEnum("status", ["pending","in_review","approved","revision_requested","expired"]).default("pending"),
+  reviewerIds: json("reviewerIds").$type<number[]>(),
+  externalToken: varchar("externalToken", { length: 128 }),
+  externalExpireAt: timestamp("externalExpireAt"),
+  isUrgent: int("isUrgent").default(0),
+  deadlineAt: timestamp("deadlineAt"),
+  fastTrack: int("fastTrack").default(0),
+  revisionNote: text("revisionNote"),
+  approvedAt: timestamp("approvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MissionReviewQueueItem = typeof missionReviewQueue.$inferSelect;
+export type InsertMissionReviewQueueItem = typeof missionReviewQueue.$inferInsert;
