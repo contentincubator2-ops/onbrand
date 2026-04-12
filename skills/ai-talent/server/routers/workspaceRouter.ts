@@ -10,7 +10,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { userWorkspaces, missions } from "../../drizzle/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 
 // Default workspaces seeded for new users
 const DEFAULT_WORKSPACE_SEEDS = [
@@ -168,15 +168,15 @@ export const workspaceRouter = router({
           }))
         );
 
-        // 2. Create 6 onboarding missions with squad bindings (raw SQL for reliability)
+        // 2. Create 6 onboarding missions with squad bindings
         const onboardingMissions = buildOnboardingMissions(ctx.user.id);
         for (const m of onboardingMissions) {
           try {
             await db.execute(
-              `INSERT INTO missions (userId, workspace, title, squadSlug, welcomeMessage, isRecurring, recurringSchedule, status)
-               VALUES (${m.userId}, '${m.workspace}', '${m.title.replace(/'/g, "\\'")}',${'\'' + m.squadSlug + '\''},
-                      '${(m.welcomeMessage || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}',
-                      ${m.isRecurring ? 1 : 0}, ${m.recurringSchedule ? `'${m.recurringSchedule}'` : 'NULL'}, 'active')`
+              sql`INSERT INTO missions (userId, workspace, title, squadSlug, welcomeMessage, isRecurring, recurringSchedule, status)
+                  VALUES (${m.userId}, ${m.workspace}, ${m.title}, ${m.squadSlug},
+                         ${m.welcomeMessage ?? ''}, ${m.isRecurring ? 1 : 0},
+                         ${m.recurringSchedule ?? null}, 'active')`
             );
           } catch (err) {
             console.error('[Onboarding] mission insert failed:', m.title, err);

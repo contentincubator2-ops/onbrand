@@ -8,6 +8,7 @@
  * - Claude-style design: warm neutrals (#faf9f7 bg), amber accents (#c9823a), refined spacing
  * - ArtifactReviewPanel receives live agent data as team members
  * - MissionContextRail receives agents + agentsLoading for left rail roster
+ * - Sprint 4: workspace.list/create/delete persisted to DB per user
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { trpc } from "../lib/trpc";
@@ -15,21 +16,16 @@ import ChatPage from "./ChatPage";
 import MissionContextRail, { type MissionContext, type AgentEntry } from "../components/chat/MissionContextRail";
 import ArtifactReviewPanel, { type TeamMember, type Artifact, type ReviewItem } from "../components/chat/ArtifactReviewPanel";
 
-// ---- Workspace config with layer mapping ----
-const WORKSPACES = [
-  { id: 'facebook', label: 'Facebook', icon: 'f',  color: 'bg-gray-600',    layer: 'execution' as const },
-  { id: 'linkedin', label: 'LinkedIn', icon: 'in', color: 'bg-gray-600',     layer: 'execution' as const },
-  { id: 'youtube',  label: 'YouTube',  icon: 'yt', color: 'bg-gray-600',     layer: 'execution' as const },
-  { id: 'pr',       label: 'PR',       icon: 'pr', color: 'bg-gray-600', layer: 'strategy' as const },
-  { id: 'event',    label: 'Event',    icon: 'ev', color: 'bg-gray-600',   layer: 'strategy' as const },
-  { id: 'instore',  label: 'In-store', icon: 'is', color: 'bg-gray-600',  layer: 'strategy' as const },
-] as const;
+type WorkspaceItem = { id: string; label: string; layer: 'execution' | 'strategy' };
 
-type WorkspaceId = typeof WORKSPACES[number]['id'];
+/** Infer layer from wsKey */
+function inferLayer(wsKey: string): 'execution' | 'strategy' {
+  const strategyKeys = ['pr', 'seo', 'event', 'strategy', 'brand'];
+  return strategyKeys.some(k => wsKey.includes(k)) ? 'strategy' : 'execution';
+}
 
 export default function WorkspacePage() {
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('facebook');
-  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [activeWorkspace, setActiveWorkspace] = useState<string>('facebook');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [missionModalOpen, setMissionModalOpen] = useState(false);
@@ -41,6 +37,38 @@ export default function WorkspacePage() {
     successMetrics: '',
     methodology: '',
     constraints: '',
+  });
+
+  // ── Workspace tRPC queries ─────────────────────────────────────────────────
+  const utils = trpc.useUtils();
+
+  const workspaceListQuery = trpc.workspace.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+
+  const workspaces: WorkspaceItem[] = (workspaceListQuery.data ?? []).map((w) => ({
+    id: w.wsKey,
+    label: w.label,
+    layer: inferLayer(w.wsKey),
+  }));
+
+  // Set initial active workspace once data loads
+  useEffect(() => {
+    if (workspaces.length > 0 && !workspaces.find(w => w.id === activeWorkspace)) {
+      setActiveWorkspace(workspaces[0].id);
+    }
+  }, [workspaceListQuery.data]);
+
+  const createWorkspaceMutation = trpc.workspace.create.useMutation({
+    onSuccess: () => {
+      utils.workspace.list.invalidate();
+    },
+  });
+
+  const deleteWorkspaceMutation = trpc.workspace.delete.useMutation({
+    onSuccess: () => {
+      utils.workspace.list.invalidate();
+    },
   });
 
   // ── Brand ──────────────────────────────────────────────────────────────────
@@ -59,9 +87,32 @@ export default function WorkspacePage() {
   // ── Sprint 2: Mission data ─────────────────────────────────────────────────
   const activeMissionQuery = trpc.mission.getActive.useQuery(
     { workspace: activeWorkspace, brandId: activeBrand?.id },
-    { enabled: !!activeBrand, refetchOnWindowFocus: false }
+    { enabled: !!activeWorkspace, refetchOnWindowFocus: false }
   );
   const activeMissionData = activeMissionQuery.data ?? null;
+
+  // ── Mission list + activeMissionId ────────────────────────────────────────
+  const [activeMissionId, setActiveMissionId] = useState<number | null>(null);
+  const missionsListQuery = trpc.mission.list.useQuery(
+    { workspace: activeWorkspace, brandId: activeBrand?.id },
+    { enabled: !!activeWorkspace, refetchOnWindowFocus: false }
+  );
+  const missionsList = missionsListQuery.data ?? [];
+
+  // Build missionsPerWorkspace: only active workspace has data loaded (lazy pattern)
+  const missionsPerWorkspace: Record<string, { id: number; title: string; status: string }[]> = {};
+  for (const ws of workspaces) {
+    missionsPerWorkspace[ws.id] = ws.id === activeWorkspace
+      ? missionsList.map((m: any) => ({ id: m.id, title: m.title, status: m.status ?? 'draft' }))
+      : [];
+  }
+
+  // Conversations under active mission
+  const conversationsQuery = trpc.conversation.listConversations.useQuery(
+    { missionId: activeMissionId! },
+    { enabled: !!activeMissionId, refetchOnWindowFocus: false }
+  );
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   const mission: MissionContext | null = activeMissionData ? {
     workspace: activeMissionData.workspace,
@@ -73,7 +124,6 @@ export default function WorkspacePage() {
     methodology: activeMissionData.methodology ?? "",
   } : null;
 
-  const utils = trpc.useUtils();
   const createMission = trpc.mission.create.useMutation({
     onSuccess: () => {
       utils.mission.getActive.invalidate({ workspace: activeWorkspace, brandId: activeBrand?.id ?? undefined });
@@ -81,7 +131,7 @@ export default function WorkspacePage() {
   });
 
   // ── Sprint 3: Live agents → Team panel + Left rail ──────────────────────────
-  const currentWorkspace = WORKSPACES.find(w => w.id === activeWorkspace)!;
+  const currentWorkspace = workspaces.find(w => w.id === activeWorkspace) ?? workspaces[0] ?? { id: activeWorkspace, label: activeWorkspace, layer: 'execution' as const };
   const agentsQuery = trpc.agent.list.useQuery(
     { layer: currentWorkspace.layer, workspace: activeWorkspace, limit: 20 },
     { refetchOnWindowFocus: false }
@@ -94,7 +144,7 @@ export default function WorkspacePage() {
     title: a.specialty ?? a.role ?? currentWorkspace.label + ' Agent',
     layer: (a.layer ?? currentWorkspace.layer) as TeamMember['layer'],
     status: 'standby' as const,
-        aiModel: a.aiModel,
+    aiModel: a.aiModel,
     owns: currentWorkspace.label,
   }));
 
@@ -106,7 +156,7 @@ export default function WorkspacePage() {
     workspace: activeWorkspace,
     layer: (a.layer ?? currentWorkspace.layer) as AgentEntry['layer'],
     status: 'idle' as const,
-        aiModel: a.aiModel,
+    aiModel: a.aiModel,
   }));
 
   // Task Units - Sprint 4
@@ -136,7 +186,6 @@ export default function WorkspacePage() {
       content: (() => {
         try {
           const r = t.result ?? t.description ?? '';
-          // Try to extract publishable_content from JSON
           const parsed = JSON.parse(r);
           return (parsed.publishable_content ?? r).slice(0, 500);
         } catch {
@@ -149,16 +198,7 @@ export default function WorkspacePage() {
 
   const [reviews] = useState<ReviewItem[]>([]);
 
-  // Close workspace menu on outside click
-  useEffect(() => {
-    if (!showWorkspaceMenu) return;
-    const handler = () => setShowWorkspaceMenu(false);
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
-  }, [showWorkspaceMenu]);
-
   const handleNewMission = () => {
-    if (!activeBrand) return;
     setMissionForm({ title: '', objective: '', audience: '', offer: '', successMetrics: '', methodology: '', constraints: '' });
     setMissionModalOpen(true);
   };
@@ -179,6 +219,21 @@ export default function WorkspacePage() {
     setMissionModalOpen(false);
   };
 
+  // ── Workspace handlers (DB-backed) ────────────────────────────────────────
+  const handleNewWorkspace = (label: string) => {
+    createWorkspaceMutation.mutate({ label });
+  };
+
+  const handleDeleteWorkspace = (wsKey: string) => {
+    deleteWorkspaceMutation.mutate({ wsKey });
+    // If active workspace is deleted, switch to first remaining
+    if (activeWorkspace === wsKey) {
+      const remaining = workspaces.filter(w => w.id !== wsKey);
+      if (remaining.length > 0) {
+        setActiveWorkspace(remaining[0].id);
+      }
+    }
+  };
 
   // ── AI Vector Search ──────────────────────────────────────────────────────
   const [searchOpen, setSearchOpen] = useState(false);
@@ -230,108 +285,86 @@ export default function WorkspacePage() {
       {!leftCollapsed && (
         <MissionContextRail
           brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
+          brands={brands.map((b: any) => ({ id: b.id, name: b.name, isDefault: b.isDefault }))}
+          onBrandChange={(id) => setActiveBrandId(id)}
           mission={mission}
           workspaceName={currentWorkspace.label}
           onEditMission={handleNewMission}
           taskUnits={taskUnits as any}
+          workspaces={workspaces.map(ws => ({ id: ws.id, label: ws.label, icon: '', layer: ws.layer }))}
+          activeWorkspace={activeWorkspace}
+          onWorkspaceChange={(id) => setActiveWorkspace(id)}
+          onNewWorkspace={handleNewWorkspace}
+          onDeleteWorkspace={handleDeleteWorkspace}
+          missionsPerWorkspace={missionsPerWorkspace}
+          missions={missionsList.map((m: any) => ({ id: m.id, title: m.title, workspace: m.workspace, status: m.status, updatedAt: m.updatedAt }))}
+          activeMissionId={activeMissionId}
+          onMissionChange={(id) => setActiveMissionId(id)}
+          onNewMission={handleNewMission}
+          conversations={conversationsQuery.data ?? []}
+          activeConversationId={activeConversationId}
+          onConversationChange={(title) => setActiveConversationId(title)}
+          onNewConversation={() => setActiveConversationId(null)}
+          onDarkToggle={() => window.dispatchEvent(new Event("toggle-dark"))}
+          onSettings={() => window.location.href = "/settings"}
+          onLogout={() => { localStorage.removeItem("authToken"); window.location.href = "/login"; }}
         />
       )}
 
       {/* CENTER */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top bar — Claude warm style */}
+        {/* Top bar — Breadcrumb style */}
         <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-white">
-          <div className="flex items-center gap-2">
-            {/* Toggle left rail */}
+          <div className="flex items-center gap-2 min-w-0">
+            {/* ≡ Toggle left rail */}
             <button
               onClick={() => setLeftCollapsed(c => !c)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
               title={leftCollapsed ? '展開左欄' : '收起左欄'}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {leftCollapsed
-                  ? <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 9 17 12 14 15"/></>
-                  : <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 15 11 12 14 9"/></>
-                }
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
             </button>
 
-            {/* Workspace selector */}
-            <div className="relative" onClick={e => e.stopPropagation()}>
-              <button
-                onClick={() => setShowWorkspaceMenu(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-[#3d3530] hover:border-[#c9a96e] hover:bg-gray-100 transition-colors"
-              >
-                <span className={`w-5 h-5 rounded ${currentWorkspace.color} text-white flex items-center justify-center text-[10px] font-bold`}>
-                  {currentWorkspace.icon}
-                </span>
-                {currentWorkspace.label}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-
-              {showWorkspaceMenu && (
-                <div className="absolute left-0 top-full mt-1 w-52 bg-[#fdfcfa] border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
-                  <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">切換 Workspace</p>
-                  </div>
-                  {WORKSPACES.map(ws => (
-                    <button
-                      key={ws.id}
-                      onClick={() => { setActiveWorkspace(ws.id); setShowWorkspaceMenu(false); }}
-                      className={`w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                        activeWorkspace === ws.id
-                          ? 'bg-[#fdf3e3] text-[#92622a] font-medium'
-                          : 'text-[#5a4f47] hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className={`w-5 h-5 rounded ${ws.color} text-white flex items-center justify-center text-[10px] font-bold shrink-0`}>{ws.icon}</span>
-                      {ws.label}
-                      {activeWorkspace === ws.id && (
-                        <svg className="ml-auto w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                      )}
-                    </button>
-                  ))}
-                </div>
+            {/* Breadcrumb: 品牌 › 工作區 › 任務 */}
+            <nav className="flex items-center gap-1 text-sm min-w-0 overflow-hidden">
+              <span className="font-semibold text-neutral-800 dark:text-neutral-100 shrink-0 truncate max-w-[80px]">
+                {activeBrand?.name ?? '—'}
+              </span>
+              <span className="text-neutral-400 shrink-0">›</span>
+              <span className="text-neutral-500 shrink-0 truncate max-w-[80px]">
+                {currentWorkspace?.label ?? '—'}
+              </span>
+              <span className="text-neutral-400 shrink-0">›</span>
+              <span className="text-neutral-400 shrink-0 truncate max-w-[120px]">
+                {activeMissionData?.title ?? '選擇任務'}
+              </span>
+              {activeMissionQuery.isLoading && (
+                <span className="w-3 h-3 border border-[#D1D5DB] border-t-gray-600 rounded-full animate-spin shrink-0" />
               )}
-            </div>
-
-            <span className="text-[#D1D5DB]">|</span>
-            <span className="text-xs text-gray-400 truncate max-w-[200px]">
-              {activeMissionData ? activeMissionData.title : '任務工作區'}
-            </span>
-            {activeMissionQuery.isLoading && (
-              <span className="w-3 h-3 border border-[#D1D5DB] border-t-gray-600 rounded-full animate-spin" />
-            )}
+            </nav>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* AI Search */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* AI Search — hidden on mobile */}
             <button
               onClick={openSearch}
-              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
               title="AI 搜尋 Agent / Squad"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               AI 搜尋
             </button>
-            <button
-              onClick={openSearch}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
-            >
-              🔍 AI 搜尋
-            </button>
+            {/* + 新任務 — always visible */}
             <button
               onClick={handleNewMission}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-[#D1D5DB] text-gray-400 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium"
             >
               + 新任務
             </button>
-            {activeBrand && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-[#5a4f47] bg-white">
-                <div className="w-4 h-4 rounded-full bg-[#3d3530] shrink-0" />
-                <span className="max-w-[140px] truncate">{activeBrand.name}</span>
-              </div>
-            )}
             {/* Toggle right rail */}
             <button
               onClick={() => setRightCollapsed(c => !c)}
@@ -350,7 +383,7 @@ export default function WorkspacePage() {
 
         {/* Chat */}
         <div className="flex-1 overflow-hidden">
-          <ChatPage initialBrandId={activeBrand?.id} preselectedAgent={selectedAgent} onClearAgent={() => setSelectedAgent(null)} />
+          <ChatPage initialBrandId={activeBrand?.id} activeMissionId={activeMissionId} preselectedAgent={selectedAgent} onClearAgent={() => setSelectedAgent(null)} />
         </div>
       </div>
 
@@ -363,19 +396,18 @@ export default function WorkspacePage() {
           agentsLoading={agentsQuery.isLoading}
         />
       )}
-    </div>
-  );
+
       {/* Mission Create Modal */}
       {missionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) setMissionModalOpen(false); }}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg sm:mx-4 overflow-hidden">
             <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
               <h2 className="text-base font-semibold text-neutral-800">+ 新任務</h2>
               <button onClick={() => setMissionModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 text-xl leading-none">×</button>
             </div>
             <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
               {[
-                { key: 'title', label: '任務名稱 *', placeholder: '例：Q2 品牌上市活務' },
+                { key: 'title', label: '任務名稱 *', placeholder: '例：Q2 品牌上市活動' },
                 { key: 'objective', label: '目標 Objective', placeholder: '這個任務要達成什麼？' },
                 { key: 'audience', label: '受眾 Audience', placeholder: '目標受眾是誰？' },
                 { key: 'offer', label: '提案 / 產品 Offer', placeholder: '主打什麼產品或服務？' },
@@ -496,5 +528,6 @@ export default function WorkspacePage() {
           </div>
         </div>
       )}
-
+    </div>
+  );
 }
