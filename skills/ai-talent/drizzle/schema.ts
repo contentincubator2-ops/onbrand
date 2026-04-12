@@ -16,6 +16,25 @@ import {
 // We map only the columns used by AI Marketer; extra columns are ignored by Drizzle.
 
 
+export const users = mysqlTable("users", {
+  id: int("id").autoincrement().primaryKey(),
+  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  name: text("name"),
+  email: varchar("email", { length: 320 }),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  isActive: int("isActive").default(0).notNull(),
+  credits: int("credits").default(1000).notNull(),
+  hasUnlimitedCredits: int("hasUnlimitedCredits").default(0).notNull(),
+  // Enterprise fields (added in MOS migration)
+  companyId: int("companyId"),
+  departmentId: int("departmentId"),
+  orgRole: mysqlEnum("orgRole", ["owner", "admin", "member"]).default("member"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+
 //  AI Agents
 export const agents = mysqlTable("agents", {
   id: int("id").autoincrement().primaryKey(),
@@ -59,6 +78,7 @@ export type InsertAgent = typeof agents.$inferInsert;
 //  Brands
 export const brands = mysqlTable("enterprise_brands", {
   id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId"),
   userId: int("userId").notNull(),
   name: varchar("name", { length: 128 }).notNull(),
   description: text("description"),
@@ -448,9 +468,13 @@ export const chatMessages = mysqlTable("chat_messages", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   brandId: int("brandId"),
+  missionId: int("missionId"),
+  conversationTitle: varchar("conversationTitle", { length: 100 }),
   role: varchar("role", { length: 10 }).notNull(),
   content: text("content").notNull(),
   taskId: int("taskId"),
+  companyId: int("companyId"),
+  departmentId: int("departmentId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ChatMessage = typeof chatMessages.$inferSelect;
@@ -528,7 +552,15 @@ export const missions = mysqlTable("missions", {
   successMetrics: text("successMetrics"),
   constraints: text("constraints"),
   methodology: text("methodology"), // e.g. "Brand Positioning v2"
+  squadSlug: varchar("squadSlug", { length: 64 }),     // 綁定的 squad slug
+  welcomeMessage: text("welcomeMessage"),               // 點任務時顯示的歡迎訊息
   status: mysqlEnum("status", ["active", "completed", "archived"]).default("active").notNull(),
+  isRecurring: boolean("isRecurring").default(false).notNull(),
+  recurringSchedule: varchar("recurringSchedule", { length: 64 }),  // 'daily' | 'weekly' | 'biweekly' | 'monthly'
+  companyId: int("companyId"),
+  brandId2: int("brandId2"),
+  departmentId: int("departmentId"),
+  workspaceId: int("workspaceId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -549,3 +581,59 @@ export const missionTaskUnits = mysqlTable("mission_task_units", {
 });
 export type MissionTaskUnit = typeof missionTaskUnits.$inferSelect;
 export type InsertMissionTaskUnit = typeof missionTaskUnits.$inferInsert;
+
+// ─── User Workspaces (用戶自訂工作區) ─────────────────────────────────────────
+export const userWorkspaces = mysqlTable("user_workspaces", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  wsKey: varchar("wsKey", { length: 64 }).notNull(),
+  label: varchar("label", { length: 64 }).notNull(),
+  sortOrder: int("sortOrder").default(0),
+  companyId: int("companyId"),
+  brandId: int("brandId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type UserWorkspace = typeof userWorkspaces.$inferSelect;
+export type InsertUserWorkspace = typeof userWorkspaces.$inferInsert;
+
+
+
+// ─── MOS Enterprise: Companies (企業層級) ─────────────────────────────────────
+// Note: 使用 mos_companies 前綴避免與既有 companies table 衝突
+export const mosCompanies = mysqlTable("mos_companies", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 128 }).notNull(),
+  industry: varchar("industry", { length: 64 }),
+  plan: mysqlEnum("plan", ["trial", "starter", "pro", "enterprise"]).default("trial"),
+  agentWorkspacePath: varchar("agentWorkspacePath", { length: 255 }),
+  agentSessionKey: varchar("agentSessionKey", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MosCompany = typeof mosCompanies.$inferSelect;
+export type InsertMosCompany = typeof mosCompanies.$inferInsert;
+
+// ─── MOS Enterprise: Departments (部門) ──────────────────────────────────────
+export const mosDepartments = mysqlTable("mos_departments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  brandId: int("brandId").notNull(),
+  name: varchar("name", { length: 64 }).notNull(),
+  headCount: int("headCount").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MosDepartment = typeof mosDepartments.$inferSelect;
+export type InsertMosDepartment = typeof mosDepartments.$inferInsert;
+
+// ─── MOS Enterprise: Company Agents (企業 AI 工作區) ─────────────────────────
+export const mosCompanyAgents = mysqlTable("mos_company_agents", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  workspacePath: varchar("workspacePath", { length: 255 }),
+  sessionKey: varchar("sessionKey", { length: 128 }),
+  soulMdContent: text("soulMdContent"),
+  memoryMdContent: text("memoryMdContent"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MosCompanyAgent = typeof mosCompanyAgents.$inferSelect;
+export type InsertMosCompanyAgent = typeof mosCompanyAgents.$inferInsert;
