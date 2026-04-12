@@ -3,7 +3,7 @@ module.exports = {
     name: 'marketing-os',
     script: './node_modules/.bin/tsx',
     args: 'server/index.ts',
-    cwd: '/home/azureuser/sowork-marketing-enterprise/skills/ai-talent',
+    cwd: '/home/azureuser/marketing-os/skills/ai-talent',
     instances: 1,
     exec_mode: 'fork',
     max_restarts: 10,
