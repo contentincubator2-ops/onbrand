@@ -89,6 +89,16 @@ interface RelayStepState {
   expanded?: boolean;
 }
 
+// Squad-chat 步驟狀態
+interface SquadStepState {
+  currentStep: number;
+  totalSteps: number;
+  agentName?: string;
+  agentTitle?: string;
+  agentRole?: string;
+  isComplete: boolean;
+}
+
 const IconSend = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
 const IconChevron = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
 const IconPlus = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
@@ -312,6 +322,9 @@ export default function ChatPage({
   const [relaySteps, setRelaySteps] = useState<RelayStepState[]>([]);
   const [pendingTask, setPendingTask] = useState("");
   const [awaitingApproval, setAwaitingApproval] = useState(false);
+  const [squadStep, setSquadStep] = useState<SquadStepState>({ currentStep: 0, totalSteps: 10, isComplete: false });
+  const [streamingAgentName, setStreamingAgentName] = useState<string | null>(null);
+  const [streamingAgentTitle, setStreamingAgentTitle] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
 
@@ -432,6 +445,9 @@ export default function ChatPage({
     setRelaySteps([]);
     setPendingTask("");
     setAwaitingApproval(false);
+    setSquadStep({ currentStep: 0, totalSteps: 10, isComplete: false });
+    setStreamingAgentName(null);
+    setStreamingAgentTitle(null);
   }, [activeMissionId, missionDataQuery.data]);
 
   useEffect(() => {
@@ -515,6 +531,113 @@ export default function ChatPage({
         } : s));
       }, idx * 1600 + 1100);
     });
+  };
+
+  const executeSquadChat = async (text: string, convId: string): Promise<boolean> => {
+    const missionData = missionDataQuery.data as any;
+    const squadSlug: string = missionData?.squadSlug ?? "";
+    if (!squadSlug) return false;
+    const token = localStorage.getItem("authToken");
+    if (!token) return false;
+
+    setLoading(true);
+    setStreamingAgentName(null);
+    setStreamingAgentTitle(null);
+
+    let streamBuffer = "";
+    const streamMsgId = `squad-stream-${Date.now()}`;
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === convId
+          ? { ...c, messages: [...c.messages, { id: streamMsgId, role: "assistant" as const, content: "", ts: Date.now() }] }
+          : c
+      )
+    );
+
+    try {
+      const brandCtx = {
+        name: (activeBrand as any)?.name,
+        industry: (activeBrand as any)?.industry,
+        website: (activeBrand as any)?.websiteUrl,
+        targetAudience: (activeBrand as any)?.targetAudience,
+        description: (activeBrand as any)?.description,
+      };
+      const resp = await fetch("/api/stream/squad-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          squadSlug,
+          missionId: activeMissionId,
+          userMessage: text,
+          conversationHistory: conversationHistory.slice(-12),
+          brandContext: brandCtx,
+          currentStep: squadStep.currentStep,
+        }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`squad-chat HTTP ${resp.status}`);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let lastAgentName: string | undefined;
+      let lastAgentTitle: string | undefined;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        let curEvent = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            curEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (curEvent === "agent") {
+                lastAgentName = data.agentName;
+                lastAgentTitle = data.agentTitle;
+                setStreamingAgentName(data.agentName);
+                setStreamingAgentTitle(data.agentTitle);
+                setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle, agentRole: data.agentRole }));
+              } else if (curEvent === "delta") {
+                streamBuffer += data.text;
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === convId
+                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
+                      : c
+                  )
+                );
+              } else if (curEvent === "done") {
+                setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
+              }
+            } catch { /* ignore */ }
+          }
+        }
+      }
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（Agent 回覆完成）", agentName: lastAgentName, agentTitle: lastAgentTitle } : m) }
+            : c
+        )
+      );
+      setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: streamBuffer }].slice(-14));
+      setLoading(false);
+      return true;
+    } catch (err: any) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `⚠️ Squad chat 錯誤：${err?.message ?? "未知"}，切換一般模式...` } : m) }
+            : c
+        )
+      );
+      setLoading(false);
+      return false;
+    }
   };
 
   const executeTask = async (text: string, convId: string) => {
@@ -682,6 +805,12 @@ export default function ChatPage({
     setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, title: c.messages.length === 0 ? text.slice(0, 32) : c.title, messages: [...c.messages, userMsg] } : c));
     saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "user", content: text });
 
+    const missionSlug = (missionDataQuery.data as any)?.squadSlug;
+    if (activeMissionId && missionSlug) {
+      const handled = await executeSquadChat(text, convId);
+      if (handled) return;
+    }
+
     if (isTaskLike(text)) {
       setTeamAssembly({ phase: "analyzing", agents: [], plan: [], taskText: text });
       setRelaySteps([]);
@@ -712,7 +841,27 @@ export default function ChatPage({
   return (
     <div className="flex h-screen bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Status badges — shown inline only when active */}
+        {/* Squad 步驟進度條 */}
+        {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
+          <div className="px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800 shrink-0 bg-neutral-50 dark:bg-neutral-900/60">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  {streamingAgentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 truncate">{streamingAgentName}</span>}
+                  {streamingAgentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500 truncate hidden sm:inline">· {streamingAgentTitle}</span>}
+                </div>
+                <span className="text-xs text-neutral-400 dark:text-neutral-500 tabular-nums shrink-0 ml-2">
+                  Step {squadStep.currentStep}/{squadStep.totalSteps}{squadStep.isComplete ? " ✅" : ""}
+                </span>
+              </div>
+              <div className="w-full h-1 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                <div className="h-full rounded-full bg-neutral-700 dark:bg-neutral-300 transition-all duration-500"
+                  style={{ width: `${Math.round((squadStep.currentStep / squadStep.totalSteps) * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Status badges */}
         {(loading || awaitingApproval) && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-neutral-100 dark:border-neutral-800 shrink-0">
             {loading && <span className="text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded-full font-medium animate-pulse">執行中…</span>}
