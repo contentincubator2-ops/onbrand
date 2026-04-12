@@ -45,6 +45,11 @@ interface Msg {
   agentModel?: string | null; // raw aiModel from DB
   isStreaming?: boolean; // currently streaming
   taskId?: number; // task ID for export
+  pendingApproval?: boolean; // waiting for user confirm before sending to panel
+  approved?: boolean; // user has confirmed this version
+  sopProposed?: boolean; // SOP prompt shown
+  sopBuilt?: boolean; // SOP has been built
+  exportFormat?: "ppt" | "word" | "copy" | "none"; // what export makes sense
 }
 
 interface Conversation {
@@ -121,6 +126,19 @@ function formatModelName(raw: string): string {
   if (r.includes('deepseek')) return 'DeepSeek R1';
   if (r.includes('llama')) return 'Llama 3';
   return raw;
+}
+
+// ── Export format detection ──────────────────────────────────────────────────
+function detectExportFormat(taskType: string, content: string): "ppt" | "word" | "copy" | "none" {
+  // Social posts / ad copy → just copy
+  if (/ad_copy|social_content|press_release/.test(taskType)) return "copy";
+  // Strategy / positioning → PPT
+  if (/brand_positioning|market_research|competitor_analysis/.test(taskType)) return "ppt";
+  // Reports / emails → Word
+  if (/email|report|content_strategy|general/.test(taskType)) return "word";
+  // Short replies → no export
+  if (content.length < 200) return "none";
+  return "word";
 }
 
 // ── Mission Steps Rail ──────────────────────────────────────────────────────
@@ -418,6 +436,8 @@ export default function ChatPage({
   const [streamingThinking, setStreamingThinking] = useState<string>("");
   const [isStopped, setIsStopped] = useState(false);
   const stopRef = useRef(false);
+  const [approvedContent, setApprovedContent] = useState<{title: string; content: string; format: string} | null>(null);
+  const [sopDraft, setSopDraft] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
@@ -1175,52 +1195,151 @@ export default function ChatPage({
                           </div>
                         )}
                         <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content || (msg.thinking ? "✅ 分析完成，請查看策略思考過程" : "（無輸出內容）")) }} />
-                        {/* Export buttons */}
-                        {msg.content && msg.content.length > 50 && (
-                          <div className="px-4 pb-3 pt-1 flex items-center gap-2 border-t border-neutral-200 dark:border-neutral-700">
-                            <span className="text-[10px] text-neutral-400 mr-1">匯出：</span>
-                            <button
-                              onClick={async () => {
-                                const token = localStorage.getItem("authToken");
-                                if (!token) return;
-                                const res = await fetch("/api/export/pptx", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                                  body: JSON.stringify({ title: msg.agentTitle ?? "SoWork 報告", content: msg.content, brandName: activeBrand?.name }),
-                                });
-                                if (res.ok) {
-                                  const blob = await res.blob();
-                                  const url = URL.createObjectURL(blob);
-                                  const a = document.createElement("a");
-                                  a.href = url; a.download = "sowork-report.pptx"; a.click();
-                                  URL.revokeObjectURL(url);
-                                }
-                              }}
-                              className="text-[10px] px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 transition-colors font-medium"
-                            >
-                              📥 下載 PPT
-                            </button>
-                            <button
-                              onClick={async () => {
-                                const token = localStorage.getItem("authToken");
-                                if (!token) return;
-                                const res = await fetch("/api/export/docx", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                                  body: JSON.stringify({ title: msg.agentTitle ?? "SoWork 報告", content: msg.content, brandName: activeBrand?.name }),
-                                });
-                                if (res.ok) {
-                                  const blob = await res.blob();
-                                  const url = URL.createObjectURL(blob);
-                                  const a = document.createElement("a");
-                                  a.href = url; a.download = "sowork-report.docx"; a.click();
-                                  URL.revokeObjectURL(url);
-                                }
-                              }}
-                              className="text-[10px] px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors font-medium"
-                            >
-                              📄 下載 Word
-                            </button>
+                        {/* ── Confirmation + Export + SOP row ── */}
+                        {msg.content && msg.content.length > 80 && (
+                          <div className="border-t border-neutral-200 dark:border-neutral-700">
+                            {/* Pending approval banner */}
+                            {msg.pendingApproval && !msg.approved && (
+                              <div className="px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center gap-3">
+                                <span className="text-xs text-amber-700 dark:text-amber-300 font-medium flex-1">這是目前產出的版本，確認後會傳送到右側面板。</span>
+                                <button
+                                  onClick={() => {
+                                    setConversations(prev => prev.map(c => ({
+                                      ...c,
+                                      messages: c.messages.map(m => m.id === msg.id
+                                        ? { ...m, pendingApproval: false, approved: true }
+                                        : m
+                                      )
+                                    })));
+                                    setApprovedContent({ title: msg.agentTitle ?? "SoWork 報告", content: msg.content, format: msg.exportFormat ?? "word" });
+                                  }}
+                                  className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold transition-colors"
+                                >✅ 確認這個版本</button>
+                                <button
+                                  onClick={() => setInput("請重新調整，")}
+                                  className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-amber-300 text-amber-600 hover:bg-amber-100 font-medium transition-colors"
+                                >✏️ 要求修改</button>
+                              </div>
+                            )}
+                            {/* Confirmed badge + export */}
+                            {msg.approved && (
+                              <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 px-2 py-0.5 rounded-full">✅ 已確認版本</span>
+                                {/* Export buttons based on format */}
+                                {(msg.exportFormat === "ppt" || !msg.exportFormat) && (
+                                  <button
+                                    onClick={async () => {
+                                      const token = localStorage.getItem("authToken");
+                                      if (!token) { alert("請先登入"); return; }
+                                      try {
+                                        const res = await fetch("/api/export/pptx", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                          body: JSON.stringify({ title: msg.agentTitle ?? "SoWork 報告", content: msg.content, brandName: activeBrand?.name }),
+                                        });
+                                        if (!res.ok) { const e = await res.json(); alert("下載失敗：" + (e.error ?? res.status)); return; }
+                                        const blob = await res.blob();
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement("a"); a.href = url;
+                                        a.download = (msg.agentTitle ?? "sowork-report") + ".pptx"; a.click();
+                                        URL.revokeObjectURL(url);
+                                      } catch(e: any) { alert("下載失敗：" + e.message); }
+                                    }}
+                                    className="text-[10px] px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 transition-colors font-medium"
+                                  >📥 下載 PPT</button>
+                                )}
+                                {(msg.exportFormat === "word" || msg.exportFormat === "none" || !msg.exportFormat) && (
+                                  <button
+                                    onClick={async () => {
+                                      const token = localStorage.getItem("authToken");
+                                      if (!token) { alert("請先登入"); return; }
+                                      try {
+                                        const res = await fetch("/api/export/docx", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                          body: JSON.stringify({ title: msg.agentTitle ?? "SoWork 報告", content: msg.content, brandName: activeBrand?.name }),
+                                        });
+                                        if (!res.ok) { const e = await res.json(); alert("下載失敗：" + (e.error ?? res.status)); return; }
+                                        const blob = await res.blob();
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement("a"); a.href = url;
+                                        a.download = (msg.agentTitle ?? "sowork-report") + ".docx"; a.click();
+                                        URL.revokeObjectURL(url);
+                                      } catch(e: any) { alert("下載失敗：" + e.message); }
+                                    }}
+                                    className="text-[10px] px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors font-medium"
+                                  >📄 下載 Word</button>
+                                )}
+                                {msg.exportFormat === "copy" && (
+                                  <button
+                                    onClick={() => { navigator.clipboard.writeText(msg.content); }}
+                                    className="text-[10px] px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600 transition-colors font-medium"
+                                  >📋 複製文案</button>
+                                )}
+                                {/* SOP button — only show if not yet proposed */}
+                                {!msg.sopProposed && !msg.sopBuilt && (
+                                  <button
+                                    onClick={() => {
+                                      setConversations(prev => prev.map(c => ({
+                                        ...c,
+                                        messages: c.messages.map(m => m.id === msg.id ? { ...m, sopProposed: true } : m)
+                                      })));
+                                    }}
+                                    className="text-[10px] px-2.5 py-1 rounded-lg border border-violet-200 dark:border-violet-700 text-violet-500 hover:bg-violet-50 hover:text-violet-700 transition-colors font-medium ml-auto"
+                                  >📋 整理成 SOP？</button>
+                                )}
+                              </div>
+                            )}
+                            {/* SOP proposal block */}
+                            {msg.sopProposed && !msg.sopBuilt && (
+                              <div className="px-4 py-3 bg-violet-50 dark:bg-violet-900/20 border-t border-violet-200 dark:border-violet-700 flex items-start gap-3">
+                                <span className="text-lg mt-0.5">📋</span>
+                                <div className="flex-1">
+                                  <p className="text-xs font-semibold text-violet-800 dark:text-violet-200 mb-1">要將這個執行流程建立成標準 SOP 嗎？</p>
+                                  <p className="text-xs text-violet-600 dark:text-violet-400">系統會自動整理本次的任務步驟、使用的 Agent 組合、輸出格式，建立成可重複使用的標準流程。</p>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    // Generate SOP from content
+                                    const sopText = `# SOP：${msg.agentTitle ?? "行銷任務"}
+
+## 觸發條件
+用戶提交${msg.agentTitle ?? "相關行銷任務"}需求。
+
+## 執行步驟
+1. 確認品牌背景與目標受眾
+2. 指派專責 Agent（${msg.agentName ?? "策略師"}）執行分析
+3. AI 產出初稿，等待用戶確認
+4. 依用戶反饋修改（最多 2 輪）
+5. 確認後匯出${msg.exportFormat === "ppt" ? "PPT 投影片" : msg.exportFormat === "copy" ? "文案並複製" : "Word 報告"}
+
+## 輸出格式
+${msg.exportFormat === "ppt" ? "PowerPoint (.pptx)" : msg.exportFormat === "copy" ? "純文字文案（複製貼上）" : "Word 文件 (.docx)"}
+
+## 使用 Agent
+${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
+
+---
+*由 SoWork AI Marketing Claw 自動整理*`;
+                                    setSopDraft(sopText);
+                                    setConversations(prev => prev.map(c => ({
+                                      ...c,
+                                      messages: c.messages.map(m => m.id === msg.id ? { ...m, sopBuilt: true } : m)
+                                    })));
+                                  }}
+                                  className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white font-semibold transition-colors"
+                                >建立 SOP</button>
+                                <button
+                                  onClick={() => {
+                                    setConversations(prev => prev.map(c => ({
+                                      ...c,
+                                      messages: c.messages.map(m => m.id === msg.id ? { ...m, sopProposed: false } : m)
+                                    })));
+                                  }}
+                                  className="shrink-0 text-xs text-violet-400 hover:text-violet-600"
+                                >略過</button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1338,6 +1457,45 @@ export default function ChatPage({
           currentStep={squadStep.currentStep}
           totalSteps={squadStep.totalSteps}
         />
+      )}
+
+      {/* SOP Draft Panel */}
+      {sopDraft && (
+        <div className="w-80 shrink-0 border-l border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/10 flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-violet-200 dark:border-violet-700 flex items-center gap-2">
+            <span className="text-base">📋</span>
+            <p className="text-sm font-semibold text-violet-800 dark:text-violet-200 flex-1">標準 SOP</p>
+            <button onClick={() => setSopDraft(null)} className="text-violet-400 hover:text-violet-600 text-xs">✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <pre className="text-xs text-violet-700 dark:text-violet-300 whitespace-pre-wrap leading-relaxed font-sans">{sopDraft}</pre>
+          </div>
+          <div className="px-4 py-3 border-t border-violet-200 dark:border-violet-700 flex gap-2">
+            <button
+              onClick={() => navigator.clipboard.writeText(sopDraft)}
+              className="flex-1 text-xs py-2 rounded-lg border border-violet-300 text-violet-600 hover:bg-violet-100 font-medium transition-colors"
+            >📋 複製 SOP</button>
+            <button
+              onClick={async () => {
+                const token = localStorage.getItem("authToken");
+                if (!token) return;
+                const res = await fetch("/api/export/docx", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ title: "SoWork SOP", content: sopDraft, brandName: activeBrand?.name }),
+                });
+                if (res.ok) {
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a"); a.href = url;
+                  a.download = "sowork-sop.docx"; a.click();
+                  URL.revokeObjectURL(url);
+                }
+              }}
+              className="flex-1 text-xs py-2 rounded-lg bg-violet-500 hover:bg-violet-600 text-white font-semibold transition-colors"
+            >📄 下載 SOP</button>
+          </div>
+        </div>
       )}
     </div>
   );
