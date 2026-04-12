@@ -29,6 +29,9 @@ export default function WorkspacePage() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [missionModalOpen, setMissionModalOpen] = useState(false);
+  const [createBrandModalOpen, setCreateBrandModalOpen] = useState(false);
+  const [newBrandName, setNewBrandName] = useState('');
+  const [creatingBrand, setCreatingBrand] = useState(false);
   const [missionForm, setMissionForm] = useState({
     title: '',
     objective: '',
@@ -74,6 +77,16 @@ export default function WorkspacePage() {
   // ── Brand ──────────────────────────────────────────────────────────────────
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
   const brands = brandsQuery.data ?? [];
+  const createBrandMutation = trpc.brand.create.useMutation({
+    onSuccess: (data: any) => {
+      brandsQuery.refetch();
+      setActiveBrandId(data.id);
+      setCreateBrandModalOpen(false);
+      setNewBrandName('');
+      setCreatingBrand(false);
+    },
+    onError: () => setCreatingBrand(false),
+  });
   const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
   const activeBrand = brands.find((b: any) => b.id === activeBrandId) ?? brands[0] ?? null;
 
@@ -287,6 +300,7 @@ export default function WorkspacePage() {
           brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
           brands={brands.map((b: any) => ({ id: b.id, name: b.name, isDefault: b.isDefault }))}
           onBrandChange={(id) => setActiveBrandId(id)}
+          onCreateBrand={() => setCreateBrandModalOpen(true)}
           mission={mission}
           workspaceName={currentWorkspace.label}
           onEditMission={handleNewMission}
@@ -524,6 +538,35 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 新建品牌 Modal ─────────────────────────────────────── */}
+      {createBrandModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCreateBrandModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-neutral-800 mb-1">新建品牌</h3>
+            <p className="text-xs text-neutral-400 mb-4">建立後可在工作區選擇此品牌</p>
+            <input
+              autoFocus
+              type="text"
+              value={newBrandName}
+              onChange={e => setNewBrandName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && newBrandName.trim()) { setCreatingBrand(true); createBrandMutation.mutate({ name: newBrandName.trim() }); } }}
+              placeholder="品牌名稱（例：SoWork AI）"
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-100"
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setCreateBrandModalOpen(false)} className="flex-1 py-2 rounded-lg border border-neutral-200 text-sm text-neutral-500 hover:bg-neutral-50">取消</button>
+              <button
+                onClick={() => { if (newBrandName.trim()) { setCreatingBrand(true); createBrandMutation.mutate({ name: newBrandName.trim() }); } }}
+                disabled={!newBrandName.trim() || creatingBrand}
+                className="flex-1 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {creatingBrand ? '建立中...' : '建立品牌'}
+              </button>
             </div>
           </div>
         </div>
