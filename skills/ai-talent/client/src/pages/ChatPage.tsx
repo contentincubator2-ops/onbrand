@@ -7,6 +7,11 @@ import TypedThreadCard from "../components/chat/TypedThreadCard";
 const A2A_PATTERNS: { regex: RegExp; workflowId: string }[] = [
   { regex: /品牌上市|brand.launch|全套.*行銷|行銷.*全套|完整.*上市|上市.*計劃|上市.*策略/i, workflowId: "brand-launch-v1" },
   { regex: /市場調研|市場研究|market.research|競品.*分析.*消費者|消費者.*洞察.*報告/i, workflowId: "market-research-v1" },
+  { regex: /品牌定位|定位報告|positioning.*report|brand.*positioning/i, workflowId: "brand-positioning-v1" },
+  { regex: /社群.*月曆|內容.*規劃|content.*calendar|月.*內容排程/i, workflowId: "content-calendar-v1" },
+  { regex: /廣告.*文案.*組合|全套.*廣告|ad.*copy.*set|fb.*ig.*廣告/i, workflowId: "ad-copy-v1" },
+  { regex: /競品.*分析|competitor.*analysis|競爭.*報告/i, workflowId: "competitor-analysis-v1" },
+  { regex: /seo.*分析|關鍵字.*研究|seo.*growth/i, workflowId: "seo-growth-v1" },
 ];
 
 function detectA2AWorkflow(text: string): string | null {
@@ -689,7 +694,9 @@ export default function ChatPage({
     // If mission is active, auto-start will handle conversation init — skip history load
     if (activeMissionId) return;
     if (!historyQuery.data || historyQuery.data.length === 0) return;
-    if (conversations.length > 0) return;
+    const convHistoryId = `conv-history-${activeBrandId}`;
+    // Only skip if we already loaded THIS brand's history
+    if (conversations.some(c => c.id === convHistoryId)) return;
     const msgs: Msg[] = historyQuery.data.map((row: any) => {
       const parsed = renderContent(row.content);
       return {
@@ -712,6 +719,13 @@ export default function ChatPage({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [active?.messages.length, loading, teamAssembly, relaySteps]);
+
+  // Shortcut auto-submit listener
+  useEffect(() => {
+    const handler = () => { handleSend(); };
+    document.addEventListener("submit-shortcut", handler);
+    return () => document.removeEventListener("submit-shortcut", handler);
+  }, [input, activeBrandId, activeMissionId, conversations, conversationHistory]);
 
   useEffect(() => {
     if (!matchQuery.data || pendingTask === "") return;
@@ -1165,7 +1179,7 @@ export default function ChatPage({
                   { label: "🔍 市場調研分析", text: "幫我做市場調研分析報告" },
                   { label: "📅 社群內容規劃", text: "幫我規劃社群媒體月曆" },
                 ].map((s) => (
-                  <button key={s.label} onClick={() => setInput(s.text)} className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 hover:border-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">{s.label}</button>
+                  <button key={s.label} onClick={() => { setInput(s.text); setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50); }} className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 hover:border-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">{s.label}</button>
                 ))}
               </div>
             </div>
@@ -1350,6 +1364,34 @@ ${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
                 </div>
               ))}
 
+              {/* ── Perplexity-style Live Execution Card (above scroll anchor) ── */}
+              {loading && !teamAssembly && (
+                <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 overflow-hidden shadow-sm">
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-blue-100 dark:border-blue-800/60">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {streamingAgentName && <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">{streamingAgentName}</span>}
+                        {streamingAgentTitle && <span className="text-xs text-blue-500 dark:text-blue-400">{streamingAgentTitle}</span>}
+                        {streamingModel && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-700">
+                            {streamingModel}
+                          </span>
+                        )}
+                        {!streamingAgentName && <span className="text-sm font-medium text-blue-700 dark:text-blue-300">正在分析任務...</span>}
+                      </div>
+                    </div>
+                    <button onClick={handleStop} className="shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 bg-white dark:bg-red-900/20 dark:border-red-700 px-2.5 py-1 rounded-lg transition-colors font-medium">⏹ 停止</button>
+                  </div>
+                  <div className="px-4 py-3 flex gap-2 items-start">
+                    <div className="flex gap-1.5 items-center mt-1 shrink-0">{[0, 150, 300].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}</div>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 italic leading-relaxed">
+                      {streamingThinking ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "") : "思考中，請稍候…"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {teamAssembly && <div className="-mx-4"><TeamAssemblyPanel state={teamAssembly} relaySteps={relaySteps} onApprove={approveExecution} onToggleSummary={toggleSummary} /></div>}
 
             {/* Sprint 5: Typed Thread Cards */}
@@ -1371,43 +1413,6 @@ ${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
               </div>
             )}
 
-              {/* ── Perplexity-style Live Execution Card ── */}
-              {loading && !teamAssembly && (
-                <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 overflow-hidden shadow-sm">
-                  {/* Header row */}
-                  <div className="flex items-center gap-3 px-4 py-3 border-b border-blue-100 dark:border-blue-800/60">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {streamingAgentName && <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">{streamingAgentName}</span>}
-                        {streamingAgentTitle && <span className="text-xs text-blue-500 dark:text-blue-400">{streamingAgentTitle}</span>}
-                        {streamingModel && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-700">
-                            {streamingModel}
-                          </span>
-                        )}
-                        {!streamingAgentName && (
-                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">正在分析任務...</span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Stop button */}
-                    <button
-                      onClick={handleStop}
-                      className="shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 bg-white dark:bg-red-900/20 dark:border-red-700 px-2.5 py-1 rounded-lg transition-colors font-medium"
-                    >
-                      ⏹ 停止
-                    </button>
-                  </div>
-                  {/* Thinking stream */}
-                  <div className="px-4 py-3 flex gap-2 items-start">
-                    <div className="flex gap-1.5 items-center mt-1 shrink-0">{[0, 150, 300].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}</div>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 italic leading-relaxed">
-                      {streamingThinking ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "") : "思考中，請稍候…"}
-                    </p>
-                  </div>
-                </div>
-              )}
               {isStopped && (
                 <div className="text-xs text-neutral-400 text-center py-2">⏹ 已停止生成</div>
               )}
