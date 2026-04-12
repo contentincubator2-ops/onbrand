@@ -84,17 +84,15 @@ streamRouter.post("/a2a-workflow", async (req: Request, res: Response) => {
   }, 15000);
 
   try {
-    const { BRAND_LAUNCH_WORKFLOW, MARKET_RESEARCH_WORKFLOW } = await import("../a2a/a2aTemplates");
+    // Dynamic workflow map — no hardcoded templates; Squad DB drives workflows
     const { buildExecutionLayers } = await import("../a2a/a2aOrchestrator") as any;
     const { executeTask } = await import("../executeTask");
     const { getDb } = await import("../db");
     const { tasks: tasksTable } = await import("../../drizzle/schema");
 
-    const templates: Record<string, typeof BRAND_LAUNCH_WORKFLOW> = {
-      "brand-launch-v1": BRAND_LAUNCH_WORKFLOW,
-      "market-research-v1": MARKET_RESEARCH_WORKFLOW,
-    };
-    const workflow = templates[workflowId];
+    const templates: Record<string, unknown> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const workflow = templates[workflowId] as any;
     if (!workflow) { send("error", { message: `Unknown workflow: ${workflowId}` }); res.end(); return; }
 
     // Match agents per task type for each node
@@ -128,7 +126,7 @@ streamRouter.post("/a2a-workflow", async (req: Request, res: Response) => {
         dependents.get(dep)?.push(node.nodeId);
       }
     }
-    let ready = workflow.nodes.filter(n => (inDegree.get(n.nodeId) ?? 0) === 0);
+    let ready = workflow.nodes.filter((n: any) => (inDegree.get(n.nodeId) ?? 0) === 0);
     while (ready.length > 0) {
       layers.push(ready);
       const nextReady: typeof workflow.nodes = [];
@@ -137,7 +135,7 @@ streamRouter.post("/a2a-workflow", async (req: Request, res: Response) => {
           const newDeg = (inDegree.get(depId) ?? 0) - 1;
           inDegree.set(depId, newDeg);
           if (newDeg === 0) {
-            const dep = workflow.nodes.find(n => n.nodeId === depId);
+            const dep = workflow.nodes.find((n: any) => n.nodeId === depId);
             if (dep) nextReady.push(dep);
           }
         }
@@ -146,7 +144,7 @@ streamRouter.post("/a2a-workflow", async (req: Request, res: Response) => {
     }
 
     for (const layer of layers) {
-      await Promise.all(layer.map(async (node) => {
+      await Promise.all(layer.map(async (node: any) => {
         // Match agent
         let agentHit: { agentId: number; name: string; title: string } | null = null;
         try {

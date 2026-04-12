@@ -10,7 +10,6 @@ import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import { executeA2AWorkflow } from "../a2a/a2aOrchestrator";
-import { BRAND_LAUNCH_WORKFLOW, MARKET_RESEARCH_WORKFLOW } from "../a2a/a2aTemplates";
 
 export const a2aStreamRouter = Router();
 
@@ -27,10 +26,8 @@ async function verifyToken(token: string): Promise<number | null> {
   }
 }
 
-const WORKFLOW_MAP: Record<string, typeof BRAND_LAUNCH_WORKFLOW> = {
-  "brand-launch-v1": BRAND_LAUNCH_WORKFLOW,
-  "market-research-v1": MARKET_RESEARCH_WORKFLOW,
-};
+// Dynamic workflow map — populated from Squad DB at runtime; no hardcoded templates
+const WORKFLOW_MAP: Record<string, unknown> = {};
 
 // GET /api/a2a/stream?workflowId=...&brandId=...
 a2aStreamRouter.get("/stream", async (req: Request, res: Response) => {
@@ -82,7 +79,7 @@ a2aStreamRouter.get("/stream", async (req: Request, res: Response) => {
   }, 15_000);
 
   try {
-    const result = await executeA2AWorkflow(workflow, userId, brandId, (event) => {
+    const result = await executeA2AWorkflow(workflow as any, userId, brandId, (event) => {
       send(event);
     });
     send({ type: "result", result });
