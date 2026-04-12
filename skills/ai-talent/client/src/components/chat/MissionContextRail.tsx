@@ -55,6 +55,7 @@ interface Props {
   brands?: { id: number; name: string; isDefault?: boolean }[];
   onBrandChange?: (id: number) => void;
   onCreateBrand?: () => void;
+  onDeleteBrand?: (id: number) => void;
   mission?: MissionContext | null;
   taskUnits?: TaskUnit[];
   workspaceName?: string;
@@ -179,17 +180,25 @@ export default function MissionContextRail({
                 <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">切換品牌</p>
               </div>
               {brands.map((b) => (
-                <button key={b.id}
-                  onClick={() => { onBrandChange?.(b.id); setBrandMenuOpen(false); }}
-                  className={`w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                    brand?.id === b.id ? 'bg-amber-50 text-amber-800 font-medium' : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-                  }`}
-                >
-                  <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-xs font-bold text-amber-600">{b.name.charAt(0)}</div>
-                  <span className="truncate">{b.name}</span>
-                  {b.isDefault && <span className="ml-auto text-xs text-neutral-400">預設</span>}
-                  {brand?.id === b.id && <svg className="ml-auto w-3.5 h-3.5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                </button>
+                <div key={b.id} className="group relative flex items-center">
+                  <button
+                    onClick={() => { onBrandChange?.(b.id); setBrandMenuOpen(false); }}
+                    className={`flex-1 text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                      brand?.id === b.id ? 'bg-amber-50 text-amber-800 font-medium' : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                    }`}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-xs font-bold text-amber-600">{b.name.charAt(0)}</div>
+                    <span className="truncate">{b.name}</span>
+                    {brand?.id === b.id && <svg className="ml-auto w-3.5 h-3.5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); if (window.confirm(`確定刪除「${b.name}」？`)) { onDeleteBrand?.(b.id); setBrandMenuOpen(false); } }}
+                    className="hidden group-hover:flex w-6 h-6 mr-2 items-center justify-center rounded text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title="刪除品牌"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                  </button>
+                </div>
               ))}
               {/* 新建品牌 */}
               <div className="border-t border-neutral-100 dark:border-neutral-800 mt-1 pt-1">

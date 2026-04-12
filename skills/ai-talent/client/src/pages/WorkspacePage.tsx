@@ -30,8 +30,10 @@ export default function WorkspacePage() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [missionModalOpen, setMissionModalOpen] = useState(false);
   const [createBrandModalOpen, setCreateBrandModalOpen] = useState(false);
-  const [newBrandName, setNewBrandName] = useState('');
   const [creatingBrand, setCreatingBrand] = useState(false);
+  const [brandForm, setBrandForm] = useState({
+    name: '', website: '', targetAudience: '', competitors: '', targetMarket: 'Taiwan', contentLanguage: 'zh-TW'
+  });
   const [missionForm, setMissionForm] = useState({
     title: '',
     objective: '',
@@ -82,10 +84,16 @@ export default function WorkspacePage() {
       brandsQuery.refetch();
       setActiveBrandId(data.id);
       setCreateBrandModalOpen(false);
-      setNewBrandName('');
+      setBrandForm({ name: '', website: '', targetAudience: '', competitors: '', targetMarket: 'Taiwan', contentLanguage: 'zh-TW' });
       setCreatingBrand(false);
     },
     onError: () => setCreatingBrand(false),
+  });
+  const deleteBrandMutation = trpc.brand.delete.useMutation({
+    onSuccess: () => {
+      brandsQuery.refetch();
+      setActiveBrandId(null);
+    },
   });
   const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
   const activeBrand = brands.find((b: any) => b.id === activeBrandId) ?? brands[0] ?? null;
@@ -301,6 +309,7 @@ export default function WorkspacePage() {
           brands={brands.map((b: any) => ({ id: b.id, name: b.name, isDefault: b.isDefault }))}
           onBrandChange={(id) => setActiveBrandId(id)}
           onCreateBrand={() => setCreateBrandModalOpen(true)}
+          onDeleteBrand={(id) => deleteBrandMutation.mutate({ id })}
           mission={mission}
           workspaceName={currentWorkspace.label}
           onEditMission={handleNewMission}
@@ -546,24 +555,70 @@ export default function WorkspacePage() {
       {/* ── 新建品牌 Modal ─────────────────────────────────────── */}
       {createBrandModalOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCreateBrandModalOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-neutral-800 mb-1">新建品牌</h3>
-            <p className="text-xs text-neutral-400 mb-4">建立後可在工作區選擇此品牌</p>
-            <input
-              autoFocus
-              type="text"
-              value={newBrandName}
-              onChange={e => setNewBrandName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && newBrandName.trim()) { setCreatingBrand(true); createBrandMutation.mutate({ name: newBrandName.trim() }); } }}
-              placeholder="品牌名稱（例：SoWork AI）"
-              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-100"
-            />
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setCreateBrandModalOpen(false)} className="flex-1 py-2 rounded-lg border border-neutral-200 text-sm text-neutral-500 hover:bg-neutral-50">取消</button>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-neutral-800 mb-0.5">新建品牌</h3>
+            <p className="text-xs text-neutral-400 mb-5">填寫基本資料即可開始，完整品牌定位進行中將有 AI 團隊幫你完成</p>
+            <div className="space-y-3">
+              {[{ label: '品牌名稱 *', key: 'name', placeholder: '例：SoWork AI', required: true },
+                { label: '官網網址', key: 'website', placeholder: 'https://sowork.ai' },
+                { label: '目標消費者', key: 'targetAudience', placeholder: '例：25-35 歲行銷人員、中小企業主' },
+                { label: '主要競爭者', key: 'competitors', placeholder: '例：HubSpot, Marketo（逗號分隔）' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">{f.label}</label>
+                  <input
+                    autoFocus={f.key === 'name'}
+                    type="text"
+                    value={(brandForm as any)[f.key]}
+                    onChange={e => setBrandForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-100"
+                  />
+                </div>
+              ))}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">目標市場</label>
+                  <select value={brandForm.targetMarket} onChange={e => setBrandForm(p => ({ ...p, targetMarket: e.target.value }))}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white">
+                    <option value="Taiwan">台灣</option>
+                    <option value="HongKong">香港</option>
+                    <option value="Singapore">新加坡</option>
+                    <option value="China">中國</option>
+                    <option value="USA">美國</option>
+                    <option value="Global">全球</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">使用語言</label>
+                  <select value={brandForm.contentLanguage} onChange={e => setBrandForm(p => ({ ...p, contentLanguage: e.target.value }))}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white">
+                    <option value="zh-TW">繁體中文</option>
+                    <option value="zh-CN">簡體中文</option>
+                    <option value="en">英文</option>
+                    <option value="ja">日文</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => { setCreateBrandModalOpen(false); setBrandForm({ name: '', website: '', targetAudience: '', competitors: '', targetMarket: 'Taiwan', contentLanguage: 'zh-TW' }); }}
+                className="flex-1 py-2 rounded-lg border border-neutral-200 text-sm text-neutral-500 hover:bg-neutral-50">取消</button>
               <button
-                onClick={() => { if (newBrandName.trim()) { setCreatingBrand(true); createBrandMutation.mutate({ name: newBrandName.trim() }); } }}
-                disabled={!newBrandName.trim() || creatingBrand}
-                className="flex-1 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  if (!brandForm.name.trim()) return;
+                  setCreatingBrand(true);
+                  createBrandMutation.mutate({
+                    name: brandForm.name.trim(),
+                    website: brandForm.website || undefined,
+                    targetAudience: brandForm.targetAudience || undefined,
+                    competitors: brandForm.competitors || undefined,
+                    targetMarket: brandForm.targetMarket,
+                    contentLanguage: brandForm.contentLanguage,
+                  });
+                }}
+                disabled={!brandForm.name.trim() || creatingBrand}
+                className="flex-1 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
               >
                 {creatingBrand ? '建立中...' : '建立品牌'}
               </button>

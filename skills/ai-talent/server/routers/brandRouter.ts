@@ -114,40 +114,42 @@ export const brandRouter = router({
   create: protectedProcedure
     .input(z.object({
       name: z.string().min(1).max(128),
-      description: z.string().optional(),
-      websiteUrl: z.string().optional(),
-      industry: z.string().optional(),
-      targetAudience: z.string().optional(),
-      brandVoice: z.string().optional(),
-      soworkAnalysis: z.record(z.unknown()).optional(),
-      isDefault: z.boolean().optional(),
+      website: z.string().optional(),
+      targetAudience: z.string().optional(),   // 目標消費者
+      competitors: z.string().optional(),       // 競爭者（逗號分隔）
+      targetMarket: z.string().optional(),      // 目標市場
+      contentLanguage: z.string().optional(),   // 使用語言
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { brands } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-      // 如果設為 default，先清除其他 default
-      if (input.isDefault) {
-        await (db.update(brands) as any)
-          .set({ isDefault: false })
-          .where(eq(brands.userId, ctx.user.id));
-      }
-      const result = await (db.insert(brands) as any).values({
-        userId: ctx.user.id,
-        name: input.name,
-        description: input.description ?? null,
-        websiteUrl: input.websiteUrl ?? null,
-        targetAudience: input.targetAudience ?? null,
-        brandVoice: input.brandVoice ?? null,
-        soworkAnalysis: input.soworkAnalysis ?? null,
-        isDefault: input.isDefault ?? false,
-        dataSource: "sowork",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      const brandId = (result as any)[0]?.insertId ?? result.insertId;
+      const result = await (db as any).execute(
+        `INSERT INTO brands (userId, name, website, targetAudience, competitors, targetMarket, contentLanguage, dataSource, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'sowork', NOW(), NOW())`,
+        [
+          ctx.user.id,
+          input.name,
+          input.website ?? null,
+          input.targetAudience ?? null,
+          input.competitors ?? null,
+          input.targetMarket ?? 'Taiwan',
+          input.contentLanguage ?? 'zh-TW',
+        ]
+      );
+      const brandId = (result as any)[0]?.insertId ?? (result as any).insertId;
       return { id: brandId, name: input.name };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await (db as any).execute(
+        `DELETE FROM brands WHERE id = ? AND userId = ?`,
+        [input.id, ctx.user.id]
+      );
+      return { success: true };
     }),
 
   runOnboarding: protectedProcedure
