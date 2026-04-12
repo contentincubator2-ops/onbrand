@@ -11,7 +11,7 @@ import {
 } from "../brand/brandEngine";
 import { getDb } from "../db";
 import { userApiKeys } from "../../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 // Helper to get user's API key
 async function getUserApiKey(userId: number): Promise<string> {
@@ -123,18 +123,9 @@ export const brandRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const result = await (db as any).execute(
-        `INSERT INTO brands (userId, name, website, targetAudience, competitors, targetMarket, contentLanguage, dataSource, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'sowork', NOW(), NOW())`,
-        [
-          ctx.user.id,
-          input.name,
-          input.website ?? null,
-          input.targetAudience ?? null,
-          input.competitors ?? null,
-          input.targetMarket ?? 'Taiwan',
-          input.contentLanguage ?? 'zh-TW',
-        ]
+      const result = await db.execute(
+        sql`INSERT INTO brands (userId, name, website, targetAudience, competitors, targetMarket, contentLanguage)
+         VALUES (${ctx.user.id}, ${input.name}, ${input.website ?? null}, ${input.targetAudience ?? null}, ${input.competitors ?? null}, ${input.targetMarket ?? 'Taiwan'}, ${input.contentLanguage ?? 'zh-TW'})`
       );
       const brandId = (result as any)[0]?.insertId ?? (result as any).insertId;
       return { id: brandId, name: input.name };
@@ -145,9 +136,8 @@ export const brandRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await (db as any).execute(
-        `DELETE FROM brands WHERE id = ? AND userId = ?`,
-        [input.id, ctx.user.id]
+      await db.execute(
+        sql`DELETE FROM brands WHERE id = ${input.id} AND userId = ${ctx.user.id}`
       );
       return { success: true };
     }),
