@@ -32,6 +32,16 @@ export default function WorkspacePage() {
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [missionModalOpen, setMissionModalOpen] = useState(false);
+  const [missionForm, setMissionForm] = useState({
+    title: '',
+    objective: '',
+    audience: '',
+    offer: '',
+    successMetrics: '',
+    methodology: '',
+    constraints: '',
+  });
 
   // ── Brand ──────────────────────────────────────────────────────────────────
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
@@ -65,7 +75,9 @@ export default function WorkspacePage() {
 
   const utils = trpc.useUtils();
   const createMission = trpc.mission.create.useMutation({
-    onSuccess: () => utils.mission.getActive.invalidate({ workspace: activeWorkspace }),
+    onSuccess: () => {
+      utils.mission.getActive.invalidate({ workspace: activeWorkspace, brandId: activeBrand?.id ?? undefined });
+    },
   });
 
   // ── Sprint 3: Live agents → Team panel + Left rail ──────────────────────────
@@ -147,9 +159,24 @@ export default function WorkspacePage() {
 
   const handleNewMission = () => {
     if (!activeBrand) return;
-    const title = prompt("輸入新任務名稱：");
-    if (!title?.trim()) return;
-    createMission.mutate({ workspace: activeWorkspace, brandId: activeBrand.id, title: title.trim() });
+    setMissionForm({ title: '', objective: '', audience: '', offer: '', successMetrics: '', methodology: '', constraints: '' });
+    setMissionModalOpen(true);
+  };
+
+  const handleMissionSubmit = async () => {
+    if (!activeBrand || !missionForm.title.trim()) return;
+    createMission.mutate({
+      workspace: activeWorkspace,
+      brandId: activeBrand.id,
+      title: missionForm.title.trim(),
+      objective: missionForm.objective,
+      audience: missionForm.audience,
+      offer: missionForm.offer,
+      successMetrics: missionForm.successMetrics,
+      methodology: missionForm.methodology,
+      constraints: missionForm.constraints,
+    });
+    setMissionModalOpen(false);
   };
 
 
@@ -338,6 +365,50 @@ export default function WorkspacePage() {
       )}
     </div>
   );
+      {/* Mission Create Modal */}
+      {missionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-neutral-800">+ 新任務</h2>
+              <button onClick={() => setMissionModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 text-xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              {[
+                { key: 'title', label: '任務名稱 *', placeholder: '例：Q2 品牌上市活務' },
+                { key: 'objective', label: '目標 Objective', placeholder: '這個任務要達成什麼？' },
+                { key: 'audience', label: '受眾 Audience', placeholder: '目標受眾是誰？' },
+                { key: 'offer', label: '提案 / 產品 Offer', placeholder: '主打什麼產品或服務？' },
+                { key: 'successMetrics', label: 'KPI / 成功指標', placeholder: '例：ROAS 3x, 新客 500人' },
+                { key: 'methodology', label: '方法論 Methodology', placeholder: '例：Brand Positioning v2' },
+                { key: 'constraints', label: '限制條件 Constraints', placeholder: '例：預算 $50K, 只能用中文' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-neutral-500 mb-1">{label}</label>
+                  <input
+                    type="text"
+                    value={(missionForm as any)[key]}
+                    onChange={(e) => setMissionForm(f => ({ ...f, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full text-sm border border-neutral-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-neutral-200 flex justify-end gap-3">
+              <button onClick={() => setMissionModalOpen(false)} className="px-4 py-2 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg">取消</button>
+              <button
+                onClick={handleMissionSubmit}
+                disabled={!missionForm.title.trim() || createMission.isPending}
+                className="px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+              >
+                {createMission.isPending ? '建立中...' : '建立任務'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── AI Search Modal ── */}
       {searchOpen && (
         <div
