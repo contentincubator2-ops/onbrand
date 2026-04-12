@@ -401,44 +401,19 @@ export default function ChatPage({
     if (preselectedAgent) setTimeout(() => chatInputRef.current?.focus(), 150);
   }, [preselectedAgent]);
 
-  // Show welcome message when activeMissionId changes and conversation is empty
+  // Mission 切換：自動啟動 Agent（__AUTO_START__ 模式）或顯示靜態歡迎詞
+  const autoStartedRef = useRef<Set<number>>(new Set());
+
   useEffect(() => {
     if (!activeMissionId || !missionDataQuery.data) return;
-    const missionData = missionDataQuery.data;
+    const missionData = missionDataQuery.data as any;
     if (!missionData.welcomeMessage) return;
 
-    // Create or find a conversation for this mission
     const missionConvId = `conv-mission-${activeMissionId}`;
+    const isAutoStart = missionData.welcomeMessage === "__AUTO_START__";
+    const squadSlug: string = missionData.squadSlug ?? "";
 
-    setConversations((prev) => {
-      const existing = prev.find((c) => c.id === missionConvId);
-      // Only show welcome message if conversation doesn't exist or has no messages
-      if (existing && existing.messages.length > 0) return prev;
-
-      const welcomeMsg: Msg = {
-        id: `welcome-${activeMissionId}`,
-        role: "assistant",
-        content: missionData.welcomeMessage!,
-        ts: Date.now(),
-      };
-
-      if (existing) {
-        // Conversation exists but is empty — add welcome message
-        return prev.map((c) =>
-          c.id === missionConvId ? { ...c, messages: [welcomeMsg] } : c
-        );
-      }
-
-      // Create new conversation with welcome message
-      const newConv: Conversation = {
-        id: missionConvId,
-        title: missionData.title,
-        messages: [welcomeMsg],
-        createdAt: Date.now(),
-      };
-      return [newConv, ...prev];
-    });
-
+    // Reset state
     setActiveId(missionConvId);
     setConversationHistory([]);
     setTeamAssembly(null);
@@ -448,6 +423,133 @@ export default function ChatPage({
     setSquadStep({ currentStep: 0, totalSteps: 10, isComplete: false });
     setStreamingAgentName(null);
     setStreamingAgentTitle(null);
+
+    // Init conversation if not exists
+    setConversations((prev) => {
+      const existing = prev.find((c) => c.id === missionConvId);
+      if (existing) return prev;
+      return [{ id: missionConvId, title: missionData.title, messages: [], createdAt: Date.now() }, ...prev];
+    });
+
+    // Auto-start: trigger Agent immediately without user input
+    if (isAutoStart && squadSlug && !autoStartedRef.current.has(activeMissionId)) {
+      autoStartedRef.current.add(activeMissionId);
+
+      // Small delay to let conversation state settle
+      setTimeout(async () => {
+        const token = localStorage.getItem("authToken");
+        if (!token) return;
+
+        // Auto-trigger message (invisible to user, just starts the flow)
+        const autoMsg = "開始";
+        setLoading(true);
+        setStreamingAgentName(null);
+        setStreamingAgentTitle(null);
+
+        let streamBuffer = "";
+        const streamMsgId = `auto-${Date.now()}`;
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === missionConvId
+              ? { ...c, messages: [...c.messages, { id: streamMsgId, role: "assistant" as const, content: "", ts: Date.now() }] }
+              : c
+          )
+        );
+
+        try {
+          const brandCtx = {
+            name: activeBrand?.name,
+            industry: (activeBrand as any)?.industry ?? (activeBrand as any)?.soworkAnalysis?.industry,
+            website: (activeBrand as any)?.websiteUrl,
+            targetAudience: (activeBrand as any)?.targetAudience,
+            description: (activeBrand as any)?.description,
+          };
+
+          const resp = await fetch("/api/stream/squad-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              squadSlug,
+              missionId: activeMissionId,
+              userMessage: autoMsg,
+              conversationHistory: [],
+              brandContext: brandCtx,
+              currentStep: 0,
+            }),
+          });
+
+          if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          let lastAgentName: string | undefined;
+          let lastAgentTitle: string | undefined;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split(String.fromCharCode(10));
+            buf = lines.pop() ?? "";
+            let curEvent = "";
+            for (const line of lines) {
+              if (line.startsWith("event: ")) curEvent = line.slice(7).trim();
+              else if (line.startsWith("data: ")) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (curEvent === "agent") {
+                    lastAgentName = data.agentName;
+                    lastAgentTitle = data.agentTitle;
+                    setStreamingAgentName(data.agentName);
+                    setStreamingAgentTitle(data.agentTitle);
+                    setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle }));
+                  } else if (curEvent === "delta") {
+                    streamBuffer += data.text;
+                    setConversations((prev) =>
+                      prev.map((c) =>
+                        c.id === missionConvId
+                          ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
+                          : c
+                      )
+                    );
+                  } else if (curEvent === "done") {
+                    setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
+                  }
+                } catch { /* ignore */ }
+              }
+            }
+          }
+
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === missionConvId
+                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（分析完成）", agentName: lastAgentName, agentTitle: lastAgentTitle } : m) }
+                : c
+            )
+          );
+          setConversationHistory([{ role: "assistant", content: streamBuffer }]);
+        } catch (err: any) {
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === missionConvId
+                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `⚠️ 自動啟動失敗：${err?.message}` } : m) }
+                : c
+            )
+          );
+        } finally {
+          setLoading(false);
+        }
+      }, 400);
+    } else if (!isAutoStart) {
+      // Static welcome message
+      setConversations((prev) => {
+        const existing = prev.find((c) => c.id === missionConvId);
+        if (existing && existing.messages.length > 0) return prev;
+        const welcomeMsg: Msg = { id: `welcome-${activeMissionId}`, role: "assistant", content: missionData.welcomeMessage!, ts: Date.now() };
+        if (existing) return prev.map((c) => c.id === missionConvId ? { ...c, messages: [welcomeMsg] } : c);
+        return [{ id: missionConvId, title: missionData.title, messages: [welcomeMsg], createdAt: Date.now() }, ...prev.filter(c => c.id !== missionConvId)];
+      });
+    }
   }, [activeMissionId, missionDataQuery.data]);
 
   useEffect(() => {

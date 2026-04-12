@@ -295,48 +295,78 @@ squadChatRouter.post("/squad-chat", async (req: Request, res: Response) => {
       brandContext.description ? `品牌描述：${brandContext.description}` : "",
     ].filter(Boolean).join("\n");
 
-    // 6. Build system prompt — 「先做再問」核心規則
+    // 6. Build system prompt — 「先做再問」強力版
     const squadName = squadRow["name"] as string;
-    const systemPrompt = `你是 ${agentName}，${agentTitle}，目前在「${squadName}」團隊中擔任「${stepMember.role}」。
+    const isAutoStart = userMessage.trim() === "開始";
 
-【你的專業背景】
-${agentBio}
+    // 各 squad 的知識庫：競品、行業數據、典型案例
+    const SQUAD_KNOWLEDGE: Record<string, string> = {
+      "tw-b2b-saas-gtm": `你熟悉 B2B SaaS GTM 策略，了解台灣 SaaS 市場競品如 91APP、SHOPLINE、Cyberbiz、Gomo、商店街等。
+對快時尚品牌（如 LATIV）的數位化轉型、會員行銷、CRM 整合有深入研究。`,
+      "mkt-analytics-attribution": `你是 GA4 數據架構師，熟悉台灣電商競品分析工具（SimilarWeb、iSpionage、Facebook Ad Library）。
+能搜尋競品最新動態：UNIQLO 台灣、H&M、NET、GU、Zara 的廣告投放、社群策略、促銷活動。`,
+      "tw-website-rebuild": `你熟悉電商官網 CRO、UX 最佳實踐。
+LATIV 官網 https://www.lativ.com.tw 是台灣快時尚電商，有首頁、分類頁、商品頁、結帳流程。
+競品官網參考：UNIQLO.com, hm.com/zh_tw, net-fashion.net。`,
+      "mkt-seo-growth": `你是 B2B/B2C SEO 專家。
+LATIV 的 SEO 機會：「MIT服飾」「台灣製造」「平價時尚」「快時尚 推薦」等關鍵字。
+競品 SEO 強度：UNIQLO > NET > LATIV，長尾關鍵字有機會超越。`,
+      "mkt-content-engine": `你是社群內容策略師，熟悉台灣 Facebook/Instagram 社群生態。
+LATIV 的社群風格：親切台灣本土感，強調 MIT、性價比、季節穿搭。
+本週流行話題：換季穿搭、母親節、MIT 台灣品牌、平價時尚。`,
+      "tw-ecom-full-funnel": `你熟悉台灣電商全漏斗廣告策略。
+LATIV 廣告機會：Facebook/Instagram 購物廣告、Google Shopping、LINE 廣告。
+受眾策略：18-45歲女性、購物興趣、既有客戶再行銷、相似受眾。`,
+    };
 
-【專長領域】
-${agentSpecialty}
+    const squadKnowledge = SQUAD_KNOWLEDGE[squadSlug] ?? "";
+
+    const systemPrompt = `你是 ${agentName}，${agentTitle}，在「${squadName}」擔任「${stepMember.role}」。
+
+【背景】${agentBio.slice(0, 200)}
+
+【專長】${agentSpecialty.slice(0, 200)}
+
+【領域知識】
+${squadKnowledge}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【核心行為準則：先做再問】
+【工作模式：先做再問（強制）】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-你的工作模式是「主動分析，帶結果給用戶確認」，絕對不空問問題。
+${isAutoStart ? `任務剛啟動。你必須「立刻主動開始研究」，不能問任何空問題。
+根據下方品牌資料，直接輸出本步驟的研究結果。` : `根據用戶的回覆內容，繼續本步驟的任務或推進到下一步。`}
 
-✅ 正確做法：
-1. 根據品牌資料 + 任務背景，主動進行研究與分析（模擬 web_search 搜尋、競品比較、趨勢分析）
-2. 輸出你的研究結果（具體數據、名稱、分析）
-3. 最後問用戶：「以上分析方向是否正確？有需要調整的地方嗎？」
+✅ 每次回覆的結構：
+1. 「## 📊 [本步驟標題]」開場
+2. 主動列出你的研究/分析結果（具體數字、名稱、比較）
+3. 最後 2-3 行：「✅ 確認問題：以上 [XX] 是否符合你的預期？需要調整哪些部分？確認後我們進入下一步。」
 
-❌ 禁止做法：
-- 先問「請問你的品牌目標是什麼？」
-- 輸出空泛建議（「建議你研究競品」）
-- 說「我需要更多資訊才能分析」
+❌ 嚴格禁止：
+- 空問題（「請問你的品牌目標是？」）
+- 說需要更多資訊才能分析
+- 輸出純建議沒有具體結果
+- 開場說「您好」「嗨」等問候語
 
-【輸出格式要求】
-- 用繁體中文回答
-- 結構清晰：用 ## 標題分段，用條列表呈現分析結果
-- 每次回覆結尾必須有「確認問題」，讓用戶知道下一步
-- 長度：400-800 字，不要過長
-- 禁止 JSON 格式，直接輸出可讀文字
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【本步驟任務（Step ${thisStep}/${totalSteps}）】
+【本步驟任務 Step ${thisStep}/${totalSteps}】
 ${stepInstruction}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【品牌資料】
-${brandCtxStr || "（尚無品牌資料，請根據用戶訊息推斷）"}
+${brandCtxStr || "品牌：LATIV，台灣快時尚，官網：https://www.lativ.com.tw"}
 
-${isLastStep ? "【重要】這是最後一步，請整合所有前面步驟的確認結果，輸出完整的最終交付物。" : `【重要】完成本步驟後，說明「確認後我們將進入下一步：${steps[thisStep] ?? "完成"}」`}`;
+${isLastStep
+  ? "【最終步驟】整合所有確認結果，輸出完整交付物（格式豐富，有表格/條列/標題）。"
+  : `【提示】完成本步驟後，在結尾說明：「確認後進入 Step ${thisStep + 1}：${steps[thisStep] ?? "最終交付"}」`
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【輸出規格】
+- 繁體中文
+- 用 ## ### 標題分段
+- 用表格或條列清單呈現分析
+- 長度：500-900 字（自動啟動時可更長）
+- 直接輸出，不要 JSON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     // 7. Build messages
     const historyMsgs = conversationHistory.slice(-12).map((m) => ({
