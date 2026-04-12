@@ -99,13 +99,13 @@ export default function WorkspacePage() {
 
   // Task Units - Sprint 4
   const [taskUnits] = useState<{ id: string; label: string; status: string }[]>([
-    { id: '1', label: 'Brief locked', status: 'approved' },
-    { id: '2', label: 'Audience defined', status: 'approved' },
-    { id: '3', label: 'Angle exploration', status: 'running' },
-    { id: '4', label: 'Copy drafting', status: 'not_started' },
-    { id: '5', label: 'Creative suggestions', status: 'not_started' },
-    { id: '6', label: 'Approval', status: 'not_started' },
-    { id: '7', label: 'Export', status: 'not_started' },
+    { id: '1', label: '簡報確認', status: 'approved' },
+    { id: '2', label: '受眾定義', status: 'approved' },
+    { id: '3', label: '角度探索', status: 'running' },
+    { id: '4', label: '文案撰寫', status: 'not_started' },
+    { id: '5', label: '創意提案', status: 'not_started' },
+    { id: '6', label: '審核確認', status: 'not_started' },
+    { id: '7', label: '匯出成果', status: 'not_started' },
   ]);
 
   // Artifacts — Sprint 5: Load from task.listRecent
@@ -228,7 +228,7 @@ export default function WorkspacePage() {
 
             <span className="text-[#D1D5DB]">|</span>
             <span className="text-xs text-gray-400 truncate max-w-[200px]">
-              {activeMissionData ? activeMissionData.title : 'Mission workspace'}
+              {activeMissionData ? activeMissionData.title : '任務工作區'}
             </span>
             {activeMissionQuery.isLoading && (
               <span className="w-3 h-3 border border-[#D1D5DB] border-t-gray-600 rounded-full animate-spin" />

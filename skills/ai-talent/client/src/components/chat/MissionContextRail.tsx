@@ -272,7 +272,7 @@ export default function MissionContextRail({
       <div className="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800">
         <div className="flex gap-2">
           <button className="flex-1 text-xs py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
-            + Add constraint
+            + 新增限制條件
           </button>
           <button className="flex-1 text-xs py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
             Switch goal

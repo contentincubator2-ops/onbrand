@@ -57,10 +57,10 @@ const LAYER_COLORS: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<string, { cls: string; label: string }> = {
-  active:   { cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300', label: 'active' },
-  waiting:  { cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', label: 'waiting' },
-  complete: { cls: 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400', label: 'done' },
-  standby:  { cls: 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500', label: 'standby' },
+  active:   { cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300', label: '執行中' },
+  waiting:  { cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', label: '等待中' },
+  complete: { cls: 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400', label: '已完成' },
+  standby:  { cls: 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500', label: '待命中' },
 };
 
 const REVIEW_STATUS: Record<string, { cls: string; label: string }> = {
@@ -102,7 +102,7 @@ function TeamTab({ team, loading }: { team: TeamMember[]; loading?: boolean }) {
   return (
     <div className="space-y-2.5 py-3">
       <div className="px-2 py-2 mb-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-700/40">
-        <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed">📋 Workspace agent pool — mission team will be assembled after task planning.</p>
+        <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed">📋 Agent 團隊池 — 任務規劃完成後將自動組成執行團隊。</p>
       </div>
       {team.map(member => {
         const badge = STATUS_BADGE[member.status];
@@ -118,7 +118,7 @@ function TeamTab({ team, loading }: { team: TeamMember[]; loading?: boolean }) {
               </div>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{member.title}</p>
               <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">Owns: {member.owns}</p>
-                            {member.aiModel && <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full mt-0.5">{member.aiModel}</span>}
+                            {/* aiModel hidden for cleaner UX */}
             </div>
           </div>
         );
@@ -215,9 +215,9 @@ export default function ArtifactReviewPanel({ team, artifacts, reviews, agentsLo
   const [activeTab, setActiveTab] = useState<Tab>('team');
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: 'team', label: 'Team', count: team.length },
-    { key: 'artifacts', label: 'Artifacts', count: artifacts.length },
-    { key: 'review', label: 'Review', count: reviews.filter(r => r.status === 'ready' || r.status === 'waiting_user').length },
+    { key: 'team', label: '團隊', count: team.length },
+    { key: 'artifacts', label: '成果', count: artifacts.length },
+    { key: 'review', label: '審核', count: reviews.filter(r => r.status === 'ready' || r.status === 'waiting_user').length },
   ];
 
   return (
