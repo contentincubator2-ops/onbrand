@@ -168,19 +168,19 @@ export const workspaceRouter = router({
           }))
         );
 
-        // 2. Create 6 onboarding missions with squad bindings
+        // 2. Create 6 onboarding missions with squad bindings (raw SQL for reliability)
         const onboardingMissions = buildOnboardingMissions(ctx.user.id);
         for (const m of onboardingMissions) {
-          await db.insert(missions).values({
-            userId: m.userId,
-            workspace: m.workspace,
-            title: m.title,
-            squadSlug: m.squadSlug,
-            welcomeMessage: m.welcomeMessage,
-            isRecurring: m.isRecurring,
-            recurringSchedule: m.recurringSchedule ?? null,
-            status: "active",
-          });
+          try {
+            await db.execute(
+              `INSERT INTO missions (userId, workspace, title, squadSlug, welcomeMessage, isRecurring, recurringSchedule, status)
+               VALUES (${m.userId}, '${m.workspace}', '${m.title.replace(/'/g, "\\'")}',${'\'' + m.squadSlug + '\''},
+                      '${(m.welcomeMessage || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}',
+                      ${m.isRecurring ? 1 : 0}, ${m.recurringSchedule ? `'${m.recurringSchedule}'` : 'NULL'}, 'active')`
+            );
+          } catch (err) {
+            console.error('[Onboarding] mission insert failed:', m.title, err);
+          }
         }
 
         return await db
