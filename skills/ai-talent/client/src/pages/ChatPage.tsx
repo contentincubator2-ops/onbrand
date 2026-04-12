@@ -42,6 +42,9 @@ interface Msg {
   model?: string;   // AI model used (e.g. 'DeepSeek V3', 'Claude 3.5')
   agentName?: string;  // agent name for this message
   agentTitle?: string; // agent title for this message
+  agentModel?: string | null; // raw aiModel from DB
+  isStreaming?: boolean; // currently streaming
+  taskId?: number; // task ID for export
 }
 
 interface Conversation {
@@ -115,9 +118,57 @@ function formatModelName(raw: string): string {
   if (r.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
   if (r.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
   if (r.includes('gemini')) return 'Gemini';
-  if (r.includes('deepseek')) return 'DeepSeek V3';
+  if (r.includes('deepseek')) return 'DeepSeek R1';
   if (r.includes('llama')) return 'Llama 3';
   return raw;
+}
+
+// ── Mission Steps Rail ──────────────────────────────────────────────────────
+const MISSION_STEPS_FRONTEND: Record<string, string[]> = {
+  "tw-b2b-saas-gtm": ["品牌基礎研究","競品分析","目標受眾","差異化優勢","價值主張草稿","品牌個性與語調","訊息策略","通路策略","定位方案 A","定位方案 B"],
+  "mkt-analytics-attribution": ["確認追蹤競品清單","競品動態搜尋","情報分析與威脅評級","行動建議","報告格式確認"],
+  "tw-website-rebuild": ["官網現況分析","競品官網比較","Hero 文案優化","CTA 與 Value Prop","完整文案交付"],
+  "mkt-seo-growth": ["關鍵字研究","競品文章分析","文章大綱","草稿（前半）","完整長文交付"],
+  "mkt-content-engine": ["本週話題研究","品牌語調確認","一週排期規劃","貼文草稿前3篇","完整版貼文"],
+  "tw-ecom-full-funnel": ["廣告現況診斷","競品廣告研究","受眾策略優化","素材與文案建議","完整優化方案"],
+};
+
+function MissionStepsRail({ squadSlug, currentStep, totalSteps }: { squadSlug: string; currentStep: number; totalSteps: number }) {
+  const steps = MISSION_STEPS_FRONTEND[squadSlug] ?? Array.from({ length: totalSteps }, (_, i) => `Step ${i + 1}`);
+  return (
+    <div className="w-64 shrink-0 border-l border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
+        <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">任務進度</p>
+        <p className="text-xs text-neutral-400 mt-0.5">{currentStep}/{steps.length} 完成</p>
+      </div>
+      <div className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+        {steps.map((label, i) => {
+          const stepNum = i + 1;
+          const isDone = stepNum < currentStep;
+          const isActive = stepNum === currentStep;
+          const isPending = stepNum > currentStep;
+          return (
+            <div key={i} className={`flex items-start gap-2.5 px-2 py-2 rounded-lg transition-colors ${
+              isActive ? 'bg-neutral-200 dark:bg-neutral-700' : isDone ? '' : ''
+            }`}>
+              <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5 ${
+                isDone ? 'bg-green-500 text-white' :
+                isActive ? 'bg-neutral-800 dark:bg-neutral-100 text-white dark:text-neutral-900 ring-2 ring-neutral-400' :
+                'bg-neutral-200 dark:bg-neutral-700 text-neutral-400'
+              }`}>
+                {isDone ? '✓' : stepNum}
+              </div>
+              <span className={`text-xs leading-relaxed ${
+                isActive ? 'text-neutral-800 dark:text-neutral-100 font-semibold' :
+                isDone ? 'text-neutral-400 dark:text-neutral-500 line-through' :
+                'text-neutral-400 dark:text-neutral-500'
+              }`}>{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function renderContent(raw: string): { main: string; thinking: string } {
@@ -134,7 +185,45 @@ function renderContent(raw: string): { main: string; thinking: string } {
 }
 
 function formatText(text: string): string {
-  return text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>");
+  if (!text) return '';
+  // Full markdown renderer
+  let html = text
+    // Headers
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:0.95em;font-weight:700;margin:1em 0 0.3em;color:inherit">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:1.05em;font-weight:700;margin:1.2em 0 0.4em;color:inherit">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="font-size:1.15em;font-weight:700;margin:1.2em 0 0.4em;color:inherit">$1</h1>')
+    // Tables — convert | col | col | rows to HTML table
+    .replace(/((?:\|.+\|\n?)+)/g, (block) => {
+      const rows = block.trim().split('\n').filter(r => r.trim());
+      const isHeader = rows[1]?.replace(/[\s|:-]/g, '') === '';
+      let table = '<table style="border-collapse:collapse;width:100%;margin:0.5em 0;font-size:0.85em">';
+      rows.forEach((row, i) => {
+        if (isHeader && i === 1) return; // skip separator
+        const cells = row.split('|').filter((_, ci) => ci > 0 && ci < row.split('|').length - 1);
+        const tag = (isHeader && i === 0) ? 'th' : 'td';
+        const style = tag === 'th'
+          ? 'background:#f5f5f5;font-weight:600;padding:4px 8px;border:1px solid #ddd;text-align:left'
+          : 'padding:4px 8px;border:1px solid #ddd;vertical-align:top';
+        table += '<tr>' + cells.map(c => `<${tag} style="${style}">${c.trim()}</${tag}>`).join('') + '</tr>';
+      });
+      table += '</table>';
+      return table;
+    })
+    // Bold & italic
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Horizontal rule
+    .replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid #e5e5e5;margin:0.8em 0">')
+    // Unordered lists
+    .replace(/^[\-\*] (.+)$/gm, '<li style="margin:0.2em 0 0.2em 1.2em;list-style:disc">$1</li>')
+    // Ordered lists
+    .replace(/^\d+\. (.+)$/gm, '<li style="margin:0.2em 0 0.2em 1.5em;list-style:decimal">$1</li>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace">$1</code>')
+    // Newlines (after block elements handled)
+    .replace(/\n\n/g, '</p><p style="margin:0.5em 0">')
+    .replace(/\n/g, '<br/>');
+  return `<p style="margin:0">${html}</p>`;
 }
 
 function LayerBadge({ layer }: { layer: string }) {
@@ -325,8 +414,25 @@ export default function ChatPage({
   const [squadStep, setSquadStep] = useState<SquadStepState>({ currentStep: 0, totalSteps: 10, isComplete: false });
   const [streamingAgentName, setStreamingAgentName] = useState<string | null>(null);
   const [streamingAgentTitle, setStreamingAgentTitle] = useState<string | null>(null);
+  const [streamingModel, setStreamingModel] = useState<string | null>(null);
+  const [streamingThinking, setStreamingThinking] = useState<string>("");
+  const [isStopped, setIsStopped] = useState(false);
+  const stopRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<EventSource | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+
+  const handleStop = () => {
+    stopRef.current = true;
+    setIsStopped(true);
+    readerRef.current?.cancel();
+    sseRef.current?.close();
+    setLoading(false);
+    setStreamingAgentName(null);
+    setStreamingAgentTitle(null);
+    setStreamingModel(null);
+    setStreamingThinking("");
+  };
 
   const createAndExecute = trpc.task.createAndExecute.useMutation();
   const workflowStart = trpc.workflow.start.useMutation();
@@ -487,6 +593,7 @@ export default function ChatPage({
           let buf = "";
           let lastAgentName: string | undefined;
           let lastAgentTitle: string | undefined;
+          let lastAgentModel: string | null = null;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -503,8 +610,10 @@ export default function ChatPage({
                   if (curEvent === "agent") {
                     lastAgentName = data.agentName;
                     lastAgentTitle = data.agentTitle;
+                    lastAgentModel = data.agentModel ?? null;
                     setStreamingAgentName(data.agentName);
                     setStreamingAgentTitle(data.agentTitle);
+                    setStreamingModel(data.agentModel ? formatModelName(data.agentModel) : null);
                     setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle }));
                   } else if (curEvent === "delta") {
                     streamBuffer += data.text;
@@ -516,6 +625,7 @@ export default function ChatPage({
                       )
                     );
                   } else if (curEvent === "done") {
+                    lastAgentModel = data.agentModel ?? lastAgentModel;
                     setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
                   }
                 } catch { /* ignore */ }
@@ -526,7 +636,7 @@ export default function ChatPage({
           setConversations((prev) =>
             prev.map((c) =>
               c.id === missionConvId
-                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（分析完成）", agentName: lastAgentName, agentTitle: lastAgentTitle } : m) }
+                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（分析完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
                 : c
             )
           );
@@ -647,11 +757,37 @@ export default function ChatPage({
     const token = localStorage.getItem("authToken");
     if (!token) return false;
 
+    // ── 用戶反遈偵測：負面評價 / 要求重做 ──
+    const isNegativeFeedback = /不對|不好|不滳意|不喜歡|不要這個|不是這樣|重做|重新|撤销|差太遠|跟我想的不一樣|no|wrong|redo|again/i.test(text);
+    if (isNegativeFeedback) {
+      // 立即回應返回與確認問題
+      const clarifyMsgId = `clarify-${Date.now()}`;
+      const currentAgent = streamingAgentName ?? missionData?.title ?? "Agent";
+      const clarifyContent = `我聽到了，你對這個方向不满意。讓我确認一下：
+
+**不满意的地方是？**（請選擇其一）
+1️⃣ 內容方向不對，請告訴我你想要的方向
+2️⃣ 分析結果不準確，我重新搜尋資料
+3️⃣ 說明風格不對，我調整语調重做
+4️⃣ 完全不對，用其他 Agent 重新分析
+
+單純回覆數字或告訴我具體哪裡不對，我马上重做。`;
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: [...c.messages, { id: clarifyMsgId, role: "assistant" as const, content: clarifyContent, agentName: currentAgent, ts: Date.now() }] }
+            : c
+        )
+      );
+      return true;
+    }
+
     setLoading(true);
     setStreamingAgentName(null);
     setStreamingAgentTitle(null);
 
     let streamBuffer = "";
+    let lastAgentModel: string | null = null;
     const streamMsgId = `squad-stream-${Date.now()}`;
     setConversations((prev) =>
       prev.map((c) =>
@@ -705,6 +841,7 @@ export default function ChatPage({
               if (curEvent === "agent") {
                 lastAgentName = data.agentName;
                 lastAgentTitle = data.agentTitle;
+                lastAgentModel = data.agentModel ?? null;
                 setStreamingAgentName(data.agentName);
                 setStreamingAgentTitle(data.agentTitle);
                 setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle, agentRole: data.agentRole }));
@@ -718,6 +855,7 @@ export default function ChatPage({
                   )
                 );
               } else if (curEvent === "done") {
+                lastAgentModel = data.agentModel ?? lastAgentModel;
                 setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
               }
             } catch { /* ignore */ }
@@ -727,7 +865,7 @@ export default function ChatPage({
       setConversations((prev) =>
         prev.map((c) =>
           c.id === convId
-            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（Agent 回覆完成）", agentName: lastAgentName, agentTitle: lastAgentTitle } : m) }
+            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（Agent 回覆完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
             : c
         )
       );
@@ -894,6 +1032,10 @@ export default function ChatPage({
   const handleSend = async () => {
     const rawText = input.trim();
     if (!rawText || loading) return;
+    stopRef.current = false;
+    setIsStopped(false);
+    setStreamingThinking("");
+    setStreamingModel(null);
     const text = preselectedAgent
       ? `[指定${preselectedAgent.type === 'agent' ? 'Agent' : 'Squad'}：${preselectedAgent.name}] ${rawText}`
       : rawText;
@@ -948,7 +1090,7 @@ export default function ChatPage({
   return (
     <div className="flex h-screen bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Squad 步驟進度條 */}
+        {/* Squad 步驟進度條 + 換 Squad 按鈕 */}
         {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
           <div className="px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800 shrink-0 bg-neutral-50 dark:bg-neutral-900/60">
             <div className="max-w-3xl mx-auto">
@@ -957,9 +1099,21 @@ export default function ChatPage({
                   {streamingAgentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 truncate">{streamingAgentName}</span>}
                   {streamingAgentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500 truncate hidden sm:inline">· {streamingAgentTitle}</span>}
                 </div>
-                <span className="text-xs text-neutral-400 dark:text-neutral-500 tabular-nums shrink-0 ml-2">
-                  Step {squadStep.currentStep}/{squadStep.totalSteps}{squadStep.isComplete ? " ✅" : ""}
-                </span>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500 tabular-nums">
+                    Step {squadStep.currentStep}/{squadStep.totalSteps}{squadStep.isComplete ? " ✅" : ""}
+                  </span>
+                  {/* 換小組按鈕 */}
+                  <button
+                    onClick={() => {
+                      const msg = `我想換一支不同的小組來執行這個任務，請列出可選的 Squad 選項`;
+                      setInput(msg);
+                    }}
+                    className="text-[10px] text-neutral-400 hover:text-neutral-600 bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 px-2 py-0.5 rounded-full transition-colors"
+                  >
+                    換 Squad
+                  </button>
+                </div>
               </div>
               <div className="w-full h-1 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
                 <div className="h-full rounded-full bg-neutral-700 dark:bg-neutral-300 transition-all duration-500"
@@ -1009,14 +1163,66 @@ export default function ChatPage({
                     )}
                     {msg.role === "assistant" ? (
                       <div className="w-full rounded-2xl rounded-bl-md bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-                        {(msg.agentName || msg.model) && (
+                        {(msg.agentName || msg.model || msg.agentModel) && (
                           <div className="px-4 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-700">
                             {msg.agentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{msg.agentName}</span>}
                             {msg.agentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500">{msg.agentTitle}</span>}
-                            {msg.model && <span className="text-[10px] text-neutral-400 dark:text-neutral-500 ml-auto bg-neutral-200 dark:bg-neutral-700 px-1.5 py-0.5 rounded-full">{formatModelName(msg.model)}</span>}
+                            {(msg.agentModel || msg.model) && (
+                              <span className="text-[10px] text-indigo-500 dark:text-indigo-400 ml-auto bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 px-1.5 py-0.5 rounded-full font-medium">
+                                {formatModelName(msg.agentModel ?? msg.model ?? "")}
+                              </span>
+                            )}
                           </div>
                         )}
                         <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content || (msg.thinking ? "✅ 分析完成，請查看策略思考過程" : "（無輸出內容）")) }} />
+                        {/* Export buttons */}
+                        {msg.content && msg.content.length > 50 && (
+                          <div className="px-4 pb-3 pt-1 flex items-center gap-2 border-t border-neutral-200 dark:border-neutral-700">
+                            <span className="text-[10px] text-neutral-400 mr-1">匯出：</span>
+                            <button
+                              onClick={async () => {
+                                const token = localStorage.getItem("authToken");
+                                if (!token) return;
+                                const res = await fetch("/api/export/pptx", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                  body: JSON.stringify({ title: msg.agentTitle ?? "SoWork 報告", content: msg.content, brandName: activeBrand?.name }),
+                                });
+                                if (res.ok) {
+                                  const blob = await res.blob();
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url; a.download = "sowork-report.pptx"; a.click();
+                                  URL.revokeObjectURL(url);
+                                }
+                              }}
+                              className="text-[10px] px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 transition-colors font-medium"
+                            >
+                              📥 下載 PPT
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const token = localStorage.getItem("authToken");
+                                if (!token) return;
+                                const res = await fetch("/api/export/docx", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                  body: JSON.stringify({ title: msg.agentTitle ?? "SoWork 報告", content: msg.content, brandName: activeBrand?.name }),
+                                });
+                                if (res.ok) {
+                                  const blob = await res.blob();
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url; a.download = "sowork-report.docx"; a.click();
+                                  URL.revokeObjectURL(url);
+                                }
+                              }}
+                              className="text-[10px] px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors font-medium"
+                            >
+                              📄 下載 Word
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="rounded-2xl rounded-br-md px-4 py-3 text-sm leading-relaxed bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900" style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
@@ -1046,11 +1252,45 @@ export default function ChatPage({
               </div>
             )}
 
+              {/* ── Perplexity-style Live Execution Card ── */}
               {loading && !teamAssembly && (
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-neutral-800 dark:bg-neutral-200 flex items-center justify-center shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" className="dark:stroke-neutral-900" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" /></svg></div>
-                  <div className="bg-neutral-100 dark:bg-neutral-800 rounded-2xl rounded-bl-md px-4 py-3"><div className="flex gap-1.5 items-center h-5">{[0, 150, 300].map((d) => <span key={d} className="w-2 h-2 rounded-full bg-neutral-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}</div></div>
+                <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 overflow-hidden shadow-sm">
+                  {/* Header row */}
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-blue-100 dark:border-blue-800/60">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {streamingAgentName && <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">{streamingAgentName}</span>}
+                        {streamingAgentTitle && <span className="text-xs text-blue-500 dark:text-blue-400">{streamingAgentTitle}</span>}
+                        {streamingModel && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-700">
+                            {streamingModel}
+                          </span>
+                        )}
+                        {!streamingAgentName && (
+                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">正在分析任務...</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Stop button */}
+                    <button
+                      onClick={handleStop}
+                      className="shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 bg-white dark:bg-red-900/20 dark:border-red-700 px-2.5 py-1 rounded-lg transition-colors font-medium"
+                    >
+                      ⏹ 停止
+                    </button>
+                  </div>
+                  {/* Thinking stream */}
+                  <div className="px-4 py-3 flex gap-2 items-start">
+                    <div className="flex gap-1.5 items-center mt-1 shrink-0">{[0, 150, 300].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}</div>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 italic leading-relaxed">
+                      {streamingThinking ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "") : "思考中，請稍候…"}
+                    </p>
+                  </div>
                 </div>
+              )}
+              {isStopped && (
+                <div className="text-xs text-neutral-400 text-center py-2">⏹ 已停止生成</div>
               )}
               <div ref={bottomRef} />
             </div>
@@ -1089,6 +1329,15 @@ export default function ChatPage({
 
       {(a2aSteps.length > 0 || (loading && a2aSteps.length > 0)) && (
         <TaskProgressTracker taskName={a2aTaskName} steps={a2aSteps} progress={a2aProgress} onComplete={() => {}} />
+      )}
+
+      {/* 右側任務流程 Rail — 只在 Squad 任務內顯示 */}
+      {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.totalSteps > 0 && (
+        <MissionStepsRail
+          squadSlug={(missionDataQuery.data as any).squadSlug}
+          currentStep={squadStep.currentStep}
+          totalSteps={squadStep.totalSteps}
+        />
       )}
     </div>
   );
