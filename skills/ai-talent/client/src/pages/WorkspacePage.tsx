@@ -120,12 +120,19 @@ export default function WorkspacePage() {
   );
   const missionsList = missionsListQuery.data ?? [];
 
-  // Build missionsPerWorkspace: only active workspace has data loaded (lazy pattern)
+  // All missions across all workspaces for current brand (for left rail display)
+  const allMissionsQuery = trpc.mission.listByBrand.useQuery(
+    { brandId: activeBrand?.id ?? 0 },
+    { enabled: !!activeBrand?.id, refetchOnWindowFocus: false, staleTime: 0 }
+  );
+  const allMissions = allMissionsQuery.data ?? [];
+
+  // Build missionsPerWorkspace from all brand missions
   const missionsPerWorkspace: Record<string, { id: number; title: string; status: string }[]> = {};
   for (const ws of workspaces) {
-    missionsPerWorkspace[ws.id] = ws.id === activeWorkspace
-      ? missionsList.map((m: any) => ({ id: m.id, title: m.title, status: m.status ?? 'draft' }))
-      : [];
+    missionsPerWorkspace[ws.id] = allMissions
+      .filter((m: any) => m.workspace === ws.id)
+      .map((m: any) => ({ id: m.id, title: m.title, status: m.status ?? 'draft' }));
   }
 
   // Conversations under active mission
@@ -148,6 +155,7 @@ export default function WorkspacePage() {
   const createMission = trpc.mission.create.useMutation({
     onSuccess: () => {
       utils.mission.getActive.invalidate({ workspace: activeWorkspace, brandId: activeBrand?.id ?? undefined });
+      utils.mission.listByBrand.invalidate({ brandId: activeBrand?.id ?? 0 });
     },
   });
 

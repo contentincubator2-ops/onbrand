@@ -26,6 +26,17 @@ export const missionRouter = router({
       return db.select().from(missions).where(and(...conditions)).orderBy(desc(missions.updatedAt));
     }),
 
+  // List all missions for a brand across all workspaces
+  listByBrand: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(missions)
+        .where(and(eq(missions.userId, ctx.user.id), eq(missions.brandId, input.brandId)))
+        .orderBy(missions.workspace, desc(missions.updatedAt));
+    }),
+
   // Get single mission with task units
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
