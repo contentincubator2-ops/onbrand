@@ -160,6 +160,7 @@ export default function WorkspacePage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [lastQuery, setLastQuery] = useState('');
+  const [selectedAgent, setSelectedAgent] = useState<{ id: number; name: string; title?: string; type: 'agent' | 'squad' } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const runSearch = useCallback(async (query: string, tab: 'agents' | 'squads') => {
@@ -287,6 +288,12 @@ export default function WorkspacePage() {
               AI 搜尋
             </button>
             <button
+              onClick={openSearch}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+            >
+              🔍 AI 搜尋
+            </button>
+            <button
               onClick={handleNewMission}
               className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-[#D1D5DB] text-gray-400 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
             >
@@ -316,7 +323,7 @@ export default function WorkspacePage() {
 
         {/* Chat */}
         <div className="flex-1 overflow-hidden">
-          <ChatPage initialBrandId={activeBrand?.id} />
+          <ChatPage initialBrandId={activeBrand?.id} preselectedAgent={selectedAgent} onClearAgent={() => setSelectedAgent(null)} />
         </div>
       </div>
 
@@ -387,7 +394,10 @@ export default function WorkspacePage() {
                     {searchResults.map((r: any) => (
                       <div key={r.id}
                         className="flex items-start gap-2.5 p-3 rounded-xl border border-gray-100 hover:border-orange-300 hover:bg-orange-50 transition-colors cursor-pointer"
-                        onClick={() => setSearchOpen(false)}
+                        onClick={() => {
+                          setSelectedAgent({ id: r.id, name: r.name, title: r.title ?? r.name_en, type: searchTab === 'agents' ? 'agent' : 'squad' });
+                          setSearchOpen(false);
+                        }}
                       >
                         <div
                           className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0"

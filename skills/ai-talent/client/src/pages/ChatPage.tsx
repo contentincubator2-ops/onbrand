@@ -286,7 +286,15 @@ function TeamAssemblyPanel({
   );
 }
 
-export default function ChatPage({ initialBrandId }: { initialBrandId?: number | null } = {}) {
+export default function ChatPage({
+  initialBrandId,
+  preselectedAgent,
+  onClearAgent,
+}: {
+  initialBrandId?: number | null;
+  preselectedAgent?: { id: number; name: string; title?: string; type: 'agent' | 'squad' } | null;
+  onClearAgent?: () => void;
+} = {}) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -368,6 +376,11 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
       setActiveBrandId(def.id);
     }
   }, [brandsQuery.isSuccess, brands.length, activeBrandId, brands, initialBrandId]);
+
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (preselectedAgent) setTimeout(() => chatInputRef.current?.focus(), 150);
+  }, [preselectedAgent]);
 
   useEffect(() => {
     if (!historyQuery.data || historyQuery.data.length === 0) return;
@@ -597,9 +610,13 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
   };
 
   const handleSend = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
+    const rawText = input.trim();
+    if (!rawText || loading) return;
+    const text = preselectedAgent
+      ? `[指定${preselectedAgent.type === 'agent' ? 'Agent' : 'Squad'}：${preselectedAgent.name}] ${rawText}`
+      : rawText;
     setInput("");
+    if (preselectedAgent && onClearAgent) onClearAgent();
 
     let convId = activeId;
     if (!convId) {
@@ -757,12 +774,22 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
 
         <div className="shrink-0 px-4 pb-6 pt-3" onClick={() => setBrandMenuOpen(false)}>
           <div className="max-w-3xl mx-auto">
+            {preselectedAgent && (
+              <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-orange-50 border border-orange-200 text-sm">
+                <span className="text-orange-500">{preselectedAgent.type === 'agent' ? '🤖' : '👥'}</span>
+                <span className="font-medium text-orange-700">{preselectedAgent.name}</span>
+                {preselectedAgent.title && <span className="text-orange-500 text-xs">· {preselectedAgent.title}</span>}
+                <span className="text-xs text-orange-400 ml-1">已選擇，輸入你的任務 👇</span>
+                <button onClick={onClearAgent} className="ml-auto text-orange-300 hover:text-orange-500 text-xs">✕</button>
+              </div>
+            )}
             <div className="flex items-end gap-3 bg-neutral-100 dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 px-4 py-3">
               <textarea
+                ref={chatInputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={activeBrand ? `告訴我你想為「${activeBrand.name}」完成什麼任務…` : "選擇品牌後開始輸入任務…"}
+                placeholder={preselectedAgent ? `告訴 ${preselectedAgent.name} 你要完成的任務…` : (activeBrand ? `告訴我你想為「${activeBrand.name}」完成什麼任務…` : "選擇品牌後開始輸入任務…")}
                 rows={1}
                 disabled={loading}
                 className="flex-1 resize-none bg-transparent text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-600 outline-none"
