@@ -73,8 +73,11 @@ app.use((req, _res, next) => {
 // Client builds to ../public (relative to server/ CWD = skills/ai-talent)
 const publicDir = join(process.cwd(), "public");
 if (existsSync(publicDir)) {
-  app.use(express.static(publicDir));
-  // SPA fallback — serve index.html for any non-API route
+  // Assets (hashed filenames) — cache 1 year
+  app.use("/assets", express.static(join(publicDir, "assets"), { maxAge: "1y", immutable: true }));
+  // Other static files (favicon, etc.) — cache 1 hour
+  app.use(express.static(publicDir, { maxAge: "1h" }));
+  // SPA fallback — serve index.html with no-cache so browser always loads latest
   app.get("*", (req, res, next) => {
     if (
       req.path.startsWith("/trpc") ||
@@ -83,6 +86,8 @@ if (existsSync(publicDir)) {
     ) {
       return next();
     }
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
     res.sendFile(join(publicDir, "index.html"));
   });
 }
