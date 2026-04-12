@@ -123,6 +123,8 @@ export default function MissionContextRail({
   onNewConversation,
   onNewWorkspace,
   onDeleteWorkspace,
+  onCreateBrand,
+  onDeleteBrand,
   onDarkToggle,
   onSettings,
   onLogout,
