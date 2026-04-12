@@ -250,7 +250,7 @@ export default function MissionContextRail({
               {executionAgents.length > 0 && (
                 <div className="mb-3">
                   <div className="mb-1">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LAYER_COLOR.execution}`}>Execution</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LAYER_COLOR.execution}`}>執行層</span>
                   </div>
                   {executionAgents.map((a) => <AgentCard key={a.id} agent={a} />)}
                 </div>
@@ -258,7 +258,7 @@ export default function MissionContextRail({
               {strategyAgents.length > 0 && (
                 <div>
                   <div className="mb-1">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LAYER_COLOR.strategy}`}>Strategy</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LAYER_COLOR.strategy}`}>策略層</span>
                   </div>
                   {strategyAgents.map((a) => <AgentCard key={a.id} agent={a} />)}
                 </div>

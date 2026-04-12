@@ -150,7 +150,7 @@ function ArtifactsTab({ artifacts, onPin, onExport }: { artifacts: Artifact[]; o
           <div className="flex gap-2 mt-2">
             {onPin && (
               <button onClick={() => onPin(art.id)} className="text-[10px] text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300">
-                {art.pinned ? 'Unpin' : 'Pin'}
+                {art.pinned ? 'Unpin' : '釘選'}
               </button>
             )}
             {onExport && (
