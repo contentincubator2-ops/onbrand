@@ -414,7 +414,7 @@ export default function WorkspacePage() {
 
         {/* Chat */}
         <div className="flex-1 overflow-hidden">
-          <ChatPage initialBrandId={activeBrand?.id} activeMissionId={activeMissionId} preselectedAgent={selectedAgent} onClearAgent={() => setSelectedAgent(null)} />
+          <ChatPage key={activeMissionId ?? "no-mission"} initialBrandId={activeBrand?.id} activeMissionId={activeMissionId} preselectedAgent={selectedAgent} onClearAgent={() => setSelectedAgent(null)} />
         </div>
       </div>
 

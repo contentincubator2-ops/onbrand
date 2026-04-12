@@ -375,9 +375,12 @@ export default function ChatPage({
     { taskDescription: pendingTask },
     { enabled: pendingTask.length > 0, refetchOnWindowFocus: false }
   );
+  // When mission active → load mission history; else load brand history
   const historyQuery = trpc.conversation.list.useQuery(
-    { brandId: activeBrandId ?? undefined },
-    { enabled: !!activeBrandId, refetchOnWindowFocus: false }
+    activeMissionId
+      ? ({ missionId: activeMissionId } as any)
+      : { brandId: activeBrandId ?? undefined },
+    { enabled: activeMissionId ? !!activeMissionId : !!activeBrandId, refetchOnWindowFocus: false }
   );
 
   const brands = brandsQuery.data ?? [];
@@ -553,6 +556,8 @@ export default function ChatPage({
   }, [activeMissionId, missionDataQuery.data]);
 
   useEffect(() => {
+    // If mission is active, auto-start will handle conversation init — skip history load
+    if (activeMissionId) return;
     if (!historyQuery.data || historyQuery.data.length === 0) return;
     if (conversations.length > 0) return;
     const msgs: Msg[] = historyQuery.data.map((row: any) => {
