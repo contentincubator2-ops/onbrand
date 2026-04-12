@@ -96,7 +96,12 @@ const IconPlus = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="non
 function renderContent(raw: string): { main: string; thinking: string } {
   try {
     const d = JSON.parse(raw);
+    // Case 1: has publishable_content
     if (d.publishable_content) return { main: d.publishable_content, thinking: d.thinking || "" };
+    // Case 2: only has thinking (strip it, show nothing or a placeholder)
+    if (d.thinking && !d.content && !d.output) return { main: "", thinking: d.thinking };
+    // Case 3: has content or output field
+    if (d.content || d.output) return { main: d.content || d.output, thinking: d.thinking || "" };
   } catch {}
   return { main: raw, thinking: "" };
 }
@@ -689,10 +694,10 @@ export default function ChatPage({ initialBrandId }: { initialBrandId?: number |
                           <div className="px-4 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-700">
                             {msg.agentName && <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{msg.agentName}</span>}
                             {msg.agentTitle && <span className="text-xs text-neutral-400 dark:text-neutral-500">{msg.agentTitle}</span>}
-                            {msg.model && <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-auto">· {msg.model}</span>}
+                            {/* model name hidden for cleaner UX */}
                           </div>
                         )}
-                        <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content) }} />
+                        <div className="px-4 py-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100" dangerouslySetInnerHTML={{ __html: formatText(msg.content || (msg.thinking ? "✅ 分析完成，請查看策略思考過程" : "（無輸出內容）")) }} />
                       </div>
                     ) : (
                       <div className="rounded-2xl rounded-br-md px-4 py-3 text-sm leading-relaxed bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900" style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>

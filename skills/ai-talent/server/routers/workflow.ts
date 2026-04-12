@@ -469,7 +469,7 @@ export const workflowRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { squadQueue } = await import('../queue/squadLeaderWorker');
-      const jobId = ;
+      const jobId = Date.now().toString();
       const job = await squadQueue.add('squad-task', {
         jobId,
         ...input,

@@ -28,6 +28,7 @@ import { slackOAuthRouter } from "./routes/slackOAuthRoute";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
+import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
 
 const app = express();
 
@@ -151,6 +152,8 @@ const server = app.listen(PORT, async () => {
   console.log(`[server] health: http://localhost:${PORT}/health`);
   startOrchestratorWorker();
   console.log("[A2A] Orchestrator Worker started");
+  startSquadLeaderWorker();
+  console.log("[A2A] Squad Leader Worker started");
   // STAB-3: Recover any billing records persisted to disk during previous crash
   const recovered = await loadBillingFallbackLog();
   if (recovered > 0) {
