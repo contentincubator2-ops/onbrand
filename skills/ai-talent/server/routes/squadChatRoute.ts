@@ -309,9 +309,9 @@ squadChatRouter.post("/squad-chat", async (req: Request, res: Response) => {
 
     // 4. Persist step state to DB
     try {
-      const db = await getDb();
-      if (db) {
-        await (db as any).execute(
+      const pool = getSquadPool(); // fixed: use already-initialized pool
+      if (pool) {
+        await pool.execute(
           `INSERT INTO mission_step_state (userId, missionId, currentStep, totalSteps, status)
            VALUES (?, ?, ?, ?, 'in_progress')
            ON DUPLICATE KEY UPDATE currentStep=VALUES(currentStep), totalSteps=VALUES(totalSteps), updatedAt=NOW()`,
