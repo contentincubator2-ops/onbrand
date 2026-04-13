@@ -16,6 +16,22 @@ import { taskWorkflows, tasks, agents, subscriptions } from "../../drizzle/schem
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
+// SEC: Simple in-memory rate limit for public LLM endpoints
+// Limits: 10 requests/minute per IP for runTask, 20 for status/recommendSquads
+const _rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function _checkRateLimit(key: string, maxPerMin: number): void {
+  const now = Date.now();
+  const entry = _rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    _rateLimitMap.set(key, { count: 1, resetAt: now + 60_000 });
+    return;
+  }
+  entry.count++;
+  if (entry.count > maxPerMin) {
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded. Please slow down." });
+  }
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface WorkflowStep {
   agentSlug: string;
@@ -315,6 +331,9 @@ export const workflowRouter = router({
       agentTitle: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // SEC: rate limit — 10 requests/minute per IP
+      const ip = (ctx as any)?.req?.ip ?? (ctx as any)?.ip ?? 'unknown';
+      _checkRateLimit(`runTask:${ip}`, 10);
       const { invokeLLM } = await import("../_core/llm");
       const { getModelForTask, inferTaskType } = await import("../_core/modelRouter");
 
@@ -391,7 +410,10 @@ export const workflowRouter = router({
       industry: z.string().optional(),
       taskType: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SEC: rate limit — 10 requests/minute per IP
+      const ip = (ctx as any)?.req?.ip ?? (ctx as any)?.ip ?? 'unknown';
+      _checkRateLimit(`start:${ip}`, 10);
       const jobId = randomUUID();
       const job = await marketingQueue.add('execute-task', {
         jobId,

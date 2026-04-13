@@ -59,12 +59,13 @@ export const taskRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // SEC: filter by userId at DB layer to prevent IDOR
       const result = await db
         .select()
         .from(tasks)
-        .where(eq(tasks.id, input.taskId))
+        .where(and(eq(tasks.id, input.taskId), eq(tasks.userId, ctx.user.id)))
         .limit(1);
-      if (!result[0] || result[0].userId !== ctx.user.id) {
+      if (!result[0]) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
       return result[0];

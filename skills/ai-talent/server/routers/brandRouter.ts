@@ -332,10 +332,21 @@ export const brandRouter = router({
 
   /**
    * 取得定位分析進度 / 結果
+   * SEC: 改成 protectedProcedure，只允許品牌擁有者查詢
    */
-  getLocalAnalysisStatus: publicProcedure
+  getLocalAnalysisStatus: protectedProcedure
     .input(z.object({ brandId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (db) {
+        const { brands } = await import("../../drizzle/schema");
+        const { and, eq } = await import("drizzle-orm");
+        // 驗證 brand 屬於當前用戶
+        const rows = await db.select({ id: brands.id }).from(brands)
+          .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
+          .limit(1);
+        if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found or unauthorized" });
+      }
       const job = await getLatestJobForBrand(input.brandId);
       return job ?? null;
     }),
