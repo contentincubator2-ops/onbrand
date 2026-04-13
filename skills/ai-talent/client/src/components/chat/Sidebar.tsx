@@ -79,6 +79,8 @@ interface Props {
   userEmail?: string;
   onSettings?: () => void;
   onLogout?: () => void;
+  // Tablet icon-only mode
+  iconOnly?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -191,6 +193,7 @@ export default function Sidebar({
   userEmail,
   onSettings,
   onLogout,
+  iconOnly = false,
 }: Props) {
   const [brandMenuOpen, setBrandMenuOpen] = useState(false);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>({});
@@ -213,8 +216,8 @@ export default function Sidebar({
   return (
     <aside
       style={{
-        width: 232,
-        minWidth: 232,
+        width: iconOnly ? 52 : 232,
+        minWidth: iconOnly ? 52 : 232,
         background: '#FAFAF9',
         borderRight: '1px solid #E7E5E4',
         display: 'flex',
@@ -300,7 +303,8 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* ── Nav ── */}
+      {/* ── Nav (hidden in icon-only mode) ── */}
+      {!iconOnly && (<>
       <nav style={{ padding: '10px 10px 4px' }}>
         {NAV_ITEMS.map(item => (
           <button
@@ -546,6 +550,7 @@ export default function Sidebar({
         )}
       </div>
 
+      </>)}
       {/* ── Bottom: User info ── */}
       <div style={{
         borderTop: '1px solid #E7E5E4',

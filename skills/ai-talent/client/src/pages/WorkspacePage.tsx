@@ -37,6 +37,21 @@ export default function WorkspacePage() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [activeNav, setActiveNav] = useState<'chat' | 'tasks' | 'reports' | 'knowledge'>('chat');
 
+  // -- Mobile/Tablet responsive state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'chat'|'tasks'|'knowledge'|'agents'>('chat');
+
+  useEffect(() => {
+    const handler = () => {
+      setIsMobile(window.innerWidth < 768);
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   // Mission modal
   const [missionModalOpen, setMissionModalOpen] = useState(false);
   const [missionForm, setMissionForm] = useState({
@@ -269,9 +284,10 @@ export default function WorkspacePage() {
       height: '100vh',
       overflow: 'hidden',
       background: '#FAFAF9',
+      flexDirection: isMobile ? 'column' : 'row',
     }}>
-      {/* LEFT SIDEBAR */}
-      {!leftCollapsed && (
+      {/* LEFT SIDEBAR - hidden on mobile, icon-only on tablet */}
+      {!leftCollapsed && !isMobile && (
         <Sidebar
           brand={activeBrand ? { name: activeBrand.name, id: activeBrand.id } : null}
           brands={brands.map((b: any) => ({ id: b.id, name: b.name, isDefault: b.isDefault }))}
@@ -298,6 +314,7 @@ export default function WorkspacePage() {
           userEmail={userEmail}
           onSettings={() => window.location.href = '/settings'}
           onLogout={() => { localStorage.removeItem('authToken'); window.location.href = '/login'; }}
+          iconOnly={isTablet}
         />
       )}
 
@@ -391,8 +408,8 @@ export default function WorkspacePage() {
         </div>
       </div>
 
-      {/* RIGHT PANEL */}
-      {!rightCollapsed && (
+      {/* RIGHT PANEL - hidden on mobile (shown as bottom sheet instead) */}
+      {!rightCollapsed && !isMobile && (
         <RightPanel
           workflowSteps={taskUnits}
           artifacts={panelArtifacts}
@@ -633,6 +650,76 @@ export default function WorkspacePage() {
           </div>
         </div>
       )}
+
+      {/* ── Mobile Bottom Tab Bar ── */}
+      {isMobile && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          background: '#FAFAF9', borderTop: '1px solid #E7E5E4',
+          display: 'flex', zIndex: 100,
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}>
+          {[
+            { id: 'chat', icon: '💬', label: '對話' },
+            { id: 'tasks', icon: '📋', label: '任務' },
+            { id: 'knowledge', icon: '📚', label: '知識庫' },
+            { id: 'agents', icon: '🤖', label: 'Agents' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setMobileTab(tab.id as any)}
+              style={{
+                flex: 1, padding: '8px 4px 6px', border: 'none',
+                background: 'transparent', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                color: mobileTab === tab.id ? '#F97316' : '#A8A29E',
+                fontSize: 10, fontFamily: 'inherit',
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => setShowMobilePanel(p => !p)}
+            style={{
+              flex: 1, padding: '8px 4px 6px', border: 'none',
+              background: 'transparent', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              color: showMobilePanel ? '#F97316' : '#A8A29E',
+              fontSize: 10, fontFamily: 'inherit',
+            }}
+          >
+            <span style={{ fontSize: 18 }}>📊</span>
+            <span>流程</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Mobile Bottom Sheet (RightPanel) ── */}
+      {isMobile && showMobilePanel && (
+        <div style={{
+          position: 'fixed', bottom: 60, left: 0, right: 0,
+          background: '#FAFAF9', borderTop: '1px solid #E7E5E4',
+          borderRadius: '16px 16px 0 0',
+          height: '60vh', zIndex: 99, overflowY: 'auto',
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+        }}>
+          <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 6px' }}>
+            <div style={{ width:36, height:4, borderRadius:2, background:'#E7E5E4' }}></div>
+          </div>
+          <div style={{ padding: '0 16px 80px' }}>
+            <div style={{ fontSize:12, fontWeight:600, color:'#78716C', marginBottom:12 }}>執行流程 & 成果</div>
+            <RightPanel
+              workflowSteps={taskUnits}
+              artifacts={panelArtifacts}
+              brandId={activeBrand?.id}
+              missionId={activeMissionId}
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
