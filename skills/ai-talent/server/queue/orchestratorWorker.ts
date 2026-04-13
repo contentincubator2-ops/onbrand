@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { connection, MarketingJobData, MarketingJobResult } from './marketingQueue';
 import { matchAgents } from '../agentMatcher';
-import { invokeLLM } from '../_core/llm';
+import { invokeLLM, invokeLLMStream } from '../_core/llm';
 import { getModelForTask, inferTaskType } from '../_core/modelRouter';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -74,31 +74,57 @@ export function startOrchestratorWorker() {
       // 3. 決定 LLM 模型
       const inferredType = inferTaskType(userRequest);
       const modelConfig = getModelForTask(inferredType);
-      console.log('[A2A Worker] Model: ' + modelConfig.label);
+      console.log('[A2A Worker] Model: claude-sonnet-4-6');
       await job.updateProgress(40);
 
-      // 4. system prompt
-      const skillSection = skillContent ? '## 你的工作指南\n' + skillContent.slice(0, 1500) + '\n\n' : '';
-      const systemPrompt = '你是 ' + agentName + '，' + agentTitle + '。\n'
-        + '專長：' + agentSpecialty + '\n'
-        + '產業：' + (industry || '科技') + '\n'
-        + '品牌：' + (brand || '未指定') + '\n\n'
-        + skillSection
-        + '請根據用戶需求提供專業行銷內容。\n\n'
-        + '輸出 JSON 格式（合法 JSON，不加 markdown code block）：\n'
-        + '{thinking:策略思考（100字以內）,publishable_content:可直接使用的行銷內容,metadata:{hashtags:[hashtag1],posting_time:建議發布時間,format:貼文格式說明}}';
+      // 4. Research step
+      let researchContext = '';
+      const urlMatchR = userRequest.match(/https?:\/\/[^\s]+/);
+      const hasResearchR = /youtube|市場|研究|分析|系統|strategy|策略|自動|競品/.test(userRequest.toLowerCase());
+      if (urlMatchR || hasResearchR) {
+        console.log('[A2A Worker] Research step starting...');
+        await job.updateProgress(35);
+        try {
+          const rQuery = urlMatchR
+            ? '深入研究這家公司：' + urlMatchR[0] + '。任務：' + userRequest.slice(0, 300)
+            : '深入研究：' + userRequest.slice(0, 400) + '。提供具體數據和可行方案。';
+          let rResult = '';
+          for await (const delta of invokeLLMStream({
+            messages: [
+              { role: 'system', content: '你是市場研究助手，搜尋並提供具體數字和洞察。' },
+              { role: 'user', content: rQuery }
+            ],
+            provider: 'openrouter',
+            model: 'perplexity/sonar-pro',
+            maxTokens: 800,
+          })) { rResult += delta; }
+          if (rResult.length > 100) {
+            researchContext = '\n\n【市場研究結果】\n' + rResult.slice(0, 4000);
+            console.log('[A2A Worker] Research done: ' + rResult.length + ' chars');
+          }
+        } catch(e) { console.warn('[A2A Worker] Research failed:', e); }
+      }
 
+      // 4.5 system prompt (upgraded)
+      const skillSection = skillContent ? '## 工作指南\n' + skillContent.slice(0, 1500) + '\n\n' : '';
+      const systemPrompt = '你是 ' + agentName + '，' + agentTitle + '。\n'
+        + '專長：' + agentSpecialty + '\n\n'
+        + skillSection
+        + '【要求】必須基於研究資料產出有具體數據的深度分析，禁止空洞行銷語言。\n'
+        + 'thinking 至少300字，publishable_content 用Markdown結構化。\n\n'
+        + '輸出合法JSON：{"thinking":"深度分析300字+","publishable_content":"結構化Markdown方案","metadata":{"hashtags":[],"format":"方案類型"}}';
+
+      // 5. 呼叫 LLM
       // 5. 呼叫 LLM
       await job.updateProgress(60);
       const response = await invokeLLM({
-        provider: modelConfig.provider as any,
-        model: modelConfig.model,
+        provider: 'openrouter',
+        model: 'anthropic/claude-sonnet-4-6',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userRequest },
+          { role: 'user', content: userRequest + researchContext },
         ],
-        max_tokens: 1500,
-        response_format: { type: 'json_object' },
+        max_tokens: 4000,
       });
 
       await job.updateProgress(90);
@@ -119,7 +145,7 @@ export function startOrchestratorWorker() {
 
       return {
         agent: { name: agentName, title: agentTitle, taskType: agentTaskType },
-        model: modelConfig.label,
+        model: modelConfig.label, // legacy log only
         thinking: parsed.thinking || '',
         publishable_content: parsed.publishable_content || '',
         metadata: parsed.metadata,

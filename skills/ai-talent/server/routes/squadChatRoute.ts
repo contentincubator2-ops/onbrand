@@ -420,7 +420,7 @@ ${isLastStep
     send("start", { message: `${agentName} 正在分析...` });
 
     let fullContent = "";
-    for await (const delta of invokeLLMStream({ messages, provider: llmProvider, model: llmModel })) {
+    for await (const delta of invokeLLMStream({ messages, provider: llmProvider, model: llmModel, maxTokens: isLastStep ? 16000 : 8192 })) {
       fullContent += delta;
       send("delta", { text: delta });
     }

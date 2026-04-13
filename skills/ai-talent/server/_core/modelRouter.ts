@@ -30,47 +30,47 @@ const AZURE_AVAILABLE = !!(ENV as any).AZURE_FOUNDRY_API_KEY;
 
 export const TASK_MODEL_MAP: Record<TaskType, ModelConfig> = {
   brand_onboarding: {
-    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
-    model: AZURE_AVAILABLE ? "gpt-4o" : "anthropic/claude-sonnet-4-6",
-    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "Claude Sonnet 4.6 (OpenRouter)",
+    provider: 'openrouter',
+    model: 'anthropic/claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     reason: "最佳品牌策略分析、長文輸出、結構化報告",
   },
   market_analysis: {
-    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
-    model: AZURE_AVAILABLE ? "gpt-4o" : "openai/gpt-4o",
-    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "GPT-4o (OpenRouter)",
+    provider: 'openrouter',
+    model: 'anthropic/claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     reason: "市場數據分析、結構化輸出",
   },
   content_generation: {
-    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
-    model: AZURE_AVAILABLE ? "gpt-4o-mini" : "deepseek/deepseek-chat",
-    label: AZURE_AVAILABLE ? "GPT-4o Mini (Azure Foundry)" : "DeepSeek V3 (OpenRouter)",
+    provider: 'openrouter',
+    model: 'anthropic/claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     reason: "內容生成、中文輸出",
   },
   data_analysis: {
-    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
-    model: AZURE_AVAILABLE ? "gpt-4o" : "openai/gpt-4o",
-    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "GPT-4o (OpenRouter)",
+    provider: 'openrouter',
+    model: 'anthropic/claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     reason: "數據分析、計算、A/B test 設計",
   },
   campaign_planning: {
-    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
-    model: AZURE_AVAILABLE ? "gpt-4o" : "anthropic/claude-sonnet-4-6",
-    label: AZURE_AVAILABLE ? "GPT-4o (Azure Foundry)" : "Claude Sonnet 4.6 (OpenRouter)",
+    provider: 'openrouter',
+    model: 'anthropic/claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     reason: "廣告活動創意策略",
   },
   general: {
-    provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
-    model: AZURE_AVAILABLE ? "gpt-4o-mini" : "google/gemma-3-27b-it",
-    label: AZURE_AVAILABLE ? "GPT-4o Mini (Azure Foundry)" : "Gemma 4 (OpenRouter)",
+    provider: 'openrouter',
+    model: 'anthropic/claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     reason: "輕量任務、成本最低",
   },
 };
 
 export const PM_MODEL: ModelConfig = {
-  provider: AZURE_AVAILABLE ? "azure-foundry" : "openrouter",
-  model: AZURE_AVAILABLE ? "gpt-4o-mini" : "google/gemma-3-27b-it",
-  label: AZURE_AVAILABLE ? "GPT-4o Mini (Azure Foundry)" : "Gemma 4 (OpenRouter)",
+  provider: 'openrouter',
+  model: 'anthropic/claude-sonnet-4-6',
+  label: 'Claude Sonnet 4.6',
   reason: "任務理解、分類、路由",
 };
 

@@ -51,7 +51,7 @@ export const conversationRouter = router({
         conditions.push(eq(chatMessages.brandId, input.brandId));
       }
       if (input.missionId !== undefined) {
-        conditions.push(eq((chatMessages as any).missionId, input.missionId));
+        conditions.push(eq(chatMessages.missionId, input.missionId));
       }
       const rows = await db
         .select()
@@ -83,7 +83,7 @@ export const conversationRouter = router({
         .where(
           and(
             eq(chatMessages.userId, userId),
-            eq((chatMessages as any).missionId, input.missionId)
+            eq(chatMessages.missionId, input.missionId)
           )
         )
         .groupBy((chatMessages as any).conversationTitle)

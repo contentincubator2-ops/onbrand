@@ -101,6 +101,8 @@ export async function pingSoworkDb(): Promise<boolean> {
   }
 }
 
+export function getPool(): Pool | null { return pool; }
+
 // DEBT-2: Graceful shutdown — drain pool before process exits
 export async function closeDb(): Promise<void> {
   const closing: Promise<void>[] = [];

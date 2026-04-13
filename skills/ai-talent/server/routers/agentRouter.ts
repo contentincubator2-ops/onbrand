@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { invokeLLM } from "../_core/llm";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getSoworkDb } from "../db";
 import { sql, eq, and } from "drizzle-orm";
@@ -84,13 +85,15 @@ export const agentRouter = router({
         limit: input.limit,
       });
 
+      // Fast plan generation (no blocking LLM call - PM intelligence runs in A2A Worker)
+      const smartPlan: Array<{ step: number; agentName: string; agentTitle: string; layer: string; action: string }> = [];
+
       const STEP_ACTIONS = [
         "分析任務需求，制定執行策略",
         "執行核心任務，產出初稿",
         "品質審核，優化最終輸出",
       ];
 
-      // Fix: graceful fallback when 0 agents returned — use a default CMO agent
       const effectiveAgents =
         agents.length > 0
           ? agents
@@ -112,13 +115,15 @@ export const agentRouter = router({
               },
             ];
 
-      const plan = effectiveAgents.slice(0, 3).map((a, i) => ({
-        step:       i + 1,
-        agentName:  a.name,
-        agentTitle: a.title,
-        layer:      a.layer,
-        action:     STEP_ACTIONS[i] ?? "執行任務",
-      }));
+      const plan = smartPlan.length > 0
+        ? smartPlan
+        : effectiveAgents.slice(0, 3).map((a, i) => ({
+            step:       i + 1,
+            agentName:  a.name,
+            agentTitle: a.title,
+            layer:      a.layer,
+            action:     STEP_ACTIONS[i] ?? "執行任務",
+          }));
 
       return { agents: effectiveAgents, plan, taskType };
     }),

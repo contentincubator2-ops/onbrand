@@ -115,140 +115,135 @@ function PlatformPreview({ platform, content, title }: { platform: string; conte
 
 // ─── SOP Tab ─────────────────────────────────────────────────────────────────
 
-function SopTab({ missionId }: { missionId?: number | null }) {
-  const [showImport, setShowImport] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [importTitle, setImportTitle] = useState('');
-  const [saving, setSaving] = useState(false);
+function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (steps: any[]) => void }) {
+  const [editingStep, setEditingStep] = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editAgent, setEditAgent] = useState('');
+  const [running, setRunning] = useState(false);
 
   const sopQuery = (trpc as any).sop.list.useQuery(
     { missionId: missionId! },
     { enabled: !!missionId, refetchOnWindowFocus: false }
   );
-  const createSop = (trpc as any).sop.create.useMutation({ onSuccess: () => sopQuery.refetch() });
   const deleteSop = (trpc as any).sop.delete.useMutation({ onSuccess: () => sopQuery.refetch() });
 
   if (!missionId) return (
     <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-4">
       <div className="text-3xl">📋</div>
-      <p className="text-xs text-neutral-400">選擇任務後可管理 SOP</p>
+      <p className="text-xs text-neutral-400">選擇任務後可查看 SOP 流程</p>
     </div>
   );
 
   const sops = sopQuery.data ?? [];
+  // Show only the first SOP (squad-based)
+  const sop = sops[0] ?? null;
 
-  const handleImport = async () => {
-    if (!importText.trim() || !importTitle.trim()) return;
-    setSaving(true);
-    const lines = importText.split('\n').filter((l: string) => l.trim());
-    const steps = lines.map((line: string, i: number) => ({
-      stepOrder: i + 1,
-      stepType: 'sequential' as const,
-      label: line.replace(/^[\d\.\-\*\s]+/, '').trim() || line,
-    }));
-    await createSop.mutateAsync({
-      missionId: missionId!,
-      title: importTitle,
-      sourceType: 'imported',
-      importSource: 'text',
-      steps,
-    });
-    setImportText('');
-    setImportTitle('');
-    setShowImport(false);
-    setSaving(false);
+  const handleStartEdit = (step: any) => {
+    setEditingStep(step.id);
+    setEditLabel(step.label);
+    setEditAgent(step.agentSlug ?? '');
   };
+
+  const handleRerun = () => {
+    if (!sop || !onRerun) return;
+    setRunning(true);
+    onRerun(sop.steps ?? []);
+    setTimeout(() => setRunning(false), 2000);
+  };
+
+  if (sopQuery.isLoading) return <div className="text-xs text-center text-neutral-400 py-8">載入中...</div>;
+
+  if (!sop) return (
+    <div className="text-center py-8">
+      <div className="text-2xl mb-2">📋</div>
+      <p className="text-xs text-neutral-400">尚無 SOP 流程</p>
+      <p className="text-xs text-neutral-300 mt-1">任務執行後自動生成</p>
+    </div>
+  );
 
   return (
     <div className="py-3 space-y-3">
-      <div className="flex gap-2">
+      {/* SOP Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-neutral-800">{sop.title}</p>
+          <p className="text-[10px] text-neutral-400 mt-0.5">
+            {sop.sourceType === 'auto_learned' ? '🤖 Squad 自動生成' : '手動建立'} · {sop.steps?.length ?? 0} 步驟
+          </p>
+        </div>
         <button
-          onClick={() => setShowImport(v => !v)}
-          className="flex-1 text-xs py-2 px-3 rounded-lg border border-dashed border-amber-300 text-amber-600 hover:bg-amber-50 transition-colors"
-        >
-          {showImport ? '✕ 取消' : '+ 導入 / 建立 SOP'}
-        </button>
+          onClick={() => deleteSop.mutate({ id: sop.id })}
+          className="text-neutral-300 hover:text-red-400 text-xs shrink-0 mt-1"
+          title="刪除 SOP"
+        >✕</button>
       </div>
 
-      {showImport && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-          <input
-            type="text"
-            value={importTitle}
-            onChange={e => setImportTitle(e.target.value)}
-            placeholder="SOP 名稱（必填）"
-            className="w-full text-xs border border-neutral-200 rounded-lg px-3 py-2 outline-none focus:border-amber-400 bg-white"
-          />
-          <textarea
-            value={importText}
-            onChange={e => setImportText(e.target.value)}
-            placeholder={"貼上你的 SOP 步驟，每行一個步驟：\n1. 確認品牌語調\n2. 研究受眾\n3. 撰寫初稿..."}
-            rows={6}
-            className="w-full text-xs border border-neutral-200 rounded-lg px-3 py-2 outline-none focus:border-amber-400 bg-white resize-none font-mono"
-          />
-          <button
-            onClick={handleImport}
-            disabled={!importText.trim() || !importTitle.trim() || saving}
-            className="w-full text-xs py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-40 transition-colors font-medium"
-          >
-            {saving ? '儲存中...' : '儲存 SOP'}
-          </button>
-        </div>
-      )}
-
-      {sopQuery.isLoading ? (
-        <div className="text-xs text-center text-neutral-400 py-4">載入中...</div>
-      ) : sops.length === 0 ? (
-        <div className="text-center py-8">
-          <div className="text-2xl mb-2">📋</div>
-          <p className="text-xs text-neutral-400">尚無 SOP</p>
-          <p className="text-xs text-neutral-300 mt-1">對話結束後可儲存執行流程</p>
-        </div>
-      ) : (
-        sops.map((sop: any) => (
-          <div key={sop.id} className="rounded-xl border border-neutral-200 bg-white p-3">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div>
-                <p className="text-sm font-semibold text-neutral-800">{sop.title}</p>
-                <p className="text-[10px] text-neutral-400 mt-0.5">
-                  v{sop.version} · {sop.sourceType === 'imported' ? '導入' : sop.sourceType === 'auto_learned' ? 'AI 學習' : '手動建立'}
-                  {sop.isGlobal ? ' · 🌐 品牌層' : ''}
-                </p>
-              </div>
-              <button
-                onClick={() => deleteSop.mutate({ id: sop.id })}
-                className="text-neutral-300 hover:text-red-400 text-xs shrink-0"
-                title="刪除"
-              >✕</button>
-            </div>
-
-            {sop.steps?.length > 0 && (
-              <div className="space-y-1 mb-2">
-                {sop.steps.map((step: any) => (
-                  <div key={step.id} className="flex items-start gap-2">
-                    <div className="w-5 h-5 rounded-full bg-neutral-100 text-neutral-500 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                      {step.stepOrder}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-neutral-700">{step.label}</p>
-                      {step.agentSlug && <p className="text-[10px] text-neutral-400">{step.agentSlug}</p>}
-                    </div>
-                    {step.stepType === 'parallel' && (
-                      <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">並行</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+      {/* Steps */}
+      <div className="space-y-2">
+        {(sop.steps ?? []).map((step: any, i: number) => (
+          <div key={step.id} className="relative">
+            {i < (sop.steps?.length ?? 0) - 1 && (
+              <div className="absolute left-[13px] top-7 bottom-[-8px] w-px bg-neutral-200" />
             )}
-
-            <div className="flex gap-2">
-              <span className="text-[10px] px-2 py-1 rounded-lg bg-neutral-100 text-neutral-500">
-                {sop.steps?.length ?? 0} 個步驟
-              </span>
+            <div className="flex gap-2.5">
+              <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold shrink-0 z-10">
+                {step.stepOrder}
+              </div>
+              <div className="flex-1 min-w-0 pb-1">
+                {editingStep === step.id ? (
+                  <div className="space-y-1.5 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                    <input
+                      value={editLabel}
+                      onChange={e => setEditLabel(e.target.value)}
+                      className="w-full text-xs border border-neutral-200 rounded px-2 py-1 bg-white outline-none focus:border-amber-400"
+                      placeholder="步驟名稱"
+                    />
+                    <input
+                      value={editAgent}
+                      onChange={e => setEditAgent(e.target.value)}
+                      className="w-full text-xs border border-neutral-200 rounded px-2 py-1 bg-white outline-none focus:border-amber-400"
+                      placeholder="AI Agent 名稱"
+                    />
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => setEditingStep(null)}
+                        className="flex-1 text-xs py-1 rounded bg-amber-500 text-white hover:bg-amber-600"
+                      >儲存</button>
+                      <button
+                        onClick={() => setEditingStep(null)}
+                        className="text-xs px-2 py-1 rounded border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
+                      >取消</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="group cursor-pointer"
+                    onClick={() => handleStartEdit(step)}
+                  >
+                    <p className="text-xs font-medium text-neutral-800 group-hover:text-amber-700 transition-colors">{step.label}</p>
+                    {step.agentSlug && (
+                      <p className="text-[10px] text-amber-600 mt-0.5">🤖 {step.agentSlug}</p>
+                    )}
+                    {step.outputSummary && (
+                      <p className="text-[10px] text-neutral-400 mt-0.5 leading-relaxed line-clamp-2">{step.outputSummary}</p>
+                    )}
+                    <p className="text-[9px] text-neutral-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">點擊編輯</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        ))
-      )}
+        ))}
+      </div>
+
+      {/* Rerun Button */}
+      <button
+        onClick={handleRerun}
+        disabled={running}
+        className="w-full text-xs py-2.5 rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition-colors font-medium mt-2"
+      >
+        {running ? '▶ 執行中...' : '▶ 重新執行此 SOP'}
+      </button>
     </div>
   );
 }

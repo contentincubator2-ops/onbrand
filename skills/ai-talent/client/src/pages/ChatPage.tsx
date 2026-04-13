@@ -49,7 +49,6 @@ interface Msg {
   agentTitle?: string; // agent title for this message
   agentModel?: string | null; // raw aiModel from DB
   isStreaming?: boolean; // currently streaming
-  taskId?: number; // task ID for export
   pendingApproval?: boolean; // waiting for user confirm before sending to panel
   approved?: boolean; // user has confirmed this version
   sopProposed?: boolean; // SOP prompt shown

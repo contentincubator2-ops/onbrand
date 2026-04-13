@@ -338,12 +338,20 @@ streamRouter.post("/task", async (req: Request, res: Response) => {
 
     const systemPrompt = `${agentPersona}
 
+【工作方式】
+1. 先在 thinking 中展示深度分析過程（不少於300字）
+2. 基於分析，在 publishable_content 輸出結構化的完整方案
+3. 如果有研究資料，必須引用具體數字和事實
+4. 輸出要有層次：背景分析 → 核心策略 → 具體步驟 → 預期成果
+
 【絕對禁止規則】
 - 禁止以問候語開場
-- publishable_content 必須是純 Markdown 文字，不含 JSON
+- 禁止空泛的行銷語言，必須有具體數據、步驟、時程
+- publishable_content 必須是結構化 Markdown（含標題、清單、表格）
+- 不允許只有一段話就結束
 
 【輸出格式】
-輸出 JSON：{ "thinking": "策略思考", "publishable_content": "可發布內容", "content_type": "類型" }`;
+輸出 JSON：{ "thinking": "深度策略思考過程", "publishable_content": "結構化完整方案（Markdown）", "content_type": "類型" }`;
 
     const historyMessages = (conversationHistory ?? []).slice(-6).map(m => ({
       role: m.role as "user" | "assistant",
@@ -354,10 +362,57 @@ streamRouter.post("/task", async (req: Request, res: Response) => {
 
 請以 JSON 格式輸出，包含 thinking 和 publishable_content。`;
 
+    // 4.5 Research step: if task contains URL or research keywords, do web research first
+    let researchContext = "";
+    const taskText = `${title} ${description ?? ""}`;
+    const urlMatch = taskText.match(/https?:\/\/[^\s]+/);
+    const hasResearchIntent = /youtube|市場|competitor|競品|research|研究|分析|系統|strategy|策略|AI系統|自動/.test(taskText.toLowerCase());
+
+    if ((urlMatch || hasResearchIntent) && taskText.length > 20) {
+      send("thinking", { text: "🔍 正在研究中..." });
+      try {
+        const researchQuery = urlMatch
+          ? `研究以下網站和市場機會：${urlMatch[0]}。任務背景：${taskText.slice(0, 200)}`
+          : `深入研究：${taskText.slice(0, 300)}。請提供具體數據、市場分析和可行方案。`;
+
+        const researchMessages = [
+          {
+            role: "system" as const,
+            content: "你是深度研究助手。請搜尋並分析相關資訊，提供具體數據和洞察，不要空泛描述。"
+          },
+          {
+            role: "user" as const,
+            content: researchQuery
+          }
+        ];
+
+        let researchResult = "";
+        // Use perplexity sonar via openrouter for web search capability
+        for await (const delta of invokeLLMStream({
+          messages: researchMessages,
+          provider: "openrouter",
+          model: "perplexity/sonar-pro",
+        })) {
+          researchResult += delta;
+        }
+
+        if (researchResult.length > 100) {
+          researchContext = `
+
+【研究結果】
+${researchResult.slice(0, 3000)}`;
+          send("thinking", { text: `✅ 研究完成（${researchResult.length} 字）` });
+        }
+      } catch (err) {
+        // Research failed silently, continue without it
+        console.error("Research step failed:", err);
+      }
+    }
+
     const messages = [
       { role: "system" as const, content: systemPrompt },
       ...historyMessages,
-      { role: "user" as const, content: userMessage },
+      { role: "user" as const, content: userMessage + researchContext },
     ];
 
     // 5. Stream tokens
