@@ -268,7 +268,7 @@ export default function WorkspacePage() {
       display: 'flex',
       height: '100vh',
       overflow: 'hidden',
-      background: '#1C1917',
+      background: '#FAFAF9',
     }}>
       {/* LEFT SIDEBAR */}
       {!leftCollapsed && (
@@ -311,14 +311,14 @@ export default function WorkspacePage() {
           padding: '0 12px',
           height: 44,
           borderBottom: '1px solid #1E1E1E',
-          background: '#211F1C',
+          background: '#FFFFFF',
           flexShrink: 0,
         }}>
           {/* Left side: toggle + breadcrumb */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <button
               onClick={() => setLeftCollapsed(c => !c)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 4, display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A8A29E', padding: 4, display: 'flex', alignItems: 'center' }}
               title={leftCollapsed ? '展開左欄' : '收起左欄'}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -327,15 +327,15 @@ export default function WorkspacePage() {
             </button>
             {/* Breadcrumb */}
             <nav style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, minWidth: 0, overflow: 'hidden' }}>
-              <span style={{ color: '#E8E8E8', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>
+              <span style={{ color: '#1C1917', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>
                 {activeBrand?.name ?? '—'}
               </span>
-              <span style={{ color: '#333' }}>›</span>
-              <span style={{ color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>
+              <span style={{ color: '#C4C0BA' }}>›</span>
+              <span style={{ color: '#78716C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>
                 {currentWorkspace?.label ?? '—'}
               </span>
-              <span style={{ color: '#333' }}>›</span>
-              <span style={{ color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
+              <span style={{ color: '#C4C0BA' }}>›</span>
+              <span style={{ color: '#A8A29E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
                 {activeMissionData?.title ?? '選擇任務'}
               </span>
             </nav>
@@ -348,8 +348,8 @@ export default function WorkspacePage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 5, fontSize: 10,
                 padding: '4px 10px', borderRadius: 6,
-                border: '1px solid #252525', background: 'none',
-                color: '#555', cursor: 'pointer',
+                border: '1px solid #E7E5E4', background: 'none',
+                color: '#A8A29E', cursor: 'pointer',
               }}
               title="AI 搜尋 Agent / Squad"
             >
@@ -368,7 +368,7 @@ export default function WorkspacePage() {
             </button>
             <button
               onClick={() => setRightCollapsed(c => !c)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 4, display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A8A29E', padding: 4, display: 'flex', alignItems: 'center' }}
               title={rightCollapsed ? '展開右欄' : '收起右欄'}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -408,12 +408,12 @@ export default function WorkspacePage() {
           onClick={(e) => { if (e.target === e.currentTarget) setMissionModalOpen(false); }}
         >
           <div style={{
-            background: '#211F1C', border: '1px solid #252525', borderRadius: 12,
+            background: '#FFFFFF', border: '1px solid #E7E5E4', borderRadius: 12,
             width: '90%', maxWidth: 480, overflow: 'hidden',
           }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #252525', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#E8E8E8' }}>+ 新任務</h2>
-              <button onClick={() => setMissionModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 18 }}>×</button>
+              <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1C1917' }}>+ 新任務</h2>
+              <button onClick={() => setMissionModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A8A29E', fontSize: 18 }}>×</button>
             </div>
             <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
               {[
@@ -426,7 +426,7 @@ export default function WorkspacePage() {
                 { key: 'constraints', label: '限制條件', placeholder: '例：預算 $50K' },
               ].map(({ key, label, placeholder }) => (
                 <div key={key}>
-                  <label style={{ display: 'block', fontSize: 10, color: '#555', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+                  <label style={{ display: 'block', fontSize: 10, color: '#A8A29E', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
                   <input
                     type="text"
                     value={(missionForm as any)[key]}
@@ -434,8 +434,8 @@ export default function WorkspacePage() {
                     placeholder={placeholder}
                     style={{
                       width: '100%', fontSize: 12, padding: '7px 10px',
-                      background: '#111', border: '1px solid #252525', borderRadius: 6,
-                      color: '#E8E8E8', outline: 'none', boxSizing: 'border-box',
+                      background: '#111', border: '1px solid #E7E5E4', borderRadius: 6,
+                      color: '#1C1917', outline: 'none', boxSizing: 'border-box',
                     }}
                   />
                 </div>
@@ -443,7 +443,7 @@ export default function WorkspacePage() {
             </div>
             <div style={{ padding: '12px 20px', borderTop: '1px solid #252525', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setMissionModalOpen(false)}
-                style={{ padding: '7px 16px', fontSize: 12, color: '#555', background: 'none', border: '1px solid #252525', borderRadius: 6, cursor: 'pointer' }}>
+                style={{ padding: '7px 16px', fontSize: 12, color: '#A8A29E', background: 'none', border: '1px solid #E7E5E4', borderRadius: 6, cursor: 'pointer' }}>
                 取消
               </button>
               <button
@@ -470,11 +470,11 @@ export default function WorkspacePage() {
           onClick={() => setSearchOpen(false)}
         >
           <div
-            style={{ width: '90%', maxWidth: 580, background: '#211F1C', borderRadius: 12, border: '1px solid #252525', overflow: 'hidden' }}
+            style={{ width: '90%', maxWidth: 580, background: '#FFFFFF', borderRadius: 12, border: '1px solid #E7E5E4', overflow: 'hidden' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid #252525' }}>
-              <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #252525' }}>
+              <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid #E7E5E4' }}>
                 {(['agents', 'squads'] as const).map(t => (
                   <button key={t} onClick={() => setSearchTab(t)}
                     style={{
@@ -495,8 +495,8 @@ export default function WorkspacePage() {
                   placeholder={searchTab === 'agents' ? '例：電商 SEO 策略師…' : '例：美妝品牌行銷團隊…'}
                   style={{
                     flex: 1, fontSize: 11, padding: '6px 10px',
-                    background: '#111', border: '1px solid #252525', borderRadius: 6,
-                    color: '#E8E8E8', outline: 'none',
+                    background: '#111', border: '1px solid #E7E5E4', borderRadius: 6,
+                    color: '#1C1917', outline: 'none',
                   }}
                 />
                 <button type="submit" disabled={searching || !searchInput.trim()}
@@ -509,21 +509,21 @@ export default function WorkspacePage() {
                   {searching ? '搜尋中…' : '搜尋'}
                 </button>
               </form>
-              <button onClick={() => setSearchOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555' }}>✕</button>
+              <button onClick={() => setSearchOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A8A29E' }}>✕</button>
             </div>
             <div style={{ padding: '12px 16px', maxHeight: 360, overflowY: 'auto' }}>
               {searching ? (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: '#555', fontSize: 11 }}>AI 向量搜尋中…</div>
+                <div style={{ textAlign: 'center', padding: '32px 0', color: '#A8A29E', fontSize: 11 }}>AI 向量搜尋中…</div>
               ) : searchResults.length === 0 && lastQuery ? (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: '#555', fontSize: 11 }}>沒有找到相關結果</div>
+                <div style={{ textAlign: 'center', padding: '32px 0', color: '#A8A29E', fontSize: 11 }}>沒有找到相關結果</div>
               ) : searchResults.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: '#444', fontSize: 11 }}>
+                <div style={{ textAlign: 'center', padding: '32px 0', color: '#A8A29E', fontSize: 11 }}>
                   <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
                   輸入任務需求，AI 幫你找最適合的 {searchTab === 'agents' ? 'Agent' : 'Squad'}
                 </div>
               ) : (
                 <div>
-                  <p style={{ fontSize: 10, color: '#555', marginBottom: 10 }}>「{lastQuery}」找到 {searchResults.length} 個結果</p>
+                  <p style={{ fontSize: 10, color: '#A8A29E', marginBottom: 10 }}>「{lastQuery}」找到 {searchResults.length} 個結果</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     {searchResults.map((r: any) => (
                       <div
@@ -531,21 +531,21 @@ export default function WorkspacePage() {
                         onClick={() => { setSelectedAgent({ id: r.id, name: r.name, title: r.title ?? r.name_en, type: searchTab === 'agents' ? 'agent' : 'squad' }); setSearchOpen(false); }}
                         style={{
                           display: 'flex', gap: 8, padding: '10px', borderRadius: 8,
-                          border: '1px solid #252525', cursor: 'pointer',
-                          background: '#1C1917',
+                          border: '1px solid #E7E5E4', cursor: 'pointer',
+                          background: '#FAFAF9',
                         }}
                       >
                         <div style={{
                           width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                          background: 'rgba(249,115,22,0.08)', color: '#F97316',
+                          background: '#FFF7ED', color: '#F97316',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 12, fontWeight: 700,
                         }}>
                           {r.name?.charAt(0) ?? '?'}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 500, color: '#E8E8E8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
-                          <div style={{ fontSize: 9, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title ?? r.name_en}</div>
+                          <div style={{ fontSize: 11, fontWeight: 500, color: '#1C1917', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                          <div style={{ fontSize: 9, color: '#A8A29E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title ?? r.name_en}</div>
                           <span style={{
                             display: 'inline-block', marginTop: 3, fontSize: 9, padding: '1px 5px', borderRadius: 3,
                             background: Math.round(r.score*100) >= 60 ? '#1DBEAA15' : '#33330A',
@@ -571,11 +571,11 @@ export default function WorkspacePage() {
           onClick={() => setCreateBrandModalOpen(false)}
         >
           <div
-            style={{ background: '#211F1C', border: '1px solid #252525', borderRadius: 12, padding: 24, width: '90%', maxWidth: 400 }}
+            style={{ background: '#FFFFFF', border: '1px solid #E7E5E4', borderRadius: 12, padding: 24, width: '90%', maxWidth: 400 }}
             onClick={e => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: '#E8E8E8' }}>新建品牌</h3>
-            <p style={{ margin: '0 0 16px', fontSize: 10, color: '#555' }}>填寫基本資料即可開始</p>
+            <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: '#1C1917' }}>新建品牌</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 10, color: '#A8A29E' }}>填寫基本資料即可開始</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
                 { label: '品牌名稱 *', key: 'name', placeholder: '例：SoWork AI' },
@@ -584,7 +584,7 @@ export default function WorkspacePage() {
                 { label: '主要競爭者', key: 'competitors', placeholder: '例：HubSpot, Marketo' },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: 10, color: '#555', marginBottom: 3 }}>{f.label}</label>
+                  <label style={{ display: 'block', fontSize: 10, color: '#A8A29E', marginBottom: 3 }}>{f.label}</label>
                   <input
                     type="text"
                     value={(brandForm as any)[f.key]}
@@ -592,8 +592,8 @@ export default function WorkspacePage() {
                     placeholder={f.placeholder}
                     style={{
                       width: '100%', fontSize: 12, padding: '6px 10px',
-                      background: '#111', border: '1px solid #252525', borderRadius: 6,
-                      color: '#E8E8E8', outline: 'none', boxSizing: 'border-box',
+                      background: '#111', border: '1px solid #E7E5E4', borderRadius: 6,
+                      color: '#1C1917', outline: 'none', boxSizing: 'border-box',
                     }}
                   />
                 </div>
@@ -602,7 +602,7 @@ export default function WorkspacePage() {
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button
                 onClick={() => { setCreateBrandModalOpen(false); setBrandForm({ name: '', website: '', targetAudience: '', competitors: '', targetMarket: 'Taiwan', contentLanguage: 'zh-TW' }); }}
-                style={{ flex: 1, padding: '8px', fontSize: 12, background: 'none', border: '1px solid #252525', borderRadius: 6, color: '#555', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '8px', fontSize: 12, background: 'none', border: '1px solid #E7E5E4', borderRadius: 6, color: '#A8A29E', cursor: 'pointer' }}
               >
                 取消
               </button>

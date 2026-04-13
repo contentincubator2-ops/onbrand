@@ -46,11 +46,11 @@ interface Props {
 // ─── Step colors ─────────────────────────────────────────────────────────────
 
 const STEP_COLORS: Record<WorkflowStep['status'], { dot: string; label: string; line: string }> = {
-  pending: { dot: '#333', label: '#555', line: '#252525' },
-  running: { dot: '#F59E0B', label: '#E8E8E8', line: '#F59E0B50' },
-  done:    { dot: '#F97316', label: '#E8E8E8', line: '#F9731650' },
+  pending: { dot: '#C4C0BA', label: '#A8A29E', line: '#E7E5E4' },
+  running: { dot: '#F59E0B', label: '#44403C', line: '#F59E0B50' },
+  done:    { dot: '#F97316', label: '#44403C', line: '#F9731650' },
   error:   { dot: '#EF4444', label: '#EF4444', line: '#EF444450' },
-  skipped: { dot: '#555', label: '#555', line: '#1E1E1E' },
+  skipped: { dot: '#A8A29E', label: '#A8A29E', line: '#E7E5E4' },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -96,8 +96,8 @@ export default function RightPanel({
     <aside style={{
       width: 288,
       minWidth: 288,
-      background: '#1C1917',
-      borderLeft: '1px solid #292524',
+      background: '#FAFAF9',
+      borderLeft: '1px solid #E7E5E4',
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -107,7 +107,7 @@ export default function RightPanel({
       {/* ── Tab bar ── */}
       <div style={{
         display: 'flex',
-        borderBottom: '1px solid #292524',
+        borderBottom: '1px solid #E7E5E4',
         flexShrink: 0,
       }}>
         {tabs.map(tab => (
@@ -139,7 +139,7 @@ export default function RightPanel({
         {activeTab === 'flow' && (
           <div>
             {workflowSteps.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#444', fontSize: 11 }}>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#A8A29E', fontSize: 11 }}>
                 尚無任務流程
               </div>
             ) : (
@@ -189,10 +189,10 @@ export default function RightPanel({
                           )}
                         </div>
                         {step.agentName && (
-                          <div style={{ fontSize: 9, color: '#444', marginTop: 1 }}>{step.agentName}</div>
+                          <div style={{ fontSize: 9, color: '#A8A29E', marginTop: 1 }}>{step.agentName}</div>
                         )}
                         {step.eta && step.status !== 'done' && (
-                          <div style={{ fontSize: 9, color: '#555', marginTop: 1 }}>預計 {step.eta}</div>
+                          <div style={{ fontSize: 9, color: '#A8A29E', marginTop: 1 }}>預計 {step.eta}</div>
                         )}
                       </div>
                     </div>
@@ -206,23 +206,23 @@ export default function RightPanel({
         {/* ── Tab 2: 知識庫 ── */}
         {activeTab === 'knowledge' && (
           <div>
-            <div style={{ fontSize: 10, color: '#555', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <div style={{ fontSize: 10, color: '#A8A29E', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               品牌知識
             </div>
             {knowledgeList.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#444', fontSize: 11 }}>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#A8A29E', fontSize: 11 }}>
                 尚無品牌知識
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {knowledgeList.map((item, i) => (
                   <div key={i} style={{
-                    background: '#211F1C',
-                    border: '1px solid #292524',
+                    background: '#FFFFFF',
+                    border: '1px solid #E7E5E4',
                     borderRadius: 6,
                     padding: '7px 10px',
                   }}>
-                    <div style={{ fontSize: 9, color: '#555', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <div style={{ fontSize: 9, color: '#A8A29E', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       {item.key}
                     </div>
                     <div style={{ fontSize: 11, color: '#C8C8C8', lineHeight: 1.5, wordBreak: 'break-word' }}>
@@ -238,11 +238,11 @@ export default function RightPanel({
         {/* ── Tab 3: 成果 ── */}
         {activeTab === 'artifacts' && (
           <div>
-            <div style={{ fontSize: 10, color: '#555', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <div style={{ fontSize: 10, color: '#A8A29E', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               任務成果
             </div>
             {artifacts.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#444', fontSize: 11 }}>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#A8A29E', fontSize: 11 }}>
                 尚無成果
               </div>
             ) : (
