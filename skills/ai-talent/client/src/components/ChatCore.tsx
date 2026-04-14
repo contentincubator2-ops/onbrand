@@ -121,6 +121,7 @@ export interface ChatCoreProps {
   activeMissionId?: number | null;
   preselectedAgent?: { id: number; name: string; title?: string; type: "agent" | "squad" } | null;
   onClearAgent?: () => void;
+  onMissionCreated?: (id: number) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -430,6 +431,7 @@ export default function ChatCore({
   activeMissionId,
   preselectedAgent,
   onClearAgent,
+  onMissionCreated,
 }: ChatCoreProps = {}) {
 
   // ── Conversations state ──────────────────────────────────────────────────
@@ -1000,6 +1002,7 @@ export default function ChatCore({
         });
         if (newMission?.id) {
           setCurrentMissionId(newMission.id);
+          if (onMissionCreated) onMissionCreated(newMission.id);
         }
       } catch {
         // non-blocking — ignore if mission create fails

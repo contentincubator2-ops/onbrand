@@ -58,7 +58,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
   useEffect(() => {
     if (step !== "done" || !createdBrand) return;
     if (countdown <= 0) {
-      navigate(`/?missionId=${createdBrand.missionId ?? ''}&brandId=${createdBrand.id}`);
+      navigate(createdBrand.missionId ? `/m/${createdBrand.missionId}` : '/');
       return;
     }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
@@ -147,7 +147,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
           </div>
           <div style={{ marginTop: 20 }}>
             <button
-              onClick={() => navigate(`/?missionId=${createdBrand.missionId ?? ''}&brandId=${createdBrand.id}`)}
+              onClick={() => navigate(createdBrand.missionId ? `/m/${createdBrand.missionId}` : '/')}
               style={{
                 background: COLORS.accent,
                 color: "#fff",

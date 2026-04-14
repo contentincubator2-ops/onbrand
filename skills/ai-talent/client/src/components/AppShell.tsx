@@ -235,10 +235,14 @@ function WorkspaceMissions({
   onMissionSelect?: (missionId: number) => void;
   onNewTask?: (wsKey: string) => void;
 }) {
-  const { data: missions, isLoading } = trpc.mission.list.useQuery(
+  const { data: missions, isLoading, refetch: refetchMissions } = trpc.mission.list.useQuery(
     { workspace: wsKey, brandId: brandId ?? undefined },
     { enabled: !!brandId, refetchOnWindowFocus: false }
   );
+  const [hoveredMission, setHoveredMission] = useState<number | null>(null);
+  const deleteMission = trpc.mission.delete.useMutation({
+    onSuccess: () => { refetchMissions(); },
+  });
 
   return (
     <div style={{ paddingLeft: 10, borderLeft: "1px solid #DEDDDA", margin: "2px 5px 2px 17px" }}>
@@ -248,7 +252,8 @@ function WorkspaceMissions({
       {(missions ?? []).map((mission: any) => (
         <div
           key={mission.id}
-          onClick={() => onMissionSelect?.(mission.id)}
+          onMouseEnter={() => setHoveredMission(mission.id)}
+          onMouseLeave={() => setHoveredMission(null)}
           style={{
             padding: "3px 6px", borderRadius: 5, cursor: "pointer",
             display: "flex", alignItems: "center", gap: 5,
@@ -260,14 +265,34 @@ function WorkspaceMissions({
             background: activeMissionId === mission.id ? "#E8631A" : "#DEDDDA",
             flexShrink: 0,
           }} />
-          <span style={{
-            fontSize: 11,
-            color: activeMissionId === mission.id ? "#1A1A18" : "#9B9990",
-            fontWeight: activeMissionId === mission.id ? 500 : 400,
-            flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
+          <span
+            onClick={() => onMissionSelect?.(mission.id)}
+            style={{
+              fontSize: 11,
+              color: activeMissionId === mission.id ? "#1A1A18" : "#9B9990",
+              fontWeight: activeMissionId === mission.id ? 500 : 400,
+              flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}
+          >
             {mission.title?.length > 20 ? mission.title.slice(0, 20) + "…" : mission.title}
           </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm("刪除此任務？")) {
+                deleteMission.mutate({ id: mission.id });
+              }
+            }}
+            style={{
+              opacity: hoveredMission === mission.id ? 1 : 0,
+              background: "none", border: "none",
+              color: "#C8C7C3", cursor: "pointer",
+              fontSize: 12, padding: "0 3px",
+              transition: "opacity 0.1s",
+              flexShrink: 0,
+            }}
+            title="刪除任務"
+          >×</button>
         </div>
       ))}
       <div
@@ -306,12 +331,15 @@ function Drawer({
   };
 
   // Brand data
-  const { data: brands, isLoading: brandsLoading } = trpc.brand.listByMember.useQuery(
+  const { data: brands, isLoading: brandsLoading, refetch: refetchBrands } = trpc.brand.listByMember.useQuery(
     undefined,
     { refetchOnWindowFocus: false }
   );
   const [selectedBrandIdx, setSelectedBrandIdx] = useState(0);
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
+  const deleteBrand = trpc.brand.delete.useMutation({
+    onSuccess: () => { refetchBrands(); setBrandDropdownOpen(false); },
+  });
   const brandList = (brands as any[]) ?? [];
   const selectedBrand = brandList[selectedBrandIdx] ?? null;
   const selectedBrandId: number | null = selectedBrand?.id ?? null;
@@ -385,7 +413,6 @@ function Drawer({
                 {brandList.map((brand: any, idx: number) => (
                   <div
                     key={brand.id}
-                    onClick={() => { setSelectedBrandIdx(idx); setBrandDropdownOpen(false); }}
                     style={{
                       padding: "8px 12px", cursor: "pointer", fontSize: 12,
                       color: idx === selectedBrandIdx ? "#E8631A" : "#1A1A18",
@@ -393,15 +420,37 @@ function Drawer({
                       display: "flex", alignItems: "center", gap: 6,
                     }}
                   >
-                    <div style={{
-                      width: 16, height: 16, borderRadius: 3, background: "#1A1A18",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 8, fontWeight: 700, color: "#F9F9F8", flexShrink: 0,
-                    }}>
-                      {brand.name.charAt(0).toUpperCase()}
+                    <div
+                      onClick={() => { setSelectedBrandIdx(idx); setBrandDropdownOpen(false); }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}
+                    >
+                      <div style={{
+                        width: 16, height: 16, borderRadius: 3, background: "#1A1A18",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 8, fontWeight: 700, color: "#F9F9F8", flexShrink: 0,
+                      }}>
+                        {brand.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {brand.name}
+                      </span>
+                      {idx === selectedBrandIdx && <span style={{ marginLeft: "auto", color: "#E8631A", flexShrink: 0 }}>✓</span>}
                     </div>
-                    {brand.name}
-                    {idx === selectedBrandIdx && <span style={{ marginLeft: "auto", color: "#E8631A" }}>✓</span>}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`確定刪除品牌「${brand.name}」？`)) {
+                          deleteBrand.mutate({ id: brand.id });
+                        }
+                      }}
+                      style={{
+                        background: "none", border: "none",
+                        color: "#C8C7C3", cursor: "pointer",
+                        fontSize: 14, padding: "0 2px",
+                        flexShrink: 0, lineHeight: 1,
+                      }}
+                      title="刪除品牌"
+                    >×</button>
                   </div>
                 ))}
                 <div

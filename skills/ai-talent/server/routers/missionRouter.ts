@@ -197,4 +197,16 @@ export const missionRouter = router({
         .orderBy(missionTaskUnits.sortOrder);
       return { ...mission, taskUnits: units };
     }),
+
+  // Delete a mission
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB not available');
+      await db.delete(missions)
+        .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)));
+      return { success: true };
+    }),
+
 });
