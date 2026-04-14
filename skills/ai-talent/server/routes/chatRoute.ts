@@ -24,6 +24,7 @@ import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 import { getDb } from "../db";
+import { runSquadLeadQA, formatQAAsMessage, SQUAD_LEAD } from "../squadLeadQA";
 
 export const chatRouter = Router();
 
@@ -354,7 +355,96 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     send("relay_step", { id: 0, status: "done", summary: fullOutput.slice(0, 400) });
     logEvent({ sessionId, userId, agentSlug: "openclaw/pm", eventType: "gateway_call", isGatewayOk: true, latencyMs: Date.now() - t0, contentLength: fullOutput.length });
 
-    // 5. Done
+    // 5. Squad Lead QA（strategy workspace 且有實質輸出才觸發）
+    if (workspace === 'strategy' && missionId && fullOutput.length > 100) {
+      try {
+        // 取得當前步驟 + 品牌資料
+        const db = await getDb();
+        let currentStep = 0;
+        let brandName = (brandContext as any).brandName ?? '';
+        let industry = (brandContext as any).industry ?? '';
+        let description = (brandContext as any).description ?? '';
+        let targetMarket = (brandContext as any).targetMarket ?? '';
+        let previousContext = '';
+
+        if (db) {
+          const [sessionRows] = await (db as any).execute(
+            `SELECT ps.currentStep, ps.stepResults,
+                    b.name as bn, b.industry as bi, b.description as bd, b.targetMarket as bt
+             FROM positioning_sessions ps
+             LEFT JOIN brands b ON b.id = ps.brandId
+             WHERE ps.missionId = ${missionId} AND ps.userId = ${userId} LIMIT 1`
+          ) as any;
+          const sess = sessionRows?.[0];
+          if (sess) {
+            currentStep = sess.currentStep ?? 0;
+            brandName = brandName || sess.bn || '未知品牌';
+            industry = industry || sess.bi || '未指定';
+            description = description || sess.bd || '';
+            targetMarket = targetMarket || sess.bt || '';
+            // 前幾步摘要（脈絡）
+            const stepResults = typeof sess.stepResults === 'string'
+              ? JSON.parse(sess.stepResults || '{}') : (sess.stepResults ?? {});
+            const prevKeys = Object.keys(stepResults).map(Number)
+              .filter(k => k < currentStep).slice(-2);
+            if (prevKeys.length > 0) {
+              previousContext = prevKeys.map(k =>
+                `步驟${k}：${JSON.stringify(stepResults[k]).slice(0, 200)}`
+              ).join('\n');
+            }
+          }
+        }
+
+        // 只在有明確定位步驟時才做 QA（step 1-10）
+        if (currentStep >= 1 && currentStep <= 10) {
+          // 通知前端：Squad Lead QA 開始
+          send('relay_step', {
+            id: 99,
+            label: `品質審核 步驟${currentStep}`,
+            agentName: SQUAD_LEAD.name,
+            agentTitle: SQUAD_LEAD.title,
+            layer: 'qa',
+            status: 'running',
+          });
+
+          const qaResult = await runSquadLeadQA({
+            stepNumber: currentStep,
+            agentOutput: fullOutput,
+            brandName: brandName || '未知品牌',
+            industry: industry || '未指定',
+            description,
+            targetMarket,
+            previousContext: previousContext || undefined,
+          });
+
+          // QA 結束 relay step
+          send('relay_step', {
+            id: 99,
+            status: 'done',
+            summary: `QA ${qaResult.status === 'pass' ? '通過' : '注意'} ${qaResult.overallScore}分`,
+          });
+
+          // 把 QA 結論作為新的訊息推給用戶
+          const qaMessage = formatQAAsMessage(qaResult);
+          send('delta', { text: '\n\n---\n' + qaMessage });
+
+          // 更新 positioning_sessions 狀態（QA 通過 → waiting_confirm；flag → waiting_confirm 也推進讓用戶決定）
+          if (db && currentStep >= 1) {
+            try {
+              const newStatus = qaResult.readyToAdvance ? 'waiting_confirm' : 'waiting_confirm';
+              await (db as any).execute(
+                `UPDATE positioning_sessions SET status='${newStatus}', updatedAt=NOW() WHERE missionId=${missionId} AND userId=${userId}`
+              );
+            } catch { /* non-fatal */ }
+          }
+        }
+      } catch (qaErr: any) {
+        // QA 失敗不影響主流程，靜默繼續
+        console.error('[SquadLeadQA] error:', qaErr?.message);
+      }
+    }
+
+    // 6. Done
     send("done", { sessionId, isComplete: true });
 
   } catch (err: any) {
