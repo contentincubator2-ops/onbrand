@@ -76,8 +76,15 @@ const publicDir = join(process.cwd(), "public");
 if (existsSync(publicDir)) {
   // Assets (hashed filenames) — cache 1 year
   app.use("/assets", express.static(join(publicDir, "assets"), { maxAge: "1y", immutable: true }));
-  // Other static files (favicon, etc.) — cache 1 hour
-  app.use(express.static(publicDir, { maxAge: "1h" }));
+  // index.html: NO cache（每次都拿最新，確保新 deploy 馬上生效）
+  app.get("/", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.sendFile(join(publicDir, "index.html"));
+  });
+  // Other static files (favicon, etc.) — cache 5 min
+  app.use(express.static(publicDir, { maxAge: "5m" }));
   // SPA fallback — serve index.html with no-cache so browser always loads latest
   app.get("*", (req, res, next) => {
     if (
