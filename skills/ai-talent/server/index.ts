@@ -25,6 +25,7 @@ import { exportRouter } from "./routes/exportRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
 import { squadChatRouter } from "./routes/squadChatRoute";
+import { chatRouter } from "./routes/chatRoute";
 import pmRouter from "./routes/pmRoute";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
@@ -123,6 +124,7 @@ app.use("/api/a2a", a2aStreamRouter);
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
 app.use("/api/stream", squadChatRouter);
+app.use("/api/chat", chatRouter);  // 新統一入口
 app.use("/api/pm", pmRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
