@@ -406,13 +406,20 @@ function RecentMissions({
   const [hoveredId, setHoveredId] = React.useState<number | null>(null);
 
   const missionList = (missions ?? []) as any[];
-  if (!brandId || missionList.length === 0) return null;
+  if (!brandId) return null;
 
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 10, fontWeight: 600, color: '#B0AFA9', textTransform: 'uppercase' as const, letterSpacing: '0.07em', padding: '8px 13px 3px' }}>
         歷史任務
       </div>
+      {missionList.length === 0 && (
+        <div style={{ padding: '6px 13px 8px', fontSize: 10, color: '#C8C7C3', lineHeight: 1.5 }}>
+          還沒有未分類任務
+          <br />
+          <span style={{ color: '#B0AFA9' }}>在任何工作區外開始對話，即自動建立</span>
+        </div>
+      )}
       {missionList.map((m: any) => (
         <div
           key={m.id}
