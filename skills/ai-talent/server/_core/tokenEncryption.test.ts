@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { encryptAccessToken, decryptAccessToken, serializeEncryptedToken, deserializeEncryptedToken } from "./_core/tokenEncryption";
+import { encryptAccessToken, decryptAccessToken, serializeEncryptedToken, deserializeEncryptedToken } from "./tokenEncryption";
 
 beforeEach(() => {
   process.env.TOKEN_ENCRYPTION_KEY = "a".repeat(64); // 64 hex chars = 256 bits
