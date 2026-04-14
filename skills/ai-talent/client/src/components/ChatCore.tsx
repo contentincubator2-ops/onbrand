@@ -996,9 +996,9 @@ export default function ChatCore({
     if (!activeMissionId && !currentMissionId && currentConvMessages.length === 0) {
       try {
         const newMission = await createMission.mutateAsync({
-          workspace: activeWorkspaceKey,
+          workspace: '',
           brandId: activeBrand?.id,
-          title: rawText.slice(0, 50),
+          title: rawText.slice(0, 40),
         });
         if (newMission?.id) {
           setCurrentMissionId(newMission.id);

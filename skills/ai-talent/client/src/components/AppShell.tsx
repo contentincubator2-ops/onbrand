@@ -220,6 +220,70 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   );
 }
 
+// ─── ResourceStats ────────────────────────────────────────────────────────────
+function ResourceStats({ resourceData, isLoading }: { resourceData: any; isLoading: boolean }) {
+  const [expanded, setExpanded] = React.useState<string | null>(null);
+
+  const items = [
+    {
+      key: 'agents',
+      label: 'Agents',
+      value: resourceData?.agents ?? null,
+      detail: resourceData?.agents ? ('共 ' + resourceData.agents.toLocaleString() + ' 位可用 Agents，專精此工作區任務') : null,
+    },
+    {
+      key: 'skills',
+      label: 'Skills',
+      value: resourceData?.skills ?? null,
+      detail: resourceData?.skills ? ('涵蓋 ' + resourceData.skills + ' 種不同技能') : null,
+    },
+    {
+      key: 'providers',
+      label: 'AI Providers',
+      value: resourceData?.providers ?? null,
+      detail: resourceData?.providerList?.length
+        ? resourceData.providerList.join(' · ')
+        : (resourceData?.providers ? (resourceData.providers + ' 家 AI 供應商') : null),
+    },
+  ];
+
+  return (
+    <div style={{ padding: '0 10px 8px' }}>
+      {items.map(item => (
+        <div key={item.key}>
+          <div
+            onClick={() => setExpanded(expanded === item.key ? null : item.key)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '3px 4px', cursor: 'pointer', borderRadius: 5,
+              background: expanded === item.key ? '#ECEAE8' : 'transparent',
+            }}
+          >
+            <span style={{ fontSize: 11, color: '#6B6A66' }}>{item.label}</span>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: '#1A1A18',
+              background: '#F2F1EF', border: '1px solid #E4E3E1',
+              borderRadius: 4, padding: '1px 7px',
+              cursor: 'pointer',
+            }}>
+              {isLoading ? '…' : item.value !== null && item.value !== undefined ? item.value : '—'}
+            </span>
+          </div>
+          {expanded === item.key && item.detail && (
+            <div style={{
+              margin: '2px 4px 4px', padding: '5px 8px',
+              background: '#FFFFFF', border: '1px solid #E4E3E1',
+              borderRadius: 6, fontSize: 10, color: '#6B6A66', lineHeight: 1.5,
+            }}>
+              {item.detail}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── WorkspaceMissions ────────────────────────────────────────────────────────
 
 function WorkspaceMissions({
@@ -305,6 +369,137 @@ function WorkspaceMissions({
   );
 }
 
+
+// ─── RecentMissions ───────────────────────────────────────────────────────────
+
+function RecentMissions({
+  brandId,
+  activeMissionId,
+  onMissionSelect,
+  workspaces,
+}: {
+  brandId: number | null;
+  activeMissionId?: number | null;
+  onMissionSelect?: (missionId: number) => void;
+  workspaces: any[];
+}) {
+  const queryResult = (trpc as any).mission?.listUncategorized?.useQuery
+    ? (trpc as any).mission.listUncategorized.useQuery(
+        { brandId: brandId ?? undefined },
+        { enabled: !!brandId, refetchOnWindowFocus: false }
+      )
+    : { data: [], refetch: () => {} };
+  const missions = queryResult.data;
+  const refetch = queryResult.refetch;
+
+  const renameMutation = (trpc as any).mission?.rename?.useMutation
+    ? (trpc as any).mission.rename.useMutation({ onSuccess: () => refetch() })
+    : { mutate: () => {} };
+
+  const moveMutation = (trpc as any).mission?.move?.useMutation
+    ? (trpc as any).mission.move.useMutation({ onSuccess: () => refetch() })
+    : { mutate: () => {} };
+
+  const [editingId, setEditingId] = React.useState<number | null>(null);
+  const [editTitle, setEditTitle] = React.useState('');
+  const [moveMenuId, setMoveMenuId] = React.useState<number | null>(null);
+  const [hoveredId, setHoveredId] = React.useState<number | null>(null);
+
+  const missionList = (missions ?? []) as any[];
+  if (!brandId || missionList.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#B0AFA9', textTransform: 'uppercase' as const, letterSpacing: '0.07em', padding: '8px 13px 3px' }}>
+        歷史任務
+      </div>
+      {missionList.map((m: any) => (
+        <div
+          key={m.id}
+          onMouseEnter={() => setHoveredId(m.id)}
+          onMouseLeave={() => setHoveredId(null)}
+          style={{ position: 'relative', margin: '1px 5px' }}
+        >
+          {editingId === m.id ? (
+            <input
+              autoFocus
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              onBlur={() => {
+                if (editTitle.trim()) renameMutation.mutate({ id: m.id, title: editTitle.trim() });
+                setEditingId(null);
+              }}
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                if (e.key === 'Enter') {
+                  if (editTitle.trim()) renameMutation.mutate({ id: m.id, title: editTitle.trim() });
+                  setEditingId(null);
+                }
+                if (e.key === 'Escape') setEditingId(null);
+              }}
+              style={{
+                width: '100%', fontSize: 11, padding: '3px 6px', borderRadius: 5,
+                border: '1px solid #E8631A', background: 'white', outline: 'none',
+                color: '#1A1A18', boxSizing: 'border-box' as const,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '3px 6px', borderRadius: 5, cursor: 'pointer',
+                background: activeMissionId === m.id ? '#FFFFFF' : 'transparent',
+              }}
+            >
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: activeMissionId === m.id ? '#E8631A' : '#DEDDDA', flexShrink: 0 }} />
+              <span
+                onClick={() => onMissionSelect?.(m.id)}
+                style={{
+                  fontSize: 11, flex: 1,
+                  color: activeMissionId === m.id ? '#1A1A18' : '#9B9990',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
+                {m.title?.length > 22 ? m.title.slice(0, 22) + '\u2026' : m.title}
+              </span>
+              {hoveredId === m.id && (
+                <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                  <button
+                    onClick={() => { setEditingId(m.id); setEditTitle(m.title); }}
+                    title="\u7de8\u8f2f\u6a19\u984c"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B9990', fontSize: 10, padding: '0 2px' }}
+                  >{'\u270e'}</button>
+                  <button
+                    onClick={() => setMoveMenuId(moveMenuId === m.id ? null : m.id)}
+                    title="\u642c\u79fb\u5230\u5de5\u4f5c\u5340"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B9990', fontSize: 10, padding: '0 2px' }}
+                  >{'\u2192'}</button>
+                </div>
+              )}
+              {moveMenuId === m.id && (
+                <div style={{
+                  position: 'absolute', right: 0, top: '100%', zIndex: 200,
+                  background: 'white', border: '1px solid #E4E3E1', borderRadius: 7,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: 130, overflow: 'hidden',
+                }}>
+                  {workspaces.map((ws: any) => (
+                    <div
+                      key={ws.wsKey}
+                      onClick={() => { moveMutation.mutate({ id: m.id, workspace: ws.wsKey }); setMoveMenuId(null); }}
+                      style={{ padding: '7px 12px', fontSize: 11, cursor: 'pointer', color: '#1A1A18' }}
+                    >
+                      {ws.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Drawer ───────────────────────────────────────────────────────────────────
 
 function Drawer({
@@ -351,15 +546,17 @@ function Drawer({
   );
   const wsList = (workspaces as any[]) ?? [];
   const [expandedWs, setExpandedWs] = useState<Record<string, boolean>>({});
+  const [activeWsKey, setActiveWsKey] = useState<string>('strategy');
 
   // Resource summary (optional chaining for missing router)
   const resourceQuery = (trpc as any).resource?.summary?.useQuery
-    ? (trpc as any).resource.summary.useQuery(undefined, { refetchOnWindowFocus: false })
+    ? (trpc as any).resource.summary.useQuery({ workspace: activeWsKey }, { refetchOnWindowFocus: false })
     : { data: null, isLoading: false };
   const resourceData = resourceQuery.data;
 
   const toggleWs = (key: string) => {
     setExpandedWs(prev => ({ ...prev, [key]: !prev[key] }));
+    setActiveWsKey(key);
   };
 
   return (
@@ -531,28 +728,17 @@ function Drawer({
           </div>
         )}
 
+        <RecentMissions
+          brandId={selectedBrandId}
+          activeMissionId={activeMissionId}
+          onMissionSelect={onMissionSelect}
+          workspaces={wsList}
+        />
+
         {/* 可用資源 section */}
         <div style={{ ...secLabel, marginTop: 6 }}>可用資源</div>
         <div style={{ padding: "0 10px 8px" }}>
-          {[
-            { label: "Agents",       value: resourceData?.agents ?? null },
-            { label: "Skills",       value: resourceData?.skills ?? null },
-            { label: "AI Providers", value: resourceData?.aiProviders ?? null },
-          ].map(item => (
-            <div key={item.label} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "3px 4px",
-            }}>
-              <span style={{ fontSize: 11, color: "#6B6A66" }}>{item.label}</span>
-              <span style={{
-                fontSize: 11, fontWeight: 600, color: "#1A1A18",
-                background: "#F2F1EF", border: "1px solid #E4E3E1",
-                borderRadius: 4, padding: "1px 7px",
-              }}>
-                {resourceQuery.isLoading ? "…" : item.value !== null ? item.value : "—"}
-              </span>
-            </div>
-          ))}
+          <ResourceStats resourceData={resourceData} isLoading={resourceQuery.isLoading} />
         </div>
       </div>
 

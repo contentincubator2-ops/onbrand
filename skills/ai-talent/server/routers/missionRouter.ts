@@ -9,13 +9,13 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { missions, missionTaskUnits } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or, isNull } from "drizzle-orm";
 
 export const missionRouter = router({
   // List missions for a workspace
   list: protectedProcedure
     .input(z.object({
-      workspace: z.string().min(1).max(50),
+      workspace: z.string().max(50).optional().default(""),
       brandId: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
@@ -69,7 +69,7 @@ export const missionRouter = router({
   // Create a new mission
   create: protectedProcedure
     .input(z.object({
-      workspace: z.string().min(1).max(50),
+      workspace: z.string().max(50).optional().default(""),
       brandId: z.number().optional(),
       title: z.string().min(1).max(255),
       objective: z.string().optional(),
@@ -175,7 +175,7 @@ export const missionRouter = router({
   // Get active mission for a workspace (most recently updated active mission)
   getActive: protectedProcedure
     .input(z.object({
-      workspace: z.string().min(1).max(50),
+      workspace: z.string().max(50).optional().default(""),
       brandId: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
@@ -207,6 +207,55 @@ export const missionRouter = router({
       await db.delete(missions)
         .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)));
       return { success: true };
+    }),
+
+
+  // Rename a mission
+  rename: protectedProcedure
+    .input(z.object({ id: z.number(), title: z.string().min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      await db.update(missions)
+        .set({ title: input.title })
+        .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)));
+      return { success: true };
+    }),
+
+  // Move mission to a workspace
+  move: protectedProcedure
+    .input(z.object({ id: z.number(), workspace: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      await db.update(missions)
+        .set({ workspace: input.workspace })
+        .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)));
+      return { success: true };
+    }),
+
+  // List uncategorized missions (workspace is null or empty string)
+  listUncategorized: protectedProcedure
+    .input(z.object({ brandId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const conditions = [
+        eq(missions.userId, ctx.user.id),
+        or(isNull(missions.workspace), eq(missions.workspace, "")),
+      ];
+      if (input.brandId) conditions.push(eq(missions.brandId, input.brandId));
+      return db.select({
+        id: missions.id,
+        title: missions.title,
+        workspace: missions.workspace,
+        brandId: missions.brandId,
+        createdAt: missions.createdAt,
+      })
+        .from(missions)
+        .where(and(...(conditions as any[])))
+        .orderBy(desc(missions.createdAt))
+        .limit(20);
     }),
 
 });

@@ -432,45 +432,35 @@ export const brandRouter = router({
             VALUES (${brandId}, ${ctx.user.id}, "owner", ${ctx.user.id})`
       );
 
-      // 1. 建立 strategy workspace（若用戶還沒有）
-      await db.execute(
-        sql`INSERT IGNORE INTO user_workspaces (userId, wsKey, label, sortOrder, brandId)
-            VALUES (${ctx.user.id}, 'strategy', '策略定位', 0, ${brandId})`
-      );
+      // Seed workspaces and missions for the new brand
+      const workspaceSeeds = [
+        { wsKey: 'strategy', label: '策略定位', sortOrder: 0 },
+        { wsKey: 'website',  label: '官網',     sortOrder: 1 },
+        { wsKey: 'facebook', label: 'Facebook', sortOrder: 2 },
+      ];
+      for (const ws of workspaceSeeds) {
+        await db.execute(
+          sql`INSERT IGNORE INTO user_workspaces (userId, wsKey, label, sortOrder, brandId)
+              VALUES (${ctx.user.id}, ${ws.wsKey}, ${ws.label}, ${ws.sortOrder}, ${brandId})`
+        );
+      }
 
-      // 取得剛建立的 workspace id（或已存在的）
-      const [wsRows] = await db.execute(
-        sql`SELECT id FROM user_workspaces WHERE userId=${ctx.user.id} AND wsKey='strategy' AND brandId=${brandId} LIMIT 1`
-      ) as any;
-      const _wsId = wsRows?.[0]?.id;
+      const missionSeeds = [
+        { workspace: 'strategy', title: '品牌定位',  squadSlug: 'brand-positioning', welcome: '你好！我是你的品牌定位顧問。\n\n🎯 接下來我們將一起完成 11 步驟品牌策略定位，幫你建立清晰的品牌定位基礎。\n\n準備好了嗎？先告訴我：你的品牌主要解決什麼問題？目標客戶是誰？' },
+        { workspace: 'strategy', title: '產品定位',  squadSlug: 'brand-positioning', welcome: '你好！我是你的產品定位顧問。\n\n讓我們一起梳理產品的核心價值主張、目標市場和差異化優勢。\n\n請先告訴我：你的產品是什麼？它解決哪個具體痛點？' },
+        { workspace: 'website',  title: 'SEO 優化',  squadSlug: 'tw-website-rebuild', welcome: '你好！我是你的 SEO 策略師。\n\n我們將從關鍵字研究到內容優化，全面提升你的網站搜尋排名。\n\n請先告訴我：你的官網 URL 是什麼？' },
+        { workspace: 'website',  title: '首頁文案調整', squadSlug: 'tw-website-rebuild', welcome: '你好！我是你的文案策略師。\n\n好的首頁文案能在 5 秒內抓住訪客注意力。請先貼上你目前的首頁主標題和副標題。' },
+        { workspace: 'facebook', title: '品牌貼文',  squadSlug: 'mkt-social-content', welcome: '你好！我是你的社群內容策略師。\n\n請先告訴我：你的品牌受眾是誰？目前 Facebook 粉專的現況如何？' },
+        { workspace: 'facebook', title: '廣告文案',  squadSlug: 'tw-facebook-ads', welcome: '你好！我是你的 Facebook 廣告文案師。\n\n讓我們一起打造高轉換的廣告文案。請告訴我：你目前在投什麼廣告目標？' },
+      ];
+      for (const m of missionSeeds) {
+        await db.execute(
+          sql`INSERT IGNORE INTO missions (userId, workspace, title, squadSlug, welcomeMessage, isRecurring, status, brandId)
+              VALUES (${ctx.user.id}, ${m.workspace}, ${m.title}, ${m.squadSlug}, ${m.welcome}, 0, 'active', ${brandId})`
+        );
+      }
 
-      // 2. 建立「品牌定位」mission
-      const positioningWelcome = `你好！我是你的品牌定位顧問。
-
-🎯 接下來我們將一起完成 **11 步驟品牌策略定位**，幫你建立清晰的品牌定位基礎。
-
-這 11 個步驟包含：
-1. 品牌核心價值定義
-2. 目標受眾分析
-3. 競品定位對比
-4. 獨特價值主張（UVP）
-5. 品牌個性與語調
-6. 市場定位地圖
-7. 價格定位策略
-8. 通路策略
-9. 內容主題柱
-10. 品牌故事框架
-11. 執行優先序
-
-準備好了嗎？先告訴我：**你的品牌主要解決什麼問題？目標客戶是誰？**`;
-
-      await db.execute(
-        sql`INSERT INTO missions (userId, workspace, title, squadSlug, welcomeMessage, isRecurring, status, brandId)
-            VALUES (${ctx.user.id}, 'strategy', '品牌定位', 'brand-positioning', ${positioningWelcome}, 0, 'active', ${brandId})
-            ON DUPLICATE KEY UPDATE id=id`
-      );
-
-      // 取得 mission id
+      // Get first mission id (品牌定位) for redirect
       const [missionRows] = await db.execute(
         sql`SELECT id FROM missions WHERE userId=${ctx.user.id} AND workspace='strategy' AND title='品牌定位' AND brandId=${brandId} LIMIT 1`
       ) as any;

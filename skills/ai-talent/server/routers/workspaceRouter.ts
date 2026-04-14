@@ -156,40 +156,6 @@ export const workspaceRouter = router({
         .where(eq(userWorkspaces.userId, ctx.user.id))
         .orderBy(asc(userWorkspaces.sortOrder), asc(userWorkspaces.createdAt));
 
-      // Auto-seed defaults if user has no workspaces yet
-      if (rows.length === 0) {
-        // 1. Create default workspaces (5 including strategy)
-        await db.insert(userWorkspaces).values(
-          DEFAULT_WORKSPACE_SEEDS.map((seed) => ({
-            userId: ctx.user.id,
-            wsKey: seed.wsKey,
-            label: seed.label,
-            sortOrder: seed.sortOrder,
-          }))
-        );
-
-        // 2. Create 6 onboarding missions with squad bindings
-        const onboardingMissions = buildOnboardingMissions(ctx.user.id);
-        for (const m of onboardingMissions) {
-          try {
-            await db.execute(
-              sql`INSERT INTO missions (userId, workspace, title, squadSlug, welcomeMessage, isRecurring, recurringSchedule, status)
-                  VALUES (${m.userId}, ${m.workspace}, ${m.title}, ${m.squadSlug},
-                         ${m.welcomeMessage ?? ''}, ${m.isRecurring ? 1 : 0},
-                         ${m.recurringSchedule ?? null}, 'active')`
-            );
-          } catch (err) {
-            console.error('[Onboarding] mission insert failed:', m.title, err);
-          }
-        }
-
-        return await db
-          .select()
-          .from(userWorkspaces)
-          .where(eq(userWorkspaces.userId, ctx.user.id))
-          .orderBy(asc(userWorkspaces.sortOrder));
-      }
-
       return rows;
     }),
 
