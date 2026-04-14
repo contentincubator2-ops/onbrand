@@ -221,29 +221,64 @@ function Rail({ activeTab, onTabChange, notifCount }: {
 }
 
 // ─── ResourceStats ────────────────────────────────────────────────────────────
+// Model name 美化對照表
+const MODEL_DISPLAY: Record<string, string> = {
+  'gpt-4o': 'GPT-4o',
+  'gpt-4o-mini': 'GPT-4o Mini',
+  'gpt-4-turbo': 'GPT-4 Turbo',
+  'gpt-3.5-turbo': 'GPT-3.5',
+  'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
+  'claude-3-5-sonnet': 'Claude 3.5 Sonnet',
+  'claude-3-haiku-20240307': 'Claude 3 Haiku',
+  'claude-3-opus-20240229': 'Claude 3 Opus',
+  'gemini-pro': 'Gemini Pro',
+  'gemini-1.5-pro': 'Gemini 1.5 Pro',
+};
+function fmtModel(m: string): string {
+  return MODEL_DISPLAY[m] ?? m.split('/').pop()?.replace(/-/g, ' ').replace(/\w/g, c => c.toUpperCase()) ?? m;
+}
+
 function ResourceStats({ resourceData, isLoading }: { resourceData: any; isLoading: boolean }) {
   const [expanded, setExpanded] = React.useState<string | null>(null);
+
+  // Skills 展開：顯示具體技能標籤
+  const skillDetail = resourceData?.skillList?.length
+    ? resourceData.skillList.slice(0, 12).join('  ·  ')
+    : resourceData?.skills ? `此工作區共 ${resourceData.skills} 種技能` : null;
+
+  // AI Providers 展開：顯示美化後的 model 名稱
+  const providerDetail = resourceData?.providerList?.length
+    ? resourceData.providerList.map((m: string) => fmtModel(m)).join('  ·  ')
+    : null;
+
+  // Agents 展開：顯示工作區說明
+  const wsDesc: Record<string, string> = {
+    strategy:  '品牌策略 · 定位分析 · 市場研究 · 競品分析',
+    website:   'SEO 優化 · 網站文案 · 內容策略 · Landing Page',
+    facebook:  '社群廣告 · 貼文創作 · 受眾分析 · 成效優化',
+  };
+  const agentDetail = resourceData?.mode && wsDesc[resourceData.mode]
+    ? wsDesc[resourceData.mode]
+    : resourceData?.agents ? `${resourceData.agents} 位 Agent 可協作執行此任務` : null;
 
   const items = [
     {
       key: 'agents',
       label: 'Agents',
       value: resourceData?.agents ?? null,
-      detail: resourceData?.agents ? ('共 ' + resourceData.agents.toLocaleString() + ' 位可用 Agents，專精此工作區任務') : null,
+      detail: agentDetail,
     },
     {
       key: 'skills',
       label: 'Skills',
       value: resourceData?.skills ?? null,
-      detail: resourceData?.skills ? ('涵蓋 ' + resourceData.skills + ' 種不同技能') : null,
+      detail: skillDetail,
     },
     {
       key: 'providers',
-      label: 'AI Providers',
+      label: 'AI Models',
       value: resourceData?.providers ?? null,
-      detail: resourceData?.providerList?.length
-        ? resourceData.providerList.join(' · ')
-        : (resourceData?.providers ? (resourceData.providers + ' 家 AI 供應商') : null),
+      detail: providerDetail,
     },
   ];
 
@@ -557,7 +592,7 @@ function Drawer({
 
   // Resource summary (optional chaining for missing router)
   const resourceQuery = (trpc as any).resource?.summary?.useQuery
-    ? (trpc as any).resource.summary.useQuery({ workspace: activeWsKey }, { refetchOnWindowFocus: false })
+    ? (trpc as any).resource.summary.useQuery({ workspace: activeWsKey }, { refetchOnWindowFocus: false, staleTime: 0 })
     : { data: null, isLoading: false };
   const resourceData = resourceQuery.data;
 
