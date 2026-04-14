@@ -940,6 +940,16 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
   const [selectedBrandIdx] = useState(0);
   const selectedBrand = brandList[selectedBrandIdx] ?? null;
 
+  // Mission + workspace for breadcrumb
+  const { data: activeMissionData } = (trpc as any).mission?.getById?.useQuery
+    ? (trpc as any).mission.getById.useQuery(
+        { id: activeMissionId },
+        { enabled: !!activeMissionId, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+  const activeMissionTitle = (activeMissionData as any)?.title ?? null;
+  const activeMissionWorkspace = (activeMissionData as any)?.workspace ?? null;
+
   const shellStyle: React.CSSProperties = {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
     background: "#F9F9F8",
@@ -1012,9 +1022,24 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         {/* Topbar */}
         <div style={topbarStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#9B9990" }}>
-            <span>{selectedBrand?.name ?? "SoWork"}</span>
-            <span style={{ color: "#D4D3D0" }}>/</span>
-            <span style={{ color: "#1A1A18", fontWeight: 500 }}>Marketing OS</span>
+            <span>{selectedBrand?.name ?? "SoWork AI"}</span>
+            {activeMissionWorkspace && (
+              <>
+                <span style={{ color: "#D4D3D0" }}>/</span>
+                <span>{activeMissionWorkspace === "strategy" ? "策略定位" : activeMissionWorkspace === "website" ? "官網" : activeMissionWorkspace === "facebook" ? "Facebook" : activeMissionWorkspace}</span>
+              </>
+            )}
+            {activeMissionTitle ? (
+              <>
+                <span style={{ color: "#D4D3D0" }}>/</span>
+                <span style={{ color: "#1A1A18", fontWeight: 500 }}>{activeMissionTitle.length > 20 ? activeMissionTitle.slice(0, 20) + "…" : activeMissionTitle}</span>
+              </>
+            ) : (
+              <>
+                <span style={{ color: "#D4D3D0" }}>/</span>
+                <span style={{ color: "#1A1A18", fontWeight: 500 }}>Marketing OS</span>
+              </>
+            )}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 5, alignItems: "center" }}>
             {/* Notification Bell */}
