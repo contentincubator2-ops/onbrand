@@ -912,6 +912,100 @@ function RightPanel() {
   );
 }
 
+// ─── BrandPositioningBar ──────────────────────────────────────────────────────
+
+function BrandPositioningBar({ brandId }: { brandId: number | null }) {
+  const { data: pos, refetch } = (trpc as any).brand?.getPositioning?.useQuery
+    ? (trpc as any).brand.getPositioning.useQuery(
+        { brandId: brandId! },
+        { enabled: !!brandId, refetchOnWindowFocus: false }
+      )
+    : { data: null, refetch: () => {} };
+
+  const generateEstimate = (trpc as any).brand?.generateEstimate?.useMutation
+    ? (trpc as any).brand.generateEstimate.useMutation({ onSuccess: () => refetch() })
+    : { mutate: () => {}, isLoading: false };
+
+  // 自動觸發推估（若無 tagline）
+  React.useEffect(() => {
+    if (brandId && pos && !pos.tagline && !generateEstimate.isLoading) {
+      generateEstimate.mutate({ brandId });
+    }
+  }, [brandId, pos?.tagline]);
+
+  if (!brandId) return null;
+
+  const p = pos as any;
+  const isLoading = !p || (!p.tagline && generateEstimate.isLoading);
+  const isEmpty = p && !p.tagline && !generateEstimate.isLoading;
+
+  const tags = [
+    p?.targetMarket,
+    p?.audienceA,
+    p?.audienceB,
+    p?.emotionalDiff,
+    p?.functionalDiff,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div style={{
+      padding: '10px 20px',
+      borderBottom: '1px solid #F0EFED',
+      background: '#FAFAF9',
+      flexShrink: 0,
+    }}>
+      {isLoading ? (
+        <div style={{ fontSize: 11, color: '#B0AFA9' }}>AI 正在推估品牌定位…</div>
+      ) : isEmpty ? (
+        <div style={{ fontSize: 11, color: '#B0AFA9' }}>品牌定位尚未設定</div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A18' }}>
+                {p?.tagline}
+              </span>
+              {p?.isEstimate === 1 && (
+                <span style={{
+                  fontSize: 9, color: '#E8631A', border: '1px solid #F5C4A8',
+                  borderRadius: 4, padding: '1px 5px', fontWeight: 500, flexShrink: 0,
+                }}>
+                  ✦ 推估中
+                </span>
+              )}
+            </div>
+            {p?.valueProposition && (
+              <div style={{ fontSize: 11, color: '#6B6A66', marginTop: 2 }}>
+                {typeof p.valueProposition === 'string' ? p.valueProposition : JSON.stringify(p.valueProposition)}
+              </div>
+            )}
+            {tags.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
+                {tags.map((tag, i) => (
+                  <span key={i} style={{
+                    fontSize: 10, padding: '2px 7px', borderRadius: 10,
+                    background: i === 0 ? '#FFF0E8' : '#F2F1EF',
+                    color: i === 0 ? '#E8631A' : '#6B6A66',
+                    border: i === 0 ? '1px solid #F5C4A8' : '1px solid #E4E3E1',
+                  }}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          {p?.isEstimate === 1 && (
+            <div style={{ fontSize: 10, color: '#B0AFA9', flexShrink: 0, maxWidth: 140, lineHeight: 1.4 }}>
+              待品牌定位完成後<br/>自動更新並套用
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ─── AppShell ─────────────────────────────────────────────────────────────────
 
 interface AppShellProps {
@@ -939,6 +1033,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
   const brandList = (brands as any[]) ?? [];
   const [selectedBrandIdx] = useState(0);
   const selectedBrand = brandList[selectedBrandIdx] ?? null;
+  const selectedBrandId: number | null = (selectedBrand as any)?.id ?? null;
 
   // Mission + workspace for breadcrumb
   const { data: activeMissionData } = (trpc as any).mission?.getById?.useQuery
@@ -1068,6 +1163,8 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
             </button>
           </div>
         </div>
+
+        <BrandPositioningBar brandId={selectedBrandId} />
 
         {/* Mission Bar */}
         <div style={missionBarStyle}>

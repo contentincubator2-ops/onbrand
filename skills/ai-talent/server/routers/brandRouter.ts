@@ -538,6 +538,95 @@ export const brandRouter = router({
       return { success: true };
     }),
 
+
+  /**
+   * 取得品牌定位欄資料
+   */
+  getPositioning: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [rows] = await db.execute(
+        sql`SELECT tagline, valueProposition, targetMarket, audienceA, audienceB,
+               emotionalDiff, functionalDiff, isEstimate, positioningStatus, name, description, industry
+          FROM brands WHERE id=${input.brandId}
+          LIMIT 1`
+      ) as any;
+      return rows?.[0] ?? null;
+    }),
+
+  /**
+   * AI 推估品牌定位（GPT-4o-mini）
+   */
+  generateEstimate: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [rows] = await db.execute(
+        sql`SELECT name, description, industry, website, tagline FROM brands
+          WHERE id=${input.brandId} LIMIT 1`
+      ) as any;
+      const brand = rows?.[0];
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
+
+      if (brand.tagline) return { skipped: true };
+
+      const endpoint = process.env.AZURE_OPENAI_ENDPOINT ?? "";
+      const apiKey = process.env.AZURE_OPENAI_KEY ?? "";
+      const deployment = "gpt-4o-mini";
+      const prompt = `你是品牌策略專家。根據以下品牌資訊，推估品牌定位，用繁體中文回答，以 JSON 格式輸出。
+
+品牌名稱：${brand.name}
+產業：${brand.industry ?? "未知"}
+品牌簡介：${brand.description ?? "無"}
+官網：${brand.website ?? "無"}
+
+請輸出以下 JSON（每個欄位限制字數如括號所示）：
+{
+  "tagline": "品牌標語，20字內，有力量感",
+  "valueProposition": "核心價值主張，50字內，說明如何幫助客戶",
+  "targetMarket": "目標市場，10字內，如：台灣中小企業",
+  "audienceA": "主要目標客群，15字內，如：25-40歲品牌創辦人",
+  "audienceB": "次要目標客群，15字內，如：中小企業行銷主管",
+  "emotionalDiff": "情感差異化要素，20字內，感受層面的差異",
+  "functionalDiff": "功能差異化要素，20字內，功能層面的差異"
+}`;
+
+      const res = await fetch(
+        `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2024-02-01`,
+        {
+          method: "POST",
+          headers: { "api-key": apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 500,
+            response_format: { type: "json_object" },
+          }),
+        }
+      );
+      const data = await res.json() as any;
+      const content = data?.choices?.[0]?.message?.content;
+      if (!content) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "GPT 回應為空" });
+
+      let parsed: any;
+      try { parsed = JSON.parse(content); } catch { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "GPT JSON 解析失敗" }); }
+
+      await db.execute(
+        sql`UPDATE brands SET
+          tagline=${parsed.tagline ?? null},
+          audienceA=${parsed.audienceA ?? null},
+          audienceB=${parsed.audienceB ?? null},
+          emotionalDiff=${parsed.emotionalDiff ?? null},
+          functionalDiff=${parsed.functionalDiff ?? null},
+          isEstimate=1
+        WHERE id=${input.brandId}`
+      );
+      return { success: true, data: parsed };
+    }),
+
   /**
    * 取得可用資源數量（依 workspace label 匹配 agents）
    */
