@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { missionOutputs } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 const PLATFORM_PREVIEW_TEMPLATES: Record<string, (content: string, title?: string) => string> = {
   facebook: (content, title) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><div style="padding:12px 16px;display:flex;align-items:center;gap:10px"><div style="width:40px;height:40px;border-radius:50%;background:#1877F2;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:16px">B</div><div><div style="font-weight:600;font-size:14px">品牌頁面</div><div style="font-size:12px;color:#65676b">剛剛 · 🌐</div></div></div><div style="padding:0 16px 12px;font-size:15px;line-height:1.6;color:#1c1e21;white-space:pre-wrap">${content}</div></div>`,
@@ -114,6 +114,53 @@ export const outputRouter = router({
           .where(eq(missionOutputs.id, id));
       }
       return { success: true, count: input.ids.length };
+    }),
+
+
+  finalize: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      finalizedBy: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const finalizedBy = input.finalizedBy ?? (ctx.user as any)?.id ?? 'unknown';
+      await db.execute(
+        sql`UPDATE mission_outputs SET finalized_status='finalized', finalized_at=NOW(), finalized_by=${finalizedBy} WHERE id=${input.id}`
+      );
+      return { success: true };
+    }),
+
+  setDeliverableMeta: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      deliverableLevel: z.number().min(1).max(3).optional(),
+      deliverableTool: z.enum(['none','canva','google_slides','google_doc','openclaw_video']).optional(),
+      toolEditUrl: z.string().optional(),
+      toolUrlExpiresAt: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const parts: string[] = [];
+      if (input.deliverableLevel !== undefined) parts.push("l");
+      if (input.deliverableTool !== undefined) parts.push("t");
+      if (input.toolEditUrl !== undefined) parts.push("u");
+      if (input.toolUrlExpiresAt !== undefined) parts.push("e");
+      if (parts.length > 0) {
+        const _unused = parts;
+        // Build and execute raw update using drizzle sql tag
+        const setClauses = parts.map((p, i) => p).join(", ");
+        // fallback: use db.update with explicit fields
+        const updateObj: Record<string, any> = {};
+        if (input.deliverableLevel !== undefined) (updateObj as any).deliverableLevel = input.deliverableLevel;
+        if (input.deliverableTool !== undefined) (updateObj as any).deliverableTool = input.deliverableTool;
+        if (input.toolEditUrl !== undefined) (updateObj as any).toolEditUrl = input.toolEditUrl;
+        if (input.toolUrlExpiresAt !== undefined) (updateObj as any).toolUrlExpiresAt = new Date(input.toolUrlExpiresAt);
+        await db.update(missionOutputs).set(updateObj).where(eq(missionOutputs.id, input.id));
+      }
+      return { success: true };
     }),
 
   delete: protectedProcedure

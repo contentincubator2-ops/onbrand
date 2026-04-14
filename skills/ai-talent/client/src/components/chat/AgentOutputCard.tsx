@@ -10,6 +10,7 @@
  * - Source cards
  */
 import React, { useState } from 'react';
+import DeliverableBlock, { DeliverableItem } from './DeliverableBlock';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,10 @@ export interface AgentOutputCardProps {
   artifacts?: AgentCardArtifact[];
   sources?: AgentCardSource[];
   isStreaming?: boolean;
+  deliverables?: DeliverableItem[];
+  onDeliverableCopy?: (content: string) => void;
+  onDeliverableFinalize?: (id: number) => Promise<void>;
+  onDeliverableRegenerateUrl?: (id: number) => Promise<void>;
   children?: React.ReactNode;
 }
 
@@ -149,6 +154,10 @@ export default function AgentOutputCard({
   artifacts = [],
   sources = [],
   isStreaming,
+  deliverables = [],
+  onDeliverableCopy,
+  onDeliverableFinalize,
+  onDeliverableRegenerateUrl,
   children,
 }: AgentOutputCardProps) {
   const [contentExpanded, setContentExpanded] = useState(true);
@@ -288,6 +297,18 @@ export default function AgentOutputCard({
             產出檔案
           </div>
           {artifacts.map(a => <ArtifactCard key={a.id} artifact={a} />)}
+        </div>
+      )}
+
+      {/* ── Deliverables ── */}
+      {deliverables.length > 0 && (
+        <div style={{ padding: '0 14px 4px' }}>
+          <DeliverableBlock
+            items={deliverables}
+            onCopy={onDeliverableCopy}
+            onFinalize={onDeliverableFinalize}
+            onRegenerateUrl={onDeliverableRegenerateUrl}
+          />
         </div>
       )}
 
