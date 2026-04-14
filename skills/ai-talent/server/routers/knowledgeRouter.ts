@@ -6,10 +6,16 @@ import { eq, and, desc } from "drizzle-orm";
 
 export const knowledgeRouter = router({
   list: protectedProcedure
-    .input(z.object({ missionId: z.number() }))
+    .input(z.object({ missionId: z.number().optional(), brandId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) return [];
+      if (input.brandId !== undefined) {
+        return db.select().from(missionKnowledgeFiles)
+          .where(eq(missionKnowledgeFiles.brandId, input.brandId))
+          .orderBy(desc(missionKnowledgeFiles.createdAt));
+      }
+      if (input.missionId === undefined) return [];
       return db.select().from(missionKnowledgeFiles)
         .where(eq(missionKnowledgeFiles.missionId, input.missionId))
         .orderBy(desc(missionKnowledgeFiles.createdAt));

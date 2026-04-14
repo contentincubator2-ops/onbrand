@@ -16,6 +16,7 @@ import { companyRouter } from "./companyRouter";
 import { sopRouter } from "./sopRouter";
 import { outputRouter } from "./outputRouter";
 import { knowledgeRouter } from "./knowledgeRouter";
+import { resourceRouter } from "./resourceRouter";
 import { reviewRouter } from "./reviewRouter";
 
 export const appRouter = router({
@@ -37,6 +38,7 @@ export const appRouter = router({
   output:        outputRouter,
   knowledge:     knowledgeRouter,
   review:        reviewRouter,
+  resource:      resourceRouter,
 });
 
 export type AppRouter = typeof appRouter;
