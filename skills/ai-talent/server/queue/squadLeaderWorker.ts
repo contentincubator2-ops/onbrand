@@ -1,4 +1,6 @@
 import { Worker, Job, Queue } from 'bullmq';
+import { logEvent, newSessionId } from "../_core/sessionLogger";
+
 // ── OpenClaw Gateway helper ───────────────────────────────────────────────────
 const GATEWAY_HTTP = "http://localhost:18790";
 const GATEWAY_TOKEN = "mos-pm-claw-2026";
@@ -6,20 +8,37 @@ const GATEWAY_TOKEN = "mos-pm-claw-2026";
 async function callGateway(
   agentId: string,
   messages: { role: string; content: string }[],
-  stream = false
+  stream = false,
+  ctx?: { sessionId?: string; userId?: number | null }
 ): Promise<string> {
-  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${GATEWAY_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: agentId, messages, stream }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!resp.ok) throw new Error(`Gateway ${resp.status}: ${await resp.text()}`);
-  const data = await resp.json() as any;
-  return data?.choices?.[0]?.message?.content ?? "";
+  const t0 = Date.now();
+  const sid = ctx?.sessionId ?? newSessionId();
+  try {
+    const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GATEWAY_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model: agentId, messages, stream }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug: agentId, eventType: "gateway_error", isGatewayOk: false, latencyMs: Date.now()-t0, errorMsg: `${resp.status}: ${errText.slice(0,200)}` });
+      throw new Error(`Gateway ${resp.status}: ${errText}`);
+    }
+    const data = await resp.json() as any;
+    const content = data?.choices?.[0]?.message?.content ?? "";
+    logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug: agentId, eventType: "gateway_call", isGatewayOk: true, latencyMs: Date.now()-t0, contentLength: content.length });
+    return content;
+  } catch(err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.startsWith("Gateway ")) {
+      logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug: agentId, eventType: "gateway_error", isGatewayOk: false, latencyMs: Date.now()-t0, errorMsg: msg });
+    }
+    throw err;
+  }
 }
 
 async function* streamGateway(

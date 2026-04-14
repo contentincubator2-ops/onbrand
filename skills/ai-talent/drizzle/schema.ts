@@ -752,3 +752,52 @@ export const missionReviewQueue = mysqlTable("mission_review_queue", {
 });
 export type MissionReviewQueueItem = typeof missionReviewQueue.$inferSelect;
 export type InsertMissionReviewQueueItem = typeof missionReviewQueue.$inferInsert;
+
+// ── Session Event Logs ────────────────────────────────────────────────────────
+export const sessionEventLogs = mysqlTable("session_event_logs", {
+  id:            int("id").autoincrement().primaryKey(),
+  sessionId:     varchar("sessionId", { length: 128 }).notNull(),
+  userId:        int("userId"),
+  agentSlug:     varchar("agentSlug", { length: 255 }),
+  agentName:     varchar("agentName", { length: 255 }),
+  eventType:     mysqlEnum("eventType", ["session_start","gateway_call","gateway_fallback","gateway_error","output","session_end"]).notNull(),
+  isGatewayOk:   int("isGatewayOk").default(1),
+  latencyMs:     int("latencyMs"),
+  contentLength: int("contentLength"),
+  qualitySignal: int("qualitySignal"),
+  errorMsg:      text("errorMsg"),
+  metadata:      json("metadata"),
+  createdAt:     timestamp("createdAt").defaultNow().notNull(),
+});
+export type SessionEventLog = typeof sessionEventLogs.$inferSelect;
+export type InsertSessionEventLog = typeof sessionEventLogs.$inferInsert;
+
+// ── Artifacts ────────────────────────────────────────────────────────────────
+export const artifacts = mysqlTable("artifacts", {
+  id:               int("id").autoincrement().primaryKey(),
+  missionId:        int("missionId"),
+  sessionId:        varchar("sessionId", { length: 128 }),
+  type:             mysqlEnum("type", ["campaign_brief","audience_matrix","messaging_angles","copy_drafts","creative_directions","launch_checklist","positioning","other"]).default("other"),
+  label:            varchar("label", { length: 255 }),
+  content:          longtext("content"),
+  version:          int("version").default(1),
+  status:           mysqlEnum("status", ["draft","pending_review","approved","needs_revision","exported"]).default("draft"),
+  createdByAgentId: int("createdByAgentId"),
+  createdByUserId:  int("createdByUserId"),
+  createdAt:        timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:        timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Artifact = typeof artifacts.$inferSelect;
+export type InsertArtifact = typeof artifacts.$inferInsert;
+
+// ── Artifact Reviews ─────────────────────────────────────────────────────────
+export const artifactReviews = mysqlTable("artifact_reviews", {
+  id:           int("id").autoincrement().primaryKey(),
+  artifactId:   int("artifactId").notNull(),
+  status:       mysqlEnum("status", ["draft","pending","approved","needs_revision","exported"]).default("draft"),
+  reviewerNote: text("reviewerNote"),
+  reviewedBy:   int("reviewedBy"),
+  createdAt:    timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArtifactReview = typeof artifactReviews.$inferSelect;
+export type InsertArtifactReview = typeof artifactReviews.$inferInsert;
