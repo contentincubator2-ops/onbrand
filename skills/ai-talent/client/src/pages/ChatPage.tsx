@@ -598,16 +598,13 @@ export default function ChatPage({
             description: (activeBrand as any)?.description,
           };
 
-          const resp = await fetch("/api/stream/squad-chat", {
+          const resp = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({
-              squadSlug,
-              missionId: activeMissionId,
               userMessage: autoMsg,
               conversationHistory: [],
               brandContext: brandCtx,
-              currentStep: 0,
             }),
           });
 
@@ -631,14 +628,19 @@ export default function ChatPage({
               else if (line.startsWith("data: ")) {
                 try {
                   const data = JSON.parse(line.slice(6));
-                  if (curEvent === "agent") {
-                    lastAgentName = data.agentName;
-                    lastAgentTitle = data.agentTitle;
-                    lastAgentModel = data.agentModel ?? null;
-                    setStreamingAgentName(data.agentName);
-                    setStreamingAgentTitle(data.agentTitle);
-                    setStreamingModel(data.agentModel ? formatModelName(data.agentModel) : null);
-                    setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle }));
+                  if (curEvent === "relay_step") {
+                    // TypedThreadCard relay step
+                    const rsId = data.id ?? 0;
+                    setRelaySteps((prev) => {
+                      const exists = prev.find((s) => s.id === rsId);
+                      if (data.status === "done") {
+                        return prev.map((s) => s.id === rsId ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) } : s);
+                      }
+                      if (exists) return prev.map((s) => s.id === rsId ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle } : s);
+                      return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
+                    });
+                    if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
+                    if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
                   } else if (curEvent === "delta") {
                     streamBuffer += data.text;
                     setConversations((prev) =>
@@ -649,8 +651,7 @@ export default function ChatPage({
                       )
                     );
                   } else if (curEvent === "done") {
-                    lastAgentModel = data.agentModel ?? lastAgentModel;
-                    setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
+                    setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
                   }
                 } catch { /* ignore */ }
               }
@@ -838,19 +839,16 @@ export default function ChatPage({
         targetAudience: (activeBrand as any)?.targetAudience,
         description: (activeBrand as any)?.description,
       };
-      const resp = await fetch("/api/stream/squad-chat", {
+      const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          squadSlug,
-          missionId: activeMissionId,
           userMessage: text,
           conversationHistory: conversationHistory.slice(-12),
           brandContext: brandCtx,
-          currentStep: squadStep.currentStep,
         }),
       });
-      if (!resp.ok || !resp.body) throw new Error(`squad-chat HTTP ${resp.status}`);
+      if (!resp.ok || !resp.body) throw new Error(`chat HTTP ${resp.status}`);
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -871,22 +869,19 @@ export default function ChatPage({
           } else if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              if (curEvent === "agent") {
-                lastAgentName = data.agentName;
-                lastAgentTitle = data.agentTitle;
-                lastAgentModel = data.agentModel ?? null;
-                setStreamingAgentName(data.agentName);
-                setStreamingAgentTitle(data.agentTitle);
-                setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle, agentRole: data.agentRole }));
-                // ── A2A relay: 每個 agent step → TypedThreadCard ──
-                const _stepId = data.step ?? 1;
-                const _totalSteps = data.totalSteps ?? 1;
+              if (curEvent === "relay_step") {
+                // ── A2A relay: TypedThreadCard ──
+                const rsId = data.id ?? 0;
                 setRelaySteps((prev) => {
-                  const exists = prev.find((s) => s.id === _stepId);
-                  const stepLabel = data.stepLabel ?? `Step ${_stepId}/${_totalSteps}: ${data.agentTitle ?? data.agentName}`;
-                  if (exists) return prev.map((s) => s.id === _stepId ? { ...s, status: "running" as const, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "" } : s);
-                  return [...prev, { id: _stepId, label: stepLabel, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
+                  const exists = prev.find((s) => s.id === rsId);
+                  if (data.status === "done") {
+                    return prev.map((s) => s.id === rsId ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) } : s);
+                  }
+                  if (exists) return prev.map((s) => s.id === rsId ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle } : s);
+                  return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
                 });
+                if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
+                if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
               } else if (curEvent === "delta") {
                 streamBuffer += data.text;
                 setConversations((prev) =>
@@ -897,14 +892,8 @@ export default function ChatPage({
                   )
                 );
               } else if (curEvent === "done") {
-                lastAgentModel = data.agentModel ?? lastAgentModel;
-                setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
-                // ── Mark relay step done + store summary ──
-                const _doneId = data.step ?? 1;
-                setRelaySteps((prev) => prev.map((s) => s.id === _doneId
-                  ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) }
-                  : s
-                ));
+                // All relay steps done
+                setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
               }
             } catch { /* ignore */ }
           }
