@@ -486,11 +486,6 @@ export default function ChatCore({
   const saveMessage = trpc.conversation.saveMessage.useMutation();
   const createMission = trpc.mission.create.useMutation();
   const confirmOutput = trpc.output.confirm.useMutation();
-  const saveMissionMsg = trpc.message.save.useMutation();
-  const savedMessagesQuery = trpc.message.list.useQuery(
-    { missionId: activeMissionId! },
-    { enabled: !!activeMissionId, refetchOnWindowFocus: false }
-  );
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
   const missionDataQuery = trpc.mission.getById.useQuery(
     { id: activeMissionId! },
@@ -708,26 +703,6 @@ export default function ChatCore({
     }
   }, [historyQuery.data, conversations.length, activeBrandId, activeBrand?.name]);
 
-  // Load mission message history from DB
-  useEffect(() => {
-    if (!activeMissionId || !savedMessagesQuery.data || savedMessagesQuery.data.length === 0) return;
-    const missionConvId = `conv-mission-${activeMissionId}`;
-    setConversations((prev) => {
-      const conv = prev.find((c) => c.id === missionConvId);
-      // Only load if the conversation exists but has 0 or just welcome msg (avoid overwriting in-progress chat)
-      if (!conv) return prev;
-      if (conv.messages.length > 1) return prev;
-      const loadedMsgs: Msg[] = (savedMessagesQuery.data as any[]).map((m: any) => ({
-        id: `db-msg-${m.id}`,
-        role: m.role as "user" | "assistant",
-        content: m.content,
-        ts: new Date(m.createdAt).getTime(),
-      }));
-      if (loadedMsgs.length === 0) return prev;
-      return prev.map((c) => c.id === missionConvId ? { ...c, messages: loadedMsgs } : c);
-    });
-  }, [savedMessagesQuery.data, activeMissionId]);
-
   // Scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -882,10 +857,6 @@ export default function ChatCore({
         )
       );
       setConversationHistory((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: streamBuffer }].slice(-14));
-      // Persist assistant response to mission_messages
-      if (activeMissionId && streamBuffer) {
-        saveMissionMsg.mutate({ missionId: activeMissionId, role: "assistant", content: streamBuffer });
-      }
       setLoading(false);
       return true;
     } catch (err: any) {
@@ -1019,10 +990,6 @@ export default function ChatCore({
     const userMsg: Msg = { id: `u-${Date.now()}`, role: "user", content: text, ts: Date.now() };
     setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, title: c.messages.length === 0 ? text.slice(0, 32) : c.title, messages: [...c.messages, userMsg] } : c));
     saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "user", content: text });
-    // Persist to mission_messages if mission is active
-    if (activeMissionId) {
-      saveMissionMsg.mutate({ missionId: activeMissionId, role: "user", content: text });
-    }
 
     // ── Auto-create mission on first message ──────────────────────────────
     const currentConvMessages = conversations.find(c => c.id === convId)?.messages ?? [];
