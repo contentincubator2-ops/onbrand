@@ -283,12 +283,13 @@ chatRouter.post("/", async (req: Request, res: Response) => {
             `・產業：${industry}`,
             description ? `・品牌簡介：${description}` : '',
             '',
-            '接下來，我會先召集「市場研究員」來分析你所在的市場環境。',
+            '接下來，我將召集品牌定位 Squad Lead *劉品妤（AI 品牌故事 CMO）* 帶領團隊展開分析。',
+            '她將主導「市場洞察」第一步，並在各步驟完成後進行 Squad 銜接總結。',
             '準備好了嗎？請告訴我「開始」，我們就立刻出發！',
           ].filter((l, i) => !(i === 7 && !description)).join('\n');
 
           // Push welcome as SSE
-          send('relay_step', { id: -1, label: 'PM 初始化', agentName: 'Brand Positioning PM', agentTitle: '品牌定位專案經理', layer: 'strategy', status: 'running' });
+          send('relay_step', { id: -1, label: 'PM 初始化', agentName: 'Brand Positioning PM', agentTitle: '品牌定位 PM → 召集 Squad Lead', layer: 'strategy', status: 'running' });
           send('delta', { text: welcomeText });
           send('relay_step', { id: -1, status: 'done' });
 
