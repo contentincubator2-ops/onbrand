@@ -878,6 +878,15 @@ export default function ChatPage({
                 setStreamingAgentName(data.agentName);
                 setStreamingAgentTitle(data.agentTitle);
                 setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, agentName: data.agentName, agentTitle: data.agentTitle, agentRole: data.agentRole }));
+                // ── A2A relay: 每個 agent step → TypedThreadCard ──
+                const _stepId = data.step ?? 1;
+                const _totalSteps = data.totalSteps ?? 1;
+                setRelaySteps((prev) => {
+                  const exists = prev.find((s) => s.id === _stepId);
+                  const stepLabel = data.stepLabel ?? `Step ${_stepId}/${_totalSteps}: ${data.agentTitle ?? data.agentName}`;
+                  if (exists) return prev.map((s) => s.id === _stepId ? { ...s, status: "running" as const, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "" } : s);
+                  return [...prev, { id: _stepId, label: stepLabel, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
+                });
               } else if (curEvent === "delta") {
                 streamBuffer += data.text;
                 setConversations((prev) =>
@@ -890,6 +899,12 @@ export default function ChatPage({
               } else if (curEvent === "done") {
                 lastAgentModel = data.agentModel ?? lastAgentModel;
                 setSquadStep((prev) => ({ ...prev, currentStep: data.step, totalSteps: data.totalSteps, isComplete: data.isComplete }));
+                // ── Mark relay step done + store summary ──
+                const _doneId = data.step ?? 1;
+                setRelaySteps((prev) => prev.map((s) => s.id === _doneId
+                  ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) }
+                  : s
+                ));
               }
             } catch { /* ignore */ }
           }
