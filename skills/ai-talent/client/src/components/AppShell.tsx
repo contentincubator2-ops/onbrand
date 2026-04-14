@@ -956,7 +956,7 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
         {activeTab === "sop" && (
           <div style={{ marginBottom: 15 }}>
-            <PositioningProgress missionId={activeMissionId} brandId={selectedBrandId} />
+            <PositioningProgress missionId={missionId} brandId={brandId} />
           </div>
         )}
 
