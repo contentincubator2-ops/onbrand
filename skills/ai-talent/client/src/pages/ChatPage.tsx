@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { MessageSquare, ClipboardList, BarChart2, BookOpen, ChevronDown, Settings, LogOut, Plus, Upload, Share2, Layers, User, FileText, Zap, Circle, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import OnboardingWizard from "./OnboardingWizard";
 import TaskProgressTracker, { type TaskStep } from "../components/chat/TaskProgressTracker";
@@ -1124,9 +1125,136 @@ export default function ChatPage({
 
   if (showOnboarding) return <OnboardingWizard onComplete={handleOnboardingComplete} />;
 
+  // ── helper: brand initial ──
+  const brandInitial = activeBrand?.name?.charAt(0)?.toUpperCase() ?? "B";
+  const missionTitle = activeMissionId && (missionDataQuery.data as any)?.title
+    ? (missionDataQuery.data as any).title
+    : activeBrand ? `${activeBrand.name} 任務對話` : "Marketing OS";
+
   return (
-    <div className="flex h-screen bg-white dark:bg-[#212121] overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif", background: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+
+      {/* ══════════ LEFT SIDEBAR 240px ══════════ */}
+      <aside style={{ width: 240, minWidth: 240, background: 'var(--bg-elevated)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+        {/* Logo */}
+        <div style={{ padding: '18px 16px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--border)' }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Layers size={14} color="white" />
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.2px' }}>Marketing OS</span>
+        </div>
+
+        {/* Brand switcher */}
+        <div style={{ padding: '10px 8px 4px' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '0 8px 6px' }}>品牌</div>
+          {activeBrand ? (
+            <div
+              onClick={() => setBrandMenuOpen(!brandMenuOpen)}
+              style={{ margin: '0 0 4px', background: 'var(--bg-overlay)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+            >
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>{brandInitial}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeBrand.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>{(activeBrand as any).industry ?? '品牌'}</div>
+              </div>
+              <ChevronDown size={12} color="var(--text-faint)" />
+            </div>
+          ) : (
+            <div style={{ margin: '0 0 4px', background: 'var(--bg-overlay)', border: '1px dashed var(--border)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
+              <Plus size={14} />
+              <span style={{ fontSize: 13 }}>選擇品牌</span>
+            </div>
+          )}
+        </div>
+
+        {/* Main nav */}
+        <div style={{ padding: '6px 8px 4px' }}>
+          {[
+            { icon: <MessageSquare size={14} />, label: '對話', active: true },
+            { icon: <ClipboardList size={14} />, label: '任務', badge: activeMissionId ? 1 : 0 },
+            { icon: <BarChart2 size={14} />, label: '報告' },
+            { icon: <BookOpen size={14} />, label: '知識庫' },
+          ].map(({ icon, label, active, badge }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 12px', borderRadius: 8, margin: '1px 0', cursor: 'pointer', fontSize: 13, color: active ? 'var(--text-primary)' : 'var(--text-muted)', background: active ? 'var(--bg-overlay)' : 'transparent', fontWeight: active ? 500 : 400 }}>
+              <span style={{ width: 16, color: active ? 'var(--text-secondary)' : 'var(--text-faint)' }}>{icon}</span>
+              <span>{label}</span>
+              {badge ? <span style={{ marginLeft: 'auto', background: 'var(--bg-overlay)', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 10, padding: '1px 6px', borderRadius: 10 }}>{badge}</span> : null}
+            </div>
+          ))}
+        </div>
+
+        {/* Recent missions */}
+        {conversations.length > 0 && (
+          <div style={{ padding: '8px 8px 4px', marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '0 12px 6px' }}>最近對話</div>
+            {conversations.slice(0, 4).map(conv => (
+              <div
+                key={conv.id}
+                onClick={() => setActiveConversationId(conv.id)}
+                style={{ padding: '5px 12px', borderRadius: 8, margin: '1px 0', cursor: 'pointer', fontSize: 12, color: conv.id === activeConversationId ? 'var(--text-primary)' : 'var(--text-muted)', background: conv.id === activeConversationId ? 'var(--bg-overlay)' : 'transparent', display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}
+              >
+                <Circle size={5} style={{ color: conv.id === activeConversationId ? 'var(--accent-orange)' : 'var(--border)', flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.title || '新對話'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Active agents in this task */}
+        {relaySteps.length > 0 && (
+          <div style={{ padding: '8px 8px 4px', marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '0 12px 6px' }}>本次 Agents</div>
+            {relaySteps.slice(0, 4).map(step => (
+              <div key={step.id} style={{ padding: '6px 12px', borderRadius: 8, margin: '1px 0', display: 'flex', alignItems: 'center', gap: 9 }}>
+                <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--bg-overlay)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <User size={11} color="var(--text-muted)" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{step.agentName}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>{step.agentTitle}</div>
+                </div>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: step.status === 'done' ? '#16a34a' : step.status === 'running' ? 'var(--accent-orange)' : 'var(--border)', flexShrink: 0 }} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{ marginTop: 'auto', padding: '10px 8px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-overlay)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <User size={13} color="var(--text-muted)" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>Marketing OS</div>
+            <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>Pro Plan</div>
+          </div>
+          <Settings size={14} color="var(--text-faint)" style={{ cursor: 'pointer' }} />
+        </div>
+      </aside>
+
+      {/* ══════════ MAIN AREA ══════════ */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-base)' }}>
+        {/* Topbar */}
+        <div style={{ padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-elevated)' }}>
+          <div>
+            <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>{missionTitle}</span>
+            {activeBrand && <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>· {activeBrand.name}</span>}
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {loading && <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}><Loader2 size={12} className="animate-spin" /> 執行中…</span>}
+            <button style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Share2 size={12} /> 共享
+            </button>
+            <button style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--text-primary)', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={12} /> 新任務
+            </button>
+          </div>
+        </div>
+
+        {/* Chat messages + input area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
         {/* Squad 步驟進度條 + 換 Squad 按鈕 */}
         {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
           <div className="px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800 shrink-0 bg-neutral-50 dark:bg-neutral-900/60">
@@ -1167,7 +1295,7 @@ export default function ChatPage({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto" onClick={() => setBrandMenuOpen(false)}>
+        <div className="flex-1 overflow-y-auto px-6" onClick={() => setBrandMenuOpen(false)} style={{ paddingTop: 16, paddingBottom: 8 }}>
           {(!active || active.messages.length === 0) && !loading && !teamAssembly ? (
             <div className="h-full flex flex-col items-center justify-center gap-6 px-6 py-12">
               <div className="w-14 h-14 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-2xl">🤖</div>
@@ -1438,8 +1566,8 @@ ${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
           )}
         </div>
 
-        <div className="shrink-0 px-4 pb-6 pt-3" onClick={() => setBrandMenuOpen(false)}>
-          <div className="max-w-3xl mx-auto">
+        <div style={{ flexShrink: 0, padding: '12px 24px 20px', borderTop: '1px solid var(--border)', background: 'var(--bg-elevated)' }} onClick={() => setBrandMenuOpen(false)}>
+          <div style={{ maxWidth: '100%' }}>
             {preselectedAgent && (
               <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-orange-50 border border-orange-200 text-sm">
                 <span className="text-orange-500">{preselectedAgent.type === 'agent' ? '🤖' : '👥'}</span>
@@ -1449,7 +1577,7 @@ ${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
                 <button onClick={onClearAgent} className="ml-auto text-orange-300 hover:text-orange-500 text-xs">✕</button>
               </div>
             )}
-            <div className="flex items-end gap-3 bg-neutral-100 dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 px-4 py-3">
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, background: 'var(--bg-overlay)', borderRadius: 14, border: '1px solid var(--border)', padding: '12px 16px', transition: 'border-color 0.15s' }}>
               <textarea
                 ref={chatInputRef}
                 value={input}
@@ -1458,10 +1586,10 @@ ${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
                 placeholder={preselectedAgent ? `告訴 ${preselectedAgent.name} 你要完成的任務…` : (activeBrand ? `告訴我你想為「${activeBrand.name}」完成什麼任務…` : "選擇品牌後開始輸入任務…")}
                 rows={1}
                 disabled={loading}
-                className="flex-1 resize-none bg-transparent text-sm text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-600 outline-none"
+                style={{ flex: 1, resize: 'none', background: 'transparent', border: 'none', outline: 'none', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'inherit', lineHeight: 1.6 }} className=""
                 style={{ maxHeight: 160, lineHeight: 1.6 }}
               />
-              <button onClick={handleSend} disabled={!input.trim() || loading} className="shrink-0 w-9 h-9 rounded-xl bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 flex items-center justify-center hover:bg-neutral-700 dark:hover:bg-neutral-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><IconSend /></button>
+              <button onClick={handleSend} disabled={!input.trim() || loading} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: 'var(--text-primary)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: 1, transition: 'opacity 0.15s' }}><IconSend /></button>
             </div>
             <p className="text-xs text-neutral-400 dark:text-neutral-600 text-center mt-2">Enter 送出 · Shift+Enter 換行</p>
           </div>
@@ -1471,6 +1599,74 @@ ${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
       {(a2aSteps.length > 0 || (loading && a2aSteps.length > 0)) && (
         <TaskProgressTracker taskName={a2aTaskName} steps={a2aSteps} progress={a2aProgress} onComplete={() => {}} />
       )}
+
+      </main>
+
+      {/* ══════════ RIGHT PANEL 300px ══════════ */}
+      <aside style={{ width: 300, minWidth: 300, background: 'var(--bg-elevated)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          {['流程', '知識庫', '成果'].map((tab, i) => (
+            <div key={tab} style={{ flex: 1, padding: '12px 8px', textAlign: 'center', fontSize: 11, color: i === 0 ? 'var(--text-primary)' : 'var(--text-muted)', cursor: 'pointer', borderBottom: i === 0 ? '2px solid var(--text-primary)' : '2px solid transparent' }}>
+              {tab}
+            </div>
+          ))}
+        </div>
+
+        {/* Panel content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
+
+          {/* Relay steps / workflow */}
+          {relaySteps.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 8 }}>執行流程</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {relaySteps.map((step, i) => (
+                  <div key={step.id}>
+                    <div style={{ background: step.status === 'done' ? '#f0fdf4' : step.status === 'running' ? '#fff7ed' : 'var(--bg-overlay)', border: `1px solid ${step.status === 'done' ? '#bbf7d0' : step.status === 'running' ? '#fed7aa' : 'var(--border)'}`, borderRadius: 9, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <div style={{ width: 24, height: 24, background: step.status === 'done' ? '#dcfce7' : step.status === 'running' ? '#ffedd5' : 'var(--bg-overlay)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {step.status === 'done' ? <CheckCircle2 size={12} color="#16a34a" /> : step.status === 'running' ? <Loader2 size={12} color="var(--accent-orange)" className="animate-spin" /> : <Circle size={12} color="var(--text-faint)" />}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, color: step.status === 'pending' ? 'var(--text-faint)' : 'var(--text-primary)' }}>{step.agentTitle || step.label}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>{step.agentName}</div>
+                      </div>
+                    </div>
+                    {i < relaySteps.length - 1 && <div style={{ textAlign: 'center', color: 'var(--border)', fontSize: 11, lineHeight: 1.2 }}><ArrowRight size={10} color="var(--text-faint)" /></div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Brand context */}
+          {activeBrand && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 8 }}>品牌知識</div>
+              {[
+                { icon: <Zap size={13} />, label: '品牌定位', val: (activeBrand as any).industry ?? '–' },
+                { icon: <User size={13} />, label: '目標受眾', val: (activeBrand as any).targetAudience ?? '–' },
+                { icon: <BarChart2 size={13} />, label: '競品', val: '–' },
+              ].map(({ icon, label, val }) => (
+                <div key={label} style={{ padding: '7px 8px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 2 }}>
+                  <span style={{ fontSize: 13, width: 20, color: 'var(--text-muted)', display: 'flex', justifyContent: 'center' }}>{icon}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-faint)' }}>{val}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Placeholder if empty */}
+          {relaySteps.length === 0 && !activeBrand && (
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-faint)', fontSize: 12 }}>
+              <Layers size={24} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+              <div>選擇品牌並開始對話</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>執行流程會在這裡顯示</div>
+            </div>
+          )}
+        </div>
+      </aside>
 
       {/* 右側任務流程 Rail — 只在 Squad 任務內顯示 */}
       {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.totalSteps > 0 && (
