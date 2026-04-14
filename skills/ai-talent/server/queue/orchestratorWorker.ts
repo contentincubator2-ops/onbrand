@@ -1,4 +1,64 @@
 import { Worker, Job } from 'bullmq';
+// ── OpenClaw Gateway helper ───────────────────────────────────────────────────
+const GATEWAY_HTTP = "http://localhost:18790";
+const GATEWAY_TOKEN = "mos-pm-claw-2026";
+
+async function callGateway(
+  agentId: string,
+  messages: { role: string; content: string }[],
+  stream = false
+): Promise<string> {
+  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GATEWAY_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: agentId, messages, stream }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok) throw new Error(`Gateway ${resp.status}: ${await resp.text()}`);
+  const data = await resp.json() as any;
+  return data?.choices?.[0]?.message?.content ?? "";
+}
+
+async function* streamGateway(
+  agentId: string,
+  messages: { role: string; content: string }[]
+): AsyncGenerator<string> {
+  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GATEWAY_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: agentId, messages, stream: true }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok || !resp.body) throw new Error(`Gateway ${resp.status}`);
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") return;
+      try {
+        const d = JSON.parse(raw);
+        const t = d?.choices?.[0]?.delta?.content ?? "";
+        if (t) yield t;
+      } catch { /* skip */ }
+    }
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { connection, MarketingJobData, MarketingJobResult } from './marketingQueue';
 import { matchAgents } from '../agentMatcher';
 import { invokeLLM, invokeLLMStream } from '../_core/llm';
@@ -89,15 +149,10 @@ export function startOrchestratorWorker() {
             ? '深入研究這家公司：' + urlMatchR[0] + '。任務：' + userRequest.slice(0, 300)
             : '深入研究：' + userRequest.slice(0, 400) + '。提供具體數據和可行方案。';
           let rResult = '';
-          for await (const delta of invokeLLMStream({
-            messages: [
-              { role: 'system', content: '你是市場研究助手，搜尋並提供具體數字和洞察。' },
-              { role: 'user', content: rQuery }
-            ],
-            provider: 'openrouter',
-            model: 'perplexity/sonar-pro',
-            maxTokens: 800,
-          })) { rResult += delta; }
+          for await (const delta of streamGateway('openclaw/pm', [
+            { role: 'system', content: '你是市場研究助手，使用 web_search 搜尋並提供具體數字和洞察。' },
+            { role: 'user', content: rQuery }
+          ])) { rResult += delta; }
           if (rResult.length > 100) {
             researchContext = '\n\n【市場研究結果】\n' + rResult.slice(0, 4000);
             console.log('[A2A Worker] Research done: ' + rResult.length + ' chars');
@@ -117,15 +172,14 @@ export function startOrchestratorWorker() {
       // 5. 呼叫 LLM
       // 5. 呼叫 LLM
       await job.updateProgress(60);
-      const response = await invokeLLM({
-        provider: 'openrouter',
-        model: 'anthropic/claude-sonnet-4-6',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userRequest + researchContext },
-        ],
-        max_tokens: 4000,
-      });
+      // Walk through OpenClaw Gateway for full skills + tools
+      const agentSlug = (agentResult as any)?.slug ? `openclaw/${(agentResult as any).slug}` : 'openclaw/pm';
+      const gatewayContent = await callGateway(agentSlug, [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userRequest + researchContext },
+      ]);
+      // Wrap in response-like object for compatibility
+      const response = { choices: [{ message: { content: gatewayContent } }], usage: undefined };
 
       await job.updateProgress(90);
 
@@ -149,11 +203,7 @@ export function startOrchestratorWorker() {
         thinking: parsed.thinking || '',
         publishable_content: parsed.publishable_content || '',
         metadata: parsed.metadata,
-        usage: response.usage ? {
-          prompt_tokens: response.usage.prompt_tokens,
-          completion_tokens: response.usage.completion_tokens,
-          total_tokens: response.usage.total_tokens,
-        } : undefined,
+        usage: undefined,
       };
     },
     {

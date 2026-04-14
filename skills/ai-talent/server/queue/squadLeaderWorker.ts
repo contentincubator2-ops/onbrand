@@ -1,4 +1,64 @@
 import { Worker, Job, Queue } from 'bullmq';
+// ── OpenClaw Gateway helper ───────────────────────────────────────────────────
+const GATEWAY_HTTP = "http://localhost:18790";
+const GATEWAY_TOKEN = "mos-pm-claw-2026";
+
+async function callGateway(
+  agentId: string,
+  messages: { role: string; content: string }[],
+  stream = false
+): Promise<string> {
+  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GATEWAY_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: agentId, messages, stream }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok) throw new Error(`Gateway ${resp.status}: ${await resp.text()}`);
+  const data = await resp.json() as any;
+  return data?.choices?.[0]?.message?.content ?? "";
+}
+
+async function* streamGateway(
+  agentId: string,
+  messages: { role: string; content: string }[]
+): AsyncGenerator<string> {
+  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GATEWAY_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: agentId, messages, stream: true }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok || !resp.body) throw new Error(`Gateway ${resp.status}`);
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") return;
+      try {
+        const d = JSON.parse(raw);
+        const t = d?.choices?.[0]?.delta?.content ?? "";
+        if (t) yield t;
+      } catch { /* skip */ }
+    }
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { connection } from './marketingQueue';
 import { invokeLLM } from '../_core/llm';
 import localPool from '../localDb';
@@ -112,16 +172,12 @@ ${members.map((m: any, i: number) => `${i + 1}. ${m.name}（${m.title}）- 專�
 請分析任務，為每個成員分配子任務，輸出 JSON：
 {"taskBreakdown":[{"memberName":"成員名稱","subTask":"具體子任務","priority":1}],"integrationPlan":"整合策略"}`;
 
-      const leaderResult = await invokeLLM({
-        model: 'anthropic/claude-sonnet-4-6',
-        provider: 'openrouter',
-        messages: [
-          { role: 'system', content: leaderSystemPrompt },
-          { role: 'user', content: `用戶任務：${userRequest}\n\n請分配任務給 Squad 成員。` }
-        ],
-        max_tokens: 800,
-        response_format: { type: 'json_object' },
-      });
+      // Leader via Gateway (has tools + memory)
+      const leaderSlug = leader.slug ? `openclaw/${leader.slug}` : 'openclaw/pm';
+      const leaderRawContent = await callGateway(leaderSlug, [
+        { role: 'system', content: leaderSystemPrompt },
+        { role: 'user', content: `用戶任務：${userRequest}\n\n請分配任務給 Squad 成員。輸出合法JSON。` }
+      ]);
 
       let taskPlan: { taskBreakdown: Array<{ memberName: string; subTask: string; priority: number }>; integrationPlan: string } = {
         taskBreakdown: [],
@@ -129,7 +185,7 @@ ${members.map((m: any, i: number) => `${i + 1}. ${m.name}（${m.title}）- 專�
       };
 
       try {
-        const parsed = JSON.parse(extractContent(leaderResult) || '{}');
+        const parsed = JSON.parse(leaderRawContent || '{}');
         if (parsed.taskBreakdown) taskPlan = parsed;
       } catch {
         console.warn('[Squad Worker] Leader JSON parse failed, using fallback plan');
@@ -146,29 +202,19 @@ ${members.map((m: any, i: number) => `${i + 1}. ${m.name}（${m.title}）- 專�
 
         const skillContent = loadSkillMd(member.taskType || 'content-text');
 
-        const memberResult = await invokeLLM({
-          model: 'deepseek/deepseek-chat',
-          provider: 'openrouter',
-          messages: [
-            {
-              role: 'system',
-              content: `你是 ${member.name}（${member.title}）。
-專長：${member.specialty || member.taskType}
-${skillContent ? `工作指南：\n${skillContent.slice(0, 400)}` : ''}
-品牌：${brand || '未指定'}，產業：${industry || '未指定'}
-直接輸出可用的行銷內容成果，不需自我介紹。`
-            },
-            { role: 'user', content: breakdown.subTask || userRequest }
-          ],
-          max_tokens: 700,
-        });
+        // Member via Gateway (own workspace SOUL.md drives persona)
+        const memberSlug = member.slug ? `openclaw/${member.slug}` : 'openclaw/pm';
+        const memberRawContent = await callGateway(memberSlug, [
+          { role: 'system', content: `你是 ${member.name}（${member.title}）。品牌：${brand || '未指定'}，產業：${industry || '未指定'}。直接輸出可用的行銷內容成果。` },
+          { role: 'user', content: breakdown.subTask || userRequest }
+        ]);
 
         return {
           agentName: member.name,
           agentTitle: member.title,
           taskType: member.taskType || '',
           subTask: breakdown.subTask || userRequest,
-          content: extractContent(memberResult) || `（${member.name} 產出待整合）`,
+          content: memberRawContent || `（${member.name} 產出待整合）`,
         };
       });
 
@@ -187,15 +233,11 @@ ${memberOutputs.map((o, i) => `【成員${i + 1}：${o.agentName}（${o.agentTit
 
 請整合所有成員的產出，形成完整、連貫、可直接交付的行銷方案。`;
 
-      const integratedResult = await invokeLLM({
-        model: 'anthropic/claude-sonnet-4-6',
-        provider: 'openrouter',
-        messages: [
-          { role: 'system', content: integrationSystem },
-          { role: 'user', content: '請整合所有成員的產出，形成完整的行銷方案。' }
-        ],
-        max_tokens: 2000,
-      });
+      const integratedLeaderSlug = leader.slug ? `openclaw/${leader.slug}` : 'openclaw/pm';
+      const integratedRaw = await callGateway(integratedLeaderSlug, [
+        { role: 'system', content: integrationSystem },
+        { role: 'user', content: '請整合所有成員的產出，形成完整的行銷方案。' }
+      ]);
 
       await job.updateProgress(100);
 
@@ -204,7 +246,7 @@ ${memberOutputs.map((o, i) => `【成員${i + 1}：${o.agentName}（${o.agentTit
         leader: leader.name,
         leaderTitle: leader.title,
         memberOutputs,
-        integratedOutput: extractContent(integratedResult) || '',
+        integratedOutput: integratedRaw || '',
         model: 'Claude Sonnet 4.6 (Leader + Integration) + DeepSeek (Members)',
         executionTimeMs: Date.now() - startTime,
       };

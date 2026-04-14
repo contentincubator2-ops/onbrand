@@ -10,6 +10,66 @@ import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import { invokeLLMStream } from "../_core/llm";
+// ── OpenClaw Gateway helper ───────────────────────────────────────────────────
+const GATEWAY_HTTP = "http://localhost:18790";
+const GATEWAY_TOKEN = "mos-pm-claw-2026";
+
+async function callGateway(
+  agentId: string,
+  messages: { role: string; content: string }[],
+  stream = false
+): Promise<string> {
+  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GATEWAY_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: agentId, messages, stream }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok) throw new Error(`Gateway ${resp.status}: ${await resp.text()}`);
+  const data = await resp.json() as any;
+  return data?.choices?.[0]?.message?.content ?? "";
+}
+
+async function* streamGateway(
+  agentId: string,
+  messages: { role: string; content: string }[]
+): AsyncGenerator<string> {
+  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GATEWAY_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: agentId, messages, stream: true }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok || !resp.body) throw new Error(`Gateway ${resp.status}`);
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") return;
+      try {
+        const d = JSON.parse(raw);
+        const t = d?.choices?.[0]?.delta?.content ?? "";
+        if (t) yield t;
+      } catch { /* skip */ }
+    }
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { getDb, getSoworkDb } from "../db";
 import { brands, tasks, agents } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -419,7 +479,8 @@ ${researchResult.slice(0, 3000)}`;
     let fullContent = "";
     send("start", { message: "開始生成..." });
 
-    for await (const delta of invokeLLMStream({ messages, provider: "openrouter" })) {
+    const _mainAgentId = agentHit ? `openclaw/${(agentHit as any).slug ?? "pm"}` : "openclaw/pm";
+    for await (const delta of streamGateway(_mainAgentId, messages as any)) {
       fullContent += delta;
       send("delta", { text: delta });
     }
