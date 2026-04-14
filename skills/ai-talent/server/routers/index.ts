@@ -19,6 +19,7 @@ import { knowledgeRouter } from "./knowledgeRouter";
 import { resourceRouter } from "./resourceRouter";
 import { reviewRouter } from "./reviewRouter";
 import { messageRouter } from "./messageRouter";
+import { positioningRouter } from "./positioningRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -40,6 +41,7 @@ export const appRouter = router({
   knowledge:     knowledgeRouter,
   review:        reviewRouter,
   message:       messageRouter,
+  positioning:   positioningRouter,
   resource:      resourceRouter,
 });
 

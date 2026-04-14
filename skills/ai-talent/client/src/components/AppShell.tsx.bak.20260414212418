@@ -764,59 +764,6 @@ const WORKFLOW_NODES = [
   { label: "PR 策略",   sub: "媒體 + KOL 佈局",      state: "wait"    as const },
 ];
 
-function PositioningProgress({ missionId, brandId }: { missionId: number | null | undefined; brandId: number | null | undefined }) {
-  const { data: steps } = (trpc as any).positioning?.getSteps?.useQuery
-    ? (trpc as any).positioning.getSteps.useQuery(
-        { missionId: missionId! },
-        { enabled: !!missionId, refetchInterval: 3000, refetchOnWindowFocus: false }
-      )
-    : { data: null };
-
-  const confirmStep = (trpc as any).positioning?.confirmStep?.useMutation
-    ? (trpc as any).positioning.confirmStep.useMutation()
-    : { mutate: () => {} };
-
-  const stepList = (steps ?? WORKFLOW_NODES.map((n, i) => ({
-    step: i + 1,
-    title: n.label,
-    agent: ''  ,
-    description: n.sub,
-    state: n.state === 'done' ? 'done' : n.state === 'running' ? 'running' : 'wait',
-  }))) as any[];
-
-  return (
-    <div>
-      {stepList.map((s: any, i: number) => (
-        <React.Fragment key={i}>
-          <WorkflowNode
-            label={s.title ?? s.label ?? ''}
-            sub={s.agent ? `${s.agent} · ${s.description ?? s.sub ?? ''}` : s.description ?? s.sub ?? ''}
-            state={s.state === 'confirm' ? 'running' : (s.state as any ?? 'wait')}
-          />
-          {s.state === 'confirm' && missionId && (
-            <button
-              onClick={() => (confirmStep as any).mutate({ missionId })}
-              style={{
-                marginLeft: 28, marginTop: 4, marginBottom: 8,
-                padding: '4px 12px', fontSize: 11, borderRadius: 6,
-                background: '#E8631A', color: 'white', border: 'none', cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              ✓ 確認此步驟
-            </button>
-          )}
-          {i < stepList.length - 1 && (
-            <div style={{ textAlign: 'center' as const, margin: '2px 0', color: '#E4E3E1', display: 'flex', justifyContent: 'center' }}>
-              <IconArrowDown />
-            </div>
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
 function WorkflowNode({ label, sub, state }: { label: string; sub: string; state: "done" | "running" | "wait" }) {
   const colors = {
     done:    { border: "#C8E6C8", bg: "#F4FCF4", iconBg: "#DCEFDC", iconColor: "#3D9A3D", nameColor: "#3D9A3D" },
@@ -850,7 +797,7 @@ function WorkflowNode({ label, sub, state }: { label: string; sub: string; state
   );
 }
 
-function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId?: number | null }) {
+function RightPanel() {
   const [activeTab, setActiveTab] = useState<"sop" | "knowledge" | "outputs">("sop");
 
   const panelStyle: React.CSSProperties = {
@@ -906,7 +853,7 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
             <div style={{
               fontSize: 10, fontWeight: 600, color: "#C8C7C3",
               textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 6,
-            }}>品牌定位流程</div>
+            }}>SOP 執行流程</div>
             {WORKFLOW_NODES.map((node, i) => (
               <React.Fragment key={node.label}>
                 <WorkflowNode {...node} />
@@ -1224,7 +1171,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         </div>
       </main>
 
-      <RightPanel missionId={activeMissionId} brandId={selectedBrandId} />
+      <RightPanel />
     </div>
   );
 }

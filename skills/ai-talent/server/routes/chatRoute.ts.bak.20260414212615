@@ -23,7 +23,6 @@ import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
-import { getDb } from "../db";
 
 export const chatRouter = Router();
 
@@ -222,13 +221,11 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { userMessage, conversationHistory = [], brandContext = {}, sessionId: clientSessionId, missionId, workspace } = req.body as {
+  const { userMessage, conversationHistory = [], brandContext = {}, sessionId: clientSessionId } = req.body as {
     userMessage: string;
     conversationHistory: { role: string; content: string }[];
     brandContext: Record<string, string>;
     sessionId?: string;
-    missionId?: number;
-    workspace?: string;
   };
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
@@ -250,75 +247,6 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   logEvent({ sessionId, userId, eventType: "session_start" });
 
   try {
-    // 0. PM Welcome for strategy workspace (first-time only)
-    if (missionId && workspace === 'strategy') {
-      try {
-        const db = await getDb();
-        // Check if this is the first message in this mission
-        const [msgRows] = await (db as any).execute(
-          `SELECT id FROM mission_messages WHERE missionId = ${missionId} LIMIT 1`
-        ) as any;
-        const isFirstTime = !msgRows?.[0];
-
-        if (isFirstTime) {
-          // Fetch mission + brand info
-          const [missionRows] = await (db as any).execute(
-            `SELECT m.title, b.name as brandName, b.industry, b.description, m.brandId
-             FROM missions m
-             LEFT JOIN brands b ON b.id = m.brandId
-             WHERE m.id = ${missionId} LIMIT 1`
-          ) as any;
-          const mission = missionRows?.[0];
-          const brandName = mission?.brandName ?? (brandContext as any)?.brandName ?? '你的品牌';
-          const industry = mission?.industry ?? (brandContext as any)?.industry ?? '未指定';
-          const description = mission?.description ?? (brandContext as any)?.description ?? '';
-
-          const welcomeText = [
-            '你好！我是 SoWork 品牌定位 PM。',
-            '',
-            '這個任務將帶你完成 10 個步驟的品牌定位分析，每個步驟由專屬 AI 顧問主導，你可以隨時調整方向。',
-            '',
-            '我已收到你的品牌資料：',
-            `・品牌名稱：${brandName}`,
-            `・產業：${industry}`,
-            description ? `・品牌簡介：${description}` : '',
-            '',
-            '接下來，我會先召集「市場研究員」來分析你所在的市場環境。',
-            '準備好了嗎？請告訴我「開始」，我們就立刻出發！',
-          ].filter((l, i) => !(i === 7 && !description)).join('\n');
-
-          // Push welcome as SSE
-          send('relay_step', { id: -1, label: 'PM 初始化', agentName: 'Brand Positioning PM', agentTitle: '品牌定位專案經理', layer: 'strategy', status: 'running' });
-          send('delta', { text: welcomeText });
-          send('relay_step', { id: -1, status: 'done' });
-
-          // Save welcome to mission_messages
-          try {
-            await (db as any).execute(
-              `INSERT INTO mission_messages (missionId, userId, role, content, metadata) VALUES (${missionId}, ${userId}, 'assistant', ${JSON.stringify(welcomeText).replace(/\\/g,'\\\\')}, '${JSON.stringify({ type: 'pm_welcome', step: 0 })}')`
-            );
-          } catch { /* non-fatal */ }
-
-          // Init positioning session at step 1
-          if (mission?.brandId) {
-            try {
-              await (db as any).execute(
-                `INSERT IGNORE INTO positioning_sessions (missionId, brandId, userId, currentStep, status, stepResults) VALUES (${missionId}, ${mission.brandId}, ${userId}, 1, 'in_progress', '{}')`
-              );
-            } catch { /* non-fatal */ }
-          }
-
-          send('done', { sessionId, isComplete: true });
-          clearInterval(keepalive);
-          logEvent({ sessionId, userId, eventType: 'session_end' });
-          res.end();
-          return;
-        }
-      } catch (welcomeErr: any) {
-        // Non-fatal: fall through to normal chat flow
-      }
-    }
-
     // 1. Semantic search
     send("status", { message: "分析任務中..." });
     const queryEmb = await getEmbedding(userMessage);
