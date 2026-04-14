@@ -75,20 +75,20 @@ const CARD_CFG: Record<CardType, {
   iconColor: string;
   accentBar: string;
 }> = {
-  human_request:   { label: "Request",  iconColor: "text-neutral-400", accentBar: "bg-neutral-600" },
-  pm_agent:        { label: "Planning", iconColor: "text-blue-400",    accentBar: "bg-blue-500" },
-  team_assembly:   { label: "Assembly", iconColor: "text-neutral-400", accentBar: "bg-neutral-500" },
-  specialist:      { label: "Output",   iconColor: "text-blue-400",    accentBar: "bg-blue-500" },
-  review_request:  { label: "Review",   iconColor: "text-amber-400",   accentBar: "bg-amber-500" },
-  approval_result: { label: "Approved", iconColor: "text-emerald-400", accentBar: "bg-emerald-500" },
+  human_request:   { label: "Request",  iconColor: "text-neutral-400", accentBar: "bg-neutral-300" },
+  pm_agent:        { label: "Planning", iconColor: "text-neutral-500", accentBar: "bg-neutral-400" },
+  team_assembly:   { label: "Assembly", iconColor: "text-neutral-400", accentBar: "bg-neutral-300" },
+  specialist:      { label: "Output",   iconColor: "text-neutral-500", accentBar: "bg-neutral-400" },
+  review_request:  { label: "Review",   iconColor: "text-neutral-500", accentBar: "bg-neutral-400" },
+  approval_result: { label: "Approved", iconColor: "text-neutral-500", accentBar: "bg-neutral-500" },
 };
 
 const STATUS_DOT: Record<string, { color: string; pulse: boolean }> = {
   pending:        { color: "bg-neutral-600", pulse: false },
-  running:        { color: "bg-blue-400",    pulse: true  },
+  running:        { color: "bg-neutral-500", pulse: true  },
   done:           { color: "bg-neutral-500", pulse: false },
-  approved:       { color: "bg-emerald-500", pulse: false },
-  needs_revision: { color: "bg-amber-500",   pulse: false },
+  approved:       { color: "bg-neutral-600", pulse: false },
+  needs_revision: { color: "bg-neutral-500", pulse: false },
 };
 
 export default function TypedThreadCard({
@@ -126,7 +126,7 @@ export default function TypedThreadCard({
           </span>
 
           {/* Type label */}
-          <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-500 tracking-wide uppercase">
+          <span className="text-[11px] font-medium text-neutral-400 tracking-wide uppercase">
             {cfg.label}
           </span>
 
@@ -134,7 +134,7 @@ export default function TypedThreadCard({
           {agentName && (
             <>
               <span className="text-neutral-700 dark:text-neutral-600 text-[11px]">·</span>
-              <span className="text-[11px] text-neutral-400 dark:text-neutral-400 font-normal">
+              <span className="text-[11px] text-neutral-500 font-normal">
                 {agentName}
               </span>
             </>
@@ -162,7 +162,7 @@ export default function TypedThreadCard({
         </div>
 
         {/* Label */}
-        <p className="text-[13px] font-normal text-neutral-200 dark:text-neutral-200 leading-snug mb-1.5">
+        <p className="text-[13px] font-normal text-neutral-800 leading-snug mb-1.5">
           {label}
         </p>
 
@@ -171,11 +171,11 @@ export default function TypedThreadCard({
           <div className="space-y-1 mb-1.5">
             {teamMembers.map((m, i) => (
               <div key={i} className="flex items-center gap-2 text-[11px]">
-                <span className="text-neutral-600">—</span>
-                <span className="text-neutral-300">{m.name}</span>
-                <span className="text-neutral-600">{m.title}</span>
+                <span className="text-neutral-400">—</span>
+                <span className="text-neutral-700">{m.name}</span>
+                <span className="text-neutral-500">{m.title}</span>
                 {m.role && (
-                  <span className="text-[10px] text-neutral-500 border border-neutral-700 rounded px-1">
+                  <span className="text-[10px] text-neutral-500 border border-neutral-300 rounded px-1">
                     {m.role}
                   </span>
                 )}
@@ -186,14 +186,14 @@ export default function TypedThreadCard({
 
         {/* Content */}
         {hasContent && !collapsed && (
-          <div className="text-[12px] text-neutral-400 dark:text-neutral-500 leading-relaxed whitespace-pre-wrap border-l border-neutral-800 pl-2.5 mt-1">
+          <div className="text-[12px] text-neutral-500 leading-relaxed whitespace-pre-wrap border-l border-neutral-200 pl-2.5 mt-1">
             {content}
           </div>
         )}
 
         {/* Artifact linkage */}
         {artifactId && cardType === "specialist" && (
-          <div className="mt-1.5 text-[11px] text-neutral-600 flex items-center gap-1">
+          <div className="mt-1.5 text-[11px] text-neutral-400 flex items-center gap-1">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
             <span>artifact/{artifactId}</span>
           </div>
@@ -201,7 +201,7 @@ export default function TypedThreadCard({
 
         {/* Next action */}
         {nextAction && (
-          <div className="mt-1.5 text-[11px] text-neutral-600 dark:text-neutral-600">
+          <div className="mt-1.5 text-[11px] text-neutral-400">
             → {nextAction}
           </div>
         )}
@@ -212,7 +212,7 @@ export default function TypedThreadCard({
             {onApprove && (
               <button
                 onClick={onApprove}
-                className="text-[11px] px-3 py-1 rounded border border-emerald-700 text-emerald-400 hover:bg-emerald-900/30 transition-colors"
+                className="text-[11px] px-3 py-1 rounded border border-neutral-300 text-neutral-600 hover:bg-neutral-100 transition-colors"
               >
                 Approve
               </button>
@@ -220,7 +220,7 @@ export default function TypedThreadCard({
             {onRevise && (
               <button
                 onClick={onRevise}
-                className="text-[11px] px-3 py-1 rounded border border-neutral-700 text-neutral-400 hover:bg-neutral-800 transition-colors"
+                className="text-[11px] px-3 py-1 rounded border border-neutral-300 text-neutral-500 hover:bg-neutral-100 transition-colors"
               >
                 Request revision
               </button>
@@ -230,7 +230,7 @@ export default function TypedThreadCard({
 
         {/* Approval result */}
         {cardType === "approval_result" && (
-          <div className="mt-1 text-[11px] text-emerald-500">
+          <div className="mt-1 text-[11px] text-neutral-600">
             Approved · workflow complete
           </div>
         )}

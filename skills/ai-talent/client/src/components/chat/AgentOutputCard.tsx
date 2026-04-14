@@ -49,22 +49,16 @@ export interface AgentOutputCardProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function avatarBg(name: string): string {
-  const colors = ['rgba(249,115,22,0.08)','#7C3AED20','#F59E0B20','#3B82F620','#EC489920'];
-  return colors[name.charCodeAt(0) % colors.length];
-}
-function avatarFg(name: string): string {
-  const colors = ['#F97316','#7C3AED','#F59E0B','#3B82F6','#EC4899'];
-  return colors[name.charCodeAt(0) % colors.length];
-}
+function avatarBg(_name: string): string { return '#F0EFEE'; }
+function avatarFg(_name: string): string { return '#6B6560'; }
 
 const TYPE_ICON: Record<string, string> = {
-  doc: '📄',
-  sheet: '📊',
-  ppt: '📑',
-  image: '🖼',
-  code: '💻',
-  other: '📎',
+  doc: 'doc',
+  sheet: 'csv',
+  ppt: 'ppt',
+  image: 'img',
+  code: 'code',
+  other: 'file',
 };
 
 function ArtifactCard({ artifact }: { artifact: AgentCardArtifact }) {
@@ -73,8 +67,8 @@ function ArtifactCard({ artifact }: { artifact: AgentCardArtifact }) {
 
   return (
     <div style={{
-      background: '#211F1C',
-      border: '1px solid #252525',
+      background: '#F7F6F5',
+      border: '1px solid #E7E5E4',
       borderRadius: 8,
       overflow: 'hidden',
       marginTop: 8,
@@ -85,10 +79,10 @@ function ArtifactCard({ artifact }: { artifact: AgentCardArtifact }) {
         alignItems: 'center',
         gap: 8,
         padding: '8px 12px',
-        borderBottom: artifact.content ? '1px solid #252525' : 'none',
+        borderBottom: artifact.content ? '1px solid #E7E5E4' : 'none',
       }}>
         <span style={{ fontSize: 14 }}>{icon}</span>
-        <span style={{ flex: 1, fontSize: 11, color: '#E8E8E8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ flex: 1, fontSize: 11, color: '#1C1917', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {artifact.filename}
         </span>
         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
@@ -98,7 +92,7 @@ function ArtifactCard({ artifact }: { artifact: AgentCardArtifact }) {
               style={{
                 fontSize: 10, padding: '2px 8px',
                 border: '1px solid #333', borderRadius: 4,
-                background: 'none', color: '#888', cursor: 'pointer',
+                background: 'none', color: '#78716C', cursor: 'pointer',
               }}
             >
               {expanded ? '收起' : '展開'}
@@ -112,7 +106,7 @@ function ArtifactCard({ artifact }: { artifact: AgentCardArtifact }) {
               style={{
                 fontSize: 10, padding: '2px 8px',
                 border: '1px solid #333', borderRadius: 4,
-                background: 'none', color: '#F97316', cursor: 'pointer',
+                background: 'none', color: '#1C1917', cursor: 'pointer',
                 textDecoration: 'none',
               }}
             >
@@ -127,12 +121,12 @@ function ArtifactCard({ artifact }: { artifact: AgentCardArtifact }) {
         <div style={{
           padding: '10px 12px',
           fontSize: 11,
-          color: '#888',
+          color: '#78716C',
           lineHeight: 1.6,
           maxHeight: 200,
           overflowY: 'auto',
           whiteSpace: 'pre-wrap',
-          background: '#111',
+          background: '#FAFAF9',
         }}>
           {artifact.content.slice(0, 800)}{artifact.content.length > 800 ? '...' : ''}
         </div>
@@ -167,8 +161,8 @@ export default function AgentOutputCard({
 
   return (
     <div style={{
-      background: '#211F1C',
-      border: '1px solid #1E1E1E',
+      background: '#FFFFFF',
+      border: '1px solid #E7E5E4',
       borderRadius: 10,
       overflow: 'hidden',
       marginBottom: 12,
@@ -176,7 +170,7 @@ export default function AgentOutputCard({
       {/* ── Header ── */}
       <div style={{
         padding: '12px 14px 10px',
-        borderBottom: '1px solid #1E1E1E',
+        borderBottom: '1px solid #F0EFEE',
         display: 'flex',
         alignItems: 'flex-start',
         gap: 10,
@@ -195,7 +189,7 @@ export default function AgentOutputCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Name + title + status */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#E8E8E8' }}>{agentName}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#1C1917' }}>{agentName}</span>
             {agentTitle && (
               <span style={{ fontSize: 11, color: '#555' }}>{agentTitle}</span>
             )}
@@ -221,8 +215,8 @@ export default function AgentOutputCard({
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
                 fontSize: 10, padding: '2px 7px',
-                background: '#818CF820', color: '#F97316',
-                border: '1px solid #818CF840',
+                background: '#F0EFEE', color: '#44403C',
+                border: '1px solid #E7E5E4',
                 borderRadius: 4, fontWeight: 500,
               }}>
                 🔧 {skill}
@@ -232,8 +226,8 @@ export default function AgentOutputCard({
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
                 fontSize: 10, padding: '2px 7px',
-                background: '#34D39915', color: '#34D399',
-                border: '1px solid #34D39930',
+                background: '#F0EFEE', color: '#78716C',
+                border: '1px solid #E7E5E4',
                 borderRadius: 4, fontWeight: 500,
               }}>
                 ✦ {aiModel}
@@ -268,7 +262,7 @@ export default function AgentOutputCard({
           )}
           {contentExpanded && (
             <div style={{
-              fontSize: 12, color: '#C8C8C8', lineHeight: 1.7,
+              fontSize: 12, color: '#44403C', lineHeight: 1.7,
               whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             }}>
               {isStreaming && (!content || content.length === 0) ? (
@@ -278,7 +272,7 @@ export default function AgentOutputCard({
                 <span style={{
                   display: 'inline-block',
                   width: 2, height: 14,
-                  background: '#F97316',
+                  background: '#78716C',
                   marginLeft: 2,
                   verticalAlign: 'middle',
                   animation: 'blink 0.8s steps(1) infinite',
@@ -314,7 +308,7 @@ export default function AgentOutputCard({
 
       {/* ── Sources ── */}
       {sources.length > 0 && (
-        <div style={{ padding: '0 14px 12px', borderTop: '1px solid #1A1A1A' }}>
+        <div style={{ padding: '0 14px 12px', borderTop: '1px solid #F0EFEE' }}>
           <div style={{ fontSize: 10, color: '#555', marginBottom: 6, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             來源
           </div>
@@ -328,8 +322,8 @@ export default function AgentOutputCard({
                 style={{
                   display: 'block',
                   padding: '5px 8px',
-                  background: '#1C1917',
-                  border: '1px solid #252525',
+                  background: '#FAFAF9',
+                  border: '1px solid #E7E5E4',
                   borderRadius: 6,
                   textDecoration: 'none',
                   maxWidth: 140,

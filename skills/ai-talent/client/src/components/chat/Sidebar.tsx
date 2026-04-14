@@ -102,15 +102,11 @@ function agentInitial(name: string): string {
   return name.charAt(0).toUpperCase();
 }
 
-function avatarColor(name: string): string {
-  const colors = ['#1DBEAA20', '#7C3AED20', '#F59E0B20', '#3B82F620', '#EC489920'];
-  const idx = name.charCodeAt(0) % colors.length;
-  return colors[idx];
+function avatarColor(_name: string): string {
+  return '#F0EFEE';
 }
-function avatarTextColor(name: string): string {
-  const colors = ['#F97316', '#7C3AED', '#F59E0B', '#3B82F6', '#EC4899'];
-  const idx = name.charCodeAt(0) % colors.length;
-  return colors[idx];
+function avatarTextColor(_name: string): string {
+  return '#6B6560';
 }
 
 function timeAgo(dateStr: string): string {
@@ -247,7 +243,7 @@ export default function Sidebar({
           {/* Logo */}
           <div style={{
             width: 28, height: 28, borderRadius: 6,
-            background: 'linear-gradient(135deg, #1DBEAA, #0D8A7E)',
+            background: '#3D3835',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'white', fontWeight: 700, fontSize: 12, flexShrink: 0,
           }}>
