@@ -432,6 +432,52 @@ export const brandRouter = router({
             VALUES (${brandId}, ${ctx.user.id}, "owner", ${ctx.user.id})`
       );
 
+      // Auto-estimate brand positioning after creation
+      try {
+        const endpoint = process.env.AZURE_OPENAI_ENDPOINT ?? "";
+        const apiKey = process.env.AZURE_OPENAI_KEY ?? "";
+        if (endpoint && apiKey) {
+          const promptText = `你是品牌策略專家。根據以下品牌資訊，推估品牌定位，用繁體中文，以 JSON 格式輸出。
+品牌名稱：${input.name}
+產業：${input.industry ?? "未知"}
+品牌簡介：${input.description ?? "無"}
+官網：${input.website ?? "無"}
+
+輸出 JSON：{"tagline":"20字內標語","valueProposition":"50字內價值主張","targetMarket":"10字內目標市場","audienceA":"15字內主要客群","audienceB":"15字內次要客群","emotionalDiff":"20字內情感差異化","functionalDiff":"20字內功能差異化"}`;
+
+          const res = await fetch(
+            `${endpoint}/openai/deployments/gpt-4o-mini/chat/completions?api-version=2024-02-01`,
+            {
+              method: "POST",
+              headers: { "api-key": apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                messages: [{ role: "user", content: promptText }],
+                max_tokens: 400,
+                response_format: { type: "json_object" },
+              }),
+            }
+          );
+          const gptData = await res.json() as any;
+          const gptContent = gptData?.choices?.[0]?.message?.content;
+          if (gptContent) {
+            const est = JSON.parse(gptContent);
+            await db.execute(sql`UPDATE brands SET
+              tagline=${est.tagline ?? null},
+              valueProposition=${JSON.stringify(est.valueProposition ?? '')},
+              targetMarket=${est.targetMarket ?? null},
+              audienceA=${est.audienceA ?? null},
+              audienceB=${est.audienceB ?? null},
+              emotionalDiff=${est.emotionalDiff ?? null},
+              functionalDiff=${est.functionalDiff ?? null},
+              isEstimate=1
+              WHERE id=${brandId}`);
+          }
+        }
+      } catch (e) {
+        // Non-fatal: ignore estimate errors
+        console.error('[brand estimate] failed:', e);
+      }
+
       // Seed workspaces and missions for the new brand
       const workspaceSeeds = [
         { wsKey: 'strategy', label: '策略定位', sortOrder: 0 },
@@ -553,7 +599,11 @@ export const brandRouter = router({
           FROM brands WHERE id=${input.brandId}
           LIMIT 1`
       ) as any;
-      return rows?.[0] ?? null;
+      const row = rows?.[0] ?? null;
+      if (row && typeof row.valueProposition === 'string') {
+        try { row.valueProposition = JSON.parse(row.valueProposition); } catch {}
+      }
+      return row;
     }),
 
   /**
@@ -617,6 +667,8 @@ export const brandRouter = router({
       await db.execute(
         sql`UPDATE brands SET
           tagline=${parsed.tagline ?? null},
+          valueProposition=${JSON.stringify(parsed.valueProposition ?? '')},
+          targetMarket=${parsed.targetMarket ?? null},
           audienceA=${parsed.audienceA ?? null},
           audienceB=${parsed.audienceB ?? null},
           emotionalDiff=${parsed.emotionalDiff ?? null},

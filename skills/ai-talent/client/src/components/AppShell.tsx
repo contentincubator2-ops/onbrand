@@ -938,7 +938,7 @@ function BrandPositioningBar({ brandId }: { brandId: number | null }) {
     if (brandId && pos && !pos.tagline && !generateEstimate.isLoading) {
       generateEstimate.mutate({ brandId });
     }
-  }, [brandId, pos?.tagline]);
+  }, [brandId, pos]);
 
   if (!brandId) return null;
 
@@ -956,7 +956,7 @@ function BrandPositioningBar({ brandId }: { brandId: number | null }) {
 
   return (
     <div style={{
-      padding: '10px 20px',
+      padding: '14px 20px',
       borderBottom: '1px solid #F0EFED',
       background: '#FAFAF9',
       flexShrink: 0,
@@ -1077,14 +1077,6 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
     borderBottom: "1px solid #ECEAE8",
     flexShrink: 0, background: "#FFFFFF",
   };
-
-  const missionBarStyle: React.CSSProperties = {
-    padding: "10px 20px", background: "#FAFAF9",
-    borderBottom: "1px solid #ECEAE8",
-    flexShrink: 0,
-    display: "flex", alignItems: "flex-start", gap: 10,
-  };
-
   const btnGhost: React.CSSProperties = {
     padding: "4px 11px", borderRadius: 6, fontSize: 11, cursor: "pointer",
     fontFamily: "inherit", background: "transparent",
@@ -1172,32 +1164,6 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         </div>
 
         <BrandPositioningBar brandId={selectedBrandId} />
-
-        {/* Mission Bar */}
-        <div style={missionBarStyle}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 7,
-            background: "#F2F1EF", border: "1px solid #E4E3E1",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0, color: "#6B6A66",
-          }}>
-            <IconTarget />
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A18" }}>
-              建立 Rubi IP 英語 YouTube 頻道，90 天達成 5,000 訂閱
-            </div>
-            <div style={{ fontSize: 11, color: "#9B9990", marginTop: 1 }}>
-              北美市場進入計畫 · 5 Agents 協作執行
-            </div>
-            <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" as const }}>
-              <span style={tagAccentStyle}>北美</span>
-              <span style={tagStyle}>3-6 歲</span>
-              <span style={tagStyle}>YouTube</span>
-              <span style={tagStyle}>90 天</span>
-            </div>
-          </div>
-        </div>
 
         {/* Children slot (chat/content area) */}
         <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
