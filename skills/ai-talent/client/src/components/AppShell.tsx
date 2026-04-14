@@ -237,7 +237,7 @@ function WorkspaceMissions({
 }) {
   const { data: missions, isLoading } = trpc.mission.list.useQuery(
     { workspace: wsKey, brandId: brandId ?? undefined },
-    { enabled: true, refetchOnWindowFocus: false }
+    { enabled: !!brandId, refetchOnWindowFocus: false }
   );
 
   return (

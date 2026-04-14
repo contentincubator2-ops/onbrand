@@ -3,6 +3,7 @@
  * Index route: AppShell + ChatCore
  * Preserved: Login, OnboardingWizard
  */
+import React from "react";
 import Login from "./pages/Login";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import AppShell from "./components/AppShell";
@@ -15,6 +16,21 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppShellWithMission() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const initialMissionId = searchParams.get('missionId') ? Number(searchParams.get('missionId')) : null;
+  const [activeMissionId, setActiveMissionId] = React.useState<number | null>(initialMissionId);
+
+  return (
+    <AppShell
+      activeMissionId={activeMissionId}
+      onMissionSelect={(id) => setActiveMissionId(id)}
+    >
+      <ChatCore activeMissionId={activeMissionId} />
+    </AppShell>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
@@ -24,9 +40,7 @@ export default function App() {
         path="/"
         element={
           <RequireAuth>
-            <AppShell>
-              <ChatCore />
-            </AppShell>
+            <AppShellWithMission />
           </RequireAuth>
         }
       />

@@ -413,11 +413,17 @@ export const brandRouter = router({
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9\u4e00-\u9fff-]/g, "")
         .slice(0, 60) + "-" + Date.now().toString(36);
-      const [result] = await db.execute(
-        sql`INSERT INTO brands (name, slug, industry, website, socialLinks, description, createdBy)
+      // Convert socialLinks string to JSON
+      let socialLinksJson: string | null = null;
+      if (input.socialLinks?.trim()) {
+        try { JSON.parse(input.socialLinks); socialLinksJson = input.socialLinks; }
+        catch { socialLinksJson = JSON.stringify(input.socialLinks.split(/[,\n]+/).map((s:string)=>s.trim()).filter(Boolean)); }
+      }
+            const [result] = await db.execute(
+        sql`INSERT INTO brands (name, slug, industry, website, socialLinks, description, createdBy, userId)
             VALUES (${input.name}, ${slug}, ${input.industry ?? null},
-                    ${input.website ?? null}, ${input.socialLinks ?? null},
-                    ${input.description ?? null}, ${ctx.user.id})`
+                    ${input.website ?? null}, ${socialLinksJson},
+                    ${input.description ?? null}, ${ctx.user.id}, ${ctx.user.id})`
       ) as any;
       const brandId = result?.insertId;
       if (!brandId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create brand" });
@@ -425,7 +431,52 @@ export const brandRouter = router({
         sql`INSERT INTO brand_members (brandId, userId, role, addedBy)
             VALUES (${brandId}, ${ctx.user.id}, "owner", ${ctx.user.id})`
       );
-      return { id: brandId, name: input.name, slug };
+
+      // 1. 建立 strategy workspace（若用戶還沒有）
+      await db.execute(
+        sql`INSERT IGNORE INTO user_workspaces (userId, wsKey, label, sortOrder, brandId)
+            VALUES (${ctx.user.id}, 'strategy', '策略定位', 0, ${brandId})`
+      );
+
+      // 取得剛建立的 workspace id（或已存在的）
+      const [wsRows] = await db.execute(
+        sql`SELECT id FROM user_workspaces WHERE userId=${ctx.user.id} AND wsKey='strategy' AND brandId=${brandId} LIMIT 1`
+      ) as any;
+      const _wsId = wsRows?.[0]?.id;
+
+      // 2. 建立「品牌定位」mission
+      const positioningWelcome = `你好！我是你的品牌定位顧問。
+
+🎯 接下來我們將一起完成 **11 步驟品牌策略定位**，幫你建立清晰的品牌定位基礎。
+
+這 11 個步驟包含：
+1. 品牌核心價值定義
+2. 目標受眾分析
+3. 競品定位對比
+4. 獨特價值主張（UVP）
+5. 品牌個性與語調
+6. 市場定位地圖
+7. 價格定位策略
+8. 通路策略
+9. 內容主題柱
+10. 品牌故事框架
+11. 執行優先序
+
+準備好了嗎？先告訴我：**你的品牌主要解決什麼問題？目標客戶是誰？**`;
+
+      await db.execute(
+        sql`INSERT INTO missions (userId, workspace, title, squadSlug, welcomeMessage, isRecurring, status, brandId)
+            VALUES (${ctx.user.id}, 'strategy', '品牌定位', 'brand-positioning', ${positioningWelcome}, 0, 'active', ${brandId})
+            ON DUPLICATE KEY UPDATE id=id`
+      );
+
+      // 取得 mission id
+      const [missionRows] = await db.execute(
+        sql`SELECT id FROM missions WHERE userId=${ctx.user.id} AND workspace='strategy' AND title='品牌定位' AND brandId=${brandId} LIMIT 1`
+      ) as any;
+      const missionId = missionRows?.[0]?.id;
+
+      return { id: brandId, name: input.name, slug, missionId: missionId ?? null };
     }),
 
   /**

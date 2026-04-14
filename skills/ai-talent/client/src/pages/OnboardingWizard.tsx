@@ -41,7 +41,7 @@ const COLORS = {
 export default function OnboardingWizard({ onComplete }: OnboardingProps) {
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "done">("form");
-  const [createdBrand, setCreatedBrand] = useState<{ id: number; name: string } | null>(null);
+  const [createdBrand, setCreatedBrand] = useState<{ id: number; name: string; missionId?: number | null } | null>(null);
   const [countdown, setCountdown] = useState(3);
 
   // Form state
@@ -58,7 +58,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
   useEffect(() => {
     if (step !== "done" || !createdBrand) return;
     if (countdown <= 0) {
-      navigate(`/?positioning=true&brandId=${createdBrand.id}`);
+      navigate(`/?missionId=${createdBrand.missionId ?? ''}&brandId=${createdBrand.id}`);
       return;
     }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
@@ -78,7 +78,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
         description: description.trim() || undefined,
         industry: industry && industry !== "請選擇產業" ? industry : undefined,
       });
-      setCreatedBrand({ id: result.id, name: result.name });
+      setCreatedBrand({ id: result.id, name: result.name, missionId: result.missionId ?? null });
       setStep("done");
       onComplete?.(result.id, result.name);
     } catch (err: any) {
@@ -147,7 +147,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
           </div>
           <div style={{ marginTop: 20 }}>
             <button
-              onClick={() => navigate(`/?positioning=true&brandId=${createdBrand.id}`)}
+              onClick={() => navigate(`/?missionId=${createdBrand.missionId ?? ''}&brandId=${createdBrand.id}`)}
               style={{
                 background: COLORS.accent,
                 color: "#fff",
