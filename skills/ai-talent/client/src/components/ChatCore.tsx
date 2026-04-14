@@ -571,7 +571,7 @@ export default function ChatCore({
     const missionData = missionDataQuery.data as any;
     if (!missionData.welcomeMessage) return;
     const missionConvId = `conv-mission-${activeMissionId}`;
-    const isAutoStart = missionData.welcomeMessage === "__AUTO_START__";
+    const isAutoStart = missionData.welcomeMessage === "__AUTO_START__"; // autoStart: PM 自動 recap
     const squadSlug: string = missionData.squadSlug ?? "";
     setActiveId(missionConvId);
     setConversationHistory([]);
@@ -587,7 +587,7 @@ export default function ChatCore({
       if (existing) return prev;
       return [{ id: missionConvId, title: missionData.title, messages: [], createdAt: Date.now() }, ...prev];
     });
-    if (isAutoStart && squadSlug && !autoStartedRef.current.has(activeMissionId)) {
+    if (isAutoStart && !autoStartedRef.current.has(activeMissionId)) {
       autoStartedRef.current.add(activeMissionId);
       setTimeout(async () => {
         const token = localStorage.getItem("authToken");
@@ -613,7 +613,7 @@ export default function ChatCore({
           const resp = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ userMessage: "開始", conversationHistory: [], brandContext: brandCtx }),
+            body: JSON.stringify({ userMessage: "開始", conversationHistory: [], brandContext: brandCtx, missionId: activeMissionId, workspace: missionData.workspace ?? undefined }),
           });
           if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
           const reader = resp.body.getReader();
