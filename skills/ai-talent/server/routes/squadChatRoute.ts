@@ -25,6 +25,7 @@ import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import { invokeLLMStream } from "../_core/llm";
+import { runSquadLeadQA, formatQAAsMessage, SQUAD_LEAD } from "../squadLeadQA";
 
 // ── OpenClaw Gateway ──────────────────────────────────────────────────────────
 const GATEWAY_HTTP = "http://localhost:18790";
@@ -517,6 +518,54 @@ ${isLastStep
       }
     } catch (err) {
       console.error("[squad-chat] save message error:", err);
+    }
+
+    // 9.5 Squad Lead QA（所有任務，Agent 輸出後自動品質控管）
+    if (fullContent.length > 100) {
+      try {
+        // 品牌資料
+        const brandName = (brandContext as any)?.name ?? (brandContext as any)?.brandName ?? '';
+        const industry = (brandContext as any)?.industry ?? '';
+        const description = (brandContext as any)?.description ?? '';
+        const targetMarket = (brandContext as any)?.targetAudience ?? (brandContext as any)?.targetMarket ?? '';
+
+        // 取得前幾步對話摘要作為脈絡
+        const historyForContext = (conversationHistory as any[])
+          .slice(-4)
+          .filter((m: any) => m.role === 'assistant')
+          .map((m: any) => String(m.content ?? '').slice(0, 200))
+          .join('\n');
+
+        // 通知前端：QA 開始
+        send('agent', {
+          agentName: SQUAD_LEAD.name,
+          agentTitle: SQUAD_LEAD.title,
+          agentRole: 'qa',
+          step: thisStep,
+          totalSteps,
+          isQA: true,
+        });
+
+        const qaResult = await runSquadLeadQA({
+          agentName: agentName ?? 'AI 顧問',
+          agentTitle: agentTitle ?? '',
+          taskTitle: steps[thisStep - 1] ?? userMessage.slice(0, 40),
+          agentOutput: fullContent,
+          brandName: brandName || undefined,
+          industry: industry || undefined,
+          description: description || undefined,
+          targetMarket: targetMarket || undefined,
+          userRequest: userMessage,
+          previousContext: historyForContext || undefined,
+        });
+
+        // 把 QA 結論推給用戶（作為額外 delta）
+        const qaMessage = formatQAAsMessage(qaResult, { isLastStep });
+        send('delta', { text: '\n\n---\n' + qaMessage });
+
+      } catch (qaErr: any) {
+        console.error('[SquadLeadQA] squad error:', qaErr?.message);
+      }
     }
 
     // 10. Done event
