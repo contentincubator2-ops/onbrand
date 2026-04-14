@@ -25,6 +25,60 @@ import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import { invokeLLMStream } from "../_core/llm";
+
+// ── OpenClaw Gateway ──────────────────────────────────────────────────────────
+const GATEWAY_HTTP = "http://localhost:18790";
+const GATEWAY_TOKEN = "mos-pm-claw-2026";
+
+async function streamViaGateway(
+  agentId: string,
+  systemPrompt: string,
+  userMessage: string,
+  history: { role: string; content: string }[],
+  onDelta: (text: string) => void,
+  onDone: (full: string) => void,
+  onError: (err: string) => void,
+): Promise<void> {
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...history.slice(-12),
+    { role: "user", content: userMessage },
+  ];
+  const body = JSON.stringify({ model: agentId, messages, stream: true });
+  try {
+    const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${GATEWAY_TOKEN}`, "Content-Type": "application/json" },
+      body,
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!resp.ok || !resp.body) throw new Error(`Gateway ${resp.status}`);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let full = "";
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") { onDone(full); return; }
+        try {
+          const parsed = JSON.parse(raw);
+          const delta = parsed?.choices?.[0]?.delta?.content ?? "";
+          if (delta) { full += delta; onDelta(delta); }
+        } catch { /* skip */ }
+      }
+    }
+    onDone(full);
+  } catch (err: any) {
+    onError(err?.message ?? "Gateway error");
+  }
+}
 import { getDb, getSoworkDb } from "../db";
 import mysql from "mysql2/promise";
 
@@ -410,19 +464,42 @@ ${isLastStep
       content: m.content,
     }));
 
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
-      ...historyMsgs,
-      { role: "user" as const, content: userMessage },
-    ];
-
-    // 8. Stream LLM response
+    // 8. Stream via OpenClaw Gateway (full skills + tools + memory)
     send("start", { message: `${agentName} 正在分析...` });
 
+    const agentSlug: string | undefined = (agentRow as any)?.slug;
+    const openclawAgentId = agentSlug ? `openclaw/${agentSlug}` : "openclaw/pm";
+
     let fullContent = "";
-    for await (const delta of invokeLLMStream({ messages, provider: llmProvider, model: llmModel, maxTokens: isLastStep ? 16000 : 8192 })) {
-      fullContent += delta;
-      send("delta", { text: delta });
+    let gatewayDone = false;
+
+    await new Promise<void>((resolve) => {
+      streamViaGateway(
+        openclawAgentId,
+        systemPrompt,
+        userMessage,
+        historyMsgs,
+        (delta) => { fullContent += delta; send("delta", { text: delta }); },
+        (_full) => { gatewayDone = true; resolve(); },
+        (_err) => {
+          console.warn(`[squad-chat] Gateway failed, falling back`);
+          resolve();
+        },
+      );
+    });
+
+    // Fallback to OpenRouter if Gateway failed
+    if (!gatewayDone) {
+      const fallbackMsgs = [
+        { role: "system" as const, content: systemPrompt },
+        ...historyMsgs,
+        { role: "user" as const, content: userMessage },
+      ];
+      fullContent = "";
+      for await (const delta of invokeLLMStream({ messages: fallbackMsgs, provider: llmProvider, model: llmModel, maxTokens: isLastStep ? 16000 : 8192 })) {
+        fullContent += delta;
+        send("delta", { text: delta });
+      }
     }
 
     // 9. Save assistant message to chat_messages
