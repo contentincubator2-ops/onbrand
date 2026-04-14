@@ -1397,18 +1397,32 @@ ${msg.agentName ?? "SoWork AI"} — ${msg.agentTitle ?? "行銷策略師"}
             {relaySteps.length > 0 && (
               <div className="mt-4 space-y-3">
                 <h4 className="text-xs font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">Execution Thread</h4>
-                {relaySteps.filter(s => s.status === 'done').map((step, i) => (
-                  <TypedThreadCard
-                    key={step.id}
-                    cardType={i === 0 ? 'pm_agent' : 'specialist'}
-                    agentName={step.agentName}
-                    label={step.label}
-                    status={step.status}
-                    content={step.summary || ''}
-                    stepIndex={i + 1}
-                    totalSteps={relaySteps.length}
-                  />
-                ))}
+                {relaySteps.filter(s => s.status === 'done').map((step, i, arr) => {
+                  // 六類卡片智能判斷
+                  type CardType = 'human_request' | 'pm_agent' | 'team_assembly' | 'specialist' | 'review_request' | 'approval_result';
+                  let cardType: CardType = 'specialist';
+                  if (i === 0) cardType = 'pm_agent';
+                  else if (step.layer === 'strategy' || step.agentTitle?.includes('PM') || step.agentTitle?.includes('策略')) cardType = 'pm_agent';
+                  else if (step.label?.includes('組隊') || step.label?.includes('分工') || step.label?.includes('team')) cardType = 'team_assembly';
+                  else if (step.label?.includes('審核') || step.label?.includes('review') || step.label?.includes('確認')) cardType = 'review_request';
+                  else if (i === arr.length - 1 && step.label?.includes('核准')) cardType = 'approval_result';
+                  else cardType = 'specialist';
+
+                  return (
+                    <TypedThreadCard
+                      key={step.id}
+                      cardType={cardType}
+                      agentName={step.agentName}
+                      label={step.label}
+                      status={step.status}
+                      content={step.summary || ''}
+                      stepIndex={i + 1}
+                      totalSteps={relaySteps.length}
+                      nextAction={i < arr.length - 1 ? `下一步：${arr[i+1]?.agentName ?? '下位成員'}執行` : undefined}
+                      collapsible={true}
+                    />
+                  );
+                })}
               </div>
             )}
 
