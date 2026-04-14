@@ -124,7 +124,8 @@ function buildPmContext(
   userMessage: string,
   squads: { slug: string; name: string; description: string; similarity: number }[],
   agents: { slug: string; name: string; title: string; specialty: string; similarity: number }[],
-  brandCtx: Record<string, string>
+  brandCtx: Record<string, string>,
+  missionCtx?: { title?: string; workspace?: string; currentStep?: number; isFirstMessage?: boolean }
 ): string {
   const brandStr = Object.entries(brandCtx).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join("\n");
   const squadList = squads.map((s, i) =>
@@ -134,23 +135,49 @@ function buildPmContext(
     `${i + 1}. [Agent] ${a.name}｜${a.title} (${a.slug}) — 相關度 ${(a.similarity * 100).toFixed(0)}%\n   ${a.specialty?.slice(0, 60) ?? ""}`
   ).join("\n");
 
-  return `【用戶任務】
-${userMessage}
+  const wsLabel: Record<string, string> = {
+    strategy: "品牌策略定位",
+    website: "官網 SEO 優化",
+    facebook: "Facebook 社群行銷",
+  };
+  const wsDesc = missionCtx?.workspace ? (wsLabel[missionCtx.workspace] ?? missionCtx.workspace) : "一般任務";
+  const missionTitle = missionCtx?.title ?? "未命名任務";
+  const stepInfo = missionCtx?.currentStep ? `（目前進度：第 ${missionCtx.currentStep} 步）` : "";
+  const isFirst = missionCtx?.isFirstMessage ?? false;
 
-【品牌資料】
+  const missionSection = isFirst
+    ? `【當前任務背景】
+工作區：${wsDesc}
+任務名稱：${missionTitle}${stepInfo}
+品牌資料：
 ${brandStr || "未提供"}
 
-【向量搜尋結果：最相關的 Squad】
+⚡ 這是用戶進入此任務的第一條訊息。
+請以繁體中文：
+1. 簡要 recap 你掌握的工作區、任務、品牌資訊（2-3 句）
+2. 詢問用戶這次想達成的具體目標
+3. 不要預設流程，等用戶說明後再拆解任務`
+    : `【當前任務背景】
+工作區：${wsDesc}
+任務名稱：${missionTitle}${stepInfo}
+品牌資料：
+${brandStr || "未提供"}`;
+
+  return `${missionSection}
+
+【用戶訊息】
+${userMessage}
+
+【向量搜尋：最相關 Squad】
 ${squadList || "無"}
 
-【向量搜尋結果：最相關的 Agent】
+【向量搜尋：最相關 Agent】
 ${agentList || "無"}
 
-請根據以上資訊：
-1. 判斷任務類型
-2. 選擇最合適的 Squad 或單一 Agent
-3. 以 relay_step SSE events 輸出執行過程
-4. 每個步驟完成後發 relay_step done event`;
+【PM 行動指引】
+你是 SoWork 行銷 AI PM，精通品牌策略、內容行銷、數位廣告。
+以繁體中文回覆。根據用戶的具體需求，自行拆解任務步驟，選擇最合適的 Squad Lead 或 Agent 執行。
+每個執行步驟以 relay_step SSE event 標記。直接分析並行動，不要問無謂的確認問題。`;
 }
 
 // ── Gateway streaming proxy ───────────────────────────────────────────────────
@@ -251,76 +278,36 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   logEvent({ sessionId, userId, eventType: "session_start" });
 
   try {
-    // 0. PM Welcome for strategy workspace (first-time only)
-    if (missionId && workspace === 'strategy') {
+    // 0. 偵測是否為首次訊息（任何工作區），傳給 PM context
+    let isFirstMessage = false;
+    let missionTitle = "";
+    let missionBrandId: number | null = null;
+    if (missionId) {
       try {
         const db = await getDb();
-        // Check if this is the first message in this mission
         const [msgRows] = await (db as any).execute(
-          `SELECT id FROM mission_messages WHERE missionId = ${missionId} LIMIT 1`
+          `SELECT id FROM mission_messages WHERE missionId = ${missionId} AND role='user' LIMIT 1`
         ) as any;
-        const isFirstTime = !msgRows?.[0];
+        isFirstMessage = !msgRows?.[0];
 
-        if (isFirstTime) {
-          // Fetch mission + brand info
-          const [missionRows] = await (db as any).execute(
-            `SELECT m.title, b.name as brandName, b.industry, b.description, m.brandId
-             FROM missions m
-             LEFT JOIN brands b ON b.id = m.brandId
-             WHERE m.id = ${missionId} LIMIT 1`
-          ) as any;
-          const mission = missionRows?.[0];
-          const brandName = mission?.brandName ?? (brandContext as any)?.brandName ?? '你的品牌';
-          const industry = mission?.industry ?? (brandContext as any)?.industry ?? '未指定';
-          const description = mission?.description ?? (brandContext as any)?.description ?? '';
+        // 取得 mission 標題和品牌
+        const [missionRows] = await (db as any).execute(
+          `SELECT m.title, m.brandId FROM missions m WHERE m.id = ${missionId} LIMIT 1`
+        ) as any;
+        missionTitle = missionRows?.[0]?.title ?? "";
+        missionBrandId = missionRows?.[0]?.brandId ?? null;
 
-          const welcomeText = [
-            '你好！我是 SoWork 品牌定位 PM。',
-            '',
-            '這個任務將帶你完成 10 個步驟的品牌定位分析，每個步驟由專屬 AI 顧問主導，你可以隨時調整方向。',
-            '',
-            '我已收到你的品牌資料：',
-            `・品牌名稱：${brandName}`,
-            `・產業：${industry}`,
-            description ? `・品牌簡介：${description}` : '',
-            '',
-            '接下來，我將召集品牌定位 Squad Lead *劉品妤（AI 品牌故事 CMO）* 帶領團隊展開分析。',
-            '她將主導「市場洞察」第一步，並在各步驟完成後進行 Squad 銜接總結。',
-            '準備好了嗎？請告訴我「開始」，我們就立刻出發！',
-          ].filter((l, i) => !(i === 7 && !description)).join('\n');
-
-          // Push welcome as SSE
-          send('relay_step', { id: -1, label: 'PM 初始化', agentName: 'Brand Positioning PM', agentTitle: '品牌定位 PM → 召集 Squad Lead', layer: 'strategy', status: 'running' });
-          send('delta', { text: welcomeText });
-          send('relay_step', { id: -1, status: 'done' });
-
-          // Save welcome to mission_messages
-          try {
-            await (db as any).execute(
-              `INSERT INTO mission_messages (missionId, userId, role, content, metadata) VALUES (${missionId}, ${userId}, 'assistant', ${JSON.stringify(welcomeText).replace(/\\/g,'\\\\')}, '${JSON.stringify({ type: 'pm_welcome', step: 0 })}')`
-            );
-          } catch { /* non-fatal */ }
-
-          // Init positioning session at step 1
-          if (mission?.brandId) {
-            try {
-              await (db as any).execute(
-                `INSERT IGNORE INTO positioning_sessions (missionId, brandId, userId, currentStep, status, stepResults) VALUES (${missionId}, ${mission.brandId}, ${userId}, 1, 'in_progress', '{}')`
-              );
-            } catch { /* non-fatal */ }
-          }
-
-          send('done', { sessionId, isComplete: true });
-          clearInterval(keepalive);
-          logEvent({ sessionId, userId, eventType: 'session_end' });
-          res.end();
-          return;
+        // 若是首次訊息，在 mission_messages 記錄用戶訊息前先建立 positioning session
+        if (isFirstMessage && missionBrandId) {
+          await (db as any).execute(
+            `INSERT IGNORE INTO positioning_sessions (missionId, brandId, userId, currentStep, status, stepResults)
+             VALUES (${missionId}, ${missionBrandId}, ${userId}, 1, 'in_progress', '{}')`
+          ).catch(() => {});
         }
-      } catch (welcomeErr: any) {
-        // Non-fatal: fall through to normal chat flow
-      }
+      } catch { /* non-fatal */ }
     }
 
+    // 1. Semantic search
     // 1. Semantic search
     send("status", { message: "分析任務中..." });
     const queryEmb = await getEmbedding(userMessage);
@@ -333,7 +320,23 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     }
 
     // 2. Build PM context
-    const pmContext = buildPmContext(userMessage, squads, agents, brandContext);
+    // 取得 positioning session 的 currentStep（若有）
+    let currentStep = 0;
+    if (missionId) {
+      try {
+        const db = await getDb();
+        const [sessRows] = await (db as any).execute(
+          `SELECT currentStep FROM positioning_sessions WHERE missionId = ${missionId} AND userId = ${userId} LIMIT 1`
+        ) as any;
+        currentStep = sessRows?.[0]?.currentStep ?? 0;
+      } catch { /* non-fatal */ }
+    }
+    const pmContext = buildPmContext(userMessage, squads, agents, brandContext, {
+      title: missionTitle,
+      workspace: workspace ?? undefined,
+      currentStep: currentStep || undefined,
+      isFirstMessage,
+    });
     const messages = [
       { role: "system", content: pmContext },
       ...conversationHistory.slice(-10),
