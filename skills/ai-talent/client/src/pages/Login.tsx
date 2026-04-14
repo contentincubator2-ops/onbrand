@@ -41,6 +41,7 @@ export default function Login() {
       }
       localStorage.setItem("authToken", data.token!);
       localStorage.setItem("userId", String(data.userId));
+      if ((data as any).email) localStorage.setItem("userEmail", (data as any).email);
       navigate("/");
     } catch {
       setError("網路錯誤，請稍後重試");
