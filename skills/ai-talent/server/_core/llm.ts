@@ -142,13 +142,13 @@ const PROVIDER_CONFIG: Record<
   },
   perplexity: {
     baseUrl:      "https://api.perplexity.ai",
-    defaultModel: "llama-3.1-sonar-large-128k-online",
+    defaultModel: "sonar-pro",
     getKey:       () => ENV.PERPLEXITY_API_KEY ?? "",
   },
   google: {
-    baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
-    defaultModel: "gemini-2.5-flash",
-    getKey:       () => (ENV as any).GOOGLE_AI_API_KEY ?? "",
+    baseUrl:      "https://openrouter.ai/api/v1",
+    defaultModel: "google/gemma-4-31b-it",
+    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
   },
   openrouter: {
     baseUrl:      "https://openrouter.ai/api/v1",

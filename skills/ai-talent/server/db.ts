@@ -80,7 +80,7 @@ export async function getSoworkDb(): Promise<ReturnType<typeof drizzle>> {
     host,
     user,
     password,
-    database: "sowork_db",
+    database: process.env.SOWORK_DB_NAME ?? process.env.DB_NAME ?? "mos_db",
     ssl: { rejectUnauthorized: false },
     connectionLimit: 5,
     waitForConnections: true,

@@ -76,33 +76,29 @@ export type Agent = typeof agents.$inferSelect;
 export type InsertAgent = typeof agents.$inferInsert;
 
 //  Brands
-export const brands = mysqlTable("enterprise_brands", {
+export const brands = mysqlTable("brands", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
-  userId: int("userId").notNull(),
-  name: varchar("name", { length: 128 }).notNull(),
+  userId: int("userId"),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 64 }).notNull(),
+  industry: varchar("industry", { length: 64 }),
+  website: text("website"),
+  socialLinks: json("socialLinks"),
   description: text("description"),
-  websiteUrl: text("websiteUrl"),
-  facebookUrl: text("facebookUrl"),
   logoUrl: text("logoUrl"),
-  // Scraped / analyzed data
+  onboardingStep: int("onboardingStep").default(0),
+  positioningStatus: mysqlEnum("positioningStatus", ["pending", "in_progress", "completed"]).default("pending"),
+  positioningSummary: text("positioningSummary"),
+  positioningReport: json("positioningReport"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),
+  // Extended fields (optional, filled by AI analysis)
   tagline: text("tagline"),
   targetAudience: text("targetAudience"),
   brandVoice: text("brandVoice"),
-  mainProducts: json("mainProducts").$type<string[]>(),
-  keywords: json("keywords").$type<string[]>(),
-  // SoWork positioning analysis result (JSON blob)
   soworkAnalysis: json("soworkAnalysis").$type<Record<string, unknown>>(),
-  // Launch & contact info (for AI employees to auto-fill press releases, time-sensitive content)
-  launchDate: varchar("launchDate", { length: 20 }),  // e.g. "2026-03-13"
-  contactName: varchar("contactName", { length: 64 }),
-  contactEmail: varchar("contactEmail", { length: 128 }),
-  contactPhone: varchar("contactPhone", { length: 32 }),
-  // Source tracking
-  dataSource: mysqlEnum("dataSource", ["manual", "website", "facebook", "sowork"]).default("manual"),
   isDefault: boolean("isDefault").default(false),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Brand = typeof brands.$inferSelect;
