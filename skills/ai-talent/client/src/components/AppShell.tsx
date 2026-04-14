@@ -147,7 +147,11 @@ function CreditsFooter() {
 
 // ─── Rail ─────────────────────────────────────────────────────────────────────
 
-function Rail({ activeTab, onTabChange }: { activeTab: string; onTabChange: (t: string) => void }) {
+function Rail({ activeTab, onTabChange, notifCount }: {
+  activeTab: string;
+  onTabChange: (t: string) => void;
+  notifCount: number;
+}) {
   const railStyle: React.CSSProperties = {
     width: 48, minWidth: 48,
     background: "#F2F1EF",
@@ -181,8 +185,8 @@ function Rail({ activeTab, onTabChange }: { activeTab: string; onTabChange: (t: 
 
   const tabs = [
     { id: "chat",         icon: <IconChat />,         badge: false },
-    { id: "tasks",        icon: <IconTasks />,        badge: true, badgeColor: "#E8631A" },
-    { id: "notification", icon: <IconNotification />, badge: true, badgeColor: "#3D9A3D" },
+    { id: "tasks",        icon: <IconTasks />,        badge: false },
+    { id: "notification", icon: <IconNotification />, badge: notifCount > 0, badgeColor: "#3D9A3D" },
     { id: "knowledge",    icon: <IconKnowledge />,    badge: false },
   ];
 
@@ -216,9 +220,77 @@ function Rail({ activeTab, onTabChange }: { activeTab: string; onTabChange: (t: 
   );
 }
 
+// ─── WorkspaceMissions ────────────────────────────────────────────────────────
+
+function WorkspaceMissions({
+  wsKey,
+  brandId,
+  activeMissionId,
+  onMissionSelect,
+  onNewTask,
+}: {
+  wsKey: string;
+  brandId: number | null;
+  activeMissionId?: number | null;
+  onMissionSelect?: (missionId: number) => void;
+  onNewTask?: (wsKey: string) => void;
+}) {
+  const { data: missions, isLoading } = trpc.mission.list.useQuery(
+    { workspace: wsKey, brandId: brandId ?? undefined },
+    { enabled: true, refetchOnWindowFocus: false }
+  );
+
+  return (
+    <div style={{ paddingLeft: 10, borderLeft: "1px solid #DEDDDA", margin: "2px 5px 2px 17px" }}>
+      {isLoading && (
+        <div style={{ padding: "3px 6px", fontSize: 10, color: "#C8C7C3" }}>載入中…</div>
+      )}
+      {(missions ?? []).map((mission: any) => (
+        <div
+          key={mission.id}
+          onClick={() => onMissionSelect?.(mission.id)}
+          style={{
+            padding: "3px 6px", borderRadius: 5, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5,
+            background: activeMissionId === mission.id ? "#FFFFFF" : "transparent",
+          }}
+        >
+          <div style={{
+            width: 4, height: 4, borderRadius: "50%",
+            background: activeMissionId === mission.id ? "#E8631A" : "#DEDDDA",
+            flexShrink: 0,
+          }} />
+          <span style={{
+            fontSize: 11,
+            color: activeMissionId === mission.id ? "#1A1A18" : "#9B9990",
+            fontWeight: activeMissionId === mission.id ? 500 : 400,
+            flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {mission.title?.length > 20 ? mission.title.slice(0, 20) + "…" : mission.title}
+          </span>
+        </div>
+      ))}
+      <div
+        onClick={() => onNewTask?.(wsKey)}
+        style={{ padding: "3px 6px", fontSize: 10, color: "#C8C7C3", cursor: "pointer" }}
+      >
+        + 新增任務
+      </div>
+    </div>
+  );
+}
+
 // ─── Drawer ───────────────────────────────────────────────────────────────────
 
-function Drawer() {
+function Drawer({
+  onMissionSelect,
+  onNewTask,
+  activeMissionId,
+}: {
+  onMissionSelect?: (missionId: number) => void;
+  onNewTask?: (wsKey: string) => void;
+  activeMissionId?: number | null;
+}) {
   const drawerStyle: React.CSSProperties = {
     width: 210, minWidth: 210,
     background: "#F2F1EF",
@@ -233,110 +305,203 @@ function Drawer() {
     padding: "8px 13px 3px",
   };
 
+  // Brand data
+  const { data: brands, isLoading: brandsLoading } = trpc.brand.listByMember.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false }
+  );
+  const [selectedBrandIdx, setSelectedBrandIdx] = useState(0);
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
+  const brandList = (brands as any[]) ?? [];
+  const selectedBrand = brandList[selectedBrandIdx] ?? null;
+  const selectedBrandId: number | null = selectedBrand?.id ?? null;
+
+  // Workspace data
+  const { data: workspaces, isLoading: wsLoading } = trpc.workspace.list.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false }
+  );
+  const wsList = (workspaces as any[]) ?? [];
+  const [expandedWs, setExpandedWs] = useState<Record<string, boolean>>({});
+
+  // Resource summary (optional chaining for missing router)
+  const resourceQuery = (trpc as any).resource?.summary?.useQuery
+    ? (trpc as any).resource.summary.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: null, isLoading: false };
+  const resourceData = resourceQuery.data;
+
+  const toggleWs = (key: string) => {
+    setExpandedWs(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   return (
     <div style={drawerStyle}>
-      {/* Header */}
-      <div style={{ padding: "13px 10px 8px", display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{
-          flex: 1, display: "flex", alignItems: "center", gap: 7,
-          padding: "5px 8px", background: "#E8E7E4", borderRadius: 7,
-          cursor: "pointer",
-        }}>
-          <div style={{
-            width: 18, height: 18, borderRadius: 4, background: "#1A1A18",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 9, fontWeight: 700, color: "#F9F9F8", flexShrink: 0,
-          }}>R</div>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A18", flex: 1 }}>Rubi IP</span>
-          <span style={{ color: "#9B9990", display: "flex", alignItems: "center" }}>
-            <IconChevronDown />
-          </span>
-        </div>
-        <button style={{
-          width: 24, height: 24, borderRadius: 6, border: "none",
-          background: "#E8E7E4", cursor: "pointer", color: "#6B6A66",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <IconPlus />
-        </button>
+      {/* Brand Switcher Header */}
+      <div style={{ padding: "13px 10px 8px", position: "relative" }}>
+        {brandsLoading ? (
+          <div style={{ padding: "5px 8px", fontSize: 11, color: "#9B9990" }}>載入品牌中…</div>
+        ) : brandList.length === 0 ? (
+          <button
+            onClick={() => { window.location.href = "/onboarding"; }}
+            style={{
+              width: "100%", padding: "7px 10px", borderRadius: 7,
+              background: "#E8631A", border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, color: "white",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+            }}
+          >
+            <IconPlus /> 建立品牌
+          </button>
+        ) : (
+          <div style={{ position: "relative" }}>
+            <div
+              onClick={() => setBrandDropdownOpen(o => !o)}
+              style={{
+                display: "flex", alignItems: "center", gap: 7,
+                padding: "5px 8px", background: "#E8E7E4", borderRadius: 7,
+                cursor: "pointer",
+              }}
+            >
+              <div style={{
+                width: 18, height: 18, borderRadius: 4, background: "#1A1A18",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, fontWeight: 700, color: "#F9F9F8", flexShrink: 0,
+              }}>
+                {(selectedBrand?.name ?? "?").charAt(0).toUpperCase()}
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A18", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selectedBrand?.name ?? "選擇品牌"}
+              </span>
+              <span style={{ color: "#9B9990", display: "flex", alignItems: "center" }}>
+                <IconChevronDown />
+              </span>
+            </div>
+            {brandDropdownOpen && (
+              <div style={{
+                position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
+                background: "white", border: "1px solid #E4E3E1", borderRadius: 8,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)", marginTop: 4, overflow: "hidden",
+              }}>
+                {brandList.map((brand: any, idx: number) => (
+                  <div
+                    key={brand.id}
+                    onClick={() => { setSelectedBrandIdx(idx); setBrandDropdownOpen(false); }}
+                    style={{
+                      padding: "8px 12px", cursor: "pointer", fontSize: 12,
+                      color: idx === selectedBrandIdx ? "#E8631A" : "#1A1A18",
+                      background: idx === selectedBrandIdx ? "#FFF5EE" : "white",
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 3, background: "#1A1A18",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 8, fontWeight: 700, color: "#F9F9F8", flexShrink: 0,
+                    }}>
+                      {brand.name.charAt(0).toUpperCase()}
+                    </div>
+                    {brand.name}
+                    {idx === selectedBrandIdx && <span style={{ marginLeft: "auto", color: "#E8631A" }}>✓</span>}
+                  </div>
+                ))}
+                <div
+                  onClick={() => { window.location.href = "/onboarding"; setBrandDropdownOpen(false); }}
+                  style={{ padding: "8px 12px", cursor: "pointer", fontSize: 11, color: "#9B9990", borderTop: "1px solid #F2F1EF", display: "flex", alignItems: "center", gap: 5 }}
+                >
+                  <IconPlus /> 建立新品牌
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto" }}>
+        {/* Workspaces */}
         <div style={secLabel}>工作區</div>
 
-        {/* Active workspace */}
-        <div>
-          <div style={{
-            padding: "4px 9px", borderRadius: 6, margin: "1px 5px",
-            cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-            background: "#FFFFFF",
-          }}>
-            <div style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: "#5A9E5A" }} />
-            <span style={{ fontSize: 9, color: "#C8C7C3" }}>▾</span>
-            <span style={{ fontSize: 12, color: "#1A1A18", fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              北美 YouTube 推廣
-            </span>
-          </div>
-          {/* Conversations */}
-          <div style={{ paddingLeft: 10, borderLeft: "1px solid #DEDDDA", margin: "2px 5px 2px 17px" }}>
-            <div style={{
-              padding: "3px 6px", borderRadius: 5, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 5,
-              background: "#FFFFFF",
-            }}>
-              <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#E8631A", flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: "#1A1A18", fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                市場進入策略規劃
-              </span>
-              <span style={{ fontSize: 9, color: "#C8C7C3" }}>今天</span>
-            </div>
-            <div style={{ padding: "3px 6px", borderRadius: 5, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#DEDDDA", flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: "#9B9990", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                競品分析 Cocomelon
-              </span>
-              <span style={{ fontSize: 9, color: "#C8C7C3" }}>昨天</span>
-            </div>
-            <div style={{ padding: "3px 6px", fontSize: 10, color: "#C8C7C3", cursor: "pointer" }}>+ 新對話</div>
-          </div>
-        </div>
+        {wsLoading && (
+          <div style={{ padding: "5px 13px", fontSize: 11, color: "#9B9990" }}>載入中…</div>
+        )}
 
-        {/* Other workspaces */}
-        <div style={{ padding: "4px 9px", borderRadius: 6, margin: "1px 5px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: "#C8973A" }} />
-          <span style={{ fontSize: 9, color: "#C8C7C3" }}>▸</span>
-          <span style={{ fontSize: 12, color: "#6B6A66", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>SEO 內容計畫</span>
-        </div>
-        <div style={{ padding: "4px 9px", borderRadius: 6, margin: "1px 5px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: "#C8C7C3" }} />
-          <span style={{ fontSize: 9, color: "#C8C7C3" }}>▸</span>
-          <span style={{ fontSize: 12, color: "#6B6A66", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>KOL 合作提案</span>
-        </div>
-        <div style={{ padding: "5px 12px", fontSize: 11, color: "#C8C7C3", cursor: "pointer" }}>+ 新增工作區</div>
-
-        {/* Agents section */}
-        <div style={{ ...secLabel, marginTop: 6 }}>本次 Agents</div>
-        <div style={{ padding: "0 4px" }}>
-          {[
-            { initial: "A", name: "Alex Chen",  skill: "market-research",  statusColor: "#3D9A3D" },
-            { initial: "M", name: "Mia Lin",    skill: "seo-optimizer",    statusColor: "#3D9A3D" },
-            { initial: "R", name: "Ryan Wu",    skill: "content-strategy", statusColor: "#E8631A" },
-          ].map(agent => (
-            <div key={agent.name} style={{
-              padding: "4px 8px", borderRadius: 6, margin: "1px 5px",
-              display: "flex", alignItems: "center", gap: 7, cursor: "pointer",
-            }}>
-              <div style={{
-                width: 20, height: 20, borderRadius: 5, background: "#D4D3D0",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 8, fontWeight: 700, color: "#4A4A45", flexShrink: 0,
-              }}>{agent.initial}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: "#4A4A45" }}>{agent.name}</div>
-                <div style={{ fontSize: 9, color: "#9B9990" }}>{agent.skill}</div>
+        {wsList.map((ws: any) => {
+          const isExpanded = expandedWs[ws.wsKey] !== false; // default expanded
+          return (
+            <div key={ws.wsKey}>
+              <div
+                style={{
+                  padding: "4px 9px", borderRadius: 6, margin: "1px 5px",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                  background: "transparent",
+                }}
+              >
+                <div style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: "#5A9E5A" }} />
+                <span
+                  onClick={() => toggleWs(ws.wsKey)}
+                  style={{ fontSize: 9, color: "#C8C7C3" }}
+                >
+                  {isExpanded ? "▾" : "▸"}
+                </span>
+                <span
+                  onClick={() => toggleWs(ws.wsKey)}
+                  style={{ fontSize: 12, color: "#1A1A18", fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {ws.label}
+                </span>
+                <button
+                  onClick={() => onNewTask?.(ws.wsKey)}
+                  title="新增任務"
+                  style={{
+                    width: 18, height: 18, borderRadius: 4, border: "none",
+                    background: "transparent", cursor: "pointer", color: "#9B9990",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <IconPlus />
+                </button>
               </div>
-              <div style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: agent.statusColor }} />
+              {isExpanded && (
+                <WorkspaceMissions
+                  wsKey={ws.wsKey}
+                  brandId={selectedBrandId}
+                  activeMissionId={activeMissionId}
+                  onMissionSelect={onMissionSelect}
+                  onNewTask={onNewTask}
+                />
+              )}
+            </div>
+          );
+        })}
+
+        {/* Fallback if no workspaces loaded yet */}
+        {!wsLoading && wsList.length === 0 && (
+          <div style={{ padding: "5px 13px", fontSize: 11, color: "#C8C7C3" }}>
+            暫無工作區
+          </div>
+        )}
+
+        {/* 可用資源 section */}
+        <div style={{ ...secLabel, marginTop: 6 }}>可用資源</div>
+        <div style={{ padding: "0 10px 8px" }}>
+          {[
+            { label: "Agents",       value: resourceData?.agents ?? null },
+            { label: "Skills",       value: resourceData?.skills ?? null },
+            { label: "AI Providers", value: resourceData?.aiProviders ?? null },
+          ].map(item => (
+            <div key={item.label} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "3px 4px",
+            }}>
+              <span style={{ fontSize: 11, color: "#6B6A66" }}>{item.label}</span>
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: "#1A1A18",
+                background: "#F2F1EF", border: "1px solid #E4E3E1",
+                borderRadius: 4, padding: "1px 7px",
+              }}>
+                {resourceQuery.isLoading ? "…" : item.value !== null ? item.value : "—"}
+              </span>
             </div>
           ))}
         </div>
@@ -516,10 +681,29 @@ function RightPanel() {
 
 interface AppShellProps {
   children: React.ReactNode;
+  onMissionSelect?: (missionId: number) => void;
+  onNewTask?: (wsKey: string) => void;
+  activeMissionId?: number | null;
 }
 
-export default function AppShell({ children }: AppShellProps) {
+export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId }: AppShellProps) {
   const [railTab, setRailTab] = useState("chat");
+
+  // Notifications for badge
+  const { data: notifData } = trpc.notifications.list.useQuery(
+    { unreadOnly: true, limit: 20 },
+    { refetchOnWindowFocus: false }
+  );
+  const notifCount = (notifData as any[])?.length ?? 0;
+
+  // Brand for topbar
+  const { data: brands } = trpc.brand.listByMember.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false }
+  );
+  const brandList = (brands as any[]) ?? [];
+  const [selectedBrandIdx] = useState(0);
+  const selectedBrand = brandList[selectedBrandIdx] ?? null;
 
   const shellStyle: React.CSSProperties = {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
@@ -581,21 +765,39 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div style={shellStyle}>
-      <Rail activeTab={railTab} onTabChange={setRailTab} />
-      <Drawer />
+      <Rail activeTab={railTab} onTabChange={setRailTab} notifCount={notifCount} />
+      <Drawer
+        onMissionSelect={onMissionSelect}
+        onNewTask={onNewTask}
+        activeMissionId={activeMissionId}
+      />
 
       {/* Main */}
       <main style={mainStyle}>
         {/* Topbar */}
         <div style={topbarStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#9B9990" }}>
-            <span>Rubi IP</span>
+            <span>{selectedBrand?.name ?? "SoWork"}</span>
             <span style={{ color: "#D4D3D0" }}>/</span>
-            <span>北美 YouTube 推廣</span>
-            <span style={{ color: "#D4D3D0" }}>/</span>
-            <span style={{ color: "#1A1A18", fontWeight: 500 }}>市場進入策略規劃</span>
+            <span style={{ color: "#1A1A18", fontWeight: 500 }}>Marketing OS</span>
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 5 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 5, alignItems: "center" }}>
+            {/* Notification Bell */}
+            <div style={{ position: "relative", marginRight: 4 }}>
+              <button
+                style={{ ...btnGhost, padding: "4px 8px" }}
+                onClick={() => setRailTab("notification")}
+              >
+                <IconNotification />
+              </button>
+              {notifCount > 0 && (
+                <div style={{
+                  position: "absolute", top: 2, right: 2,
+                  width: 7, height: 7, borderRadius: "50%",
+                  background: "#E8631A", border: "1.5px solid white",
+                }} />
+              )}
+            </div>
             <button style={btnGhost}>
               <IconExport />
               匯出

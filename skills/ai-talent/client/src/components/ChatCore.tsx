@@ -464,6 +464,10 @@ export default function ChatCore({
   const [streamingModel, setStreamingModel] = useState<string | null>(null);
   const [streamingThinking, setStreamingThinking] = useState<string>("");
   const [isStopped, setIsStopped] = useState(false);
+  // ── New feature state ───────────────────────────────────────────────────
+  const [confirmedMsgIds, setConfirmedMsgIds] = useState<Set<string>>(new Set());
+  const [activeWorkspaceKey, setActiveWorkspaceKey] = useState<string>("strategy");
+  const [currentMissionId, setCurrentMissionId] = useState<number | null>(null);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
@@ -478,6 +482,8 @@ export default function ChatCore({
   const createAndExecute = trpc.task.createAndExecute.useMutation();
   const workflowStart = trpc.workflow.start.useMutation();
   const saveMessage = trpc.conversation.saveMessage.useMutation();
+  const createMission = trpc.mission.create.useMutation();
+  const confirmOutput = trpc.output.confirm.useMutation();
   const brandsQuery = trpc.brand.list.useQuery(undefined, { refetchOnWindowFocus: false });
   const missionDataQuery = trpc.mission.getById.useQuery(
     { id: activeMissionId! },
@@ -982,6 +988,24 @@ export default function ChatCore({
     const userMsg: Msg = { id: `u-${Date.now()}`, role: "user", content: text, ts: Date.now() };
     setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, title: c.messages.length === 0 ? text.slice(0, 32) : c.title, messages: [...c.messages, userMsg] } : c));
     saveMessage.mutate({ brandId: activeBrand?.id, missionId: activeMissionId ?? undefined, role: "user", content: text });
+
+    // ── Auto-create mission on first message ──────────────────────────────
+    const currentConvMessages = conversations.find(c => c.id === convId)?.messages ?? [];
+    if (!activeMissionId && !currentMissionId && currentConvMessages.length === 0) {
+      try {
+        const newMission = await createMission.mutateAsync({
+          workspace: activeWorkspaceKey,
+          brandId: activeBrand?.id,
+          title: rawText.slice(0, 50),
+        });
+        if (newMission?.id) {
+          setCurrentMissionId(newMission.id);
+        }
+      } catch {
+        // non-blocking — ignore if mission create fails
+      }
+    }
+
     const missionSlug = (missionDataQuery.data as any)?.squadSlug;
     if (activeMissionId && missionSlug) {
       const handled = await executeSquadChat(text, convId);
@@ -1025,6 +1049,39 @@ export default function ChatCore({
       background: "#FFFFFF",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
     }}>
+      {/* ── Chat toolbar ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: "6px 20px",
+        borderBottom: "1px solid #ECEAE8",
+        background: "#FAFAF9",
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <button
+          onClick={() => {
+            const summaryText = "請總結以上對話的重點，包含：主要決策、行動項目、待確認事項。";
+            setInput(summaryText);
+            setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
+          }}
+          disabled={loading || !active || (active.messages.length === 0)}
+          style={{
+            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+            fontFamily: "inherit", background: "transparent",
+            border: "1px solid #E4E3E1", color: "#6B6A66",
+            display: "flex", alignItems: "center", gap: 4,
+            opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          總結對話
+        </button>
+      </div>
+
       {/* ── Squad progress bar ── */}
       {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
         <div style={{
@@ -1261,6 +1318,44 @@ export default function ChatCore({
                       __html: formatText(msg.content || (msg.thinking ? "✅ 分析完成，請查看策略思考過程" : "（無輸出內容）")),
                     }}
                   />
+                  {/* 定案 button — only for agent messages */}
+                  {msg.role === "assistant" && (
+                    <div style={{ padding: "6px 14px 8px", display: "flex", justifyContent: "flex-end" }}>
+                      {confirmedMsgIds.has(msg.id) ? (
+                        <span style={{
+                          fontSize: 10, color: "#9B9990",
+                          background: "#F2F1EF", border: "1px solid #E4E3E1",
+                          borderRadius: 5, padding: "2px 8px",
+                          display: "flex", alignItems: "center", gap: 3,
+                        }}>
+                          ✓ 已定案
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            const mId = activeMissionId ?? currentMissionId;
+                            if (!mId) return;
+                            confirmOutput.mutate(
+                              { missionId: mId, content: msg.content, platform: "other", outputType: "other" },
+                              {
+                                onSuccess: () => {
+                                  setConfirmedMsgIds(prev => new Set([...prev, msg.id]));
+                                },
+                              }
+                            );
+                          }}
+                          style={{
+                            fontSize: 10, color: "#6B6A66",
+                            background: "transparent", border: "1px solid #E4E3E1",
+                            borderRadius: 5, padding: "2px 8px", cursor: "pointer",
+                            display: "flex", alignItems: "center", gap: 3,
+                          }}
+                        >
+                          定案
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
