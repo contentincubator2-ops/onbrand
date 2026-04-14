@@ -21,8 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
+      - name: Install server dependencies
         run: npm install --prefix skills/ai-talent
+      - name: Install client dependencies
+        run: npm install --prefix skills/ai-talent/client
       - name: Type check
         run: npm run lint --prefix skills/ai-talent
       - name: Run tests
