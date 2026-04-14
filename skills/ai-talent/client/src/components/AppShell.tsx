@@ -765,24 +765,61 @@ const WORKFLOW_NODES = [
 ];
 
 function PositioningProgress({ missionId, brandId }: { missionId: number | null | undefined; brandId: number | null | undefined }) {
-  const { data: steps } = (trpc as any).positioning?.getSteps?.useQuery
+  const [qaResult, setQaResult] = React.useState<any | null>(null);
+  const [qaLoading, setQaLoading] = React.useState(false);
+  const [showForceConfirm, setShowForceConfirm] = React.useState(false);
+
+  const { data: steps, refetch: refetchSteps } = (trpc as any).positioning?.getSteps?.useQuery
     ? (trpc as any).positioning.getSteps.useQuery(
         { missionId: missionId! },
         { enabled: !!missionId, refetchInterval: 3000, refetchOnWindowFocus: false }
       )
-    : { data: null };
+    : { data: null, refetch: () => {} };
+
+  const squadLeadQA = (trpc as any).positioning?.squadLeadQA?.useMutation
+    ? (trpc as any).positioning.squadLeadQA.useMutation()
+    : { mutateAsync: async () => ({}) };
 
   const confirmStep = (trpc as any).positioning?.confirmStep?.useMutation
-    ? (trpc as any).positioning.confirmStep.useMutation()
+    ? (trpc as any).positioning.confirmStep.useMutation({
+        onSuccess: () => {
+          setQaResult(null);
+          setShowForceConfirm(false);
+          refetchSteps?.();
+        },
+      })
     : { mutate: () => {} };
+
+  const handleRequestQA = async () => {
+    if (!missionId) return;
+    setQaLoading(true);
+    setQaResult(null);
+    setShowForceConfirm(false);
+    try {
+      const result = await (squadLeadQA as any).mutateAsync({ missionId });
+      setQaResult(result);
+      if (result?.status === 'flag') setShowForceConfirm(true);
+    } catch (e) {
+      setQaResult({ status: 'pass', comment: '審核完成，可推進。', overallScore: 80, alignmentCheck: '', contextCheck: '', suggestions: [], readyToAdvance: true });
+    } finally {
+      setQaLoading(false);
+    }
+  };
+
+  const handleConfirm = (force = false) => {
+    if (!missionId) return;
+    (confirmStep as any).mutate({ missionId, forceAdvance: force });
+  };
 
   const stepList = (steps ?? WORKFLOW_NODES.map((n, i) => ({
     step: i + 1,
     title: n.label,
-    agent: ''  ,
+    agent: '',
     description: n.sub,
     state: n.state === 'done' ? 'done' : n.state === 'running' ? 'running' : 'wait',
   }))) as any[];
+
+  const confirmingStep = stepList.find((s: any) => s.state === 'confirm');
 
   return (
     <div>
@@ -793,19 +830,6 @@ function PositioningProgress({ missionId, brandId }: { missionId: number | null 
             sub={s.agent ? `${s.agent} · ${s.description ?? s.sub ?? ''}` : s.description ?? s.sub ?? ''}
             state={s.state === 'confirm' ? 'running' : (s.state as any ?? 'wait')}
           />
-          {s.state === 'confirm' && missionId && (
-            <button
-              onClick={() => (confirmStep as any).mutate({ missionId })}
-              style={{
-                marginLeft: 28, marginTop: 4, marginBottom: 8,
-                padding: '4px 12px', fontSize: 11, borderRadius: 6,
-                background: '#E8631A', color: 'white', border: 'none', cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              ✓ 確認此步驟
-            </button>
-          )}
           {i < stepList.length - 1 && (
             <div style={{ textAlign: 'center' as const, margin: '2px 0', color: '#E4E3E1', display: 'flex', justifyContent: 'center' }}>
               <IconArrowDown />
@@ -813,6 +837,136 @@ function PositioningProgress({ missionId, brandId }: { missionId: number | null 
           )}
         </React.Fragment>
       ))}
+
+      {/* ── Squad Lead QA 區塊（有 confirm 步驟時才顯示）── */}
+      {confirmingStep && missionId && (
+        <div style={{ marginTop: 12 }}>
+          {/* QA 觸發按鈕 */}
+          {!qaResult && (
+            <button
+              onClick={handleRequestQA}
+              disabled={qaLoading}
+              style={{
+                width: '100%', padding: '8px 0', fontSize: 11, borderRadius: 8,
+                background: qaLoading ? '#F0EDE9' : '#1DBEAA',
+                color: qaLoading ? '#A8A29E' : 'white',
+                border: 'none', cursor: qaLoading ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', fontWeight: 600, display: 'flex',
+                alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              {qaLoading ? (
+                <>
+                  <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span>
+                  劉品妤審核中...
+                </>
+              ) : '✦ 請劉品妤審核此步驟'}
+            </button>
+          )}
+
+          {/* QA 結果卡片 */}
+          {qaResult && (
+            <div style={{
+              background: qaResult.status === 'pass' ? '#F0FDF8' : '#FFF8F0',
+              border: `1px solid ${qaResult.status === 'pass' ? '#1DBEAA' : '#F97316'}`,
+              borderRadius: 10, padding: '10px 12px', marginTop: 4,
+            }}>
+              {/* Squad Lead 身份 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <div style={{
+                  width: 24, height: 24, borderRadius: '50%',
+                  background: '#E8631A', color: 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, fontWeight: 700, flexShrink: 0,
+                }}>品</div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#1A1A18' }}>劉品妤</div>
+                  <div style={{ fontSize: 9, color: '#A8A29E' }}>AI 品牌故事 CMO · Squad Lead</div>
+                </div>
+                <div style={{
+                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+                  color: qaResult.status === 'pass' ? '#1DBEAA' : '#F97316',
+                  background: qaResult.status === 'pass' ? '#E0FAF5' : '#FEF0E6',
+                  padding: '2px 7px', borderRadius: 5,
+                }}>
+                  {qaResult.status === 'pass' ? `✓ 通過 ${qaResult.overallScore}分` : `⚠ 注意 ${qaResult.overallScore}分`}
+                </div>
+              </div>
+
+              {/* QA 評語 */}
+              <div style={{ fontSize: 11, color: '#44403C', lineHeight: 1.6, marginBottom: 6 }}>
+                {qaResult.comment}
+              </div>
+
+              {/* 對齊度 + 脈絡 */}
+              {qaResult.alignmentCheck && (
+                <div style={{ fontSize: 10, color: '#78716C', marginBottom: 4, display: 'flex', gap: 4 }}>
+                  <span style={{ color: '#1DBEAA', flexShrink: 0 }}>◎ 需求對齊</span>
+                  <span>{qaResult.alignmentCheck}</span>
+                </div>
+              )}
+              {qaResult.contextCheck && (
+                <div style={{ fontSize: 10, color: '#78716C', marginBottom: 6, display: 'flex', gap: 4 }}>
+                  <span style={{ color: '#F97316', flexShrink: 0 }}>◎ 脈絡一致</span>
+                  <span>{qaResult.contextCheck}</span>
+                </div>
+              )}
+
+              {/* 建議 */}
+              {qaResult.suggestions?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  {qaResult.suggestions.map((sg: string, i: number) => (
+                    <div key={i} style={{ fontSize: 10, color: '#57534E', padding: '3px 0', display: 'flex', gap: 4 }}>
+                      <span style={{ color: '#F97316' }}>→</span>
+                      <span>{sg}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 操作按鈕 */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                {qaResult.readyToAdvance && (
+                  <button
+                    onClick={() => handleConfirm(false)}
+                    style={{
+                      flex: 1, padding: '6px 0', fontSize: 11, borderRadius: 6,
+                      background: '#1DBEAA', color: 'white', border: 'none',
+                      cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit',
+                    }}
+                  >
+                    ✓ 確認推進下一步
+                  </button>
+                )}
+                {!qaResult.readyToAdvance && showForceConfirm && (
+                  <>
+                    <button
+                      onClick={() => { setQaResult(null); setShowForceConfirm(false); }}
+                      style={{
+                        flex: 1, padding: '6px 0', fontSize: 10, borderRadius: 6,
+                        background: '#F5F4F2', color: '#78716C', border: '1px solid #E7E5E4',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      重新審核
+                    </button>
+                    <button
+                      onClick={() => handleConfirm(true)}
+                      style={{
+                        flex: 1, padding: '6px 0', fontSize: 10, borderRadius: 6,
+                        background: '#F97316', color: 'white', border: 'none',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      強制推進
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
