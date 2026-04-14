@@ -21,7 +21,6 @@ import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./llmWithBilling";
 import { createContext } from "./_core/trpc";
 import { authRouter } from "./auth/authRouter";
-import { streamRouter } from "./routes/streamRoute";
 import { exportRouter } from "./routes/exportRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
@@ -118,7 +117,6 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: tr
 
 // ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
-app.use("/api/stream", streamRouter);
 app.use("/api/export", exportRouter);
 app.use("/api/a2a", a2aStreamRouter);
 
