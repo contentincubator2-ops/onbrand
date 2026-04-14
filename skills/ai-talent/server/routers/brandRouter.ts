@@ -352,4 +352,166 @@ export const brandRouter = router({
     }),
 
 
+  // ── New: brand_members & positioning steps ─────────────────────────────────
+
+  /**
+   * 列出用戶有權限的品牌（透過 brand_members 表）
+   */
+  listByMember: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const [rows] = await db.execute(
+        sql`SELECT b.*, bm.role
+            FROM brands b
+            INNER JOIN brand_members bm ON bm.brandId = b.id
+            WHERE bm.userId = ${ctx.user.id}
+            ORDER BY b.createdAt DESC`
+      ) as any;
+      return rows ?? [];
+    }),
+
+  /**
+   * 取得單一品牌（含定位步驟進度），需為成員
+   */
+  getByMember: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [membership] = await db.execute(
+        sql`SELECT role FROM brand_members WHERE brandId = ${input.brandId} AND userId = ${ctx.user.id} LIMIT 1`
+      ) as any;
+      if (!membership?.[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this brand" });
+      const [brandRows] = await db.execute(
+        sql`SELECT * FROM brands WHERE id = ${input.brandId} LIMIT 1`
+      ) as any;
+      const brand = brandRows?.[0];
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+      const [stepRows] = await db.execute(
+        sql`SELECT * FROM brand_positioning_steps WHERE brandId = ${input.brandId} ORDER BY step ASC`
+      ) as any;
+      return { ...brand, role: membership[0].role, positioningSteps: stepRows ?? [] };
+    }),
+
+  /**
+   * 建立品牌並加入 brand_members 為 owner
+   */
+  createWithMember: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(128),
+      website: z.string().optional(),
+      socialLinks: z.string().optional(),
+      description: z.string().optional(),
+      industry: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const slug = input.name
+        .toLowerCase().trim()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9\u4e00-\u9fff-]/g, "")
+        .slice(0, 60) + "-" + Date.now().toString(36);
+      const [result] = await db.execute(
+        sql`INSERT INTO brands (name, slug, industry, website, socialLinks, description, createdBy)
+            VALUES (${input.name}, ${slug}, ${input.industry ?? null},
+                    ${input.website ?? null}, ${input.socialLinks ?? null},
+                    ${input.description ?? null}, ${ctx.user.id})`
+      ) as any;
+      const brandId = result?.insertId;
+      if (!brandId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create brand" });
+      await db.execute(
+        sql`INSERT INTO brand_members (brandId, userId, role, addedBy)
+            VALUES (${brandId}, ${ctx.user.id}, "owner", ${ctx.user.id})`
+      );
+      return { id: brandId, name: input.name, slug };
+    }),
+
+  /**
+   * 加入成員
+   */
+  addMember: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      userId: z.number(),
+      role: z.enum(["editor", "viewer"]).default("editor"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [memberRows] = await db.execute(
+        sql`SELECT role FROM brand_members WHERE brandId = ${input.brandId} AND userId = ${ctx.user.id} LIMIT 1`
+      ) as any;
+      const callerRole = memberRows?.[0]?.role;
+      if (!callerRole || callerRole === "viewer") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient permissions" });
+      }
+      await db.execute(
+        sql`INSERT INTO brand_members (brandId, userId, role, addedBy)
+            VALUES (${input.brandId}, ${input.userId}, ${input.role}, ${ctx.user.id})
+            ON DUPLICATE KEY UPDATE role = ${input.role}`
+      );
+      return { success: true };
+    }),
+
+  /**
+   * 更新定位步驟結果
+   * 若 step=11 且 status=completed 則更新 brands.positioningStatus="completed"
+   */
+  savePositioningStep: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      step: z.number().int().min(0).max(11),
+      content: z.string(),
+      status: z.enum(["pending", "in_progress", "completed"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [memberRows] = await db.execute(
+        sql`SELECT role FROM brand_members WHERE brandId = ${input.brandId} AND userId = ${ctx.user.id} LIMIT 1`
+      ) as any;
+      const callerRole = memberRows?.[0]?.role;
+      if (!callerRole || callerRole === "viewer") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient permissions" });
+      }
+      await db.execute(
+        sql`INSERT INTO brand_positioning_steps (brandId, step, content, status, completedAt)
+            VALUES (${input.brandId}, ${input.step}, ${input.content}, ${input.status},
+                    ${input.status === "completed" ? new Date() : null})
+            ON DUPLICATE KEY UPDATE
+              content = VALUES(content),
+              status = VALUES(status),
+              completedAt = IF(VALUES(status) = "completed", NOW(), NULL)`
+      );
+      if (input.step === 11 && input.status === "completed") {
+        await db.execute(
+          sql`UPDATE brands SET positioningStatus = "completed", onboardingStep = 11 WHERE id = ${input.brandId}`
+        );
+      } else if (input.status === "in_progress") {
+        await db.execute(
+          sql`UPDATE brands SET positioningStatus = "in_progress", onboardingStep = ${input.step} WHERE id = ${input.brandId}`
+        );
+      }
+      return { success: true };
+    }),
+
+  /**
+   * 取得可用資源數量（依 workspace label 匹配 agents）
+   */
+  resourceCount: protectedProcedure
+    .input(z.object({ wsKey: z.string().min(1).max(64) }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { count: 0 };
+      const pattern = "%" + input.wsKey + "%";
+      const [rows] = await db.execute(
+        sql`SELECT COUNT(*) AS cnt FROM agents
+            WHERE isAvailable = 1
+              AND (primarySkill LIKE ${pattern} OR specialty LIKE ${pattern})`
+      ) as any;
+      return { count: Number(rows?.[0]?.cnt ?? 0) };
+    }),
+
 });
