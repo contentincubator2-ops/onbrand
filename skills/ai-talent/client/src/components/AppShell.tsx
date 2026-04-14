@@ -756,13 +756,7 @@ function Drawer({
 
 // ─── RightPanel ───────────────────────────────────────────────────────────────
 
-const WORKFLOW_NODES = [
-  { label: "市場研究",  sub: "北美競品 + 市場規模", state: "done"    as const },
-  { label: "SEO 分析",  sub: "關鍵字 + 頻道優化",   state: "done"    as const },
-  { label: "內容策略",  sub: "90 天行事曆",          state: "running" as const },
-  { label: "廣告規劃",  sub: "$9K/月預算分配",       state: "wait"    as const },
-  { label: "PR 策略",   sub: "媒體 + KOL 佈局",      state: "wait"    as const },
-];
+// WORKFLOW_NODES 硬編碼已移除
 
 function PositioningProgress({ missionId, brandId }: { missionId: number | null | undefined; brandId: number | null | undefined }) {
   const { data: steps } = (trpc as any).positioning?.getSteps?.useQuery
@@ -772,16 +766,46 @@ function PositioningProgress({ missionId, brandId }: { missionId: number | null 
       )
     : { data: null };
 
-  const stepList = (steps ?? WORKFLOW_NODES.map((n, i) => ({
-    step: i + 1,
-    title: n.label,
-    agent: '',
-    description: n.sub,
-    state: n.state === 'done' ? 'done' : n.state === 'running' ? 'running' : 'wait',
-  }))) as any[];
+  // 沒有 DB 資料時顯示空白等待狀態，不顯示假資料
+  const stepList = (steps ?? []) as any[];
 
   // 找出當前進行中的步驟（running 或 confirm 狀態）
   const activeStep = stepList.find((s: any) => s.state === 'running' || s.state === 'confirm');
+
+  // 空狀態：尚未開始任何步驟
+  if (stepList.length === 0) {
+    return (
+      <div style={{ padding: '12px 0' }}>
+        <div style={{
+          padding: '10px 12px', borderRadius: 8,
+          background: '#FAFAF9', border: '1px solid #E7E5E4',
+          fontSize: 11, color: '#A8A29E', textAlign: 'center' as const,
+        }}>
+          <div style={{ fontSize: 16, marginBottom: 4 }}>⏳</div>
+          <div>開始對話後</div>
+          <div>步驟進度會顯示在這裡</div>
+        </div>
+        <div style={{
+          marginTop: 10, padding: '7px 10px',
+          background: '#FFF8F5', border: '1px solid #FDDCCC',
+          borderRadius: 7,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{
+              width: 18, height: 18, borderRadius: '50%',
+              background: '#E8631A', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 8, fontWeight: 700, flexShrink: 0,
+            }}>品</div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#44403C' }}>劉品妤 · Squad Lead</div>
+              <div style={{ fontSize: 9, color: '#A8A29E' }}>每步自動 QA 品質控管</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -932,20 +956,7 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
         {activeTab === "sop" && (
           <div style={{ marginBottom: 15 }}>
-            <div style={{
-              fontSize: 10, fontWeight: 600, color: "#C8C7C3",
-              textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 6,
-            }}>品牌定位流程</div>
-            {WORKFLOW_NODES.map((node, i) => (
-              <React.Fragment key={node.label}>
-                <WorkflowNode {...node} />
-                {i < WORKFLOW_NODES.length - 1 && (
-                  <div style={{ textAlign: "center" as const, margin: "2px 0", color: "#E4E3E1", display: "flex", justifyContent: "center" }}>
-                    <IconArrowDown />
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
+            <PositioningProgress missionId={activeMissionId} brandId={selectedBrandId} />
           </div>
         )}
 
