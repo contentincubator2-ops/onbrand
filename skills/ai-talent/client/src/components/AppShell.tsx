@@ -85,6 +85,23 @@ const IconArrowDown = () => (
   </svg>
 );
 
+
+const IconPackage = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+    <line x1="12" y1="22.08" x2="12" y2="12"/>
+  </svg>
+);
+
+const IconSettings = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+
 const IconCheckDone = () => (
   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
     <polyline points="20 6 9 17 4 12"/>
@@ -184,10 +201,10 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   };
 
   const tabs = [
-    { id: "chat",         icon: <IconChat />,         badge: false },
-    { id: "tasks",        icon: <IconTasks />,        badge: false },
-    { id: "notification", icon: <IconNotification />, badge: notifCount > 0, badgeColor: "#3D9A3D" },
-    { id: "knowledge",    icon: <IconKnowledge />,    badge: false },
+    { id: "tasks",        icon: <IconTasks />,        badge: false, label: "任務" },
+    { id: "chat",         icon: <IconChat />,         badge: false, label: "對話" },
+    { id: "outputs",      icon: <IconPackage />,      badge: false, label: "產出" },
+    { id: "settings",     icon: <IconSettings />,     badge: false, label: "設定" },
   ];
 
   return (
@@ -207,11 +224,14 @@ function Rail({ activeTab, onTabChange, notifCount }: {
             <div style={{
               position: "absolute", top: 5, right: 5,
               width: 6, height: 6, borderRadius: "50%",
-              background: tab.badgeColor,
+              background: (tab as any).badgeColor ?? '#3D9A3D',
               border: "1.5px solid #F2F1EF",
             }} />
           )}
-          {tab.icon}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+            {tab.icon}
+            <span style={{ fontSize: 8, color: "inherit", lineHeight: 1 }}>{tab.label}</span>
+          </div>
         </button>
       ))}
       <div style={{ flex: 1 }} />
@@ -938,8 +958,249 @@ function WorkflowNode({ label, sub, state }: { label: string; sub: string; state
   );
 }
 
+
+// ─── BrandBrainTab ────────────────────────────────────────────────────────────
+
+function BrandBrainTab({ brandId }: { brandId?: number | null }) {
+  const [expanded, setExpanded] = React.useState<string | null>(null);
+  const [addingNew, setAddingNew] = React.useState(false);
+
+  // Fetch brand brain data from API
+  const brandBrainQuery = (trpc as any).brandBrain?.list?.useQuery
+    ? (trpc as any).brandBrain.list.useQuery(
+        { brandId: brandId! },
+        { enabled: !!brandId, refetchOnWindowFocus: false }
+      )
+    : { data: null, isLoading: false };
+
+  const brandBrainItems = brandBrainQuery.data ?? [];
+
+  // Default items to show when no real data
+  const defaultItems = [
+    { key: "品牌定位", updatedAt: null, content: null },
+    { key: "目標受眾", updatedAt: null, content: null },
+    { key: "品牌語調", updatedAt: null, content: null },
+    { key: "競品地圖", updatedAt: null, content: null },
+  ];
+
+  const items = brandBrainItems.length > 0 ? brandBrainItems : defaultItems;
+
+  const fmtDate = (d: string | null) => {
+    if (!d) return "未建立";
+    try {
+      const dt = new Date(d);
+      return ;
+    } catch { return d; }
+  };
+
+  return (
+    <div>
+      <div style={{
+        fontSize: 10, fontWeight: 600, color: "#C8C7C3",
+        textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 10,
+      }}>🧠 品牌大腦</div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        {items.map((item: any) => {
+          const key = item.key ?? item.category ?? "未知";
+          const date = item.updatedAt ?? item.updated_at ?? null;
+          const isExpanded = expanded === key;
+          const hasContent = !!(item.content ?? item.value);
+          return (
+            <div key={key}>
+              <div
+                onClick={() => setExpanded(isExpanded ? null : key)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "7px 8px", borderRadius: 7, cursor: "pointer",
+                  background: isExpanded ? "#F0EEF9" : "white",
+                  border: "1px solid #ECEAE8",
+                  transition: "all 0.12s",
+                }}
+              >
+                <span style={{ fontSize: 11, color: "#1A1A18", flex: 1, fontWeight: 500 }}>{key}</span>
+                <span style={{
+                  fontSize: 9, color: date ? "#3D9A3D" : "#C8C7C3",
+                  background: date ? "#F0FDF4" : "#F2F1EF",
+                  border: '1px solid ' + (date ? '#C8E6C8' : '#E4E3E1'),
+                  borderRadius: 4, padding: "1px 6px", flexShrink: 0,
+                }}>
+                  {fmtDate(date)}
+                </span>
+                <span style={{ fontSize: 9, color: "#9B9990" }}>{isExpanded ? "▲" : "▼"}</span>
+              </div>
+              {isExpanded && (
+                <div style={{
+                  margin: "2px 0 4px", padding: "8px 10px",
+                  background: "#F8F8FF", border: "1px solid #E0DEF5",
+                  borderRadius: 7, fontSize: 11, color: "#4A4A45", lineHeight: 1.6,
+                }}>
+                  {hasContent
+                    ? (item.content ?? item.value)
+                    : <span style={{ color: "#C8C7C3", fontStyle: "italic" }}>尚未建立此知識項目</span>
+                  }
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={() => setAddingNew(true)}
+        style={{
+          marginTop: 10, width: "100%",
+          padding: "7px 0", borderRadius: 7,
+          border: "1px dashed #C8C7C3", background: "transparent",
+          color: "#9B9990", fontSize: 11, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+        }}
+      >
+        <span>+</span> 手動新增知識
+      </button>
+
+      {addingNew && (
+        <div style={{
+          marginTop: 6, padding: "10px",
+          background: "#FAFAF9", border: "1px solid #E4E3E1",
+          borderRadius: 8, fontSize: 11,
+        }}>
+          <div style={{ color: "#9B9990", textAlign: "center" as const }}>
+            手動新增功能開發中…
+          </div>
+          <button
+            onClick={() => setAddingNew(false)}
+            style={{ marginTop: 6, width: "100%", padding: "4px", background: "none", border: "none", color: "#C8C7C3", cursor: "pointer", fontSize: 11 }}
+          >取消</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MembersTab ───────────────────────────────────────────────────────────────
+
+function MembersTab({ missionId }: { missionId?: number | null }) {
+  // Load relay steps from positioning steps
+  const stepsQuery = (trpc as any).positioning?.getSteps?.useQuery
+    ? (trpc as any).positioning.getSteps.useQuery(
+        { missionId: missionId! },
+        { enabled: !!missionId, refetchInterval: 5000, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+
+  const steps = (stepsQuery.data ?? []) as any[];
+
+  // Build members from steps
+  const memberMap = new Map<string, {
+    name: string; title: string; model: string;
+    skills: string[]; status: string; stepLabel: string; stepState: string;
+  }>();
+
+  steps.forEach((s: any) => {
+    const agentKey = s.agent ?? s.agentName ?? "未知";
+    if (!memberMap.has(agentKey)) {
+      memberMap.set(agentKey, {
+        name: agentKey,
+        title: s.agentTitle ?? s.title ?? "",
+        model: "Claude Sonnet",
+        skills: [],
+        status: s.state ?? "wait",
+        stepLabel: s.title ?? s.label ?? "",
+        stepState: s.state ?? "wait",
+      });
+    } else {
+      const m = memberMap.get(agentKey)!;
+      // Update status to most recent step
+      if (s.state === "running" || (s.state === "done" && m.stepState !== "running")) {
+        m.status = s.state;
+        m.stepLabel = s.title ?? s.label ?? "";
+        m.stepState = s.state;
+      }
+    }
+  });
+
+  const members = Array.from(memberMap.values());
+
+  const statusIcon = (state: string) => {
+    if (state === "done") return "✅";
+    if (state === "running") return "⏳";
+    return "⏸️";
+  };
+
+  const statusLabel = (state: string, label: string) => {
+    if (state === "done") return ;
+    if (state === "running") return ;
+    return "等待中";
+  };
+
+  if (!missionId) {
+    return (
+      <div style={{ padding: "30px 0", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11 }}>
+        選擇任務後顯示成員
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        fontSize: 10, fontWeight: 600, color: "#C8C7C3",
+        textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 10,
+      }}>👥 本任務團隊</div>
+
+      {members.length === 0 ? (
+        <div style={{
+          padding: "24px 12px", textAlign: "center" as const,
+          background: "#FAFAF9", border: "1px solid #E4E3E1",
+          borderRadius: 8, fontSize: 11, color: "#A8A29E",
+        }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>👥</div>
+          <div>開始任務後</div>
+          <div>成員將在此顯示</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {members.map((m, i) => (
+            <div key={i} style={{
+              background: "white", border: "1px solid #ECEAE8",
+              borderRadius: 9, padding: "9px 10px",
+            }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: "#1A1A18", color: "white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {m.name.charAt(0)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18" }}>{m.name}</div>
+                  <div style={{ fontSize: 10, color: "#9B9990", marginTop: 1 }}>
+                    {m.title}{m.title && m.model ? " · " : ""}{m.model}
+                  </div>
+                  <div style={{
+                    marginTop: 5, fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4,
+                  }}>
+                    <span>{statusIcon(m.stepState)}</span>
+                    <span style={{ color: m.stepState === "done" ? "#3D9A3D" : m.stepState === "running" ? "#E8631A" : "#9B9990" }}>
+                      {statusLabel(m.stepState, m.stepLabel)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId?: number | null }) {
-  const [activeTab, setActiveTab] = useState<"sop" | "knowledge" | "outputs">("sop");
+  const [activeTab, setActiveTab] = useState<"sop" | "brandbrain" | "members">("sop");
 
   const panelStyle: React.CSSProperties = {
     width: 264, minWidth: 264,
@@ -950,9 +1211,9 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
   };
 
   const tabs = [
-    { id: "sop"       as const, label: "流程" },
-    { id: "knowledge" as const, label: "知識庫" },
-    { id: "outputs"   as const, label: "成果" },
+    { id: "sop"        as const, label: "📋 流程" },
+    { id: "brandbrain" as const, label: "🧠 品牌大腦" },
+    { id: "members"    as const, label: "👥 成員" },
   ];
 
   return (
@@ -995,52 +1256,12 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
           </div>
         )}
 
-        {activeTab === "knowledge" && (
-          <div>
-            <div style={{
-              fontSize: 10, fontWeight: 600, color: "#C8C7C3",
-              textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 6,
-            }}>品牌知識</div>
-            {[
-              { label: "品牌定位", val: "已設定" },
-              { label: "目標受眾", val: "3-6 歲" },
-              { label: "競品清單", val: "8 家" },
-              { label: "目標市場", val: "北美" },
-            ].map(item => (
-              <div key={item.label} style={{
-                padding: "4px 6px", borderRadius: 6,
-                display: "flex", alignItems: "center", gap: 7, cursor: "pointer",
-              }}>
-                <span style={{ width: 16, textAlign: "center" as const, color: "#9B9990" }}>·</span>
-                <span style={{ fontSize: 11, color: "#6B6A66", flex: 1 }}>{item.label}</span>
-                <span style={{ fontSize: 10, color: "#C8C7C3" }}>{item.val}</span>
-              </div>
-            ))}
-          </div>
+        {activeTab === "brandbrain" && (
+          <BrandBrainTab brandId={brandId} />
         )}
 
-        {activeTab === "outputs" && (
-          <div>
-            <div style={{
-              fontSize: 10, fontWeight: 600, color: "#C8C7C3",
-              textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 6,
-            }}>成果</div>
-            {[
-              { title: "市場研究報告", desc: "北美兒童 YouTube 市場分析", meta: "Alex · market-research" },
-              { title: "SEO 關鍵字清單", desc: "Top 50，難度評分 + 縮圖建議", meta: "Mia · seo-optimizer" },
-              { title: "90 天內容行事曆", desc: "生成中…", meta: "Ryan · content-strategy · 進行中", muted: true },
-            ].map(item => (
-              <div key={item.title} style={{
-                background: "white", border: "1px solid #ECEAE8", borderRadius: 8,
-                padding: "8px 10px", marginBottom: 4, cursor: "pointer",
-                opacity: item.muted ? 0.45 : 1,
-              }}>
-                <div style={{ fontSize: 11, color: "#1A1A18", fontWeight: 500, marginBottom: 2 }}>{item.title}</div>
-                <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.5 }}>{item.desc}</div>
-                <div style={{ fontSize: 10, color: "#C8C7C3", marginTop: 3 }}>{item.meta}</div>
-              </div>
-            ))}
-          </div>
+        {activeTab === "members" && (
+          <MembersTab missionId={missionId} />
         )}
       </div>
     </div>
@@ -1148,6 +1369,148 @@ interface AppShellProps {
   onMissionSelect?: (missionId: number) => void;
   onNewTask?: (wsKey: string) => void;
   activeMissionId?: number | null;
+}
+
+
+// ─── ExportsPanel ─────────────────────────────────────────────────────────────
+
+function ExportsPanel({ brandId }: { brandId?: number | null }) {
+  const [exports, setExports] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!brandId) return;
+    setLoading(true);
+    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+    fetch('/api/exports' + (brandId ? '?brandId=' + brandId : ''), {
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setExports(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [brandId]);
+
+  const typeIcon = (type: string) => {
+    if (type === "ppt" || type === "presentation") return "📊";
+    if (type === "report" || type === "doc") return "📄";
+    if (type === "copy" || type === "text") return "✍️";
+    return "📦";
+  };
+
+  const typeLabel = (type: string) => {
+    if (type === "ppt" || type === "presentation") return "PPT";
+    if (type === "report") return "報告";
+    if (type === "doc") return "文件";
+    if (type === "copy" || type === "text") return "文案";
+    return "其他";
+  };
+
+  const fmtDate = (d: string) => {
+    try { return new Date(d).toLocaleDateString("zh-TW"); } catch { return d; }
+  };
+
+  return (
+    <div style={{
+      flex: 1, display: "flex", flexDirection: "column",
+      background: "#FAFAF9", overflow: "hidden",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "20px 24px 16px",
+        borderBottom: "1px solid #ECEAE8",
+        background: "white",
+        flexShrink: 0,
+      }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A18", margin: 0 }}>
+          📦 任務產出
+        </h2>
+        <p style={{ fontSize: 12, color: "#9B9990", marginTop: 4, marginBottom: 0 }}>
+          所有任務生成的 PPT、報告、文案等產出
+        </p>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+        {loading ? (
+          <div style={{ textAlign: "center" as const, padding: "60px 0", color: "#C8C7C3", fontSize: 13 }}>
+            載入中…
+          </div>
+        ) : exports.length === 0 ? (
+          <div style={{ textAlign: "center" as const, padding: "60px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A18", marginBottom: 6 }}>尚無產出</div>
+            <div style={{ fontSize: 12, color: "#9B9990" }}>完成任務後，產出將自動出現在這裡</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+            {exports.map((item: any, i: number) => (
+              <div key={i} style={{
+                background: "white", border: "1px solid #ECEAE8",
+                borderRadius: 10, padding: "14px 16px",
+                display: "flex", flexDirection: "column", gap: 8,
+              }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 8,
+                    background: "#F2F1EF", display: "flex",
+                    alignItems: "center", justifyContent: "center",
+                    fontSize: 18, flexShrink: 0,
+                  }}>
+                    {typeIcon(item.outputType ?? item.type ?? "")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A18", marginBottom: 2 }}>
+                      {item.missionTitle ?? item.title ?? "未命名產出"}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
+                      <span style={{
+                        fontSize: 10, padding: "1px 7px", borderRadius: 4,
+                        background: "#F2F1EF", color: "#6B6A66",
+                        border: "1px solid #E4E3E1",
+                      }}>
+                        {typeLabel(item.outputType ?? item.type ?? "")}
+                      </span>
+                      {item.createdAt && (
+                        <span style={{ fontSize: 10, color: "#C8C7C3" }}>
+                          {fmtDate(item.createdAt)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {item.content && (
+                  <div style={{
+                    fontSize: 11, color: "#6B6A66", lineHeight: 1.5,
+                    maxHeight: 48, overflow: "hidden",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical" as any,
+                  }}>
+                    {item.content.slice(0, 150)}
+                  </div>
+                )}
+                {item.fileUrl && (
+                  <a
+                    href={item.fileUrl}
+                    download
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                      padding: "6px 12px", borderRadius: 6,
+                      background: "#1A1A18", color: "white",
+                      fontSize: 11, fontWeight: 500, textDecoration: "none",
+                      marginTop: "auto",
+                    }}
+                  >
+                    ⬇ 下載
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId }: AppShellProps) {
@@ -1293,9 +1656,12 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
 
         <BrandPositioningBar brandId={selectedBrandId} />
 
-        {/* Children slot (chat/content area) */}
+        {/* Children slot (chat/content area) or Exports panel */}
         <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          {children}
+          {railTab === "outputs"
+            ? <ExportsPanel brandId={selectedBrandId} />
+            : children
+          }
         </div>
       </main>
 
