@@ -765,8 +765,8 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
 
-  // DEBUG: log incoming payload
-  console.log('[chatRoute] incoming:', JSON.stringify({ userId, missionId, brandId: bodyBrandId, workspace, userMessage: userMessage.slice(0, 30) }));
+  console.log('[chatRoute] req:', JSON.stringify({ userId, missionId, brandId: bodyBrandId, workspace }));
+
 
   const sessionId: string = clientSessionId ?? newSessionId();
 
@@ -809,12 +809,12 @@ chatRouter.post("/", async (req: Request, res: Response) => {
       }
 
       // 取得 brandId + brandContext from mission/brand DB
-      let brandId: number = 0;
+      let brandId: number = bodyBrandId ?? 0;
       const enrichedBrandCtx: Record<string, string> = { ...brandContext };
       
       try {
         const [mRows] = await localPool.execute(
-          `SELECT m.brandId, m.title, b.name, b.industry, b.description, b.targetMarket, b.website
+          `SELECT m.brandId, m.title, b.name, b.industry, b.description, b.website
            FROM missions m LEFT JOIN brands b ON b.id = m.brandId
            WHERE m.id=? LIMIT 1`,
           [resolvedMissionId ?? 0]
@@ -825,7 +825,6 @@ chatRouter.post("/", async (req: Request, res: Response) => {
           enrichedBrandCtx.name = enrichedBrandCtx.name || m.name || "";
           enrichedBrandCtx.industry = enrichedBrandCtx.industry || m.industry || "";
           enrichedBrandCtx.description = enrichedBrandCtx.description || m.description || "";
-          enrichedBrandCtx.targetAudience = enrichedBrandCtx.targetAudience || m.targetMarket || "";
           enrichedBrandCtx.website = enrichedBrandCtx.website || m.website || "";
         }
       } catch (e: any) {
@@ -859,10 +858,10 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     if (lookupId2) {
       try {
         const query2 = missionId
-          ? `SELECT m.brandId, b.name, b.industry, b.description, b.targetMarket, b.website
+          ? `SELECT m.brandId, b.name, b.industry, b.description, b.website
              FROM missions m LEFT JOIN brands b ON b.id = m.brandId
              WHERE m.id = ? LIMIT 1`
-          : `SELECT id as brandId, name, industry, description, targetMarket, website FROM brands WHERE id = ? LIMIT 1`;
+          : `SELECT id as brandId, name, industry, description , website FROM brands WHERE id = ? LIMIT 1`;
         const [mBrandRows] = await localPool.execute(query2, [lookupId2]) as any[];
         const mb = (mBrandRows as any[])?.[0];
         if (mb) {
@@ -870,7 +869,6 @@ chatRouter.post("/", async (req: Request, res: Response) => {
           if (!enrichedBrandCtx.name && mb.name) enrichedBrandCtx.name = mb.name;
           if (!enrichedBrandCtx.industry && mb.industry) enrichedBrandCtx.industry = mb.industry;
           if (!enrichedBrandCtx.description && mb.description) enrichedBrandCtx.description = mb.description;
-          if (!enrichedBrandCtx.targetAudience && mb.targetMarket) enrichedBrandCtx.targetAudience = mb.targetMarket;
           if (!enrichedBrandCtx.website && mb.website) enrichedBrandCtx.website = mb.website;
         }
       } catch (e: any) {
