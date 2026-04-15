@@ -1,0 +1,17 @@
+import { Router, type Request, type Response } from "express";
+const router = Router();
+router.get("/install", (_req: Request, res: Response) => {
+  res.status(410).send("Slack install is handled by OpenClaw Slack provider.");
+});
+router.get("/oauth/callback", (_req: Request, res: Response) => {
+  res.status(410).send("Slack OAuth callback is handled by OpenClaw Slack provider.");
+});
+router.post("/events", (req: Request, res: Response) => {
+  const payload = req.body as { type?: string; challenge?: string };
+  if (payload?.type === "url_verification") {
+    res.json({ challenge: payload.challenge });
+    return;
+  }
+  res.status(410).send("Slack events are handled by OpenClaw Slack provider.");
+});
+export { router as slackOAuthRouter };

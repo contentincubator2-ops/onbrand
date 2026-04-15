@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Provide dummy env vars so zod validation passes in CI
+      DB_HOST: localhost
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: test
+      JWT_SECRET: ci-test-secret-at-least-32-chars-long
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install server dependencies
+        run: npm install --prefix skills/ai-talent
+      - name: Install client dependencies
+        run: npm install --prefix skills/ai-talent/client
+      - name: Type check
+        run: npm run lint --prefix skills/ai-talent
+      - name: Run tests
+        run: npm run test --prefix skills/ai-talent
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os
+            git pull origin main
+            npm install --prefix skills/ai-talent
+            npm run build --prefix skills/ai-talent/client
+            pm2 restart marketing-os

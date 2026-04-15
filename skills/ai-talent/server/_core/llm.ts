@@ -1,0 +1,537 @@
+import { ENV } from "./env";
+
+export type Role = "system" | "user" | "assistant" | "tool" | "function";
+
+export type TextContent = {
+  type: "text";
+  text: string;
+};
+
+export type ImageContent = {
+  type: "image_url";
+  image_url: {
+    url: string;
+    detail?: "auto" | "low" | "high";
+  };
+};
+
+export type FileContent = {
+  type: "file_url";
+  file_url: {
+    url: string;
+    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4";
+  };
+};
+
+export type MessageContent = string | TextContent | ImageContent | FileContent;
+
+export type Message = {
+  role: Role;
+  content: MessageContent | MessageContent[];
+  name?: string;
+  tool_call_id?: string;
+};
+
+export type Tool = {
+  type: "function";
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
+};
+
+export type ToolChoicePrimitive = "none" | "auto" | "required";
+export type ToolChoiceByName = { name: string };
+export type ToolChoiceExplicit = {
+  type: "function";
+  function: {
+    name: string;
+  };
+};
+
+export type ToolChoice =
+  | ToolChoicePrimitive
+  | ToolChoiceByName
+  | ToolChoiceExplicit;
+
+// DEBT-1: Add provider + model params for multi-provider routing
+export type InvokeParams = {
+  messages: Message[];
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex";
+  model?: string;
+  tools?: Tool[];
+  toolChoice?: ToolChoice;
+  tool_choice?: ToolChoice;
+  maxTokens?: number;
+  max_tokens?: number;
+  outputSchema?: OutputSchema;
+  output_schema?: OutputSchema;
+  responseFormat?: ResponseFormat;
+  response_format?: ResponseFormat;
+};
+
+export type ToolCall = {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+export type InvokeResult = {
+  id: string;
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: Role;
+      content: string | Array<TextContent | ImageContent | FileContent>;
+      tool_calls?: ToolCall[];
+    };
+    finish_reason: string | null;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+};
+
+export type JsonSchema = {
+  name: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
+};
+
+export type OutputSchema = JsonSchema;
+
+export type ResponseFormat =
+  | { type: "text" }
+  | { type: "json_object" }
+  | { type: "json_schema"; json_schema: JsonSchema };
+
+// DEBT-1: Provider config map — centralised routing table
+const PROVIDER_CONFIG: Record<
+  string,
+  { baseUrl: string; defaultModel: string; getKey: () => string }
+> = {
+  forge: {
+    baseUrl:      ENV.BUILT_IN_FORGE_API_URL
+      ? `${ENV.BUILT_IN_FORGE_API_URL.replace(/\/$/, "")}/v1`
+      : "https://forge.manus.im/v1",
+    defaultModel: "gemini-2.5-flash",
+    getKey:       () => ENV.BUILT_IN_FORGE_API_KEY ?? "",
+  },
+  openai: {
+    baseUrl:      "https://api.openai.com/v1",
+    defaultModel: "gpt-4o-mini",
+    getKey:       () => ENV.OPENAI_API_KEY ?? "",
+  },
+  zhipu: {
+    baseUrl:      "https://open.bigmodel.cn/api/paas/v4",
+    defaultModel: "glm-4-flash",
+    getKey:       () => ENV.ZHIPU_API_KEY ?? "",
+  },
+  qwen: {
+    baseUrl:      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    defaultModel: "qwen-plus",
+    getKey:       () => ENV.QWEN_API_KEY ?? "",
+  },
+  perplexity: {
+    baseUrl:      "https://api.perplexity.ai",
+    defaultModel: "sonar-pro",
+    getKey:       () => ENV.PERPLEXITY_API_KEY ?? "",
+  },
+  google: {
+    baseUrl:      "https://openrouter.ai/api/v1",
+    defaultModel: "google/gemma-4-31b-it",
+    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
+  },
+  openrouter: {
+    baseUrl:      "https://openrouter.ai/api/v1",
+    defaultModel: "anthropic/claude-sonnet-4-6",
+    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? "",
+  },
+  anthropic: {
+    baseUrl:      "https://api.anthropic.com/v1",
+    defaultModel: "claude-sonnet-4-6",
+    getKey:       () => (ENV as any).ANTHROPIC_API_KEY ?? "",
+  },
+  cohere: {
+    baseUrl:      "https://api.cohere.com/compatibility/v1",
+    defaultModel: "command-r-plus",
+    getKey:       () => ENV.COHERE_API_KEY ?? "",
+  },
+  // Azure AI Foundry — project-level OpenAI-compatible endpoint
+  // Endpoint: https://{hub}.services.ai.azure.com/api/projects/{project}/openai/v1
+  "azure-foundry": {
+    baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
+      ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
+      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
+    defaultModel: "gpt-4o-mini",
+    getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+  },
+  // Google Vertex AI — OpenAI-compatible endpoint (uses service account)
+  "google-vertex": {
+    baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/ecommerce-483415/locations/us-central1/endpoints/openapi",
+    defaultModel: "google/gemini-2.5-flash",
+    getKey:       () => "service-account", // sentinel: token fetched dynamically
+  },
+};
+
+// ─── Content normalisation helpers ───────────────────────────────────────────
+
+const ensureArray = (
+  value: MessageContent | MessageContent[]
+): MessageContent[] => (Array.isArray(value) ? value : [value]);
+
+const normalizeContentPart = (
+  part: MessageContent
+): TextContent | ImageContent | FileContent => {
+  if (typeof part === "string") {
+    return { type: "text", text: part };
+  }
+
+  if (part.type === "text") return part;
+  if (part.type === "image_url") return part;
+  if (part.type === "file_url") return part;
+
+  throw new Error("Unsupported message content part");
+};
+
+const normalizeMessage = (message: Message) => {
+  const { role, name, tool_call_id } = message;
+
+  if (role === "tool" || role === "function") {
+    const content = ensureArray(message.content)
+      .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
+      .join("\n");
+    return { role, name, tool_call_id, content };
+  }
+
+  const contentParts = ensureArray(message.content).map(normalizeContentPart);
+
+  // Collapse single text content to plain string for wider API compatibility
+  if (contentParts.length === 1 && contentParts[0]!.type === "text") {
+    return { role, name, content: (contentParts[0] as any).text as string };
+  }
+
+  return { role, name, content: contentParts };
+};
+
+const normalizeToolChoice = (
+  toolChoice: ToolChoice | undefined,
+  tools: Tool[] | undefined
+): "none" | "auto" | ToolChoiceExplicit | undefined => {
+  if (!toolChoice) return undefined;
+
+  if (toolChoice === "none" || toolChoice === "auto") return toolChoice;
+
+  if (toolChoice === "required") {
+    if (!tools || tools.length === 0) {
+      throw new Error(
+        "tool_choice 'required' was provided but no tools were configured"
+      );
+    }
+    if (tools.length > 1) {
+      throw new Error(
+        "tool_choice 'required' needs a single tool or specify the tool name explicitly"
+      );
+    }
+    return { type: "function", function: { name: tools[0]!.function.name } };
+  }
+
+  if ("name" in toolChoice) {
+    return { type: "function", function: { name: toolChoice.name } };
+  }
+
+  return toolChoice;
+};
+
+const normalizeResponseFormat = ({
+  responseFormat,
+  response_format,
+  outputSchema,
+  output_schema,
+}: {
+  responseFormat?: ResponseFormat;
+  response_format?: ResponseFormat;
+  outputSchema?: OutputSchema;
+  output_schema?: OutputSchema;
+}):
+  | { type: "json_schema"; json_schema: JsonSchema }
+  | { type: "text" }
+  | { type: "json_object" }
+  | undefined => {
+  const explicitFormat = responseFormat || response_format;
+  if (explicitFormat) {
+    if (
+      explicitFormat.type === "json_schema" &&
+      !explicitFormat.json_schema?.schema
+    ) {
+      throw new Error(
+        "responseFormat json_schema requires a defined schema object"
+      );
+    }
+    return explicitFormat;
+  }
+
+  const schema = outputSchema || output_schema;
+  if (!schema) return undefined;
+
+  if (!schema.name || !schema.schema) {
+    throw new Error("outputSchema requires both name and schema");
+  }
+
+  return {
+    type: "json_schema",
+    json_schema: {
+      name:   schema.name,
+      schema: schema.schema,
+      ...(typeof schema.strict === "boolean" ? { strict: schema.strict } : {}),
+    },
+  };
+};
+
+// ─── Google Service Account token helper ─────────────────────────────────────
+
+let _googleTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/auth/cloud-platform"): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (_googleTokenCache && _googleTokenCache.expiresAt > now + 60) {
+    return _googleTokenCache.token;
+  }
+
+  const credPath = (process.env.GOOGLE_APPLICATION_CREDENTIALS ?? "");
+  if (!credPath) throw new Error("GOOGLE_APPLICATION_CREDENTIALS not set");
+
+  const fs = await import("fs");
+  const sa = JSON.parse(fs.readFileSync(credPath, "utf8"));
+
+  const crypto = await import("crypto");
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    iss: sa.client_email,
+    scope,
+    aud: "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now,
+  })).toString("base64url");
+
+  const msg = `${header}.${payload}`;
+  const sign = crypto.createSign("RSA-SHA256");
+  sign.update(msg);
+  const sig = sign.sign(sa.private_key, "base64url");
+  const jwt = `${msg}.${sig}`;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  const data = await res.json() as { access_token: string };
+  _googleTokenCache = { token: data.access_token, expiresAt: now + 3600 };
+  return data.access_token;
+}
+
+// ─── Main invoke function ─────────────────────────────────────────────────────
+
+export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  // DEBT-1: Real multi-provider routing
+  const providerKey = params.provider ?? "openrouter";
+  const config = PROVIDER_CONFIG[providerKey];
+  if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
+
+  // For Google providers, use service account token if available
+  let apiKey: string;
+  if (providerKey === "google" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/generative-language");
+  } else if (providerKey === "google-vertex" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/cloud-platform");
+  } else {
+    apiKey = config.getKey();
+  }
+  // SEC-4: Obfuscate error — don't leak key names in logs/responses
+  if (!apiKey) throw new Error("LLM provider not configured");
+
+  const model = params.model ?? config.defaultModel;
+  const apiUrl = `${config.baseUrl}/chat/completions`;
+
+  const {
+    messages,
+    tools,
+    toolChoice,
+    tool_choice,
+    outputSchema,
+    output_schema,
+    responseFormat,
+    response_format,
+  } = params;
+
+  const payload: Record<string, unknown> = {
+    model,
+    messages: messages.map(normalizeMessage),
+    max_tokens: params.maxTokens ?? params.max_tokens ?? 8192,
+  };
+
+  if (tools && tools.length > 0) {
+    payload.tools = tools;
+  }
+
+  const normalizedToolChoice = normalizeToolChoice(
+    toolChoice || tool_choice,
+    tools
+  );
+  if (normalizedToolChoice) {
+    payload.tool_choice = normalizedToolChoice;
+  }
+
+  const normalizedResponseFormat = normalizeResponseFormat({
+    responseFormat,
+    response_format,
+    outputSchema,
+    output_schema,
+  });
+  if (normalizedResponseFormat) {
+    payload.response_format = normalizedResponseFormat;
+  }
+
+  // Azure Foundry uses api-key header, others use Bearer token
+  const authHeaders: Record<string, string> = providerKey === "azure-foundry"
+    ? { "api-key": apiKey }
+    : { authorization: `Bearer ${apiKey}` };
+
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...authHeaders,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    // Auto-fallback: if azure-foundry returns DeploymentNotFound, retry with openrouter
+    if (
+      providerKey === "azure-foundry" &&
+      (response.status === 404 || errorText.includes("DeploymentNotFound"))
+    ) {
+      console.warn("[LLM] Azure Foundry deployment not found, falling back to openrouter");
+      const fallbackConfig = PROVIDER_CONFIG["openrouter"]!;
+      const fallbackKey = fallbackConfig.getKey();
+      if (fallbackKey) {
+        const fallbackModel = (params.model && !params.model.includes("/"))
+          ? "openai/" + params.model
+          : "openai/gpt-4o-mini";
+        const fallbackUrl = fallbackConfig.baseUrl + "/chat/completions";
+        const fallbackResp = await fetch(fallbackUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "authorization": "Bearer " + fallbackKey,
+          },
+          body: JSON.stringify({ ...payload, model: fallbackModel }),
+        });
+        if (fallbackResp.ok) {
+          console.warn("[LLM] Fallback to openrouter/" + fallbackModel + " succeeded");
+          return (await fallbackResp.json()) as InvokeResult;
+        }
+        const fallbackErr = await fallbackResp.text();
+        throw new Error("LLM fallback failed: " + fallbackResp.status + " – " + fallbackErr);
+      }
+    }
+    throw new Error(
+      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+    );
+  }
+
+  return (await response.json()) as InvokeResult;
+}
+
+
+// ─── Streaming invoke function ──────────────────────────────────────────────
+export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<string> {
+  const providerKey = params.provider ?? "openrouter";
+  const config = PROVIDER_CONFIG[providerKey];
+  if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
+
+  let apiKey: string;
+  if (providerKey === "google" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/generative-language");
+  } else if (providerKey === "google-vertex" && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    apiKey = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/cloud-platform");
+  } else {
+    apiKey = config.getKey();
+  }
+  if (!apiKey) throw new Error("LLM provider not configured");
+
+  const model = params.model ?? config.defaultModel;
+  const apiUrl = `${config.baseUrl}/chat/completions`;
+
+  const { messages, tools, toolChoice, tool_choice } = params;
+  const payload: Record<string, unknown> = {
+    model,
+    messages: messages.map(normalizeMessage),
+    max_tokens: params.maxTokens ?? params.max_tokens ?? 8192,
+    stream: true,
+  };
+
+  if (tools && tools.length > 0) {
+    payload.tools = tools;
+  }
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
+  if (normalizedToolChoice) {
+    payload.tool_choice = normalizedToolChoice;
+  }
+
+  // Azure Foundry uses api-key header, others use Bearer token
+  const streamAuthHeaders: Record<string, string> = providerKey === "azure-foundry"
+    ? { "api-key": apiKey }
+    : { authorization: `Bearer ${apiKey}` };
+
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...streamAuthHeaders,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`LLM stream failed: ${response.status} ${response.statusText} – ${errorText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "data: [DONE]") continue;
+      if (!trimmed.startsWith("data: ")) continue;
+      try {
+        const json = JSON.parse(trimmed.slice(6)) as any;
+        const delta = json.choices?.[0]?.delta?.content;
+        if (delta) yield delta;
+      } catch { /* skip malformed SSE lines */ }
+    }
+  }
+}
