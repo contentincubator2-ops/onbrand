@@ -2,6 +2,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { computeMissionResources } from "../missionResourceComputer";
 
 // resourceRouter.ts - Workspace resource summary
 // Fixed 2025-04: use proper DB COUNT(DISTINCT) queries instead of readdir()
@@ -103,5 +104,41 @@ export const resourceRouter = router({
         providerList: row.providerList ? JSON.parse(row.providerList) as string[] : [],
         topAgents:   row.topAgents   ? JSON.parse(row.topAgents)   as unknown[] : [],
       };
+    }),
+
+  // Trigger semantic computation for an existing mission (used when switching to old missions)
+  triggerCompute: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { triggered: false };
+
+      // Skip if already computed
+      const [resRows] = await db.execute(
+        sql`SELECT status FROM mission_resources WHERE missionId = ${input.missionId} LIMIT 1`
+      ) as any;
+      if ((resRows as any)?.[0]?.status === "ready") return { triggered: false };
+
+      // Fetch mission + brand details
+      const [missionRows] = await db.execute(
+        sql`SELECT m.title, m.description, m.workspace, m.brandId, b.name as brandName
+            FROM missions m
+            LEFT JOIN brands b ON b.id = m.brandId
+            WHERE m.id = ${input.missionId} AND m.userId = ${ctx.user.id}
+            LIMIT 1`
+      ) as any;
+      const mission = (missionRows as any)?.[0];
+      if (!mission) return { triggered: false };
+
+      // Fire-and-forget — same pattern as missionRouter.create
+      computeMissionResources({
+        missionId:   input.missionId,
+        title:       mission.title       ?? "",
+        description: mission.description ?? undefined,
+        workspace:   mission.workspace   ?? "",
+        brandName:   mission.brandName   ?? undefined,
+      }).catch(console.error);
+
+      return { triggered: true };
     }),
 });

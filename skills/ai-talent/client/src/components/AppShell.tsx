@@ -654,6 +654,14 @@ function Drawer({
   // Only show "..." when global data itself is loading — not while mission is pending
   const effectiveResourceLoading = resourceQuery.isLoading;
 
+  // Trigger semantic computation for existing missions that have no computed resources yet
+  const triggerCompute = trpc.resource.triggerCompute.useMutation();
+  React.useEffect(() => {
+    if (activeMissionId && isMissionPending) {
+      triggerCompute.mutate({ missionId: activeMissionId });
+    }
+  }, [activeMissionId]);
+
   const toggleWs = (key: string) => {
     setExpandedWs(prev => ({ ...prev, [key]: !prev[key] }));
     setActiveWsKey(key);
