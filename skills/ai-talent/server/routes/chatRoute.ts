@@ -24,7 +24,9 @@ import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 import { invokeLLMStream } from "../_core/llm";
 import mysql from "mysql2/promise";
-import pptxgen from "pptxgenjs";
+import { createRequire } from "module";
+const _require = createRequire(import.meta.url);
+const PptxGenJS = _require("pptxgenjs");
 import sgMail from "@sendgrid/mail";
 
 export const chatRouter = Router();
@@ -478,7 +480,7 @@ async function generateAndSendPPT(
   stepResults: Record<string, string>
 ): Promise<void> {
   try {
-    const pptx = new pptxgen();
+    const pptx = new PptxGenJS();
     pptx.layout = "LAYOUT_WIDE";
     pptx.title = `${brandName} 品牌定位報告`;
 
