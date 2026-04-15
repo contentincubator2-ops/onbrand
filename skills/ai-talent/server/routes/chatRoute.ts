@@ -708,7 +708,7 @@ async function executePositioningStep(params: {
   // 最後一步：生成 PPT 並發送 + 自動寫入 Brand Brain + 記錄 Exports
   if (targetStep === 6) {
     send("delta", { text: "\n\n⏳ 正在生成 PPT 報告..." });
-    const allResults = { ...stepResultsRaw, "6": fullContent };
+    const allResults: Record<string, string> = { ...stepResultsRaw, "6": fullContent };
 
     // 自動寫入 Brand Brain（各步驟結論）
     if (brandId) {
