@@ -1,5 +1,6 @@
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 // resourceRouter.ts - Workspace resource summary
@@ -38,31 +39,31 @@ export const resourceRouter = router({
 
                    // Count agents matching this workspace
                    const [agentCountRows] = await db.execute(
-                             db.raw(`SELECT COUNT(*) as cnt FROM agents WHERE ${whereClause}`)
+                             sql.raw(`SELECT COUNT(*) as cnt FROM agents WHERE ${whereClause}`)
                            ) as any;
               const agentCount = Number((agentCountRows as any)?.[0]?.cnt ?? 0);
 
                    // Count distinct skills (fix: was using readdir() before = wrong count)
                    const [skillCountRows] = await db.execute(
-                             db.raw(`SELECT COUNT(DISTINCT primarySkill) as cnt FROM agents WHERE ${whereClause} AND primarySkill IS NOT NULL AND primarySkill != ''`)
+                             sql.raw(`SELECT COUNT(DISTINCT primarySkill) as cnt FROM agents WHERE ${whereClause} AND primarySkill IS NOT NULL AND primarySkill != ''`)
                            ) as any;
               const skillCount = Number((skillCountRows as any)?.[0]?.cnt ?? 0);
 
                    // Get sample skill list (top 20 for display)
                    const [skillRows] = await db.execute(
-                             db.raw(`SELECT DISTINCT primarySkill FROM agents WHERE ${whereClause} AND primarySkill IS NOT NULL AND primarySkill != '' LIMIT 20`)
+                             sql.raw(`SELECT DISTINCT primarySkill FROM agents WHERE ${whereClause} AND primarySkill IS NOT NULL AND primarySkill != '' LIMIT 20`)
                            ) as any;
               const skillSet = new Set<string>((skillRows ?? []).map((r: any) => r.primarySkill).filter(Boolean));
 
                    // Count distinct AI models (fix: was returning 2 before)
                    const [modelCountRows] = await db.execute(
-                             db.raw(`SELECT COUNT(DISTINCT aiModel) as cnt FROM agents WHERE ${whereClause} AND aiModel IS NOT NULL AND aiModel != ''`)
+                             sql.raw(`SELECT COUNT(DISTINCT aiModel) as cnt FROM agents WHERE ${whereClause} AND aiModel IS NOT NULL AND aiModel != ''`)
                            ) as any;
               const providerCount = Number((modelCountRows as any)?.[0]?.cnt ?? 0);
 
                    // Get distinct AI model list
                    const [modelRows] = await db.execute(
-                             db.raw(`SELECT DISTINCT aiModel FROM agents WHERE ${whereClause} AND aiModel IS NOT NULL AND aiModel != ''`)
+                             sql.raw(`SELECT DISTINCT aiModel FROM agents WHERE ${whereClause} AND aiModel IS NOT NULL AND aiModel != ''`)
                            ) as any;
               const providerList = (modelRows ?? []).map((r: any) => r.aiModel).filter(Boolean) as string[];
 

@@ -753,12 +753,13 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace } = req.body as {
+  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {} } = req.body as {
     userMessage: string;
     conversationHistory: { role: string; content: string }[];
     sessionId?: string;
     missionId?: number;
     workspace?: string;
+    brandContext?: Record<string, string>;
   };
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
