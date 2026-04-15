@@ -5,7 +5,7 @@
  */
 import React, { useState } from "react";
 import { trpc } from "../lib/trpc";
-import { NewMissionModal } from "./NewMissionModal";
+import { MissionModal } from "./MissionModal";
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -1671,7 +1671,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
   const selectedBrand = brandList[selectedBrandIdx] ?? null;
   const selectedBrandId: number | null = (selectedBrand as any)?.id ?? null;
 
-  // Workspace list for NewMissionModal (React Query deduplicates with Drawer's query)
+  // Workspace list for MissionModal (React Query deduplicates with Drawer's query)
   const { data: shellWorkspaces } = trpc.workspace.list.useQuery(
     undefined,
     { refetchOnWindowFocus: false }
@@ -1812,7 +1812,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
 
       <RightPanel missionId={activeMissionId} brandId={selectedBrandId} />
 
-      <NewMissionModal
+      <MissionModal
         open={newMissionOpen}
         defaultWorkspace={newMissionWsKey}
         brandId={selectedBrandId ?? undefined}

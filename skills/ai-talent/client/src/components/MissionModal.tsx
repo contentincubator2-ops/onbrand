@@ -1,5 +1,5 @@
 /**
- * NewMissionModal.tsx
+ * MissionModal.tsx
  *
  * Modal for creating a new mission.
  * - Brand: hidden when brandId is passed in (already in brand context)
@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 
-interface NewMissionModalProps {
+interface MissionModalProps {
   open: boolean;
   defaultWorkspace?: string;
   /** Pre-filled brand — hides the brand selector */
@@ -20,7 +20,7 @@ interface NewMissionModalProps {
   onCreated: (missionId: number, workspace: string) => void;
 }
 
-export const NewMissionModal: React.FC<NewMissionModalProps> = ({
+export const MissionModal: React.FC<MissionModalProps> = ({
   open,
   defaultWorkspace = "strategy",
   brandId: propBrandId,
