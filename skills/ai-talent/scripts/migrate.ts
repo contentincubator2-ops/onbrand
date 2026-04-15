@@ -21,12 +21,17 @@ async function main() {
   try {
     console.log("[migrate] Running migrations...");
 
-    // 1. Add description column to missions (idempotent via IF NOT EXISTS workaround)
-    await conn.execute(`
-      ALTER TABLE missions
-      ADD COLUMN IF NOT EXISTS description TEXT NULL
-    `);
-    console.log("[migrate] missions.description: OK");
+    // 1. Add description column to missions (idempotent: check information_schema first)
+    const [colRows] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'missions' AND COLUMN_NAME = 'description'
+    `) as any;
+    if ((colRows as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE missions ADD COLUMN description TEXT NULL`);
+      console.log("[migrate] missions.description: added");
+    } else {
+      console.log("[migrate] missions.description: already exists, skipped");
+    }
 
     // 2. Create mission_resources table
     await conn.execute(`
