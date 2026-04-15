@@ -171,7 +171,7 @@ squadRouter.get("/:missionId/squad", async (req: Request, res: Response) => {
     }
 
     // 對於一般任務，從 chat_messages / task_executions 抽取 agent 資訊
-    const [msgRows] = await pool.execute(
+    const [msgRows] = await localPool.execute(
       `SELECT DISTINCT role, content
        FROM chat_messages
        WHERE missionId = ? AND role = 'assistant'
@@ -181,7 +181,7 @@ squadRouter.get("/:missionId/squad", async (req: Request, res: Response) => {
     ) as any[];
 
     // 嘗試從 task_executions 取得 agent 資訊
-    const [taskRows] = await pool.execute(
+    const [taskRows] = await localPool.execute(
       `SELECT te.agentSlug, te.status, te.createdAt,
               a.name as agentName, a.title as agentTitle, a.specialty
        FROM task_executions te

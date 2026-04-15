@@ -9,25 +9,9 @@
 import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
-import mysql from "mysql2/promise";
+import localPool from "../localDb";
 
 export const brandBrainRouter = Router();
-
-// ── Azure MySQL Pool ──────────────────────────────────────────────────────────
-let _pool: mysql.Pool | null = null;
-function getPool(): mysql.Pool {
-  if (!_pool) {
-    _pool = mysql.createPool({
-      host: process.env.DB_HOST!,
-      user: process.env.DB_USER!,
-      password: process.env.DB_PASSWORD!,
-      database: process.env.DB_NAME!,
-      ssl: { rejectUnauthorized: false },
-      connectionLimit: 5,
-    });
-  }
-  return _pool;
-}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 async function verifyToken(req: Request): Promise<number | null> {
@@ -49,8 +33,7 @@ brandBrainRouter.get("/:brandId", async (req: Request, res: Response) => {
   if (!brandId) { res.status(400).json({ error: "Invalid brandId" }); return; }
 
   try {
-    const pool = getPool();
-    const [rows] = await pool.execute(
+    const [rows] = await localPool.execute(
       `SELECT id, brand_id, category, title, content, source_mission_id, created_at, updated_at
        FROM brand_brain
        WHERE brand_id = ?
@@ -112,8 +95,7 @@ brandBrainRouter.post("/:brandId", async (req: Request, res: Response) => {
   }
 
   try {
-    const pool = getPool();
-    const [result] = await pool.execute(
+    const [result] = await localPool.execute(
       `INSERT INTO brand_brain (brand_id, category, title, content, source_mission_id)
        VALUES (?, ?, ?, ?, ?)`,
       [brandId, category, title, content, sourceMissionId ?? null]
@@ -152,7 +134,6 @@ brandBrainRouter.put("/entry/:id", async (req: Request, res: Response) => {
   }
 
   try {
-    const pool = getPool();
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -169,7 +150,7 @@ brandBrainRouter.put("/entry/:id", async (req: Request, res: Response) => {
     }
 
     values.push(id);
-    const [result] = await pool.execute(
+    const [result] = await localPool.execute(
       `UPDATE brand_brain SET ${updates.join(", ")}, updated_at = NOW() WHERE id = ?`,
       values
     ) as any[];
@@ -195,8 +176,7 @@ brandBrainRouter.delete("/entry/:id", async (req: Request, res: Response) => {
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
   try {
-    const pool = getPool();
-    const [result] = await pool.execute(
+    const [result] = await localPool.execute(
       `DELETE FROM brand_brain WHERE id = ?`,
       [id]
     ) as any[];
@@ -222,8 +202,7 @@ export async function writeBrandBrainEntry(params: {
   sourceMissionId?: number;
 }): Promise<void> {
   try {
-    const pool = getPool();
-    await pool.execute(
+    await localPool.execute(
       `INSERT INTO brand_brain (brand_id, category, title, content, source_mission_id)
        VALUES (?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE content = VALUES(content), updated_at = NOW()`,

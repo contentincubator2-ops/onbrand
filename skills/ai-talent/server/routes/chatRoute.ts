@@ -23,7 +23,6 @@ import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 import { invokeLLMStream } from "../_core/llm";
-import mysql from "mysql2/promise";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
 const PptxGenJS = _require("pptxgenjs");
@@ -38,21 +37,7 @@ const GATEWAY_TOKEN = "mos-pm-claw-2026";
 const SENDGRID_KEY = "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";
 const PPT_EMAIL = "cjwang@sowork.tw";
 
-// ── Azure MySQL Pool (sowork_db) ──────────────────────────────────────────────
-let _azurePool: mysql.Pool | null = null;
-function getAzurePool(): mysql.Pool {
-  if (!_azurePool) {
-    _azurePool = mysql.createPool({
-      host: process.env.DB_HOST!,
-      user: process.env.DB_USER!,
-      password: process.env.DB_PASSWORD!,
-      database: process.env.DB_NAME!,
-      ssl: { rejectUnauthorized: false },
-      connectionLimit: 5,
-    });
-  }
-  return _azurePool;
-}
+// P0 fix: use localPool (mos_db) for all DB operations
 
 // ── 品牌定位 6 步驟定義 ───────────────────────────────────────────────────────
 const POSITIONING_STEPS_6 = [
@@ -555,7 +540,6 @@ async function executePositioningStep(params: {
   send: (event: string, data: unknown) => void;
 }): Promise<void> {
   const { userId, missionId, brandId, userMessage, conversationHistory, brandContext, send } = params;
-  const pool = getAzurePool();
 
   // 讀取當前步驟
   let currentStep = 0;
@@ -563,7 +547,7 @@ async function executePositioningStep(params: {
   let sessionExists = false;
 
   try {
-    const [sessRows] = await pool.execute(
+    const [sessRows] = await localPool.execute(
       `SELECT currentStep, stepResults, status FROM positioning_sessions WHERE missionId=? AND userId=? LIMIT 1`,
       [missionId, userId]
     ) as any;
@@ -583,7 +567,7 @@ async function executePositioningStep(params: {
   // 如果沒有 session，建立一個
   if (!sessionExists) {
     try {
-      await pool.execute(
+      await localPool.execute(
         `INSERT IGNORE INTO positioning_sessions (missionId, brandId, userId, currentStep, status, stepResults)
          VALUES (?, ?, ?, 0, 'in_progress', '{}')`,
         [missionId, brandId, userId]
@@ -617,7 +601,7 @@ async function executePositioningStep(params: {
 
   // 更新 DB：標記 in_progress
   try {
-    await pool.execute(
+    await localPool.execute(
       `UPDATE positioning_sessions SET status='in_progress', updatedAt=NOW() WHERE missionId=? AND userId=?`,
       [missionId, userId]
     );
@@ -631,8 +615,11 @@ async function executePositioningStep(params: {
     .map(([k, v]) => `=== Step ${k} 確認內容 ===\n${String(v).slice(0, 500)}`)
     .join("\n\n");
 
-  // 取得用戶目標（Step 2+ 從 stepResults 取）
-  const userGoal = stepResultsRaw["1"] || userMessage;
+  // 取得用戶目標（P1 fix: 從對話歷史取第一個 user 回覆，或 userMessage）
+  // Step 1 的 AI 輸出問：「這次定位最想解決的痛點是什麼？」
+  // 用戶回答是對話歷史中第二個 user 訊息（或當前 userMessage 若是 Step 2 的第一次觸發）
+  const firstUserReply = conversationHistory.find(m => m.role === "user")?.content;
+  const userGoal = firstUserReply || userMessage;
 
   // 建立 system prompt
   let systemPrompt: string;
@@ -683,7 +670,7 @@ async function executePositioningStep(params: {
     const newStatus = targetStep >= 6 ? "completed" : "waiting_confirm";
 
     try {
-      await pool.execute(
+      await localPool.execute(
         `UPDATE positioning_sessions 
          SET currentStep=?, status=?, stepResults=?, updatedAt=NOW()
          WHERE missionId=? AND userId=?`,
@@ -791,16 +778,35 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   logEvent({ sessionId, userId, eventType: "session_start" });
 
   try {
-    // ── 品牌定位 6 步驟（workspace=strategy，missionId 存在）──────────────────
-    if (workspace === "strategy" && missionId) {
-      const pool = getAzurePool();
-      
+    // ── 品牌定位 6 步驟（workspace=strategy）──────────────────────────────────
+    if (workspace === "strategy") {
+      // P3 fix: 若沒有 missionId，自動建立 strategy mission
+      let resolvedMissionId = missionId;
+      if (!resolvedMissionId) {
+        try {
+          const missionTitle = brandContext.name
+            ? `${brandContext.name} 品牌定位`
+            : "品牌定位任務";
+          const [insertResult] = await localPool.execute(
+            `INSERT INTO missions (userId, workspace, title, status, createdAt, updatedAt)
+             VALUES (?, 'strategy', ?, 'active', NOW(), NOW())`,
+            [userId, missionTitle]
+          ) as any[];
+          resolvedMissionId = (insertResult as any).insertId;
+          send("status", { message: `已自動建立任務 #${resolvedMissionId}` });
+          console.log(`[chatRoute] P3: auto-created missionId=${resolvedMissionId} for userId=${userId}`);
+        } catch (e: any) {
+          console.error("[chatRoute] P3 auto-create mission error:", e?.message);
+          resolvedMissionId = 0;
+        }
+      }
+
       // 取得 brandId + brandContext from mission/brand DB
       let brandId: number = 0;
       const enrichedBrandCtx: Record<string, string> = { ...brandContext };
       
       try {
-        const [mRows] = await pool.execute(
+        const [mRows] = await localPool.execute(
           `SELECT m.brandId, m.title, b.name, b.industry, b.description, b.targetMarket, b.website
            FROM missions m LEFT JOIN brands b ON b.id = m.brandId
            WHERE m.id=? LIMIT 1`,
@@ -823,7 +829,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
       await executePositioningStep({
         userId,
-        missionId,
+        missionId: resolvedMissionId ?? 0,
         brandId,
         userMessage,
         conversationHistory,
@@ -849,8 +855,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     let missionTitle = "";
     if (missionId) {
       try {
-        const pool = getAzurePool();
-        const [mRows] = await pool.execute(
+              const [mRows] = await localPool.execute(
           `SELECT title FROM missions WHERE id=? LIMIT 1`,
           [missionId]
         ) as any;

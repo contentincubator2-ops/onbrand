@@ -15,6 +15,7 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import { randomBytes } from "crypto";
+import { loadAgentContext } from "../agentContextLoader";
 
 // ── Squad Lead 定義 ────────────────────────────────────────────────────────────
 const SQUAD_LEAD_DEF = {
@@ -168,6 +169,7 @@ export const squadRouter = router({
     }),
 
   // ── 4. squadLeadOpen — Squad Lead 掌握 context 後生成開場問題 ─────────────
+// ── 4. squadLeadOpen — Squad Lead 讀取 100 筆 context 後生成開場問題 ──────────
   squadLeadOpen: protectedProcedure
     .input(z.object({
       squadUid: z.string(),
@@ -177,47 +179,44 @@ export const squadRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // 取得品牌 + 任務 context
-      const [rows] = await db.execute(
-        sql`SELECT b.name as brandName, b.industry, b.description, b.targetAudience,
-                   b.tagline, b.positioningStatus,
-                   m.title as missionTitle, m.objective, m.workspace,
-                   s.title as squadTitle
-            FROM squads s
-            JOIN missions m ON m.id = s.mission_id
-            JOIN brands b ON b.id = s.brand_id
-            WHERE s.squad_uid = ${input.squadUid} AND s.user_id = ${ctx.user.id}
-            LIMIT 1`
+      // 取得 brand_id from squad
+      const [sqRows] = await db.execute(
+        sql`SELECT brand_id, title FROM squads
+            WHERE squad_uid = ${input.squadUid} AND user_id = ${ctx.user.id} LIMIT 1`
       ) as any[];
+      const sq = (sqRows as any[])?.[0];
+      if (!sq) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const ctx_data = (rows as any[])?.[0];
-      if (!ctx_data) throw new TRPCError({ code: "NOT_FOUND" });
+      // Squad Lead 用 Context Loader 讀取 100 筆（isSquadLead: true）
+      const agentCtx = await loadAgentContext({
+        missionId: input.missionId,
+        brandId: sq.brand_id,
+        userId: ctx.user.id,
+        squadUid: input.squadUid,
+        agentKey: undefined,
+        isSquadLead: true,
+      });
 
-      const prompt = `你是 ${SQUAD_LEAD_DEF.agentName}，${SQUAD_LEAD_DEF.agentTitle}，剛剛帶領了一支品牌定位小組被召集完畢。
+      const systemPrompt = `你是 ${SQUAD_LEAD_DEF.agentName}，${SQUAD_LEAD_DEF.agentTitle}。
+你剛剛帶領了「${sq.title ?? "品牌定位小組"}」完成召集，即將展開工作。
 
-品牌資訊：
-- 品牌名稱：${ctx_data.brandName}
-- 產業：${ctx_data.industry ?? "未填寫"}
-- 描述：${ctx_data.description ?? "未填寫"}
-- 目標受眾：${ctx_data.targetAudience ?? "未填寫"}
-- 目前 Tagline：${ctx_data.tagline ?? "尚無"}
-- 定位狀態：${ctx_data.positioningStatus ?? "pending"}
+${agentCtx.systemPromptPrefix}`;
 
-任務：${ctx_data.missionTitle}
-目標：${ctx_data.objective ?? "未填寫"}
+      const userPrompt = `根據以上品牌資料和對話記錄，作為 Squad Lead，請：
+1. 用一句話確認你對這個品牌目前狀況的初步理解
+2. 提出 2-3 個最關鍵的問題，幫助團隊在開始之前釐清課題
+3. 簡短說明你推薦的工作流程（10 步驟品牌定位）為什麼適合這個品牌現況
 
-根據以上資訊，作為 Squad Lead，請：
-1. 用一句話確認你對這個品牌的初步理解
-2. 提出 2-3 個最關鍵的問題，幫助你的團隊在開始之前釐清課題
-3. 推薦接下來的 10 步驟品牌定位流程（一句話說明為什麼這個流程適合這個品牌）
+語氣：專業但有溫度，像真正帶過品牌的行銷人。用繁體中文回應。
+長度：控制在 250 字內。
+${agentCtx.depthLabel}`;
 
-語氣：專業但有溫度，像一個真正帶過品牌的行銷人。用繁體中文回應。
-長度：控制在 200 字內。`;
-
-      const llmResult = await invokeLLM({ messages: [
-        { role: "system", content: `你是 ${SQUAD_LEAD_DEF.agentName}，${SQUAD_LEAD_DEF.agentTitle}。` },
-        { role: "user", content: prompt },
-      ]});
+      const llmResult = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
       const replyContent = llmResult.choices?.[0]?.message?.content ?? "";
       const reply = typeof replyContent === "string" ? replyContent : JSON.stringify(replyContent);
 
@@ -233,6 +232,12 @@ export const squadRouter = router({
         WHERE squad_uid = ${input.squadUid} AND user_id = ${ctx.user.id}
       `);
 
-      return { message: reply, agentName: SQUAD_LEAD_DEF.agentName, agentTitle: SQUAD_LEAD_DEF.agentTitle };
+      return {
+        message: reply,
+        agentName: SQUAD_LEAD_DEF.agentName,
+        agentTitle: SQUAD_LEAD_DEF.agentTitle,
+        historyDepth: agentCtx.historyDepth,
+        depthLabel: agentCtx.depthLabel,
+      };
     }),
 });
