@@ -489,8 +489,8 @@ function RecentMissions({
         </button>
       </div>
       {missionList.length === 0 && (
-        <div style={{ padding: '4px 13px 8px', fontSize: 10, color: '#C8C7C3', lineHeight: 1.5 }}>
-          點擊 <IconCompose /> 開始即興對話
+        <div style={{ padding: '4px 13px 8px', fontSize: 10, color: '#C8C7C3', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <IconCompose /> 開始即興對話
         </div>
       )}
       {missionList.map((m: any) => (
@@ -540,7 +540,7 @@ function RecentMissions({
                 onClick={() => onMissionSelect?.(m.id)}
                 style={{
                   fontSize: 11, flex: 1,
-                  color: activeMissionId === m.id ? '#1A1A18' : '#9B9990',
+                  color: activeMissionId === m.id ? '#1A1A18' : '#4A4A45',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}
               >
