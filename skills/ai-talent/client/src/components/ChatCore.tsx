@@ -605,91 +605,91 @@ export default function ChatCore({
           )
         );
         try {
-          const brandCtx = {
-            name: activeBrand?.name,
-            industry: (activeBrand as any)?.industry ?? (activeBrand as any)?.soworkAnalysis?.industry,
-            website: (activeBrand as any)?.websiteUrl,
-            targetAudience: (activeBrand as any)?.targetAudience,
-            description: (activeBrand as any)?.description,
-          };
-          const resp = await fetch("/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ userMessage: "開始", conversationHistory: [], brandContext: brandCtx, missionId: activeMissionId, workspace: missionData.workspace ?? undefined }),
-          });
-          if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
-          const reader = resp.body.getReader();
-          const decoder = new TextDecoder();
-          let buf = "";
-          let lastAgentName: string | undefined;
-          let lastAgentTitle: string | undefined;
-          let lastAgentModel: string | null = null;
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            const lines = buf.split(String.fromCharCode(10));
-            buf = lines.pop() ?? "";
-            let curEvent = "";
-            for (const line of lines) {
-              if (line.startsWith("event: ")) curEvent = line.slice(7).trim();
-              else if (line.startsWith("data: ")) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  if (curEvent === "relay_step") {
-                    const rsId = data.id ?? 0;
-                    setRelaySteps((prev) => {
-                      const exists = prev.find((s) => s.id === rsId);
-                      if (data.status === "done") return prev.map((s) => s.id === rsId ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) } : s);
-                      if (exists) return prev.map((s) => s.id === rsId ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle } : s);
-                      return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
-                    });
-                    if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
-                    if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
-                  } else if (curEvent === "delta") {
-                    streamBuffer += data.text;
-                    setConversations((prev) =>
-                      prev.map((c) =>
-                        c.id === missionConvId
-                          ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
-                          : c
-                      )
-                    );
-                  } else if (curEvent === "squad_recommend") {
-                    const sqData = data as { squads: any[]; missionId: number; brandId: number };
-                    setConversations((prev) =>
-                      prev.map((c) =>
-                        c.id === missionConvId
-                          ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, squadRecommend: sqData } : m) }
-                          : c
-                      )
-                    );
-                  } else if (curEvent === "done") {
-                    setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
-                  }
-                } catch { /* ignore */ }
+      // Auto-start: pass IDs directly
+      const resp = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userMessage: "開始",
+          conversationHistory: [],
+          brandId: activeBrandId ?? undefined,
+          missionId: activeMissionId,
+          workspace: missionData.workspace ?? undefined,
+        }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let lastAgentName: string | undefined;
+      let lastAgentTitle: string | undefined;
+      let lastAgentModel: string | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split(String.fromCharCode(10));
+        buf = lines.pop() ?? "";
+        let curEvent = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) curEvent = line.slice(7).trim();
+          else if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (curEvent === "relay_step") {
+                const rsId = data.id ?? 0;
+                setRelaySteps((prev) => {
+                  const exists = prev.find((s) => s.id === rsId);
+                  if (data.status === "done") return prev.map((s) => s.id === rsId ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) } : s);
+                  if (exists) return prev.map((s) => s.id === rsId ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle } : s);
+                  return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
+                });
+                if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
+                if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
+              } else if (curEvent === "delta") {
+                streamBuffer += data.text;
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === missionConvId
+                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
+                      : c
+                  )
+                );
+              } else if (curEvent === "squad_recommend") {
+                const sqData = data as { squads: any[]; missionId: number; brandId: number };
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === missionConvId
+                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, squadRecommend: sqData } : m) }
+                      : c
+                  )
+                );
+              } else if (curEvent === "done") {
+                setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
               }
-            }
+            } catch { /* ignore */ }
           }
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === missionConvId
-                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（分析完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
-                : c
-            )
-          );
-          setConversationHistory([{ role: "assistant", content: streamBuffer }]);
-        } catch (err: any) {
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === missionConvId
-                ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `自動啟動失敗：${err?.message}` } : m) }
-                : c
-            )
-          );
-        } finally {
-          setLoading(false);
         }
+      }
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === missionConvId
+            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（分析完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
+            : c
+        )
+      );
+      setConversationHistory([{ role: "assistant", content: streamBuffer }]);
+    } catch (err: any) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === missionConvId
+            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `自動啟動失敗：${err?.message}` } : m) }
+            : c
+        )
+      );
+    } finally {
+      setLoading(false);
+    }
       }, 400);
     } else if (!isAutoStart) {
       setConversations((prev) => {
@@ -839,7 +839,13 @@ export default function ChatCore({
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userMessage: text, conversationHistory: conversationHistory.slice(-12), brandContext: brandCtx, missionId: activeMissionId ?? currentMissionId ?? undefined, workspace: (missionDataQuery.data as any)?.workspace ?? undefined }),
+        body: JSON.stringify({
+          userMessage: text,
+          conversationHistory: conversationHistory.slice(-12),
+          brandId: activeBrandId ?? undefined,
+          missionId: activeMissionId ?? currentMissionId ?? undefined,
+          workspace: (missionDataQuery.data as any)?.workspace ?? undefined,
+        }),
       });
       if (!resp.ok || !resp.body) throw new Error(`chat HTTP ${resp.status}`);
       const reader = resp.body.getReader();
@@ -867,23 +873,23 @@ export default function ChatCore({
                   if (exists) return prev.map((s) => s.id === rsId ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle } : s);
                   return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
                 });
-                if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
-                if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
-              } else if (curEvent === "delta") {
-                streamBuffer += data.text;
-                setConversations((prev) =>
-                  prev.map((c) =>
-                    c.id === convId
-                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
-                      : c
-                  )
-                );
-              } else if (curEvent === "done") {
-                setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
-              }
-            } catch { /* ignore */ }
+            if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
+            if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
+          } else if (curEvent === "delta") {
+            streamBuffer += data.text;
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === convId
+                  ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
+                  : c
+              )
+            );
+          } else if (curEvent === "done") {
+            setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
           }
-        }
+        } catch { /* ignore */ }
+      }
+    }
       }
       setConversations((prev) =>
         prev.map((c) =>
@@ -1152,59 +1158,59 @@ export default function ChatCore({
                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                   body: JSON.stringify({ missionId: activeMissionId }),
                 });
-              } catch { /* non-fatal */ }
-            }
-          }}
-          disabled={loading || !active || (active?.messages.length === 0)}
-          style={{
-            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-            fontFamily: "inherit", background: "transparent",
-            border: "1px solid #E4E3E1", color: "#9B4040",
-            display: "flex", alignItems: "center", gap: 4,
-            opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
-          }}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14H6L5 6"/>
-            <path d="M10 11v6M14 11v6"/>
-            <path d="M9 6V4h6v2"/>
-          </svg>
-          清空對話
-        </button>
+          } catch { /* non-fatal */ }
+        }
+      }}
+      disabled={loading || !active || (active?.messages.length === 0)}
+      style={{
+        padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+        fontFamily: "inherit", background: "transparent",
+        border: "1px solid #E4E3E1", color: "#9B4040",
+        display: "flex", alignItems: "center", gap: 4,
+        opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
+      }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+      清空對話
+    </button>
 
-        {/* 新增對話按鈕 */}
-        <button
-          onClick={() => {
-            // 建立新對話，重置所有 relay/team 狀態
-            const newId = `conv-new-${Date.now()}`;
-            const newConv = { id: newId, title: "新對話", messages: [], createdAt: Date.now() };
-            setConversations((prev) => [newConv, ...prev]);
-            setActiveId(newId);
-            setRelaySteps([]);
-            setConversationHistory([]);
-            setTeamAssembly(null);
-            setStreamingAgentName(null);
-            setStreamingAgentTitle(null);
-            setInput("");
-            setTimeout(() => chatInputRef.current?.focus(), 100);
-          }}
-          disabled={loading}
-          style={{
-            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-            fontFamily: "inherit", background: "transparent",
-            border: "1px solid #E4E3E1", color: "#4A6B4A",
-            display: "flex", alignItems: "center", gap: 4,
-            opacity: loading ? 0.4 : 1,
-            marginLeft: "auto",
-          }}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          新增對話
-        </button>
+    {/* 新增對話按鈕 */}
+    <button
+      onClick={() => {
+        // 建立新對話，重置所有 relay/team 狀態
+        const newId = `conv-new-${Date.now()}`;
+        const newConv = { id: newId, title: "新對話", messages: [], createdAt: Date.now() };
+        setConversations((prev) => [newConv, ...prev]);
+        setActiveId(newId);
+        setRelaySteps([]);
+        setConversationHistory([]);
+        setTeamAssembly(null);
+        setStreamingAgentName(null);
+        setStreamingAgentTitle(null);
+        setInput("");
+        setTimeout(() => chatInputRef.current?.focus(), 100);
+      }}
+      disabled={loading}
+      style={{
+        padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+        fontFamily: "inherit", background: "transparent",
+        border: "1px solid #E4E3E1", color: "#4A6B4A",
+        display: "flex", alignItems: "center", gap: 4,
+        opacity: loading ? 0.4 : 1,
+        marginLeft: "auto",
+      }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      新增對話
+    </button>
       </div>
 
       {/* ── Squad progress bar ── */}

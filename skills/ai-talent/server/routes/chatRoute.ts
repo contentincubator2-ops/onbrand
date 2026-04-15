@@ -753,12 +753,13 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { userMessage, conversationHistory = [], brandContext = {}, sessionId: clientSessionId, missionId, workspace } = req.body as {
+  const { userMessage, conversationHistory = [], brandContext = {}, sessionId: clientSessionId, missionId, brandId: bodyBrandId, workspace } = req.body as {
     userMessage: string;
     conversationHistory: { role: string; content: string }[];
-    brandContext: Record<string, string>;
+    brandContext?: Record<string, string>;
     sessionId?: string;
     missionId?: number;
+    brandId?: number;
     workspace?: string;
   };
 
@@ -848,19 +849,21 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     send("status", { message: "分析任務中..." });
 
     // 一般路徑也從 DB 補充 brand context（避免 PM 問已知資訊）
-    let brandId: number = 0;
-    const enrichedBrandCtx: Record<string, string> = { ...brandContext };
-    if (missionId) {
+    let brandId: number = bodyBrandId ?? 0;
+    const enrichedBrandCtx: Record<string, string> = { ...(brandContext ?? {}) };
+    // 用 missionId 或 brandId 查詢品牌資料
+    const lookupId2 = missionId ?? brandId;
+    if (lookupId2) {
       try {
-        const [mBrandRows] = await localPool.execute(
-          `SELECT m.brandId, b.name, b.industry, b.description, b.targetMarket, b.website
-           FROM missions m LEFT JOIN brands b ON b.id = m.brandId
-           WHERE m.id = ? LIMIT 1`,
-          [missionId]
-        ) as any[];
+        const query2 = missionId
+          ? `SELECT m.brandId, b.name, b.industry, b.description, b.targetMarket, b.website
+             FROM missions m LEFT JOIN brands b ON b.id = m.brandId
+             WHERE m.id = ? LIMIT 1`
+          : `SELECT id as brandId, name, industry, description, targetMarket, website FROM brands WHERE id = ? LIMIT 1`;
+        const [mBrandRows] = await localPool.execute(query2, [lookupId2]) as any[];
         const mb = (mBrandRows as any[])?.[0];
         if (mb) {
-          brandId = mb.brandId ?? 0;
+          if (!brandId) brandId = mb.brandId ?? 0;
           if (!enrichedBrandCtx.name && mb.name) enrichedBrandCtx.name = mb.name;
           if (!enrichedBrandCtx.industry && mb.industry) enrichedBrandCtx.industry = mb.industry;
           if (!enrichedBrandCtx.description && mb.description) enrichedBrandCtx.description = mb.description;
@@ -868,7 +871,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
           if (!enrichedBrandCtx.website && mb.website) enrichedBrandCtx.website = mb.website;
         }
       } catch (e: any) {
-        console.warn('[chatRoute] general path brand fetch:', e?.message);
+        console.warn("[chatRoute] general path brand fetch:", e?.message);
       }
     }
 
