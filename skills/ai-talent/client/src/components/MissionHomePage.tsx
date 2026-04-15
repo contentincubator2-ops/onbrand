@@ -62,15 +62,15 @@ export function MissionHomePage({ workspace = 'strategy', onTaskSelect }: Missio
                     <div className="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
                                 <div className="grid grid-cols-3 gap-4">
                                               <div className="text-center">
-                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.agentCount || 0}</div>
+                                                              <div className="text-2xl font-bold text-slate-900">{(resourceSummary as any).agents || 0}</div>
                                                               <div className="text-xs text-slate-600 mt-1">Agents</div>
                                               </div>
                                               <div className="text-center">
-                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.skillCount || 0}</div>
+                                                              <div className="text-2xl font-bold text-slate-900">{(resourceSummary as any).skills || 0}</div>
                                                               <div className="text-xs text-slate-600 mt-1">Skills</div>
                                               </div>
                                               <div className="text-center">
-                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.modelCount || 0}</div>
+                                                              <div className="text-2xl font-bold text-slate-900">{(resourceSummary as any).providers || 0}</div>
                                                               <div className="text-xs text-slate-600 mt-1">Models</div>
                                               </div>
                                 </div>
