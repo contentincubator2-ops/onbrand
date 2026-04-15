@@ -30,7 +30,7 @@ import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
 import { squadRouter } from "./routes/squadRoute";
-import { closeDb, pingDb, pingSoworkDb } from "./db";
+import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
@@ -169,9 +169,42 @@ setInterval(async () => {
   }
 }, 60_000);
 
+// Run idempotent DB migrations on startup (uses server's own DB connection)
+async function runStartupMigrations() {
+  try {
+    const db = await getDb();
+    const [colRows] = await db.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'missions' AND COLUMN_NAME = 'description'`
+    ) as any;
+    if ((colRows as any[]).length === 0) {
+      await db.execute(`ALTER TABLE missions ADD COLUMN description TEXT NULL`);
+      console.log("[migrate] missions.description: added");
+    }
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS mission_resources (
+        id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        missionId   INT          NOT NULL UNIQUE,
+        status      VARCHAR(20)  NOT NULL DEFAULT 'pending',
+        agents      INT          NOT NULL DEFAULT 0,
+        skills      INT          NOT NULL DEFAULT 0,
+        providers   INT          NOT NULL DEFAULT 0,
+        skillList   LONGTEXT     NULL,
+        providerList LONGTEXT    NULL,
+        topAgents   LONGTEXT     NULL,
+        createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] mission_resources: OK");
+  } catch (err) {
+    console.error("[migrate] startup migration error:", err);
+  }
+}
+
 const server = app.listen(PORT, async () => {
   console.log(`[server] sowork-enterprise listening on port ${PORT}`);
   console.log(`[server] health: http://localhost:${PORT}/health`);
+  await runStartupMigrations();
   startOrchestratorWorker();
   console.log("[A2A] Orchestrator Worker started");
   startSquadLeaderWorker();
