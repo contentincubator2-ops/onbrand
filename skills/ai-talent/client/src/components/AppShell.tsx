@@ -640,11 +640,30 @@ function Drawer({
   const [expandedWs, setExpandedWs] = useState<Record<string, boolean>>({});
   const [activeWsKey, setActiveWsKey] = useState<string>('strategy');
 
-  // Resource summary (optional chaining for missing router)
+  // Workspace-level resource summary (fallback when no active mission)
   const resourceQuery = (trpc as any).resource?.summary?.useQuery
     ? (trpc as any).resource.summary.useQuery({ workspace: activeWsKey }, { refetchOnWindowFocus: false, staleTime: 0 })
     : { data: null, isLoading: false };
-  const resourceData = resourceQuery.data;
+
+  // Mission-level semantic resource summary (polls until ready)
+  const missionResourceQuery = (trpc as any).resource?.summaryByMission?.useQuery
+    ? (trpc as any).resource.summaryByMission.useQuery(
+        { missionId: activeMissionId! },
+        {
+          enabled: !!activeMissionId,
+          refetchInterval: (query: any) => {
+            const status = query.state.data?.status;
+            return status === 'ready' || status === 'error' ? false : 2000;
+          },
+          refetchOnWindowFocus: false,
+        }
+      )
+    : { data: null, isLoading: false };
+
+  const missionResource = activeMissionId ? missionResourceQuery.data : null;
+  const isMissionPending = !!activeMissionId && (!missionResource || (missionResource as any)?.status === 'pending');
+  const effectiveResourceData = (missionResource as any)?.status === 'ready' ? missionResource : resourceQuery.data;
+  const effectiveResourceLoading = isMissionPending || resourceQuery.isLoading;
 
   const toggleWs = (key: string) => {
     setExpandedWs(prev => ({ ...prev, [key]: !prev[key] }));
@@ -884,9 +903,14 @@ function Drawer({
         </div>
 
         {/* 可用資源 section */}
-        <div style={{ ...secLabel, marginTop: 6 }}>可用資源</div>
+        <div style={{ ...secLabel, marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
+          <span>可用資源</span>
+          {isMissionPending && (
+            <span style={{ fontSize: 9, color: "#9B9990", fontWeight: 400, letterSpacing: 0 }}>⚙ 配對中…</span>
+          )}
+        </div>
         <div style={{ padding: "0 10px 8px" }}>
-          <ResourceStats resourceData={resourceData} isLoading={resourceQuery.isLoading} />
+          <ResourceStats resourceData={effectiveResourceData} isLoading={effectiveResourceLoading} />
         </div>
       </div>
 

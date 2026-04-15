@@ -217,41 +217,6 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                 </div>
             )}
 
-            {/* Resource Stats */}
-            {agents > 0 && (
-                          <div
-                                      style={{
-                                                    display: "flex",
-                                                    gap: 12,
-                                                    marginBottom: 28,
-                                                    flexWrap: "wrap",
-                                                    justifyContent: "center",
-                                      }}
-                                    >
-                            {[
-                                      { label: "可用 Agents", value: formatNumber(agents), icon: "🤖", color: "#5B7FDB" },
-                                      { label: "專業技能", value: formatNumber(skills), icon: "⚡", color: "#27AE60" },
-                                      { label: "AI 模型", value: formatNumber(providers), icon: "🧠", color: "#E67E22" },
-                                                ].map(({ label, value, icon, color }) => (
-                                                              <div
-                                                                              key={label}
-                                                                              style={{
-                                                                                                background: "#FFFFFF",
-                                                                                                border: "1px solid #E8EAF0",
-                                                                                                borderRadius: 12,
-                                                                                                padding: "12px 20px",
-                                                                                                textAlign: "center",
-                                                                                                minWidth: 100,
-                                                                                                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                                                                              }}
-                                                                            >
-                                                                            <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
-                                                                            <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-                                                                            <div style={{ fontSize: 11, color: "#9B9990", marginTop: 2 }}>{label}</div>
-                                                              </div>
-                                                            ))}
-                          </div>
-                )}
           
             {/* Search Input */}
                 <div
@@ -379,7 +344,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                       textAlign: "center",
                           }}
                         >
-                        由 text-embedding-3-large 語意搜尋驅動 · {formatNumber(agents)} 個專業 Agent 待命中
+                        由 text-embedding-3-large 語意搜尋驅動
                 </p>
           </div>
         );
