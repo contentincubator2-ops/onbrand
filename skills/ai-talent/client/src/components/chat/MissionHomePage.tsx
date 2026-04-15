@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { trpc } from "../../lib/trpc";
 
 /**
  * MissionHomePage - Perplexity-style mission landing page
@@ -87,12 +88,14 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
 }) => {
     const [inputValue, setInputValue] = useState("");
 
-    const wsLabel = WORKSPACE_LABELS[workspace] ?? workspace;
+    const resourceQuery = trpc.resource.summary.useQuery({ workspace }, { enabled: !resourceSummary });
+        const effectiveSummary = resourceSummary ?? (resourceQuery.data as ResourceSummary | undefined);
+        const wsLabel = WORKSPACE_LABELS[workspace] ?? workspace;
     const tasks = SUGGESTED_TASKS[workspace] ?? DEFAULT_TASKS;
 
-    const agents = resourceSummary?.agents ?? 0;
-    const skills = resourceSummary?.skills ?? 0;
-    const providers = resourceSummary?.providers ?? 0;
+    const agents = effectiveSummary?.agents ?? 0;
+    const skills = effectiveSummary?.skills ?? 0;
+    const providers = effectiveSummary?.providers ?? 0;
 
     const handleSubmit = () => {
           if (inputValue.trim() && onTaskSelect) {
