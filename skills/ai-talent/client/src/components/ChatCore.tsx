@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import TaskProgressTracker, { type TaskStep } from "./chat/TaskProgressTracker";
 import TypedThreadCard from "./chat/TypedThreadCard";
+import SquadRecommendCards from "./chat/SquadRecommendCards";
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ export interface Msg {
   sopProposed?: boolean;
   sopBuilt?: boolean;
   exportFormat?: "ppt" | "word" | "copy" | "none";
+  squadRecommend?: { squads: any[]; missionId: number; brandId: number };
 }
 
 interface AssembledAgent {
@@ -653,6 +655,15 @@ export default function ChatCore({
                           : c
                       )
                     );
+                  } else if (curEvent === "squad_recommend") {
+                    const sqData = data as { squads: any[]; missionId: number; brandId: number };
+                    setConversations((prev) =>
+                      prev.map((c) =>
+                        c.id === missionConvId
+                          ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, squadRecommend: sqData } : m) }
+                          : c
+                      )
+                    );
                   } else if (curEvent === "done") {
                     setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
                   }
@@ -1116,6 +1127,84 @@ export default function ChatCore({
           </svg>
           總結對話
         </button>
+
+        {/* 清空對話按鈕 */}
+        <button
+          onClick={async () => {
+            if (!window.confirm("確定要清空目前對話？定位進度也會重置。")) return;
+            // 清空前端狀態
+            if (active) {
+              setConversations((prev) =>
+                prev.map((c) => c.id === active.id ? { ...c, messages: [] } : c)
+              );
+            }
+            setRelaySteps([]);
+            setConversationHistory([]);
+            setTeamAssembly(null);
+            setStreamingAgentName(null);
+            setStreamingAgentTitle(null);
+            // 清空後端 positioning_sessions（strategy workspace）
+            if (activeMissionId) {
+              try {
+                const token = localStorage.getItem("authToken");
+                await fetch(`/api/chat/reset-positioning`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ missionId: activeMissionId }),
+                });
+              } catch { /* non-fatal */ }
+            }
+          }}
+          disabled={loading || !active || (active?.messages.length === 0)}
+          style={{
+            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+            fontFamily: "inherit", background: "transparent",
+            border: "1px solid #E4E3E1", color: "#9B4040",
+            display: "flex", alignItems: "center", gap: 4,
+            opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+          清空對話
+        </button>
+
+        {/* 新增對話按鈕 */}
+        <button
+          onClick={() => {
+            // 建立新對話，重置所有 relay/team 狀態
+            const newId = `conv-new-${Date.now()}`;
+            const newConv = { id: newId, title: "新對話", messages: [], createdAt: Date.now() };
+            setConversations((prev) => [newConv, ...prev]);
+            setActiveId(newId);
+            setRelaySteps([]);
+            setConversationHistory([]);
+            setTeamAssembly(null);
+            setStreamingAgentName(null);
+            setStreamingAgentTitle(null);
+            setInput("");
+            setTimeout(() => chatInputRef.current?.focus(), 100);
+          }}
+          disabled={loading}
+          style={{
+            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+            fontFamily: "inherit", background: "transparent",
+            border: "1px solid #E4E3E1", color: "#4A6B4A",
+            display: "flex", alignItems: "center", gap: 4,
+            opacity: loading ? 0.4 : 1,
+            marginLeft: "auto",
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          新增對話
+        </button>
       </div>
 
       {/* ── Squad progress bar ── */}
@@ -1354,6 +1443,19 @@ export default function ChatCore({
                       __html: formatText(msg.content || (msg.thinking ? "✅ 分析完成，請查看策略思考過程" : "（無輸出內容）")),
                     }}
                   />
+                  {/* Squad 推薦卡片 */}
+                  {msg.squadRecommend && (
+                    <div style={{ padding: "0 14px 12px" }}>
+                      <SquadRecommendCards
+                        squads={msg.squadRecommend.squads}
+                        missionId={msg.squadRecommend.missionId}
+                        brandId={msg.squadRecommend.brandId}
+                        onConfirmed={(_uid, _title) => {
+                          // 切換到成員 tab（如果有 callback）
+                        }}
+                      />
+                    </div>
+                  )}
                   {/* 定案 button — only for agent messages */}
                   {msg.role === "assistant" && (
                     <div style={{ padding: "6px 14px 8px", display: "flex", justifyContent: "flex-end" }}>

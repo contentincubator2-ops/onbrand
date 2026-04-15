@@ -897,6 +897,41 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   }
 });
 
+// ── Reset positioning session ────────────────────────────────────────────────
+chatRouter.post("/reset-positioning", async (req: Request, res: Response) => {
+  const userId = await verifyToken(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const { missionId } = req.body as { missionId?: number };
+
+  try {
+    if (missionId) {
+      // 清空指定 mission 的定位展期 (only if owned by this user)
+      await localPool.execute(
+        `DELETE FROM positioning_sessions WHERE missionId = ? AND userId = ?`,
+        [missionId, userId]
+      );
+      // 清空對應 mission 的 chat messages
+      await localPool.execute(
+        `DELETE FROM chat_messages WHERE missionId = ? AND userId = ?`,
+        [missionId, userId]
+      );
+    } else {
+      // 清空該用戶所有 strategy 定位 sessions
+      await localPool.execute(
+        `DELETE ps FROM positioning_sessions ps
+         INNER JOIN missions m ON m.id = ps.missionId
+         WHERE ps.userId = ? AND m.workspace = 'strategy'`,
+        [userId]
+      );
+    }
+    res.json({ ok: true, message: "定位展期已重置" });
+  } catch (err: any) {
+    console.error("[chatRoute] reset-positioning error:", err?.message);
+    res.status(500).json({ error: err?.message });
+  }
+});
+
 // ── Save conversation ─────────────────────────────────────────────────────────
 chatRouter.post("/save", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
