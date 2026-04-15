@@ -522,7 +522,7 @@ async function generateAndSendPPT(
     sgMail.setApiKey(SENDGRID_KEY);
     await sgMail.send({
       to: PPT_EMAIL,
-      from: "marketing-os@sowork.tw",
+      from: "noreply@sowork.ai",
       subject: `${brandName} 品牌定位報告`,
       text: `附件為 ${brandName} 的品牌定位完整報告，由 Marketing OS 自動生成。`,
       html: `<p>附件為 <strong>${brandName}</strong> 的品牌定位完整報告，由 Marketing OS 自動生成。</p>`,
@@ -763,7 +763,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
       
       try {
         const [mRows] = await pool.execute(
-          `SELECT m.brandId, m.title, b.name, b.industry, b.description, b.targetMarket, b.websiteUrl
+          `SELECT m.brandId, m.title, b.name, b.industry, b.description, b.targetMarket, b.website
            FROM missions m LEFT JOIN brands b ON b.id = m.brandId
            WHERE m.id=? LIMIT 1`,
           [missionId]
@@ -775,7 +775,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
           enrichedBrandCtx.industry = enrichedBrandCtx.industry || m.industry || "";
           enrichedBrandCtx.description = enrichedBrandCtx.description || m.description || "";
           enrichedBrandCtx.targetAudience = enrichedBrandCtx.targetAudience || m.targetMarket || "";
-          enrichedBrandCtx.website = enrichedBrandCtx.website || m.websiteUrl || "";
+          enrichedBrandCtx.website = enrichedBrandCtx.website || m.website || "";
         }
       } catch (e: any) {
         console.error("[chatRoute] mission/brand fetch error:", e?.message);
