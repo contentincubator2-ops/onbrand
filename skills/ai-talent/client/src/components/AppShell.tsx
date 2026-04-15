@@ -55,6 +55,22 @@ const IconPlus = () => (
   </svg>
 );
 
+// Claude-style: folder with a plus — new workspace
+const IconFolder = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+  </svg>
+);
+
+// Claude-style: pencil/compose — new mission
+const IconCompose = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+
 const IconExport = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -415,12 +431,6 @@ function WorkspaceMissions({
           >×</button>
         </div>
       ))}
-      <div
-        onClick={() => onNewTask?.(wsKey)}
-        style={{ padding: "3px 6px", fontSize: 10, color: "#C8C7C3", cursor: "pointer" }}
-      >
-        + 新增任務
-      </div>
     </div>
   );
 }
@@ -758,18 +768,6 @@ function Drawer({
                 >
                   {ws.label}
                 </span>
-                <button
-                  onClick={() => onNewTask?.(ws.wsKey)}
-                  title="新增任務"
-                  style={{
-                    width: 18, height: 18, borderRadius: 4, border: "none",
-                    background: "transparent", cursor: "pointer", color: "#9B9990",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <IconPlus />
-                </button>
               </div>
               {isExpanded && (
                 <WorkspaceMissions
@@ -1653,6 +1651,17 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
   const [railTab, setRailTab] = useState("chat");
   const [newMissionOpen, setNewMissionOpen] = useState(false);
   const [newMissionWsKey, setNewMissionWsKey] = useState("strategy");
+  const [newWsOpen, setNewWsOpen] = useState(false);
+  const [newWsLabel, setNewWsLabel] = useState("");
+
+  const shellUtils = trpc.useUtils();
+  const createWorkspace = trpc.workspace.create.useMutation({
+    onSuccess: () => {
+      shellUtils.workspace.list.invalidate();
+      setNewWsOpen(false);
+      setNewWsLabel("");
+    },
+  });
 
   // Notifications for badge
   const { data: notifData } = trpc.notifications.list.useQuery(
@@ -1788,12 +1797,20 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
                 }} />
               )}
             </div>
-            <button style={btnGhost}>
-              <IconExport />
-              匯出
+            <button
+              style={btnGhost}
+              title="新增工作區"
+              onClick={() => setNewWsOpen(true)}
+            >
+              <IconFolder />
+              新工作區
             </button>
-            <button style={btnDark} onClick={() => { setNewMissionWsKey(activeMissionWorkspace ?? "strategy"); setNewMissionOpen(true); }}>
-              <IconPlus />
+            <button
+              style={btnDark}
+              title="新增任務"
+              onClick={() => { setNewMissionWsKey(activeMissionWorkspace ?? "strategy"); setNewMissionOpen(true); }}
+            >
+              <IconCompose />
               新任務
             </button>
           </div>
@@ -1811,6 +1828,41 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
       </main>
 
       <RightPanel missionId={activeMissionId} brandId={selectedBrandId} />
+
+      {/* New Workspace inline modal */}
+      {newWsOpen && (
+        <div
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
+          onClick={() => { setNewWsOpen(false); setNewWsLabel(""); }}
+        >
+          <div
+            style={{ background:"#FFFFFF", borderRadius:16, padding:"28px 32px", width:"100%", maxWidth:400, boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize:17, fontWeight:700, color:"#1A1A18", margin:"0 0 18px" }}>新增工作區</h2>
+            <form onSubmit={(e) => { e.preventDefault(); if (newWsLabel.trim()) createWorkspace.mutate({ label: newWsLabel.trim() }); }}>
+              <input
+                autoFocus
+                type="text"
+                value={newWsLabel}
+                onChange={(e) => setNewWsLabel(e.target.value)}
+                placeholder="例：Instagram、電商、公關"
+                style={{ width:"100%", border:"1.5px solid #E2E8F0", borderRadius:8, padding:"9px 12px", fontSize:13, color:"#1A1A18", outline:"none", fontFamily:"inherit", boxSizing:"border-box" as const, marginBottom:16 }}
+              />
+              <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+                <button type="button" onClick={() => { setNewWsOpen(false); setNewWsLabel(""); }}
+                  style={{ background:"transparent", border:"1px solid #E8EAF0", borderRadius:8, padding:"7px 16px", fontSize:12, cursor:"pointer", color:"#5A5A5A" }}>
+                  取消
+                </button>
+                <button type="submit" disabled={!newWsLabel.trim() || createWorkspace.isPending}
+                  style={{ background: newWsLabel.trim() ? "#1A1A18" : "#E8EAF0", color: newWsLabel.trim() ? "#FFFFFF" : "#9B9990", border:"none", borderRadius:8, padding:"7px 18px", fontSize:12, fontWeight:600, cursor: newWsLabel.trim() ? "pointer" : "not-allowed" }}>
+                  {createWorkspace.isPending ? "建立中…" : "建立"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <MissionModal
         open={newMissionOpen}
