@@ -10,6 +10,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { missions, missionTaskUnits } from "../../drizzle/schema";
 import { eq, and, desc, or, isNull } from "drizzle-orm";
+import { computeMissionResources } from "../missionResourceComputer";
 
 export const missionRouter = router({
   // List missions for a workspace
@@ -71,7 +72,9 @@ export const missionRouter = router({
     .input(z.object({
       workspace: z.string().max(50).optional().default(""),
       brandId: z.number().optional(),
+      brandName: z.string().optional(),   // for semantic matching context
       title: z.string().min(1).max(255),
+      description: z.string().optional(), // 任務說明，給語意配對用
       objective: z.string().optional(),
       audience: z.string().optional(),
       offer: z.string().optional(),
@@ -89,6 +92,7 @@ export const missionRouter = router({
         workspace: input.workspace,
         brandId: input.brandId ?? null,
         title: input.title,
+        description: input.description ?? null,
         objective: input.objective ?? "",
         audience: input.audience ?? "",
         offer: input.offer ?? "",
@@ -99,7 +103,16 @@ export const missionRouter = router({
         welcomeMessage: input.welcomeMessage ?? null,
         status: "active",
       });
-      return { id: result.insertId };
+      const missionId = result.insertId;
+      // Fire-and-forget: compute semantic agent matching asynchronously
+      computeMissionResources({
+        missionId,
+        title: input.title,
+        description: input.description,
+        workspace: input.workspace,
+        brandName: input.brandName,
+      }).catch(console.error);
+      return { id: missionId };
     }),
 
   // Update mission context

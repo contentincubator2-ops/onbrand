@@ -48,5 +48,6 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             npm install --prefix skills/ai-talent
+            npm run db:migrate --prefix skills/ai-talent
             npm run build --prefix skills/ai-talent/client
             pm2 restart marketing-os

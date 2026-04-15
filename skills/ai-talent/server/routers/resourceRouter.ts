@@ -76,4 +76,32 @@ export const resourceRouter = router({
                              mode: wsKey,
                    };
       }),
+
+  // Per-mission semantic resource summary (polled by MissionHomePage)
+  summaryByMission: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { status: "pending" as const, agents: 0, skills: 0, providers: 0 };
+
+      const [rows] = await db.execute(
+        sql`SELECT status, agents, skills, providers, skillList, providerList, topAgents
+            FROM mission_resources
+            WHERE missionId = ${input.missionId}
+            LIMIT 1`
+      ) as any;
+
+      const row = (rows as any)?.[0];
+      if (!row) return { status: "pending" as const, agents: 0, skills: 0, providers: 0 };
+
+      return {
+        status: (row.status ?? "pending") as "pending" | "ready" | "error",
+        agents:      Number(row.agents ?? 0),
+        skills:      Number(row.skills ?? 0),
+        providers:   Number(row.providers ?? 0),
+        skillList:   row.skillList   ? JSON.parse(row.skillList)   as string[] : [],
+        providerList: row.providerList ? JSON.parse(row.providerList) as string[] : [],
+        topAgents:   row.topAgents   ? JSON.parse(row.topAgents)   as unknown[] : [],
+      };
+    }),
 });

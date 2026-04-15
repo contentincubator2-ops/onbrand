@@ -1291,6 +1291,7 @@ export default function ChatCore({
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
                 brandName={activeBrandName ?? undefined}
+                missionId={activeMissionId}
                 onTaskSelect={(task) => {
                   setInput(task);
                   setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);

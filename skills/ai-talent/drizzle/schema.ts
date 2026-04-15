@@ -548,6 +548,7 @@ export const missions = mysqlTable("missions", {
   successMetrics: text("successMetrics"),
   constraints: text("constraints"),
   methodology: text("methodology"), // e.g. "Brand Positioning v2"
+  description: text("description"),  // 任務說明（給語意配對用）
   squadSlug: varchar("squadSlug", { length: 64 }),     // 綁定的 squad slug
   welcomeMessage: text("welcomeMessage"),               // 點任務時顯示的歡迎訊息
   status: mysqlEnum("status", ["active", "completed", "archived"]).default("active").notNull(),
@@ -577,6 +578,23 @@ export const missionTaskUnits = mysqlTable("mission_task_units", {
 });
 export type MissionTaskUnit = typeof missionTaskUnits.$inferSelect;
 export type InsertMissionTaskUnit = typeof missionTaskUnits.$inferInsert;
+
+// ─── Mission Resources (語意配對結果快取) ────────────────────────────────────────
+// Computed async after mission creation via text-embedding-3-large cosine similarity
+export const missionResources = mysqlTable("mission_resources", {
+  id: int("id").autoincrement().primaryKey(),
+  missionId: int("missionId").notNull().unique(),
+  status: varchar("status", { length: 20 }).default("pending"), // pending | ready | error
+  agents: int("agents").default(0),
+  skills: int("skills").default(0),
+  providers: int("providers").default(0),
+  skillList: text("skillList"),       // JSON string[]
+  providerList: text("providerList"), // JSON string[]
+  topAgents: text("topAgents"),       // JSON: [{slug, name, title, score}]
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MissionResource = typeof missionResources.$inferSelect;
+export type InsertMissionResource = typeof missionResources.$inferInsert;
 
 // ─── User Workspaces (用戶自訂工作區) ─────────────────────────────────────────
 export const userWorkspaces = mysqlTable("user_workspaces", {

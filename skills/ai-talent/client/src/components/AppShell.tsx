@@ -5,6 +5,7 @@
  */
 import React, { useState } from "react";
 import { trpc } from "../lib/trpc";
+import { NewMissionModal } from "./NewMissionModal";
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -1650,6 +1651,8 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
 
 export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId }: AppShellProps) {
   const [railTab, setRailTab] = useState("chat");
+  const [newMissionOpen, setNewMissionOpen] = useState(false);
+  const [newMissionWsKey, setNewMissionWsKey] = useState("strategy");
 
   // Notifications for badge
   const { data: notifData } = trpc.notifications.list.useQuery(
@@ -1733,7 +1736,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
       <Rail activeTab={railTab} onTabChange={setRailTab} notifCount={notifCount} />
       <Drawer
         onMissionSelect={onMissionSelect}
-        onNewTask={onNewTask}
+        onNewTask={(wsKey) => { setNewMissionWsKey(wsKey); setNewMissionOpen(true); }}
         activeMissionId={activeMissionId}
       />
 
@@ -1782,7 +1785,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
               <IconExport />
               匯出
             </button>
-            <button style={btnDark}>
+            <button style={btnDark} onClick={() => { setNewMissionWsKey(activeMissionWorkspace ?? "strategy"); setNewMissionOpen(true); }}>
               <IconPlus />
               新任務
             </button>
@@ -1801,6 +1804,16 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
       </main>
 
       <RightPanel missionId={activeMissionId} brandId={selectedBrandId} />
+
+      <NewMissionModal
+        open={newMissionOpen}
+        defaultWorkspace={newMissionWsKey}
+        onClose={() => setNewMissionOpen(false)}
+        onCreated={(missionId) => {
+          setNewMissionOpen(false);
+          onMissionSelect?.(missionId);
+        }}
+      />
     </div>
   );
 }

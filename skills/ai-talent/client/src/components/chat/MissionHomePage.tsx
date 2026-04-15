@@ -30,6 +30,7 @@ interface MissionHomePageProps {
     brandName?: string;
     workspace?: string;
     resourceSummary?: ResourceSummary;
+    missionId?: number | null;
     onTaskSelect?: (task: string) => void;
 }
 
@@ -84,13 +85,31 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
     brandName,
     workspace = "global",
     resourceSummary,
+    missionId,
     onTaskSelect,
 }) => {
     const [inputValue, setInputValue] = useState("");
 
-    const resourceQuery = trpc.resource.summary.useQuery({ workspace }, { enabled: !resourceSummary });
-        const effectiveSummary = resourceSummary ?? (resourceQuery.data as ResourceSummary | undefined);
-        const wsLabel = WORKSPACE_LABELS[workspace] ?? workspace;
+    // Per-mission semantic resource polling (stops when status === 'ready')
+    const missionResourceQuery = trpc.resource.summaryByMission.useQuery(
+        { missionId: missionId! },
+        {
+            enabled: !!missionId,
+            refetchInterval: (query) => {
+                const status = (query.state.data as any)?.status;
+                return status === "ready" || status === "error" ? false : 2000;
+            },
+        }
+    );
+    const missionResource = missionId ? (missionResourceQuery.data as (ResourceSummary & { status?: string }) | undefined) : undefined;
+
+    // Fall back to workspace-level summary only when no missionId is provided
+    const resourceQuery = trpc.resource.summary.useQuery({ workspace }, { enabled: !resourceSummary && !missionId });
+    const effectiveSummary: (ResourceSummary & { status?: string }) | undefined =
+        missionResource ?? resourceSummary ?? (resourceQuery.data as ResourceSummary | undefined);
+
+    const isLoading = !!missionId && (!missionResource || (missionResource as any).status === "pending");
+    const wsLabel = WORKSPACE_LABELS[workspace] ?? workspace;
     const tasks = SUGGESTED_TASKS[workspace] ?? DEFAULT_TASKS;
 
     const agents = effectiveSummary?.agents ?? 0;
@@ -161,6 +180,43 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                         </p>
                 </div>
           
+            {/* Loading state: semantic matching in progress */}
+            {isLoading && (
+                <div style={{
+                    background: "#F0F4FF",
+                    border: "1px solid #D4E0FF",
+                    borderRadius: 12,
+                    padding: "16px 24px",
+                    marginBottom: 24,
+                    textAlign: "center",
+                    maxWidth: 400,
+                    width: "100%",
+                }}>
+                    <div style={{ fontSize: 16, marginBottom: 8 }}>⚙️</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#3B5BD5", marginBottom: 6 }}>
+                        正在為此任務配對最佳 AI 代理人選…
+                    </div>
+                    <div style={{
+                        height: 4,
+                        background: "#E0E7FF",
+                        borderRadius: 2,
+                        overflow: "hidden",
+                    }}>
+                        <div style={{
+                            height: "100%",
+                            background: "linear-gradient(90deg, #5B7FDB 0%, #A5B4FC 50%, #5B7FDB 100%)",
+                            backgroundSize: "200% 100%",
+                            animation: "shimmer 1.5s infinite linear",
+                            borderRadius: 2,
+                        }} />
+                    </div>
+                    <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+                    <div style={{ fontSize: 11, color: "#9B9990", marginTop: 8 }}>
+                        由 text-embedding-3-large 語意搜尋驅動
+                    </div>
+                </div>
+            )}
+
             {/* Resource Stats */}
             {agents > 0 && (
                           <div
