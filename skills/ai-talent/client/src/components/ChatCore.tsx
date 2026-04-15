@@ -1285,9 +1285,9 @@ export default function ChatCore({
         }}
         className="messages-scroll"
       >
-        {/* Empty state */}
-        {(!active || active.messages.length === 0) && !loading && !teamAssembly && (
-              
+        {/* Empty state — show when no USER messages yet (welcome assistant msg doesn't count) */}
+        {(!active || active.messages.filter(m => m.role === "user").length === 0) && !loading && !teamAssembly && (
+
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
                 brandName={activeBrandName ?? undefined}
