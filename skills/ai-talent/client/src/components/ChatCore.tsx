@@ -555,6 +555,14 @@ export default function ChatCore({
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
+  // Sync activeBrandId from mission data (most reliable source)
+  useEffect(() => {
+    const mBrandId = (missionDataQuery.data as any)?.brandId;
+    if (mBrandId && mBrandId !== activeBrandId) {
+      setActiveBrandId(mBrandId);
+    }
+  }, [missionDataQuery.data, activeBrandId]);
+
   useEffect(() => {
     if (brandsQuery.isSuccess && brands.length > 0 && !activeBrandId) {
       const preferred = initialBrandId ? brands.find((b: any) => b.id === initialBrandId) : null;
@@ -612,7 +620,7 @@ export default function ChatCore({
         body: JSON.stringify({
           userMessage: "開始",
           conversationHistory: [],
-          brandId: activeBrandId ?? undefined,
+          brandId: (missionData.brandId ?? activeBrandId) ?? undefined,
           missionId: activeMissionId,
           workspace: missionData.workspace ?? undefined,
         }),
@@ -829,20 +837,15 @@ export default function ChatCore({
       )
     );
     try {
-      const brandCtx = {
-        name: (activeBrand as any)?.name,
-        industry: (activeBrand as any)?.industry,
-        website: (activeBrand as any)?.websiteUrl,
-        targetAudience: (activeBrand as any)?.targetAudience,
-        description: (activeBrand as any)?.description,
-      };
+      // Use missionData.brandId as primary source (reliable from DB)
+      const effectiveBrandId = (missionDataQuery.data as any)?.brandId ?? activeBrandId ?? undefined;
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           userMessage: text,
           conversationHistory: conversationHistory.slice(-12),
-          brandId: activeBrandId ?? undefined,
+          brandId: effectiveBrandId,
           missionId: activeMissionId ?? currentMissionId ?? undefined,
           workspace: (missionDataQuery.data as any)?.workspace ?? undefined,
         }),

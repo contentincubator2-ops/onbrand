@@ -765,6 +765,9 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
 
+  // DEBUG: log incoming payload
+  console.log('[chatRoute] incoming:', JSON.stringify({ userId, missionId, brandId: bodyBrandId, workspace, userMessage: userMessage.slice(0, 30) }));
+
   const sessionId: string = clientSessionId ?? newSessionId();
 
   res.setHeader("Content-Type", "text/event-stream");
