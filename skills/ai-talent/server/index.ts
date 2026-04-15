@@ -35,6 +35,7 @@ import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
+import { computeMissionResources } from "./missionResourceComputer";
 
 const app = express();
 
@@ -202,6 +203,41 @@ async function runStartupMigrations() {
   }
 }
 
+// Background job: compute mission resources for all missions without a 'ready' record.
+// Runs once on startup, processes one mission every 2s to avoid hammering the embedding API.
+async function backfillMissionResources(): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const [rows] = await db.execute(sql`
+      SELECT m.id, m.title, m.description, m.workspace, m.brandId,
+             b.name AS brandName
+      FROM missions m
+      LEFT JOIN mission_resources mr ON mr.missionId = m.id
+      LEFT JOIN brands b ON b.id = m.brandId
+      WHERE mr.id IS NULL OR mr.status != 'ready'
+      LIMIT 100
+    `) as any;
+    const missions = (rows as any[]) ?? [];
+    if (missions.length === 0) return;
+    console.log(`[backfill] Computing resources for ${missions.length} mission(s)…`);
+    for (const m of missions) {
+      await computeMissionResources({
+        missionId:   m.id,
+        title:       m.title       ?? "",
+        description: m.description ?? undefined,
+        workspace:   m.workspace   ?? "",
+        brandName:   m.brandName   ?? undefined,
+      }).catch((err: unknown) => console.error(`[backfill] mission ${m.id}:`, err));
+      // Pace: 2s between calls so we don't saturate the embedding API
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    console.log("[backfill] Done.");
+  } catch (err) {
+    console.error("[backfill] error:", err);
+  }
+}
+
 const server = app.listen(PORT, async () => {
   console.log(`[server] sowork-enterprise listening on port ${PORT}`);
   console.log(`[server] health: http://localhost:${PORT}/health`);
@@ -215,6 +251,8 @@ const server = app.listen(PORT, async () => {
   if (recovered > 0) {
     console.log(`[server] recovered ${recovered} billing records from fallback log`);
   }
+  // Backfill mission resources for existing missions (fire-and-forget)
+  backfillMissionResources();
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {
