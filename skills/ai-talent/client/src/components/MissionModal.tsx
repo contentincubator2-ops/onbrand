@@ -37,8 +37,13 @@ export const MissionModal: React.FC<MissionModalProps> = ({
   // Sync workspace when defaultWorkspace changes (e.g. opened from sidebar button)
   useEffect(() => { setWorkspace(defaultWorkspace); }, [defaultWorkspace]);
 
+  const utils = trpc.useUtils();
+
   const createMission = trpc.mission.create.useMutation({
     onSuccess: (data) => {
+      // Invalidate all mission list queries so sidebar refreshes
+      utils.mission.list.invalidate();
+      utils.mission.listByBrand.invalidate();
       onCreated(data.id, workspace);
       handleClose();
     },
