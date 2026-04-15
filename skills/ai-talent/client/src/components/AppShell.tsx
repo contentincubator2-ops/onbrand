@@ -1671,6 +1671,13 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
   const selectedBrand = brandList[selectedBrandIdx] ?? null;
   const selectedBrandId: number | null = (selectedBrand as any)?.id ?? null;
 
+  // Workspace list for NewMissionModal (React Query deduplicates with Drawer's query)
+  const { data: shellWorkspaces } = trpc.workspace.list.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false }
+  );
+  const shellWsList = (shellWorkspaces as any[]) ?? [];
+
   // Mission + workspace for breadcrumb
   const { data: activeMissionData } = (trpc as any).mission?.getById?.useQuery
     ? (trpc as any).mission.getById.useQuery(
@@ -1810,7 +1817,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         defaultWorkspace={newMissionWsKey}
         brandId={selectedBrandId ?? undefined}
         brandName={(selectedBrand as any)?.name}
-        workspaces={wsList}
+        workspaces={shellWsList}
         onClose={() => setNewMissionOpen(false)}
         onCreated={(missionId) => {
           setNewMissionOpen(false);
