@@ -141,19 +141,19 @@ export const brandRouter = router({
 
       // Auto-seed 6 onboarding missions for this brand
       const ONBOARDING_MISSIONS = [
-        { workspace: 'strategy', title: '品牌定位', isRecurring: false, recurringSchedule: null, squadSlug: 'tw-b2b-saas-gtm', welcomeMessage: '🔍 **B2B SaaS GTM 策略組**已集結！我們採「先研究、再確認」的 10 步驟流程，每步都帶著分析結果給你看。目標：2個方向×5個定位=10個方案。請告訴我品牌名稱和主要產品/服務（有官網更好）！' },
-        { workspace: 'strategy', title: '競品每日情報', isRecurring: true, recurringSchedule: 'daily', squadSlug: 'mkt-analytics-attribution', welcomeMessage: '📊 **行銷數據歸因組**上線！我會主動搜尋競品最新動態，帶研究結果給你確認，不空問。請告訴我品牌名稱和所在產業，我立刻幫你搜尋主要競品清單！' },
-        { workspace: 'website', title: '官網文案調整', isRecurring: false, recurringSchedule: null, squadSlug: 'tw-website-rebuild', welcomeMessage: '💻 **官網重建技術組**就位！我會先分析你現有官網文案，再對比競品找改善機會。請提供官網網址，我馬上掃描 Hero/CTA/Value Prop！' },
-        { workspace: 'website', title: '每周長文', isRecurring: true, recurringSchedule: 'weekly', squadSlug: 'mkt-seo-growth', welcomeMessage: '✍️ **SEO 自然流量成長組**就緒！流程：先做關鍵字研究+競品文章分析，提出主題候選給你選，確認後輸出1500字+SEO長文。請告訴我品牌/產業，有沒有特別想寫的主題方向？' },
-        { workspace: 'facebook', title: '固定品牌貼文', isRecurring: true, recurringSchedule: 'weekly', squadSlug: 'mkt-content-engine', welcomeMessage: '📱 **內容行銷引擎組**開始！我先搜尋本週行業熱門話題，提出一週排期草稿給你確認。請告訴我品牌名稱，我馬上查本週熱門話題！' },
-        { workspace: 'facebook', title: '廣告投放優化', isRecurring: false, recurringSchedule: null, squadSlug: 'tw-ecom-full-funnel', welcomeMessage: '🎯 **全漏斗電商行銷組**集結！我先診斷問題點、研究競品廣告策略，帶3個Ad Set優化方向給你確認。請告訴我品牌名稱和目前主要廣告類型（流量/轉換/再行銷）！' },
-      ]
+        { workspace: 'strategy', title: '品牌定位',    isRecurring: false, recurringSchedule: null,     squadSlug: 'tw-b2b-saas-gtm' },
+        { workspace: 'strategy', title: '競品每日情報', isRecurring: true,  recurringSchedule: 'daily',   squadSlug: 'mkt-analytics-attribution' },
+        { workspace: 'website',  title: '官網文案調整', isRecurring: false, recurringSchedule: null,     squadSlug: 'tw-website-rebuild' },
+        { workspace: 'website',  title: '每周長文',    isRecurring: true,  recurringSchedule: 'weekly',  squadSlug: 'mkt-seo-growth' },
+        { workspace: 'facebook', title: '固定品牌貼文', isRecurring: true,  recurringSchedule: 'weekly',  squadSlug: 'mkt-content-engine' },
+        { workspace: 'facebook', title: '廣告投放優化', isRecurring: false, recurringSchedule: null,     squadSlug: 'tw-ecom-full-funnel' },
+      ];
       for (const m of ONBOARDING_MISSIONS) {
         try {
           await db.execute(
-            sql`INSERT INTO missions (userId, brandId, workspace, title, squadSlug, welcomeMessage, isRecurring, recurringSchedule, status)
+            sql`INSERT INTO missions (userId, brandId, workspace, title, squadSlug, isRecurring, recurringSchedule, status)
                 VALUES (${ctx.user.id}, ${brandId}, ${m.workspace}, ${m.title}, ${m.squadSlug},
-                       ${m.welcomeMessage}, ${m.isRecurring ? 1 : 0}, ${m.recurringSchedule ?? null}, 'active')`
+                       ${m.isRecurring ? 1 : 0}, ${m.recurringSchedule ?? null}, 'active')`
           );
         } catch (err) {
           console.error('[brand.create] mission seed failed:', m.title, err);

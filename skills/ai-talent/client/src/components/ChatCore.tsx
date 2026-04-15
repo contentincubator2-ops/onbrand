@@ -576,14 +576,11 @@ export default function ChatCore({
     if (preselectedAgent) setTimeout(() => chatInputRef.current?.focus(), 150);
   }, [preselectedAgent]);
 
-  // Mission init
+  // Mission init — set up conversation container when switching missions
   useEffect(() => {
     if (!activeMissionId || !missionDataQuery.data) return;
     const missionData = missionDataQuery.data as any;
-    if (!missionData.welcomeMessage) return;
     const missionConvId = `conv-mission-${activeMissionId}`;
-    const isAutoStart = missionData.welcomeMessage === "__AUTO_START__"; // autoStart: PM 自動 recap
-    const squadSlug: string = missionData.squadSlug ?? "";
     setActiveId(missionConvId);
     setConversationHistory([]);
     setTeamAssembly(null);
@@ -598,116 +595,6 @@ export default function ChatCore({
       if (existing) return prev;
       return [{ id: missionConvId, title: missionData.title, messages: [], createdAt: Date.now() }, ...prev];
     });
-    if (isAutoStart && !autoStartedRef.current.has(activeMissionId)) {
-      autoStartedRef.current.add(activeMissionId);
-      setTimeout(async () => {
-        const token = localStorage.getItem("authToken");
-        if (!token) return;
-        setLoading(true);
-        let streamBuffer = "";
-        const streamMsgId = `auto-${Date.now()}`;
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === missionConvId
-              ? { ...c, messages: [...c.messages, { id: streamMsgId, role: "assistant" as const, content: "", ts: Date.now() }] }
-              : c
-          )
-        );
-        try {
-      // Auto-start: pass IDs directly
-      const resp = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          userMessage: "開始",
-          conversationHistory: [],
-          missionId: activeMissionId,
-          workspace: missionData.workspace ?? undefined,
-        }),
-      });
-      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let lastAgentName: string | undefined;
-      let lastAgentTitle: string | undefined;
-      let lastAgentModel: string | null = null;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split(String.fromCharCode(10));
-        buf = lines.pop() ?? "";
-        let curEvent = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) curEvent = line.slice(7).trim();
-          else if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (curEvent === "relay_step") {
-                const rsId = data.id ?? 0;
-                setRelaySteps((prev) => {
-                  const exists = prev.find((s) => s.id === rsId);
-                  if (data.status === "done") return prev.map((s) => s.id === rsId ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) } : s);
-                  if (exists) return prev.map((s) => s.id === rsId ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle } : s);
-                  return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
-                });
-                if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
-                if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
-              } else if (curEvent === "delta") {
-                streamBuffer += data.text;
-                setConversations((prev) =>
-                  prev.map((c) =>
-                    c.id === missionConvId
-                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
-                      : c
-                  )
-                );
-              } else if (curEvent === "squad_recommend") {
-                const sqData = data as { squads: any[]; missionId: number; brandId: number };
-                setConversations((prev) =>
-                  prev.map((c) =>
-                    c.id === missionConvId
-                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, squadRecommend: sqData } : m) }
-                      : c
-                  )
-                );
-              } else if (curEvent === "done") {
-                setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
-              }
-            } catch { /* ignore */ }
-          }
-        }
-      }
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === missionConvId
-            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（分析完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
-            : c
-        )
-      );
-      setConversationHistory([{ role: "assistant", content: streamBuffer }]);
-    } catch (err: any) {
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === missionConvId
-            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `自動啟動失敗：${err?.message}` } : m) }
-            : c
-        )
-      );
-    } finally {
-      setLoading(false);
-    }
-      }, 400);
-    } else if (!isAutoStart) {
-      setConversations((prev) => {
-        const existing = prev.find((c) => c.id === missionConvId);
-        if (existing && existing.messages.length > 0) return prev;
-        const welcomeMsg: Msg = { id: `welcome-${activeMissionId}`, role: "assistant", content: missionData.welcomeMessage!, ts: Date.now() };
-        if (existing) return prev.map((c) => c.id === missionConvId ? { ...c, messages: [welcomeMsg] } : c);
-        return [{ id: missionConvId, title: missionData.title, messages: [welcomeMsg], createdAt: Date.now() }, ...prev.filter((c) => c.id !== missionConvId)];
-      });
-    }
   }, [activeMissionId, missionDataQuery.data]);
 
   // History load

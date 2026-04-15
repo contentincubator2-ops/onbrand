@@ -82,7 +82,6 @@ export const missionRouter = router({
       constraints: z.string().optional(),
       methodology: z.string().optional(),
       squadSlug: z.string().max(64).optional(),
-      welcomeMessage: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -100,7 +99,6 @@ export const missionRouter = router({
         constraints: input.constraints ?? "",
         methodology: input.methodology ?? "",
         squadSlug: input.squadSlug ?? null,
-        welcomeMessage: input.welcomeMessage ?? null,
         status: "active",
       });
       const missionId = result.insertId;
