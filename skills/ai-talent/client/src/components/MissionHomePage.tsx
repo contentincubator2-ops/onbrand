@@ -14,7 +14,7 @@ const SUGGESTED_TASKS = [
   { id: 2, label: '廣告文案組合', description: '文案創意、視覺概念、投放策略' },
   { id: 3, label: '市場調研分析', description: '市場規模、消費者洞察、趨勢預測' },
   { id: 4, label: '社群內容規劃', description: '內容日曆、互動策略、成長計畫' },
-  ];
+];
 
 export function MissionHomePage({ workspace = 'strategy', onTaskSelect }: MissionHomePageProps) {
     const [searchInput, setSearchInput] = useState('');
@@ -23,7 +23,7 @@ export function MissionHomePage({ workspace = 'strategy', onTaskSelect }: Missio
   const { data: resourceSummary } = trpc.resource.summary.useQuery(
     { workspace },
     { staleTime: 1000 * 60 * 5 } // 5 minutes cache
-      );
+  );
 
   const handleTaskClick = (taskLabel: string) => {
         if (onTaskSelect) {
@@ -46,37 +46,37 @@ export function MissionHomePage({ workspace = 'strategy', onTaskSelect }: Missio
                       <div className="flex justify-center">
                                 <div className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center">
                                             <BriefcaseIcon className="w-8 h-8 text-slate-600" />
-                                </div>div>
-                      </div>div>
-              
+                                </div>
+                      </div>
+
                 {/* Title */}
                       <div className="text-center space-y-3">
-                                <h1 className="text-3xl font-bold text-slate-900">啟動自主代理任務</h1>h1>
+                                <h1 className="text-3xl font-bold text-slate-900">啟動自主代理任務</h1>
                                 <p className="text-base text-slate-600">
                                             輸入任務後，系統會先提案團隊與執行計劃，再接力式自動完成。
-                                </p>p>
-                      </div>div>
-              
+                                </p>
+                      </div>
+
                 {/* Resource Summary */}
                 {resourceSummary && (
                     <div className="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
                                 <div className="grid grid-cols-3 gap-4">
                                               <div className="text-center">
-                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.agentCount || 0}</div>div>
-                                                              <div className="text-xs text-slate-600 mt-1">Agents</div>div>
-                                              </div>div>
+                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.agentCount || 0}</div>
+                                                              <div className="text-xs text-slate-600 mt-1">Agents</div>
+                                              </div>
                                               <div className="text-center">
-                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.skillCount || 0}</div>div>
-                                                              <div className="text-xs text-slate-600 mt-1">Skills</div>div>
-                                              </div>div>
+                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.skillCount || 0}</div>
+                                                              <div className="text-xs text-slate-600 mt-1">Skills</div>
+                                              </div>
                                               <div className="text-center">
-                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.modelCount || 0}</div>div>
-                                                              <div className="text-xs text-slate-600 mt-1">Models</div>div>
-                                              </div>div>
-                                </div>div>
-                    </div>div>
+                                                              <div className="text-2xl font-bold text-slate-900">{resourceSummary.modelCount || 0}</div>
+                                                              <div className="text-xs text-slate-600 mt-1">Models</div>
+                                              </div>
+                                </div>
+                    </div>
                       )}
-              
+
                 {/* Search Input */}
                       <form onSubmit={handleSearch} className="w-full">
                                 <div className="relative">
@@ -88,15 +88,15 @@ export function MissionHomePage({ workspace = 'strategy', onTaskSelect }: Missio
                                                             onChange={(e) => setSearchInput(e.target.value)}
                                                             className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-slate-900 placeholder:text-slate-500"
                                                           />
-                                </div>div>
-                      </form>form>
-              
+                                </div>
+                      </form>
+
                 {/* Suggested Tasks */}
                       <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                             <SparklesIcon className="w-4 h-4 text-amber-500" />
-                                            <span className="text-sm font-medium text-slate-700">建議任務</span>span>
-                                </div>div>
+                                            <span className="text-sm font-medium text-slate-700">建議任務</span>
+                                </div>
                                 <div className="grid grid-cols-2 gap-3">
                                   {SUGGESTED_TASKS.map((task) => (
                         <button
@@ -104,13 +104,13 @@ export function MissionHomePage({ workspace = 'strategy', onTaskSelect }: Missio
                                           onClick={() => handleTaskClick(task.label)}
                                           className="p-4 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left hover:shadow-md"
                                         >
-                                        <div className="font-medium text-slate-900 text-sm">{task.label}</div>div>
-                                        <div className="text-xs text-slate-500 mt-1">{task.description}</div>div>
-                        </button>button>
+                                        <div className="font-medium text-slate-900 text-sm">{task.label}</div>
+                                        <div className="text-xs text-slate-500 mt-1">{task.description}</div>
+                        </button>
                       ))}
-                                </div>div>
-                      </div>div>
-              </div>div>
-        </div>div>
+                                </div>
+                      </div>
+              </div>
+        </div>
       );
-}</div>
+}

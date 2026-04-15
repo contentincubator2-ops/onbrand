@@ -1296,7 +1296,7 @@ export default function ChatCore({
                   setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
                 }}
               />
-        ))}
+        )}
 
         {/* Loading card (streaming) */}
         {loading && !teamAssembly && (
