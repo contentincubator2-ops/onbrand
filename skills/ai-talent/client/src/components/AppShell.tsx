@@ -634,19 +634,18 @@ function Drawer({
     : { data: null, isLoading: false };
 
   // Mission-level semantic resource summary (polls until ready)
-  const missionResourceQuery = (trpc as any).resource?.summaryByMission?.useQuery
-    ? (trpc as any).resource.summaryByMission.useQuery(
-        { missionId: activeMissionId! },
-        {
-          enabled: !!activeMissionId,
-          refetchInterval: (query: any) => {
-            const status = query.state.data?.status;
-            return status === 'ready' || status === 'error' ? false : 2000;
-          },
-          refetchOnWindowFocus: false,
-        }
-      )
-    : { data: null, isLoading: false };
+  // Use direct typed call (not conditional) so React Query properly re-fetches on missionId change
+  const missionResourceQuery = trpc.resource.summaryByMission.useQuery(
+    { missionId: activeMissionId ?? 0 },
+    {
+      enabled: !!activeMissionId,
+      refetchInterval: (query: any) => {
+        const status = (query.state.data as any)?.status;
+        return status === 'ready' || status === 'error' ? false : 2000;
+      },
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const missionResource = activeMissionId ? missionResourceQuery.data : null;
   const isMissionPending = !!activeMissionId && (!missionResource || (missionResource as any)?.status === 'pending');
