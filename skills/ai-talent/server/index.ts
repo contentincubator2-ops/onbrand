@@ -31,6 +31,7 @@ import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
 import { squadRouter } from "./routes/squadRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
+import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
@@ -173,15 +174,15 @@ setInterval(async () => {
 async function runStartupMigrations() {
   try {
     const db = await getDb();
-    const [colRows] = await db.execute(
-      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'missions' AND COLUMN_NAME = 'description'`
-    ) as any;
+    const [colRows] = await db.execute(sql`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'missions' AND COLUMN_NAME = 'description'
+    `) as any;
     if ((colRows as any[]).length === 0) {
-      await db.execute(`ALTER TABLE missions ADD COLUMN description TEXT NULL`);
+      await db.execute(sql`ALTER TABLE missions ADD COLUMN description TEXT NULL`);
       console.log("[migrate] missions.description: added");
     }
-    await db.execute(`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS mission_resources (
         id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         missionId   INT          NOT NULL UNIQUE,
