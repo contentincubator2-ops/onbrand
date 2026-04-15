@@ -482,15 +482,18 @@ function RecentMissions({
         <span>即興任務</span>
         <button
           onClick={onNewImpromptu}
-          title="新增即興任務"
+          title="開始即興任務"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B9990', display: 'flex', alignItems: 'center', padding: '1px 3px', borderRadius: 4 }}
         >
           <IconCompose />
         </button>
       </div>
       {missionList.length === 0 && (
-        <div style={{ padding: '4px 13px 8px', fontSize: 10, color: '#C8C7C3', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <IconCompose /> 開始即興對話
+        <div
+          onClick={onNewImpromptu}
+          style={{ padding: '4px 13px 8px', fontSize: 11, color: '#E8631A', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 500 }}
+        >
+          <IconCompose /> 開始即興任務
         </div>
       )}
       {missionList.map((m: any) => (
