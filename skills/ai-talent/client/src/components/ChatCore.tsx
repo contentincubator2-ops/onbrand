@@ -620,9 +620,9 @@ export default function ChatCore({
     const missionConvId = `conv-mission-${activeMissionId}`;
     setConversations((prev) => {
       const conv = prev.find((c) => c.id === missionConvId);
-      // Only load if the conversation exists but has 0 or just welcome msg (avoid overwriting in-progress chat)
+      // Only load if the conversation exists and is still empty (avoid overwriting in-progress chat)
       if (!conv) return prev;
-      if (conv.messages.length > 1) return prev;
+      if (conv.messages.length > 0) return prev;
       const loadedMsgs: Msg[] = (savedMessagesQuery.data as any[]).map((m: any) => ({
         id: `db-msg-${m.id}`,
         role: m.role as "user" | "assistant",
@@ -1172,8 +1172,13 @@ export default function ChatCore({
         }}
         className="messages-scroll"
       >
-        {/* Empty state — show when no USER messages yet (welcome assistant msg doesn't count) */}
-        {(!active || active.messages.filter(m => m.role === "user").length === 0) && !loading && !teamAssembly && (
+        {/* Empty state — show when no USER messages yet.
+            Wait for savedMessagesQuery to finish fetching first (prevents 1-2s flicker
+            where homepage shows then disappears once DB history loads in). */}
+        {(!active || (
+          !savedMessagesQuery.isFetching &&
+          active.messages.filter(m => m.role === "user").length === 0
+        )) && !loading && !teamAssembly && (
 
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
