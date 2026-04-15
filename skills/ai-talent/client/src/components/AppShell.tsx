@@ -640,9 +640,9 @@ function Drawer({
   const [expandedWs, setExpandedWs] = useState<Record<string, boolean>>({});
   const [activeWsKey, setActiveWsKey] = useState<string>('strategy');
 
-  // Workspace-level resource summary (fallback when no active mission)
+  // Database-level resource summary (fallback when no active mission) — show ALL agents/skills/models
   const resourceQuery = (trpc as any).resource?.summary?.useQuery
-    ? (trpc as any).resource.summary.useQuery({ workspace: activeWsKey }, { refetchOnWindowFocus: false, staleTime: 0 })
+    ? (trpc as any).resource.summary.useQuery({ workspace: "global" }, { refetchOnWindowFocus: false, staleTime: 0 })
     : { data: null, isLoading: false };
 
   // Mission-level semantic resource summary (polls until ready)
