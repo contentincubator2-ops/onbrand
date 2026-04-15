@@ -662,8 +662,10 @@ function Drawer({
 
   const missionResource = activeMissionId ? missionResourceQuery.data : null;
   const isMissionPending = !!activeMissionId && (!missionResource || (missionResource as any)?.status === 'pending');
+  // When mission ready → show mission-specific counts; otherwise always show global counts
   const effectiveResourceData = (missionResource as any)?.status === 'ready' ? missionResource : resourceQuery.data;
-  const effectiveResourceLoading = isMissionPending || resourceQuery.isLoading;
+  // Only show "..." when global data itself is loading — not while mission is pending
+  const effectiveResourceLoading = resourceQuery.isLoading;
 
   const toggleWs = (key: string) => {
     setExpandedWs(prev => ({ ...prev, [key]: !prev[key] }));
