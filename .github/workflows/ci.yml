@@ -45,7 +45,8 @@ jobs:
           script: |
             set -e
             cd /home/azureuser/marketing-os
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             npm install --prefix skills/ai-talent
             npm run build --prefix skills/ai-talent/client
             pm2 restart marketing-os
