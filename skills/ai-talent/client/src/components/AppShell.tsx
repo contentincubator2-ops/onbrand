@@ -278,80 +278,68 @@ function fmtModel(m: string): string {
 function ResourceStats({ resourceData, isLoading }: { resourceData: any; isLoading: boolean }) {
   const [expanded, setExpanded] = React.useState<string | null>(null);
 
-  // Skills 展開：顯示具體技能標籤
-  const skillDetail = resourceData?.skillList?.length
-    ? resourceData.skillList.slice(0, 12).join('  ·  ')
-    : resourceData?.skills ? `此工作區共 ${resourceData.skills} 種技能` : null;
-
-  // AI Providers 展開：顯示美化後的 model 名稱
-  const providerDetail = resourceData?.providerList?.length
-    ? resourceData.providerList.map((m: string) => fmtModel(m)).join('  ·  ')
+  const skillChips: string[]    = (resourceData?.skillList   ?? []).slice(0, 20);
+  const modelChips: string[]    = (resourceData?.providerList ?? []).map((m: string) => fmtModel(m));
+  const agentDesc: string | null = resourceData?.agents != null
+    ? `${resourceData.agents.toLocaleString()} 位專業行銷 Agent 待命中`
     : null;
 
-  // Agents 展開：顯示工作區說明
-  const wsDesc: Record<string, string> = {
-    strategy:  '品牌策略 · 定位分析 · 市場研究 · 競品分析',
-    website:   'SEO 優化 · 網站文案 · 內容策略 · Landing Page',
-    facebook:  '社群廣告 · 貼文創作 · 受眾分析 · 成效優化',
-  };
-  const agentDetail = resourceData?.mode && wsDesc[resourceData.mode]
-    ? wsDesc[resourceData.mode]
-    : resourceData?.agents ? `${resourceData.agents} 位 Agent 可協作執行此任務` : null;
-
   const items = [
-    {
-      key: 'agents',
-      label: 'Agents',
-      value: resourceData?.agents ?? null,
-      detail: agentDetail,
-    },
-    {
-      key: 'skills',
-      label: 'Skills',
-      value: resourceData?.skills ?? null,
-      detail: skillDetail,
-    },
-    {
-      key: 'providers',
-      label: 'AI Models',
-      value: resourceData?.providers ?? null,
-      detail: providerDetail,
-    },
+    { key: 'agents',    label: 'Agents',    value: resourceData?.agents,    chips: [] as string[],  detail: agentDesc },
+    { key: 'skills',    label: 'Skills',    value: resourceData?.skills,    chips: skillChips,       detail: null },
+    { key: 'providers', label: 'AI Models', value: resourceData?.providers, chips: modelChips,       detail: null },
   ];
 
   return (
-    <div style={{ padding: '0 10px 8px' }}>
-      {items.map(item => (
-        <div key={item.key}>
-          <div
-            onClick={() => setExpanded(expanded === item.key ? null : item.key)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '3px 4px', cursor: 'pointer', borderRadius: 5,
-              background: expanded === item.key ? '#ECEAE8' : 'transparent',
-            }}
-          >
-            <span style={{ fontSize: 11, color: '#6B6A66' }}>{item.label}</span>
-            <span style={{
-              fontSize: 11, fontWeight: 600, color: '#1A1A18',
-              background: '#F2F1EF', border: '1px solid #E4E3E1',
-              borderRadius: 4, padding: '1px 7px',
-              cursor: 'pointer',
-            }}>
-              {isLoading ? '…' : item.value !== null && item.value !== undefined ? item.value : '—'}
-            </span>
-          </div>
-          {expanded === item.key && item.detail && (
-            <div style={{
-              margin: '2px 4px 4px', padding: '5px 8px',
-              background: '#FFFFFF', border: '1px solid #E4E3E1',
-              borderRadius: 6, fontSize: 10, color: '#6B6A66', lineHeight: 1.5,
-            }}>
-              {item.detail}
+    <div>
+      {items.map(item => {
+        const hasDetail = item.chips.length > 0 || !!item.detail;
+        const isOpen = expanded === item.key;
+        return (
+          <div key={item.key}>
+            <div
+              onClick={() => hasDetail && setExpanded(isOpen ? null : item.key)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '4px 6px', borderRadius: 5,
+                cursor: hasDetail ? 'pointer' : 'default',
+                background: isOpen ? '#ECEAE8' : 'transparent',
+              }}
+            >
+              <span style={{ fontSize: 11, color: '#6B6A66' }}>{item.label}</span>
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: '#1A1A18',
+                background: '#F2F1EF', border: '1px solid #E4E3E1',
+                borderRadius: 4, padding: '1px 7px', minWidth: 28, textAlign: 'center',
+              }}>
+                {/* Show value if available; fall back to loading only when truly no data */}
+                {item.value != null ? Number(item.value).toLocaleString() : (isLoading ? '…' : '—')}
+              </span>
             </div>
-          )}
-        </div>
-      ))}
+
+            {isOpen && hasDetail && (
+              <div style={{
+                margin: '2px 4px 6px', padding: '6px 8px',
+                background: '#FFFFFF', border: '1px solid #E4E3E1', borderRadius: 6,
+              }}>
+                {item.chips.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {item.chips.map((chip, i) => (
+                      <span key={i} style={{
+                        fontSize: 9, padding: '2px 6px',
+                        background: '#F2F1EF', border: '1px solid #E4E3E1',
+                        borderRadius: 10, color: '#6B6A66', whiteSpace: 'nowrap',
+                      }}>{chip}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 10, color: '#6B6A66', lineHeight: 1.5 }}>{item.detail}</div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -904,14 +892,17 @@ function Drawer({
           </button>
         </div>
 
-        {/* 可用資源 section */}
-        <div style={{ ...secLabel, marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
+      </div>
+
+      {/* 可用資源 — 固定在 drawer 底部 */}
+      <div style={{ borderTop: "1px solid #E4E3E1", flexShrink: 0 }}>
+        <div style={{ ...secLabel, display: "flex", alignItems: "center", gap: 5, marginTop: 0 }}>
           <span>可用資源</span>
           {isMissionPending && (
             <span style={{ fontSize: 9, color: "#9B9990", fontWeight: 400, letterSpacing: 0 }}>⚙ 配對中…</span>
           )}
         </div>
-        <div style={{ padding: "0 10px 8px" }}>
+        <div style={{ padding: "0 10px 6px" }}>
           <ResourceStats resourceData={effectiveResourceData} isLoading={effectiveResourceLoading} />
         </div>
       </div>
