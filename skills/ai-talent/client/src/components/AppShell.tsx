@@ -579,10 +579,14 @@ function Drawer({
   onMissionSelect,
   onNewTask,
   activeMissionId,
+  onNewMission,
+  onNewWorkspace,
 }: {
   onMissionSelect?: (missionId: number) => void;
   onNewTask?: (wsKey: string) => void;
   activeMissionId?: number | null;
+  onNewMission?: () => void;
+  onNewWorkspace?: () => void;
 }) {
   const drawerStyle: React.CSSProperties = {
     width: 210, minWidth: 210,
@@ -737,8 +741,17 @@ function Drawer({
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {/* Workspaces */}
-        <div style={secLabel}>工作區</div>
+        {/* Workspaces header row */}
+        <div style={{ ...secLabel, display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 8 }}>
+          <span>工作區</span>
+          <button
+            onClick={onNewWorkspace}
+            title="新增工作區"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#9B9990", display: "flex", alignItems: "center", padding: "1px 3px", borderRadius: 4 }}
+          >
+            <IconFolder />
+          </button>
+        </div>
 
         {wsLoading && (
           <div style={{ padding: "5px 13px", fontSize: 11, color: "#9B9990" }}>載入中…</div>
@@ -788,6 +801,22 @@ function Drawer({
             暫無工作區
           </div>
         )}
+
+        {/* 新任務 button */}
+        <div style={{ padding: "4px 8px 6px" }}>
+          <button
+            onClick={onNewMission}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 6,
+              background: "none", border: "1px dashed #DEDDDA", borderRadius: 6,
+              padding: "5px 10px", cursor: "pointer", color: "#9B9990", fontSize: 11,
+              fontFamily: "inherit",
+            }}
+          >
+            <IconCompose />
+            新任務
+          </button>
+        </div>
 
         <RecentMissions
           brandId={selectedBrandId}
@@ -1754,6 +1783,8 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         onMissionSelect={onMissionSelect}
         onNewTask={(wsKey) => { setNewMissionWsKey(wsKey); setNewMissionOpen(true); }}
         activeMissionId={activeMissionId}
+        onNewMission={() => { setNewMissionWsKey(activeMissionWorkspace ?? "strategy"); setNewMissionOpen(true); }}
+        onNewWorkspace={() => setNewWsOpen(true)}
       />
 
       {/* Main */}
@@ -1797,22 +1828,6 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
                 }} />
               )}
             </div>
-            <button
-              style={btnGhost}
-              title="新增工作區"
-              onClick={() => setNewWsOpen(true)}
-            >
-              <IconFolder />
-              新工作區
-            </button>
-            <button
-              style={btnDark}
-              title="新增任務"
-              onClick={() => { setNewMissionWsKey(activeMissionWorkspace ?? "strategy"); setNewMissionOpen(true); }}
-            >
-              <IconCompose />
-              新任務
-            </button>
           </div>
         </div>
 
