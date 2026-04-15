@@ -32,9 +32,10 @@ interface AgentRow {
   embeddingJson: string | null;
 }
 
-const THRESHOLD_HIGH = 0.35;
-const THRESHOLD_LOW  = 0.25;
-const AGENT_FETCH_LIMIT = 2000;
+const THRESHOLD_HIGH = 0.20;   // lowered: 0.35 was too strict for diverse agent pool
+const THRESHOLD_LOW  = 0.10;   // lowered: fallback threshold
+const MIN_RESULTS    = 50;     // guarantee at least this many agents (take top-N if needed)
+const AGENT_FETCH_LIMIT = 5000; // increased: sample more of the 17K agent pool
 
 export async function computeMissionResources(input: MissionComputeInput): Promise<void> {
   const db = await getDb();
@@ -105,16 +106,20 @@ export async function computeMissionResources(input: MissionComputeInput): Promi
       });
     }
 
-    let threshold = THRESHOLD_HIGH;
-    let matched = scored.filter((a) => a.score >= threshold);
+    // Sort all agents by score descending first
+    scored.sort((a, b) => b.score - a.score);
+
+    let matched = scored.filter((a) => a.score >= THRESHOLD_HIGH);
 
     // Auto-lower threshold if too few matches
-    if (matched.length < 10) {
-      threshold = THRESHOLD_LOW;
-      matched = scored.filter((a) => a.score >= threshold);
+    if (matched.length < MIN_RESULTS) {
+      matched = scored.filter((a) => a.score >= THRESHOLD_LOW);
     }
 
-    matched.sort((a, b) => b.score - a.score);
+    // Still too few? Take top MIN_RESULTS by score regardless of threshold
+    if (matched.length < MIN_RESULTS) {
+      matched = scored.slice(0, MIN_RESULTS);
+    }
 
     const uniqueSkills   = new Set(matched.map((a) => a.skill).filter(Boolean));
     const uniqueModels   = new Set(matched.map((a) => a.model).filter(Boolean));
