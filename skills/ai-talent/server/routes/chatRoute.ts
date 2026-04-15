@@ -22,8 +22,8 @@ import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
-import { getDb } from "../db";
 import { invokeLLMStream } from "../_core/llm";
+import mysql from "mysql2/promise";
 import pptxgen from "pptxgenjs";
 import sgMail from "@sendgrid/mail";
 
@@ -33,6 +33,22 @@ const GATEWAY_HTTP = "http://localhost:18790";
 const GATEWAY_TOKEN = "mos-pm-claw-2026";
 const SENDGRID_KEY = "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";
 const PPT_EMAIL = "cjwang@sowork.tw";
+
+// ── Azure MySQL Pool (sowork_db) ──────────────────────────────────────────────
+let _azurePool: mysql.Pool | null = null;
+function getAzurePool(): mysql.Pool {
+  if (!_azurePool) {
+    _azurePool = mysql.createPool({
+      host: process.env.DB_HOST!,
+      user: process.env.DB_USER!,
+      password: process.env.DB_PASSWORD!,
+      database: process.env.DB_NAME!,
+      ssl: { rejectUnauthorized: false },
+      connectionLimit: 5,
+    });
+  }
+  return _azurePool;
+}
 
 // ── 品牌定位 6 步驟定義 ───────────────────────────────────────────────────────
 const POSITIONING_STEPS_6 = [
@@ -363,7 +379,7 @@ function buildPmContext(
   squads: any[],
   agents: any[],
   brandCtx: Record<string, string>,
-  missionCtx?: { title?: string; workspace?: string; currentStep?: number; isFirstMessage?: boolean }
+  missionCtx?: { title?: string; workspace?: string }
 ): string {
   const brandStr = Object.entries(brandCtx).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join("\n");
   const squadList = squads.map((s, i) =>
@@ -535,18 +551,19 @@ async function executePositioningStep(params: {
   send: (event: string, data: unknown) => void;
 }): Promise<void> {
   const { userId, missionId, brandId, userMessage, conversationHistory, brandContext, send } = params;
-  const db = await getDb();
+  const pool = getAzurePool();
 
   // 讀取當前步驟
   let currentStep = 0;
   let stepResultsRaw: Record<string, string> = {};
   let sessionExists = false;
 
-  if (db) {
-    const [sessRows] = await (db as any).execute(
-      `SELECT currentStep, stepResults, status FROM positioning_sessions WHERE missionId=${missionId} AND userId=${userId} LIMIT 1`
+  try {
+    const [sessRows] = await pool.execute(
+      `SELECT currentStep, stepResults, status FROM positioning_sessions WHERE missionId=? AND userId=? LIMIT 1`,
+      [missionId, userId]
     ) as any;
-    const sess = sessRows?.[0];
+    const sess = (sessRows as any[])?.[0];
     if (sess) {
       currentStep = sess.currentStep ?? 0;
       sessionExists = true;
@@ -555,14 +572,21 @@ async function executePositioningStep(params: {
           ? JSON.parse(sess.stepResults || "{}") : (sess.stepResults ?? {});
       } catch { stepResultsRaw = {}; }
     }
+  } catch (e: any) {
+    console.error("[chatRoute] DB read error:", e?.message);
   }
 
   // 如果沒有 session，建立一個
-  if (!sessionExists && db) {
-    await (db as any).execute(
-      `INSERT IGNORE INTO positioning_sessions (missionId, brandId, userId, currentStep, status, stepResults)
-       VALUES (${missionId}, ${brandId}, ${userId}, 0, 'in_progress', '{}')`
-    ).catch(() => {});
+  if (!sessionExists) {
+    try {
+      await pool.execute(
+        `INSERT IGNORE INTO positioning_sessions (missionId, brandId, userId, currentStep, status, stepResults)
+         VALUES (?, ?, ?, 0, 'in_progress', '{}')`,
+        [missionId, brandId, userId]
+      );
+    } catch (e: any) {
+      console.error("[chatRoute] DB insert error:", e?.message);
+    }
     currentStep = 0;
   }
 
@@ -588,10 +612,13 @@ async function executePositioningStep(params: {
   });
 
   // 更新 DB：標記 in_progress
-  if (db) {
-    await (db as any).execute(
-      `UPDATE positioning_sessions SET status='in_progress', updatedAt=NOW() WHERE missionId=${missionId} AND userId=${userId}`
-    ).catch(() => {});
+  try {
+    await pool.execute(
+      `UPDATE positioning_sessions SET status='in_progress', updatedAt=NOW() WHERE missionId=? AND userId=?`,
+      [missionId, userId]
+    );
+  } catch (e: any) {
+    console.error("[chatRoute] DB update status error:", e?.message);
   }
 
   // 建立前步脈絡
@@ -628,12 +655,12 @@ async function executePositioningStep(params: {
         send(event, data);
         if (event === "delta") fullContent += (data as any).text ?? "";
       }
-      gatewayOk = true;
+      if (fullContent.length >= 50) gatewayOk = true;
     } catch {
       console.warn("[chatRoute] Gateway failed, falling back to LLM");
     }
 
-    if (!gatewayOk || fullContent.length < 50) {
+    if (!gatewayOk) {
       // 重置，用 invokeLLMStream
       fullContent = "";
       for await (const delta of streamFromLLM(systemPrompt, conversationHistory.slice(-8), userMessage)) {
@@ -646,17 +673,21 @@ async function executePositioningStep(params: {
   }
 
   // 儲存步驟結果到 DB
-  if (db && fullContent.length > 20) {
+  if (fullContent.length > 20) {
     const newResults = { ...stepResultsRaw, [String(targetStep)]: fullContent };
     const nextCurrentStep = targetStep;
     const newStatus = targetStep >= 6 ? "completed" : "waiting_confirm";
 
-    await (db as any).execute(
-      `UPDATE positioning_sessions 
-       SET currentStep=${nextCurrentStep}, status='${newStatus}', stepResults=?, updatedAt=NOW()
-       WHERE missionId=${missionId} AND userId=${userId}`,
-      [JSON.stringify(newResults)]
-    ).catch((e: any) => console.error("[chatRoute] DB update error:", e?.message));
+    try {
+      await pool.execute(
+        `UPDATE positioning_sessions 
+         SET currentStep=?, status=?, stepResults=?, updatedAt=NOW()
+         WHERE missionId=? AND userId=?`,
+        [nextCurrentStep, newStatus, JSON.stringify(newResults), missionId, userId]
+      );
+    } catch (e: any) {
+      console.error("[chatRoute] DB save step error:", e?.message);
+    }
   }
 
   // 步驟完成 relay_step event
@@ -722,39 +753,30 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   try {
     // ── 品牌定位 6 步驟（workspace=strategy，missionId 存在）──────────────────
     if (workspace === "strategy" && missionId) {
-      // 取得 brandId from mission
+      const pool = getAzurePool();
+      
+      // 取得 brandId + brandContext from mission/brand DB
       let brandId: number = 0;
-      let missionTitle = "";
-      try {
-        const db = await getDb();
-        if (db) {
-          const [mRows] = await (db as any).execute(
-            `SELECT brandId, title FROM missions WHERE id=${missionId} LIMIT 1`
-          ) as any;
-          brandId = mRows?.[0]?.brandId ?? 0;
-          missionTitle = mRows?.[0]?.title ?? "";
-        }
-      } catch { /* non-fatal */ }
-
-      // 從 brand DB 補充 brandContext（如果前端沒帶）
       const enrichedBrandCtx: Record<string, string> = { ...brandContext };
-      if (brandId && !enrichedBrandCtx.name) {
-        try {
-          const db = await getDb();
-          if (db) {
-            const [bRows] = await (db as any).execute(
-              `SELECT name, industry, description, targetMarket, websiteUrl FROM brands WHERE id=${brandId} LIMIT 1`
-            ) as any;
-            const b = bRows?.[0];
-            if (b) {
-              enrichedBrandCtx.name = b.name ?? "";
-              enrichedBrandCtx.industry = b.industry ?? "";
-              enrichedBrandCtx.description = b.description ?? "";
-              enrichedBrandCtx.targetAudience = b.targetMarket ?? "";
-              enrichedBrandCtx.website = b.websiteUrl ?? "";
-            }
-          }
-        } catch { /* non-fatal */ }
+      
+      try {
+        const [mRows] = await pool.execute(
+          `SELECT m.brandId, m.title, b.name, b.industry, b.description, b.targetMarket, b.websiteUrl
+           FROM missions m LEFT JOIN brands b ON b.id = m.brandId
+           WHERE m.id=? LIMIT 1`,
+          [missionId]
+        ) as any;
+        const m = (mRows as any[])?.[0];
+        if (m) {
+          brandId = m.brandId ?? 0;
+          enrichedBrandCtx.name = enrichedBrandCtx.name || m.name || "";
+          enrichedBrandCtx.industry = enrichedBrandCtx.industry || m.industry || "";
+          enrichedBrandCtx.description = enrichedBrandCtx.description || m.description || "";
+          enrichedBrandCtx.targetAudience = enrichedBrandCtx.targetAudience || m.targetMarket || "";
+          enrichedBrandCtx.website = enrichedBrandCtx.website || m.websiteUrl || "";
+        }
+      } catch (e: any) {
+        console.error("[chatRoute] mission/brand fetch error:", e?.message);
       }
 
       send("status", { message: "品牌定位步驟執行中..." });
@@ -787,13 +809,12 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     let missionTitle = "";
     if (missionId) {
       try {
-        const db = await getDb();
-        if (db) {
-          const [mRows] = await (db as any).execute(
-            `SELECT title FROM missions WHERE id=${missionId} LIMIT 1`
-          ) as any;
-          missionTitle = mRows?.[0]?.title ?? "";
-        }
+        const pool = getAzurePool();
+        const [mRows] = await pool.execute(
+          `SELECT title FROM missions WHERE id=? LIMIT 1`,
+          [missionId]
+        ) as any;
+        missionTitle = (mRows as any[])?.[0]?.title ?? "";
       } catch { /* non-fatal */ }
     }
 
