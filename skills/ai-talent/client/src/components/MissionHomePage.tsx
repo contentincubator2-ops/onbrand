@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { trpc } from '@/lib/trpc';
+import { trpc } from '../lib/trpc';
 import { BriefcaseIcon, Search, SparklesIcon } from 'lucide-react';
 
 interface MissionHomePageProps {

@@ -1289,7 +1289,7 @@ export default function ChatCore({
         {(!active || active.messages.length === 0) && !loading && !teamAssembly && (
               
               <MissionHomePage
-                workspace={missionData?.workspace ?? "strategy"}
+                workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
                 brandName={activeBrandName ?? undefined}
                 onTaskSelect={(task) => {
                   setInput(task);
