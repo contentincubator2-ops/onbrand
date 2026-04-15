@@ -839,7 +839,7 @@ export default function ChatCore({
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userMessage: text, conversationHistory: conversationHistory.slice(-12), brandContext: brandCtx }),
+        body: JSON.stringify({ userMessage: text, conversationHistory: conversationHistory.slice(-12), brandContext: brandCtx, missionId: activeMissionId ?? currentMissionId ?? undefined, workspace: (missionDataQuery.data as any)?.workspace ?? undefined }),
       });
       if (!resp.ok || !resp.body) throw new Error(`chat HTTP ${resp.status}`);
       const reader = resp.body.getReader();

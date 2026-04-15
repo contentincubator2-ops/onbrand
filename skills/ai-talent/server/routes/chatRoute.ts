@@ -23,6 +23,7 @@ import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 import { invokeLLMStream } from "../_core/llm";
+import { loadAgentContext } from "../agentContextLoader";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
 const PptxGenJS = _require("pptxgenjs");
@@ -368,7 +369,7 @@ function buildPmContext(
   squads: any[],
   agents: any[],
   brandCtx: Record<string, string>,
-  missionCtx?: { title?: string; workspace?: string }
+  missionCtx?: { title?: string; workspace?: string; agentCtxPrefix?: string; agentDepthLabel?: string }
 ): string {
   const brandStr = Object.entries(brandCtx).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join("\n");
   const squadList = squads.map((s, i) =>
@@ -378,6 +379,8 @@ function buildPmContext(
     `${i + 1}. [Agent] ${a.name}｜${a.title} (${a.slug}) — 相關度 ${(a.similarity * 100).toFixed(0)}%\n   ${a.specialty?.slice(0, 60) ?? ""}`
   ).join("\n");
 
+  const ctxSection = missionCtx?.agentCtxPrefix ? ("\n\n【任務 & 品牌記憶】\n" + missionCtx.agentCtxPrefix.slice(0, 1500)) : "";
+  const depthNote = missionCtx?.agentDepthLabel ?? "";
   const wsLabel: Record<string, string> = {
     strategy: "品牌策略定位",
     website: "官網 SEO 優化",
@@ -390,7 +393,7 @@ function buildPmContext(
 工作區：${wsDesc}
 任務名稱：${missionTitle}
 品牌資料：
-${brandStr || "未提供"}
+${brandStr || "未提供"}${ctxSection}
 
 【用戶訊息】
 ${userMessage}
@@ -405,7 +408,7 @@ ${agentList || "無"}
 你是 SoWork 行銷 AI PM，精通品牌策略、內容行銷、數位廣告。
 以繁體中文回覆。根據用戶的具體需求，自行拆解任務步驟，選擇最合適的 Squad Lead 或 Agent 執行。
 品牌資料已提供，不要讓 Agent 重複詢問用戶已知資訊。
-直接分析並行動，不要問無謂的確認問題。`;
+直接分析並行動，不要問無謂的確認問題。${depthNote ? ("\n" + depthNote) : ""}`;
 }
 
 // ── Gateway streaming proxy ───────────────────────────────────────────────────
@@ -810,7 +813,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
           `SELECT m.brandId, m.title, b.name, b.industry, b.description, b.targetMarket, b.website
            FROM missions m LEFT JOIN brands b ON b.id = m.brandId
            WHERE m.id=? LIMIT 1`,
-          [missionId]
+          [resolvedMissionId ?? 0]
         ) as any;
         const m = (mRows as any[])?.[0];
         if (m) {
@@ -843,6 +846,32 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
     // ── 一般任務（非 strategy workspace）──────────────────────────────────────
     send("status", { message: "分析任務中..." });
+
+    // 一般路徑也從 DB 補充 brand context（避免 PM 問已知資訊）
+    let brandId: number = 0;
+    const enrichedBrandCtx: Record<string, string> = { ...brandContext };
+    if (missionId) {
+      try {
+        const [mBrandRows] = await localPool.execute(
+          `SELECT m.brandId, b.name, b.industry, b.description, b.targetMarket, b.website
+           FROM missions m LEFT JOIN brands b ON b.id = m.brandId
+           WHERE m.id = ? LIMIT 1`,
+          [missionId]
+        ) as any[];
+        const mb = (mBrandRows as any[])?.[0];
+        if (mb) {
+          brandId = mb.brandId ?? 0;
+          if (!enrichedBrandCtx.name && mb.name) enrichedBrandCtx.name = mb.name;
+          if (!enrichedBrandCtx.industry && mb.industry) enrichedBrandCtx.industry = mb.industry;
+          if (!enrichedBrandCtx.description && mb.description) enrichedBrandCtx.description = mb.description;
+          if (!enrichedBrandCtx.targetAudience && mb.targetMarket) enrichedBrandCtx.targetAudience = mb.targetMarket;
+          if (!enrichedBrandCtx.website && mb.website) enrichedBrandCtx.website = mb.website;
+        }
+      } catch (e: any) {
+        console.warn('[chatRoute] general path brand fetch:', e?.message);
+      }
+    }
+
     const queryEmb = await getEmbedding(userMessage);
     let squads: any[] = [];
     let agents: any[] = [];
@@ -863,9 +892,29 @@ chatRouter.post("/", async (req: Request, res: Response) => {
       } catch { /* non-fatal */ }
     }
 
-    const pmContext = buildPmContext(userMessage, squads, agents, brandContext, {
+    // Context Loader: 一般 agent 讀最近20筆
+    let agentCtxPrefix = "";
+    let agentDepthLabel = "";
+    if (brandId && missionId) {
+      try {
+        const agentCtx = await loadAgentContext({
+          missionId,
+          brandId,
+          userId,
+          isSquadLead: false,
+        });
+        agentCtxPrefix = agentCtx.systemPromptPrefix;
+        agentDepthLabel = agentCtx.depthLabel;
+      } catch (e: any) {
+        console.warn('[chatRoute] agentCtx error:', (e as any)?.message);
+      }
+    }
+
+    const pmContext = buildPmContext(userMessage, squads, agents, enrichedBrandCtx, {
       title: missionTitle,
       workspace: workspace ?? undefined,
+      agentCtxPrefix,
+      agentDepthLabel,
     });
     const messages = [
       { role: "system", content: pmContext },

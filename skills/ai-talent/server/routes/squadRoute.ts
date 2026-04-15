@@ -6,25 +6,9 @@
 import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
-import mysql from "mysql2/promise";
+import localPool from "../localDb";
 
 export const squadRouter = Router();
-
-// ── Azure MySQL Pool ──────────────────────────────────────────────────────────
-let _pool: mysql.Pool | null = null;
-function getPool(): mysql.Pool {
-  if (!_pool) {
-    _pool = mysql.createPool({
-      host: process.env.DB_HOST!,
-      user: process.env.DB_USER!,
-      password: process.env.DB_PASSWORD!,
-      database: process.env.DB_NAME!,
-      ssl: { rejectUnauthorized: false },
-      connectionLimit: 5,
-    });
-  }
-  return _pool;
-}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 async function verifyToken(req: Request): Promise<number | null> {
@@ -98,10 +82,8 @@ squadRouter.get("/:missionId/squad", async (req: Request, res: Response) => {
   if (!missionId) { res.status(400).json({ error: "Invalid missionId" }); return; }
 
   try {
-    const pool = getPool();
-
     // 查詢任務資訊
-    const [missionRows] = await pool.execute(
+    const [missionRows] = await localPool.execute(
       `SELECT m.id, m.workspace, m.title, m.status,
               ps.currentStep, ps.status as posStatus, ps.stepResults
        FROM missions m
