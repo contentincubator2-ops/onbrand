@@ -1080,82 +1080,60 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
 
 // ─── MembersTab ───────────────────────────────────────────────────────────────
 
-function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId?: number | null }) {
-  const [assembling, setAssembling] = React.useState(false);
-  const [squadUid, setSquadUid] = React.useState<string | null>(null);
-  const [squadTitle, setSquadTitle] = React.useState<string>("");
-  const [squadStatus, setSquadStatus] = React.useState<string | null>(null);
-  const [openingMsg, setOpeningMsg] = React.useState<string | null>(null);
-  const [openingAgent, setOpeningAgent] = React.useState<string>("");
-
-  // 輪詢 squad status
-  const statusQuery = (trpc as any).squad?.getStatus?.useQuery
-    ? (trpc as any).squad.getStatus.useQuery(
+function MembersTab({ missionId }: { missionId?: number | null }) {
+  // Load relay steps from positioning steps
+  const stepsQuery = (trpc as any).positioning?.getSteps?.useQuery
+    ? (trpc as any).positioning.getSteps.useQuery(
         { missionId: missionId! },
-        { enabled: !!missionId && !squadUid, refetchInterval: 2000, refetchOnWindowFocus: false }
+        { enabled: !!missionId, refetchInterval: 5000, refetchOnWindowFocus: false }
       )
     : { data: null };
 
-  // 取得 squad agents（有 squadUid 才查）
-  const agentsQuery = (trpc as any).squad?.getAgents?.useQuery
-    ? (trpc as any).squad.getAgents.useQuery(
-        { squadUid: squadUid ?? "" },
-        { enabled: !!squadUid, refetchOnWindowFocus: false }
-      )
-    : { data: null };
+  const steps = (stepsQuery.data ?? []) as any[];
 
-  const assembbleMutation = (trpc as any).squad?.assemble?.useMutation
-    ? (trpc as any).squad.assemble.useMutation({
-        onSuccess: (data: any) => {
-          setSquadUid(data.squadUid);
-          setSquadTitle(data.title);
-          setSquadStatus("ready");
-          setAssembling(false);
-        },
-        onError: () => setAssembling(false),
-      })
-    : null;
+  // Build members from steps
+  const memberMap = new Map<string, {
+    name: string; title: string; model: string;
+    skills: string[]; status: string; stepLabel: string; stepState: string;
+  }>();
 
-  const squadLeadOpenMutation = (trpc as any).squad?.squadLeadOpen?.useMutation
-    ? (trpc as any).squad.squadLeadOpen.useMutation({
-        onSuccess: (data: any) => {
-          setOpeningMsg(data.message);
-          setOpeningAgent(data.agentName ?? "劉品妤");
-          setSquadStatus("running");
-        },
-      })
-    : null;
-
-  // 同步外部已存在的 squad（頁面刷新後）
-  React.useEffect(() => {
-    const sq = statusQuery.data;
-    if (sq && sq.squadUid && !squadUid) {
-      setSquadUid(sq.squadUid);
-      setSquadTitle(sq.title ?? "");
-      setSquadStatus(sq.status);
+  steps.forEach((s: any) => {
+    const agentKey = s.agent ?? s.agentName ?? "未知";
+    if (!memberMap.has(agentKey)) {
+      memberMap.set(agentKey, {
+        name: agentKey,
+        title: s.agentTitle ?? s.title ?? "",
+        model: "Claude Sonnet",
+        skills: [],
+        status: s.state ?? "wait",
+        stepLabel: s.title ?? s.label ?? "",
+        stepState: s.state ?? "wait",
+      });
+    } else {
+      const m = memberMap.get(agentKey)!;
+      // Update status to most recent step
+      if (s.state === "running" || (s.state === "done" && m.stepState !== "running")) {
+        m.status = s.state;
+        m.stepLabel = s.title ?? s.label ?? "";
+        m.stepState = s.state;
+      }
     }
-  }, [statusQuery.data]);
+  });
 
-  // squad ready 後自動觸發 squadLeadOpen
-  React.useEffect(() => {
-    if (squadStatus === "ready" && squadUid && !openingMsg && squadLeadOpenMutation) {
-      squadLeadOpenMutation.mutate({ squadUid, missionId: missionId! });
-    }
-  }, [squadStatus, squadUid]);
+  const members = Array.from(memberMap.values());
 
-  const handleAssemble = () => {
-    if (!missionId || !brandId || !assembbleMutation) return;
-    setAssembling(true);
-    assembbleMutation.mutate({
-      missionId, brandId, workspace: "strategy", squadType: "brand_positioning",
-    });
+  const statusIcon = (state: string) => {
+    if (state === "done") return "✅";
+    if (state === "running") return "⏳";
+    return "⏸️";
   };
 
-  const agents = (agentsQuery.data ?? []) as any[];
+  const statusLabel = (state: string, label: string) => {
+    if (state === "done") return ;
+    if (state === "running") return ;
+    return "等待中";
+  };
 
-  const statusIcon = (s: string) => s === "done" ? "✅" : s === "running" ? "⏳" : "⏸️";
-
-  // ── 未選任務 ───────────────────────────────────────────────────────────────
   if (!missionId) {
     return (
       <div style={{ padding: "30px 0", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11 }}>
@@ -1164,172 +1142,59 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
     );
   }
 
-  // ── 尚未組隊 ───────────────────────────────────────────────────────────────
-  if (!squadUid && !assembling) {
-    return (
-      <div style={{ padding: "20px 8px" }}>
-        <div style={{ textAlign: "center" as const, marginBottom: 16 }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>👥</div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>召集你的行銷小組</div>
-          <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
-            PM 已為這個任務推薦了<br />最適合的 Agent 組合
-          </div>
-        </div>
-        {/* 預覽成員陣容 */}
-        <div style={{ marginBottom: 14, display: "flex", flexDirection: "column" as const, gap: 5 }}>
-          {[
-            { name: "劉品妤", role: "Squad Lead · AI 品牌故事 CMO", lead: true },
-            { name: "Mark Liu", role: "市場研究師" },
-            { name: "Amy Chen", role: "消費者洞察師" },
-            { name: "Sarah Chen", role: "品牌策略師" },
-            { name: "David Wang", role: "策略定位師" },
-            { name: "Jessica Wu", role: "品牌文案師" },
-            { name: "Tom Lin", role: "行銷通路師" },
-          ].map((m, i) => (
-            <div key={i} style={{
-              display: "flex", alignItems: "center", gap: 8,
-              background: m.lead ? "#F0FDF8" : "white",
-              border: `1px solid ${m.lead ? "#1DBEAA" : "#ECEAE8"}`,
-              borderRadius: 8, padding: "7px 9px",
-            }}>
-              <div style={{
-                width: 24, height: 24, borderRadius: "50%",
-                background: m.lead ? "#1DBEAA" : "#1A1A18", color: "white",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 700, flexShrink: 0,
-              }}>{m.name.charAt(0)}</div>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{m.name}</div>
-                <div style={{ fontSize: 10, color: "#9B9990" }}>{m.role}</div>
-              </div>
-              {m.lead && <div style={{ marginLeft: "auto", fontSize: 9, background: "#1DBEAA", color: "white", padding: "2px 5px", borderRadius: 4 }}>Lead</div>}
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={handleAssemble}
-          style={{
-            width: "100%", padding: "10px 0", borderRadius: 8,
-            background: "#1A1A18", color: "white",
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-            border: "none", fontFamily: "inherit",
-          }}
-        >
-          ✅ 確認組隊，開始召集
-        </button>
-      </div>
-    );
-  }
-
-  // ── 召集中 ─────────────────────────────────────────────────────────────────
-  if (assembling || (squadUid && squadStatus === "assembling")) {
-    return (
-      <div style={{ padding: "30px 8px", textAlign: "center" as const }}>
-        <div style={{ fontSize: 28, marginBottom: 10 }}>⏳</div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>成員召集中...</div>
-        <div style={{ fontSize: 11, color: "#9B9990" }}>正在為這個品牌建立專屬小組</div>
-      </div>
-    );
-  }
-
-  // ── Squad Lead 開場（ready → running）─────────────────────────────────────
-  if (squadUid && (squadStatus === "ready" || squadStatus === "running") && !openingMsg) {
-    return (
-      <div style={{ padding: "20px 8px", textAlign: "center" as const }}>
-        <div style={{ fontSize: 24, marginBottom: 8 }}>🎯</div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>小組就緒！</div>
-        <div style={{ fontSize: 11, color: "#9B9990" }}>Squad Lead 正在分析品牌...</div>
-        <div style={{ marginTop: 12, fontSize: 10, color: "#C8C7C3" }}>⏳</div>
-      </div>
-    );
-  }
-
-  // ── Squad Lead 開場訊息 ────────────────────────────────────────────────────
   return (
     <div>
-      {/* Squad 標題 */}
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 10, fontWeight: 600, color: "#C8C7C3", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>
-          👥 {squadTitle || "品牌定位小組"}
-        </div>
-      </div>
+      <div style={{
+        fontSize: 10, fontWeight: 600, color: "#C8C7C3",
+        textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 10,
+      }}>👥 本任務團隊</div>
 
-      {/* Squad Lead 開場 */}
-      {openingMsg && (
+      {members.length === 0 ? (
         <div style={{
-          background: "#F0FDF8", border: "1px solid #1DBEAA",
-          borderRadius: 9, padding: "10px 11px", marginBottom: 12,
+          padding: "24px 12px", textAlign: "center" as const,
+          background: "#FAFAF9", border: "1px solid #E4E3E1",
+          borderRadius: 8, fontSize: 11, color: "#A8A29E",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
-            <div style={{
-              width: 22, height: 22, borderRadius: "50%",
-              background: "#1DBEAA", color: "white",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 10, fontWeight: 700,
-            }}>劉</div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{openingAgent || "劉品妤"}</div>
-              <div style={{ fontSize: 9, color: "#9B9990" }}>Squad Lead · AI 品牌故事 CMO</div>
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: "#1A1A18", lineHeight: 1.6, whiteSpace: "pre-wrap" as const }}>
-            {openingMsg}
-          </div>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>👥</div>
+          <div>開始任務後</div>
+          <div>成員將在此顯示</div>
         </div>
-      )}
-
-      {/* 成員清單 */}
-      <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
-        {agents.length > 0 ? agents.map((m: any, i: number) => (
-          <div key={i} style={{
-            background: "white", border: "1px solid #ECEAE8",
-            borderRadius: 8, padding: "8px 10px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{
-                width: 26, height: 26, borderRadius: "50%",
-                background: "#1A1A18", color: "white",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 700, flexShrink: 0,
-              }}>{(m.agentName ?? "A").charAt(0)}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{m.agentName}</div>
-                <div style={{ fontSize: 10, color: "#9B9990" }}>{m.agentRole} · {m.model}</div>
-              </div>
-              <div style={{ fontSize: 13 }}>{statusIcon(m.status)}</div>
-            </div>
-          </div>
-        )) : (
-          // Fallback：用靜態清單顯示
-          [
-            { name: "Mark Liu", role: "市場研究師" },
-            { name: "Amy Chen", role: "消費者洞察師" },
-            { name: "Sarah Chen", role: "品牌策略師" },
-            { name: "David Wang", role: "策略定位師" },
-            { name: "Jessica Wu", role: "品牌文案師" },
-            { name: "Tom Lin", role: "行銷通路師" },
-            { name: "PM Agent", role: "行銷計劃師" },
-          ].map((m, i) => (
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {members.map((m, i) => (
             <div key={i} style={{
               background: "white", border: "1px solid #ECEAE8",
-              borderRadius: 8, padding: "8px 10px",
+              borderRadius: 9, padding: "9px 10px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                 <div style={{
-                  width: 26, height: 26, borderRadius: "50%",
+                  width: 28, height: 28, borderRadius: "50%",
                   background: "#1A1A18", color: "white",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 10, fontWeight: 700,
-                }}>{m.name.charAt(0)}</div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{m.name}</div>
-                  <div style={{ fontSize: 10, color: "#9B9990" }}>{m.role}</div>
+                  fontSize: 11, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {m.name.charAt(0)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18" }}>{m.name}</div>
+                  <div style={{ fontSize: 10, color: "#9B9990", marginTop: 1 }}>
+                    {m.title}{m.title && m.model ? " · " : ""}{m.model}
+                  </div>
+                  <div style={{
+                    marginTop: 5, fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4,
+                  }}>
+                    <span>{statusIcon(m.stepState)}</span>
+                    <span style={{ color: m.stepState === "done" ? "#3D9A3D" : m.stepState === "running" ? "#E8631A" : "#9B9990" }}>
+                      {statusLabel(m.stepState, m.stepLabel)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1396,7 +1261,7 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
         )}
 
         {activeTab === "members" && (
-          <MembersTab missionId={missionId} brandId={brandId} />
+          <MembersTab missionId={missionId} />
         )}
       </div>
     </div>

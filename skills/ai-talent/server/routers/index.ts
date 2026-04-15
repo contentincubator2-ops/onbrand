@@ -20,6 +20,7 @@ import { resourceRouter } from "./resourceRouter";
 import { reviewRouter } from "./reviewRouter";
 import { messageRouter } from "./messageRouter";
 import { positioningRouter } from "./positioningRouter";
+import { squadRouter } from "./squadRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -43,6 +44,7 @@ export const appRouter = router({
   message:       messageRouter,
   positioning:   positioningRouter,
   resource:      resourceRouter,
+  squad:         squadRouter,
 });
 
 export type AppRouter = typeof appRouter;
