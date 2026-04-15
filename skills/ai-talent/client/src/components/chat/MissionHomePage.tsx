@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { trpc } from "../../lib/trpc";
+import { TASK_SQUADS, type SquadOption } from "../../data/taskSquads";
 
 interface ResourceSummary {
     agents: number;
@@ -20,6 +21,7 @@ interface MissionHomePageProps {
     resourceSummary?: ResourceSummary;
     missionId?: number | null;
     onTaskSelect?: (task: string) => void;
+    onSquadSelect?: (taskLabel: string, squad: SquadOption, allSquads: SquadOption[]) => void;
 }
 
 const WORKSPACE_LABELS: Record<string, string> = {
@@ -70,8 +72,10 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
     resourceSummary,
     missionId,
     onTaskSelect,
+    onSquadSelect,
 }) => {
     const [inputValue, setInputValue] = useState("");
+    const [selectedTask, setSelectedTask] = useState<string | null>(null);
 
     // Per-mission semantic resource (kept for drawer sync, not displayed here)
     const missionResourceQuery = trpc.resource.summaryByMission.useQuery(
@@ -109,6 +113,91 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
             handleSubmit();
         }
     };
+
+    if (selectedTask !== null) {
+        const squads = TASK_SQUADS[selectedTask] ?? [];
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    height: "100%",
+                    overflowY: "auto",
+                    padding: "40px 20px 120px",
+                    background: "linear-gradient(180deg, #F8F9FC 0%, #FFFFFF 100%)",
+                }}
+            >
+                <div style={{ width: "100%", maxWidth: 640 }}>
+                    <button
+                        onClick={() => setSelectedTask(null)}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            color: "#6B6A66",
+                            padding: "0 0 20px 0",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontFamily: "inherit",
+                        }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1A1A18"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#6B6A66"; }}
+                    >
+                        ← 返回
+                    </button>
+                    <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1A1A18", marginBottom: 4 }}>
+                        {selectedTask}
+                    </h2>
+                    <p style={{ fontSize: 13, color: "#9B9990", marginBottom: 20 }}>選擇執行方式</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        {squads.map((squad) => (
+                            <button
+                                key={squad.squadSlug}
+                                onClick={() => {
+                                    const allSquads = TASK_SQUADS[selectedTask] ?? [];
+                                    onSquadSelect?.(selectedTask, squad, allSquads);
+                                    setSelectedTask(null);
+                                }}
+                                style={{
+                                    background: "#FFFFFF",
+                                    border: "1px solid #E8EAF0",
+                                    borderRadius: 12,
+                                    padding: "12px 14px",
+                                    textAlign: "left",
+                                    cursor: "pointer",
+                                    transition: "border-color 0.15s",
+                                    fontFamily: "inherit",
+                                }}
+                                onMouseEnter={(e) => {
+                                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#C0C0BA";
+                                }}
+                                onMouseLeave={(e) => {
+                                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#E8EAF0";
+                                }}
+                            >
+                                <div style={{ fontWeight: 600, fontSize: 13, color: "#1A1A18", marginBottom: 2 }}>
+                                    {squad.name}
+                                </div>
+                                <div style={{ fontSize: 11, color: "#9B9990", marginBottom: 6 }}>
+                                    {squad.leadTitle}
+                                </div>
+                                <div style={{ fontSize: 12, color: "#6B6A66", marginBottom: 8, lineHeight: 1.5 }}>
+                                    {squad.tagline}
+                                </div>
+                                <div style={{ fontSize: 10, color: "#C0C0BA", lineHeight: 1.4 }}>
+                                    {squad.steps.map((s) => s.phase).join(" → ")}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -237,9 +326,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                     {tasks.map((task) => (
                         <button
                             key={task.label}
-                            onClick={() => {
-                                if (onTaskSelect) onTaskSelect(task.label);
-                            }}
+                            onClick={() => setSelectedTask(task.label)}
                             style={{
                                 background: "#FFFFFF",
                                 border: "1px solid #E8EAF0",

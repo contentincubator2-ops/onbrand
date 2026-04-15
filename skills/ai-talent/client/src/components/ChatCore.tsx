@@ -125,6 +125,7 @@ export interface ChatCoreProps {
   preselectedAgent?: { id: number; name: string; title?: string; type: "agent" | "squad" } | null;
   onClearAgent?: () => void;
   onMissionCreated?: (id: number) => void;
+  onSquadSelect?: (taskLabel: string, squad: import('../data/taskSquads').SquadOption, allSquads: import('../data/taskSquads').SquadOption[]) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -435,6 +436,7 @@ export default function ChatCore({
   preselectedAgent,
   onClearAgent,
   onMissionCreated,
+  onSquadSelect,
 }: ChatCoreProps = {}) {
 
   // ── Conversations state ──────────────────────────────────────────────────
@@ -488,6 +490,7 @@ export default function ChatCore({
   const workflowStart = trpc.workflow.start.useMutation();
   const saveMessage = trpc.conversation.saveMessage.useMutation();
   const createMission = trpc.mission.create.useMutation();
+  const updateMission = trpc.mission.update.useMutation();
   const confirmOutput = trpc.output.confirm.useMutation();
   const saveMissionMsg = trpc.message.save.useMutation();
   const savedMessagesQuery = trpc.message.list.useQuery(
@@ -1188,6 +1191,17 @@ export default function ChatCore({
                 onTaskSelect={(task) => {
                   setInput(task);
                   setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
+                }}
+                onSquadSelect={(taskLabel, squad, allSquads) => {
+                  // 1. Persist squad slug to mission
+                  if (activeMissionId) {
+                    updateMission.mutate({ id: activeMissionId, squadSlug: squad.squadSlug } as any);
+                  }
+                  // 2. Notify parent (AppShell/App) to update right panel
+                  onSquadSelect?.(taskLabel, squad, allSquads);
+                  // 3. Pre-fill input and auto-send
+                  setInput(taskLabel);
+                  setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 80);
                 }}
               />
         )}

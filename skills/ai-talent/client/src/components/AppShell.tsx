@@ -3,9 +3,10 @@
  * Rail(48px) + Drawer(210px) + Main(flex:1) + RightPanel(264px)
  * All styles are inline, mirroring marketing-os-mockup-v7.html
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import { MissionModal } from "./MissionModal";
+import type { SquadOption } from '../data/taskSquads';
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -1444,8 +1445,20 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
   );
 }
 
-function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId?: number | null }) {
+function RightPanel({
+  missionId, brandId, activeSquad, taskSquads,
+}: {
+  missionId?: number | null;
+  brandId?: number | null;
+  activeSquad?: SquadOption | null;
+  taskSquads?: SquadOption[];
+}) {
   const [activeTab, setActiveTab] = useState<"sop" | "brandbrain" | "members">("sop");
+
+  // Auto-switch to 流程 tab whenever a new squad is selected
+  useEffect(() => {
+    if (activeSquad) setActiveTab("sop");
+  }, [activeSquad]);
 
   const panelStyle: React.CSSProperties = {
     width: 264, minWidth: 264,
@@ -1456,10 +1469,12 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
   };
 
   const tabs = [
-    { id: "sop"        as const, label: "📋 流程" },
-    { id: "brandbrain" as const, label: "🧠 品牌大腦" },
-    { id: "members"    as const, label: "👥 成員" },
+    { id: "sop"        as const, label: "流程" },
+    { id: "brandbrain" as const, label: "品牌大腦" },
+    { id: "members"    as const, label: "成員" },
   ];
+
+  const otherSquads = (taskSquads ?? []).filter(s => s.squadSlug !== activeSquad?.squadSlug);
 
   return (
     <div style={panelStyle}>
@@ -1479,11 +1494,8 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
               fontSize: 11, fontWeight: 500,
               color: activeTab === tab.id ? "#1A1A18" : "#9B9990",
               cursor: "pointer",
-              borderBottom: `2px solid ${activeTab === tab.id ? "#1A1A18" : "transparent"}`,
               background: "transparent", border: "none",
-              borderBottomStyle: "solid",
-              borderBottomWidth: 2,
-              borderBottomColor: activeTab === tab.id ? "#1A1A18" : "transparent",
+              borderBottom: `2px solid ${activeTab === tab.id ? "#1A1A18" : "transparent"}`,
               fontFamily: "inherit",
               transition: "all 0.12s",
             }}
@@ -1496,9 +1508,9 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
       {/* Body */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
         {activeTab === "sop" && (
-          <div style={{ marginBottom: 15 }}>
-            <PositioningProgress missionId={missionId} brandId={brandId} />
-          </div>
+          activeSquad
+            ? <SquadMethodologyPanel squad={activeSquad} />
+            : <div style={{ marginBottom: 15 }}><PositioningProgress missionId={missionId} brandId={brandId} /></div>
         )}
 
         {activeTab === "brandbrain" && (
@@ -1506,8 +1518,91 @@ function RightPanel({ missionId, brandId }: { missionId?: number | null; brandId
         )}
 
         {activeTab === "members" && (
-          <MembersTab missionId={missionId} brandId={brandId} />
+          activeSquad && otherSquads.length > 0
+            ? <SquadMembersList squads={otherSquads} />
+            : <MembersTab missionId={missionId} brandId={brandId} />
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── SquadMethodologyPanel ─────────────────────────────────────────────────────
+
+function SquadMethodologyPanel({ squad }: { squad: SquadOption }) {
+  return (
+    <div>
+      {/* Squad header */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
+          {squad.name}
+        </div>
+        <div style={{ fontSize: 11, color: "#9B9990", marginBottom: 6 }}>
+          {squad.leadTitle}
+        </div>
+        <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5 }}>
+          {squad.tagline}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: "#E7E5E4", marginBottom: 14 }} />
+
+      {/* Methodology steps */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {squad.steps.map((step, i) => (
+          <div key={step.phase} style={{ display: "flex", gap: 10 }}>
+            {/* Step number */}
+            <div style={{
+              width: 20, height: 20, borderRadius: "50%",
+              background: "#1A1A18", color: "#FFFFFF",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
+            }}>
+              {i + 1}
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
+                {step.phase}
+              </div>
+              <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
+                {step.description}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── SquadMembersList ──────────────────────────────────────────────────────────
+
+function SquadMembersList({ squads }: { squads: SquadOption[] }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "#9B9990", marginBottom: 10, fontWeight: 500, letterSpacing: 0.3, textTransform: "uppercase" as const }}>
+        協作成員
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {squads.map((squad) => (
+          <div
+            key={squad.squadSlug}
+            style={{
+              padding: "9px 10px",
+              background: "#FFFFFF",
+              border: "1px solid #E7E5E4",
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 500, color: "#1A1A18", marginBottom: 1 }}>
+              {squad.name}
+            </div>
+            <div style={{ fontSize: 11, color: "#9B9990" }}>
+              {squad.leadTitle}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1614,6 +1709,8 @@ interface AppShellProps {
   onMissionSelect?: (missionId: number) => void;
   onNewTask?: (wsKey: string) => void;
   activeMissionId?: number | null;
+  activeSquad?: SquadOption | null;
+  taskSquads?: SquadOption[];
 }
 
 
@@ -1758,7 +1855,7 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
   );
 }
 
-export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId }: AppShellProps) {
+export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId, activeSquad, taskSquads }: AppShellProps) {
   const [railTab, setRailTab] = useState("chat");
   const [newMissionOpen, setNewMissionOpen] = useState(false);
   const [newMissionWsKey, setNewMissionWsKey] = useState("strategy");
@@ -1924,7 +2021,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         </div>
       </main>
 
-      <RightPanel missionId={activeMissionId} brandId={selectedBrandId} />
+      <RightPanel missionId={activeMissionId} brandId={selectedBrandId} activeSquad={activeSquad ?? null} taskSquads={taskSquads ?? []} />
 
       {/* New Workspace inline modal */}
       {newWsOpen && (
