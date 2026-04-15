@@ -442,11 +442,13 @@ function RecentMissions({
   brandId,
   activeMissionId,
   onMissionSelect,
+  onNewImpromptu,
   workspaces,
 }: {
   brandId: number | null;
   activeMissionId?: number | null;
   onMissionSelect?: (missionId: number) => void;
+  onNewImpromptu?: () => void;
   workspaces: any[];
 }) {
   const queryResult = (trpc as any).mission?.listUncategorized?.useQuery
@@ -476,22 +478,32 @@ function RecentMissions({
 
   return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: '#B0AFA9', textTransform: 'uppercase' as const, letterSpacing: '0.07em', padding: '8px 13px 3px' }}>
-        歷史任務
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#B0AFA9', textTransform: 'uppercase' as const, letterSpacing: '0.07em', padding: '8px 13px 3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8 }}>
+        <span>即興任務</span>
+        <button
+          onClick={onNewImpromptu}
+          title="新增即興任務"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B9990', display: 'flex', alignItems: 'center', padding: '1px 3px', borderRadius: 4 }}
+        >
+          <IconCompose />
+        </button>
       </div>
       {missionList.length === 0 && (
-        <div style={{ padding: '6px 13px 8px', fontSize: 10, color: '#C8C7C3', lineHeight: 1.5 }}>
-          還沒有未分類任務
-          <br />
-          <span style={{ color: '#B0AFA9' }}>在任何工作區外開始對話，即自動建立</span>
+        <div style={{ padding: '4px 13px 8px', fontSize: 10, color: '#C8C7C3', lineHeight: 1.5 }}>
+          點擊 <IconCompose /> 開始即興對話
         </div>
       )}
       {missionList.map((m: any) => (
         <div
           key={m.id}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData('missionId', String(m.id));
+            e.dataTransfer.effectAllowed = 'move';
+          }}
           onMouseEnter={() => setHoveredId(m.id)}
           onMouseLeave={() => setHoveredId(null)}
-          style={{ position: 'relative', margin: '1px 5px' }}
+          style={{ position: 'relative', margin: '1px 5px', cursor: 'grab' }}
         >
           {editingId === m.id ? (
             <input
@@ -636,6 +648,33 @@ function Drawer({
     setActiveWsKey(key);
   };
 
+  // 即興任務：直接建立，不開 modal
+  const utils = trpc.useUtils();
+  const createImpromptu = trpc.mission.create.useMutation({
+    onSuccess: (data) => {
+      utils.mission.listUncategorized.invalidate();
+      onMissionSelect?.(data.id);
+    },
+  });
+  const handleNewImpromptu = () => {
+    createImpromptu.mutate({
+      workspace: "",
+      brandId: selectedBrandId ?? undefined,
+      title: "新對話",
+    });
+  };
+
+  // 拖曳移動：即興任務 → 工作區
+  const [dragOverWs, setDragOverWs] = useState<string | null>(null);
+  const moveMission = (trpc as any).mission?.move?.useMutation
+    ? (trpc as any).mission.move.useMutation({
+        onSuccess: () => {
+          utils.mission.listUncategorized.invalidate();
+          utils.mission.list.invalidate();
+        },
+      })
+    : { mutate: () => {} };
+
   return (
     <div style={drawerStyle}>
       {/* Brand Switcher Header */}
@@ -741,6 +780,17 @@ function Drawer({
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto" }}>
+        {/* 即興任務 section — above workspaces */}
+        <RecentMissions
+          brandId={selectedBrandId}
+          activeMissionId={activeMissionId}
+          onMissionSelect={onMissionSelect}
+          onNewImpromptu={handleNewImpromptu}
+          workspaces={wsList}
+        />
+
+        <div style={{ margin: "4px 10px", borderTop: "1px solid #E4E3E1" }} />
+
         {/* Workspaces header row */}
         <div style={{ ...secLabel, display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 8 }}>
           <span>工作區</span>
@@ -759,13 +809,25 @@ function Drawer({
 
         {wsList.map((ws: any) => {
           const isExpanded = expandedWs[ws.wsKey] !== false; // default expanded
+          const isDragTarget = dragOverWs === ws.wsKey;
           return (
-            <div key={ws.wsKey}>
+            <div key={ws.wsKey}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverWs(ws.wsKey); }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverWs(null); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const missionId = Number(e.dataTransfer.getData('missionId'));
+                if (missionId) moveMission.mutate({ id: missionId, workspace: ws.wsKey });
+                setDragOverWs(null);
+              }}
+            >
               <div
                 style={{
                   padding: "4px 9px", borderRadius: 6, margin: "1px 5px",
                   cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                  background: "transparent",
+                  background: isDragTarget ? "#EAF4EA" : "transparent",
+                  border: isDragTarget ? "1px dashed #5A9E5A" : "1px solid transparent",
+                  transition: "background 0.1s, border 0.1s",
                 }}
               >
                 <div style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: "#5A9E5A" }} />
@@ -802,8 +864,8 @@ function Drawer({
           </div>
         )}
 
-        {/* 新任務 button */}
-        <div style={{ padding: "4px 8px 6px" }}>
+        {/* 新任務 button — left-aligned with mission items (WorkspaceMissions margin 17px + paddingLeft 10px = 27px) */}
+        <div style={{ padding: "4px 8px 6px 27px" }}>
           <button
             onClick={onNewMission}
             style={{
@@ -817,13 +879,6 @@ function Drawer({
             新任務
           </button>
         </div>
-
-        <RecentMissions
-          brandId={selectedBrandId}
-          activeMissionId={activeMissionId}
-          onMissionSelect={onMissionSelect}
-          workspaces={wsList}
-        />
 
         {/* 可用資源 section */}
         <div style={{ ...secLabel, marginTop: 6 }}>可用資源</div>
