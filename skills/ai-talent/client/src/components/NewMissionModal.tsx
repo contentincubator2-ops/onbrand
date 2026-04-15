@@ -1,26 +1,21 @@
 /**
  * NewMissionModal.tsx
  *
- * Modal for creating a new mission with brand, workspace, title, and description.
- * Triggered by the "新任務" button in AppShell.
- * On submit: calls trpc.mission.create, then navigates to the new mission.
+ * Modal for creating a new mission.
+ * - Brand: hidden when brandId is passed in (already in brand context)
+ * - Workspace: shows only the user's actual workspaces (passed from AppShell)
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
-
-const WORKSPACES = [
-  { key: "strategy",  label: "品牌策略" },
-  { key: "facebook",  label: "Facebook 行銷" },
-  { key: "linkedin",  label: "LinkedIn" },
-  { key: "youtube",   label: "YouTube" },
-  { key: "website",   label: "官網優化" },
-  { key: "pr",        label: "公關媒體" },
-  { key: "event",     label: "活動企劃" },
-];
 
 interface NewMissionModalProps {
   open: boolean;
   defaultWorkspace?: string;
+  /** Pre-filled brand — hides the brand selector */
+  brandId?: number;
+  brandName?: string;
+  /** User's actual workspace list from sidebar */
+  workspaces?: { wsKey: string; label: string }[];
   onClose: () => void;
   onCreated: (missionId: number, workspace: string) => void;
 }
@@ -28,18 +23,19 @@ interface NewMissionModalProps {
 export const NewMissionModal: React.FC<NewMissionModalProps> = ({
   open,
   defaultWorkspace = "strategy",
+  brandId: propBrandId,
+  brandName: propBrandName,
+  workspaces = [],
   onClose,
   onCreated,
 }) => {
-  const [brandId, setBrandId] = useState<number | "">("");
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
 
-  const { data: brands = [] } = trpc.brand.listByMember.useQuery(undefined, {
-    staleTime: 1000 * 60 * 5,
-  });
+  // Sync workspace when defaultWorkspace changes (e.g. opened from sidebar button)
+  useEffect(() => { setWorkspace(defaultWorkspace); }, [defaultWorkspace]);
 
   const createMission = trpc.mission.create.useMutation({
     onSuccess: (data) => {
@@ -50,7 +46,6 @@ export const NewMissionModal: React.FC<NewMissionModalProps> = ({
   });
 
   const handleClose = () => {
-    setBrandId("");
     setWorkspace(defaultWorkspace);
     setTitle("");
     setDescription("");
@@ -61,13 +56,11 @@ export const NewMissionModal: React.FC<NewMissionModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) { setError("請輸入任務名稱"); return; }
-
-    const selectedBrand = brands.find((b: any) => b.id === Number(brandId));
     createMission.mutate({
-      brandId:    brandId ? Number(brandId) : undefined,
-      brandName:  selectedBrand?.name,
+      brandId:     propBrandId,
+      brandName:   propBrandName,
       workspace,
-      title:      title.trim(),
+      title:       title.trim(),
       description: description.trim() || undefined,
     });
   };
@@ -104,28 +97,18 @@ export const NewMissionModal: React.FC<NewMissionModalProps> = ({
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1A1A18", margin: 0 }}>
             建立新任務
           </h2>
-          <p style={{ fontSize: 13, color: "#9B9990", marginTop: 4 }}>
+          {propBrandName && (
+            <p style={{ fontSize: 13, color: "#5B7FDB", marginTop: 4, fontWeight: 500 }}>
+              {propBrandName}
+            </p>
+          )}
+          <p style={{ fontSize: 13, color: "#9B9990", marginTop: 2 }}>
             填寫越詳細，AI 代理人選配對越精準
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Brand */}
-          <div>
-            <label style={labelStyle}>品牌</label>
-            <select
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value === "" ? "" : Number(e.target.value))}
-              style={selectStyle}
-            >
-              <option value="">選擇品牌（選填）</option>
-              {brands.map((b: any) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Workspace */}
+          {/* Workspace — only show user's actual workspaces */}
           <div>
             <label style={labelStyle}>工作區 <span style={{ color: "#E53E3E" }}>*</span></label>
             <select
@@ -133,9 +116,12 @@ export const NewMissionModal: React.FC<NewMissionModalProps> = ({
               onChange={(e) => setWorkspace(e.target.value)}
               style={selectStyle}
             >
-              {WORKSPACES.map((ws) => (
-                <option key={ws.key} value={ws.key}>{ws.label}</option>
-              ))}
+              {workspaces.length > 0
+                ? workspaces.map((ws) => (
+                    <option key={ws.wsKey} value={ws.wsKey}>{ws.label}</option>
+                  ))
+                : <option value={workspace}>{workspace}</option>
+              }
             </select>
           </div>
 

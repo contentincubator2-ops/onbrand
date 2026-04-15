@@ -1808,6 +1808,9 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
       <NewMissionModal
         open={newMissionOpen}
         defaultWorkspace={newMissionWsKey}
+        brandId={selectedBrandId ?? undefined}
+        brandName={(selectedBrand as any)?.name}
+        workspaces={wsList}
         onClose={() => setNewMissionOpen(false)}
         onCreated={(missionId) => {
           setNewMissionOpen(false);
