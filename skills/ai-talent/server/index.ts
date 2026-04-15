@@ -27,6 +27,9 @@ import { slackOAuthRouter } from "./routes/slackOAuthRoute";
 import { squadChatRouter } from "./routes/squadChatRoute";
 import { chatRouter } from "./routes/chatRoute";
 import pmRouter from "./routes/pmRoute";
+import { brandBrainRouter } from "./routes/brandBrainRoute";
+import { exportsRouter } from "./routes/exportsRoute";
+import { squadRouter } from "./routes/squadRoute";
 import { closeDb, pingDb, pingSoworkDb } from "./db";
 import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
@@ -126,6 +129,9 @@ app.use("/slack", slackOAuthRouter);
 app.use("/api/stream", squadChatRouter);
 app.use("/api/chat", chatRouter);  // 新統一入口
 app.use("/api/pm", pmRouter);
+app.use("/api/brand-brain", brandBrainRouter);
+app.use("/api/exports", exportsRouter);
+app.use("/api/missions", squadRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 app.get("/health", healthLimiter, async (_req, res) => {

@@ -28,6 +28,8 @@ import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
 const PptxGenJS = _require("pptxgenjs");
 import sgMail from "@sendgrid/mail";
+import { writeBrandBrainEntry } from "./brandBrainRoute";
+import { recordMissionExport } from "./exportsRoute";
 
 export const chatRouter = Router();
 
@@ -703,16 +705,52 @@ async function executePositioningStep(params: {
     summary: fullContent.slice(0, 300),
   });
 
-  // 最後一步：生成 PPT 並發送
+  // 最後一步：生成 PPT 並發送 + 自動寫入 Brand Brain + 記錄 Exports
   if (targetStep === 6) {
     send("delta", { text: "\n\n⏳ 正在生成 PPT 報告..." });
     const allResults = { ...stepResultsRaw, "6": fullContent };
+
+    // 自動寫入 Brand Brain（各步驟結論）
+    if (brandId) {
+      const brainWrites: Array<{ step: string; category: "competitors"|"audience"|"positioning"|"voice"; title: string }> = [
+        { step: "2", category: "competitors", title: `競品分析 - ${brandContext.name || "Brand"}` },
+        { step: "3", category: "audience",    title: `目標受眾 - ${brandContext.name || "Brand"}` },
+        { step: "4", category: "positioning", title: `品牌定位宣言 - ${brandContext.name || "Brand"}` },
+        { step: "5", category: "voice",       title: `品牌聲音定義 - ${brandContext.name || "Brand"}` },
+      ];
+      await Promise.allSettled(
+        brainWrites.map(({ step, category, title }) => {
+          const stepContent = allResults[step];
+          if (!stepContent) return Promise.resolve();
+          return writeBrandBrainEntry({
+            brandId,
+            category,
+            title,
+            content: stepContent.slice(0, 5000),
+            sourceMissionId: missionId,
+          });
+        })
+      );
+      console.log(`[chatRoute] Brand Brain auto-written for brandId=${brandId}`);
+    }
+
     try {
       await generateAndSendPPT(
         brandContext.name || "Brand",
         fullContent,
         allResults
       );
+
+      // 記錄到 mission_exports
+      if (brandId) {
+        await recordMissionExport({
+          brandId,
+          missionId,
+          exportType: "pptx",
+          title: `${brandContext.name || "Brand"} 品牌定位報告`,
+        });
+      }
+
       send("delta", { text: `\n\n✅ **PPT 已成功發送至 ${PPT_EMAIL}！**\n請查收信箱。` });
     } catch (pptErr: any) {
       send("delta", { text: `\n\n⚠️ PPT 發送失敗：${pptErr?.message}（報告內容已完整顯示在上方）` });
