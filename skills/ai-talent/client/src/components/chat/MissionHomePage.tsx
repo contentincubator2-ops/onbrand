@@ -141,9 +141,9 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                                   fontWeight: 500,
                                     }}
                                   >
-                                  <span>🤖</span>span>
-                                  <span>A2A 自主代理行銷作業系統</span>span>
-                        </div>div>
+                                  <span>🤖</span>
+                                  <span>A2A 自主代理行銷作業系統</span>
+                        </div>
                 
                         <h1
                                     style={{
@@ -155,11 +155,11 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                     }}
                                   >
                           {brandName ? `${brandName} · ${wsLabel}` : `${wsLabel} 任務啟動`}
-                        </h1>h1>
+                        </h1>
                         <p style={{ fontSize: 14, color: "#9B9990", lineHeight: 1.6 }}>
                                   輸入任務需求，AI 代理團隊將自動組建、規劃並執行
-                        </p>p>
-                </div>div>
+                        </p>
+                </div>
           
             {/* Resource Stats */}
             {agents > 0 && (
@@ -189,12 +189,12 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                                                                                 boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
                                                                               }}
                                                                             >
-                                                                            <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>div>
-                                                                            <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>div>
-                                                                            <div style={{ fontSize: 11, color: "#9B9990", marginTop: 2 }}>{label}</div>div>
-                                                              </div>div>
+                                                                            <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
+                                                                            <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+                                                                            <div style={{ fontSize: 11, color: "#9B9990", marginTop: 2 }}>{label}</div>
+                                                              </div>
                                                             ))}
-                          </div>div>
+                          </div>
                 )}
           
             {/* Search Input */}
@@ -249,8 +249,8 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                     }}
                                   >
                                   啟動任務 →
-                        </button>button>
-                </div>div>
+                        </button>
+                </div>
           
             {/* Suggested Tasks */}
                 <div style={{ width: "100%", maxWidth: 640 }}>
@@ -265,7 +265,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                     }}
                                   >
                                   推薦任務
-                        </p>p>
+                        </p>
                         <div
                                     style={{
                                                   display: "grid",
@@ -300,19 +300,19 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                                                                   (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
                                                                 }}
                                                               >
-                                                              <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{task.icon}</span>span>
+                                                              <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{task.icon}</span>
                                                               <div>
                                                                               <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
                                                                                 {task.label}
-                                                                              </div>div>
+                                                                              </div>
                                                                               <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
                                                                                 {task.description}
-                                                                              </div>div>
-                                                              </div>div>
-                                                </button>button>
+                                                                              </div>
+                                                              </div>
+                                                </button>
                                               ))}
-                        </div>div>
-                </div>div>
+                        </div>
+                </div>
           
             {/* Footer hint */}
                 <p
@@ -324,7 +324,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                           }}
                         >
                         由 text-embedding-3-large 語意搜尋驅動 · {formatNumber(agents)} 個專業 Agent 待命中
-                </p>p>
-          </div>div>
+                </p>
+          </div>
         );
-};</div>
+};
