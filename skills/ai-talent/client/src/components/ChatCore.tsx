@@ -1183,6 +1183,7 @@ export default function ChatCore({
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
                 brandName={activeBrandName ?? undefined}
+                missionTitle={(missionDataQuery.data as any)?.title ?? undefined}
                 missionId={activeMissionId}
                 onTaskSelect={(task) => {
                   setInput(task);
