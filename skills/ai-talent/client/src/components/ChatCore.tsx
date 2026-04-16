@@ -916,16 +916,15 @@ export default function ChatCore({
     const rawText = input.trim();
     if (!rawText || loading) return;
 
-    // First-message: flip mission from inactive → active, persist selected squad
+    // First-message: persist selected squad
     const active = conversations.find((c) => c.id === activeId);
     const isFirstUserMsg = !active || active.messages.filter(m => m.role === "user").length === 0;
-    if (isFirstUserMsg && activeMissionId) {
+    if (isFirstUserMsg && activeMissionId && selectedSquadForMission) {
       updateMission.mutate({
         id: activeMissionId,
-        status: "active",
-        squadSlug: selectedSquadForMission?.squadSlug ?? undefined,
+        squadSlug: selectedSquadForMission.squadSlug,
       });
-      if (selectedSquadForMission) onSquadSelect?.(rawText, selectedSquadForMission, []);
+      onSquadSelect?.(rawText, selectedSquadForMission, []);
     }
 
     stopRef.current = false;
@@ -1178,10 +1177,12 @@ export default function ChatCore({
         }}
         className="messages-scroll"
       >
-        {/* MissionHomePage: 只在 mission status = "inactive" 時顯示（建立後尚未送出第一條訊息） */}
+        {/* MissionHomePage: 顯示當 missionData 載入完成 且 DB 確認 0 訊息 且 記憶體也無 user 訊息 */}
         {activeMissionId
           && missionDataQuery.isSuccess
-          && (missionDataQuery.data as any)?.status === "inactive"
+          && savedMessagesQuery.isSuccess
+          && (savedMessagesQuery.data as any[]).length === 0
+          && !(active?.messages.some(m => m.role === "user"))
           && !teamAssembly && (
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}

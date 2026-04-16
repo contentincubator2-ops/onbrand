@@ -99,7 +99,7 @@ export const missionRouter = router({
         constraints: input.constraints ?? "",
         methodology: input.methodology ?? "",
         squadSlug: input.squadSlug ?? null,
-        status: "inactive",
+        status: "active",
       });
       const missionId = result.insertId;
       // Fire-and-forget: compute semantic agent matching asynchronously
