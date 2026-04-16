@@ -12,6 +12,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../public", // build 到 server/public，讓 Express 直接 serve
+    outDir: "../public",  // build 到 server/public，讓 Express 直接 serve
+    emptyOutDir: true,    // 每次 build 清除舊 assets，防止舊 JS hash 殘留造成快取問題
   },
 });
