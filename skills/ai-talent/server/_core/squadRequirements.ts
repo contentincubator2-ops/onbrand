@@ -212,6 +212,97 @@ export const SQUAD_REQUIREMENTS_MAP: Record<string, SquadRequirementsConfig> = {
     },
   },
 
+  // ── Category Design（品類設計）────────────────────────────────────────────
+  "category-design-positioning": {
+    requirements: [
+      { id: "brand_name",  label: "品牌名稱",          type: "text", section: "identity", required: true },
+      { id: "website_url", label: "官網 URL",           type: "url",  section: "identity", required: false, hint: "agents 爬取現有定位語言做品類診斷" },
+      { id: "industry",    label: "所在產業 / 市場",   type: "text", section: "identity", required: false, hint: "例：B2B SaaS CRM、能量飲料、健身科技" },
+      { id: "out_gdrive",  label: "Google Drive",      type: "output", section: "output", required: false, provider: "google-drive", hint: "品類藍圖與 POV 文件存入 Drive" },
+      { id: "out_email",   label: "Email 報告",         type: "output", section: "output", required: false, provider: "email" },
+      { id: "out_youtube", label: "YouTube 發布",       type: "output", section: "output", required: false, provider: "youtube",       hint: "思想領袖影音內容" },
+    ],
+    outputs: {
+      default:           ["品類 POV 文件", "品類藍圖", "競品重框架地圖", "思想領袖內容計劃"],
+      with_industry:     ["產業品類現況深度分析"],
+      with_out_gdrive:   ["品類藍圖 Google Slides（可編輯）"],
+      with_out_youtube:  ["思想領袖影音腳本 + 自動上傳"],
+      with_out_email:    ["品類策略報告 PDF 寄送"],
+    },
+  },
+
+  // ── Mind Positioning（心智佔位）— Ries & Trout ───────────────────────────
+  "mind-positioning": {
+    requirements: [
+      { id: "brand_name",       label: "品牌名稱",           type: "text", section: "identity", required: true },
+      { id: "website_url",      label: "官網 URL",           type: "url",  section: "identity", required: false, hint: "agents 爬取品牌現有定位訊息" },
+      { id: "competitor_names", label: "主要競品（逗號分隔）",type: "text", section: "identity", required: false, hint: "例：品牌A, 品牌B — agents 分析其心智位置" },
+      { id: "out_gdrive",  label: "Google Drive", type: "output", section: "output", required: false, provider: "google-drive" },
+      { id: "out_email",   label: "Email 報告",   type: "output", section: "output", required: false, provider: "email" },
+    ],
+    outputs: {
+      default:                ["心智梯子地圖", "核心屬性選擇報告", "競品重定位策略", "定位聲明草稿"],
+      with_competitor_names:  ["詳細競品心智位置分析（octolens）"],
+      with_out_gdrive:        ["心智定位策略簡報（可編輯）"],
+      with_out_email:         ["定位策略報告 PDF 寄送"],
+    },
+  },
+
+  // ── JTBD Positioning（任務導向定位）──────────────────────────────────────
+  "jtbd-positioning": {
+    requirements: [
+      { id: "brand_name",  label: "品牌名稱", type: "text", section: "identity", required: true },
+      { id: "website_url", label: "官網 URL",  type: "url",  section: "identity", required: false, hint: "agents 爬取產品頁提取 Job 線索" },
+      { id: "ga4_access",  label: "Google Analytics",  type: "oauth", section: "access", required: false, provider: "google-analytics", hint: "驗證 Job 與行為路徑的相關性" },
+      { id: "fb_business", label: "Facebook Business", type: "oauth", section: "access", required: false, provider: "facebook-ads",     hint: "取得受眾行為觸發點數據" },
+      { id: "out_gdrive",  label: "Google Drive", type: "output", section: "output", required: false, provider: "google-drive" },
+      { id: "out_email",   label: "Email 報告",   type: "output", section: "output", required: false, provider: "email" },
+    ],
+    outputs: {
+      default:          ["Job Map", "Switch Interview 分析", "任務型競爭替代品地圖", "JTBD 定位聲明", "任務驅動訊息框架"],
+      with_ga4_access:  ["行為路徑 Job 驗證報告"],
+      with_fb_business: ["受眾 Job 觸發點廣告建議"],
+      with_out_gdrive:  ["JTBD 策略文件（Google Drive）"],
+      with_out_email:   ["報告 PDF 寄送"],
+    },
+  },
+
+  // ── Purpose-Driven Positioning（目的導向定位）────────────────────────────
+  "purpose-driven-positioning": {
+    requirements: [
+      { id: "brand_name",   label: "品牌名稱",          type: "text", section: "identity", required: true },
+      { id: "website_url",  label: "官網 URL",           type: "url",  section: "identity", required: false, hint: "agents 爬取現有 About / CSR 頁面做真實性稽核" },
+      { id: "brand_cause",  label: "品牌在意的社會議題", type: "text", section: "identity", required: false, hint: "例：環境永續、女性賦權、弱勢教育 — 填入後 agents 做真實性驗證" },
+      { id: "out_gdrive",   label: "Google Drive",      type: "output", section: "output", required: false, provider: "google-drive",  hint: "Manifesto + 策略文件存入 Drive" },
+      { id: "out_email",    label: "Email 報告",         type: "output", section: "output", required: false, provider: "email" },
+      { id: "out_youtube",  label: "YouTube 發布",       type: "output", section: "output", required: false, provider: "youtube",       hint: "品牌 Manifesto 影片腳本" },
+      { id: "out_line",     label: "LINE 分享",           type: "output", section: "output", required: false, provider: "line",          hint: "運動感召快速分享" },
+    ],
+    outputs: {
+      default:           ["使命真實性稽核報告", "Purpose 聲明（三層架構）", "Manifesto 草稿", "全通路 Purpose 整合手冊"],
+      with_brand_cause:  ["社會議題共鳴度分析", "同類 Purpose 品牌競品研究"],
+      with_out_gdrive:   ["Brand Manifesto Google Slides"],
+      with_out_youtube:  ["Manifesto 影片腳本 + 自動上傳"],
+      with_out_line:     ["LINE 運動感召分享貼文"],
+      with_out_email:    ["品牌使命報告 PDF 寄送"],
+    },
+  },
+
+  // ── Brand Archetype Positioning（品牌原型定位）───────────────────────────
+  "brand-archetype-positioning": {
+    requirements: [
+      { id: "brand_name",  label: "品牌名稱", type: "text", section: "identity", required: true },
+      { id: "website_url", label: "官網 URL",  type: "url",  section: "identity", required: false, hint: "agents 爬取品牌現有溝通素材做原型診斷" },
+      { id: "out_gdrive",  label: "Google Drive", type: "output", section: "output", required: false, provider: "google-drive", hint: "品牌聲音指南 + 視覺方向存入 Drive" },
+      { id: "out_email",   label: "Email 報告",   type: "output", section: "output", required: false, provider: "email" },
+    ],
+    outputs: {
+      default:         ["品牌人格現況診斷", "原型選擇理由書", "品牌聲音指南（用詞庫 + 語調）", "視覺體驗方向", "全通路原型一致性手冊"],
+      with_out_gdrive: ["品牌指南 Google Slides（可直接使用）"],
+      with_out_email:  ["品牌原型報告 PDF 寄送"],
+    },
+  },
+
   // ── Website Rebuild ────────────────────────────────────────────────────────
   "tw-website-rebuild": {
     requirements: [

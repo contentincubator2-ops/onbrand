@@ -912,6 +912,387 @@ async function main() {
       });
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Brand Positioning Methodologies 6-10
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ── 6. Category Design（品類設計）──────────────────────────────────────────
+    // Create a new category and become its king rather than fighting for share
+    {
+      const slug     = "category-design-positioning";
+      const taskType = "category-design-positioning";
+      const used: number[] = [];
+
+      const leadId = await findAgent(conn, ["category-design", "category-creation", "market-creation", "thought-leadership", "brand-strategy", "positioning"], used);
+      if (leadId) used.push(leadId);
+      const m2 = await findAgent(conn, ["content-strategy", "thought-leadership", "narrative", "storytelling", "brand-voice"], used);
+      if (m2) used.push(m2);
+      const m3 = await findAgent(conn, ["market-research", "market-analysis", "industry-research", "competitive-intelligence"], used);
+      if (m3) used.push(m3);
+      const m4 = await findAgent(conn, ["gtm", "go-to-market", "launch-strategy", "product-marketing", "growth"], used);
+      if (m4) used.push(m4);
+
+      const members = [
+        leadId && { agent_id: leadId, is_lead: true,  role: "category_designer",      order: 1 },
+        m2     && { agent_id: m2,     is_lead: false, role: "thought_leader_writer",   order: 2 },
+        m3     && { agent_id: m3,     is_lead: false, role: "market_analyst",          order: 3 },
+        m4     && { agent_id: m4,     is_lead: false, role: "gtm_strategist",          order: 4 },
+      ].filter(Boolean);
+
+      await upsertWorkflow(conn, {
+        taskType,
+        name: "品類設計定位流程",
+        description: "Category Design 七步法：定義品類問題 → 建立品類 POV → 競品再框架 → 品類藍圖 → 思想領袖內容 → 生態系建立 → 品類傳道",
+        steps: [
+          {
+            order: 1, name: "品類問題診斷",
+            description: "用 Madison MarketMind Research Agents 分析現有市場結構，找出尚未被命名的問題空間（problem space）。識別消費者還沒意識到自己有的「痛點」。",
+            tool: "madison-market-research",
+            outputType: "category_problem_brief",
+          },
+          {
+            order: 2, name: "品類 POV（觀點）建立",
+            description: "撰寫品類的核心觀點文件（Category POV）：為什麼現有解法不夠好？你的品類為何是唯一的正確答案？格式：問題陳述 → 舊世界 vs 新世界 → 品類宣言。",
+            tool: "osp_marketing_tools",
+            outputType: "category_pov_document",
+          },
+          {
+            order: 3, name: "競品重新框架",
+            description: "用 octolens 監控競品如何自我定位，用 marketing-strategy-pmm Battlecard 工具記錄競品弱點，然後把競品定位為解決舊問題的「傳統方案」，而你的品牌解決的是全新的問題。",
+            tool: "octolens",
+            outputType: "competitive_reframe_map",
+          },
+          {
+            order: 4, name: "品類藍圖設計",
+            description: "用 osp_marketing_tools Value Map Generator 繪製品類全景：品類名稱、子品類結構、典型客戶旅程、品類關鍵詞。建立你的品牌在品類中的「Category King」座標。",
+            tool: "osp_marketing_tools",
+            outputType: "category_blueprint",
+          },
+          {
+            order: 5, name: "思想領袖內容策略",
+            description: "設計讓你教育市場、成為品類代言人的內容計劃：白皮書主題、演講敘事、播客議程、LinkedIn 系列文章。目標：讓媒體和分析師用你的品類語言報導市場。",
+            tool: "internal",
+            outputType: "thought_leadership_content_plan",
+          },
+          {
+            order: 6, name: "品類生態系規劃",
+            description: "識別潛在的盟友（投資人、合作夥伴、早期採用者社群）共同建立品類生態系。設計品類論壇、認證計劃或社群活動讓品類變成運動。",
+            tool: "internal",
+            outputType: "ecosystem_strategy",
+          },
+        ],
+      });
+
+      await upsertSquad(conn, {
+        slug,
+        name: "品類設計定位小組",
+        description: "不在既有市場競爭份額，而是創造新品類成為 Category King。整合 Madison 市場研究、osp_marketing_tools 品類藍圖、octolens 競品監控，設計品類 POV、思想領袖內容計劃，讓媒體與分析師用你的語言定義市場。",
+        industryKey: "general",
+        taskType,
+        members,
+        tags: ["category-design", "category-creation", "thought-leadership", "brand-strategy", "market-creation", "gtm", "positioning", "strategy", "innovation", "b2b"],
+        useCases: ["新產品品類命名", "創新市場進入策略", "思想領袖內容規劃", "競品重新框架", "品類生態系建立", "IPO 前品牌定位"],
+      });
+    }
+
+    // ── 7. Mind Positioning（心智佔位）— Ries & Trout ─────────────────────────
+    // Own the #1 position in the consumer's mind; being first beats being best
+    {
+      const slug     = "mind-positioning";
+      const taskType = "mind-positioning";
+      const used: number[] = [];
+
+      const leadId = await findAgent(conn, ["positioning", "brand-positioning", "brand-strategy", "mind-share", "market-leadership"], used);
+      if (leadId) used.push(leadId);
+      const m2 = await findAgent(conn, ["competitive-intelligence", "competitive-analysis", "competitor-research", "market-analysis"], used);
+      if (m2) used.push(m2);
+      const m3 = await findAgent(conn, ["messaging", "brand-voice", "copywriting", "brand-narrative"], used);
+      if (m3) used.push(m3);
+      const m4 = await findAgent(conn, ["advertising", "campaign-strategy", "media-planning", "ad-strategy"], used);
+      if (m4) used.push(m4);
+
+      const members = [
+        leadId && { agent_id: leadId, is_lead: true,  role: "mind_positioning_strategist", order: 1 },
+        m2     && { agent_id: m2,     is_lead: false, role: "competitive_intelligence",     order: 2 },
+        m3     && { agent_id: m3,     is_lead: false, role: "messaging_architect",          order: 3 },
+        m4     && { agent_id: m4,     is_lead: false, role: "campaign_strategist",          order: 4 },
+      ].filter(Boolean);
+
+      await upsertWorkflow(conn, {
+        taskType,
+        name: "心智佔位定位流程",
+        description: "Ries & Trout 心智定位六步法：心智地圖掃描 → 梯子分析 → 屬性選擇 → 競品重定位 → 定位聲明 → 媒體心智強化",
+        steps: [
+          {
+            order: 1, name: "心智地圖掃描",
+            description: "用 octolens 和 Madison MarketMind 掃描目標市場的「心智梯子」：品類前三名品牌分別佔據哪個屬性？消費者說到品類第一個聯想到誰？識別已被佔領和空缺的心智位置。",
+            tool: "octolens",
+            outputType: "mind_ladder_map",
+          },
+          {
+            order: 2, name: "梯子位置分析",
+            description: "用 marketing-strategy-pmm 競品分析工具繪製「心智梯子」：第一名的品牌佔什麼位置？第二名的策略是跟隨還是反定位？評估你的品牌目前在消費者心智中的位階。",
+            tool: "marketing-strategy-pmm",
+            outputType: "ladder_position_analysis",
+          },
+          {
+            order: 3, name: "核心屬性選擇",
+            description: "選擇一個尚未被競品完全佔領的核心屬性（速度、安全、天然、創新…），確保這個屬性夠獨特、夠重要且你能真正擁有它。用 osp_marketing_tools 驗證屬性的品牌共鳴度。",
+            tool: "osp_marketing_tools",
+            outputType: "core_attribute_selection",
+          },
+          {
+            order: 4, name: "競品重定位策略",
+            description: "設計「重定位競品」策略（如 Avis 的 We Try Harder、7-Up 的 Uncola）：承認你不是第一，但把第一的位置重新定義，讓你的屬性更重要。或找到品類第二名的機會位置。",
+            tool: "marketing-strategy-pmm",
+            outputType: "repositioning_strategy",
+          },
+          {
+            order: 5, name: "定位聲明與訊息",
+            description: "撰寫符合「心智佔位」原則的定位聲明：單一屬性、極度清晰、無歧義。用 osp_marketing_tools Value Map Generator 確保訊息一致性，建立所有通路的統一定位語言。",
+            tool: "osp_marketing_tools",
+            outputType: "positioning_statement",
+          },
+          {
+            order: 6, name: "心智強化媒體計劃",
+            description: "設計讓心智佔位持續強化的媒體策略：哪些媒體管道能最有效地在目標受眾心智中植入你的屬性？設計重複性強化的廣告訊息節奏。",
+            tool: "internal",
+            outputType: "mind_reinforcement_media_plan",
+          },
+        ],
+      });
+
+      await upsertSquad(conn, {
+        slug,
+        name: "心智佔位定位小組",
+        description: "用 Ries & Trout 心智定位法，在消費者心智中搶佔品類首位。整合 octolens 競品監控、Madison MarketMind 心智掃描、marketing-strategy-pmm 競品分析，識別心智梯子空缺，設計重定位策略與一致性訊息，讓你的品牌成為品類代名詞。",
+        industryKey: "general",
+        taskType,
+        members,
+        tags: ["mind-positioning", "brand-positioning", "competitive-strategy", "ries-trout", "market-leadership", "brand-strategy", "messaging", "positioning", "strategy", "b2b"],
+        useCases: ["搶占品類心智第一名", "成熟市場重新定位", "競品重定位策略", "B2B 品牌心智佔位", "廣告訊息一致性", "心智梯子分析"],
+      });
+    }
+
+    // ── 8. JTBD Positioning（任務導向定位）────────────────────────────────────
+    // Position around the "job" customers hire your product to do, not demographics
+    {
+      const slug     = "jtbd-positioning";
+      const taskType = "jtbd-positioning";
+      const used: number[] = [];
+
+      const leadId = await findAgent(conn, ["jobs-to-be-done", "jtbd", "customer-research", "user-research", "product-marketing"], used);
+      if (leadId) used.push(leadId);
+      const m2 = await findAgent(conn, ["qualitative-research", "interview-analysis", "customer-insights", "consumer-insights"], used);
+      if (m2) used.push(m2);
+      const m3 = await findAgent(conn, ["product-positioning", "product-marketing", "pmm", "gtm"], used);
+      if (m3) used.push(m3);
+      const m4 = await findAgent(conn, ["messaging", "copywriting", "brand-voice", "content-strategy"], used);
+      if (m4) used.push(m4);
+
+      const members = [
+        leadId && { agent_id: leadId, is_lead: true,  role: "jtbd_strategist",         order: 1 },
+        m2     && { agent_id: m2,     is_lead: false, role: "interview_analyst",        order: 2 },
+        m3     && { agent_id: m3,     is_lead: false, role: "product_positioning",      order: 3 },
+        m4     && { agent_id: m4,     is_lead: false, role: "jtbd_messaging_writer",    order: 4 },
+      ].filter(Boolean);
+
+      await upsertWorkflow(conn, {
+        taskType,
+        name: "任務導向定位流程",
+        description: "JTBD 定位五步法：任務挖掘 → 觸發點分析 → 替代方案識別 → 任務聲明 → 圍繞任務的訊息框架",
+        steps: [
+          {
+            order: 1, name: "任務挖掘（Job Mapping）",
+            description: "用 Madison Synthetic Persona Agents 和 MarketMind Research 模擬客戶「雇用」產品的情境：他們在完成什麼更大的任務？觸發點是什麼？成功看起來是什麼樣子？建立 Job Map（開始 → 準備 → 執行 → 結束）。",
+            tool: "madison-market-research",
+            outputType: "job_map",
+          },
+          {
+            order: 2, name: "Switch Interview 分析",
+            description: "模擬客戶從舊方案切換到你的產品的「轉換故事」：四個力（推力 Push、拉力 Pull、焦慮 Anxiety、習慣 Habit）分析。識別哪些 Job 已有足夠強的切換驅動力，哪些還需要教育。",
+            tool: "madison-market-research",
+            outputType: "switch_analysis",
+          },
+          {
+            order: 3, name: "競爭替代品重定義",
+            description: "不按傳統行業分類定義競品，而是問「客戶不用你的產品時，他們用什麼完成同一個 Job」？用 marketing-strategy-pmm ICP 工具和 octolens 找出真正的任務替代品（可能是完全不同行業的產品）。",
+            tool: "marketing-strategy-pmm",
+            outputType: "job_based_competitor_map",
+          },
+          {
+            order: 4, name: "JTBD 定位聲明",
+            description: "圍繞 Job 寫定位聲明（不是人口統計，是情境）：「當 [情境] 時，[目標客戶] 雇用 [產品] 來 [完成任務]，因為它是唯一能 [差異點] 的方案」。用 osp_marketing_tools Value Map Generator 驗證 Job 和效益的對應關係。",
+            tool: "osp_marketing_tools",
+            outputType: "jtbd_positioning_statement",
+          },
+          {
+            order: 5, name: "任務驅動訊息框架",
+            description: "用 marketing-strategy-pmm PMM 工具建立所有通路的統一訊息框架：官網英雄區塊、廣告標題、銷售話術，全部圍繞 Job 而非功能特性或受眾人口統計。",
+            tool: "marketing-strategy-pmm",
+            outputType: "jtbd_messaging_framework",
+          },
+        ],
+      });
+
+      await upsertSquad(conn, {
+        slug,
+        name: "任務導向定位小組",
+        description: "不依賴人口統計分眾，而是挖掘客戶真正「雇用」產品完成的任務（Job），圍繞任務做定位。整合 Madison 合成訪談研究、marketing-strategy-pmm ICP 和訊息框架、osp_marketing_tools 效益驗證，建立情境驅動的定位聲明與跨通路訊息一致性。",
+        industryKey: "general",
+        taskType,
+        members,
+        tags: ["jtbd", "jobs-to-be-done", "customer-research", "product-positioning", "product-marketing", "positioning", "strategy", "b2b", "saas", "innovation"],
+        useCases: ["新產品定位策略", "B2B SaaS 重新定位", "客戶研究驅動訊息", "產品創新方向驗證", "Landing Page 優化", "銷售話術建立"],
+      });
+    }
+
+    // ── 9. Purpose-Driven Positioning（目的導向定位）──────────────────────────
+    // Use the brand's social mission and values as the core positioning driver
+    {
+      const slug     = "purpose-driven-positioning";
+      const taskType = "purpose-driven-positioning";
+      const used: number[] = [];
+
+      const leadId = await findAgent(conn, ["purpose-driven", "brand-purpose", "csr", "sustainability", "social-impact", "brand-strategy"], used);
+      if (leadId) used.push(leadId);
+      const m2 = await findAgent(conn, ["brand-voice", "storytelling", "content-strategy", "brand-narrative", "copywriting"], used);
+      if (m2) used.push(m2);
+      const m3 = await findAgent(conn, ["campaign-strategy", "social-media", "influencer", "community", "dtc"], used);
+      if (m3) used.push(m3);
+      const m4 = await findAgent(conn, ["consumer-insights", "customer-research", "audience-analysis", "market-research"], used);
+      if (m4) used.push(m4);
+
+      const members = [
+        leadId && { agent_id: leadId, is_lead: true,  role: "purpose_strategist",      order: 1 },
+        m2     && { agent_id: m2,     is_lead: false, role: "brand_narrator",          order: 2 },
+        m3     && { agent_id: m3,     is_lead: false, role: "campaign_strategist",     order: 3 },
+        m4     && { agent_id: m4,     is_lead: false, role: "audience_analyst",        order: 4 },
+      ].filter(Boolean);
+
+      await upsertWorkflow(conn, {
+        taskType,
+        name: "目的導向定位流程",
+        description: "Purpose-Driven 定位五步法：使命真實性稽核 → 目標受眾價值觀對齊 → Purpose 聲明 → 使命驅動敘事 → 全通路整合",
+        steps: [
+          {
+            order: 1, name: "使命真實性稽核",
+            description: "用 Madison MarketMind Research 和 octolens 掃描品牌歷史、現有 CSR 活動、產品特性，找出品牌真實能「擁有」的社會使命。避免 purpose washing——必須有可驗證的行動支撐聲明。",
+            tool: "madison-market-research",
+            outputType: "purpose_authenticity_audit",
+          },
+          {
+            order: 2, name: "目標受眾價值觀對齊",
+            description: "用 Madison Synthetic Persona Agents 建立目標受眾的價值觀地圖：他們關心什麼社會議題？什麼使命會讓他們主動選擇你？用 marketing-strategy-pmm ICP 確認 Purpose 與 Ideal Customer 的交集。",
+            tool: "marketing-strategy-pmm",
+            outputType: "purpose_audience_alignment_map",
+          },
+          {
+            order: 3, name: "Purpose 聲明建立",
+            description: "用 osp_marketing_tools Value Map Generator 建立三層 Purpose 架構：What（你做什麼）→ How（你怎麼做）→ Why（為什麼這件事重要，比賺錢更重要的理由）。確保 Purpose 夠具體、可行動、可衡量。",
+            tool: "osp_marketing_tools",
+            outputType: "brand_purpose_statement",
+          },
+          {
+            order: 4, name: "使命驅動敘事設計",
+            description: "設計讓消費者「加入運動」而非「購買產品」的品牌故事框架。格式：英雄不是品牌而是消費者，品牌是賦能者。建立 Manifesto、Signature Campaign 概念（類 Patagonia / Nike 風格）。",
+            tool: "osp_marketing_tools",
+            outputType: "purpose_narrative_manifesto",
+          },
+          {
+            order: 5, name: "全通路 Purpose 整合",
+            description: "確保 Purpose 貫穿所有觸點：產品包裝、官網 About 頁、社群貼文語調、廣告標題、客服話術。設計可追蹤的使命指標（除了銷售，還有什麼數字能證明 Purpose 在發揮作用）。",
+            tool: "marketing-strategy-pmm",
+            outputType: "purpose_integration_playbook",
+          },
+        ],
+      });
+
+      await upsertSquad(conn, {
+        slug,
+        name: "目的導向定位小組",
+        description: "以品牌社會使命為核心定位驅動力，讓消費者因認同而選擇你。整合 Madison 受眾價值觀研究、osp_marketing_tools Purpose 框架、marketing-strategy-pmm 訊息整合，建立真實可驗證的 Brand Purpose、Manifesto 敘事與全通路 Purpose 整合手冊。",
+        industryKey: "general",
+        taskType,
+        members,
+        tags: ["purpose-driven", "brand-purpose", "csr", "sustainability", "social-impact", "brand-strategy", "dtc", "gen-z", "storytelling", "campaign"],
+        useCases: ["DTC 品牌差異化", "年輕受眾品牌共鳴", "ESG 品牌策略", "品牌重塑使命宣言", "Manifesto Campaign 概念", "企業社會責任行銷"],
+      });
+    }
+
+    // ── 10. Brand Archetype Positioning（品牌原型定位）────────────────────────
+    // Use Jung's 12 archetypes to unify brand voice, visuals, and experience
+    {
+      const slug     = "brand-archetype-positioning";
+      const taskType = "brand-archetype-positioning";
+      const used: number[] = [];
+
+      const leadId = await findAgent(conn, ["brand-archetype", "brand-identity", "brand-personality", "jungian", "brand-strategy"], used);
+      if (leadId) used.push(leadId);
+      const m2 = await findAgent(conn, ["brand-voice", "tone-of-voice", "brand-narrative", "copywriting", "content-strategy"], used);
+      if (m2) used.push(m2);
+      const m3 = await findAgent(conn, ["visual-identity", "creative-direction", "design-strategy", "brand-design"], used);
+      if (m3) used.push(m3);
+      const m4 = await findAgent(conn, ["consumer-insights", "audience-analysis", "brand-perception", "market-research"], used);
+      if (m4) used.push(m4);
+
+      const members = [
+        leadId && { agent_id: leadId, is_lead: true,  role: "archetype_strategist",   order: 1 },
+        m2     && { agent_id: m2,     is_lead: false, role: "brand_voice_specialist",  order: 2 },
+        m3     && { agent_id: m3,     is_lead: false, role: "creative_director",       order: 3 },
+        m4     && { agent_id: m4,     is_lead: false, role: "brand_perception_analyst",order: 4 },
+      ].filter(Boolean);
+
+      await upsertWorkflow(conn, {
+        taskType,
+        name: "品牌原型定位流程",
+        description: "Brand Archetype 五步法：現有品牌人格診斷 → 原型選擇與組合 → 品牌聲音指南 → 視覺與體驗方向 → 全通路原型一致性",
+        steps: [
+          {
+            order: 1, name: "現有品牌人格診斷",
+            description: "用 octolens 爬取品牌既有溝通素材（官網文案、社群貼文、廣告），Madison MarketMind 掃描消費者對品牌的感知描述詞，診斷品牌目前隱性展現的原型是什麼，以及與期望原型的落差。",
+            tool: "octolens",
+            outputType: "brand_personality_audit",
+          },
+          {
+            order: 2, name: "原型選擇與組合",
+            description: "基於品牌使命、目標受眾心理需求、競品原型地圖，從 Jung 12 原型中選擇主原型（Primary）和輔助原型（Secondary）。避免選擇競品已強勢佔據的原型。建立原型選擇理由書。",
+            tool: "marketing-strategy-pmm",
+            outputType: "archetype_selection_rationale",
+          },
+          {
+            order: 3, name: "品牌聲音指南",
+            description: "用 osp_marketing_tools Brand Voice Generator 建立以原型為核心的品牌聲音指南：用詞庫（宜用 / 禁用）、句子結構偏好、情緒基調、各通路語調微調（官網 vs 社群 vs 廣告 vs 客服）。",
+            tool: "osp_marketing_tools",
+            outputType: "brand_voice_guide",
+          },
+          {
+            order: 4, name: "視覺與體驗方向",
+            description: "根據原型特質制定視覺方向：配色系統、字型個性、攝影風格、版面偏好。建立體驗設計原則：產品包裝、官網 UX、門市空間（如適用）應傳遞的感受。提供 Moodboard 方向。",
+            tool: "internal",
+            outputType: "visual_experience_direction",
+          },
+          {
+            order: 5, name: "全通路原型一致性稽核",
+            description: "用 marketing-strategy-pmm 訊息一致性工具，稽核所有現有觸點的原型一致性。建立品牌原型評分標準，讓後續所有溝通都能自我稽核是否符合原型人格。",
+            tool: "marketing-strategy-pmm",
+            outputType: "archetype_consistency_audit",
+          },
+        ],
+      });
+
+      await upsertSquad(conn, {
+        slug,
+        name: "品牌原型定位小組",
+        description: "以 Jung 心理學 12 原型統一品牌的聲音、視覺與體驗，從人格層面建立深度的消費者情感連結。整合 octolens 品牌感知稽核、osp_marketing_tools 品牌聲音框架、marketing-strategy-pmm 訊息一致性，輸出原型選擇理由書、品牌聲音指南與全通路一致性手冊。",
+        industryKey: "general",
+        taskType,
+        members,
+        tags: ["brand-archetype", "brand-identity", "brand-personality", "brand-voice", "visual-identity", "jungian", "brand-strategy", "rebranding", "creative", "omnichannel"],
+        useCases: ["品牌重塑人格設定", "全通路品牌聲音統一", "新品牌人格建立", "視覺識別方向制定", "創意策略指引", "品牌代言人選擇依據"],
+      });
+    }
+
     console.log("[seed-local] Done. All local squad seeds applied successfully.");
 
   } catch (err: any) {
