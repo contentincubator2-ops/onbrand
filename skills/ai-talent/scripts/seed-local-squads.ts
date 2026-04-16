@@ -38,6 +38,51 @@ async function findAgent(
 }
 
 /**
+ * After finding an agent for a specific squad role, write the required skills
+ * back to their specialty field — only appending skills they don't already have.
+ *
+ * This gradually refines the 17K+ agent pool's skill metadata through seeding,
+ * making agents more precisely discoverable for future searches.
+ * Does NOT touch soul.md or any identity field — only the skills/specialty tag.
+ */
+async function assignSkillsToAgent(
+  conn: any,
+  agentId: number,
+  skills: string[],
+): Promise<void> {
+  if (!agentId || !skills.length) return;
+  try {
+    const [rows] = await conn.execute(
+      `SELECT primarySkill, specialty FROM agents WHERE id = ? LIMIT 1`, [agentId]
+    ) as any[];
+    const row = (rows as any[])[0];
+    if (!row) return;
+
+    // Build current skill set (primarySkill + specialty, split by common delimiters)
+    const existing = new Set(
+      [row.primarySkill ?? "", row.specialty ?? ""]
+        .join(",")
+        .split(/[,|;\n]/)
+        .map((s: string) => s.trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    const toAdd = skills.filter(s => !existing.has(s.toLowerCase()));
+    if (toAdd.length === 0) return;
+
+    // Append new skills to specialty (non-destructive)
+    const newSpecialty = [row.specialty ?? "", ...toAdd].filter(Boolean).join(", ");
+    await conn.execute(
+      `UPDATE agents SET specialty = ? WHERE id = ?`, [newSpecialty, agentId]
+    );
+    console.log(`[seed-local] Agent ${agentId}: added skills [${toAdd.join(", ")}]`);
+  } catch (err: any) {
+    // Non-fatal — skill assignment is best-effort
+    console.warn(`[seed-local] assignSkillsToAgent(${agentId}) warn:`, err.message);
+  }
+}
+
+/**
  * Idempotent upsert: insert a squad or update its name/description/agents/tags
  * if the slug already exists.
  */
@@ -707,16 +752,21 @@ async function main() {
       const taskType = "benefit-based-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["messaging", "brand-voice", "content-strategy", "pmm", "copywriting", "positioning"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["consumer-insights", "customer-research", "ux-research", "insight"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["emotional-branding", "brand-dna", "brand-strategy", "emotional"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["copywriting", "conversion", "cro", "ad-creative", "performance-marketing"], used);
-      if (m4) used.push(m4);
-      const m5 = await findAgent(conn, ["ad-creative", "paid-social", "facebook-ads", "messaging", "performance"], used);
-      if (m5) used.push(m5);
+      const leadSkills = ["messaging", "brand-voice", "content-strategy", "pmm", "copywriting", "positioning"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["consumer-insights", "customer-research", "ux-research", "insight"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["emotional-branding", "brand-dna", "brand-strategy", "emotional"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["copywriting", "conversion", "cro", "ad-creative", "performance-marketing"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
+      const m5Skills = ["ad-creative", "paid-social", "facebook-ads", "messaging", "performance"];
+      const m5 = await findAgent(conn, m5Skills, used);
+      if (m5) { used.push(m5); await assignSkillsToAgent(conn, m5, m5Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "messaging_strategist",   order: 1 },
@@ -731,11 +781,11 @@ async function main() {
         name: "利益階梯定位流程（Benefit Ladder）",
         description: "從產品功能出發，沿 Feature → Functional Benefit → Emotional Benefit 梯形爬升，最終落地為轉換文案與廣告訊息。工具：osp_marketing_tools Value Map Generator + marketing-strategy-pmm Messaging Hierarchy。",
         steps: [
-          { step: 1, title: "Squad Lead Intake：產品功能與受眾盤點", description: "Squad Lead 收集產品功能清單、目標受眾、現有訊息，評估目前定位成熟度，Brief 成員任務範疇", owner: "squad_lead", output: "任務簡報（Brief）", tools: [] },
-          { step: 2, title: "功能利益轉化", description: "Consumer Insight Analyst 將每項產品功能轉譯為明確的功能利益（Functional Benefit），使用 osp_marketing_tools Product Value Map Generator：features → position statements", owner: "consumer_insight_analyst", output: "功能利益清單（Feature → Functional Benefit Map）", tools: ["osp_marketing_tools: Product Value Map Generator"] },
-          { step: 3, title: "情感利益挖掘", description: "Emotional Brand Specialist 對每項功能利益往上挖掘對應的情感利益，依 marketing-strategy-pmm Messaging Hierarchy（Headline → Benefits → Features → Proof）整合", owner: "emotional_brand_specialist", output: "情感利益映射表（Functional → Emotional Benefit）", tools: ["marketing-strategy-pmm: Messaging Hierarchy"] },
-          { step: 4, title: "利益階梯訊息框架建構", description: "Messaging Strategist 整合前兩步，產出完整 Message Ladder：品牌主張 → 功能利益 → 情感利益 → 社會認同 → 行動呼籲", owner: "messaging_strategist", output: "完整 Message Ladder 文件", tools: ["osp_marketing_tools: Tagline Generator", "marketing-strategy-pmm: Messaging Hierarchy"] },
-          { step: 5, title: "轉換文案與廣告訊息落地", description: "Conversion Copywriter 將 Message Ladder 轉化為廣告 Headline、Landing Page Copy、Email Subject Lines；Ad Messaging Validator 用 A/B 框架評估效力", owner: "conversion_copywriter", output: "廣告文案包（Ads / LP / Email）", tools: ["marketing-strategy-pmm: Messaging Hierarchy"] },
+          { step: 1, title: "Squad Lead Intake：產品功能與受眾盤點", description: "Squad Lead 收集產品功能清單、目標受眾、現有訊息，評估目前定位成熟度，Brief 成員任務範疇", owner: "squad_lead", output: "任務簡報（Brief）", tools: [], requiredSkills: ["benefit-laddering", "consumer-psychology", "feature-analysis"] },
+          { step: 2, title: "功能利益轉化", description: "Consumer Insight Analyst 將每項產品功能轉譯為明確的功能利益（Functional Benefit），使用 osp_marketing_tools Product Value Map Generator：features → position statements", owner: "consumer_insight_analyst", output: "功能利益清單（Feature → Functional Benefit Map）", tools: ["osp_marketing_tools: Product Value Map Generator"], requiredSkills: ["emotional-branding", "brand-psychology", "consumer-insights"] },
+          { step: 3, title: "情感利益挖掘", description: "Emotional Brand Specialist 對每項功能利益往上挖掘對應的情感利益，依 marketing-strategy-pmm Messaging Hierarchy（Headline → Benefits → Features → Proof）整合", owner: "emotional_brand_specialist", output: "情感利益映射表（Functional → Emotional Benefit）", tools: ["marketing-strategy-pmm: Messaging Hierarchy"], requiredSkills: ["messaging", "brand-voice", "copywriting", "positioning"] },
+          { step: 4, title: "利益階梯訊息框架建構", description: "Messaging Strategist 整合前兩步，產出完整 Message Ladder：品牌主張 → 功能利益 → 情感利益 → 社會認同 → 行動呼籲", owner: "messaging_strategist", output: "完整 Message Ladder 文件", tools: ["osp_marketing_tools: Tagline Generator", "marketing-strategy-pmm: Messaging Hierarchy"], requiredSkills: ["copywriting", "brand-voice", "positioning", "brand-strategy"] },
+          { step: 5, title: "轉換文案與廣告訊息落地", description: "Conversion Copywriter 將 Message Ladder 轉化為廣告 Headline、Landing Page Copy、Email Subject Lines；Ad Messaging Validator 用 A/B 框架評估效力", owner: "conversion_copywriter", output: "廣告文案包（Ads / LP / Email）", tools: ["marketing-strategy-pmm: Messaging Hierarchy"], requiredSkills: ["content-strategy", "omnichannel", "messaging", "ad-creative"] },
           { step: 6, title: "Squad Lead QA & 利益階梯定位書交付", description: "Squad Lead 校閱全部輸出，確保階梯一致性與情感共鳴，輸出最終品牌利益定位書", owner: "squad_lead", output: "利益階梯定位書（Benefit-Based Positioning Deck）", tools: [] },
         ],
       });
@@ -769,16 +819,21 @@ async function main() {
       const taskType = "differentiation-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["brand-strategy", "positioning", "strategy", "gtm", "cmo", "differentiation"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["competitor-analysis", "competitive-analysis", "competitive-intelligence", "market-research"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["brand-identity", "brand-dna", "brand-strategy", "creative-strategy"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["sales-enablement", "battlecard", "win-loss", "product-marketing", "pmm"], used);
-      if (m4) used.push(m4);
-      const m5 = await findAgent(conn, ["market-research", "research", "analysis", "insight", "consumer-insights"], used);
-      if (m5) used.push(m5);
+      const leadSkills = ["brand-strategy", "positioning", "strategy", "gtm", "cmo", "differentiation"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["competitor-analysis", "competitive-analysis", "competitive-intelligence", "market-research"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["brand-identity", "brand-dna", "brand-strategy", "creative-strategy"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["sales-enablement", "battlecard", "win-loss", "product-marketing", "pmm"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
+      const m5Skills = ["market-research", "research", "analysis", "insight", "consumer-insights"];
+      const m5 = await findAgent(conn, m5Skills, used);
+      if (m5) { used.push(m5); await assignSkillsToAgent(conn, m5, m5Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "differentiation_strategist",    order: 1 },
@@ -793,11 +848,11 @@ async function main() {
         name: "差異化定位流程（April Dunford Method）",
         description: "系統性找出競品尚未佔據的差異化空間，以 April Dunford Obviously Awesome 方法論為核心：獨特屬性 → 客戶價值 → 市場類別 → 宣告並固守。搭配 Battlecard 與 Win/Loss 分析落地。",
         steps: [
-          { step: 1, title: "Squad Lead Intake：競爭現況與品牌優勢盤點", description: "Squad Lead 收集品牌現有定位、已知競品、客戶反饋，評估差異化成熟度，確認 April Dunford 方法論適用範疇", owner: "squad_lead", output: "競爭盤點簡報（Competitive Audit Brief）", tools: [] },
-          { step: 2, title: "獨特屬性識別（Isolate Unique Attributes）", description: "Competitive Intelligence Analyst 系統性列出品牌相對競品的所有獨特屬性（功能、技術、流程、團隊），使用 marketing-strategy-pmm April Dunford 框架過濾真正差異化的屬性", owner: "competitive_intelligence_analyst", output: "差異化屬性清單（Unique Attributes List）", tools: ["marketing-strategy-pmm: April Dunford – Isolate Unique Attributes"] },
-          { step: 3, title: "客戶價值映射（Map to Customer Value）", description: "Brand Identity Specialist 將每項獨特屬性對映至客戶真實重視的價值（cost savings / risk reduction / strategic value），移除客戶不在乎的假差異化", owner: "brand_identity_specialist", output: "客戶價值映射表（Attribute → Customer Value Map）", tools: ["marketing-strategy-pmm: April Dunford – Map to Customer Value"] },
-          { step: 4, title: "市場類別選定（Choose Market Category）", description: "Differentiation Strategist 根據最強差異化屬性選定最有利的市場類別框架（新品類 / 子品類 / 重新框架既有類別），確立品牌在該類別的領導地位", owner: "differentiation_strategist", output: "市場類別宣言（Market Category Statement）", tools: ["marketing-strategy-pmm: April Dunford – Choose Market Category"] },
-          { step: 5, title: "Battlecard & Win/Loss 分析", description: "Battlecard PMM 產出競品對比 Battlecard（我方優勢 vs 各競品弱點），使用 marketing-strategy-pmm Win/Loss Analysis Template 驗證差異化主張是否在實際銷售中成立", owner: "battlecard_pmm", output: "競品 Battlecard 套組 + Win/Loss 分析報告", tools: ["marketing-strategy-pmm: Battlecard Template", "marketing-strategy-pmm: Win/Loss Analysis"] },
+          { step: 1, title: "Squad Lead Intake：競爭現況與品牌優勢盤點", description: "Squad Lead 收集品牌現有定位、已知競品、客戶反饋，評估差異化成熟度，確認 April Dunford 方法論適用範疇", owner: "squad_lead", output: "競爭盤點簡報（Competitive Audit Brief）", tools: [], requiredSkills: ["competitive-analysis", "market-research", "competitor-intelligence"] },
+          { step: 2, title: "獨特屬性識別（Isolate Unique Attributes）", description: "Competitive Intelligence Analyst 系統性列出品牌相對競品的所有獨特屬性（功能、技術、流程、團隊），使用 marketing-strategy-pmm April Dunford 框架過濾真正差異化的屬性", owner: "competitive_intelligence_analyst", output: "差異化屬性清單（Unique Attributes List）", tools: ["marketing-strategy-pmm: April Dunford – Isolate Unique Attributes"], requiredSkills: ["brand-strategy", "differentiation", "positioning", "product-marketing"] },
+          { step: 3, title: "客戶價值映射（Map to Customer Value）", description: "Brand Identity Specialist 將每項獨特屬性對映至客戶真實重視的價值（cost savings / risk reduction / strategic value），移除客戶不在乎的假差異化", owner: "brand_identity_specialist", output: "客戶價值映射表（Attribute → Customer Value Map）", tools: ["marketing-strategy-pmm: April Dunford – Map to Customer Value"], requiredSkills: ["positioning", "brand-strategy", "copywriting", "pmm"] },
+          { step: 4, title: "市場類別選定（Choose Market Category）", description: "Differentiation Strategist 根據最強差異化屬性選定最有利的市場類別框架（新品類 / 子品類 / 重新框架既有類別），確立品牌在該類別的領導地位", owner: "differentiation_strategist", output: "市場類別宣言（Market Category Statement）", tools: ["marketing-strategy-pmm: April Dunford – Choose Market Category"], requiredSkills: ["battlecard", "sales-enablement", "competitive-analysis", "pmm"] },
+          { step: 5, title: "Battlecard & Win/Loss 分析", description: "Battlecard PMM 產出競品對比 Battlecard（我方優勢 vs 各競品弱點），使用 marketing-strategy-pmm Win/Loss Analysis Template 驗證差異化主張是否在實際銷售中成立", owner: "battlecard_pmm", output: "競品 Battlecard 套組 + Win/Loss 分析報告", tools: ["marketing-strategy-pmm: Battlecard Template", "marketing-strategy-pmm: Win/Loss Analysis"], requiredSkills: ["win-loss", "sales-enablement", "competitive-intelligence", "market-research"] },
           { step: 6, title: "Squad Lead QA & 差異化定位書交付", description: "Squad Lead 確認差異化主張在市場、銷售、產品三端的一致性，輸出可落地的差異化定位書", owner: "squad_lead", output: "差異化定位書（Differentiation Positioning Playbook）", tools: [] },
         ],
       });
@@ -831,16 +886,21 @@ async function main() {
       const taskType = "value-proposition-mapping";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["gtm", "b2b", "product-marketing", "pmm", "demand-gen", "saas"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["icp", "customer-research", "b2b", "firmographic", "segmentation", "buyer-persona"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["value-proposition", "positioning", "product-marketing", "b2b", "saas"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["copywriting", "messaging", "content-strategy", "brand-voice", "landing-page"], used);
-      if (m4) used.push(m4);
-      const m5 = await findAgent(conn, ["sales-enablement", "sales-deck", "collateral", "demand-gen", "cro"], used);
-      if (m5) used.push(m5);
+      const leadSkills = ["gtm", "b2b", "product-marketing", "pmm", "demand-gen", "saas"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["icp", "customer-research", "b2b", "firmographic", "segmentation", "buyer-persona"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["value-proposition", "positioning", "product-marketing", "b2b", "saas"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["copywriting", "messaging", "content-strategy", "brand-voice", "landing-page"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
+      const m5Skills = ["sales-enablement", "sales-deck", "collateral", "demand-gen", "cro"];
+      const m5 = await findAgent(conn, m5Skills, used);
+      if (m5) { used.push(m5); await assignSkillsToAgent(conn, m5, m5Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "gtm_value_strategist",   order: 1 },
@@ -855,11 +915,11 @@ async function main() {
         name: "價值主張映射流程（Value Proposition Mapping）",
         description: "B2B/SaaS 核心定位工具：將產品功能對映至買家痛點，定義 ICP，生成市場/技術/UX/商業四維度定位聲明，直接轉化為銷售素材與廣告文案。工具：osp_marketing_tools Value Map + marketing-strategy-pmm ICP。",
         steps: [
-          { step: 1, title: "Squad Lead Intake：產品功能清單 + 初步 ICP 定義", description: "Squad Lead 收集產品功能列表、已知客戶類型、主要競品，評估 messaging-market fit 現況，確認 Value Mapping 優先聚焦的買家類型", owner: "squad_lead", output: "產品功能清單 + ICP 初稿（Brief）", tools: [] },
-          { step: 2, title: "ICP 精確定義（Firmographic → Psychographic）", description: "ICP Researcher 使用 marketing-strategy-pmm ICP Scoring 框架，從 Firmographics → Technographics → Psychographics → Buyer Personas 三層遞進，建立 A/B/C/D ICP 評分模型", owner: "icp_researcher", output: "ICP 定義文件（含 A/B/C/D 評分）", tools: ["marketing-strategy-pmm: ICP Scoring (A/B/C/D)", "marketing-strategy-pmm: Buyer Persona Template"] },
-          { step: 3, title: "痛點與功能價值對應（Pain → Feature → Benefit）", description: "Value Map Architect 使用 osp_marketing_tools Product Value Map Generator，為每個 ICP Persona 生成 Pain Points → Features → Benefits → Position Statements 的完整映射", owner: "value_map_architect", output: "價值映射矩陣（每 ICP × 每功能）", tools: ["osp_marketing_tools: Product Value Map Generator"] },
-          { step: 4, title: "四維度定位聲明生成（Market / Technical / UX / Business）", description: "Value Map Architect 使用 osp_marketing_tools 生成四個維度的定位聲明：Market Position（市場）、Technical Position（技術）、UX Position（體驗）、Business Position（商業價值），再由 Messaging Copywriter 精煉文字", owner: "value_map_architect", output: "四維度定位聲明文件", tools: ["osp_marketing_tools: Position Statement Generator (4 dimensions)"] },
-          { step: 5, title: "銷售素材與廣告文案轉化", description: "Messaging Copywriter 將定位聲明轉化為 Landing Page Copy、Sales Deck、Ad Headlines；Sales Collateral PMM 打包為可直接使用的銷售素材包", owner: "messaging_copywriter", output: "銷售素材包（LP / Sales Deck / Ads）", tools: ["marketing-strategy-pmm: Value Proposition Formula"] },
+          { step: 1, title: "Squad Lead Intake：產品功能清單 + 初步 ICP 定義", description: "Squad Lead 收集產品功能列表、已知客戶類型、主要競品，評估 messaging-market fit 現況，確認 Value Mapping 優先聚焦的買家類型", owner: "squad_lead", output: "產品功能清單 + ICP 初稿（Brief）", tools: [], requiredSkills: ["icp", "customer-research", "b2b", "pain-point-analysis"] },
+          { step: 2, title: "ICP 精確定義（Firmographic → Psychographic）", description: "ICP Researcher 使用 marketing-strategy-pmm ICP Scoring 框架，從 Firmographics → Technographics → Psychographics → Buyer Personas 三層遞進，建立 A/B/C/D ICP 評分模型", owner: "icp_researcher", output: "ICP 定義文件（含 A/B/C/D 評分）", tools: ["marketing-strategy-pmm: ICP Scoring (A/B/C/D)", "marketing-strategy-pmm: Buyer Persona Template"], requiredSkills: ["value-proposition", "positioning", "product-marketing", "b2b"] },
+          { step: 3, title: "痛點與功能價值對應（Pain → Feature → Benefit）", description: "Value Map Architect 使用 osp_marketing_tools Product Value Map Generator，為每個 ICP Persona 生成 Pain Points → Features → Benefits → Position Statements 的完整映射", owner: "value_map_architect", output: "價值映射矩陣（每 ICP × 每功能）", tools: ["osp_marketing_tools: Product Value Map Generator"], requiredSkills: ["positioning", "brand-strategy", "pmm", "copywriting"] },
+          { step: 4, title: "四維度定位聲明生成（Market / Technical / UX / Business）", description: "Value Map Architect 使用 osp_marketing_tools 生成四個維度的定位聲明：Market Position（市場）、Technical Position（技術）、UX Position（體驗）、Business Position（商業價值），再由 Messaging Copywriter 精煉文字", owner: "value_map_architect", output: "四維度定位聲明文件", tools: ["osp_marketing_tools: Position Statement Generator (4 dimensions)"], requiredSkills: ["gtm", "messaging", "content-strategy", "demand-gen"] },
+          { step: 5, title: "銷售素材與廣告文案轉化", description: "Messaging Copywriter 將定位聲明轉化為 Landing Page Copy、Sales Deck、Ad Headlines；Sales Collateral PMM 打包為可直接使用的銷售素材包", owner: "messaging_copywriter", output: "銷售素材包（LP / Sales Deck / Ads）", tools: ["marketing-strategy-pmm: Value Proposition Formula"], requiredSkills: ["sales-enablement", "sales-deck", "collateral", "demand-gen"] },
           { step: 6, title: "Squad Lead QA & 價值主張定位書交付", description: "Squad Lead 確認四維度聲明的一致性與競爭差異化，輸出完整 Value Proposition Playbook", owner: "squad_lead", output: "價值主張定位書（Value Proposition Playbook）", tools: [] },
         ],
       });
@@ -894,16 +954,21 @@ async function main() {
       const taskType = "segmentation-based-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["segmentation", "audience", "analytics", "consumer-insights", "data", "research"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["data", "analytics", "data-analysis", "survey", "research", "quantitative"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["persona", "consumer-insights", "behavioral", "customer-research", "qualitative"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["icp", "b2b", "product-marketing", "pmm", "buyer-persona", "segmentation"], used);
-      if (m4) used.push(m4);
-      const m5 = await findAgent(conn, ["personalization", "channel-strategy", "audience-targeting", "paid-social", "media-planning"], used);
-      if (m5) used.push(m5);
+      const leadSkills = ["segmentation", "audience", "analytics", "consumer-insights", "data", "research"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["data", "analytics", "data-analysis", "survey", "research", "quantitative"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["persona", "consumer-insights", "behavioral", "customer-research", "qualitative"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["icp", "b2b", "product-marketing", "pmm", "buyer-persona", "segmentation"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
+      const m5Skills = ["personalization", "channel-strategy", "audience-targeting", "paid-social", "media-planning"];
+      const m5 = await findAgent(conn, m5Skills, used);
+      if (m5) { used.push(m5); await assignSkillsToAgent(conn, m5, m5Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "segmentation_strategist",   order: 1 },
@@ -918,11 +983,11 @@ async function main() {
         name: "分眾定位流程（Segmentation-Based Positioning）",
         description: "針對不同受眾群體建立差異化定位，而非廣播式一刀切。使用 Madison Research Agents 進行問卷分析與合成 Persona 開發，搭配 marketing-strategy-pmm ICP 評分模型（A/B/C/D）優先排序目標客群。McKinsey 資料顯示有效個人化可降低 50% 獲客成本。",
         steps: [
-          { step: 1, title: "Squad Lead Intake：受眾現況與分眾目標盤點", description: "Squad Lead 收集現有客戶資料、已知受眾假設、行銷目標，評估分眾定位的必要性與優先分群方向", owner: "squad_lead", output: "分眾定位簡報（Segmentation Brief）", tools: [] },
-          { step: 2, title: "受眾資料收集與分析（Survey Analysis）", description: "Data Analyst 使用 Madison Research Agents 進行 survey analysis 與二手資料收集，建立受眾基本資料集（人口統計、行為、購買動機）", owner: "data_analyst", output: "受眾資料集（Audience Dataset）", tools: ["Madison: Research Agents – Survey Analysis", "Madison: Research Agents – Secondary Research"] },
-          { step: 3, title: "合成 Persona 開發（Synthetic Persona Development）", description: "Persona Developer 使用 Madison 的 Synthetic Persona Development 與 Preference Modeling 建立 3-5 個資料驅動的 Persona，超越傳統「拍腦袋 Persona」", owner: "persona_developer", output: "合成 Persona 卡片（Data-Driven Personas）", tools: ["Madison: Synthetic Persona Development", "Madison: Preference Modeling"] },
-          { step: 4, title: "ICP 評分與優先排序（A/B/C/D Fit Scoring）", description: "ICP Scoring PMM 使用 marketing-strategy-pmm ICP Scoring 框架，對每個 Persona 進行 A/B/C/D Fit 評分（Firmographic / Technographic / Psychographic / Economic Buyer），確定最優先攻佔的客群", owner: "icp_scoring_pmm", output: "ICP 評分表（Priority Segment Matrix）", tools: ["marketing-strategy-pmm: ICP Scoring A/B/C/D", "marketing-strategy-pmm: Buyer Persona Templates"] },
-          { step: 5, title: "各分群差異化定位與個人化訊息開發", description: "Personalization Strategist 針對每個 A-grade ICP 開發專屬的定位訊息、觸達渠道策略、個人化廣告素材方向", owner: "personalization_strategist", output: "分眾定位訊息矩陣（Segment × Positioning Message）", tools: ["Madison: Preference Modeling"] },
+          { step: 1, title: "Squad Lead Intake：受眾現況與分眾目標盤點", description: "Squad Lead 收集現有客戶資料、已知受眾假設、行銷目標，評估分眾定位的必要性與優先分群方向", owner: "squad_lead", output: "分眾定位簡報（Segmentation Brief）", tools: [], requiredSkills: ["segmentation", "market-research", "data-analysis", "quantitative-research"] },
+          { step: 2, title: "受眾資料收集與分析（Survey Analysis）", description: "Data Analyst 使用 Madison Research Agents 進行 survey analysis 與二手資料收集，建立受眾基本資料集（人口統計、行為、購買動機）", owner: "data_analyst", output: "受眾資料集（Audience Dataset）", tools: ["Madison: Research Agents – Survey Analysis", "Madison: Research Agents – Secondary Research"], requiredSkills: ["icp", "b2b", "scoring-model", "data-analysis", "segmentation"] },
+          { step: 3, title: "合成 Persona 開發（Synthetic Persona Development）", description: "Persona Developer 使用 Madison 的 Synthetic Persona Development 與 Preference Modeling 建立 3-5 個資料驅動的 Persona，超越傳統「拍腦袋 Persona」", owner: "persona_developer", output: "合成 Persona 卡片（Data-Driven Personas）", tools: ["Madison: Synthetic Persona Development", "Madison: Preference Modeling"], requiredSkills: ["persona", "consumer-insights", "qualitative-research", "behavioral-analysis"] },
+          { step: 4, title: "ICP 評分與優先排序（A/B/C/D Fit Scoring）", description: "ICP Scoring PMM 使用 marketing-strategy-pmm ICP Scoring 框架，對每個 Persona 進行 A/B/C/D Fit 評分（Firmographic / Technographic / Psychographic / Economic Buyer），確定最優先攻佔的客群", owner: "icp_scoring_pmm", output: "ICP 評分表（Priority Segment Matrix）", tools: ["marketing-strategy-pmm: ICP Scoring A/B/C/D", "marketing-strategy-pmm: Buyer Persona Templates"], requiredSkills: ["positioning", "brand-strategy", "pmm", "messaging"] },
+          { step: 5, title: "各分群差異化定位與個人化訊息開發", description: "Personalization Strategist 針對每個 A-grade ICP 開發專屬的定位訊息、觸達渠道策略、個人化廣告素材方向", owner: "personalization_strategist", output: "分眾定位訊息矩陣（Segment × Positioning Message）", tools: ["Madison: Preference Modeling"], requiredSkills: ["channel-strategy", "personalization", "audience-targeting", "media-planning"] },
           { step: 6, title: "Squad Lead QA & 分眾定位矩陣交付", description: "Squad Lead 確認各分群定位的差異化與協同性，輸出完整分眾定位矩陣與執行建議", owner: "squad_lead", output: "分眾定位矩陣（Segmentation Positioning Playbook）", tools: [] },
         ],
       });
@@ -957,16 +1022,21 @@ async function main() {
       const taskType = "competitive-perceptual-mapping";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["competitive-analysis", "competitor-analysis", "market-research", "strategy", "positioning"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["competitor-analysis", "competitive-intelligence", "web-research", "monitoring"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["market-research", "research", "trend-analysis", "secondary-research", "intelligence"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["data", "analytics", "data-visualization", "analysis", "reporting"], used);
-      if (m4) used.push(m4);
-      const m5 = await findAgent(conn, ["brand-strategy", "positioning", "gtm", "channel-strategy", "ad-targeting"], used);
-      if (m5) used.push(m5);
+      const leadSkills = ["competitive-analysis", "competitor-analysis", "market-research", "strategy", "positioning"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["competitor-analysis", "competitive-intelligence", "web-research", "monitoring"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["market-research", "research", "trend-analysis", "secondary-research", "intelligence"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["data", "analytics", "data-visualization", "analysis", "reporting"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
+      const m5Skills = ["brand-strategy", "positioning", "gtm", "channel-strategy", "ad-targeting"];
+      const m5 = await findAgent(conn, m5Skills, used);
+      if (m5) { used.push(m5); await assignSkillsToAgent(conn, m5, m5Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "competitive_perceptual_strategist", order: 1 },
@@ -981,11 +1051,11 @@ async function main() {
         name: "競爭感知圖流程（Competitive Perceptual Mapping）",
         description: "系統繪製品牌 vs 競品的雙軸感知地圖（價格/品質、創新/傳統等），識別未被佔據的市場白空間。工具：octolens 競品即時監控 + Madison Intelligence Agents MarketMind Research + marketing-strategy-pmm Competitive Positioning Map。",
         steps: [
-          { step: 1, title: "Squad Lead Intake：競品範疇定義與地圖維度假設", description: "Squad Lead 確認需要納入的競品範疇（直接/間接競品）、感知地圖的初步維度假設（如：價格 vs 品質、傳統 vs 創新），訂定資料收集計劃", owner: "squad_lead", output: "競品範疇清單 + 初步維度假設（Brief）", tools: [] },
-          { step: 2, title: "競品即時數據監控（Real-time Competitor Tracking）", description: "Competitor Monitor 使用 octolens 對目標競品進行即時網頁資料抽取，收集官網定位訊息、廣告文案、定價頁面、PR 發稿等資料", owner: "competitor_monitor", output: "競品原始資料集（Competitor Raw Data）", tools: ["octolens: Competitor Monitoring & Web Data Extraction"] },
-          { step: 3, title: "市場情報深度分析（MarketMind Research）", description: "Market Intelligence Analyst 使用 Madison Intelligence Agents 的 MarketMind Research 模組，進行 reputation monitoring、trend analysis 與市場二手資料研究，補充 octolens 原始數據的深度解讀", owner: "market_intelligence_analyst", output: "市場情報分析報告", tools: ["Madison: Intelligence Agents – MarketMind Research", "Madison: Intelligence Agents – Reputation Monitoring", "Madison: Intelligence Agents – Trend Analysis"] },
-          { step: 4, title: "感知地圖繪製（Perceptual Map Construction）", description: "Data Visualization Specialist 使用 marketing-strategy-pmm Competitive Positioning Map 框架，根據研究結果選定最具區分度的 2 個維度軸，繪製品牌 vs 競品的二維感知定位圖", owner: "data_visualization_specialist", output: "競爭感知地圖（Perceptual Map）", tools: ["marketing-strategy-pmm: Competitive Positioning Map Construction", "marketing-strategy-pmm: positioning-frameworks.md"] },
-          { step: 5, title: "白空間識別與定位機會建議", description: "Positioning Strategist 分析感知地圖，識別競品尚未佔據的白空間，評估品牌進入白空間的可行性，提出 2-3 個差異化定位方向及對應的廣告策略、渠道策略、定價建議", owner: "positioning_strategist", output: "白空間機會分析 + 定位方向建議書", tools: ["marketing-strategy-pmm: Whitespace Analysis"] },
+          { step: 1, title: "Squad Lead Intake：競品範疇定義與地圖維度假設", description: "Squad Lead 確認需要納入的競品範疇（直接/間接競品）、感知地圖的初步維度假設（如：價格 vs 品質、傳統 vs 創新），訂定資料收集計劃", owner: "squad_lead", output: "競品範疇清單 + 初步維度假設（Brief）", tools: [], requiredSkills: ["competitive-intelligence", "competitor-analysis", "market-monitoring"] },
+          { step: 2, title: "競品即時數據監控（Real-time Competitor Tracking）", description: "Competitor Monitor 使用 octolens 對目標競品進行即時網頁資料抽取，收集官網定位訊息、廣告文案、定價頁面、PR 發稿等資料", owner: "competitor_monitor", output: "競品原始資料集（Competitor Raw Data）", tools: ["octolens: Competitor Monitoring & Web Data Extraction"], requiredSkills: ["market-research", "positioning", "competitive-analysis", "brand-strategy"] },
+          { step: 3, title: "市場情報深度分析（MarketMind Research）", description: "Market Intelligence Analyst 使用 Madison Intelligence Agents 的 MarketMind Research 模組，進行 reputation monitoring、trend analysis 與市場二手資料研究，補充 octolens 原始數據的深度解讀", owner: "market_intelligence_analyst", output: "市場情報分析報告", tools: ["Madison: Intelligence Agents – MarketMind Research", "Madison: Intelligence Agents – Reputation Monitoring", "Madison: Intelligence Agents – Trend Analysis"], requiredSkills: ["data-visualization", "analysis", "competitive-analysis", "reporting"] },
+          { step: 4, title: "感知地圖繪製（Perceptual Map Construction）", description: "Data Visualization Specialist 使用 marketing-strategy-pmm Competitive Positioning Map 框架，根據研究結果選定最具區分度的 2 個維度軸，繪製品牌 vs 競品的二維感知定位圖", owner: "data_visualization_specialist", output: "競爭感知地圖（Perceptual Map）", tools: ["marketing-strategy-pmm: Competitive Positioning Map Construction", "marketing-strategy-pmm: positioning-frameworks.md"], requiredSkills: ["market-research", "positioning", "strategy", "competitive-analysis"] },
+          { step: 5, title: "白空間識別與定位機會建議", description: "Positioning Strategist 分析感知地圖，識別競品尚未佔據的白空間，評估品牌進入白空間的可行性，提出 2-3 個差異化定位方向及對應的廣告策略、渠道策略、定價建議", owner: "positioning_strategist", output: "白空間機會分析 + 定位方向建議書", tools: ["marketing-strategy-pmm: Whitespace Analysis"], requiredSkills: ["brand-strategy", "positioning", "gtm", "ad-targeting"] },
           { step: 6, title: "Squad Lead QA & 感知定位報告交付", description: "Squad Lead 整合感知地圖 + 白空間分析 + 定位建議，輸出完整競爭感知定位報告，直接用於廣告策略、渠道規劃、定價決策", owner: "squad_lead", output: "競爭感知定位報告（Competitive Perceptual Positioning Report）", tools: [] },
         ],
       });
@@ -1022,14 +1092,18 @@ async function main() {
       const taskType = "category-design-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["category-design", "category-creation", "market-creation", "thought-leadership", "brand-strategy", "positioning"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["content-strategy", "thought-leadership", "narrative", "storytelling", "brand-voice"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["market-research", "market-analysis", "industry-research", "competitive-intelligence"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["gtm", "go-to-market", "launch-strategy", "product-marketing", "growth"], used);
-      if (m4) used.push(m4);
+      const leadSkills = ["category-design", "category-creation", "market-creation", "thought-leadership", "brand-strategy", "positioning"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["content-strategy", "thought-leadership", "narrative", "storytelling", "brand-voice"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["market-research", "market-analysis", "industry-research", "competitive-intelligence"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["gtm", "go-to-market", "launch-strategy", "product-marketing", "growth"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "category_designer",      order: 1 },
@@ -1048,36 +1122,42 @@ async function main() {
             description: "用 Madison MarketMind Research Agents 分析現有市場結構，找出尚未被命名的問題空間（problem space）。識別消費者還沒意識到自己有的「痛點」。",
             tool: "madison-market-research",
             outputType: "category_problem_brief",
+            requiredSkills: ["market-research", "category-design", "industry-analysis", "market-creation"],
           },
           {
             order: 2, name: "品類 POV（觀點）建立",
             description: "撰寫品類的核心觀點文件（Category POV）：為什麼現有解法不夠好？你的品類為何是唯一的正確答案？格式：問題陳述 → 舊世界 vs 新世界 → 品類宣言。",
             tool: "osp_marketing_tools",
             outputType: "category_pov_document",
+            requiredSkills: ["thought-leadership", "brand-strategy", "copywriting", "category-design"],
           },
           {
             order: 3, name: "競品重新框架",
             description: "用 octolens 監控競品如何自我定位，用 marketing-strategy-pmm Battlecard 工具記錄競品弱點，然後把競品定位為解決舊問題的「傳統方案」，而你的品牌解決的是全新的問題。",
             tool: "octolens",
             outputType: "competitive_reframe_map",
+            requiredSkills: ["competitive-analysis", "positioning", "brand-strategy", "battlecard"],
           },
           {
             order: 4, name: "品類藍圖設計",
             description: "用 osp_marketing_tools Value Map Generator 繪製品類全景：品類名稱、子品類結構、典型客戶旅程、品類關鍵詞。建立你的品牌在品類中的「Category King」座標。",
             tool: "osp_marketing_tools",
             outputType: "category_blueprint",
+            requiredSkills: ["category-design", "brand-strategy", "market-creation", "gtm"],
           },
           {
             order: 5, name: "思想領袖內容策略",
             description: "設計讓你教育市場、成為品類代言人的內容計劃：白皮書主題、演講敘事、播客議程、LinkedIn 系列文章。目標：讓媒體和分析師用你的品類語言報導市場。",
             tool: "internal",
             outputType: "thought_leadership_content_plan",
+            requiredSkills: ["thought-leadership", "content-strategy", "narrative", "brand-voice"],
           },
           {
             order: 6, name: "品類生態系規劃",
             description: "識別潛在的盟友（投資人、合作夥伴、早期採用者社群）共同建立品類生態系。設計品類論壇、認證計劃或社群活動讓品類變成運動。",
             tool: "internal",
             outputType: "ecosystem_strategy",
+            requiredSkills: ["gtm", "partnership", "community", "go-to-market"],
           },
         ],
       });
@@ -1111,14 +1191,18 @@ async function main() {
       const taskType = "mind-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["positioning", "brand-positioning", "brand-strategy", "mind-share", "market-leadership"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["competitive-intelligence", "competitive-analysis", "competitor-research", "market-analysis"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["messaging", "brand-voice", "copywriting", "brand-narrative"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["advertising", "campaign-strategy", "media-planning", "ad-strategy"], used);
-      if (m4) used.push(m4);
+      const leadSkills = ["positioning", "brand-positioning", "brand-strategy", "mind-share", "market-leadership"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["competitive-intelligence", "competitive-analysis", "competitor-research", "market-analysis"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["messaging", "brand-voice", "copywriting", "brand-narrative"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["advertising", "campaign-strategy", "media-planning", "ad-strategy"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "mind_positioning_strategist", order: 1 },
@@ -1137,36 +1221,42 @@ async function main() {
             description: "用 octolens 和 Madison MarketMind 掃描目標市場的「心智梯子」：品類前三名品牌分別佔據哪個屬性？消費者說到品類第一個聯想到誰？識別已被佔領和空缺的心智位置。",
             tool: "octolens",
             outputType: "mind_ladder_map",
+            requiredSkills: ["competitive-intelligence", "market-research", "brand-positioning", "mind-share"],
           },
           {
             order: 2, name: "梯子位置分析",
             description: "用 marketing-strategy-pmm 競品分析工具繪製「心智梯子」：第一名的品牌佔什麼位置？第二名的策略是跟隨還是反定位？評估你的品牌目前在消費者心智中的位階。",
             tool: "marketing-strategy-pmm",
             outputType: "ladder_position_analysis",
+            requiredSkills: ["competitive-analysis", "positioning", "brand-strategy", "market-leadership"],
           },
           {
             order: 3, name: "核心屬性選擇",
             description: "選擇一個尚未被競品完全佔領的核心屬性（速度、安全、天然、創新…），確保這個屬性夠獨特、夠重要且你能真正擁有它。用 osp_marketing_tools 驗證屬性的品牌共鳴度。",
             tool: "osp_marketing_tools",
             outputType: "core_attribute_selection",
+            requiredSkills: ["brand-strategy", "positioning", "brand-voice", "differentiation"],
           },
           {
             order: 4, name: "競品重定位策略",
             description: "設計「重定位競品」策略（如 Avis 的 We Try Harder、7-Up 的 Uncola）：承認你不是第一，但把第一的位置重新定義，讓你的屬性更重要。或找到品類第二名的機會位置。",
             tool: "marketing-strategy-pmm",
             outputType: "repositioning_strategy",
+            requiredSkills: ["positioning", "brand-strategy", "competitive-analysis", "copywriting"],
           },
           {
             order: 5, name: "定位聲明與訊息",
             description: "撰寫符合「心智佔位」原則的定位聲明：單一屬性、極度清晰、無歧義。用 osp_marketing_tools Value Map Generator 確保訊息一致性，建立所有通路的統一定位語言。",
             tool: "osp_marketing_tools",
             outputType: "positioning_statement",
+            requiredSkills: ["messaging", "copywriting", "brand-voice", "positioning"],
           },
           {
             order: 6, name: "心智強化媒體計劃",
             description: "設計讓心智佔位持續強化的媒體策略：哪些媒體管道能最有效地在目標受眾心智中植入你的屬性？設計重複性強化的廣告訊息節奏。",
             tool: "internal",
             outputType: "mind_reinforcement_media_plan",
+            requiredSkills: ["advertising", "media-planning", "campaign-strategy", "ad-strategy"],
           },
         ],
       });
@@ -1200,14 +1290,18 @@ async function main() {
       const taskType = "jtbd-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["jobs-to-be-done", "jtbd", "customer-research", "user-research", "product-marketing"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["qualitative-research", "interview-analysis", "customer-insights", "consumer-insights"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["product-positioning", "product-marketing", "pmm", "gtm"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["messaging", "copywriting", "brand-voice", "content-strategy"], used);
-      if (m4) used.push(m4);
+      const leadSkills = ["jobs-to-be-done", "jtbd", "customer-research", "user-research", "product-marketing"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["qualitative-research", "interview-analysis", "customer-insights", "consumer-insights"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["product-positioning", "product-marketing", "pmm", "gtm"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["messaging", "copywriting", "brand-voice", "content-strategy"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "jtbd_strategist",         order: 1 },
@@ -1226,30 +1320,35 @@ async function main() {
             description: "用 Madison Synthetic Persona Agents 和 MarketMind Research 模擬客戶「雇用」產品的情境：他們在完成什麼更大的任務？觸發點是什麼？成功看起來是什麼樣子？建立 Job Map（開始 → 準備 → 執行 → 結束）。",
             tool: "madison-market-research",
             outputType: "job_map",
+            requiredSkills: ["jobs-to-be-done", "jtbd", "customer-research", "qualitative-research"],
           },
           {
             order: 2, name: "Switch Interview 分析",
             description: "模擬客戶從舊方案切換到你的產品的「轉換故事」：四個力（推力 Push、拉力 Pull、焦慮 Anxiety、習慣 Habit）分析。識別哪些 Job 已有足夠強的切換驅動力，哪些還需要教育。",
             tool: "madison-market-research",
             outputType: "switch_analysis",
+            requiredSkills: ["jtbd", "customer-research", "behavioral-analysis", "user-research"],
           },
           {
             order: 3, name: "競爭替代品重定義",
             description: "不按傳統行業分類定義競品，而是問「客戶不用你的產品時，他們用什麼完成同一個 Job」？用 marketing-strategy-pmm ICP 工具和 octolens 找出真正的任務替代品（可能是完全不同行業的產品）。",
             tool: "marketing-strategy-pmm",
             outputType: "job_based_competitor_map",
+            requiredSkills: ["competitive-analysis", "jtbd", "market-research", "product-marketing"],
           },
           {
             order: 4, name: "JTBD 定位聲明",
             description: "圍繞 Job 寫定位聲明（不是人口統計，是情境）：「當 [情境] 時，[目標客戶] 雇用 [產品] 來 [完成任務]，因為它是唯一能 [差異點] 的方案」。用 osp_marketing_tools Value Map Generator 驗證 Job 和效益的對應關係。",
             tool: "osp_marketing_tools",
             outputType: "jtbd_positioning_statement",
+            requiredSkills: ["positioning", "jtbd", "copywriting", "brand-strategy"],
           },
           {
             order: 5, name: "任務驅動訊息框架",
             description: "用 marketing-strategy-pmm PMM 工具建立所有通路的統一訊息框架：官網英雄區塊、廣告標題、銷售話術，全部圍繞 Job 而非功能特性或受眾人口統計。",
             tool: "marketing-strategy-pmm",
             outputType: "jtbd_messaging_framework",
+            requiredSkills: ["messaging", "pmm", "content-strategy", "gtm"],
           },
         ],
       });
@@ -1283,14 +1382,18 @@ async function main() {
       const taskType = "purpose-driven-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["purpose-driven", "brand-purpose", "csr", "sustainability", "social-impact", "brand-strategy"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["brand-voice", "storytelling", "content-strategy", "brand-narrative", "copywriting"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["campaign-strategy", "social-media", "influencer", "community", "dtc"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["consumer-insights", "customer-research", "audience-analysis", "market-research"], used);
-      if (m4) used.push(m4);
+      const leadSkills = ["purpose-driven", "brand-purpose", "csr", "sustainability", "social-impact", "brand-strategy"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["brand-voice", "storytelling", "content-strategy", "brand-narrative", "copywriting"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["campaign-strategy", "social-media", "influencer", "community", "dtc"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["consumer-insights", "customer-research", "audience-analysis", "market-research"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "purpose_strategist",      order: 1 },
@@ -1309,30 +1412,35 @@ async function main() {
             description: "用 Madison MarketMind Research 和 octolens 掃描品牌歷史、現有 CSR 活動、產品特性，找出品牌真實能「擁有」的社會使命。避免 purpose washing——必須有可驗證的行動支撐聲明。",
             tool: "madison-market-research",
             outputType: "purpose_authenticity_audit",
+            requiredSkills: ["brand-purpose", "csr", "brand-strategy", "sustainability"],
           },
           {
             order: 2, name: "目標受眾價值觀對齊",
             description: "用 Madison Synthetic Persona Agents 建立目標受眾的價值觀地圖：他們關心什麼社會議題？什麼使命會讓他們主動選擇你？用 marketing-strategy-pmm ICP 確認 Purpose 與 Ideal Customer 的交集。",
             tool: "marketing-strategy-pmm",
             outputType: "purpose_audience_alignment_map",
+            requiredSkills: ["consumer-insights", "audience-analysis", "brand-purpose", "market-research"],
           },
           {
             order: 3, name: "Purpose 聲明建立",
             description: "用 osp_marketing_tools Value Map Generator 建立三層 Purpose 架構：What（你做什麼）→ How（你怎麼做）→ Why（為什麼這件事重要，比賺錢更重要的理由）。確保 Purpose 夠具體、可行動、可衡量。",
             tool: "osp_marketing_tools",
             outputType: "brand_purpose_statement",
+            requiredSkills: ["brand-purpose", "copywriting", "brand-strategy", "storytelling"],
           },
           {
             order: 4, name: "使命驅動敘事設計",
             description: "設計讓消費者「加入運動」而非「購買產品」的品牌故事框架。格式：英雄不是品牌而是消費者，品牌是賦能者。建立 Manifesto、Signature Campaign 概念（類 Patagonia / Nike 風格）。",
             tool: "osp_marketing_tools",
             outputType: "purpose_narrative_manifesto",
+            requiredSkills: ["storytelling", "brand-narrative", "campaign-strategy", "brand-voice"],
           },
           {
             order: 5, name: "全通路 Purpose 整合",
             description: "確保 Purpose 貫穿所有觸點：產品包裝、官網 About 頁、社群貼文語調、廣告標題、客服話術。設計可追蹤的使命指標（除了銷售，還有什麼數字能證明 Purpose 在發揮作用）。",
             tool: "marketing-strategy-pmm",
             outputType: "purpose_integration_playbook",
+            requiredSkills: ["omnichannel", "content-strategy", "brand-voice", "campaign-strategy"],
           },
         ],
       });
@@ -1366,14 +1474,18 @@ async function main() {
       const taskType = "brand-archetype-positioning";
       const used: number[] = [];
 
-      const leadId = await findAgent(conn, ["brand-archetype", "brand-identity", "brand-personality", "jungian", "brand-strategy"], used);
-      if (leadId) used.push(leadId);
-      const m2 = await findAgent(conn, ["brand-voice", "tone-of-voice", "brand-narrative", "copywriting", "content-strategy"], used);
-      if (m2) used.push(m2);
-      const m3 = await findAgent(conn, ["visual-identity", "creative-direction", "design-strategy", "brand-design"], used);
-      if (m3) used.push(m3);
-      const m4 = await findAgent(conn, ["consumer-insights", "audience-analysis", "brand-perception", "market-research"], used);
-      if (m4) used.push(m4);
+      const leadSkills = ["brand-archetype", "brand-identity", "brand-personality", "jungian", "brand-strategy"];
+      const leadId = await findAgent(conn, leadSkills, used);
+      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
+      const m2Skills = ["brand-voice", "tone-of-voice", "brand-narrative", "copywriting", "content-strategy"];
+      const m2 = await findAgent(conn, m2Skills, used);
+      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
+      const m3Skills = ["visual-identity", "creative-direction", "design-strategy", "brand-design"];
+      const m3 = await findAgent(conn, m3Skills, used);
+      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
+      const m4Skills = ["consumer-insights", "audience-analysis", "brand-perception", "market-research"];
+      const m4 = await findAgent(conn, m4Skills, used);
+      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
 
       const members = [
         leadId && { agent_id: leadId, is_lead: true,  role: "archetype_strategist",   order: 1 },
@@ -1392,30 +1504,35 @@ async function main() {
             description: "用 octolens 爬取品牌既有溝通素材（官網文案、社群貼文、廣告），Madison MarketMind 掃描消費者對品牌的感知描述詞，診斷品牌目前隱性展現的原型是什麼，以及與期望原型的落差。",
             tool: "octolens",
             outputType: "brand_personality_audit",
+            requiredSkills: ["brand-archetype", "brand-identity", "brand-perception", "competitive-analysis"],
           },
           {
             order: 2, name: "原型選擇與組合",
             description: "基於品牌使命、目標受眾心理需求、競品原型地圖，從 Jung 12 原型中選擇主原型（Primary）和輔助原型（Secondary）。避免選擇競品已強勢佔據的原型。建立原型選擇理由書。",
             tool: "marketing-strategy-pmm",
             outputType: "archetype_selection_rationale",
+            requiredSkills: ["brand-archetype", "brand-strategy", "brand-identity", "jungian"],
           },
           {
             order: 3, name: "品牌聲音指南",
             description: "用 osp_marketing_tools Brand Voice Generator 建立以原型為核心的品牌聲音指南：用詞庫（宜用 / 禁用）、句子結構偏好、情緒基調、各通路語調微調（官網 vs 社群 vs 廣告 vs 客服）。",
             tool: "osp_marketing_tools",
             outputType: "brand_voice_guide",
+            requiredSkills: ["brand-voice", "tone-of-voice", "copywriting", "brand-narrative"],
           },
           {
             order: 4, name: "視覺與體驗方向",
             description: "根據原型特質制定視覺方向：配色系統、字型個性、攝影風格、版面偏好。建立體驗設計原則：產品包裝、官網 UX、門市空間（如適用）應傳遞的感受。提供 Moodboard 方向。",
             tool: "internal",
             outputType: "visual_experience_direction",
+            requiredSkills: ["visual-identity", "creative-direction", "brand-design", "design-strategy"],
           },
           {
             order: 5, name: "全通路原型一致性稽核",
             description: "用 marketing-strategy-pmm 訊息一致性工具，稽核所有現有觸點的原型一致性。建立品牌原型評分標準，讓後續所有溝通都能自我稽核是否符合原型人格。",
             tool: "marketing-strategy-pmm",
             outputType: "archetype_consistency_audit",
+            requiredSkills: ["brand-strategy", "omnichannel", "brand-voice", "content-strategy"],
           },
         ],
       });
