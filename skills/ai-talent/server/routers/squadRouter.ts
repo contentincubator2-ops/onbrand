@@ -410,42 +410,45 @@ export const squadRouter = router({
       let agentDefs: AgentDef[] = [];
 
       if (input.squadId) {
-        // Pull real members from agent_squads
-        const [sqRows] = await db.execute(
-          sql`SELECT name, members FROM agent_squads WHERE id = ${input.squadId} AND is_active = 1 LIMIT 1`
-        ) as any[];
-        const sq = (sqRows as any[])?.[0];
+        // Pull real members from agent_squads (lives on VM local DB — localPool)
+        try {
+          const [sqRows] = await localPool.execute(
+            `SELECT name, members FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+            [input.squadId]
+          ) as any[];
+          const sq = (sqRows as any[])?.[0];
 
-        if (sq) {
-          squadTitle = `${brandName} × ${sq.name}`;
-          const membersJson = safeJsonParse<any[]>(sq.members, []);
-          const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
+          if (sq) {
+            squadTitle = `${brandName} × ${sq.name}`;
+            const membersJson = safeJsonParse<any[]>(sq.members, []);
+            const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
 
-          if (agentIds.length) {
-            const [agentRows] = await db.execute(
-              sql.raw(
+            if (agentIds.length) {
+              const [agentRows] = await localPool.execute(
                 `SELECT id, name, title, primarySkill, aiModel
                  FROM agents WHERE id IN (${agentIds.join(",")})`
-              )
-            ) as any[];
-            const agentMap: Record<number, any> = {};
-            for (const a of agentRows as any[]) agentMap[a.id] = a;
+              ) as any[];
+              const agentMap: Record<number, any> = {};
+              for (const a of agentRows as any[]) agentMap[(a as any).id] = a;
 
-            agentDefs = membersJson
-              .map((m: any) => {
-                const a = agentMap[m.agent_id];
-                if (!a) return null;
-                return {
-                  agentName:  a.name,
-                  agentRole:  m.role ?? "specialist",
-                  agentTitle: a.title,
-                  model:      a.aiModel ?? "claude-sonnet",
-                  skills:     a.primarySkill ? [a.primarySkill] : [],
-                  isLead:     !!(m.is_lead === true || m.is_lead === 1),
-                };
-              })
-              .filter(Boolean) as AgentDef[];
+              agentDefs = membersJson
+                .map((m: any) => {
+                  const a = agentMap[m.agent_id];
+                  if (!a) return null;
+                  return {
+                    agentName:  a.name,
+                    agentRole:  m.role ?? "specialist",
+                    agentTitle: a.title,
+                    model:      a.aiModel ?? "claude-sonnet",
+                    skills:     a.primarySkill ? [a.primarySkill] : [],
+                    isLead:     !!(m.is_lead === true || m.is_lead === 1),
+                  };
+                })
+                .filter(Boolean) as AgentDef[];
+            }
           }
+        } catch (e) {
+          console.error("[squadRouter] assemble: agent_squads lookup error (localPool):", e);
         }
       }
 
