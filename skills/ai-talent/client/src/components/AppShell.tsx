@@ -1535,7 +1535,9 @@ function RightPanel({
         {activeTab === "members" && (
           effectiveSquad && otherSquads.length > 0
             ? <SquadMembersList squads={otherSquads} />
-            : <MembersTab missionId={missionId} brandId={brandId} />
+            : <div style={{ padding: "32px 8px", textAlign: "center", color: "#C5C5C0", fontSize: 12, lineHeight: 1.8 }}>
+                選擇執行方式<br />查看對應成員
+              </div>
         )}
       </div>
     </div>
