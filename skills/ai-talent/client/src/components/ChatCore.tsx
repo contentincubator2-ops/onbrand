@@ -477,9 +477,7 @@ export default function ChatCore({
   // ── New feature state ───────────────────────────────────────────────────
   const [confirmedMsgIds, setConfirmedMsgIds] = useState<Set<string>>(new Set());
   const [activeWorkspaceKey, setActiveWorkspaceKey] = useState<string>("strategy");
-  const [currentMissionId, setCurrentMissionId] = useState<number | null>(null);
   const [selectedSquadForMission, setSelectedSquadForMission] = useState<SquadOption | null>(null);
-  const [isHomepageExiting, setIsHomepageExiting] = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
@@ -605,10 +603,9 @@ export default function ChatCore({
     });
   }, [activeMissionId, missionDataQuery.data]);
 
-  // Reset squad selection and exit animation when mission changes
+  // Reset squad selection when mission changes
   useEffect(() => {
     setSelectedSquadForMission(null);
-    setIsHomepageExiting(false);
   }, [activeMissionId]);
 
   // History load
@@ -744,7 +741,7 @@ export default function ChatCore({
         body: JSON.stringify({
           userMessage: text,
           conversationHistory: conversationHistory.slice(-12),
-          missionId: activeMissionId ?? currentMissionId ?? undefined,
+          missionId: activeMissionId ?? undefined,
           workspace: (missionDataQuery.data as any)?.workspace ?? undefined,
         }),
       });
@@ -919,16 +916,16 @@ export default function ChatCore({
     const rawText = input.trim();
     if (!rawText || loading) return;
 
-    // First-message handling: squad update + exit animation
+    // First-message: flip mission from inactive → active, persist selected squad
     const active = conversations.find((c) => c.id === activeId);
     const isFirstUserMsg = !active || active.messages.filter(m => m.role === "user").length === 0;
-    if (isFirstUserMsg) {
-      if (selectedSquadForMission && activeMissionId) {
-        updateMission.mutate({ id: activeMissionId, squadSlug: selectedSquadForMission.squadSlug } as any);
-        onSquadSelect?.(rawText, selectedSquadForMission, []);
-      }
-      setIsHomepageExiting(true);
-      setTimeout(() => setIsHomepageExiting(false), 400);
+    if (isFirstUserMsg && activeMissionId) {
+      updateMission.mutate({
+        id: activeMissionId,
+        status: "active",
+        squadSlug: selectedSquadForMission?.squadSlug ?? undefined,
+      });
+      if (selectedSquadForMission) onSquadSelect?.(rawText, selectedSquadForMission, []);
     }
 
     stopRef.current = false;
@@ -953,24 +950,6 @@ export default function ChatCore({
     // Persist to mission_messages if mission is active
     if (activeMissionId) {
       saveMissionMsg.mutate({ missionId: activeMissionId, role: "user", content: text });
-    }
-
-    // ── Auto-create mission on first message ──────────────────────────────
-    const currentConvMessages = conversations.find(c => c.id === convId)?.messages ?? [];
-    if (!activeMissionId && !currentMissionId && currentConvMessages.length === 0) {
-      try {
-        const newMission = await createMission.mutateAsync({
-          workspace: '',
-          brandId: activeBrand?.id,
-          title: rawText.slice(0, 40),
-        });
-        if (newMission?.id) {
-          setCurrentMissionId(newMission.id);
-          if (onMissionCreated) onMissionCreated(newMission.id);
-        }
-      } catch {
-        // non-blocking — ignore if mission create fails
-      }
     }
 
     const missionSlug = (missionDataQuery.data as any)?.squadSlug;
@@ -1199,20 +1178,14 @@ export default function ChatCore({
         }}
         className="messages-scroll"
       >
-        {/* Empty state — show when no USER messages yet.
-            Wait for savedMessagesQuery to finish fetching first (prevents 1-2s flicker
-            where homepage shows then disappears once DB history loads in). */}
-        {(!active || (
-          !savedMessagesQuery.isFetching &&
-          (active.messages.filter(m => m.role === "user").length === 0 || isHomepageExiting)
-        )) && !teamAssembly && (
-
+        {/* MissionHomePage: 只在 mission status = "inactive" 時顯示（建立後尚未送出第一條訊息） */}
+        {activeMissionId
+          && missionDataQuery.isSuccess
+          && (missionDataQuery.data as any)?.status === "inactive"
+          && !teamAssembly && (
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
-                brandName={activeBrandName ?? undefined}
                 missionTitle={(missionDataQuery.data as any)?.title ?? undefined}
-                missionId={activeMissionId}
-                isExiting={isHomepageExiting}
                 onTaskSelect={(task) => {
                   setInput(task);
                   setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);

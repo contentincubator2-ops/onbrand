@@ -50,6 +50,14 @@ async function main() {
     `);
     console.log("[migrate] mission_resources: OK");
 
+    // 3. Add 'inactive' to missions.status enum and change default to 'inactive'
+    await conn.execute(`
+      ALTER TABLE missions
+        MODIFY COLUMN status ENUM('inactive','active','completed','archived')
+        NOT NULL DEFAULT 'inactive'
+    `);
+    console.log("[migrate] missions.status: added 'inactive' value, default changed");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

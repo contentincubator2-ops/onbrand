@@ -99,7 +99,7 @@ export const missionRouter = router({
         constraints: input.constraints ?? "",
         methodology: input.methodology ?? "",
         squadSlug: input.squadSlug ?? null,
-        status: "active",
+        status: "inactive",
       });
       const missionId = result.insertId;
       // Fire-and-forget: compute semantic agent matching asynchronously
@@ -124,7 +124,8 @@ export const missionRouter = router({
       successMetrics: z.string().optional(),
       constraints: z.string().optional(),
       methodology: z.string().optional(),
-      status: z.enum(["active", "completed", "archived"]).optional(),
+      status: z.enum(["inactive", "active", "completed", "archived"]).optional(),
+      squadSlug: z.string().max(64).optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

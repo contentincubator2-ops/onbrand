@@ -551,7 +551,7 @@ export const missions = mysqlTable("missions", {
   description: text("description"),  // 任務說明（給語意配對用）
   squadSlug: varchar("squadSlug", { length: 64 }),     // 綁定的 squad slug
   welcomeMessage: text("welcomeMessage"),               // 點任務時顯示的歡迎訊息
-  status: mysqlEnum("status", ["active", "completed", "archived"]).default("active").notNull(),
+  status: mysqlEnum("status", ["inactive", "active", "completed", "archived"]).default("inactive").notNull(),
   isRecurring: boolean("isRecurring").default(false).notNull(),
   recurringSchedule: varchar("recurringSchedule", { length: 64 }),  // 'daily' | 'weekly' | 'biweekly' | 'monthly'
   companyId: int("companyId"),
