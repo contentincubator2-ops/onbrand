@@ -7,6 +7,7 @@ import React, { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import { MissionModal } from "./MissionModal";
 import type { SquadOption } from '../data/taskSquads';
+import { WORKSPACE_SQUADS, findSquadBySlug } from '../data/taskSquads';
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -1446,19 +1447,33 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
 }
 
 function RightPanel({
-  missionId, brandId, activeSquad, taskSquads,
+  missionId, brandId, activeSquad, taskSquads, missionSquadSlug, missionWorkspace,
 }: {
   missionId?: number | null;
   brandId?: number | null;
   activeSquad?: SquadOption | null;
   taskSquads?: SquadOption[];
+  missionSquadSlug?: string | null;
+  missionWorkspace?: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<"sop" | "brandbrain" | "members">("sop");
 
-  // Auto-switch to 流程 tab whenever a new squad is selected
+  // Resolve the squad to display:
+  // 1. activeSquad from current session (user just clicked a chip)
+  // 2. squad stored on the mission in DB (persists across sessions)
+  // 3. null → show fallback
+  const storedSquad = missionSquadSlug ? findSquadBySlug(missionSquadSlug) : null;
+  const effectiveSquad = activeSquad ?? storedSquad;
+
+  // Workspace squads for the members tab
+  const wsSquads = WORKSPACE_SQUADS[missionWorkspace ?? "strategy"] ?? [];
+  const effectiveAllSquads = (taskSquads ?? []).length > 0 ? (taskSquads ?? []) : wsSquads;
+  const otherSquads = effectiveAllSquads.filter(s => s.squadSlug !== effectiveSquad?.squadSlug);
+
+  // Auto-switch to 流程 tab whenever effective squad changes
   useEffect(() => {
-    if (activeSquad) setActiveTab("sop");
-  }, [activeSquad]);
+    if (effectiveSquad) setActiveTab("sop");
+  }, [effectiveSquad?.squadSlug]);
 
   const panelStyle: React.CSSProperties = {
     width: 264, minWidth: 264,
@@ -1473,8 +1488,6 @@ function RightPanel({
     { id: "brandbrain" as const, label: "品牌大腦" },
     { id: "members"    as const, label: "成員" },
   ];
-
-  const otherSquads = (taskSquads ?? []).filter(s => s.squadSlug !== activeSquad?.squadSlug);
 
   return (
     <div style={panelStyle}>
@@ -1508,8 +1521,8 @@ function RightPanel({
       {/* Body */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
         {activeTab === "sop" && (
-          activeSquad
-            ? <SquadMethodologyPanel squad={activeSquad} />
+          effectiveSquad
+            ? <SquadMethodologyPanel squad={effectiveSquad} />
             : <div style={{ marginBottom: 15 }}><PositioningProgress missionId={missionId} brandId={brandId} /></div>
         )}
 
@@ -1518,7 +1531,7 @@ function RightPanel({
         )}
 
         {activeTab === "members" && (
-          activeSquad && otherSquads.length > 0
+          effectiveSquad && otherSquads.length > 0
             ? <SquadMembersList squads={otherSquads} />
             : <MembersTab missionId={missionId} brandId={brandId} />
         )}
@@ -1904,6 +1917,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
     : { data: null };
   const activeMissionTitle = (activeMissionData as any)?.title ?? null;
   const activeMissionWorkspace = (activeMissionData as any)?.workspace ?? null;
+  const activeMissionSquadSlug = (activeMissionData as any)?.squadSlug ?? null;
 
   const shellStyle: React.CSSProperties = {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
@@ -2021,7 +2035,14 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         </div>
       </main>
 
-      <RightPanel missionId={activeMissionId} brandId={selectedBrandId} activeSquad={activeSquad ?? null} taskSquads={taskSquads ?? []} />
+      <RightPanel
+        missionId={activeMissionId}
+        brandId={selectedBrandId}
+        activeSquad={activeSquad ?? null}
+        taskSquads={taskSquads ?? []}
+        missionSquadSlug={activeMissionSquadSlug}
+        missionWorkspace={activeMissionWorkspace}
+      />
 
       {/* New Workspace inline modal */}
       {newWsOpen && (

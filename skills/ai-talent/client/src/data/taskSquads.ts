@@ -262,6 +262,18 @@ const FACEBOOK_SQUADS: SquadOption[] = [
   },
 ];
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Find a SquadOption by its slug across all workspace squad pools. */
+export function findSquadBySlug(slug: string): SquadOption | null {
+  const allPools = [STRATEGY_SQUADS, WEBSITE_SQUADS, FACEBOOK_SQUADS];
+  for (const pool of allPools) {
+    const found = pool.find(s => s.squadSlug === slug);
+    if (found) return found;
+  }
+  return null;
+}
+
 // ─── Task → Squads mapping ────────────────────────────────────────────────────
 
 export const WORKSPACE_SQUADS: Record<string, SquadOption[]> = {
