@@ -41,7 +41,7 @@ function escapeLike(s: string): string {
 
 // ── Workspace → tag keywords mapping ─────────────────────────────────────────
 
-const WORKSPACE_TAGS: Record<string, string[]> = {
+const WORKSPACE_TAGS: Record<string, string[]> & { strategy: string[] } = {
   strategy:  ["brand", "strategy", "gtm", "b2b", "full-funnel", "positioning", "market", "saas"],
   website:   ["seo", "website", "content", "web", "ux", "cro", "copywriting", "conversion"],
   facebook:  ["meta-ads", "facebook", "social", "ads", "community", "ecom", "creative"],
@@ -454,7 +454,7 @@ export const squadRouter = router({
         ];
       }
 
-      const leadDef = agentDefs.find(a => a.isLead) ?? agentDefs[0];
+      const leadDef = agentDefs.find(a => a.isLead) ?? agentDefs[0]!;
 
       // Insert squads record
       await db.execute(sql`
