@@ -1303,6 +1303,35 @@ export default function ChatCore({
           <div style={{ fontSize: 11, color: "#C8C7C3", textAlign: "center", padding: "8px 0" }}>⏹ 已停止生成</div>
         )}
 
+        {/* Layer 2: Pin to requirements — shown after each completed relay step */}
+        {activeMissionId && relaySteps.filter(s => s.status === "done" && s.summary).map((step) => (
+          <div key={`pin-${step.id}`} style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+            <button
+              onClick={() => {
+                const md = missionDataQuery.data as any;
+                const existingObj = md?.objective ?? "";
+                const snippet = step.summary!.length > 300 ? step.summary!.slice(0, 300) + "…" : step.summary!;
+                const newObj = existingObj ? existingObj : snippet;
+                updateMission.mutate({ id: activeMissionId, objective: newObj });
+              }}
+              title="儲存到任務需求"
+              style={{
+                background: "none", border: "1px solid #E4E3E1",
+                borderRadius: 6, padding: "2px 8px",
+                fontSize: 10, color: "#9B9990", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 3,
+                fontFamily: "inherit",
+                opacity: 0,
+                transition: "opacity 0.15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0"; }}
+            >
+              📌 更新需求
+            </button>
+          </div>
+        ))}
+
         {/* Bottom anchor */}
         <div ref={bottomRef} />
       </div>
@@ -1360,6 +1389,30 @@ export default function ChatCore({
                 {lastAgentMsg.agentName?.charAt(0) ?? "A"}
               </div>
               <span>回覆 {lastAgentMsg.agentName ?? "Agent"}</span>
+            </div>
+          );
+        })()}
+
+        {/* Layer 1: Requirements context indicator */}
+        {activeMissionId && (() => {
+          const md = missionDataQuery.data as any;
+          const hasReqs = md && (md.objective || md.audience || md.successMetrics || md.constraints);
+          const count = [md?.objective, md?.audience, md?.successMetrics, md?.constraints].filter(Boolean).length;
+          if (!hasReqs) return null;
+          return (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "4px 10px 6px",
+              fontSize: 10, color: "#059669",
+            }}>
+              <span style={{
+                background: "#ECFDF5", border: "1px solid #BBF7D0",
+                borderRadius: 10, padding: "1px 8px", fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 4,
+              }}>
+                <span>📋</span>
+                <span>任務需求已套用 ({count} 項)</span>
+              </span>
             </div>
           );
         })()}

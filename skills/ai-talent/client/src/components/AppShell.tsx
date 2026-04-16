@@ -1447,12 +1447,15 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
 
 function RightPanel({
   missionId, brandId, activeSquad, missionSquadSlug, missionWorkspace,
+  width, onWidthChange,
 }: {
   missionId?: number | null;
   brandId?: number | null;
   activeSquad?: DBSquad | null;
   missionSquadSlug?: string | null;
   missionWorkspace?: string | null;
+  width?: number;
+  onWidthChange?: (w: number) => void;
 }) {
   // ── Resolve squad: prefer chip selection, fall back to stored slug ──────────
   const slugQuery = trpc.squad.getSquadBySlug.useQuery(
@@ -1477,14 +1480,14 @@ function RightPanel({
 
   // ── Accordion ──────────────────────────────────────────────────────────────
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
-    sop: false, members: false, alternatives: false, brandbrain: false,
+    requirements: true, sop: false, members: false, alternatives: false, brandbrain: false,
   });
 
   useEffect(() => {
     if (effectiveSquad) {
-      setOpenSections({ sop: true, members: true, alternatives: true, brandbrain: false });
+      setOpenSections({ requirements: true, sop: true, members: true, alternatives: true, brandbrain: false });
     } else {
-      setOpenSections({ sop: false, members: false, alternatives: false, brandbrain: false });
+      setOpenSections({ requirements: true, sop: false, members: false, alternatives: false, brandbrain: false });
     }
   }, [effectiveSquad?.squadId]);
 
@@ -1498,6 +1501,11 @@ function RightPanel({
   );
 
   const sections = [
+    {
+      key: "requirements",
+      label: "任務需求",
+      content: <MissionRequirementsPanel missionId={missionId} />,
+    },
     {
       key: "sop",
       label: "執行流程",
@@ -1536,14 +1544,46 @@ function RightPanel({
     },
   ];
 
+  const panelWidth = width ?? 264;
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      const delta = startX - ev.clientX;
+      const next = Math.max(200, Math.min(540, startW + delta));
+      onWidthChange?.(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   return (
     <div style={{
-      width: 264, minWidth: 264,
+      width: panelWidth, minWidth: 200,
       background: "#FAFAF9",
       borderLeft: "1px solid #E4E3E1",
       display: "flex", flexDirection: "column",
       overflow: "hidden",
+      position: "relative" as const,
+      flexShrink: 0,
     }}>
+      {/* Drag handle */}
+      <div
+        onMouseDown={handleDragStart}
+        style={{
+          position: "absolute" as const, left: 0, top: 0, bottom: 0, width: 4,
+          cursor: "col-resize", zIndex: 10,
+          background: "transparent",
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "rgba(26,26,24,0.08)"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+      />
       <div style={{ flex: 1, overflowY: "auto" }}>
         {sections.map((section, idx) => (
           <div key={section.key} style={{ borderBottom: "1px solid #E4E3E1" }}>
@@ -1632,7 +1672,7 @@ function DBSquadMethodologyPanel({
               </div>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
-                  {step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
+                  {step.title ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
                 </div>
                 <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
                   {step.description ?? ""}
@@ -1801,6 +1841,166 @@ function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; 
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── MissionRequirementsPanel ─────────────────────────────────────────────────
+// Layer 1: structured mission brief displayed in RightPanel
+// Layer 2: "更新需求" action triggered from chat
+
+function MissionRequirementsPanel({
+  missionId,
+  onExtractRequest,
+}: {
+  missionId?: number | null;
+  onExtractRequest?: () => void;
+}) {
+  const utils = trpc.useUtils();
+  const missionQuery = trpc.mission.getById.useQuery(
+    { id: missionId! },
+    { enabled: !!missionId, staleTime: 10_000, refetchOnWindowFocus: false }
+  );
+  const updateMission = (trpc as any).mission?.update?.useMutation
+    ? (trpc as any).mission.update.useMutation({
+        onSuccess: () => utils.mission.getById.invalidate({ id: missionId! }),
+      })
+    : { mutate: () => {}, isPending: false };
+
+  const data = missionQuery.data as any;
+
+  const FIELDS = [
+    { key: "objective",      label: "任務目標",   placeholder: "例：提升品牌知名度、增加 30% 轉換率…" },
+    { key: "audience",       label: "目標受眾",   placeholder: "例：25-40 歲職場女性、對健康生活有興趣…" },
+    { key: "successMetrics", label: "成功指標",   placeholder: "例：觸及 10 萬人、NPS ≥ 50、MQL 提升 20%…" },
+    { key: "constraints",    label: "限制條件",   placeholder: "例：預算 NT$50 萬、不使用 KOL、本月底上線…" },
+  ] as const;
+
+  type FieldKey = "objective" | "audience" | "successMetrics" | "constraints";
+
+  const [fields, setFields] = React.useState<Record<FieldKey, string>>({
+    objective: "", audience: "", successMetrics: "", constraints: "",
+  });
+  const [dirtyKeys, setDirtyKeys] = React.useState<Set<FieldKey>>(new Set());
+  const [savingKey, setSavingKey] = React.useState<FieldKey | null>(null);
+
+  // Sync from DB when data loads/changes
+  React.useEffect(() => {
+    if (!data) return;
+    setFields({
+      objective:      data.objective      ?? "",
+      audience:       data.audience       ?? "",
+      successMetrics: data.successMetrics ?? "",
+      constraints:    data.constraints    ?? "",
+    });
+    setDirtyKeys(new Set());
+  }, [data?.id, data?.objective, data?.audience, data?.successMetrics, data?.constraints]);
+
+  const handleChange = (key: FieldKey, value: string) => {
+    setFields(prev => ({ ...prev, [key]: value }));
+    setDirtyKeys(prev => new Set([...prev, key]));
+  };
+
+  const handleBlur = (key: FieldKey) => {
+    if (!missionId || !dirtyKeys.has(key)) return;
+    setSavingKey(key);
+    updateMission.mutate(
+      { id: missionId, [key]: fields[key] },
+      { onSettled: () => setSavingKey(null) }
+    );
+    setDirtyKeys(prev => { const s = new Set(prev); s.delete(key); return s; });
+  };
+
+  const filledCount = FIELDS.filter(f => fields[f.key].trim().length > 0).length;
+
+  if (!missionId) {
+    return (
+      <div style={{ padding: "18px 8px", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11, lineHeight: 1.7 }}>
+        選擇任務後<br />填寫任務需求
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {filledCount > 0 && (
+            <span style={{
+              fontSize: 10, background: "#ECFDF5", color: "#059669",
+              border: "1px solid #A7F3D0", borderRadius: 10, padding: "1px 7px", fontWeight: 600,
+            }}>
+              {filledCount}/4 已填寫
+            </span>
+          )}
+        </div>
+        {onExtractRequest && (
+          <button
+            onClick={onExtractRequest}
+            title="從對話中提取需求"
+            style={{
+              fontSize: 10, background: "none", border: "1px solid #E4E3E1",
+              borderRadius: 6, padding: "2px 8px", color: "#6B6A66", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 4,
+            }}
+          >
+            ✦ 從對話提取
+          </button>
+        )}
+      </div>
+
+      {/* Fields */}
+      <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
+        {FIELDS.map(({ key, label, placeholder }) => {
+          const value = fields[key];
+          const isDirty = dirtyKeys.has(key);
+          const isSaving = savingKey === key;
+          const hasFilled = value.trim().length > 0;
+          return (
+            <div key={key}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 3,
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "#6B6A66" }}>{label}</span>
+                {isSaving && <span style={{ fontSize: 9, color: "#9B9990" }}>儲存中…</span>}
+                {!isSaving && isDirty && <span style={{ fontSize: 9, color: "#E8631A" }}>● 未儲存</span>}
+                {!isSaving && !isDirty && hasFilled && <span style={{ fontSize: 9, color: "#059669" }}>✓</span>}
+              </div>
+              <textarea
+                value={value}
+                onChange={e => handleChange(key, e.target.value)}
+                onBlur={() => handleBlur(key)}
+                placeholder={placeholder}
+                rows={2}
+                style={{
+                  width: "100%", boxSizing: "border-box" as const,
+                  border: `1px solid ${isDirty ? "#E8631A" : hasFilled ? "#D0E8FF" : "#E4E3E1"}`,
+                  borderRadius: 6, padding: "6px 8px",
+                  fontSize: 11, color: "#1A1A18", lineHeight: 1.5,
+                  background: hasFilled ? "#F8FBFF" : "#FAFAF9",
+                  resize: "none" as const, outline: "none",
+                  fontFamily: "inherit",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Layer 1 hint */}
+      {filledCount > 0 && (
+        <div style={{
+          marginTop: 10, padding: "6px 9px",
+          background: "#F0FDF4", border: "1px solid #BBF7D0",
+          borderRadius: 6, fontSize: 10, color: "#15803D",
+          display: "flex", alignItems: "center", gap: 5,
+        }}>
+          <span>📋</span>
+          <span>需求已自動套用為 AI 對話背景</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -2053,6 +2253,14 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
 
 export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId, activeSquad }: AppShellProps) {
   const [railTab, setRailTab] = useState("chat");
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("rightPanelWidth") : null;
+    return stored ? parseInt(stored, 10) : 264;
+  });
+  const handleRightWidthChange = React.useCallback((w: number) => {
+    setRightPanelWidth(w);
+    localStorage.setItem("rightPanelWidth", String(w));
+  }, []);
   const [newMissionOpen, setNewMissionOpen] = useState(false);
   const [newMissionWsKey, setNewMissionWsKey] = useState("strategy");
   const [newWsOpen, setNewWsOpen] = useState(false);
@@ -2224,6 +2432,8 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         activeSquad={activeSquad ?? null}
         missionSquadSlug={activeMissionSquadSlug}
         missionWorkspace={activeMissionWorkspace}
+        width={rightPanelWidth}
+        onWidthChange={handleRightWidthChange}
       />
 
       {/* New Workspace inline modal */}
