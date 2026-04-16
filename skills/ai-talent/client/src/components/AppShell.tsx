@@ -1523,7 +1523,9 @@ function RightPanel({
         {activeTab === "sop" && (
           effectiveSquad
             ? <SquadMethodologyPanel squad={effectiveSquad} />
-            : <div style={{ marginBottom: 15 }}><PositioningProgress missionId={missionId} brandId={brandId} /></div>
+            : <div style={{ padding: "32px 8px", textAlign: "center", color: "#C5C5C0", fontSize: 12, lineHeight: 1.8 }}>
+                選擇執行方式<br />查看對應流程
+              </div>
         )}
 
         {activeTab === "brandbrain" && (
