@@ -132,6 +132,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
                                 onClick={() => {
                                     const next = isSelected ? null : squad;
                                     setSelectedSquad(next);
+                                    setInputValue(next ? `請 ${next.name} 協助我` : "");
                                     onSquadPreview?.(next, squads);
                                 }}
                                 style={{
