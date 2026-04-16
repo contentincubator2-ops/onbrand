@@ -1467,14 +1467,14 @@ function RightPanel({
 
   // Accordion open state: auto-expand 流程+成員 when squad selected
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
-    sop: false, members: false, brandbrain: false,
+    sop: false, members: false, alternatives: false, brandbrain: false,
   });
 
   useEffect(() => {
     if (effectiveSquad) {
-      setOpenSections({ sop: true, members: true, brandbrain: false });
+      setOpenSections({ sop: true, members: true, alternatives: true, brandbrain: false });
     } else {
-      setOpenSections({ sop: false, members: false, brandbrain: false });
+      setOpenSections({ sop: false, members: false, alternatives: false, brandbrain: false });
     }
   }, [effectiveSquad?.squadSlug]);
 
@@ -1498,9 +1498,16 @@ function RightPanel({
     {
       key: "members",
       label: "協作成員",
+      content: effectiveSquad && effectiveSquad.members?.length > 0
+        ? <AgentMembersList members={effectiveSquad.members} />
+        : emptyHint("選擇執行方式\n查看協作成員"),
+    },
+    {
+      key: "alternatives",
+      label: "備選專家",
       content: effectiveSquad && otherSquads.length > 0
         ? <SquadMembersList squads={otherSquads} />
-        : emptyHint("選擇執行方式\n查看對應成員"),
+        : emptyHint("選擇執行方式\n查看備選專家"),
     },
     {
       key: "brandbrain",
@@ -1606,34 +1613,90 @@ function SquadMethodologyPanel({ squad }: { squad: SquadOption }) {
   );
 }
 
+// ─── AgentMembersList ─────────────────────────────────────────────────────────
+
+function AgentMembersList({ members }: { members: import('../data/taskSquads').AgentMember[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {members.map((agent) => (
+        <div
+          key={agent.name}
+          style={{
+            padding: "10px 10px",
+            background: "#FFFFFF",
+            border: "1px solid #E7E5E4",
+            borderRadius: 8,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
+            {agent.name}
+          </div>
+          <div style={{ fontSize: 11, color: "#6B6A66", marginBottom: 6 }}>
+            {agent.title}
+          </div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
+            <span style={{
+              fontSize: 10, padding: "2px 7px", borderRadius: 20,
+              background: "#F0F4FF", color: "#4A6FA5",
+              border: "1px solid #D0DCEF",
+            }}>
+              {agent.skill}
+            </span>
+            <span style={{
+              fontSize: 10, padding: "2px 7px", borderRadius: 20,
+              background: "#F5F0FF", color: "#6B4FA5",
+              border: "1px solid #DDD0EF",
+            }}>
+              {agent.aiModel}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── SquadMembersList ──────────────────────────────────────────────────────────
 
 function SquadMembersList({ squads }: { squads: SquadOption[] }) {
   return (
-    <div>
-      <div style={{ fontSize: 11, color: "#9B9990", marginBottom: 10, fontWeight: 500, letterSpacing: 0.3, textTransform: "uppercase" as const }}>
-        協作成員
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {squads.map((squad) => (
-          <div
-            key={squad.squadSlug}
-            style={{
-              padding: "9px 10px",
-              background: "#FFFFFF",
-              border: "1px solid #E7E5E4",
-              borderRadius: 8,
-            }}
-          >
-            <div style={{ fontSize: 12, fontWeight: 500, color: "#1A1A18", marginBottom: 1 }}>
-              {squad.name}
-            </div>
-            <div style={{ fontSize: 11, color: "#9B9990" }}>
-              {squad.leadTitle}
-            </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {squads.map((squad) => (
+        <div
+          key={squad.squadSlug}
+          style={{
+            padding: "10px 10px",
+            background: "#FFFFFF",
+            border: "1px solid #E7E5E4",
+            borderRadius: 8,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
+            {squad.name}
           </div>
-        ))}
-      </div>
+          <div style={{ fontSize: 11, color: "#6B6A66", marginBottom: 6 }}>
+            {squad.leadTitle}
+          </div>
+          {squad.members?.[0] && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
+              <span style={{
+                fontSize: 10, padding: "2px 7px", borderRadius: 20,
+                background: "#F5F5F4", color: "#6B6A66",
+                border: "1px solid #E4E3E1",
+              }}>
+                {squad.members[0].skill}
+              </span>
+              <span style={{
+                fontSize: 10, padding: "2px 7px", borderRadius: 20,
+                background: "#F5F5F4", color: "#6B6A66",
+                border: "1px solid #E4E3E1",
+              }}>
+                {squad.members[0].aiModel}
+              </span>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
