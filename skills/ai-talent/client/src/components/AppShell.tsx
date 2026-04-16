@@ -1852,9 +1852,7 @@ function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; 
 }
 
 // ─── SquadRequirementsPanel ───────────────────────────────────────────────────
-// Right-panel checklist: what data/access this squad needs, and what it delivers.
-// Layer 1 — static config per squad slug (immediate).
-// Layer 2 — Squad Lead auto-fills items from conversation (async).
+// Compact one-line-per-item checklist. Matches Claude's information density.
 
 function SquadRequirementsPanel({
   missionId,
@@ -1865,7 +1863,6 @@ function SquadRequirementsPanel({
   squadSlug?: string | null;
   workspace?: string | null;
 }) {
-  // ── Requirements config (static per squad) ─────────────────────────────────
   const requirementsQuery = (trpc as any).squad?.getRequirements?.useQuery
     ? (trpc as any).squad.getRequirements.useQuery(
         { squadSlug: squadSlug ?? "", workspace: workspace ?? undefined },
@@ -1873,7 +1870,6 @@ function SquadRequirementsPanel({
       )
     : { data: null };
 
-  // ── Filled values (from mission_requirements table) ────────────────────────
   const valuesQuery = (trpc as any).mission?.getRequirementValues?.useQuery
     ? (trpc as any).mission.getRequirementValues.useQuery(
         { missionId: missionId!, squadSlug: squadSlug ?? "" },
@@ -1887,291 +1883,254 @@ function SquadRequirementsPanel({
       })
     : { mutate: () => {}, isPending: false };
 
-  const config = requirementsQuery.data as any;
+  const config       = requirementsQuery.data as any;
   const requirements: any[] = config?.requirements ?? [];
   const outputs: Record<string, string[]> = config?.outputs ?? {};
-  const values: Record<string, string> = (valuesQuery.data as any) ?? {};
+  const values: Record<string, string>    = (valuesQuery.data as any) ?? {};
 
-  // ── Local edit state ───────────────────────────────────────────────────────
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editValue, setEditValue] = React.useState("");
 
-  const startEdit = (reqId: string) => {
-    setEditingId(reqId);
-    setEditValue(values[reqId] ?? "");
-  };
-
-  const commitEdit = (reqId: string) => {
+  const startEdit = (id: string) => { setEditingId(id); setEditValue(values[id] ?? ""); };
+  const cancelEdit = () => setEditingId(null);
+  const commitEdit = (id: string) => {
     if (missionId && squadSlug && editValue.trim()) {
-      setValueMutation.mutate({
-        missionId, squadSlug,
-        requirementId: reqId,
-        value: editValue.trim(),
-      });
+      setValueMutation.mutate({ missionId, squadSlug, requirementId: id, value: editValue.trim() });
     }
     setEditingId(null);
   };
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  const totalCount    = requirements.length;
-  const filledCount   = requirements.filter((r: any) => !!values[r.id]?.trim()).length;
-  const requiredCount = requirements.filter((r: any) => r.required).length;
-  const filledRequiredCount = requirements.filter((r: any) => r.required && !!values[r.id]?.trim()).length;
+  const totalCount   = requirements.length;
+  const filledCount  = requirements.filter((r: any) => !!values[r.id]?.trim()).length;
+  const reqDone      = requirements.filter((r: any) => r.required && !!values[r.id]?.trim()).length;
+  const reqTotal     = requirements.filter((r: any) => r.required).length;
+  const unlockedGates = new Set(requirements.filter((r: any) => !!values[r.id]?.trim()).map((r: any) => `with_${r.id}`));
 
-  // Which gate outputs are unlocked
-  const unlockedGates = new Set(
-    requirements
-      .filter((r: any) => !!values[r.id]?.trim())
-      .map((r: any) => `with_${r.id}`)
+  // ── Empty states ─────────────────────────────────────────────────────────
+  if (!missionId) return (
+    <div style={{ padding: "16px 4px", textAlign: "center" as const, color: "#C5C4C0", fontSize: 11, lineHeight: 1.8 }}>
+      選擇任務後<br />查看需求清單
+    </div>
+  );
+  if (!squadSlug) return (
+    <div style={{ padding: "14px 4px", textAlign: "center" as const, color: "#C5C4C0", fontSize: 11, lineHeight: 1.8 }}>
+      選擇一個 Squad<br />查看所需資料清單
+    </div>
   );
 
-  // ── Empty states ───────────────────────────────────────────────────────────
-  if (!missionId) {
-    return (
-      <div style={{ padding: "18px 8px", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11, lineHeight: 1.8 }}>
-        選擇任務後<br />查看需求清單
-      </div>
-    );
-  }
-  if (!squadSlug) {
-    return (
-      <div style={{ padding: "14px 8px", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11, lineHeight: 1.8 }}>
-        選擇執行方式（Squad）後<br />查看所需資料清單
-      </div>
-    );
-  }
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ fontSize: 12 }}>
-
-      {/* Progress bar */}
+    <div>
+      {/* ── Progress header ── */}
       {totalCount > 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-            <span style={{ fontSize: 10, color: "#9B9990" }}>
-              {filledCount}/{totalCount} 已填寫
-            </span>
-            {requiredCount > 0 && filledRequiredCount >= requiredCount && (
-              <span style={{
-                fontSize: 10, background: "#ECFDF5", color: "#059669",
-                border: "1px solid #A7F3D0", borderRadius: 10, padding: "1px 7px", fontWeight: 600,
-              }}>
-                必填完成 ✓
-              </span>
-            )}
-          </div>
-          {/* thin progress track */}
-          <div style={{ height: 3, background: "#F0EFED", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          {/* thin track */}
+          <div style={{ flex: 1, height: 3, background: "#EEEDE9", borderRadius: 2, overflow: "hidden" }}>
             <div style={{
-              height: "100%", borderRadius: 2,
-              background: filledRequiredCount >= requiredCount ? "#10B981" : "#5B7FDB",
-              width: totalCount > 0 ? `${Math.round((filledCount / totalCount) * 100)}%` : "0%",
-              transition: "width 0.4s ease",
+              height: "100%", borderRadius: 2, transition: "width 0.35s",
+              background: reqDone >= reqTotal && reqTotal > 0 ? "#10B981" : "#5B7FDB",
+              width: `${totalCount ? Math.round(filledCount / totalCount * 100) : 0}%`,
             }} />
           </div>
+          <span style={{ fontSize: 10, color: "#9B9990", whiteSpace: "nowrap" as const, flexShrink: 0 }}>
+            {filledCount}/{totalCount}
+            {reqTotal > 0 && reqDone >= reqTotal && " ✓"}
+          </span>
         </div>
       )}
 
-      {/* Requirements checklist */}
-      <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
+      {/* ── Checklist rows (compact, 1 line each) ── */}
+      <div style={{ display: "flex", flexDirection: "column" as const }}>
         {requirements.map((req: any) => {
-          const filled   = !!values[req.id]?.trim();
+          const filled    = !!values[req.id]?.trim();
           const isEditing = editingId === req.id;
 
           return (
-            <div
-              key={req.id}
-              style={{
-                background: filled ? "#F0FDF4" : "#F9F9F8",
-                border: `1px solid ${filled ? "#BBF7D0" : req.required ? "#E4E3E1" : "#EEEDE9"}`,
-                borderRadius: 8, padding: "7px 9px",
-                transition: "background 0.2s",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-                {/* Status icon */}
-                <span style={{
-                  fontSize: 14, marginTop: 0, flexShrink: 0,
-                  color: filled ? "#10B981" : req.required ? "#D1A04A" : "#C8C7C3",
-                  lineHeight: 1.3,
-                }}>
-                  {filled ? "✓" : "○"}
-                </span>
+            <div key={req.id}>
+              {/* Row */}
+              {!isEditing && (
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "5px 2px",
+                    borderBottom: "1px solid #F3F2F0",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => startEdit(req.id)}
+                  title={req.hint ?? ""}
+                >
+                  {/* icon */}
+                  <span style={{
+                    fontSize: 12, flexShrink: 0, width: 14, textAlign: "center" as const,
+                    color: filled ? "#10B981" : req.required ? "#D1A04A" : "#D0CEC9",
+                  }}>
+                    {filled ? "✓" : "○"}
+                  </span>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Label row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const, marginBottom: 2 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "#3A3A38" }}>{req.label}</span>
-                    {req.required && (
-                      <span style={{ fontSize: 9, color: "#D1A04A", fontWeight: 700, lineHeight: 1 }}>必填</span>
+                  {/* label */}
+                  <span style={{
+                    fontSize: 11, color: filled ? "#3A3A38" : "#6B6A66",
+                    flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+                    fontWeight: filled ? 500 : 400,
+                  }}>
+                    {req.label}
+                    {req.required && !filled && (
+                      <span style={{ color: "#E8A838", fontSize: 10, marginLeft: 3 }}>*</span>
                     )}
+                  </span>
+
+                  {/* value pill OR type badge */}
+                  {filled ? (
                     <span style={{
-                      fontSize: 9, color: "#9B9990", background: "#EEEDE9",
-                      borderRadius: 3, padding: "0 4px", lineHeight: 1.6,
+                      fontSize: 10, color: "#059669", background: "#F0FDF4",
+                      border: "1px solid #D1FAE5", borderRadius: 10,
+                      padding: "0 7px", maxWidth: 90, overflow: "hidden",
+                      textOverflow: "ellipsis", whiteSpace: "nowrap" as const, flexShrink: 0,
+                    }}>
+                      {values[req.id]}
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: 9, color: "#B5B4B0", background: "#F3F2F0",
+                      borderRadius: 4, padding: "1px 5px", flexShrink: 0,
                     }}>
                       {req.type}
                     </span>
+                  )}
+
+                  {/* pencil */}
+                  <span style={{ fontSize: 11, color: "#C5C4C0", flexShrink: 0, lineHeight: 1 }}>✎</span>
+                </div>
+              )}
+
+              {/* Inline edit — expands in place */}
+              {isEditing && (
+                <div style={{
+                  padding: "8px 6px 10px", background: "#F9F9F8",
+                  borderBottom: "1px solid #E8E7E3", borderLeft: "2px solid #5B7FDB",
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#3A3A38", marginBottom: 6 }}>
+                    {req.label}
+                    {req.required && <span style={{ color: "#E8A838", marginLeft: 3 }}>*</span>}
+                    {req.hint && (
+                      <span style={{ fontSize: 10, fontWeight: 400, color: "#9B9990", marginLeft: 6 }}>
+                        {req.hint}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Filled value display */}
-                  {filled && !isEditing && (
-                    <div style={{ fontSize: 10, color: "#059669", wordBreak: "break-all" as const, lineHeight: 1.5 }}>
-                      {values[req.id]}
+                  {req.type === "select" ? (
+                    <select
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      autoFocus
+                      style={{
+                        width: "100%", fontSize: 11, border: "1px solid #D1D5DB",
+                        borderRadius: 5, padding: "5px 6px", background: "#FFF", fontFamily: "inherit",
+                      }}
+                    >
+                      <option value="">選擇…</option>
+                      {(req.options ?? []).map((o: string) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  ) : req.type === "boolean" ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {["是", "否"].map(opt => (
+                        <button key={opt} onClick={() => setEditValue(opt)} style={{
+                          fontSize: 11, border: `1px solid ${editValue === opt ? "#5B7FDB" : "#D1D5DB"}`,
+                          borderRadius: 5, padding: "4px 18px", cursor: "pointer",
+                          background: editValue === opt ? "#EEF2FF" : "#FFF", fontFamily: "inherit",
+                        }}>{opt}</button>
+                      ))}
                     </div>
+                  ) : (
+                    <input
+                      autoFocus
+                      type={req.type === "url" ? "url" : "text"}
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      placeholder={req.hint ?? req.label}
+                      onKeyDown={e => { if (e.key === "Enter") commitEdit(req.id); if (e.key === "Escape") cancelEdit(); }}
+                      style={{
+                        width: "100%", fontSize: 11, border: "1px solid #CBD5E1",
+                        borderRadius: 5, padding: "5px 8px", boxSizing: "border-box" as const,
+                        fontFamily: "inherit", outline: "none", background: "#FFF",
+                      }}
+                    />
                   )}
 
-                  {/* Hint (unfilled, not editing) */}
-                  {!filled && !isEditing && req.hint && (
-                    <div style={{ fontSize: 10, color: "#B0AFA9", lineHeight: 1.4 }}>{req.hint}</div>
-                  )}
-
-                  {/* Inline edit form */}
-                  {isEditing && (
-                    <div style={{ marginTop: 5 }}>
-                      {req.type === "select" ? (
-                        <select
-                          value={editValue}
-                          onChange={e => setEditValue(e.target.value)}
-                          autoFocus
-                          style={{
-                            width: "100%", fontSize: 11, border: "1px solid #D1D5DB",
-                            borderRadius: 5, padding: "4px 6px", background: "#FFF",
-                            fontFamily: "inherit",
-                          }}
-                        >
-                          <option value="">選擇…</option>
-                          {(req.options ?? []).map((o: string) => (
-                            <option key={o} value={o}>{o}</option>
-                          ))}
-                        </select>
-                      ) : req.type === "boolean" ? (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {["是", "否"].map(opt => (
-                            <button
-                              key={opt}
-                              onClick={() => setEditValue(opt)}
-                              style={{
-                                fontSize: 11, border: "1px solid #D1D5DB", borderRadius: 5,
-                                padding: "3px 14px", cursor: "pointer",
-                                background: editValue === opt ? (opt === "是" ? "#DCFCE7" : "#FEE2E2") : "#FFF",
-                                fontFamily: "inherit",
-                              }}
-                            >{opt}</button>
-                          ))}
-                        </div>
-                      ) : (
-                        <input
-                          autoFocus
-                          type={req.type === "url" ? "url" : "text"}
-                          value={editValue}
-                          onChange={e => setEditValue(e.target.value)}
-                          placeholder={req.hint ?? ""}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") commitEdit(req.id);
-                            if (e.key === "Escape") setEditingId(null);
-                          }}
-                          style={{
-                            width: "100%", fontSize: 11, border: "1px solid #D1D5DB",
-                            borderRadius: 5, padding: "4px 6px", boxSizing: "border-box" as const,
-                            fontFamily: "inherit", outline: "none",
-                          }}
-                        />
-                      )}
-                      <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
-                        <button
-                          onClick={() => commitEdit(req.id)}
-                          style={{
-                            fontSize: 10, background: "#1A1A18", color: "#FFF",
-                            border: "none", borderRadius: 5, padding: "3px 10px",
-                            cursor: "pointer", fontFamily: "inherit",
-                          }}
-                        >儲存</button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          style={{
-                            fontSize: 10, background: "none", border: "1px solid #E4E3E1",
-                            borderRadius: 5, padding: "3px 8px", cursor: "pointer",
-                            color: "#6B6A66", fontFamily: "inherit",
-                          }}
-                        >取消</button>
-                      </div>
-                    </div>
-                  )}
+                  <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
+                    <button onClick={() => commitEdit(req.id)} style={{
+                      fontSize: 10, background: "#1A1A18", color: "#FFF", border: "none",
+                      borderRadius: 5, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit",
+                    }}>儲存</button>
+                    <button onClick={cancelEdit} style={{
+                      fontSize: 10, background: "none", border: "1px solid #E4E3E1",
+                      borderRadius: 5, padding: "4px 10px", cursor: "pointer",
+                      color: "#6B6A66", fontFamily: "inherit",
+                    }}>取消</button>
+                  </div>
                 </div>
-
-                {/* Edit pencil button */}
-                {!isEditing && (
-                  <button
-                    onClick={() => startEdit(req.id)}
-                    title="手動填寫"
-                    style={{
-                      fontSize: 11, background: "none", border: "none",
-                      color: "#C5C4C0", cursor: "pointer", flexShrink: 0, padding: "0 2px",
-                      lineHeight: 1,
-                    }}
-                  >✎</button>
-                )}
-              </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Outputs section */}
+      {/* ── Outputs (collapsed, compact) ── */}
       {Object.keys(outputs).length > 0 && (
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #EEEDE9" }}>
-          <div style={{
-            fontSize: 10, fontWeight: 700, color: "#9B9990", marginBottom: 8,
-            textTransform: "uppercase" as const, letterSpacing: "0.07em",
-          }}>
-            預期交付物
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #EEEDE9" }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", marginBottom: 6, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>
+            交付物
           </div>
 
-          {/* Default outputs (always available) */}
-          {(outputs["default"] ?? []).length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column" as const, gap: 4, marginBottom: 6 }}>
-              {(outputs["default"] ?? []).map((item: string, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#3A3A38" }}>
-                  <span style={{ color: "#10B981", fontSize: 10, flexShrink: 0 }}>●</span>
-                  {item}
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Default — inline chip list */}
+          <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4 }}>
+            {(outputs["default"] ?? []).map((item: string, i: number) => (
+              <span key={i} style={{
+                fontSize: 10, background: "#F3F2F0", color: "#3A3A38",
+                borderRadius: 10, padding: "2px 8px", lineHeight: 1.6,
+              }}>
+                {item}
+              </span>
+            ))}
+          </div>
 
-          {/* Gated outputs (unlocked by filling a requirement) */}
+          {/* Gated outputs */}
           {Object.entries(outputs)
             .filter(([gate]) => gate !== "default")
             .map(([gate, items]) => {
-              const isUnlocked = unlockedGates.has(gate);
-              const reqId = gate.replace(/^with_/, "");
-              const matchingReq = requirements.find((r: any) => r.id === reqId);
               if (!items.length) return null;
+              const unlocked   = unlockedGates.has(gate);
+              const reqId      = gate.replace(/^with_/, "");
+              const matchLabel = requirements.find((r: any) => r.id === reqId)?.label ?? reqId;
               return (
-                <div key={gate} style={{ marginTop: 8, opacity: isUnlocked ? 1 : 0.5 }}>
-                  <div style={{ fontSize: 9, color: "#9B9990", marginBottom: 4, lineHeight: 1.5 }}>
-                    {isUnlocked ? "✓" : "○"}{" "}
-                    填寫「{matchingReq?.label ?? reqId}」後解鎖：
+                <div key={gate} style={{ marginTop: 7 }}>
+                  <div style={{ fontSize: 9, color: unlocked ? "#059669" : "#B5B4B0", marginBottom: 4 }}>
+                    {unlocked ? "✓" : "+"} 填「{matchLabel}」解鎖：
                   </div>
-                  {items.map((item: string, i: number) => (
-                    <div key={i} style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      fontSize: 11, color: isUnlocked ? "#3A3A38" : "#B0AFA9",
-                    }}>
-                      <span style={{ color: isUnlocked ? "#10B981" : "#D1D5DB", fontSize: 10, flexShrink: 0 }}>●</span>
-                      {item}
-                    </div>
-                  ))}
+                  <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4 }}>
+                    {items.map((item: string, i: number) => (
+                      <span key={i} style={{
+                        fontSize: 10, borderRadius: 10, padding: "2px 8px", lineHeight: 1.6,
+                        background: unlocked ? "#ECFDF5" : "#F5F4F2",
+                        color: unlocked ? "#059669" : "#B5B4B0",
+                        border: `1px solid ${unlocked ? "#A7F3D0" : "#E8E7E3"}`,
+                      }}>
+                        {item}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               );
             })}
         </div>
       )}
 
-      {/* Layer 2 hint */}
-      <div style={{ marginTop: 10, fontSize: 10, color: "#B0AFA9", lineHeight: 1.6 }}>
-        Squad Lead 在對話中會主動詢問未填項目，並自動更新此清單。
+      {/* Layer 2 hint — subtle */}
+      <div style={{ marginTop: 10, fontSize: 10, color: "#C5C4C0", lineHeight: 1.5, fontStyle: "italic" as const }}>
+        Squad Lead 會在對話中詢問未填項目
       </div>
     </div>
   );
