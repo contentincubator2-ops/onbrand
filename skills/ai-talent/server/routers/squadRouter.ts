@@ -218,7 +218,7 @@ export const squadRouter = router({
         name:        (row.name ?? "") as string,
         description: (row.description ?? null) as string | null,
         industryKey: (row.industry_key ?? null) as string | null,
-        taskType:    (row.missionType ?? row.taskType ?? null) as string | null,
+        taskType:    (row.missionType ?? null) as string | null,
         memberCount: members.length,
         lead: leadAgentId && leadMap[leadAgentId] ? {
           agentId: leadAgentId,
@@ -236,7 +236,7 @@ export const squadRouter = router({
     .query(async ({ input }) => {
       // agent_squads and agents live on VM local DB (localPool)
       const [squadRows] = await localPool.execute(
-        `SELECT name, agents, missionType, taskType, showcases, methodology FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+        `SELECT name, agents, missionType, showcases, methodology FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
         [input.squadId]
       ) as any[];
       const squad = (squadRows as any[])?.[0];
@@ -284,7 +284,7 @@ export const squadRouter = router({
 
       // Fetch workflow steps from squad_workflow_templates (also on local DB)
       let steps: any[] = [];
-      const effectiveMissionType = squad.missionType ?? squad.taskType;
+      const effectiveMissionType = squad.missionType;
       if (effectiveMissionType) {
         try {
           const [wfRows] = await localPool.execute(
@@ -371,7 +371,7 @@ export const squadRouter = router({
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
       const [rows] = await localPool.execute(
-        `SELECT id, slug, name, description, industry_key, missionType, taskType, agents
+        `SELECT id, slug, name, description, industry_key, missionType, agents
          FROM agent_squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
         [input.slug]
       ) as any[];
@@ -398,7 +398,7 @@ export const squadRouter = router({
         name:        (row.name ?? "") as string,
         description: (row.description ?? null) as string | null,
         industryKey: (row.industry_key ?? null) as string | null,
-        taskType:    (row.missionType ?? row.taskType ?? null) as string | null,
+        taskType:    (row.missionType ?? null) as string | null,
         memberCount: members.length,
         lead,
       };
