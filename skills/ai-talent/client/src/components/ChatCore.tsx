@@ -14,6 +14,7 @@ import TaskProgressTracker, { type TaskStep } from "./chat/TaskProgressTracker";
 import TypedThreadCard from "./chat/TypedThreadCard";
 import SquadRecommendCards from "./chat/SquadRecommendCards";
 import { MissionHomePage } from "./chat/MissionHomePage";
+import type { SquadOption } from '../data/taskSquads';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
 
@@ -125,7 +126,8 @@ export interface ChatCoreProps {
   preselectedAgent?: { id: number; name: string; title?: string; type: "agent" | "squad" } | null;
   onClearAgent?: () => void;
   onMissionCreated?: (id: number) => void;
-  onSquadSelect?: (taskLabel: string, squad: import('../data/taskSquads').SquadOption, allSquads: import('../data/taskSquads').SquadOption[]) => void;
+  onSquadSelect?: (taskLabel: string, squad: SquadOption, allSquads: SquadOption[]) => void;
+  onSquadPreview?: (squad: SquadOption | null, allSquads: SquadOption[]) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -437,6 +439,7 @@ export default function ChatCore({
   onClearAgent,
   onMissionCreated,
   onSquadSelect,
+  onSquadPreview,
 }: ChatCoreProps = {}) {
 
   // ── Conversations state ──────────────────────────────────────────────────
@@ -475,6 +478,8 @@ export default function ChatCore({
   const [confirmedMsgIds, setConfirmedMsgIds] = useState<Set<string>>(new Set());
   const [activeWorkspaceKey, setActiveWorkspaceKey] = useState<string>("strategy");
   const [currentMissionId, setCurrentMissionId] = useState<number | null>(null);
+  const [selectedSquadForMission, setSelectedSquadForMission] = useState<SquadOption | null>(null);
+  const [isHomepageExiting, setIsHomepageExiting] = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
@@ -599,6 +604,12 @@ export default function ChatCore({
       return [{ id: missionConvId, title: missionData.title, messages: [], createdAt: Date.now() }, ...prev];
     });
   }, [activeMissionId, missionDataQuery.data]);
+
+  // Reset squad selection and exit animation when mission changes
+  useEffect(() => {
+    setSelectedSquadForMission(null);
+    setIsHomepageExiting(false);
+  }, [activeMissionId]);
 
   // History load
   useEffect(() => {
@@ -907,6 +918,19 @@ export default function ChatCore({
   const handleSend = async () => {
     const rawText = input.trim();
     if (!rawText || loading) return;
+
+    // First-message handling: squad update + exit animation
+    const active = conversations.find((c) => c.id === activeId);
+    const isFirstUserMsg = !active || active.messages.filter(m => m.role === "user").length === 0;
+    if (isFirstUserMsg) {
+      if (selectedSquadForMission && activeMissionId) {
+        updateMission.mutate({ id: activeMissionId, squadSlug: selectedSquadForMission.squadSlug } as any);
+        onSquadSelect?.(rawText, selectedSquadForMission, []);
+      }
+      setIsHomepageExiting(true);
+      setTimeout(() => setIsHomepageExiting(false), 400);
+    }
+
     stopRef.current = false;
     setIsStopped(false);
     setStreamingThinking("");
@@ -1180,28 +1204,22 @@ export default function ChatCore({
             where homepage shows then disappears once DB history loads in). */}
         {(!active || (
           !savedMessagesQuery.isFetching &&
-          active.messages.filter(m => m.role === "user").length === 0
-        )) && !loading && !teamAssembly && (
+          (active.messages.filter(m => m.role === "user").length === 0 || isHomepageExiting)
+        )) && !teamAssembly && (
 
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
                 brandName={activeBrandName ?? undefined}
                 missionTitle={(missionDataQuery.data as any)?.title ?? undefined}
                 missionId={activeMissionId}
+                isExiting={isHomepageExiting}
                 onTaskSelect={(task) => {
                   setInput(task);
                   setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
                 }}
-                onSquadSelect={(taskLabel, squad, allSquads) => {
-                  // 1. Persist squad slug to mission
-                  if (activeMissionId) {
-                    updateMission.mutate({ id: activeMissionId, squadSlug: squad.squadSlug } as any);
-                  }
-                  // 2. Notify parent (AppShell/App) to update right panel
-                  onSquadSelect?.(taskLabel, squad, allSquads);
-                  // 3. Pre-fill input and auto-send
-                  setInput(taskLabel);
-                  setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 80);
+                onSquadPreview={(squad, allSquads) => {
+                  setSelectedSquadForMission(squad);
+                  onSquadPreview?.(squad, allSquads);
                 }}
               />
         )}

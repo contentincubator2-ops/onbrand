@@ -48,9 +48,9 @@ function MissionPage() {
         key={`mission-${numericMissionId}`}
         activeMissionId={numericMissionId}
         onMissionCreated={(id) => navigate(`/m/${id}`)}
-        onSquadSelect={(taskLabel, squad, allSquads) => {
+        onSquadPreview={(squad, allSquads) => {
           setActiveSquad(squad);
-          setTaskSquads(allSquads);
+          setTaskSquads(allSquads ?? []);
         }}
       />
     </AppShell>

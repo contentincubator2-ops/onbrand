@@ -264,6 +264,12 @@ const FACEBOOK_SQUADS: SquadOption[] = [
 
 // ─── Task → Squads mapping ────────────────────────────────────────────────────
 
+export const WORKSPACE_SQUADS: Record<string, SquadOption[]> = {
+  strategy: STRATEGY_SQUADS,
+  website:  WEBSITE_SQUADS,
+  facebook: FACEBOOK_SQUADS,
+};
+
 export const TASK_SQUADS: Record<string, SquadOption[]> = {
   // Strategy
   "品牌定位分析": STRATEGY_SQUADS,
