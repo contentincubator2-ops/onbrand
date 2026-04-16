@@ -9,7 +9,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { missions, missionTaskUnits } from "../../drizzle/schema";
-import { eq, and, desc, or, isNull } from "drizzle-orm";
+import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
 import { computeMissionResources } from "../missionResourceComputer";
 
 export const missionRouter = router({
@@ -268,6 +268,110 @@ export const missionRouter = router({
         .where(and(...(conditions as any[])))
         .orderBy(desc(missions.createdAt))
         .limit(20);
+    }),
+
+  // ── Mission Requirements (Layer 1 + Layer 2) ────────────────────────────────
+  // Stored in mission_requirements table (auto-created on first use).
+
+  /** Return filled requirement values for a mission + squad as a plain map */
+  getRequirementValues: protectedProcedure
+    .input(z.object({
+      missionId: z.number(),
+      squadSlug: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return {} as Record<string, string>;
+      // Auto-create table if it doesn't exist yet
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS mission_requirements (
+          id             INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          mission_id     INT           NOT NULL,
+          squad_slug     VARCHAR(120)  NOT NULL,
+          requirement_id VARCHAR(80)   NOT NULL,
+          value          TEXT,
+          updated_at     DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                       ON UPDATE CURRENT_TIMESTAMP(3),
+          UNIQUE KEY uniq_req (mission_id, squad_slug, requirement_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      const [rows] = await db.execute(
+        sql`SELECT requirement_id, value
+            FROM mission_requirements
+            WHERE mission_id = ${input.missionId}
+              AND squad_slug  = ${input.squadSlug}`
+      ) as any[];
+      const result: Record<string, string> = {};
+      for (const row of (rows as any[])) {
+        result[row.requirement_id] = row.value ?? "";
+      }
+      return result;
+    }),
+
+  /** Upsert a single requirement value (manual fill or Layer 2 auto-fill) */
+  setRequirementValue: protectedProcedure
+    .input(z.object({
+      missionId:     z.number(),
+      squadSlug:     z.string(),
+      requirementId: z.string().max(80),
+      value:         z.string().max(2000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { ok: false };
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS mission_requirements (
+          id             INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          mission_id     INT           NOT NULL,
+          squad_slug     VARCHAR(120)  NOT NULL,
+          requirement_id VARCHAR(80)   NOT NULL,
+          value          TEXT,
+          updated_at     DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                       ON UPDATE CURRENT_TIMESTAMP(3),
+          UNIQUE KEY uniq_req (mission_id, squad_slug, requirement_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      await db.execute(sql`
+        INSERT INTO mission_requirements (mission_id, squad_slug, requirement_id, value)
+        VALUES (${input.missionId}, ${input.squadSlug}, ${input.requirementId}, ${input.value})
+        ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW(3)
+      `);
+      return { ok: true };
+    }),
+
+  /** Bulk-upsert multiple requirement values (used by Layer 2 auto-extract) */
+  bulkSetRequirements: protectedProcedure
+    .input(z.object({
+      missionId: z.number(),
+      squadSlug: z.string(),
+      values:    z.record(z.string().max(80), z.string().max(2000)),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { ok: false, count: 0 };
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS mission_requirements (
+          id             INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          mission_id     INT           NOT NULL,
+          squad_slug     VARCHAR(120)  NOT NULL,
+          requirement_id VARCHAR(80)   NOT NULL,
+          value          TEXT,
+          updated_at     DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                       ON UPDATE CURRENT_TIMESTAMP(3),
+          UNIQUE KEY uniq_req (mission_id, squad_slug, requirement_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      let count = 0;
+      for (const [reqId, val] of Object.entries(input.values)) {
+        if (!val?.trim()) continue;
+        await db.execute(sql`
+          INSERT INTO mission_requirements (mission_id, squad_slug, requirement_id, value)
+          VALUES (${input.missionId}, ${input.squadSlug}, ${reqId}, ${val})
+          ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW(3)
+        `);
+        count++;
+      }
+      return { ok: true, count };
     }),
 
 });

@@ -23,6 +23,7 @@ import { sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import { randomBytes } from "crypto";
 import { loadAgentContext } from "../agentContextLoader";
+import { getSquadRequirements } from "../_core/squadRequirements";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -618,5 +619,16 @@ ${agentCtx.systemPromptPrefix}`;
         historyDepth: agentCtx.historyDepth,
         depthLabel:   agentCtx.depthLabel,
       };
+    }),
+
+  // ── getRequirements ───────────────────────────────────────────────────────
+  // Return the static requirements config for a squad slug (+ workspace fallback).
+  getRequirements: protectedProcedure
+    .input(z.object({
+      squadSlug: z.string().optional().default(""),
+      workspace: z.string().optional(),
+    }))
+    .query(({ input }) => {
+      return getSquadRequirements(input.squadSlug || null, input.workspace ?? null);
     }),
 });

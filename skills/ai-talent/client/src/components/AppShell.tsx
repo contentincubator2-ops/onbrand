@@ -1504,7 +1504,13 @@ function RightPanel({
     {
       key: "requirements",
       label: "任務需求",
-      content: <MissionRequirementsPanel missionId={missionId} />,
+      content: (
+        <SquadRequirementsPanel
+          missionId={missionId}
+          squadSlug={effectiveSquad?.slug ?? null}
+          workspace={missionWorkspace ?? null}
+        />
+      ),
     },
     {
       key: "sop",
@@ -1845,162 +1851,328 @@ function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; 
   );
 }
 
-// ─── MissionRequirementsPanel ─────────────────────────────────────────────────
-// Layer 1: structured mission brief displayed in RightPanel
-// Layer 2: "更新需求" action triggered from chat
+// ─── SquadRequirementsPanel ───────────────────────────────────────────────────
+// Right-panel checklist: what data/access this squad needs, and what it delivers.
+// Layer 1 — static config per squad slug (immediate).
+// Layer 2 — Squad Lead auto-fills items from conversation (async).
 
-function MissionRequirementsPanel({
+function SquadRequirementsPanel({
   missionId,
-  onExtractRequest,
+  squadSlug,
+  workspace,
 }: {
   missionId?: number | null;
-  onExtractRequest?: () => void;
+  squadSlug?: string | null;
+  workspace?: string | null;
 }) {
-  const utils = trpc.useUtils();
-  const missionQuery = trpc.mission.getById.useQuery(
-    { id: missionId! },
-    { enabled: !!missionId, staleTime: 10_000, refetchOnWindowFocus: false }
-  );
-  const updateMission = (trpc as any).mission?.update?.useMutation
-    ? (trpc as any).mission.update.useMutation({
-        onSuccess: () => utils.mission.getById.invalidate({ id: missionId! }),
+  // ── Requirements config (static per squad) ─────────────────────────────────
+  const requirementsQuery = (trpc as any).squad?.getRequirements?.useQuery
+    ? (trpc as any).squad.getRequirements.useQuery(
+        { squadSlug: squadSlug ?? "", workspace: workspace ?? undefined },
+        { staleTime: 5 * 60_000, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+
+  // ── Filled values (from mission_requirements table) ────────────────────────
+  const valuesQuery = (trpc as any).mission?.getRequirementValues?.useQuery
+    ? (trpc as any).mission.getRequirementValues.useQuery(
+        { missionId: missionId!, squadSlug: squadSlug ?? "" },
+        { enabled: !!missionId && !!squadSlug, staleTime: 5_000, refetchOnWindowFocus: false }
+      )
+    : { data: null, refetch: () => {} };
+
+  const setValueMutation = (trpc as any).mission?.setRequirementValue?.useMutation
+    ? (trpc as any).mission.setRequirementValue.useMutation({
+        onSuccess: () => (valuesQuery as any).refetch?.(),
       })
     : { mutate: () => {}, isPending: false };
 
-  const data = missionQuery.data as any;
+  const config = requirementsQuery.data as any;
+  const requirements: any[] = config?.requirements ?? [];
+  const outputs: Record<string, string[]> = config?.outputs ?? {};
+  const values: Record<string, string> = (valuesQuery.data as any) ?? {};
 
-  const FIELDS = [
-    { key: "objective",      label: "任務目標",   placeholder: "例：提升品牌知名度、增加 30% 轉換率…" },
-    { key: "audience",       label: "目標受眾",   placeholder: "例：25-40 歲職場女性、對健康生活有興趣…" },
-    { key: "successMetrics", label: "成功指標",   placeholder: "例：觸及 10 萬人、NPS ≥ 50、MQL 提升 20%…" },
-    { key: "constraints",    label: "限制條件",   placeholder: "例：預算 NT$50 萬、不使用 KOL、本月底上線…" },
-  ] as const;
+  // ── Local edit state ───────────────────────────────────────────────────────
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editValue, setEditValue] = React.useState("");
 
-  type FieldKey = "objective" | "audience" | "successMetrics" | "constraints";
-
-  const [fields, setFields] = React.useState<Record<FieldKey, string>>({
-    objective: "", audience: "", successMetrics: "", constraints: "",
-  });
-  const [dirtyKeys, setDirtyKeys] = React.useState<Set<FieldKey>>(new Set());
-  const [savingKey, setSavingKey] = React.useState<FieldKey | null>(null);
-
-  // Sync from DB when data loads/changes
-  React.useEffect(() => {
-    if (!data) return;
-    setFields({
-      objective:      data.objective      ?? "",
-      audience:       data.audience       ?? "",
-      successMetrics: data.successMetrics ?? "",
-      constraints:    data.constraints    ?? "",
-    });
-    setDirtyKeys(new Set());
-  }, [data?.id, data?.objective, data?.audience, data?.successMetrics, data?.constraints]);
-
-  const handleChange = (key: FieldKey, value: string) => {
-    setFields(prev => ({ ...prev, [key]: value }));
-    setDirtyKeys(prev => new Set([...prev, key]));
+  const startEdit = (reqId: string) => {
+    setEditingId(reqId);
+    setEditValue(values[reqId] ?? "");
   };
 
-  const handleBlur = (key: FieldKey) => {
-    if (!missionId || !dirtyKeys.has(key)) return;
-    setSavingKey(key);
-    updateMission.mutate(
-      { id: missionId, [key]: fields[key] },
-      { onSettled: () => setSavingKey(null) }
-    );
-    setDirtyKeys(prev => { const s = new Set(prev); s.delete(key); return s; });
+  const commitEdit = (reqId: string) => {
+    if (missionId && squadSlug && editValue.trim()) {
+      setValueMutation.mutate({
+        missionId, squadSlug,
+        requirementId: reqId,
+        value: editValue.trim(),
+      });
+    }
+    setEditingId(null);
   };
 
-  const filledCount = FIELDS.filter(f => fields[f.key].trim().length > 0).length;
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const totalCount    = requirements.length;
+  const filledCount   = requirements.filter((r: any) => !!values[r.id]?.trim()).length;
+  const requiredCount = requirements.filter((r: any) => r.required).length;
+  const filledRequiredCount = requirements.filter((r: any) => r.required && !!values[r.id]?.trim()).length;
 
+  // Which gate outputs are unlocked
+  const unlockedGates = new Set(
+    requirements
+      .filter((r: any) => !!values[r.id]?.trim())
+      .map((r: any) => `with_${r.id}`)
+  );
+
+  // ── Empty states ───────────────────────────────────────────────────────────
   if (!missionId) {
     return (
-      <div style={{ padding: "18px 8px", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11, lineHeight: 1.7 }}>
-        選擇任務後<br />填寫任務需求
+      <div style={{ padding: "18px 8px", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11, lineHeight: 1.8 }}>
+        選擇任務後<br />查看需求清單
+      </div>
+    );
+  }
+  if (!squadSlug) {
+    return (
+      <div style={{ padding: "14px 8px", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11, lineHeight: 1.8 }}>
+        選擇執行方式（Squad）後<br />查看所需資料清單
       </div>
     );
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div>
-      {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {filledCount > 0 && (
-            <span style={{
-              fontSize: 10, background: "#ECFDF5", color: "#059669",
-              border: "1px solid #A7F3D0", borderRadius: 10, padding: "1px 7px", fontWeight: 600,
-            }}>
-              {filledCount}/4 已填寫
-            </span>
-          )}
-        </div>
-        {onExtractRequest && (
-          <button
-            onClick={onExtractRequest}
-            title="從對話中提取需求"
-            style={{
-              fontSize: 10, background: "none", border: "1px solid #E4E3E1",
-              borderRadius: 6, padding: "2px 8px", color: "#6B6A66", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 4,
-            }}
-          >
-            ✦ 從對話提取
-          </button>
-        )}
-      </div>
+    <div style={{ fontSize: 12 }}>
 
-      {/* Fields */}
-      <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
-        {FIELDS.map(({ key, label, placeholder }) => {
-          const value = fields[key];
-          const isDirty = dirtyKeys.has(key);
-          const isSaving = savingKey === key;
-          const hasFilled = value.trim().length > 0;
-          return (
-            <div key={key}>
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                marginBottom: 3,
+      {/* Progress bar */}
+      {totalCount > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+            <span style={{ fontSize: 10, color: "#9B9990" }}>
+              {filledCount}/{totalCount} 已填寫
+            </span>
+            {requiredCount > 0 && filledRequiredCount >= requiredCount && (
+              <span style={{
+                fontSize: 10, background: "#ECFDF5", color: "#059669",
+                border: "1px solid #A7F3D0", borderRadius: 10, padding: "1px 7px", fontWeight: 600,
               }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "#6B6A66" }}>{label}</span>
-                {isSaving && <span style={{ fontSize: 9, color: "#9B9990" }}>儲存中…</span>}
-                {!isSaving && isDirty && <span style={{ fontSize: 9, color: "#E8631A" }}>● 未儲存</span>}
-                {!isSaving && !isDirty && hasFilled && <span style={{ fontSize: 9, color: "#059669" }}>✓</span>}
+                必填完成 ✓
+              </span>
+            )}
+          </div>
+          {/* thin progress track */}
+          <div style={{ height: 3, background: "#F0EFED", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: 2,
+              background: filledRequiredCount >= requiredCount ? "#10B981" : "#5B7FDB",
+              width: totalCount > 0 ? `${Math.round((filledCount / totalCount) * 100)}%` : "0%",
+              transition: "width 0.4s ease",
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Requirements checklist */}
+      <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
+        {requirements.map((req: any) => {
+          const filled   = !!values[req.id]?.trim();
+          const isEditing = editingId === req.id;
+
+          return (
+            <div
+              key={req.id}
+              style={{
+                background: filled ? "#F0FDF4" : "#F9F9F8",
+                border: `1px solid ${filled ? "#BBF7D0" : req.required ? "#E4E3E1" : "#EEEDE9"}`,
+                borderRadius: 8, padding: "7px 9px",
+                transition: "background 0.2s",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+                {/* Status icon */}
+                <span style={{
+                  fontSize: 14, marginTop: 0, flexShrink: 0,
+                  color: filled ? "#10B981" : req.required ? "#D1A04A" : "#C8C7C3",
+                  lineHeight: 1.3,
+                }}>
+                  {filled ? "✓" : "○"}
+                </span>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Label row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const, marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#3A3A38" }}>{req.label}</span>
+                    {req.required && (
+                      <span style={{ fontSize: 9, color: "#D1A04A", fontWeight: 700, lineHeight: 1 }}>必填</span>
+                    )}
+                    <span style={{
+                      fontSize: 9, color: "#9B9990", background: "#EEEDE9",
+                      borderRadius: 3, padding: "0 4px", lineHeight: 1.6,
+                    }}>
+                      {req.type}
+                    </span>
+                  </div>
+
+                  {/* Filled value display */}
+                  {filled && !isEditing && (
+                    <div style={{ fontSize: 10, color: "#059669", wordBreak: "break-all" as const, lineHeight: 1.5 }}>
+                      {values[req.id]}
+                    </div>
+                  )}
+
+                  {/* Hint (unfilled, not editing) */}
+                  {!filled && !isEditing && req.hint && (
+                    <div style={{ fontSize: 10, color: "#B0AFA9", lineHeight: 1.4 }}>{req.hint}</div>
+                  )}
+
+                  {/* Inline edit form */}
+                  {isEditing && (
+                    <div style={{ marginTop: 5 }}>
+                      {req.type === "select" ? (
+                        <select
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          autoFocus
+                          style={{
+                            width: "100%", fontSize: 11, border: "1px solid #D1D5DB",
+                            borderRadius: 5, padding: "4px 6px", background: "#FFF",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          <option value="">選擇…</option>
+                          {(req.options ?? []).map((o: string) => (
+                            <option key={o} value={o}>{o}</option>
+                          ))}
+                        </select>
+                      ) : req.type === "boolean" ? (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {["是", "否"].map(opt => (
+                            <button
+                              key={opt}
+                              onClick={() => setEditValue(opt)}
+                              style={{
+                                fontSize: 11, border: "1px solid #D1D5DB", borderRadius: 5,
+                                padding: "3px 14px", cursor: "pointer",
+                                background: editValue === opt ? (opt === "是" ? "#DCFCE7" : "#FEE2E2") : "#FFF",
+                                fontFamily: "inherit",
+                              }}
+                            >{opt}</button>
+                          ))}
+                        </div>
+                      ) : (
+                        <input
+                          autoFocus
+                          type={req.type === "url" ? "url" : "text"}
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          placeholder={req.hint ?? ""}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") commitEdit(req.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          style={{
+                            width: "100%", fontSize: 11, border: "1px solid #D1D5DB",
+                            borderRadius: 5, padding: "4px 6px", boxSizing: "border-box" as const,
+                            fontFamily: "inherit", outline: "none",
+                          }}
+                        />
+                      )}
+                      <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
+                        <button
+                          onClick={() => commitEdit(req.id)}
+                          style={{
+                            fontSize: 10, background: "#1A1A18", color: "#FFF",
+                            border: "none", borderRadius: 5, padding: "3px 10px",
+                            cursor: "pointer", fontFamily: "inherit",
+                          }}
+                        >儲存</button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          style={{
+                            fontSize: 10, background: "none", border: "1px solid #E4E3E1",
+                            borderRadius: 5, padding: "3px 8px", cursor: "pointer",
+                            color: "#6B6A66", fontFamily: "inherit",
+                          }}
+                        >取消</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Edit pencil button */}
+                {!isEditing && (
+                  <button
+                    onClick={() => startEdit(req.id)}
+                    title="手動填寫"
+                    style={{
+                      fontSize: 11, background: "none", border: "none",
+                      color: "#C5C4C0", cursor: "pointer", flexShrink: 0, padding: "0 2px",
+                      lineHeight: 1,
+                    }}
+                  >✎</button>
+                )}
               </div>
-              <textarea
-                value={value}
-                onChange={e => handleChange(key, e.target.value)}
-                onBlur={() => handleBlur(key)}
-                placeholder={placeholder}
-                rows={2}
-                style={{
-                  width: "100%", boxSizing: "border-box" as const,
-                  border: `1px solid ${isDirty ? "#E8631A" : hasFilled ? "#D0E8FF" : "#E4E3E1"}`,
-                  borderRadius: 6, padding: "6px 8px",
-                  fontSize: 11, color: "#1A1A18", lineHeight: 1.5,
-                  background: hasFilled ? "#F8FBFF" : "#FAFAF9",
-                  resize: "none" as const, outline: "none",
-                  fontFamily: "inherit",
-                }}
-              />
             </div>
           );
         })}
       </div>
 
-      {/* Layer 1 hint */}
-      {filledCount > 0 && (
-        <div style={{
-          marginTop: 10, padding: "6px 9px",
-          background: "#F0FDF4", border: "1px solid #BBF7D0",
-          borderRadius: 6, fontSize: 10, color: "#15803D",
-          display: "flex", alignItems: "center", gap: 5,
-        }}>
-          <span>📋</span>
-          <span>需求已自動套用為 AI 對話背景</span>
+      {/* Outputs section */}
+      {Object.keys(outputs).length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #EEEDE9" }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, color: "#9B9990", marginBottom: 8,
+            textTransform: "uppercase" as const, letterSpacing: "0.07em",
+          }}>
+            預期交付物
+          </div>
+
+          {/* Default outputs (always available) */}
+          {(outputs["default"] ?? []).length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: 4, marginBottom: 6 }}>
+              {(outputs["default"] ?? []).map((item: string, i: number) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#3A3A38" }}>
+                  <span style={{ color: "#10B981", fontSize: 10, flexShrink: 0 }}>●</span>
+                  {item}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Gated outputs (unlocked by filling a requirement) */}
+          {Object.entries(outputs)
+            .filter(([gate]) => gate !== "default")
+            .map(([gate, items]) => {
+              const isUnlocked = unlockedGates.has(gate);
+              const reqId = gate.replace(/^with_/, "");
+              const matchingReq = requirements.find((r: any) => r.id === reqId);
+              if (!items.length) return null;
+              return (
+                <div key={gate} style={{ marginTop: 8, opacity: isUnlocked ? 1 : 0.5 }}>
+                  <div style={{ fontSize: 9, color: "#9B9990", marginBottom: 4, lineHeight: 1.5 }}>
+                    {isUnlocked ? "✓" : "○"}{" "}
+                    填寫「{matchingReq?.label ?? reqId}」後解鎖：
+                  </div>
+                  {items.map((item: string, i: number) => (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontSize: 11, color: isUnlocked ? "#3A3A38" : "#B0AFA9",
+                    }}>
+                      <span style={{ color: isUnlocked ? "#10B981" : "#D1D5DB", fontSize: 10, flexShrink: 0 }}>●</span>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
         </div>
       )}
+
+      {/* Layer 2 hint */}
+      <div style={{ marginTop: 10, fontSize: 10, color: "#B0AFA9", lineHeight: 1.6 }}>
+        Squad Lead 在對話中會主動詢問未填項目，並自動更新此清單。
+      </div>
     </div>
   );
 }
