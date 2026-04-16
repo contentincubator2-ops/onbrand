@@ -1502,25 +1502,16 @@ function RightPanel({
 
   const sections = [
     {
-      key: "requirements",
-      label: "任務需求",
-      content: (
-        <SquadRequirementsPanel
-          missionId={missionId}
-          squadSlug={effectiveSquad?.slug ?? null}
-          workspace={missionWorkspace ?? null}
-        />
-      ),
-    },
-    {
       key: "sop",
       label: "執行流程",
       content: effectiveSquad
         ? <DBSquadMethodologyPanel
             squadName={membersData?.squadName ?? effectiveSquad.name}
             description={effectiveSquad.description ?? ""}
+            methodology={membersData?.methodology ?? (effectiveSquad as any).methodology ?? ""}
             leadTitle={membersData?.lead?.title ?? effectiveSquad.lead?.title ?? ""}
             steps={membersData?.steps ?? []}
+            showcases={membersData?.showcases ?? []}
             isLoading={membersQuery.isLoading}
           />
         : emptyHint("選擇執行方式\n查看對應流程"),
@@ -1535,6 +1526,17 @@ function RightPanel({
             isLoading={membersQuery.isLoading}
           />
         : emptyHint("選擇執行方式\n查看協作成員"),
+    },
+    {
+      key: "requirements",
+      label: "任務需求",
+      content: (
+        <SquadRequirementsPanel
+          missionId={missionId}
+          squadSlug={effectiveSquad?.slug ?? null}
+          workspace={missionWorkspace ?? null}
+        />
+      ),
     },
     {
       key: "alternatives",
@@ -1634,17 +1636,20 @@ function RightPanel({
 // Renders methodology steps from squad_workflow_templates (real DB data)
 
 function DBSquadMethodologyPanel({
-  squadName, description, leadTitle, steps, isLoading,
+  squadName, description, methodology, leadTitle, steps, showcases, isLoading,
 }: {
   squadName: string;
   description: string;
+  methodology: string;
   leadTitle: string;
   steps: any[];
+  showcases: any[];
   isLoading: boolean;
 }) {
   return (
     <div>
-      <div style={{ marginBottom: 14 }}>
+      {/* Squad header */}
+      <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
           {squadName}
         </div>
@@ -1654,10 +1659,20 @@ function DBSquadMethodologyPanel({
         {description && (
           <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5 }}>{description}</div>
         )}
+        {methodology && (
+          <div style={{
+            marginTop: 6, fontSize: 10, color: "#9B9990",
+            background: "#F4F4F2", borderRadius: 4, padding: "3px 7px",
+            display: "inline-block", fontStyle: "italic",
+          }}>
+            📖 {methodology}
+          </div>
+        )}
       </div>
 
-      <div style={{ height: 1, background: "#E7E5E4", marginBottom: 14 }} />
+      <div style={{ height: 1, background: "#E7E5E4", marginBottom: 12 }} />
 
+      {/* Steps */}
       {isLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {[1,2,3,4].map(i => (
@@ -1678,7 +1693,7 @@ function DBSquadMethodologyPanel({
               </div>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
-                  {step.title ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
+                  {step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
                 </div>
                 <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
                   {step.description ?? ""}
@@ -1691,6 +1706,45 @@ function DBSquadMethodologyPanel({
         <div style={{ fontSize: 11, color: "#C8C7C3", textAlign: "center", padding: "12px 0" }}>
           此小隊尚未設定執行流程
         </div>
+      )}
+
+      {/* 商業驗證 showcases */}
+      {showcases.length > 0 && (
+        <>
+          <div style={{ height: 1, background: "#E7E5E4", margin: "14px 0 12px" }} />
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 8, letterSpacing: 0.3 }}>
+            🏆 商業驗證
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {showcases.map((sc: any, i: number) => (
+              <div key={i} style={{
+                background: "#FFFBEB",
+                border: "1px solid #FDE68A",
+                borderRadius: 8,
+                padding: "9px 10px",
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#92400E", marginBottom: 3 }}>
+                  {sc.company ?? sc.brand ?? "案例"}
+                </div>
+                {sc.result && (
+                  <div style={{ fontSize: 11, color: "#78350F", lineHeight: 1.5, marginBottom: 3 }}>
+                    📈 {sc.result}
+                  </div>
+                )}
+                {sc.description && (
+                  <div style={{ fontSize: 10, color: "#A16207", lineHeight: 1.4 }}>
+                    {sc.description}
+                  </div>
+                )}
+                {sc.source && (
+                  <div style={{ fontSize: 9, color: "#B45309", marginTop: 4, fontStyle: "italic" }}>
+                    來源：{sc.source}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

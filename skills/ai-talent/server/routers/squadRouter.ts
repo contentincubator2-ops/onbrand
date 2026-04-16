@@ -128,7 +128,7 @@ export const squadRouter = router({
       try {
         const [rows] = await localPool.execute(
           `SELECT id, slug, name, description, industry_key, missionType,
-                  agents, tags, use_cases
+                  agents, tags, use_cases, methodology
            FROM agent_squads
            WHERE is_active = 1 AND (${tagLikes}${industryClause})
            ORDER BY id DESC
@@ -157,22 +157,38 @@ export const squadRouter = router({
 
       // 5. JS-side scoring
       const candidates = squadRows.map(row => {
-        const members  = safeJsonParse<any[]>(row.agents ?? row.members, []);
-        const rowTags  = safeJsonParse<string[]>(row.tags, []);
-        const useCases = safeJsonParse<string[]>(row.use_cases, []);
+        const members    = safeJsonParse<any[]>(row.agents ?? row.members, []);
+        const rowTags    = safeJsonParse<string[]>(row.tags, []);
+        const useCases   = safeJsonParse<string[]>(row.use_cases, []);
+        const rowDesc    = (row.description ?? "").toLowerCase();
+        const rowName    = (row.name ?? "").toLowerCase();
+        const methodology = (row.methodology ?? "").toLowerCase();
 
         let score = 0;
+
+        // Workspace tag match — baseline relevance
         for (const tag of tags) {
-          if (rowTags.some((t: string) => t && t.toLowerCase().includes(tag.toLowerCase()))) score += 3;
+          const tl = tag.toLowerCase();
+          if (rowTags.some((t: string) => t && t.toLowerCase().includes(tl))) score += 3;
+          if (rowName.includes(tl)) score += 1;
         }
+
+        // Brand industry match
         if (brandIndustry) {
           if (row.industry_key === brandIndustry) score += 5;
           if (rowTags.some((t: string) => t && t.toLowerCase().includes(brandIndustry!.toLowerCase()))) score += 2;
         }
+
+        // Mission keyword matching — stronger weight to differentiate within workspace
         for (const word of missionKeywords) {
-          if ((row.name ?? "").includes(word)) score += 2;
-          if (useCases.some((uc: string) => uc && uc.includes(word))) score += 1;
+          const wl = word.toLowerCase();
+          if (rowName.includes(wl)) score += 4;           // name match is strongest signal
+          if (rowDesc.includes(wl)) score += 2;           // description match
+          if (methodology.includes(wl)) score += 1;
+          if (useCases.some((uc: string) => uc && uc.toLowerCase().includes(wl))) score += 3;
+          if (rowTags.some((t: string) => t && t.toLowerCase().includes(wl))) score += 2;
         }
+
         score += Math.min(members.length, 5);
 
         const leadMember = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
@@ -220,11 +236,11 @@ export const squadRouter = router({
     .query(async ({ input }) => {
       // agent_squads and agents live on VM local DB (localPool)
       const [squadRows] = await localPool.execute(
-        `SELECT name, agents, missionType, taskType FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+        `SELECT name, agents, missionType, taskType, showcases, methodology FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
         [input.squadId]
       ) as any[];
       const squad = (squadRows as any[])?.[0];
-      if (!squad) return { squadName: "", lead: null, members: [], steps: [] };
+      if (!squad) return { squadName: "", lead: null, members: [], steps: [], showcases: [], methodology: "" };
 
       const membersJson = safeJsonParse<any[]>(squad.agents ?? squad.members, []);
       const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
@@ -280,11 +296,15 @@ export const squadRouter = router({
         } catch { /* no steps */ }
       }
 
+      const showcases = safeJsonParse<any[]>(squad.showcases, []);
+
       return {
-        squadName: (squad.name ?? "") as string,
+        squadName:   (squad.name ?? "") as string,
+        methodology: (squad.methodology ?? "") as string,
         lead,
         members,
         steps,
+        showcases,
       };
     }),
 
