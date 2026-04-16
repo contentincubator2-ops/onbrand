@@ -130,7 +130,8 @@ export const squadRouter = router({
                   members, tags, use_cases
            FROM agent_squads
            WHERE is_active = 1 AND (${tagLikes}${industryClause})
-           LIMIT 60`
+           ORDER BY id DESC
+           LIMIT 300`
         ) as any[];
         squadRows = rows as any[];
       } catch (e) {
