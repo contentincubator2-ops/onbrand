@@ -128,7 +128,7 @@ export const squadRouter = router({
       try {
         const [rows] = await localPool.execute(
           `SELECT id, slug, name, description, industry_key, missionType,
-                  agents, tags, use_cases, methodology
+                  agents, tags, use_cases, methodology, workspace
            FROM agent_squads
            WHERE is_active = 1 AND (${tagLikes}${industryClause})
            ORDER BY id DESC
@@ -157,16 +157,28 @@ export const squadRouter = router({
 
       // 5. JS-side scoring
       const candidates = squadRows.map(row => {
-        const members    = safeJsonParse<any[]>(row.agents ?? row.members, []);
-        const rowTags    = safeJsonParse<string[]>(row.tags, []);
-        const useCases   = safeJsonParse<string[]>(row.use_cases, []);
-        const rowDesc    = (row.description ?? "").toLowerCase();
-        const rowName    = (row.name ?? "").toLowerCase();
+        const agents      = safeJsonParse<any[]>(row.agents, []);
+        const rowTags     = safeJsonParse<string[]>(row.tags, []);
+        const useCases    = safeJsonParse<string[]>(row.use_cases, []);
+        const squadWs     = safeJsonParse<string[]>(row.workspace, []);
+        const rowDesc     = (row.description ?? "").toLowerCase();
+        const rowName     = (row.name ?? "").toLowerCase();
         const methodology = (row.methodology ?? "").toLowerCase();
 
         let score = 0;
 
-        // Workspace tag match — baseline relevance
+        // ── Workspace direct match — strongest differentiator ────────────────
+        // Squad's workspace column stores the intended workspace(s) it was built for.
+        // An exact match gives a large bonus; no match at all applies a penalty.
+        const wsLower = input.workspace.toLowerCase();
+        const squadWsLower = squadWs.map(w => w.toLowerCase());
+        if (squadWsLower.some(w => w === wsLower || w.includes(wsLower) || wsLower.includes(w))) {
+          score += 12;  // direct workspace match — very strong signal
+        } else if (squadWsLower.length > 0) {
+          score -= 4;   // squad has declared workspace(s) but none match → penalise
+        }
+
+        // Workspace tag match — secondary relevance
         for (const tag of tags) {
           const tl = tag.toLowerCase();
           if (rowTags.some((t: string) => t && t.toLowerCase().includes(tl))) score += 3;
@@ -189,10 +201,10 @@ export const squadRouter = router({
           if (rowTags.some((t: string) => t && t.toLowerCase().includes(wl))) score += 2;
         }
 
-        score += Math.min(members.length, 5);
+        score += Math.min(agents.length, 5);
 
-        const leadMember = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
-        return { row, members, score, leadAgentId: leadMember?.agent_id ?? null };
+        const leadAgent = agents.find((m: any) => m.is_lead === true || m.is_lead === 1);
+        return { row, agents, score, leadAgentId: leadAgent?.agent_id ?? null };
       });
 
       // 6. Sort + take top N
@@ -212,14 +224,14 @@ export const squadRouter = router({
         }
       }
 
-      return top.map(({ row, members, score, leadAgentId }) => ({
+      return top.map(({ row, agents, score, leadAgentId }) => ({
         squadId:     row.id as number,
         slug:        (row.slug ?? "") as string,
         name:        (row.name ?? "") as string,
         description: (row.description ?? null) as string | null,
         industryKey: (row.industry_key ?? null) as string | null,
-        taskType:    (row.missionType ?? null) as string | null,
-        memberCount: members.length,
+        missionType: (row.missionType ?? null) as string | null,
+        agentCount:  agents.length,
         lead: leadAgentId && leadMap[leadAgentId] ? {
           agentId: leadAgentId,
           name:    leadMap[leadAgentId].name as string,
@@ -230,7 +242,7 @@ export const squadRouter = router({
     }),
 
   // ── getMembersById ──────────────────────────────────────────────────────────
-  // 給定 squadId，解析 members JSON → 查 agents → 回傳真實成員 + workflow steps
+  // 給定 squadId，解析 agents JSON → 查 agents table → 回傳真實成員 + workflow steps
   getMembersById: protectedProcedure
     .input(z.object({ squadId: z.number() }))
     .query(async ({ input }) => {
@@ -240,10 +252,10 @@ export const squadRouter = router({
         [input.squadId]
       ) as any[];
       const squad = (squadRows as any[])?.[0];
-      if (!squad) return { squadName: "", lead: null, members: [], steps: [], showcases: [], methodology: "" };
+      if (!squad) return { squadName: "", lead: null, agents: [], steps: [], showcases: [], methodology: "" };
 
-      const membersJson = safeJsonParse<any[]>(squad.agents ?? squad.members, []);
-      const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
+      const agentsJson = safeJsonParse<any[]>(squad.agents, []);
+      const agentIds = agentsJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
 
       // Fetch real agent data
       let agentMap: Record<number, any> = {};
@@ -255,8 +267,8 @@ export const squadRouter = router({
         for (const a of agentRows as any[]) agentMap[(a as any).id] = a;
       }
 
-      // Merge members JSON with real agent data
-      const mapped = membersJson
+      // Merge agents JSON with real agent data
+      const mapped = agentsJson
         .map(m => {
           const a = agentMap[m.agent_id];
           if (!a) return null;
@@ -279,8 +291,8 @@ export const squadRouter = router({
         (b.isLead ? 1 : 0) - (a.isLead ? 1 : 0) || a.order - b.order
       );
 
-      const lead    = mapped.find((m: any) => m.isLead) ?? null;
-      const members = mapped.filter((m: any) => !m.isLead);
+      const lead   = mapped.find((m: any) => m.isLead) ?? null;
+      const agents = mapped.filter((m: any) => !m.isLead);
 
       // Fetch workflow steps from squad_workflow_templates (also on local DB)
       let steps: any[] = [];
@@ -302,7 +314,7 @@ export const squadRouter = router({
         squadName:   (squad.name ?? "") as string,
         methodology: (squad.methodology ?? "") as string,
         lead,
-        members,
+        agents,
         steps,
         showcases,
       };
@@ -331,9 +343,9 @@ export const squadRouter = router({
 
       const candidates = (rows as any[])
         .map((row: any) => {
-          const members = safeJsonParse<any[]>(row.agents ?? row.members, []);
-          const lead = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
-          return { squadId: row.id, squadName: row.name, leadAgentId: lead?.agent_id ?? null };
+          const agents = safeJsonParse<any[]>(row.agents, []);
+          const leadAgent = agents.find((m: any) => m.is_lead === true || m.is_lead === 1);
+          return { squadId: row.id, squadName: row.name, leadAgentId: leadAgent?.agent_id ?? null };
         })
         .filter((c: any) => c.leadAgentId);
 
@@ -378,15 +390,15 @@ export const squadRouter = router({
       const row = (rows as any[])?.[0];
       if (!row) return null;
 
-      const members  = safeJsonParse<any[]>(row.agents ?? row.members, []);
-      const leadMember = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
+      const agentsArr  = safeJsonParse<any[]>(row.agents, []);
+      const leadAgent  = agentsArr.find((m: any) => m.is_lead === true || m.is_lead === 1);
 
       // Fetch lead agent via localPool
       let lead = null;
-      if (leadMember?.agent_id) {
+      if (leadAgent?.agent_id) {
         const [aRows] = await localPool.execute(
           `SELECT id, name, title FROM agents WHERE id = ? LIMIT 1`,
-          [leadMember.agent_id]
+          [leadAgent.agent_id]
         ) as any[];
         const a = (aRows as any[])?.[0];
         if (a) lead = { agentId: (a as any).id, name: (a as any).name, title: (a as any).title };
@@ -398,8 +410,8 @@ export const squadRouter = router({
         name:        (row.name ?? "") as string,
         description: (row.description ?? null) as string | null,
         industryKey: (row.industry_key ?? null) as string | null,
-        taskType:    (row.missionType ?? null) as string | null,
-        memberCount: members.length,
+        missionType: (row.missionType ?? null) as string | null,
+        agentCount:  agentsArr.length,
         lead,
       };
     }),

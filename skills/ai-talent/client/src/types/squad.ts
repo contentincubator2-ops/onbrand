@@ -16,14 +16,14 @@ export interface DBSquad {
   name: string;
   description?: string | null;
   industryKey?: string | null;
-  taskType?: string | null;
-  memberCount?: number;
+  missionType?: string | null;
+  agentCount?: number;
   lead?: DBSquadLead | null;
   matchScore?: number;
 }
 
-/** A real DB agent member returned from getMembersById */
-export interface DBAgentMember {
+/** A real DB agent returned from getMembersById */
+export interface DBAgent {
   agentId: number;
   role: string;
   isLead: boolean;
@@ -36,12 +36,17 @@ export interface DBAgentMember {
   avatarUrl?: string | null;
 }
 
-/** Full squad detail: lead + members + workflow steps */
+/** @deprecated Use DBAgent instead */
+export type DBAgentMember = DBAgent;
+
+/** Full squad detail: lead + agents + workflow steps */
 export interface DBSquadDetail {
   squadName: string;
-  lead: DBAgentMember | null;
-  members: DBAgentMember[];
+  methodology: string;
+  lead: DBAgent | null;
+  agents: DBAgent[];
   steps: DBWorkflowStep[];
+  showcases: any[];
 }
 
 /** One step from squad_workflow_templates */
@@ -50,5 +55,5 @@ export interface DBWorkflowStep {
   skill: string;
   role_key: string;
   description: string;
-  taskType?: string;
+  missionType?: string;
 }

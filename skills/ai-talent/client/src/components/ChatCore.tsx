@@ -1193,8 +1193,8 @@ export default function ChatCore({
                 missionTitle={(missionDataQuery.data as any)?.title ?? undefined}
                 missionId={activeMissionId}
                 brandId={(missionDataQuery.data as any)?.brandId ?? null}
-                onTaskSelect={(task) => {
-                  setInput(task);
+                onMissionSelect={(text) => {
+                  setInput(text);
                   setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
                 }}
                 onSquadPreview={(squad) => {

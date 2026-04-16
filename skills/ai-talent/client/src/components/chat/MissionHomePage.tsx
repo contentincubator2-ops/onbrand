@@ -3,12 +3,12 @@ import { trpc } from "../../lib/trpc";
 import type { DBSquad } from "../../types/squad";
 
 interface MissionHomePageProps {
-  workspace?:      string;
-  missionTitle?:   string;
-  missionId?:      number | null;
-  brandId?:        number | null;
-  onTaskSelect?:   (task: string) => void;
-  onSquadPreview?: (squad: DBSquad | null) => void;
+  workspace?:        string;
+  missionTitle?:     string;
+  missionId?:        number | null;
+  brandId?:          number | null;
+  onMissionSelect?:  (text: string) => void;
+  onSquadPreview?:   (squad: DBSquad | null) => void;
 }
 
 // ── Tiny resource badge shown below squad chips ───────────────────────────────
@@ -100,11 +100,11 @@ function ResourceBanner({ missionId }: { missionId: number }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MissionHomePage: React.FC<MissionHomePageProps> = ({
-  workspace     = "strategy",
+  workspace      = "strategy",
   missionTitle,
   missionId,
   brandId,
-  onTaskSelect,
+  onMissionSelect,
   onSquadPreview,
 }) => {
   const [inputValue, setInputValue]       = useState("");
@@ -127,8 +127,8 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSubmit = () => {
-    if (inputValue.trim() && onTaskSelect) {
-      onTaskSelect(inputValue.trim());
+    if (inputValue.trim() && onMissionSelect) {
+      onMissionSelect(inputValue.trim());
       setInputValue("");
     }
   };

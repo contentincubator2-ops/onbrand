@@ -1464,12 +1464,12 @@ function RightPanel({
   );
   const effectiveSquad: DBSquad | null = activeSquad ?? (slugQuery.data as any) ?? null;
 
-  // ── Fetch members + workflow steps when a squad is selected ────────────────
-  const membersQuery = trpc.squad.getMembersById.useQuery(
+  // ── Fetch agents + workflow steps when a squad is selected ─────────────────
+  const agentsQuery = trpc.squad.getMembersById.useQuery(
     { squadId: effectiveSquad?.squadId ?? 0 },
     { enabled: !!effectiveSquad?.squadId, staleTime: 5 * 60_000, refetchOnWindowFocus: false }
   );
-  const membersData = membersQuery.data as any;
+  const agentsData = agentsQuery.data as any;
 
   // ── Fetch alternative squad leads ──────────────────────────────────────────
   const alternativesQuery = trpc.squad.getAlternativeLeads.useQuery(
@@ -1480,14 +1480,14 @@ function RightPanel({
 
   // ── Accordion ──────────────────────────────────────────────────────────────
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
-    requirements: true, sop: false, members: false, alternatives: false, brandbrain: false,
+    requirements: true, sop: false, agents: false, alternatives: false, brandbrain: false,
   });
 
   useEffect(() => {
     if (effectiveSquad) {
-      setOpenSections({ requirements: true, sop: true, members: true, alternatives: true, brandbrain: false });
+      setOpenSections({ requirements: true, sop: true, agents: true, alternatives: true, brandbrain: false });
     } else {
-      setOpenSections({ requirements: true, sop: false, members: false, alternatives: false, brandbrain: false });
+      setOpenSections({ requirements: true, sop: false, agents: false, alternatives: false, brandbrain: false });
     }
   }, [effectiveSquad?.squadId]);
 
@@ -1506,24 +1506,24 @@ function RightPanel({
       label: "執行流程",
       content: effectiveSquad
         ? <DBSquadMethodologyPanel
-            squadName={membersData?.squadName ?? effectiveSquad.name}
+            squadName={agentsData?.squadName ?? effectiveSquad.name}
             description={effectiveSquad.description ?? ""}
-            methodology={membersData?.methodology ?? (effectiveSquad as any).methodology ?? ""}
-            leadTitle={membersData?.lead?.title ?? effectiveSquad.lead?.title ?? ""}
-            steps={membersData?.steps ?? []}
-            showcases={membersData?.showcases ?? []}
-            isLoading={membersQuery.isLoading}
+            methodology={agentsData?.methodology ?? (effectiveSquad as any).methodology ?? ""}
+            leadTitle={agentsData?.lead?.title ?? effectiveSquad.lead?.title ?? ""}
+            steps={agentsData?.steps ?? []}
+            showcases={agentsData?.showcases ?? []}
+            isLoading={agentsQuery.isLoading}
           />
         : emptyHint("選擇執行方式\n查看對應流程"),
     },
     {
-      key: "members",
+      key: "agents",
       label: "協作成員",
       content: effectiveSquad
         ? <DBAgentMembersList
-            lead={membersData?.lead ?? null}
-            members={membersData?.members ?? []}
-            isLoading={membersQuery.isLoading}
+            lead={agentsData?.lead ?? null}
+            agents={agentsData?.agents ?? []}
+            isLoading={agentsQuery.isLoading}
           />
         : emptyHint("選擇執行方式\n查看協作成員"),
     },
@@ -1664,8 +1664,9 @@ function DBSquadMethodologyPanel({
             marginTop: 6, fontSize: 10, color: "#9B9990",
             background: "#F4F4F2", borderRadius: 4, padding: "3px 7px",
             display: "inline-block", fontStyle: "italic",
+            letterSpacing: 0.2,
           }}>
-            📖 {methodology}
+            {methodology}
           </div>
         )}
       </div>
@@ -1712,33 +1713,37 @@ function DBSquadMethodologyPanel({
       {showcases.length > 0 && (
         <>
           <div style={{ height: 1, background: "#E7E5E4", margin: "14px 0 12px" }} />
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 8, letterSpacing: 0.3 }}>
-            🏆 商業驗證
+          <div style={{
+            fontSize: 10, fontWeight: 600, color: "#9B9990", marginBottom: 8,
+            letterSpacing: 0.8, textTransform: "uppercase" as const,
+          }}>
+            Commercial Validation
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {showcases.map((sc: any, i: number) => (
               <div key={i} style={{
-                background: "#FFFBEB",
-                border: "1px solid #FDE68A",
-                borderRadius: 8,
+                background: "#FAFAF9",
+                border: "1px solid #E7E5E4",
+                borderLeft: "3px solid #D6B96B",
+                borderRadius: 6,
                 padding: "9px 10px",
               }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#92400E", marginBottom: 3 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 3 }}>
                   {sc.company ?? sc.brand ?? "案例"}
                 </div>
                 {sc.result && (
-                  <div style={{ fontSize: 11, color: "#78350F", lineHeight: 1.5, marginBottom: 3 }}>
-                    📈 {sc.result}
+                  <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5, marginBottom: 3 }}>
+                    {sc.result}
                   </div>
                 )}
                 {sc.description && (
-                  <div style={{ fontSize: 10, color: "#A16207", lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.4 }}>
                     {sc.description}
                   </div>
                 )}
                 {sc.source && (
-                  <div style={{ fontSize: 9, color: "#B45309", marginTop: 4, fontStyle: "italic" }}>
-                    來源：{sc.source}
+                  <div style={{ fontSize: 9, color: "#B5B4B0", marginTop: 4, fontStyle: "italic" }}>
+                    {sc.source}
                   </div>
                 )}
               </div>
@@ -1754,10 +1759,10 @@ function DBSquadMethodologyPanel({
 // Renders real DB agents: lead (teal card) + members
 
 function DBAgentMembersList({
-  lead, members, isLoading,
+  lead, agents, isLoading,
 }: {
   lead: any | null;
-  members: any[];
+  agents: any[];
   isLoading: boolean;
 }) {
   if (isLoading) {
@@ -1770,7 +1775,7 @@ function DBAgentMembersList({
     );
   }
 
-  const allMembers = [lead, ...members].filter(Boolean);
+  const allMembers = [lead, ...agents].filter(Boolean);
 
   if (!allMembers.length) {
     return (

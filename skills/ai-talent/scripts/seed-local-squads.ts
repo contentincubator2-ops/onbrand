@@ -259,7 +259,7 @@ async function main() {
     console.log("[seed-local] Schema migrations: done");
 
     // ── 1. SoWork品牌定位 workflow template ──────────────────────────────────────
-    const TASK_TYPE = "sowork-brand-positioning";
+    const MISSION_TYPE = "sowork-brand-positioning";
 
     const steps = [
       {
@@ -403,28 +403,28 @@ async function main() {
     // Check if template already exists
     const [existingTpl] = await conn.execute(
       `SELECT id FROM squad_workflow_templates WHERE taskType = ? LIMIT 1`,
-      [TASK_TYPE]
+      [MISSION_TYPE]
     ) as any[];
 
     if ((existingTpl as any[]).length > 0) {
-      console.log(`[seed-local] Workflow template '${TASK_TYPE}' already exists — updating steps.`);
+      console.log(`[seed-local] Workflow template '${MISSION_TYPE}' already exists — updating steps.`);
       await conn.execute(
         `UPDATE squad_workflow_templates SET steps = ?, missionType = ?, updatedAt = NOW() WHERE taskType = ?`,
-        [JSON.stringify(steps), TASK_TYPE, TASK_TYPE]
+        [JSON.stringify(steps), MISSION_TYPE, MISSION_TYPE]
       );
     } else {
       await conn.execute(
         `INSERT INTO squad_workflow_templates (taskType, missionType, name, description, steps, isActive, createdAt)
          VALUES (?, ?, ?, ?, ?, 1, NOW())`,
         [
-          TASK_TYPE,
-          TASK_TYPE,
+          MISSION_TYPE,
+          MISSION_TYPE,
           "SoWork 品牌定位 11 步分析框架",
           "從深層動機到品牌個性的完整品牌定位分析流程，最終輸出品牌定位書",
           JSON.stringify(steps),
         ]
       );
-      console.log(`[seed-local] Workflow template '${TASK_TYPE}' inserted.`);
+      console.log(`[seed-local] Workflow template '${MISSION_TYPE}' inserted.`);
     }
 
     // ── 2. SoWork品牌定位 squad ─────────────────────────────────────────────────
@@ -471,7 +471,7 @@ async function main() {
         [
           "SoWork品牌定位",
           "完整 11 步品牌定位分析框架，從深層動機挖掘到品牌個性建立，最終輸出可執行的品牌定位書。適合新品牌建立、老品牌重定位、或需要清晰競爭差異化的企業。",
-          TASK_TYPE,
+          MISSION_TYPE,
           JSON.stringify(members),
           tags,
           useCases,
@@ -495,7 +495,7 @@ async function main() {
           "SoWork品牌定位",
           "完整 11 步品牌定位分析框架，從深層動機挖掘到品牌個性建立，最終輸出可執行的品牌定位書。適合新品牌建立、老品牌重定位、或需要清晰競爭差異化的企業。",
           "general",
-          TASK_TYPE,
+          MISSION_TYPE,
           JSON.stringify(members),
           tags,
           useCases,
