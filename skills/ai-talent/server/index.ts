@@ -209,6 +209,24 @@ async function runStartupMigrations() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log("[migrate] mission_resources: OK");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS squad_usage_log (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id      INT          NOT NULL,
+        brand_id     INT          NULL,
+        workspace    VARCHAR(80)  NULL,
+        mission_id   INT          NULL,
+        mission_type VARCHAR(100) NULL,
+        squad_id     INT          NOT NULL,
+        squad_slug   VARCHAR(120) NOT NULL,
+        started_at   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_user    (user_id),
+        INDEX idx_brand   (brand_id),
+        INDEX idx_mission (mission_id),
+        INDEX idx_squad   (squad_slug)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] squad_usage_log: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }

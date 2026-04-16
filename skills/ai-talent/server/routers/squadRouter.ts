@@ -127,8 +127,8 @@ export const squadRouter = router({
       let squadRows: any[] = [];
       try {
         const [rows] = await localPool.execute(
-          `SELECT id, slug, name, description, industry_key, taskType,
-                  members, tags, use_cases
+          `SELECT id, slug, name, description, industry_key, missionType,
+                  agents, tags, use_cases
            FROM agent_squads
            WHERE is_active = 1 AND (${tagLikes}${industryClause})
            ORDER BY id DESC
@@ -140,8 +140,8 @@ export const squadRouter = router({
         // Fallback: return all active squads without tag filter
         try {
           const [rows] = await localPool.execute(
-            `SELECT id, slug, name, description, industry_key, taskType,
-                    members, tags, use_cases
+            `SELECT id, slug, name, description, industry_key, missionType,
+                    agents, tags, use_cases
              FROM agent_squads WHERE is_active = 1
              ORDER BY RAND() LIMIT 60`
           ) as any[];
@@ -157,7 +157,7 @@ export const squadRouter = router({
 
       // 5. JS-side scoring
       const candidates = squadRows.map(row => {
-        const members  = safeJsonParse<any[]>(row.members, []);
+        const members  = safeJsonParse<any[]>(row.agents ?? row.members, []);
         const rowTags  = safeJsonParse<string[]>(row.tags, []);
         const useCases = safeJsonParse<string[]>(row.use_cases, []);
 
@@ -202,7 +202,7 @@ export const squadRouter = router({
         name:        (row.name ?? "") as string,
         description: (row.description ?? null) as string | null,
         industryKey: (row.industry_key ?? null) as string | null,
-        taskType:    (row.taskType ?? null) as string | null,
+        taskType:    (row.missionType ?? row.taskType ?? null) as string | null,
         memberCount: members.length,
         lead: leadAgentId && leadMap[leadAgentId] ? {
           agentId: leadAgentId,
@@ -220,13 +220,13 @@ export const squadRouter = router({
     .query(async ({ input }) => {
       // agent_squads and agents live on VM local DB (localPool)
       const [squadRows] = await localPool.execute(
-        `SELECT name, members, taskType FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+        `SELECT name, agents, missionType, taskType FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
         [input.squadId]
       ) as any[];
       const squad = (squadRows as any[])?.[0];
       if (!squad) return { squadName: "", lead: null, members: [], steps: [] };
 
-      const membersJson = safeJsonParse<any[]>(squad.members, []);
+      const membersJson = safeJsonParse<any[]>(squad.agents ?? squad.members, []);
       const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
 
       // Fetch real agent data
@@ -268,11 +268,12 @@ export const squadRouter = router({
 
       // Fetch workflow steps from squad_workflow_templates (also on local DB)
       let steps: any[] = [];
-      if (squad.taskType) {
+      const effectiveMissionType = squad.missionType ?? squad.taskType;
+      if (effectiveMissionType) {
         try {
           const [wfRows] = await localPool.execute(
             `SELECT steps FROM squad_workflow_templates WHERE taskType = ? AND isActive = 1 LIMIT 1`,
-            [squad.taskType]
+            [effectiveMissionType]
           ) as any[];
           const wf = (wfRows as any[])?.[0];
           if (wf) steps = safeJsonParse<any[]>(wf.steps, []);
@@ -301,7 +302,7 @@ export const squadRouter = router({
       const excludeClause = input.excludeSquadId ? `AND s.id != ${input.excludeSquadId}` : "";
 
       const [rows] = await localPool.execute(
-        `SELECT s.id, s.name, s.members, s.industry_key
+        `SELECT s.id, s.name, s.agents, s.industry_key
          FROM agent_squads s
          WHERE s.is_active = 1 AND (${tagLikes})
          ${excludeClause}
@@ -310,7 +311,7 @@ export const squadRouter = router({
 
       const candidates = (rows as any[])
         .map((row: any) => {
-          const members = safeJsonParse<any[]>(row.members, []);
+          const members = safeJsonParse<any[]>(row.agents ?? row.members, []);
           const lead = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
           return { squadId: row.id, squadName: row.name, leadAgentId: lead?.agent_id ?? null };
         })
@@ -350,14 +351,14 @@ export const squadRouter = router({
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
       const [rows] = await localPool.execute(
-        `SELECT id, slug, name, description, industry_key, taskType, members
+        `SELECT id, slug, name, description, industry_key, missionType, taskType, agents
          FROM agent_squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
         [input.slug]
       ) as any[];
       const row = (rows as any[])?.[0];
       if (!row) return null;
 
-      const members  = safeJsonParse<any[]>(row.members, []);
+      const members  = safeJsonParse<any[]>(row.agents ?? row.members, []);
       const leadMember = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
 
       // Fetch lead agent via localPool
@@ -377,7 +378,7 @@ export const squadRouter = router({
         name:        (row.name ?? "") as string,
         description: (row.description ?? null) as string | null,
         industryKey: (row.industry_key ?? null) as string | null,
-        taskType:    (row.taskType ?? null) as string | null,
+        taskType:    (row.missionType ?? row.taskType ?? null) as string | null,
         memberCount: members.length,
         lead,
       };
@@ -415,14 +416,14 @@ export const squadRouter = router({
         // Pull real members from agent_squads (lives on VM local DB — localPool)
         try {
           const [sqRows] = await localPool.execute(
-            `SELECT name, members FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+            `SELECT name, agents FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
             [input.squadId]
           ) as any[];
           const sq = (sqRows as any[])?.[0];
 
           if (sq) {
             squadTitle = `${brandName} × ${sq.name}`;
-            const membersJson = safeJsonParse<any[]>(sq.members, []);
+            const membersJson = safeJsonParse<any[]>(sq.agents ?? sq.members, []);
             const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
 
             if (agentIds.length) {
@@ -630,5 +631,67 @@ ${agentCtx.systemPromptPrefix}`;
     }))
     .query(({ input }) => {
       return getSquadRequirements(input.squadSlug || null, input.workspace ?? null);
+    }),
+
+  // ── logUsage ─────────────────────────────────────────────────────────────────
+  // Write a squad_usage_log row when the user starts a squad session.
+  logUsage: protectedProcedure
+    .input(z.object({
+      squadId:     z.number(),
+      squadSlug:   z.string(),
+      missionId:   z.number().optional(),
+      brandId:     z.number().optional(),
+      workspace:   z.string().optional(),
+      missionType: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { ok: false };
+      await db.execute(sql`
+        INSERT INTO squad_usage_log
+          (user_id, brand_id, workspace, mission_id, mission_type, squad_id, squad_slug, started_at)
+        VALUES (
+          ${ctx.user.id},
+          ${input.brandId ?? null},
+          ${input.workspace ?? null},
+          ${input.missionId ?? null},
+          ${input.missionType ?? null},
+          ${input.squadId},
+          ${input.squadSlug},
+          NOW(3)
+        )
+      `);
+      return { ok: true };
+    }),
+
+  // ── getUsageStats ─────────────────────────────────────────────────────────────
+  // PM analytics: aggregate squad usage counts for the current user (or all if admin).
+  getUsageStats: protectedProcedure
+    .input(z.object({
+      days:    z.number().default(30),
+      brandId: z.number().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const [rows] = await db.execute(sql`
+        SELECT squad_slug, mission_type, workspace,
+               COUNT(*) AS uses,
+               MAX(started_at) AS last_used
+        FROM squad_usage_log
+        WHERE user_id = ${ctx.user.id}
+          AND started_at >= DATE_SUB(NOW(), INTERVAL ${input.days} DAY)
+          ${input.brandId ? sql`AND brand_id = ${input.brandId}` : sql``}
+        GROUP BY squad_slug, mission_type, workspace
+        ORDER BY uses DESC
+        LIMIT 50
+      `) as any[];
+      return (rows as any[]).map(r => ({
+        squadSlug:   r.squad_slug as string,
+        missionType: (r.mission_type ?? null) as string | null,
+        workspace:   (r.workspace ?? null) as string | null,
+        uses:        Number(r.uses),
+        lastUsed:    r.last_used as Date,
+      }));
     }),
 });

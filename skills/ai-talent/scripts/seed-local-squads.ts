@@ -38,29 +38,43 @@ async function findAgent(
 }
 
 /**
- * Idempotent upsert: insert a squad or update its name/description/members/tags
+ * Idempotent upsert: insert a squad or update its name/description/agents/tags
  * if the slug already exists.
  */
 async function upsertSquad(conn: any, s: {
   slug: string; name: string; description: string;
-  industryKey: string; taskType: string;
-  members: object[]; tags: string[]; useCases: string[];
+  industryKey: string; missionType: string;
+  workspace: string[];
+  methodology: string;
+  agents: object[]; tags: string[]; useCases: string[];
+  outputFormats: string[];
+  requiredIntegrations: string[];
+  token: number;
+  showcases: { company: string; description: string; result: string; source?: string }[];
 }) {
   const [existing] = await conn.execute(
     `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
   ) as any[];
   if ((existing as any[]).length > 0) {
     await conn.execute(
-      `UPDATE agent_squads SET name=?, description=?, taskType=?, members=?, tags=?, use_cases=?, is_active=1, updated_at=NOW() WHERE slug=?`,
-      [s.name, s.description, s.taskType, JSON.stringify(s.members), JSON.stringify(s.tags), JSON.stringify(s.useCases), s.slug]
+      `UPDATE agent_squads SET name=?, description=?, missionType=?, agents=?, tags=?, use_cases=?,
+       workspace=?, methodology=?, output_formats=?, required_integrations=?, token=?, showcases=?,
+       is_active=1, updated_at=NOW() WHERE slug=?`,
+      [s.name, s.description, s.missionType, JSON.stringify(s.agents), JSON.stringify(s.tags),
+       JSON.stringify(s.useCases), JSON.stringify(s.workspace), s.methodology,
+       JSON.stringify(s.outputFormats), JSON.stringify(s.requiredIntegrations), s.token,
+       JSON.stringify(s.showcases), s.slug]
     );
     console.log(`[seed-local] Squad '${s.slug}': updated`);
   } else {
     await conn.execute(
-      `INSERT INTO agent_squads (slug,name,description,industry_key,taskType,members,tags,use_cases,is_active,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,1,NOW(),NOW())`,
-      [s.slug, s.name, s.description, s.industryKey, s.taskType,
-       JSON.stringify(s.members), JSON.stringify(s.tags), JSON.stringify(s.useCases)]
+      `INSERT INTO agent_squads (slug,name,description,industry_key,missionType,agents,tags,use_cases,
+       workspace,methodology,output_formats,required_integrations,token,showcases,is_active,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW())`,
+      [s.slug, s.name, s.description, s.industryKey, s.missionType,
+       JSON.stringify(s.agents), JSON.stringify(s.tags), JSON.stringify(s.useCases),
+       JSON.stringify(s.workspace), s.methodology, JSON.stringify(s.outputFormats),
+       JSON.stringify(s.requiredIntegrations), s.token, JSON.stringify(s.showcases)]
     );
     const [newRow] = await conn.execute(
       `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
@@ -73,23 +87,23 @@ async function upsertSquad(conn: any, s: {
  * Idempotent upsert for workflow templates.
  */
 async function upsertWorkflow(conn: any, w: {
-  taskType: string; name: string; description: string; steps: object[];
+  missionType: string; name: string; description: string; steps: object[];
 }) {
   const [existing] = await conn.execute(
-    `SELECT id FROM squad_workflow_templates WHERE taskType = ? LIMIT 1`, [w.taskType]
+    `SELECT id FROM squad_workflow_templates WHERE taskType = ? LIMIT 1`, [w.missionType]
   ) as any[];
   if ((existing as any[]).length > 0) {
     await conn.execute(
-      `UPDATE squad_workflow_templates SET name=?, description=?, steps=?, updatedAt=NOW() WHERE taskType=?`,
-      [w.name, w.description, JSON.stringify(w.steps), w.taskType]
+      `UPDATE squad_workflow_templates SET name=?, description=?, steps=?, missionType=?, updatedAt=NOW() WHERE taskType=?`,
+      [w.name, w.description, JSON.stringify(w.steps), w.missionType, w.missionType]
     );
-    console.log(`[seed-local] Workflow '${w.taskType}': updated`);
+    console.log(`[seed-local] Workflow '${w.missionType}': updated`);
   } else {
     await conn.execute(
-      `INSERT INTO squad_workflow_templates (taskType,name,description,steps,isActive,createdAt) VALUES (?,?,?,?,1,NOW())`,
-      [w.taskType, w.name, w.description, JSON.stringify(w.steps)]
+      `INSERT INTO squad_workflow_templates (taskType,missionType,name,description,steps,isActive,createdAt) VALUES (?,?,?,?,?,1,NOW())`,
+      [w.missionType, w.missionType, w.name, w.description, JSON.stringify(w.steps)]
     );
-    console.log(`[seed-local] Workflow '${w.taskType}': inserted`);
+    console.log(`[seed-local] Workflow '${w.missionType}': inserted`);
   }
 }
 
@@ -140,6 +154,29 @@ async function main() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log("[seed-local] agent_squads: ready");
+
+    // ── Schema migrations (idempotent, wrapped in try/catch) ─────────────────────
+    console.log("[seed-local] Running schema migrations…");
+    const migrations = [
+      // Rename members → agents
+      `ALTER TABLE agent_squads CHANGE COLUMN members agents LONGTEXT NULL`,
+      // Rename taskType → missionType in agent_squads
+      `ALTER TABLE agent_squads CHANGE COLUMN taskType missionType VARCHAR(100) NULL`,
+      // Add new columns to agent_squads
+      `ALTER TABLE agent_squads ADD COLUMN workspace             LONGTEXT NULL`,
+      `ALTER TABLE agent_squads ADD COLUMN methodology           VARCHAR(100) NULL`,
+      `ALTER TABLE agent_squads ADD COLUMN output_formats        LONGTEXT NULL`,
+      `ALTER TABLE agent_squads ADD COLUMN required_integrations LONGTEXT NULL`,
+      `ALTER TABLE agent_squads ADD COLUMN token                 INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE agent_squads ADD COLUMN showcases             LONGTEXT NULL`,
+      // Add missionType to workflow templates (mirror of taskType)
+      `ALTER TABLE squad_workflow_templates ADD COLUMN missionType VARCHAR(100) NULL`,
+      `UPDATE squad_workflow_templates SET missionType = taskType WHERE missionType IS NULL`,
+    ];
+    for (const m of migrations) {
+      try { await conn.execute(m); } catch (_) { /* already applied */ }
+    }
+    console.log("[seed-local] Schema migrations: done");
 
     // ── 1. SoWork品牌定位 workflow template ──────────────────────────────────────
     const TASK_TYPE = "sowork-brand-positioning";
@@ -292,14 +329,15 @@ async function main() {
     if ((existingTpl as any[]).length > 0) {
       console.log(`[seed-local] Workflow template '${TASK_TYPE}' already exists — updating steps.`);
       await conn.execute(
-        `UPDATE squad_workflow_templates SET steps = ?, updatedAt = NOW() WHERE taskType = ?`,
-        [JSON.stringify(steps), TASK_TYPE]
+        `UPDATE squad_workflow_templates SET steps = ?, missionType = ?, updatedAt = NOW() WHERE taskType = ?`,
+        [JSON.stringify(steps), TASK_TYPE, TASK_TYPE]
       );
     } else {
       await conn.execute(
-        `INSERT INTO squad_workflow_templates (taskType, name, description, steps, isActive, createdAt)
-         VALUES (?, ?, ?, ?, 1, NOW())`,
+        `INSERT INTO squad_workflow_templates (taskType, missionType, name, description, steps, isActive, createdAt)
+         VALUES (?, ?, ?, ?, ?, 1, NOW())`,
         [
+          TASK_TYPE,
           TASK_TYPE,
           "SoWork 品牌定位 11 步分析框架",
           "從深層動機到品牌個性的完整品牌定位分析流程，最終輸出品牌定位書",
@@ -346,7 +384,9 @@ async function main() {
       console.log(`[seed-local] Squad 'sowork-brand-positioning' (id=${existingId}) already exists — updating.`);
       await conn.execute(
         `UPDATE agent_squads
-         SET name = ?, description = ?, taskType = ?, members = ?, tags = ?, use_cases = ?, is_active = 1, updated_at = NOW()
+         SET name = ?, description = ?, missionType = ?, agents = ?, tags = ?, use_cases = ?,
+         workspace = ?, methodology = ?, output_formats = ?, required_integrations = ?, token = ?, showcases = ?,
+         is_active = 1, updated_at = NOW()
          WHERE slug = 'sowork-brand-positioning'`,
         [
           "SoWork品牌定位",
@@ -355,13 +395,21 @@ async function main() {
           JSON.stringify(members),
           tags,
           useCases,
+          JSON.stringify(["brand-positioning"]),
+          "sowork-brand-positioning",
+          JSON.stringify(["PDF 策略報告", "Google Slides 簡報", "YouTube 影片腳本"]),
+          JSON.stringify(["google-analytics", "facebook-ads"]),
+          80000,
+          JSON.stringify([{ company: "SoWork", description: "整合品牌定位五步法，協助 B2B SaaS 企業在 6 週內完成完整品牌定位轉型", result: "品牌認知度提升 40%，銷售週期縮短 25%", source: "SoWork 內部案例" }]),
         ]
       );
     } else {
       await conn.execute(
         `INSERT INTO agent_squads
-           (slug, name, description, industry_key, taskType, members, tags, use_cases, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
+           (slug, name, description, industry_key, missionType, agents, tags, use_cases,
+            workspace, methodology, output_formats, required_integrations, token, showcases,
+            is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
         [
           "sowork-brand-positioning",
           "SoWork品牌定位",
@@ -371,6 +419,12 @@ async function main() {
           JSON.stringify(members),
           tags,
           useCases,
+          JSON.stringify(["brand-positioning"]),
+          "sowork-brand-positioning",
+          JSON.stringify(["PDF 策略報告", "Google Slides 簡報", "YouTube 影片腳本"]),
+          JSON.stringify(["google-analytics", "facebook-ads"]),
+          80000,
+          JSON.stringify([{ company: "SoWork", description: "整合品牌定位五步法，協助 B2B SaaS 企業在 6 週內完成完整品牌定位轉型", result: "品牌認知度提升 40%，銷售週期縮短 25%", source: "SoWork 內部案例" }]),
         ]
       );
 
@@ -625,15 +679,15 @@ async function main() {
       ) as any[];
       if ((exists as any[]).length > 0) {
         await conn.execute(
-          `UPDATE squad_workflow_templates SET name = ?, description = ?, steps = ?, updatedAt = NOW() WHERE taskType = ?`,
-          [wf.name, wf.description, JSON.stringify(wf.steps), wf.taskType]
+          `UPDATE squad_workflow_templates SET name = ?, description = ?, steps = ?, missionType = ?, updatedAt = NOW() WHERE taskType = ?`,
+          [wf.name, wf.description, JSON.stringify(wf.steps), wf.taskType, wf.taskType]
         );
         console.log(`[seed-local] Workflow '${wf.taskType}': updated`);
       } else {
         await conn.execute(
-          `INSERT INTO squad_workflow_templates (taskType, name, description, steps, isActive, createdAt)
-           VALUES (?, ?, ?, ?, 1, NOW())`,
-          [wf.taskType, wf.name, wf.description, JSON.stringify(wf.steps)]
+          `INSERT INTO squad_workflow_templates (taskType, missionType, name, description, steps, isActive, createdAt)
+           VALUES (?, ?, ?, ?, ?, 1, NOW())`,
+          [wf.taskType, wf.taskType, wf.name, wf.description, JSON.stringify(wf.steps)]
         );
         console.log(`[seed-local] Workflow '${wf.taskType}': inserted`);
       }
@@ -673,7 +727,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "利益階梯定位流程（Benefit Ladder）",
         description: "從產品功能出發，沿 Feature → Functional Benefit → Emotional Benefit 梯形爬升，最終落地為轉換文案與廣告訊息。工具：osp_marketing_tools Value Map Generator + marketing-strategy-pmm Messaging Hierarchy。",
         steps: [
@@ -691,10 +745,19 @@ async function main() {
         name: "利益階梯定位小組",
         description: "沿 Feature → Functional Benefit → Emotional Benefit 梯形攀升，將產品特性轉化為打動人心的品牌訊息與高轉換廣告文案。依據 Emerald 研究，利益定位比功能定位在品牌好感度、差異化、可信度上全面勝出。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "benefit-based",
+        agents: members,
         tags: ["brand", "positioning", "messaging", "copywriting", "emotional-branding", "benefit-ladder", "conversion", "ad-creative", "strategy"],
         useCases: ["新產品上市訊息框架", "廣告文案改版", "Landing Page 轉換優化", "品牌重新定位訊息整合", "品牌故事建立"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "YouTube 影片腳本"],
+        requiredIntegrations: [],
+        token: 60000,
+        showcases: [
+          { company: "Apple", description: "iPod 從「5GB MP3 播放器」轉化為「1,000 首歌放口袋」，Feature→功能→情感效益三層轉化", result: "iPod 上市首年銷售超過 600 萬台，改變整個音樂產業", source: "Apple Marketing Case Study" },
+          { company: "Slack", description: "從「企業通訊軟體」重新定位為「讓你少寄 Email 的工具」，聚焦情感效益（解脫感）", result: "DAU 從 0 成長到 1,200 萬，估值超過 $270 億", source: "Slack S-1 Filing" },
+        ],
       });
     }
 
@@ -726,7 +789,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "差異化定位流程（April Dunford Method）",
         description: "系統性找出競品尚未佔據的差異化空間，以 April Dunford Obviously Awesome 方法論為核心：獨特屬性 → 客戶價值 → 市場類別 → 宣告並固守。搭配 Battlecard 與 Win/Loss 分析落地。",
         steps: [
@@ -744,10 +807,19 @@ async function main() {
         name: "差異化定位小組",
         description: "系統性找出競品未宣稱的市場空白，以 April Dunford Obviously Awesome 方法論為核心，從獨特屬性識別到市場類別宣告，最終以 Battlecard 與 Win/Loss 分析驗證。FUEL 數據顯示，具備清晰差異化的品牌市場份額成長 2-3 倍。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "differentiation",
+        agents: members,
         tags: ["brand", "positioning", "differentiation", "competitive-analysis", "brand-strategy", "battlecard", "april-dunford", "gtm", "market-category"],
         useCases: ["新市場進入策略", "對抗強勢競品", "品牌重新定位", "銷售 Battlecard 建立", "PMM 競品分析"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "競品 Battlecard"],
+        requiredIntegrations: [],
+        token: 70000,
+        showcases: [
+          { company: "Drift", description: "April Dunford 方法論：找到「AI 對話式行銷」空位，明確定義競爭替代品為傳統表單行銷工具", result: "以超過 $10 億被收購，成為 Conversational Marketing 品類代表", source: "Obviously Awesome, April Dunford" },
+          { company: "Basecamp", description: "在大平台競爭時代，差異化為「專為小團隊設計的最簡工具」，拒絕功能膨脹", result: "逆勢盈利成長，客戶留存率持續高於行業平均", source: "Basecamp Annual Report" },
+        ],
       });
     }
 
@@ -779,7 +851,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "價值主張映射流程（Value Proposition Mapping）",
         description: "B2B/SaaS 核心定位工具：將產品功能對映至買家痛點，定義 ICP，生成市場/技術/UX/商業四維度定位聲明，直接轉化為銷售素材與廣告文案。工具：osp_marketing_tools Value Map + marketing-strategy-pmm ICP。",
         steps: [
@@ -797,10 +869,19 @@ async function main() {
         name: "價值主張映射小組",
         description: "B2B/SaaS 核心定位工具：將產品功能映射至買家痛點，建立精確 ICP，生成市場、技術、UX、商業四維度定位聲明，直接落地為銷售素材與廣告文案。Messaging-market fit 先於 product-market fit。",
         industryKey: "b2b",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "value-proposition",
+        agents: members,
         tags: ["b2b", "saas", "gtm", "value-proposition", "icp", "positioning", "product-marketing", "pmm", "demand-gen", "messaging", "strategy"],
         useCases: ["B2B SaaS 定位建立", "GTM 訊息框架", "ICP 精確定義", "Sales Deck 重建", "Landing Page 轉換優化", "Messaging-market fit 驗證"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "Value Map Canvas"],
+        requiredIntegrations: ["google-analytics"],
+        token: 70000,
+        showcases: [
+          { company: "Stripe", description: "清晰的開發者 Value Prop：「在兩行程式碼內完成支付」，精準對應開發者最大痛點（複雜的支付整合）", result: "市值超過 $950 億，成為 B2B 支付基礎設施首選", source: "Stripe Growth Story" },
+          { company: "Notion", description: "Value Map：把分散的 Wiki/Tasks/Docs 工具整合為一，對應知識工作者「工具疲勞」的核心 Job", result: "用戶成長到 3,000 萬，估值 $100 億", source: "Notion Investor Deck" },
+        ],
       });
     }
 
@@ -833,7 +914,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "分眾定位流程（Segmentation-Based Positioning）",
         description: "針對不同受眾群體建立差異化定位，而非廣播式一刀切。使用 Madison Research Agents 進行問卷分析與合成 Persona 開發，搭配 marketing-strategy-pmm ICP 評分模型（A/B/C/D）優先排序目標客群。McKinsey 資料顯示有效個人化可降低 50% 獲客成本。",
         steps: [
@@ -851,10 +932,19 @@ async function main() {
         name: "分眾定位小組",
         description: "針對不同受眾群體建立差異化定位，使用 Madison Research Agents 進行資料驅動的合成 Persona 開發與偏好建模，搭配 ICP A/B/C/D 評分模型精確排序目標客群，有效個人化可降低獲客成本達 50%。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "segmentation",
+        agents: members,
         tags: ["segmentation", "audience", "persona", "icp", "positioning", "consumer-insights", "personalization", "b2b", "data", "research", "strategy"],
         useCases: ["受眾細分與優先排序", "ICP 精確定義", "個人化行銷策略", "多 Persona 品牌定位", "新市場受眾洞察", "降低獲客成本"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "Persona 卡片"],
+        requiredIntegrations: ["facebook-ads", "google-analytics"],
+        token: 80000,
+        showcases: [
+          { company: "Netflix", description: "三層 ICP 分群（家庭、影迷、串流早期採用者）各自設計定位和內容策略，而非單一訊息打所有人", result: "訂閱用戶超過 2.6 億，成為全球最大串流平台", source: "Netflix Investor Relations" },
+          { company: "HubSpot", description: "SMB vs Enterprise 雙分群定位策略：Freemium 吸引 SMB，Enterprise 專屬功能和服務模型", result: "ARR 超過 $14 億，成功跨越 SMB 到 Enterprise 市場", source: "HubSpot Annual Report 2023" },
+        ],
       });
     }
 
@@ -887,7 +977,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "競爭感知圖流程（Competitive Perceptual Mapping）",
         description: "系統繪製品牌 vs 競品的雙軸感知地圖（價格/品質、創新/傳統等），識別未被佔據的市場白空間。工具：octolens 競品即時監控 + Madison Intelligence Agents MarketMind Research + marketing-strategy-pmm Competitive Positioning Map。",
         steps: [
@@ -905,10 +995,19 @@ async function main() {
         name: "競爭感知定位小組",
         description: "系統繪製品牌 vs 競品雙軸感知地圖，識別市場白空間。整合 octolens 即時競品監控、Madison Intelligence Agents MarketMind Research、marketing-strategy-pmm 定位框架，直接指導廣告策略、渠道規劃與定價決策。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "perceptual-mapping",
+        agents: members,
         tags: ["competitive-analysis", "competitor-analysis", "positioning", "market-research", "perceptual-map", "whitespace", "brand-strategy", "strategy", "intelligence", "gtm"],
         useCases: ["找出市場白空間", "競品定位分析", "廣告策略依據", "定價策略輸入", "新品類進入評估", "品牌重定位競品研究"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "互動式感知地圖"],
+        requiredIntegrations: [],
+        token: 75000,
+        showcases: [
+          { company: "Chobani", description: "用感知地圖找到「天然 + 高蛋白」雙軸白空間，在傳統優格市場中創造新定位", result: "從 0 成長到 $15 億市值，重塑美國優格市場格局", source: "Chobani Brand Story" },
+          { company: "Dollar Shave Club", description: "感知地圖定位為「高性價比 + 便利配送」，對抗 Gillette 的「高科技 + 高價」定位", result: "以 $10 億被 Unilever 收購，改變刮鬍刀市場結構", source: "Unilever Press Release" },
+        ],
       });
     }
 
@@ -940,7 +1039,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "品類設計定位流程",
         description: "Category Design 七步法：定義品類問題 → 建立品類 POV → 競品再框架 → 品類藍圖 → 思想領袖內容 → 生態系建立 → 品類傳道",
         steps: [
@@ -988,10 +1087,20 @@ async function main() {
         name: "品類設計定位小組",
         description: "不在既有市場競爭份額，而是創造新品類成為 Category King。整合 Madison 市場研究、osp_marketing_tools 品類藍圖、octolens 競品監控，設計品類 POV、思想領袖內容計劃，讓媒體與分析師用你的語言定義市場。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "category-design",
+        agents: members,
         tags: ["category-design", "category-creation", "thought-leadership", "brand-strategy", "market-creation", "gtm", "positioning", "strategy", "innovation", "b2b"],
         useCases: ["新產品品類命名", "創新市場進入策略", "思想領袖內容規劃", "競品重新框架", "品類生態系建立", "IPO 前品牌定位"],
+        outputFormats: ["PDF 策略報告", "品類 POV 文件", "Google Slides 簡報", "YouTube 影片腳本"],
+        requiredIntegrations: [],
+        token: 120000,
+        showcases: [
+          { company: "HubSpot", description: "發明「Inbound Marketing」品類，從教育內容、認證體系到社群，把品類變成行銷人的運動", result: "市值超過 $270 億，成為 B2B 行銷科技品類之王", source: "Play Bigger, 2016" },
+          { company: "Salesforce", description: "創造「雲端 CRM」品類概念，舉辦 No Software 運動，從根本上重新框架競品 Siebel 為過時技術", result: "市值超過 $2,500 億，至今仍是 CRM 品類定義者", source: "Harvard Business Review" },
+          { company: "Red Bull", description: "在碳酸飲料市場外創造「能量飲料」全新品類，而非與可樂競爭", result: "至今仍佔全球能量飲料市場 ~40% 份額", source: "Future Ventures Research" },
+        ],
       });
     }
 
@@ -1019,7 +1128,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "心智佔位定位流程",
         description: "Ries & Trout 心智定位六步法：心智地圖掃描 → 梯子分析 → 屬性選擇 → 競品重定位 → 定位聲明 → 媒體心智強化",
         steps: [
@@ -1067,10 +1176,20 @@ async function main() {
         name: "心智佔位定位小組",
         description: "用 Ries & Trout 心智定位法，在消費者心智中搶佔品類首位。整合 octolens 競品監控、Madison MarketMind 心智掃描、marketing-strategy-pmm 競品分析，識別心智梯子空缺，設計重定位策略與一致性訊息，讓你的品牌成為品類代名詞。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "mind-positioning",
+        agents: members,
         tags: ["mind-positioning", "brand-positioning", "competitive-strategy", "ries-trout", "market-leadership", "brand-strategy", "messaging", "positioning", "strategy", "b2b"],
         useCases: ["搶占品類心智第一名", "成熟市場重新定位", "競品重定位策略", "B2B 品牌心智佔位", "廣告訊息一致性", "心智梯子分析"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "廣告訊息框架"],
+        requiredIntegrations: [],
+        token: 65000,
+        showcases: [
+          { company: "Avis", description: "承認自己是租車第二名，用「We Try Harder」把劣勢變成優勢，重新定位 Hertz 為「自滿的第一名」", result: "Avis 首次轉虧為盈，廣告成為廣告史經典案例", source: "Positioning: The Battle for Your Mind, Ries & Trout" },
+          { company: "7-Up", description: "以「Uncola」定位逃離 Coke/Pepsi 雙寡佔心智梯子，成功在消費者心智中佔據「可樂替代品」位置", result: "銷量顯著提升，成功在巨頭夾縫中建立獨特心智位置", source: "Ries & Trout Original Case" },
+          { company: "AWS", description: "靠「雲端基礎設施第一名」心智佔位持續強化，讓後進競爭者（Azure、GCP）永遠追趕", result: "至今仍是全球雲端市場領導者，市占超過 30%", source: "Gartner Cloud Report 2024" },
+        ],
       });
     }
 
@@ -1098,7 +1217,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "任務導向定位流程",
         description: "JTBD 定位五步法：任務挖掘 → 觸發點分析 → 替代方案識別 → 任務聲明 → 圍繞任務的訊息框架",
         steps: [
@@ -1140,10 +1259,20 @@ async function main() {
         name: "任務導向定位小組",
         description: "不依賴人口統計分眾，而是挖掘客戶真正「雇用」產品完成的任務（Job），圍繞任務做定位。整合 Madison 合成訪談研究、marketing-strategy-pmm ICP 和訊息框架、osp_marketing_tools 效益驗證，建立情境驅動的定位聲明與跨通路訊息一致性。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "jtbd",
+        agents: members,
         tags: ["jtbd", "jobs-to-be-done", "customer-research", "product-positioning", "product-marketing", "positioning", "strategy", "b2b", "saas", "innovation"],
         useCases: ["新產品定位策略", "B2B SaaS 重新定位", "客戶研究驅動訊息", "產品創新方向驗證", "Landing Page 優化", "銷售話術建立"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "JTBD Job Map"],
+        requiredIntegrations: ["google-analytics"],
+        token: 75000,
+        showcases: [
+          { company: "McDonald's", description: "重新理解奶昔的 Job：不是甜點，而是「通勤路上的早餐替代品」。圍繞 Job 調整產品（更濃稠、更耐久）和行銷訊息", result: "奶昔銷量顯著提升，成為 JTBD 理論最廣泛引用的案例", source: "Clayton Christensen, Forbes" },
+          { company: "FedEx", description: "定義 Job 為「我需要把這個東西從這裡以最快速度、零風險送到那裡」，整個品牌圍繞這個任務建立", result: "成為隔夜快遞 Job 的代名詞，建立品類領導地位", source: "Clayton Christensen JTBD Framework" },
+          { company: "Snickers", description: "找到真正的 Job：「你餓的時候不像自己，需要快速回到最佳狀態」，「You're not you when you're hungry」圍繞 Job 定位", result: "成為全球最暢銷巧克力棒之一，訊息在 80+ 個市場持續有效", source: "Mars Inc. Marketing Case" },
+        ],
       });
     }
 
@@ -1171,7 +1300,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "目的導向定位流程",
         description: "Purpose-Driven 定位五步法：使命真實性稽核 → 目標受眾價值觀對齊 → Purpose 聲明 → 使命驅動敘事 → 全通路整合",
         steps: [
@@ -1213,10 +1342,20 @@ async function main() {
         name: "目的導向定位小組",
         description: "以品牌社會使命為核心定位驅動力，讓消費者因認同而選擇你。整合 Madison 受眾價值觀研究、osp_marketing_tools Purpose 框架、marketing-strategy-pmm 訊息整合，建立真實可驗證的 Brand Purpose、Manifesto 敘事與全通路 Purpose 整合手冊。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "purpose-driven",
+        agents: members,
         tags: ["purpose-driven", "brand-purpose", "csr", "sustainability", "social-impact", "brand-strategy", "dtc", "gen-z", "storytelling", "campaign"],
         useCases: ["DTC 品牌差異化", "年輕受眾品牌共鳴", "ESG 品牌策略", "品牌重塑使命宣言", "Manifesto Campaign 概念", "企業社會責任行銷"],
+        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "Brand Manifesto", "YouTube 影片腳本", "LINE 分享卡"],
+        requiredIntegrations: [],
+        token: 85000,
+        showcases: [
+          { company: "Patagonia", description: "「Don't Buy This Jacket」反消費廣告，讓品牌使命（環境永續）凌駕於短期銷售，真實行動支撐 Purpose（修舊衣計劃、1% for the Planet）", result: "廣告上線後隔年營收成長 30%，品牌估值達 $30 億", source: "LinkedIn / Matt Vanderlinden" },
+          { company: "Nike", description: "「Dream Crazy」Colin Kaepernick 廣告，押注於核心受眾（運動員、年輕族群）的價值觀，承擔爭議風險", result: "品牌價值增加 $60 億，上線後線上銷售增長 31%", source: "MarkHub24 Brand Analysis" },
+          { company: "Dove", description: "「Real Beauty」使命：讓每位女性認為自己美麗，直接挑戰美妝行業的傳統美麗標準", result: "部分市場銷售暴增 700%，建立品牌長達 20 年的差異化定位", source: "M Accelerator Case Study" },
+        ],
       });
     }
 
@@ -1244,7 +1383,7 @@ async function main() {
       ].filter(Boolean);
 
       await upsertWorkflow(conn, {
-        taskType,
+        missionType: taskType,
         name: "品牌原型定位流程",
         description: "Brand Archetype 五步法：現有品牌人格診斷 → 原型選擇與組合 → 品牌聲音指南 → 視覺與體驗方向 → 全通路原型一致性",
         steps: [
@@ -1286,10 +1425,20 @@ async function main() {
         name: "品牌原型定位小組",
         description: "以 Jung 心理學 12 原型統一品牌的聲音、視覺與體驗，從人格層面建立深度的消費者情感連結。整合 octolens 品牌感知稽核、osp_marketing_tools 品牌聲音框架、marketing-strategy-pmm 訊息一致性，輸出原型選擇理由書、品牌聲音指南與全通路一致性手冊。",
         industryKey: "general",
-        taskType,
-        members,
+        missionType: taskType,
+        workspace: ["brand-positioning"],
+        methodology: "brand-archetype",
+        agents: members,
         tags: ["brand-archetype", "brand-identity", "brand-personality", "brand-voice", "visual-identity", "jungian", "brand-strategy", "rebranding", "creative", "omnichannel"],
         useCases: ["品牌重塑人格設定", "全通路品牌聲音統一", "新品牌人格建立", "視覺識別方向制定", "創意策略指引", "品牌代言人選擇依據"],
+        outputFormats: ["PDF 策略報告", "品牌聲音指南", "Google Slides 簡報", "視覺方向 Moodboard"],
+        requiredIntegrations: [],
+        token: 70000,
+        showcases: [
+          { company: "Nike", description: "Hero 原型一致性貫穿 30 年所有 Campaign：Just Do It、Dream Crazy、Find Your Greatness，每個廣告都強化英雄敘事", result: "年營收從 1988 年 $8.77 億成長到 1998 年 $92 億，成為全球最有價值運動品牌", source: "Nike Annual Reports" },
+          { company: "Old Spice", description: "Jester + Hero 混合原型重塑過時品牌，The Man Your Man Could Smell Like 系列顛覆男性美容品類", result: "一個月內 body wash 銷售飆漲 107%，市占從 3% 翻倍到 6%，2017 年總營收超過 $10 億", source: "M Accelerator / Procter & Gamble" },
+          { company: "Apple", description: "Creator 原型一致性：Think Different、設計至上、「對世界有不同想法的人」，視覺、產品、零售全部統一", result: "成為全球最高市值品牌，品牌忠誠度長期位居各行業第一", source: "Interbrand Best Global Brands" },
+        ],
       });
     }
 
