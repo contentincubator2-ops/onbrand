@@ -986,6 +986,15 @@ export default function ChatCore({
 
   const activeBrandName = activeBrand?.name ?? "";
 
+  const isShowingHomepage = !!(
+    activeMissionId
+    && missionDataQuery.isSuccess
+    && savedMessagesQuery.isSuccess
+    && (savedMessagesQuery.data as any[]).length === 0
+    && !(active?.messages.some(m => m.role === "user"))
+    && !teamAssembly
+  );
+
   return (
     <div style={{
       display: "flex",
@@ -1178,12 +1187,7 @@ export default function ChatCore({
         className="messages-scroll"
       >
         {/* MissionHomePage: 顯示當 missionData 載入完成 且 DB 確認 0 訊息 且 記憶體也無 user 訊息 */}
-        {activeMissionId
-          && missionDataQuery.isSuccess
-          && savedMessagesQuery.isSuccess
-          && (savedMessagesQuery.data as any[]).length === 0
-          && !(active?.messages.some(m => m.role === "user"))
-          && !teamAssembly && (
+        {isShowingHomepage && (
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
                 missionTitle={(missionDataQuery.data as any)?.title ?? undefined}
@@ -1302,11 +1306,19 @@ export default function ChatCore({
       </div>
 
       {/* ── Input wrap ── */}
+      <style>{`
+        @keyframes chatInputSlideIn {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       <div style={{
         flexShrink: 0,
         padding: "12px 20px 16px",
         borderTop: "1px solid #ECEAE8",
         background: "#FAFAF9",
+        display: isShowingHomepage ? "none" : undefined,
+        animation: !isShowingHomepage ? "chatInputSlideIn 0.3s ease" : undefined,
       }}>
         {/* Pre-selected agent tag */}
         {preselectedAgent && (
