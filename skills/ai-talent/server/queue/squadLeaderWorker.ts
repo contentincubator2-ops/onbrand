@@ -6,285 +6,289 @@ const GATEWAY_HTTP = "http://localhost:18790";
 const GATEWAY_TOKEN = "mos-pm-claw-2026";
 
 async function callGateway(
-  agentId: string,
+  agentSlug: string,
   messages: { role: string; content: string }[],
   stream = false,
   ctx?: { sessionId?: string; userId?: number | null }
 ): Promise<string> {
-  const t0 = Date.now();
+  const t0  = Date.now();
   const sid = ctx?.sessionId ?? newSessionId();
   try {
     const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GATEWAY_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ model: agentId, messages, stream }),
-      signal: AbortSignal.timeout(120_000),
+      method:  "POST",
+      headers: { Authorization: `Bearer ${GATEWAY_TOKEN}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ model: agentSlug, messages, stream }),
+      signal:  AbortSignal.timeout(120_000),
     });
     if (!resp.ok) {
       const errText = await resp.text();
-      logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug: agentId, eventType: "gateway_error", isGatewayOk: false, latencyMs: Date.now()-t0, errorMsg: `${resp.status}: ${errText.slice(0,200)}` });
+      logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug, eventType: "gateway_error",
+        isGatewayOk: false, latencyMs: Date.now() - t0, errorMsg: `${resp.status}: ${errText.slice(0, 200)}` });
       throw new Error(`Gateway ${resp.status}: ${errText}`);
     }
-    const data = await resp.json() as any;
+    const data    = await resp.json() as any;
     const content = data?.choices?.[0]?.message?.content ?? "";
-    logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug: agentId, eventType: "gateway_call", isGatewayOk: true, latencyMs: Date.now()-t0, contentLength: content.length });
+    logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug, eventType: "gateway_call",
+      isGatewayOk: true, latencyMs: Date.now() - t0, contentLength: content.length });
     return content;
-  } catch(err) {
+  } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (!msg.startsWith("Gateway ")) {
-      logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug: agentId, eventType: "gateway_error", isGatewayOk: false, latencyMs: Date.now()-t0, errorMsg: msg });
+      logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug, eventType: "gateway_error",
+        isGatewayOk: false, latencyMs: Date.now() - t0, errorMsg: msg });
     }
     throw err;
   }
 }
 
-async function* streamGateway(
-  agentId: string,
-  messages: { role: string; content: string }[]
-): AsyncGenerator<string> {
-  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${GATEWAY_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: agentId, messages, stream: true }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!resp.ok || !resp.body) throw new Error(`Gateway ${resp.status}`);
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (raw === "[DONE]") return;
-      try {
-        const d = JSON.parse(raw);
-        const t = d?.choices?.[0]?.delta?.content ?? "";
-        if (t) yield t;
-      } catch { /* skip */ }
-    }
-  }
-}
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { connection } from './marketingQueue';
-import { invokeLLM } from '../_core/llm';
 import localPool from '../localDb';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const SKILLS_PATH = process.env.SKILLS_PATH || '/home/azureuser/A2A-Marketing-Claw/skills';
 
 export interface SquadJobData {
-  jobId: string;
-  squadId: number;
+  jobId:       string;
+  squadId:     number;
   userRequest: string;
-  brand?: string;
-  industry?: string;
-  userId?: number;
+  brand?:      string;
+  industry?:   string;
+  userId?:     number;
 }
 
-export interface SquadMemberOutput {
-  agentName: string;
-  agentTitle: string;
-  taskType: string;
-  subTask: string;
-  content: string;
+/** One step's execution result */
+export interface StepOutput {
+  stepOrder:         number;
+  stepName:          string;
+  assignedAgentName: string | null;
+  assignedAgentSlug: string | null;
+  output:            string;
 }
 
 export interface SquadJobResult {
-  squadName: string;
-  leader: string;
-  leaderTitle: string;
-  memberOutputs: SquadMemberOutput[];
-  integratedOutput: string;
-  model: string;
+  squadName:       string;
+  missionType:     string;
+  leader:          string;
+  leaderTitle:     string;
+  stepOutputs:     StepOutput[];
+  integratedOutput:string;
   executionTimeMs: number;
 }
 
 export const squadQueue = new Queue('squad-jobs', { connection });
 
-function loadSkillMd(taskType: string): string {
-  try {
-    const skillFile = path.join(SKILLS_PATH, taskType, 'SKILL.md');
-    if (fs.existsSync(skillFile)) {
-      return fs.readFileSync(skillFile, 'utf-8').slice(0, 800);
-    }
-  } catch {}
-  return '';
+// ── Gateway slug resolver ─────────────────────────────────────────────────────
+// OpenClaw gateway requires "openclaw/<slug>" format.
+function gatewaySlug(slug?: string | null): string {
+  if (!slug) return "openclaw/pm";
+  return slug.startsWith("openclaw/") ? slug : `openclaw/${slug}`;
 }
 
-function extractContent(result: Awaited<ReturnType<typeof invokeLLM>>): string {
-  const raw = result.choices?.[0]?.message?.content;
-  if (!raw) return '';
-  if (typeof raw === 'string') return raw;
-  // Array of content parts
-  const textPart = (raw as any[]).find((p: any) => p.type === 'text');
-  return textPart?.text || '';
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Step-driven Squad Execution
+//
+// Flow:
+//   1. Load squad definition (from agent_squads.agents JSON — NOT squad_members join table)
+//   2. Load workflow steps (from squad_workflow_templates, ordered by step.order)
+//   3. Squad Lead does a brief context analysis
+//   4. Execute each step SEQUENTIALLY:
+//        - Use step.assignedAgentSlug if available (pre-assigned at seed time)
+//        - Fall back to squad lead if no agent assigned to this step
+//        - Pass accumulated context (previous step outputs) to each step
+//   5. Squad Lead integrates all step outputs into final deliverable
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function startSquadLeaderWorker() {
   const worker = new Worker<SquadJobData, SquadJobResult>(
     'squad-jobs',
     async (job: Job<SquadJobData>) => {
       const startTime = Date.now();
-      const { squadId, userRequest, brand, industry } = job.data;
-      console.log(`[Squad Worker] Processing squad ${squadId}: ${userRequest.slice(0, 60)}`);
+      const { squadId, userRequest, brand, industry, userId } = job.data;
+      const ctx = { sessionId: newSessionId(), userId };
+      console.log(`[Squad Worker] ▶ squad=${squadId} request="${userRequest.slice(0, 60)}"`);
 
       await job.updateProgress(5);
 
-      // 1. Get squad info
+      // ── 1. Load squad from agent_squads.agents JSON ──────────────────────────
       const [squadRows] = await localPool.query(
-        'SELECT id, name, squad_size, description FROM agent_squads WHERE id = ? AND is_active = 1',
+        `SELECT id, slug, name, description, missionType, agents
+         FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
         [squadId]
       ) as any[];
       const squad = (squadRows as any[])[0];
-      if (!squad) throw new Error(`Squad ${squadId} not found or inactive`);
+      if (!squad) throw new Error(`Squad ${squadId} not found`);
 
-      // 2. Get leader
-      const [leaderRows] = await localPool.query(
-        `SELECT a.id, a.name, a.title, a.specialty, a.taskType
-         FROM agents a
-         JOIN squad_members sm ON a.id = sm.agent_id
-         WHERE sm.squad_id = ? AND sm.is_lead = 1
-         LIMIT 1`,
-        [squadId]
-      ) as any[];
-      const leader = (leaderRows as any[])[0] || { name: 'Squad Leader', title: '專案負責人', specialty: '行銷策略', taskType: 'brand' };
+      // Parse agents JSON: [{agent_id, is_lead, role, order, ...}]
+      let agentDefs: any[] = [];
+      try { agentDefs = JSON.parse(squad.agents ?? "[]"); } catch {}
 
-      // 3. Get members
-      const [memberRows] = await localPool.query(
-        `SELECT a.id, a.name, a.title, a.specialty, a.taskType
-         FROM agents a
-         JOIN squad_members sm ON a.id = sm.agent_id
-         WHERE sm.squad_id = ? AND sm.is_lead = 0
-         ORDER BY sm.order_index
-         LIMIT 4`,
-        [squadId]
-      ) as any[];
-      const members = memberRows as any[];
+      // Find lead definition
+      const leadDef = agentDefs.find((a: any) => a.is_lead) ?? agentDefs[0] ?? null;
 
-      await job.updateProgress(15);
-      console.log(`[Squad Worker] Squad: ${squad.name}, Leader: ${leader.name}, Members: ${members.length}`);
-
-      // 4. Leader creates task breakdown
-      const leaderSystemPrompt = `你是「${squad.name}」的 Squad Leader：${leader.name}（${leader.title}）。
-專長：${leader.specialty || '行銷策略規劃'}
-Squad 描述：${squad.description || squad.name}
-
-你的 Squad 成員：
-${members.map((m: any, i: number) => `${i + 1}. ${m.name}（${m.title}）- 專長：${m.specialty || m.taskType}`).join('\n')}
-
-品牌：${brand || '未指定'}，產業：${industry || '未指定'}
-
-請分析任務，為每個成員分配子任務，輸出 JSON：
-{"taskBreakdown":[{"memberName":"成員名稱","subTask":"具體子任務","priority":1}],"integrationPlan":"整合策略"}`;
-
-      // Leader via Gateway (has tools + memory)
-      const leaderSlug = leader.slug ? `openclaw/${leader.slug}` : 'openclaw/pm';
-      const leaderRawContent = await callGateway(leaderSlug, [
-        { role: 'system', content: leaderSystemPrompt },
-        { role: 'user', content: `用戶任務：${userRequest}\n\n請分配任務給 Squad 成員。輸出合法JSON。` }
-      ]);
-
-      let taskPlan: { taskBreakdown: Array<{ memberName: string; subTask: string; priority: number }>; integrationPlan: string } = {
-        taskBreakdown: [],
-        integrationPlan: '整合所有成員的專業產出，形成完整的行銷策略方案'
-      };
-
-      try {
-        const parsed = JSON.parse(leaderRawContent || '{}');
-        if (parsed.taskBreakdown) taskPlan = parsed;
-      } catch {
-        console.warn('[Squad Worker] Leader JSON parse failed, using fallback plan');
+      // ── 2. Resolve Squad Lead's full profile ──────────────────────────────────
+      let leader = { name: "Squad Leader", title: "專案負責人", slug: null as string | null };
+      if (leadDef?.agent_id) {
+        try {
+          const [lRows] = await localPool.query(
+            `SELECT name, title, slug FROM agents WHERE id = ? LIMIT 1`, [leadDef.agent_id]
+          ) as any[];
+          const lRow = (lRows as any[])[0];
+          if (lRow) leader = { name: lRow.name, title: lRow.title, slug: lRow.slug };
+        } catch (e) {
+          console.warn(`[Squad Worker] lead lookup error:`, e);
+        }
       }
 
-      await job.updateProgress(35);
+      const leaderGatewaySlug = gatewaySlug(leader.slug);
+      const brandCtx = [brand && `品牌：${brand}`, industry && `產業：${industry}`].filter(Boolean).join("，");
 
-      // 5. Members execute in parallel (max 3)
-      const activeMembers = members.slice(0, 3);
-      const execPromises = activeMembers.map(async (member: any, i: number) => {
-        const breakdown = taskPlan.taskBreakdown.find((b) => b.memberName === member.name)
-          || taskPlan.taskBreakdown[i]
-          || { subTask: userRequest, priority: i + 1 };
+      await job.updateProgress(15);
+      console.log(`[Squad Worker] Squad: ${squad.name} | Lead: ${leader.name} | missionType: ${squad.missionType}`);
 
-        const skillContent = loadSkillMd(member.taskType || 'content-text');
+      // ── 3. Load workflow steps ────────────────────────────────────────────────
+      let steps: any[] = [];
+      try {
+        const [wfRows] = await localPool.query(
+          `SELECT steps FROM squad_workflow_templates WHERE taskType = ? AND isActive = 1 LIMIT 1`,
+          [squad.missionType]
+        ) as any[];
+        const wf = (wfRows as any[])[0];
+        if (wf?.steps) {
+          const parsed = JSON.parse(wf.steps);
+          steps = Array.isArray(parsed)
+            ? parsed.sort((a: any, b: any) => (a.order ?? a.step ?? 0) - (b.order ?? b.step ?? 0))
+            : [];
+        }
+      } catch (e) {
+        console.warn(`[Squad Worker] workflow steps load error:`, e);
+      }
 
-        // Member via Gateway (own workspace SOUL.md drives persona)
-        const memberSlug = member.slug ? `openclaw/${member.slug}` : 'openclaw/pm';
-        const memberRawContent = await callGateway(memberSlug, [
-          { role: 'system', content: `你是 ${member.name}（${member.title}）。品牌：${brand || '未指定'}，產業：${industry || '未指定'}。直接輸出可用的行銷內容成果。` },
-          { role: 'user', content: breakdown.subTask || userRequest }
-        ]);
+      // ── 4. Lead context brief ─────────────────────────────────────────────────
+      const briefSystem = `你是「${squad.name}」的 Squad Lead：${leader.name}（${leader.title}）。\n${brandCtx ? brandCtx + "\n" : ""}任務：${userRequest}\n\n用 2-3 句話說明你將如何帶領這個任務，以及整體策略方向。`;
+      let leaderBrief = "";
+      try {
+        leaderBrief = await callGateway(leaderGatewaySlug,
+          [{ role: "system", content: briefSystem },
+           { role: "user",   content: "請簡要說明任務策略方向。" }], false, ctx);
+      } catch (e) {
+        console.warn(`[Squad Worker] lead brief error:`, e);
+        leaderBrief = `${squad.name} 任務啟動。`;
+      }
+      await job.updateProgress(25);
 
-        return {
-          agentName: member.name,
-          agentTitle: member.title,
-          taskType: member.taskType || '',
-          subTask: breakdown.subTask || userRequest,
-          content: memberRawContent || `（${member.name} 產出待整合）`,
-        };
-      });
+      // ── 5. Execute steps SEQUENTIALLY ────────────────────────────────────────
+      // Context accumulates across steps so each agent sees prior outputs.
+      const stepOutputs: StepOutput[] = [];
+      let   accumulatedContext = `任務：${userRequest}\n${brandCtx}\n\nSquad Lead 策略方向：${leaderBrief}\n`;
 
-      const memberOutputs = await Promise.all(execPromises);
+      const progressPerStep = steps.length > 0 ? Math.floor(50 / steps.length) : 10;
+
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        const stepNum  = step.order ?? step.step ?? (i + 1);
+        const stepName = step.name ?? step.title ?? `Step ${stepNum}`;
+        const stepDesc = step.description ?? "";
+        const outputType = step.outputType ?? "";
+
+        // Determine which agent runs this step
+        const assignedSlug = step.assignedAgentSlug as string | null ?? null;
+        const assignedName = step.assignedAgentName as string | null ?? null;
+        const executorSlug = assignedSlug ? gatewaySlug(assignedSlug) : leaderGatewaySlug;
+        const executorName = assignedName ?? leader.name;
+
+        console.log(`[Squad Worker] Step ${stepNum}/${steps.length}: "${stepName}" → agent: ${executorName}`);
+
+        const stepSystem = [
+          `你是執行步驟「${stepName}」的專家：${executorName}。`,
+          brandCtx,
+          `\n── 任務背景 ──\n${accumulatedContext}`,
+          `\n── 本步驟要求 ──\n${stepDesc}`,
+          outputType ? `\n請輸出：${outputType}` : "",
+          `\n直接輸出本步驟的完整成果，不需解釋你在做什麼。`,
+        ].filter(Boolean).join("\n");
+
+        let stepOutput = "";
+        try {
+          stepOutput = await callGateway(
+            executorSlug,
+            [{ role: "system", content: stepSystem },
+             { role: "user",   content: `請執行「${stepName}」並輸出完整成果。` }],
+            false, ctx
+          );
+        } catch (e: any) {
+          console.error(`[Squad Worker] Step ${stepNum} error:`, e.message);
+          stepOutput = `（步驟 ${stepNum} ${stepName} 執行失敗：${e.message}）`;
+        }
+
+        stepOutputs.push({
+          stepOrder:         stepNum,
+          stepName,
+          assignedAgentName: assignedName,
+          assignedAgentSlug: assignedSlug,
+          output:            stepOutput,
+        });
+
+        // Append condensed step result to context for next step
+        accumulatedContext += `\n\n── 步驟 ${stepNum}（${stepName}）結果 ──\n${stepOutput.slice(0, 600)}${stepOutput.length > 600 ? "…" : ""}`;
+
+        await job.updateProgress(25 + (i + 1) * progressPerStep);
+      }
+
+      // ── 6. Squad Lead final integration ──────────────────────────────────────
       await job.updateProgress(80);
 
-      // 6. Leader integrates outputs
-      const integrationSystem = `你是「${squad.name}」的 Squad Leader：${leader.name}（${leader.title}）。
-原始任務：${userRequest}
-品牌：${brand || '未指定'}，產業：${industry || '未指定'}
+      const integrationSystem = [
+        `你是「${squad.name}」的 Squad Lead：${leader.name}（${leader.title}）。`,
+        brandCtx,
+        `原始任務：${userRequest}`,
+        ``,
+        `你的團隊已完成以下 ${stepOutputs.length} 個步驟：`,
+        stepOutputs.map(s =>
+          `【步驟 ${s.stepOrder}：${s.stepName}】（執行人：${s.assignedAgentName ?? "Squad Lead"}）\n${s.output}`
+        ).join("\n\n---\n\n"),
+        ``,
+        `請以 Squad Lead 身份，整合所有步驟產出，形成一份完整、連貫、可直接交付給客戶的最終報告。`,
+        `確保內容邏輯一致，去除重複，突出關鍵洞察與行動建議。`,
+      ].join("\n");
 
-Squad 成員的工作產出：
-${memberOutputs.map((o, i) => `【成員${i + 1}：${o.agentName}（${o.agentTitle}）】\n子任務：${o.subTask}\n產出：\n${o.content}`).join('\n\n---\n\n')}
-
-整合策略：${taskPlan.integrationPlan}
-
-請整合所有成員的產出，形成完整、連貫、可直接交付的行銷方案。`;
-
-      const integratedLeaderSlug = leader.slug ? `openclaw/${leader.slug}` : 'openclaw/pm';
-      const integratedRaw = await callGateway(integratedLeaderSlug, [
-        { role: 'system', content: integrationSystem },
-        { role: 'user', content: '請整合所有成員的產出，形成完整的行銷方案。' }
-      ]);
+      let integratedOutput = "";
+      try {
+        integratedOutput = await callGateway(
+          leaderGatewaySlug,
+          [{ role: "system", content: integrationSystem },
+           { role: "user",   content: "請整合所有步驟產出，輸出完整的客戶交付報告。" }],
+          false, ctx
+        );
+      } catch (e: any) {
+        console.error(`[Squad Worker] Integration error:`, e.message);
+        // Fallback: concatenate step outputs
+        integratedOutput = stepOutputs.map(s => `## ${s.stepName}\n${s.output}`).join("\n\n");
+      }
 
       await job.updateProgress(100);
 
       return {
-        squadName: squad.name,
-        leader: leader.name,
-        leaderTitle: leader.title,
-        memberOutputs,
-        integratedOutput: integratedRaw || '',
-        model: 'Claude Sonnet 4.6 (Leader + Integration) + DeepSeek (Members)',
-        executionTimeMs: Date.now() - startTime,
+        squadName:        squad.name,
+        missionType:      squad.missionType ?? "",
+        leader:           leader.name,
+        leaderTitle:      leader.title,
+        stepOutputs,
+        integratedOutput,
+        executionTimeMs:  Date.now() - startTime,
       };
     },
     { connection, concurrency: 3 }
   );
 
-  worker.on('completed', (job) => {
-    console.log(`[Squad Worker] ✅ Squad job ${job.id} completed`);
+  worker.on("completed", (job) => {
+    console.log(`[Squad Worker] ✅ job ${job.id} completed in ${job.returnvalue?.executionTimeMs}ms`);
+  });
+  worker.on("failed", (job, err) => {
+    console.error(`[Squad Worker] ❌ job ${job?.id} failed:`, err.message);
+  });
+  worker.on("error", (err) => {
+    console.error(`[Squad Worker] worker error:`, err.message);
   });
 
-  worker.on('failed', (job, err) => {
-    console.error(`[Squad Worker] ❌ Squad job ${job?.id} failed:`, err.message);
-  });
-
-  worker.on('error', (err) => {
-    console.error('[Squad Worker] Worker error:', err.message);
-  });
-
-  console.log('[Squad Worker] Squad Leader Worker started (concurrency: 3)');
+  console.log("[Squad Worker] Step-driven Squad Leader Worker started (concurrency: 3)");
   return worker;
 }
