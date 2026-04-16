@@ -1852,7 +1852,39 @@ function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; 
 }
 
 // ─── SquadRequirementsPanel ───────────────────────────────────────────────────
-// Compact one-line-per-item checklist. Matches Claude's information density.
+// Three-section layout: 🔍 基本資訊 / 🔑 平台授權 / 📤 成果交付
+// Users provide facts + connect platforms + choose output channels.
+// Market research, competitor analysis, audience data = agents' job.
+
+const SECTION_ORDER = ["identity", "access", "output"] as const;
+const SECTION_META: Record<string, { icon: string; title: string; sub: string }> = {
+  identity: { icon: "🔍", title: "基本資訊",  sub: "讓 agents 開始研究" },
+  access:   { icon: "🔑", title: "平台授權",  sub: "授權後可代你操作" },
+  output:   { icon: "📤", title: "成果交付",  sub: "選擇輸出方式" },
+};
+
+/** For oauth/output items: display a "連結" action button */
+function isActionType(type: string) {
+  return type === "oauth" || type === "output";
+}
+
+/** Placeholder label for a provider */
+function providerActionLabel(type: string, provider?: string) {
+  if (type === "output") {
+    if (provider === "email") return "輸入 Email";
+    if (provider === "line")  return "輸入 LINE ID";
+    return "授權連結";
+  }
+  return "連結帳戶";
+}
+
+/** Inline edit placeholder text */
+function actionPlaceholder(type: string, provider?: string) {
+  if (provider === "email") return "收件地址 example@email.com";
+  if (provider === "line")  return "LINE ID 或手機號碼";
+  if (type === "output")    return "貼上授權 Token（暫時）";
+  return "貼上 API Key 或 Access Token（暫時）";
+}
 
 function SquadRequirementsPanel({
   missionId,
@@ -1900,11 +1932,19 @@ function SquadRequirementsPanel({
     setEditingId(null);
   };
 
-  const totalCount   = requirements.length;
-  const filledCount  = requirements.filter((r: any) => !!values[r.id]?.trim()).length;
-  const reqDone      = requirements.filter((r: any) => r.required && !!values[r.id]?.trim()).length;
-  const reqTotal     = requirements.filter((r: any) => r.required).length;
+  const totalCount    = requirements.length;
+  const filledCount   = requirements.filter((r: any) => !!values[r.id]?.trim()).length;
+  const reqDone       = requirements.filter((r: any) => r.required && !!values[r.id]?.trim()).length;
+  const reqTotal      = requirements.filter((r: any) => r.required).length;
   const unlockedGates = new Set(requirements.filter((r: any) => !!values[r.id]?.trim()).map((r: any) => `with_${r.id}`));
+
+  // Group by section, fallback to identity
+  const bySection: Record<string, any[]> = { identity: [], access: [], output: [] };
+  for (const req of requirements) {
+    const s = req.section ?? "identity";
+    if (bySection[s]) bySection[s].push(req);
+    else bySection.identity.push(req);
+  }
 
   // ── Empty states ─────────────────────────────────────────────────────────
   if (!missionId) return (
@@ -1923,8 +1963,7 @@ function SquadRequirementsPanel({
     <div>
       {/* ── Progress header ── */}
       {totalCount > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          {/* thin track */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ flex: 1, height: 3, background: "#EEEDE9", borderRadius: 2, overflow: "hidden" }}>
             <div style={{
               height: "100%", borderRadius: 2, transition: "width 0.35s",
@@ -1933,159 +1972,207 @@ function SquadRequirementsPanel({
             }} />
           </div>
           <span style={{ fontSize: 10, color: "#9B9990", whiteSpace: "nowrap" as const, flexShrink: 0 }}>
-            {filledCount}/{totalCount}
-            {reqTotal > 0 && reqDone >= reqTotal && " ✓"}
+            {filledCount}/{totalCount}{reqTotal > 0 && reqDone >= reqTotal ? " ✓" : ""}
           </span>
         </div>
       )}
 
-      {/* ── Checklist rows (compact, 1 line each) ── */}
-      <div style={{ display: "flex", flexDirection: "column" as const }}>
-        {requirements.map((req: any) => {
-          const filled    = !!values[req.id]?.trim();
-          const isEditing = editingId === req.id;
-
-          return (
-            <div key={req.id}>
-              {/* Row */}
-              {!isEditing && (
-                <div
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "5px 2px",
-                    borderBottom: "1px solid #F3F2F0",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => startEdit(req.id)}
-                  title={req.hint ?? ""}
-                >
-                  {/* icon */}
-                  <span style={{
-                    fontSize: 12, flexShrink: 0, width: 14, textAlign: "center" as const,
-                    color: filled ? "#10B981" : req.required ? "#D1A04A" : "#D0CEC9",
-                  }}>
-                    {filled ? "✓" : "○"}
-                  </span>
-
-                  {/* label */}
-                  <span style={{
-                    fontSize: 11, color: filled ? "#3A3A38" : "#6B6A66",
-                    flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
-                    fontWeight: filled ? 500 : 400,
-                  }}>
-                    {req.label}
-                    {req.required && !filled && (
-                      <span style={{ color: "#E8A838", fontSize: 10, marginLeft: 3 }}>*</span>
-                    )}
-                  </span>
-
-                  {/* value pill OR type badge */}
-                  {filled ? (
-                    <span style={{
-                      fontSize: 10, color: "#059669", background: "#F0FDF4",
-                      border: "1px solid #D1FAE5", borderRadius: 10,
-                      padding: "0 7px", maxWidth: 90, overflow: "hidden",
-                      textOverflow: "ellipsis", whiteSpace: "nowrap" as const, flexShrink: 0,
-                    }}>
-                      {values[req.id]}
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 9, color: "#B5B4B0", background: "#F3F2F0",
-                      borderRadius: 4, padding: "1px 5px", flexShrink: 0,
-                    }}>
-                      {req.type}
-                    </span>
-                  )}
-
-                  {/* pencil */}
-                  <span style={{ fontSize: 11, color: "#C5C4C0", flexShrink: 0, lineHeight: 1 }}>✎</span>
-                </div>
-              )}
-
-              {/* Inline edit — expands in place */}
-              {isEditing && (
-                <div style={{
-                  padding: "8px 6px 10px", background: "#F9F9F8",
-                  borderBottom: "1px solid #E8E7E3", borderLeft: "2px solid #5B7FDB",
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#3A3A38", marginBottom: 6 }}>
-                    {req.label}
-                    {req.required && <span style={{ color: "#E8A838", marginLeft: 3 }}>*</span>}
-                    {req.hint && (
-                      <span style={{ fontSize: 10, fontWeight: 400, color: "#9B9990", marginLeft: 6 }}>
-                        {req.hint}
-                      </span>
-                    )}
-                  </div>
-
-                  {req.type === "select" ? (
-                    <select
-                      value={editValue}
-                      onChange={e => setEditValue(e.target.value)}
-                      autoFocus
-                      style={{
-                        width: "100%", fontSize: 11, border: "1px solid #D1D5DB",
-                        borderRadius: 5, padding: "5px 6px", background: "#FFF", fontFamily: "inherit",
-                      }}
-                    >
-                      <option value="">選擇…</option>
-                      {(req.options ?? []).map((o: string) => (
-                        <option key={o} value={o}>{o}</option>
-                      ))}
-                    </select>
-                  ) : req.type === "boolean" ? (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {["是", "否"].map(opt => (
-                        <button key={opt} onClick={() => setEditValue(opt)} style={{
-                          fontSize: 11, border: `1px solid ${editValue === opt ? "#5B7FDB" : "#D1D5DB"}`,
-                          borderRadius: 5, padding: "4px 18px", cursor: "pointer",
-                          background: editValue === opt ? "#EEF2FF" : "#FFF", fontFamily: "inherit",
-                        }}>{opt}</button>
-                      ))}
-                    </div>
-                  ) : (
-                    <input
-                      autoFocus
-                      type={req.type === "url" ? "url" : "text"}
-                      value={editValue}
-                      onChange={e => setEditValue(e.target.value)}
-                      placeholder={req.hint ?? req.label}
-                      onKeyDown={e => { if (e.key === "Enter") commitEdit(req.id); if (e.key === "Escape") cancelEdit(); }}
-                      style={{
-                        width: "100%", fontSize: 11, border: "1px solid #CBD5E1",
-                        borderRadius: 5, padding: "5px 8px", boxSizing: "border-box" as const,
-                        fontFamily: "inherit", outline: "none", background: "#FFF",
-                      }}
-                    />
-                  )}
-
-                  <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
-                    <button onClick={() => commitEdit(req.id)} style={{
-                      fontSize: 10, background: "#1A1A18", color: "#FFF", border: "none",
-                      borderRadius: 5, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit",
-                    }}>儲存</button>
-                    <button onClick={cancelEdit} style={{
-                      fontSize: 10, background: "none", border: "1px solid #E4E3E1",
-                      borderRadius: 5, padding: "4px 10px", cursor: "pointer",
-                      color: "#6B6A66", fontFamily: "inherit",
-                    }}>取消</button>
-                  </div>
-                </div>
-              )}
+      {/* ── Three sections ── */}
+      {SECTION_ORDER.map(sectionKey => {
+        const items = bySection[sectionKey] ?? [];
+        if (items.length === 0) return null;
+        const meta = SECTION_META[sectionKey];
+        return (
+          <div key={sectionKey} style={{ marginBottom: 12 }}>
+            {/* Section header */}
+            <div style={{
+              display: "flex", alignItems: "baseline", gap: 5,
+              marginBottom: 4, paddingBottom: 3,
+              borderBottom: "1px solid #EEEDE9",
+            }}>
+              <span style={{ fontSize: 11 }}>{meta.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "#6B6A66" }}>{meta.title}</span>
+              <span style={{ fontSize: 9, color: "#C5C4C0" }}>{meta.sub}</span>
             </div>
-          );
-        })}
-      </div>
 
-      {/* ── Outputs (collapsed, compact) ── */}
+            {/* Items */}
+            <div style={{ display: "flex", flexDirection: "column" as const }}>
+              {items.map((req: any) => {
+                const filled    = !!values[req.id]?.trim();
+                const isEditing = editingId === req.id;
+                const isAction  = isActionType(req.type);
+
+                return (
+                  <div key={req.id}>
+                    {/* Row — collapsed */}
+                    {!isEditing && (
+                      <div
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "5px 2px",
+                          borderBottom: "1px solid #F5F4F2",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => startEdit(req.id)}
+                        title={req.hint ?? ""}
+                      >
+                        {/* status icon */}
+                        <span style={{
+                          fontSize: 12, flexShrink: 0, width: 14, textAlign: "center" as const,
+                          color: filled ? "#10B981" : req.required ? "#D1A04A" : "#D0CEC9",
+                        }}>
+                          {filled ? "✓" : "○"}
+                        </span>
+
+                        {/* label */}
+                        <span style={{
+                          fontSize: 11, color: filled ? "#3A3A38" : "#6B6A66",
+                          flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+                          fontWeight: filled ? 500 : 400,
+                        }}>
+                          {req.label}
+                          {req.required && !filled && (
+                            <span style={{ color: "#E8A838", fontSize: 10, marginLeft: 3 }}>*</span>
+                          )}
+                        </span>
+
+                        {/* right side: pill if filled, action button or type badge if not */}
+                        {filled ? (
+                          <span style={{
+                            fontSize: 10,
+                            color: isAction ? "#059669" : "#059669",
+                            background: isAction ? "#F0FDF4" : "#F0FDF4",
+                            border: "1px solid #D1FAE5", borderRadius: 10,
+                            padding: "0 7px", maxWidth: 90, overflow: "hidden",
+                            textOverflow: "ellipsis", whiteSpace: "nowrap" as const, flexShrink: 0,
+                          }}>
+                            {isAction ? (req.provider === "email" || req.provider === "line" ? values[req.id] : "已連結 ✓") : values[req.id]}
+                          </span>
+                        ) : isAction ? (
+                          <span style={{
+                            fontSize: 10, color: "#5B7FDB", background: "#EEF2FF",
+                            border: "1px solid #C7D2FE", borderRadius: 10,
+                            padding: "1px 8px", flexShrink: 0, whiteSpace: "nowrap" as const,
+                          }}>
+                            🔗 {providerActionLabel(req.type, req.provider)}
+                          </span>
+                        ) : (
+                          <>
+                            <span style={{
+                              fontSize: 9, color: "#B5B4B0", background: "#F3F2F0",
+                              borderRadius: 4, padding: "1px 5px", flexShrink: 0,
+                            }}>
+                              {req.type}
+                            </span>
+                            <span style={{ fontSize: 11, color: "#C5C4C0", flexShrink: 0, lineHeight: 1 }}>✎</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Inline edit — expands in place */}
+                    {isEditing && (
+                      <div style={{
+                        padding: "8px 6px 10px", background: "#F9F9F8",
+                        borderBottom: "1px solid #E8E7E3",
+                        borderLeft: `2px solid ${isAction ? "#10B981" : "#5B7FDB"}`,
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#3A3A38", marginBottom: 6 }}>
+                          {req.label}
+                          {req.required && <span style={{ color: "#E8A838", marginLeft: 3 }}>*</span>}
+                          {req.hint && (
+                            <span style={{ fontSize: 10, fontWeight: 400, color: "#9B9990", marginLeft: 6 }}>
+                              {req.hint}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Input control by type */}
+                        {req.type === "select" ? (
+                          <select
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            autoFocus
+                            style={{
+                              width: "100%", fontSize: 11, border: "1px solid #D1D5DB",
+                              borderRadius: 5, padding: "5px 6px", background: "#FFF", fontFamily: "inherit",
+                            }}
+                          >
+                            <option value="">選擇…</option>
+                            {(req.options ?? []).map((o: string) => (
+                              <option key={o} value={o}>{o}</option>
+                            ))}
+                          </select>
+                        ) : req.type === "boolean" ? (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {["是", "否"].map(opt => (
+                              <button key={opt} onClick={() => setEditValue(opt)} style={{
+                                fontSize: 11, border: `1px solid ${editValue === opt ? "#5B7FDB" : "#D1D5DB"}`,
+                                borderRadius: 5, padding: "4px 18px", cursor: "pointer",
+                                background: editValue === opt ? "#EEF2FF" : "#FFF", fontFamily: "inherit",
+                              }}>{opt}</button>
+                            ))}
+                          </div>
+                        ) : isAction ? (
+                          /* oauth / output: text input with context-aware placeholder */
+                          <input
+                            autoFocus
+                            type={req.provider === "email" ? "email" : "text"}
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            placeholder={actionPlaceholder(req.type, req.provider)}
+                            onKeyDown={e => { if (e.key === "Enter") commitEdit(req.id); if (e.key === "Escape") cancelEdit(); }}
+                            style={{
+                              width: "100%", fontSize: 11, border: "1px solid #A7F3D0",
+                              borderRadius: 5, padding: "5px 8px", boxSizing: "border-box" as const,
+                              fontFamily: "inherit", outline: "none", background: "#FFF",
+                            }}
+                          />
+                        ) : (
+                          <input
+                            autoFocus
+                            type={req.type === "url" ? "url" : "text"}
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            placeholder={req.hint ?? req.label}
+                            onKeyDown={e => { if (e.key === "Enter") commitEdit(req.id); if (e.key === "Escape") cancelEdit(); }}
+                            style={{
+                              width: "100%", fontSize: 11, border: "1px solid #CBD5E1",
+                              borderRadius: 5, padding: "5px 8px", boxSizing: "border-box" as const,
+                              fontFamily: "inherit", outline: "none", background: "#FFF",
+                            }}
+                          />
+                        )}
+
+                        <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
+                          <button onClick={() => commitEdit(req.id)} style={{
+                            fontSize: 10, background: "#1A1A18", color: "#FFF", border: "none",
+                            borderRadius: 5, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit",
+                          }}>儲存</button>
+                          <button onClick={cancelEdit} style={{
+                            fontSize: 10, background: "none", border: "1px solid #E4E3E1",
+                            borderRadius: 5, padding: "4px 10px", cursor: "pointer",
+                            color: "#6B6A66", fontFamily: "inherit",
+                          }}>取消</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ── Outputs ── */}
       {Object.keys(outputs).length > 0 && (
-        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #EEEDE9" }}>
+        <div style={{ marginTop: 8, paddingTop: 10, borderTop: "1px solid #EEEDE9" }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", marginBottom: 6, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>
             交付物
           </div>
 
-          {/* Default — inline chip list */}
+          {/* Default always-unlocked chips */}
           <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4 }}>
             {(outputs["default"] ?? []).map((item: string, i: number) => (
               <span key={i} style={{
@@ -2097,18 +2184,20 @@ function SquadRequirementsPanel({
             ))}
           </div>
 
-          {/* Gated outputs */}
+          {/* Gated — unlocked by connecting a platform or filling an output */}
           {Object.entries(outputs)
             .filter(([gate]) => gate !== "default")
             .map(([gate, items]) => {
               if (!items.length) return null;
               const unlocked   = unlockedGates.has(gate);
               const reqId      = gate.replace(/^with_/, "");
-              const matchLabel = requirements.find((r: any) => r.id === reqId)?.label ?? reqId;
+              const matchReq   = requirements.find((r: any) => r.id === reqId);
+              const matchLabel = matchReq?.label ?? reqId;
+              const isConn     = isActionType(matchReq?.type ?? "");
               return (
                 <div key={gate} style={{ marginTop: 7 }}>
                   <div style={{ fontSize: 9, color: unlocked ? "#059669" : "#B5B4B0", marginBottom: 4 }}>
-                    {unlocked ? "✓" : "+"} 填「{matchLabel}」解鎖：
+                    {unlocked ? "✓" : (isConn ? "🔗" : "+")} {isConn ? "連結" : "填"}「{matchLabel}」解鎖：
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4 }}>
                     {items.map((item: string, i: number) => (
@@ -2127,11 +2216,6 @@ function SquadRequirementsPanel({
             })}
         </div>
       )}
-
-      {/* Layer 2 hint — subtle */}
-      <div style={{ marginTop: 10, fontSize: 10, color: "#C5C4C0", lineHeight: 1.5, fontStyle: "italic" as const }}>
-        Squad Lead 會在對話中詢問未填項目
-      </div>
     </div>
   );
 }
