@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed-local": "tsx scripts/seed-local-squads.ts",
+    "db:seed-missing": "tsx scripts/seed-missing-squads.ts",
     "db:analyze-squads": "tsx scripts/analyze-existing-squads.ts",
     "db:studio": "drizzle-kit studio",
     "lint": "tsc --noEmit"
