@@ -1456,89 +1456,102 @@ function RightPanel({
   missionSquadSlug?: string | null;
   missionWorkspace?: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<"sop" | "brandbrain" | "members">("sop");
-
-  // Resolve the squad to display:
-  // 1. activeSquad from current session (user just clicked a chip)
-  // 2. squad stored on the mission in DB (persists across sessions)
-  // 3. null → show fallback
+  // Resolve the squad to display
   const storedSquad = missionSquadSlug ? findSquadBySlug(missionSquadSlug) : null;
   const effectiveSquad = activeSquad ?? storedSquad;
 
-  // Workspace squads for the members tab
+  // Workspace squads for the members section
   const wsSquads = WORKSPACE_SQUADS[missionWorkspace ?? "strategy"] ?? [];
   const effectiveAllSquads = (taskSquads ?? []).length > 0 ? (taskSquads ?? []) : wsSquads;
   const otherSquads = effectiveAllSquads.filter(s => s.squadSlug !== effectiveSquad?.squadSlug);
 
-  // Auto-switch to 流程 tab whenever effective squad changes
+  // Accordion open state: auto-expand 流程+成員 when squad selected
+  const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
+    sop: false, members: false, brandbrain: false,
+  });
+
   useEffect(() => {
-    if (effectiveSquad) setActiveTab("sop");
+    if (effectiveSquad) {
+      setOpenSections({ sop: true, members: true, brandbrain: false });
+    } else {
+      setOpenSections({ sop: false, members: false, brandbrain: false });
+    }
   }, [effectiveSquad?.squadSlug]);
 
-  const panelStyle: React.CSSProperties = {
-    width: 264, minWidth: 264,
-    background: "#FAFAF9",
-    borderLeft: "1px solid #E4E3E1",
-    display: "flex", flexDirection: "column",
-    overflow: "hidden",
-  };
+  const toggleSection = (key: string) =>
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const tabs = [
-    { id: "sop"        as const, label: "流程" },
-    { id: "brandbrain" as const, label: "品牌大腦" },
-    { id: "members"    as const, label: "成員" },
+  const emptyHint = (text: string) => (
+    <div style={{ padding: "16px 8px", textAlign: "center", color: "#C5C5C0", fontSize: 11, lineHeight: 1.8 }}>
+      {text}
+    </div>
+  );
+
+  const sections = [
+    {
+      key: "sop",
+      label: "執行流程",
+      content: effectiveSquad
+        ? <SquadMethodologyPanel squad={effectiveSquad} />
+        : emptyHint("選擇執行方式\n查看對應流程"),
+    },
+    {
+      key: "members",
+      label: "協作成員",
+      content: effectiveSquad && otherSquads.length > 0
+        ? <SquadMembersList squads={otherSquads} />
+        : emptyHint("選擇執行方式\n查看對應成員"),
+    },
+    {
+      key: "brandbrain",
+      label: "品牌大腦",
+      content: <BrandBrainTab brandId={brandId} />,
+    },
   ];
 
   return (
-    <div style={panelStyle}>
-      {/* Tabs */}
-      <div style={{
-        display: "flex",
-        borderBottom: "1px solid #E4E3E1",
-        flexShrink: 0, padding: "0 4px",
-      }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              flex: 1, padding: "9px 4px",
-              textAlign: "center" as const,
-              fontSize: 11, fontWeight: 500,
-              color: activeTab === tab.id ? "#1A1A18" : "#9B9990",
-              cursor: "pointer",
-              background: "transparent", border: "none",
-              borderBottom: `2px solid ${activeTab === tab.id ? "#1A1A18" : "transparent"}`,
-              fontFamily: "inherit",
-              transition: "all 0.12s",
-            }}
-          >
-            {tab.label}
-          </button>
+    <div style={{
+      width: 264, minWidth: 264,
+      background: "#FAFAF9",
+      borderLeft: "1px solid #E4E3E1",
+      display: "flex", flexDirection: "column",
+      overflow: "hidden",
+    }}>
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {sections.map((section, idx) => (
+          <div key={section.key} style={{ borderBottom: "1px solid #E4E3E1" }}>
+            {/* Section header */}
+            <button
+              onClick={() => toggleSection(section.key)}
+              style={{
+                width: "100%",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 12px",
+                background: "transparent", border: "none",
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", letterSpacing: 0.3 }}>
+                {section.label}
+              </span>
+              <span style={{
+                fontSize: 10, color: "#9B9990",
+                transform: openSections[section.key] ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s",
+                display: "inline-block",
+              }}>
+                ▾
+              </span>
+            </button>
+
+            {/* Section body */}
+            {openSections[section.key] && (
+              <div style={{ padding: "0 12px 14px" }}>
+                {section.content}
+              </div>
+            )}
+          </div>
         ))}
-      </div>
-
-      {/* Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
-        {activeTab === "sop" && (
-          effectiveSquad
-            ? <SquadMethodologyPanel squad={effectiveSquad} />
-            : <div style={{ padding: "32px 8px", textAlign: "center", color: "#C5C5C0", fontSize: 12, lineHeight: 1.8 }}>
-                選擇執行方式<br />查看對應流程
-              </div>
-        )}
-
-        {activeTab === "brandbrain" && (
-          <BrandBrainTab brandId={brandId} />
-        )}
-
-        {activeTab === "members" && (
-          effectiveSquad && otherSquads.length > 0
-            ? <SquadMembersList squads={otherSquads} />
-            : <div style={{ padding: "32px 8px", textAlign: "center", color: "#C5C5C0", fontSize: 12, lineHeight: 1.8 }}>
-                選擇執行方式<br />查看對應成員
-              </div>
-        )}
       </div>
     </div>
   );
