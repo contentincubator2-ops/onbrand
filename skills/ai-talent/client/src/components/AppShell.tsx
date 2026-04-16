@@ -6,8 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import { MissionModal } from "./MissionModal";
-import type { SquadOption } from '../data/taskSquads';
-import { WORKSPACE_SQUADS, findSquadBySlug } from '../data/taskSquads';
+import type { DBSquad } from '../types/squad';
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -1447,25 +1446,36 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
 }
 
 function RightPanel({
-  missionId, brandId, activeSquad, taskSquads, missionSquadSlug, missionWorkspace,
+  missionId, brandId, activeSquad, missionSquadSlug, missionWorkspace,
 }: {
   missionId?: number | null;
   brandId?: number | null;
-  activeSquad?: SquadOption | null;
-  taskSquads?: SquadOption[];
+  activeSquad?: DBSquad | null;
   missionSquadSlug?: string | null;
   missionWorkspace?: string | null;
 }) {
-  // Resolve the squad to display
-  const storedSquad = missionSquadSlug ? findSquadBySlug(missionSquadSlug) : null;
-  const effectiveSquad = activeSquad ?? storedSquad;
+  // ── Resolve squad: prefer chip selection, fall back to stored slug ──────────
+  const slugQuery = trpc.squad.getSquadBySlug.useQuery(
+    { slug: missionSquadSlug ?? "" },
+    { enabled: !activeSquad && !!missionSquadSlug, staleTime: 60_000, refetchOnWindowFocus: false }
+  );
+  const effectiveSquad: DBSquad | null = activeSquad ?? (slugQuery.data as any) ?? null;
 
-  // Workspace squads for the members section
-  const wsSquads = WORKSPACE_SQUADS[missionWorkspace ?? "strategy"] ?? [];
-  const effectiveAllSquads = (taskSquads ?? []).length > 0 ? (taskSquads ?? []) : wsSquads;
-  const otherSquads = effectiveAllSquads.filter(s => s.squadSlug !== effectiveSquad?.squadSlug);
+  // ── Fetch members + workflow steps when a squad is selected ────────────────
+  const membersQuery = trpc.squad.getMembersById.useQuery(
+    { squadId: effectiveSquad?.squadId ?? 0 },
+    { enabled: !!effectiveSquad?.squadId, staleTime: 5 * 60_000, refetchOnWindowFocus: false }
+  );
+  const membersData = membersQuery.data as any;
 
-  // Accordion open state: auto-expand 流程+成員 when squad selected
+  // ── Fetch alternative squad leads ──────────────────────────────────────────
+  const alternativesQuery = trpc.squad.getAlternativeLeads.useQuery(
+    { workspace: missionWorkspace ?? "strategy", excludeSquadId: effectiveSquad?.squadId, limit: 6 },
+    { enabled: !!effectiveSquad, staleTime: 5 * 60_000, refetchOnWindowFocus: false }
+  );
+  const alternatives = (alternativesQuery.data ?? []) as any[];
+
+  // ── Accordion ──────────────────────────────────────────────────────────────
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
     sop: false, members: false, alternatives: false, brandbrain: false,
   });
@@ -1476,7 +1486,7 @@ function RightPanel({
     } else {
       setOpenSections({ sop: false, members: false, alternatives: false, brandbrain: false });
     }
-  }, [effectiveSquad?.squadSlug]);
+  }, [effectiveSquad?.squadId]);
 
   const toggleSection = (key: string) =>
     setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -1492,21 +1502,31 @@ function RightPanel({
       key: "sop",
       label: "執行流程",
       content: effectiveSquad
-        ? <SquadMethodologyPanel squad={effectiveSquad} />
+        ? <DBSquadMethodologyPanel
+            squadName={membersData?.squadName ?? effectiveSquad.name}
+            description={effectiveSquad.description ?? ""}
+            leadTitle={membersData?.lead?.title ?? effectiveSquad.lead?.title ?? ""}
+            steps={membersData?.steps ?? []}
+            isLoading={membersQuery.isLoading}
+          />
         : emptyHint("選擇執行方式\n查看對應流程"),
     },
     {
       key: "members",
       label: "協作成員",
-      content: effectiveSquad && effectiveSquad.members?.length > 0
-        ? <AgentMembersList members={effectiveSquad.members} />
+      content: effectiveSquad
+        ? <DBAgentMembersList
+            lead={membersData?.lead ?? null}
+            members={membersData?.members ?? []}
+            isLoading={membersQuery.isLoading}
+          />
         : emptyHint("選擇執行方式\n查看協作成員"),
     },
     {
       key: "alternatives",
       label: "備選專家",
-      content: effectiveSquad && otherSquads.length > 0
-        ? <SquadMembersList squads={otherSquads} />
+      content: effectiveSquad
+        ? <DBAlternativesList alternatives={alternatives} isLoading={alternativesQuery.isLoading} />
         : emptyHint("選擇執行方式\n查看備選專家"),
     },
     {
@@ -1564,91 +1584,155 @@ function RightPanel({
   );
 }
 
-// ─── SquadMethodologyPanel ─────────────────────────────────────────────────────
+// ─── DBSquadMethodologyPanel ──────────────────────────────────────────────────
+// Renders methodology steps from squad_workflow_templates (real DB data)
 
-function SquadMethodologyPanel({ squad }: { squad: SquadOption }) {
+function DBSquadMethodologyPanel({
+  squadName, description, leadTitle, steps, isLoading,
+}: {
+  squadName: string;
+  description: string;
+  leadTitle: string;
+  steps: any[];
+  isLoading: boolean;
+}) {
   return (
     <div>
-      {/* Squad header */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
-          {squad.name}
+          {squadName}
         </div>
-        <div style={{ fontSize: 11, color: "#9B9990", marginBottom: 6 }}>
-          {squad.leadTitle}
-        </div>
-        <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5 }}>
-          {squad.tagline}
-        </div>
+        {leadTitle && (
+          <div style={{ fontSize: 11, color: "#9B9990", marginBottom: 4 }}>{leadTitle}</div>
+        )}
+        {description && (
+          <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5 }}>{description}</div>
+        )}
       </div>
 
-      {/* Divider */}
       <div style={{ height: 1, background: "#E7E5E4", marginBottom: 14 }} />
 
-      {/* Methodology steps */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {squad.steps.map((step, i) => (
-          <div key={step.phase} style={{ display: "flex", gap: 10 }}>
-            {/* Step number */}
-            <div style={{
-              width: 20, height: 20, borderRadius: "50%",
-              background: "#1A1A18", color: "#FFFFFF",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
-            }}>
-              {i + 1}
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
-                {step.phase}
+      {isLoading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ height: 36, background: "#F2F1EF", borderRadius: 8, opacity: 0.6 }} />
+          ))}
+        </div>
+      ) : steps.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {steps.map((step: any, i: number) => (
+            <div key={i} style={{ display: "flex", gap: 10 }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: "50%",
+                background: "#1A1A18", color: "#FFFFFF",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
+              }}>
+                {step.step ?? i + 1}
               </div>
-              <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
-                {step.description}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
+                  {step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
+                </div>
+                <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
+                  {step.description ?? ""}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 11, color: "#C8C7C3", textAlign: "center", padding: "12px 0" }}>
+          此小隊尚未設定執行流程
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── AgentMembersList ─────────────────────────────────────────────────────────
+// ─── DBAgentMembersList ───────────────────────────────────────────────────────
+// Renders real DB agents: lead (teal card) + members
 
-function AgentMembersList({ members }: { members: import('../data/taskSquads').AgentMember[] }) {
+function DBAgentMembersList({
+  lead, members, isLoading,
+}: {
+  lead: any | null;
+  members: any[];
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {[1,2,3,4].map(i => (
+          <div key={i} style={{ height: 68, background: "#F2F1EF", borderRadius: 8, opacity: 0.6 }} />
+        ))}
+      </div>
+    );
+  }
+
+  const allMembers = [lead, ...members].filter(Boolean);
+
+  if (!allMembers.length) {
+    return (
+      <div style={{ padding: "12px 0", textAlign: "center", fontSize: 11, color: "#C8C7C3" }}>
+        無成員資料
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {members.map((agent) => (
+      {allMembers.map((agent: any, i: number) => (
         <div
-          key={agent.name}
+          key={agent.agentId ?? i}
           style={{
             padding: "10px 10px",
-            background: "#FFFFFF",
-            border: "1px solid #E7E5E4",
+            background: agent.isLead ? "#F0FDF8" : "#FFFFFF",
+            border: `1px solid ${agent.isLead ? "#A7F3D0" : "#E7E5E4"}`,
             borderRadius: 8,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
-            {agent.name}
-          </div>
-          <div style={{ fontSize: 11, color: "#6B6A66", marginBottom: 6 }}>
-            {agent.title}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: "50%",
+              background: agent.isLead ? "#1DBEAA" : "#1A1A18",
+              color: "white", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 9, fontWeight: 700, flexShrink: 0,
+            }}>
+              {(agent.name ?? "A").charAt(0)}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18" }}>
+                {agent.name}
+              </div>
+              <div style={{ fontSize: 10, color: "#6B6A66" }}>{agent.title}</div>
+            </div>
+            {agent.isLead && (
+              <span style={{
+                fontSize: 9, padding: "1px 6px", borderRadius: 4,
+                background: "#1DBEAA", color: "white", fontWeight: 600,
+              }}>
+                Lead
+              </span>
+            )}
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
-            <span style={{
-              fontSize: 10, padding: "2px 7px", borderRadius: 20,
-              background: "#F0F4FF", color: "#4A6FA5",
-              border: "1px solid #D0DCEF",
-            }}>
-              {agent.skill}
-            </span>
-            <span style={{
-              fontSize: 10, padding: "2px 7px", borderRadius: 20,
-              background: "#F5F0FF", color: "#6B4FA5",
-              border: "1px solid #DDD0EF",
-            }}>
-              {agent.aiModel}
-            </span>
+            {agent.primarySkill && (
+              <span style={{
+                fontSize: 10, padding: "2px 7px", borderRadius: 20,
+                background: "#F0F4FF", color: "#4A6FA5", border: "1px solid #D0DCEF",
+              }}>
+                {agent.primarySkill}
+              </span>
+            )}
+            {agent.aiModel && (
+              <span style={{
+                fontSize: 10, padding: "2px 7px", borderRadius: 20,
+                background: "#F5F0FF", color: "#6B4FA5", border: "1px solid #DDD0EF",
+              }}>
+                {agent.aiModel}
+              </span>
+            )}
           </div>
         </div>
       ))}
@@ -1656,45 +1740,65 @@ function AgentMembersList({ members }: { members: import('../data/taskSquads').A
   );
 }
 
-// ─── SquadMembersList ──────────────────────────────────────────────────────────
+// ─── DBAlternativesList ────────────────────────────────────────────────────────
+// Renders alternative squad lead agents from other squads
 
-function SquadMembersList({ squads }: { squads: SquadOption[] }) {
+function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {[1,2,3].map(i => (
+          <div key={i} style={{ height: 56, background: "#F2F1EF", borderRadius: 8, opacity: 0.6 }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!alternatives.length) {
+    return (
+      <div style={{ padding: "12px 0", textAlign: "center", fontSize: 11, color: "#C8C7C3" }}>
+        無備選專家資料
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {squads.map((squad) => (
+      {alternatives.map((alt: any, i: number) => (
         <div
-          key={squad.squadSlug}
+          key={alt.agentId ?? i}
           style={{
-            padding: "10px 10px",
-            background: "#FFFFFF",
-            border: "1px solid #E7E5E4",
-            borderRadius: 8,
+            padding: "10px 10px", background: "#FFFFFF",
+            border: "1px solid #E7E5E4", borderRadius: 8,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
-            {squad.name}
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
+            {alt.name}
           </div>
-          <div style={{ fontSize: 11, color: "#6B6A66", marginBottom: 6 }}>
-            {squad.leadTitle}
+          <div style={{ fontSize: 10, color: "#6B6A66", marginBottom: 6 }}>
+            {alt.title}
+            {alt.squadName && (
+              <span style={{ color: "#B0AFA9" }}> · {alt.squadName}</span>
+            )}
           </div>
-          {squad.members?.[0] && (
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
+            {alt.primarySkill && (
               <span style={{
                 fontSize: 10, padding: "2px 7px", borderRadius: 20,
-                background: "#F5F5F4", color: "#6B6A66",
-                border: "1px solid #E4E3E1",
+                background: "#F5F5F4", color: "#6B6A66", border: "1px solid #E4E3E1",
               }}>
-                {squad.members[0].skill}
+                {alt.primarySkill}
               </span>
+            )}
+            {alt.aiModel && (
               <span style={{
                 fontSize: 10, padding: "2px 7px", borderRadius: 20,
-                background: "#F5F5F4", color: "#6B6A66",
-                border: "1px solid #E4E3E1",
+                background: "#F5F5F4", color: "#6B6A66", border: "1px solid #E4E3E1",
               }}>
-                {squad.members[0].aiModel}
+                {alt.aiModel}
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -1802,8 +1906,7 @@ interface AppShellProps {
   onMissionSelect?: (missionId: number) => void;
   onNewTask?: (wsKey: string) => void;
   activeMissionId?: number | null;
-  activeSquad?: SquadOption | null;
-  taskSquads?: SquadOption[];
+  activeSquad?: DBSquad | null;
 }
 
 
@@ -1948,7 +2051,7 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
   );
 }
 
-export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId, activeSquad, taskSquads }: AppShellProps) {
+export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId, activeSquad }: AppShellProps) {
   const [railTab, setRailTab] = useState("chat");
   const [newMissionOpen, setNewMissionOpen] = useState(false);
   const [newMissionWsKey, setNewMissionWsKey] = useState("strategy");
@@ -2119,7 +2222,6 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         missionId={activeMissionId}
         brandId={selectedBrandId}
         activeSquad={activeSquad ?? null}
-        taskSquads={taskSquads ?? []}
         missionSquadSlug={activeMissionSquadSlug}
         missionWorkspace={activeMissionWorkspace}
       />

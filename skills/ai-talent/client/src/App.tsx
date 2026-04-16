@@ -8,7 +8,7 @@ import AppShell from "./components/AppShell";
 import ChatCore from "./components/ChatCore";
 import { Navigate, Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { trpc } from "./lib/trpc";
-import type { SquadOption } from "./data/taskSquads";
+import type { DBSquad } from "./types/squad";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem("authToken");
@@ -22,12 +22,10 @@ function MissionPage() {
   const navigate = useNavigate();
   const numericMissionId = missionId ? Number(missionId) : null;
 
-  const [activeSquad, setActiveSquad] = useState<SquadOption | null>(null);
-  const [taskSquads, setTaskSquads] = useState<SquadOption[]>([]);
+  const [activeSquad, setActiveSquad] = useState<DBSquad | null>(null);
 
   useEffect(() => {
     setActiveSquad(null);
-    setTaskSquads([]);
   }, [numericMissionId]);
 
   const handleMissionSelect = (id: number) => {
@@ -42,15 +40,13 @@ function MissionPage() {
         console.log("new task", _wsKey);
       }}
       activeSquad={activeSquad}
-      taskSquads={taskSquads}
     >
       <ChatCore
         key={`mission-${numericMissionId}`}
         activeMissionId={numericMissionId}
         onMissionCreated={(id) => navigate(`/m/${id}`)}
-        onSquadPreview={(squad, allSquads) => {
+        onSquadPreview={(squad) => {
           setActiveSquad(squad);
-          setTaskSquads(allSquads ?? []);
         }}
       />
     </AppShell>

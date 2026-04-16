@@ -14,7 +14,7 @@ import TaskProgressTracker, { type TaskStep } from "./chat/TaskProgressTracker";
 import TypedThreadCard from "./chat/TypedThreadCard";
 import SquadRecommendCards from "./chat/SquadRecommendCards";
 import { MissionHomePage } from "./chat/MissionHomePage";
-import type { SquadOption } from '../data/taskSquads';
+import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
 
@@ -126,8 +126,8 @@ export interface ChatCoreProps {
   preselectedAgent?: { id: number; name: string; title?: string; type: "agent" | "squad" } | null;
   onClearAgent?: () => void;
   onMissionCreated?: (id: number) => void;
-  onSquadSelect?: (taskLabel: string, squad: SquadOption, allSquads: SquadOption[]) => void;
-  onSquadPreview?: (squad: SquadOption | null, allSquads: SquadOption[]) => void;
+  onSquadSelect?: (taskLabel: string, squad: DBSquad) => void;
+  onSquadPreview?: (squad: DBSquad | null) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -477,7 +477,7 @@ export default function ChatCore({
   // ── New feature state ───────────────────────────────────────────────────
   const [confirmedMsgIds, setConfirmedMsgIds] = useState<Set<string>>(new Set());
   const [activeWorkspaceKey, setActiveWorkspaceKey] = useState<string>("strategy");
-  const [selectedSquadForMission, setSelectedSquadForMission] = useState<SquadOption | null>(null);
+  const [selectedSquadForMission, setSelectedSquadForMission] = useState<DBSquad | null>(null);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
@@ -922,9 +922,9 @@ export default function ChatCore({
     if (isFirstUserMsg && activeMissionId && selectedSquadForMission) {
       updateMission.mutate({
         id: activeMissionId,
-        squadSlug: selectedSquadForMission.squadSlug,
+        squadSlug: selectedSquadForMission.slug,
       });
-      onSquadSelect?.(rawText, selectedSquadForMission, []);
+      onSquadSelect?.(rawText, selectedSquadForMission);
     }
 
     stopRef.current = false;
@@ -1191,13 +1191,15 @@ export default function ChatCore({
               <MissionHomePage
                 workspace={(missionDataQuery.data as any)?.workspace ?? "strategy"}
                 missionTitle={(missionDataQuery.data as any)?.title ?? undefined}
+                missionId={activeMissionId}
+                brandId={(missionDataQuery.data as any)?.brandId ?? null}
                 onTaskSelect={(task) => {
                   setInput(task);
                   setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
                 }}
-                onSquadPreview={(squad, allSquads) => {
+                onSquadPreview={(squad) => {
                   setSelectedSquadForMission(squad);
-                  onSquadPreview?.(squad, allSquads);
+                  onSquadPreview?.(squad);
                 }}
               />
         )}
