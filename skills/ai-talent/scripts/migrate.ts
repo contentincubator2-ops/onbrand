@@ -50,13 +50,27 @@ async function main() {
     `);
     console.log("[migrate] mission_resources: OK");
 
-    // 3. Add 'inactive' to missions.status enum and change default to 'inactive'
-    await conn.execute(`
-      ALTER TABLE missions
-        MODIFY COLUMN status ENUM('inactive','active','completed','archived')
-        NOT NULL DEFAULT 'inactive'
-    `);
-    console.log("[migrate] missions.status: added 'inactive' value, default changed");
+    // 3. Add 'inactive' to missions.status enum (idempotent: check current column type first)
+    const [enumRows] = await conn.execute(`
+      SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'missions'
+        AND COLUMN_NAME = 'status'
+    `) as any;
+    const currentType: string = (enumRows as any[])[0]?.COLUMN_TYPE ?? "";
+    console.log("[migrate] missions.status current type:", currentType);
+    if (!currentType.includes("'inactive'")) {
+      await conn.execute(`
+        ALTER TABLE missions
+          MODIFY COLUMN \`status\`
+          ENUM('inactive','active','completed','archived')
+          CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+          NOT NULL DEFAULT 'inactive'
+      `);
+      console.log("[migrate] missions.status: added 'inactive', default changed");
+    } else {
+      console.log("[migrate] missions.status: 'inactive' already present, skipped");
+    }
 
     console.log("[migrate] All migrations applied successfully.");
   } finally {
