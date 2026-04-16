@@ -50,8 +50,11 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
         >
             {/* Title */}
             <div style={{ maxWidth: 600, textAlign: "center", marginBottom: 28 }}>
-                <div style={{ fontSize: 22, fontWeight: 600, color: "#1A1A18" }}>
+                <div style={{ fontSize: 22, fontWeight: 600, color: "#1A1A18", marginBottom: 6 }}>
                     {titleText}
+                </div>
+                <div style={{ fontSize: 13, color: "#9B9990" }}>
+                    選擇執行方式，輸入任務需求
                 </div>
             </div>
 
