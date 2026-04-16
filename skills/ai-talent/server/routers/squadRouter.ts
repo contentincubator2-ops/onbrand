@@ -18,6 +18,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
+import localPool from "../localDb";
 import { sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import { randomBytes } from "crypto";
@@ -85,93 +86,112 @@ export const squadRouter = router({
     }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
 
       const tags = WORKSPACE_TAGS[input.workspace] ?? WORKSPACE_TAGS.strategy;
 
-      // 1. Get brand industry
+      // 1. Get brand industry (app DB — brands lives in sowork_db)
       let brandIndustry: string | null = null;
-      if (input.brandId) {
-        const [bRows] = await db.execute(
-          sql`SELECT industry FROM brands WHERE id = ${input.brandId} LIMIT 1`
-        ) as any[];
-        const raw = (bRows as any[])?.[0]?.industry ?? null;
-        // sanitise before embedding in raw SQL
-        brandIndustry = raw ? raw.replace(/['"\\;]/g, "") : null;
+      if (input.brandId && db) {
+        try {
+          const [bRows] = await db.execute(
+            sql`SELECT industry FROM brands WHERE id = ${input.brandId} LIMIT 1`
+          ) as any[];
+          const raw = (bRows as any[])?.[0]?.industry ?? null;
+          brandIndustry = raw ? raw.replace(/['"\\;]/g, "") : null;
+        } catch (e) {
+          console.error("[squadRouter] brand lookup error:", e);
+        }
       }
 
-      // 2. Get mission title + description for keyword scoring
+      // 2. Get mission keywords (app DB)
       let missionKeywords: string[] = [];
-      if (input.missionId) {
-        const [mRows] = await db.execute(
-          sql`SELECT title, description FROM missions WHERE id = ${input.missionId} LIMIT 1`
-        ) as any[];
-        const m = (mRows as any[])?.[0];
-        const text = [m?.title ?? "", m?.description ?? ""].join(" ");
-        missionKeywords = text.split(/[\s，,。、！？]+/).filter(w => w.length >= 2);
+      if (input.missionId && db) {
+        try {
+          const [mRows] = await db.execute(
+            sql`SELECT title, description FROM missions WHERE id = ${input.missionId} LIMIT 1`
+          ) as any[];
+          const m = (mRows as any[])?.[0];
+          const text = [m?.title ?? "", m?.description ?? ""].join(" ");
+          missionKeywords = text.split(/[\s，,。、！？]+/).filter(w => w.length >= 2);
+        } catch (e) {
+          console.error("[squadRouter] mission lookup error:", e);
+        }
       }
 
-      // 3. Build dynamic LIKE conditions from workspace tags (hardcoded, safe)
+      // 3. Build LIKE conditions
       const tagLikes = tags.map(t => `tags LIKE '%${escapeLike(t)}%'`).join(" OR ");
-      const industryClause = brandIndustry
-        ? ` OR industry_key = '${brandIndustry}'`
-        : "";
+      const industryClause = brandIndustry ? ` OR industry_key = '${brandIndustry}'` : "";
 
-      // 4. Fetch up to 60 candidates
-      const [squadRows] = await db.execute(
-        sql.raw(`
-          SELECT id, slug, name, description, industry_key, market, taskType,
-                 members, tags, use_cases, squad_type
-          FROM agent_squads
-          WHERE is_active = 1
-            AND (${tagLikes}${industryClause})
-          LIMIT 60
-        `)
-      ) as any[];
+      // 4. Fetch candidates via localPool (raw mysql2 — agent data lives on VM local DB)
+      let squadRows: any[] = [];
+      try {
+        const [rows] = await localPool.execute(
+          `SELECT id, slug, name, description, industry_key, taskType,
+                  members, tags, use_cases
+           FROM agent_squads
+           WHERE is_active = 1 AND (${tagLikes}${industryClause})
+           LIMIT 60`
+        ) as any[];
+        squadRows = rows as any[];
+      } catch (e) {
+        console.error("[squadRouter] agent_squads query error (localPool):", e);
+        // Fallback: return all active squads without tag filter
+        try {
+          const [rows] = await localPool.execute(
+            `SELECT id, slug, name, description, industry_key, taskType,
+                    members, tags, use_cases
+             FROM agent_squads WHERE is_active = 1
+             ORDER BY RAND() LIMIT 60`
+          ) as any[];
+          squadRows = rows as any[];
+          console.log("[squadRouter] fallback query returned", squadRows.length, "squads");
+        } catch (e2) {
+          console.error("[squadRouter] fallback query also failed:", e2);
+        }
+      }
 
-      if (!(squadRows as any[]).length) return [];
+      console.log(`[squadRouter] getRecommendedSquads workspace=${input.workspace} found=${squadRows.length} candidates`);
+      if (!squadRows.length) return [];
 
       // 5. JS-side scoring
-      const candidates = (squadRows as any[]).map(row => {
+      const candidates = squadRows.map(row => {
         const members  = safeJsonParse<any[]>(row.members, []);
         const rowTags  = safeJsonParse<string[]>(row.tags, []);
         const useCases = safeJsonParse<string[]>(row.use_cases, []);
 
         let score = 0;
-        // Workspace tag overlap
         for (const tag of tags) {
-          if (rowTags.some(t => t.toLowerCase().includes(tag.toLowerCase()))) score += 3;
+          if (rowTags.some((t: string) => t && t.toLowerCase().includes(tag.toLowerCase()))) score += 3;
         }
-        // Industry match
         if (brandIndustry) {
           if (row.industry_key === brandIndustry) score += 5;
-          if (rowTags.some(t => t.toLowerCase().includes(brandIndustry!.toLowerCase()))) score += 2;
+          if (rowTags.some((t: string) => t && t.toLowerCase().includes(brandIndustry!.toLowerCase()))) score += 2;
         }
-        // Mission keyword overlap
         for (const word of missionKeywords) {
           if ((row.name ?? "").includes(word)) score += 2;
-          if (useCases.some((uc: string) => uc.includes(word))) score += 1;
+          if (useCases.some((uc: string) => uc && uc.includes(word))) score += 1;
         }
-        // Member richness bonus
         score += Math.min(members.length, 5);
 
         const leadMember = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
-        return { row, members, rowTags, useCases, score, leadAgentId: leadMember?.agent_id ?? null };
+        return { row, members, score, leadAgentId: leadMember?.agent_id ?? null };
       });
 
       // 6. Sort + take top N
-      const top = [...candidates]
-        .sort((a, b) => b.score - a.score)
-        .slice(0, input.limit);
+      const top = [...candidates].sort((a, b) => b.score - a.score).slice(0, input.limit);
 
-      // 7. Batch-fetch lead agents
+      // 7. Batch-fetch lead agents via localPool
       const leadIds = top.map(c => c.leadAgentId).filter(Boolean) as number[];
       const leadMap: Record<number, any> = {};
       if (leadIds.length) {
-        const [agentRows] = await db.execute(
-          sql.raw(`SELECT id, name, title FROM agents WHERE id IN (${leadIds.join(",")})`)
-        ) as any[];
-        for (const a of agentRows as any[]) leadMap[a.id] = a;
+        try {
+          const [agentRows] = await localPool.execute(
+            `SELECT id, name, title FROM agents WHERE id IN (${leadIds.join(",")})`
+          ) as any[];
+          for (const a of agentRows as any[]) leadMap[a.id] = a;
+        } catch (e) {
+          console.error("[squadRouter] lead agents lookup error:", e);
+        }
       }
 
       return top.map(({ row, members, score, leadAgentId }) => ({
@@ -196,28 +216,25 @@ export const squadRouter = router({
   getMembersById: protectedProcedure
     .input(z.object({ squadId: z.number() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { squadName: "", lead: null, members: [], steps: [] };
-
-      const [squadRows] = await db.execute(
-        sql`SELECT name, members, taskType FROM agent_squads WHERE id = ${input.squadId} AND is_active = 1 LIMIT 1`
+      // agent_squads and agents live on VM local DB (localPool)
+      const [squadRows] = await localPool.execute(
+        `SELECT name, members, taskType FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+        [input.squadId]
       ) as any[];
       const squad = (squadRows as any[])?.[0];
       if (!squad) return { squadName: "", lead: null, members: [], steps: [] };
 
       const membersJson = safeJsonParse<any[]>(squad.members, []);
-      const agentIds = membersJson.map(m => m.agent_id).filter(Boolean) as number[];
+      const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
 
       // Fetch real agent data
       let agentMap: Record<number, any> = {};
       if (agentIds.length) {
-        const [agentRows] = await db.execute(
-          sql.raw(
-            `SELECT id, name, title, specialty, primarySkill, aiModel, avatarUrl
-             FROM agents WHERE id IN (${agentIds.join(",")})`
-          )
+        const [agentRows] = await localPool.execute(
+          `SELECT id, name, title, specialty, primarySkill, aiModel, avatarUrl
+           FROM agents WHERE id IN (${agentIds.join(",")})`
         ) as any[];
-        for (const a of agentRows as any[]) agentMap[a.id] = a;
+        for (const a of agentRows as any[]) agentMap[(a as any).id] = a;
       }
 
       // Merge members JSON with real agent data
@@ -247,14 +264,17 @@ export const squadRouter = router({
       const lead    = mapped.find((m: any) => m.isLead) ?? null;
       const members = mapped.filter((m: any) => !m.isLead);
 
-      // Fetch workflow steps from squad_workflow_templates
+      // Fetch workflow steps from squad_workflow_templates (also on local DB)
       let steps: any[] = [];
       if (squad.taskType) {
-        const [wfRows] = await db.execute(
-          sql`SELECT steps FROM squad_workflow_templates WHERE taskType = ${squad.taskType} AND isActive = 1 LIMIT 1`
-        ) as any[];
-        const wf = (wfRows as any[])?.[0];
-        if (wf) steps = safeJsonParse<any[]>(wf.steps, []);
+        try {
+          const [wfRows] = await localPool.execute(
+            `SELECT steps FROM squad_workflow_templates WHERE taskType = ? AND isActive = 1 LIMIT 1`,
+            [squad.taskType]
+          ) as any[];
+          const wf = (wfRows as any[])?.[0];
+          if (wf) steps = safeJsonParse<any[]>(wf.steps, []);
+        } catch { /* no steps */ }
       }
 
       return {
@@ -274,47 +294,39 @@ export const squadRouter = router({
       limit:          z.number().default(6),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return [];
-
       const tags = WORKSPACE_TAGS[input.workspace] ?? WORKSPACE_TAGS.strategy;
       const tagLikes = tags.map(t => `s.tags LIKE '%${escapeLike(t)}%'`).join(" OR ");
       const excludeClause = input.excludeSquadId ? `AND s.id != ${input.excludeSquadId}` : "";
 
-      const [rows] = await db.execute(
-        sql.raw(`
-          SELECT s.id, s.name, s.members, s.industry_key
-          FROM agent_squads s
-          WHERE s.is_active = 1 AND (${tagLikes})
-          ${excludeClause}
-          LIMIT 30
-        `)
+      const [rows] = await localPool.execute(
+        `SELECT s.id, s.name, s.members, s.industry_key
+         FROM agent_squads s
+         WHERE s.is_active = 1 AND (${tagLikes})
+         ${excludeClause}
+         LIMIT 30`
       ) as any[];
 
-      // Extract lead agent ids
       const candidates = (rows as any[])
-        .map(row => {
+        .map((row: any) => {
           const members = safeJsonParse<any[]>(row.members, []);
           const lead = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
           return { squadId: row.id, squadName: row.name, leadAgentId: lead?.agent_id ?? null };
         })
-        .filter(c => c.leadAgentId);
+        .filter((c: any) => c.leadAgentId);
 
       if (!candidates.length) return [];
 
-      const leadIds = candidates.map(c => c.leadAgentId) as number[];
-      const [agentRows] = await db.execute(
-        sql.raw(
-          `SELECT id, name, title, primarySkill, aiModel
-           FROM agents WHERE id IN (${leadIds.join(",")}) ORDER BY rating DESC`
-        )
+      const leadIds = candidates.map((c: any) => c.leadAgentId) as number[];
+      const [agentRows] = await localPool.execute(
+        `SELECT id, name, title, primarySkill, aiModel
+         FROM agents WHERE id IN (${leadIds.join(",")}) ORDER BY rating DESC`
       ) as any[];
 
       const agentMap: Record<number, any> = {};
-      for (const a of agentRows as any[]) agentMap[a.id] = a;
+      for (const a of agentRows as any[]) agentMap[(a as any).id] = a;
 
       return candidates
-        .map(c => {
+        .map((c: any) => {
           const agent = agentMap[c.leadAgentId!];
           if (!agent) return null;
           return {
@@ -332,16 +344,13 @@ export const squadRouter = router({
     }),
 
   // ── getSquadBySlug ────────────────────────────────────────────────────────────
-  // 透過 slug 查單一 squad（用於頁面重載後還原選中的 chip 狀態）
   getSquadBySlug: protectedProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return null;
-
-      const [rows] = await db.execute(
-        sql`SELECT id, slug, name, description, industry_key, taskType, members
-            FROM agent_squads WHERE slug = ${input.slug} AND is_active = 1 LIMIT 1`
+      const [rows] = await localPool.execute(
+        `SELECT id, slug, name, description, industry_key, taskType, members
+         FROM agent_squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
+        [input.slug]
       ) as any[];
       const row = (rows as any[])?.[0];
       if (!row) return null;
@@ -349,14 +358,15 @@ export const squadRouter = router({
       const members  = safeJsonParse<any[]>(row.members, []);
       const leadMember = members.find((m: any) => m.is_lead === true || m.is_lead === 1);
 
-      // Fetch lead agent
+      // Fetch lead agent via localPool
       let lead = null;
       if (leadMember?.agent_id) {
-        const [aRows] = await db.execute(
-          sql`SELECT id, name, title FROM agents WHERE id = ${leadMember.agent_id} LIMIT 1`
+        const [aRows] = await localPool.execute(
+          `SELECT id, name, title FROM agents WHERE id = ? LIMIT 1`,
+          [leadMember.agent_id]
         ) as any[];
         const a = (aRows as any[])?.[0];
-        if (a) lead = { agentId: a.id, name: a.name, title: a.title };
+        if (a) lead = { agentId: (a as any).id, name: (a as any).name, title: (a as any).title };
       }
 
       return {
