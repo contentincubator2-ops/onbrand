@@ -104,8 +104,10 @@ export const squadRouter = router({
         }
       }
 
-      // 2. Get mission keywords (app DB)
+      // 2. Get mission keywords + workspace hint (app DB)
       let missionKeywords: string[] = [];
+      let missionWorkspaceHint: string | null = null;
+
       if (input.missionId && db) {
         try {
           const [mRows] = await db.execute(
@@ -113,49 +115,91 @@ export const squadRouter = router({
           ) as any[];
           const m = (mRows as any[])?.[0];
           const text = [m?.title ?? "", m?.description ?? ""].join(" ");
-          missionKeywords = text.split(/[\s，,。、！？]+/).filter(w => w.length >= 2);
+
+          // Split on whitespace + Chinese punctuation
+          const parts = text.split(/[\s，,。、！？：:；;「」【】()[\]]+/).filter(Boolean);
+          const kws = new Set<string>();
+          for (const part of parts) {
+            const p = part.toLowerCase();
+            if (p.length >= 2 && p.length <= 30) kws.add(p);
+            // Chinese bigrams (2-char substrings) for non-split CJK runs
+            if (p.length > 3 && /[\u4e00-\u9fff]/.test(p)) {
+              for (let i = 0; i < p.length - 1; i++) {
+                const bi = p.slice(i, i + 2);
+                if (/[\u4e00-\u9fff]{2}/.test(bi)) kws.add(bi);
+              }
+            }
+          }
+          missionKeywords = [...kws];
+
+          // Detect workspace from mission text (Chinese & English keywords)
+          const tl = text.toLowerCase();
+          if (/臉書|facebook|\bfb\b|meta.*ads|fb.*貼文/.test(tl))         missionWorkspaceHint = "facebook";
+          else if (/linkedin/.test(tl))                                    missionWorkspaceHint = "linkedin";
+          else if (/youtube|yt\b|影片|youtube/.test(tl))                   missionWorkspaceHint = "youtube";
+          else if (/公關|媒體關係|\bpr\b|kol|news.*release/.test(tl))      missionWorkspaceHint = "pr";
+          else if (/seo|搜尋引擎|網站|website|landing.*page/.test(tl))     missionWorkspaceHint = "website";
+          else if (/活動|event|展覽|conference/.test(tl))                  missionWorkspaceHint = "event";
+          else if (/instagram|\bIG\b|ig.*貼文/.test(tl))                   missionWorkspaceHint = "facebook"; // IG squads are under facebook ws
+          console.log(`[squadRouter] mission ${input.missionId} keywords=${missionKeywords.slice(0,8).join(",")} hint=${missionWorkspaceHint}`);
         } catch (e) {
           console.error("[squadRouter] mission lookup error:", e);
         }
       }
 
+      // Effective workspace = hint from mission text (strongest signal) OR passed-in workspace
+      const effectiveWorkspace = missionWorkspaceHint ?? input.workspace;
+      const effectiveTags      = WORKSPACE_TAGS[effectiveWorkspace] ?? WORKSPACE_TAGS[input.workspace] ?? WORKSPACE_TAGS.strategy;
+
       // 3. Build LIKE conditions
-      const tagLikes = tags.map(t => `tags LIKE '%${escapeLike(t)}%'`).join(" OR ");
+      const tagLikes      = effectiveTags.map(t => `tags LIKE '%${escapeLike(t)}%'`).join(" OR ");
+      const wsLike        = escapeLike(effectiveWorkspace);
       const industryClause = brandIndustry ? ` OR industry_key = '${brandIndustry}'` : "";
 
-      // 4. Fetch candidates via localPool (raw mysql2 — agent data lives on VM local DB)
+      const selectCols = `id, slug, name, description, industry_key, missionType,
+                          agents, tags, use_cases, methodology, workspace`;
+
+      // 4. Two-pass fetch — workspace-declared squads first, then tag-based supplement
       let squadRows: any[] = [];
+      const seenIds = new Set<number>();
+
       try {
-        const [rows] = await localPool.execute(
-          `SELECT id, slug, name, description, industry_key, missionType,
-                  agents, tags, use_cases, methodology, workspace
+        // Pass A: squads that explicitly declare this workspace
+        const [wsRows] = await localPool.execute(
+          `SELECT ${selectCols}
+           FROM agent_squads
+           WHERE is_active = 1 AND workspace LIKE '%${wsLike}%'
+           ORDER BY id DESC LIMIT 150`
+        ) as any[];
+        for (const r of wsRows as any[]) { squadRows.push(r); seenIds.add(r.id); }
+        console.log(`[squadRouter] pass-A (workspace="${effectiveWorkspace}"): ${squadRows.length} rows`);
+
+        // Pass B: tag-based candidates (exclude already found)
+        const [tagRows] = await localPool.execute(
+          `SELECT ${selectCols}
            FROM agent_squads
            WHERE is_active = 1 AND (${tagLikes}${industryClause})
-           ORDER BY id DESC
-           LIMIT 300`
+           ORDER BY id DESC LIMIT 200`
         ) as any[];
-        squadRows = rows as any[];
+        for (const r of tagRows as any[]) {
+          if (!seenIds.has(r.id)) { squadRows.push(r); seenIds.add(r.id); }
+        }
+        console.log(`[squadRouter] pass-B total candidates: ${squadRows.length}`);
       } catch (e) {
-        console.error("[squadRouter] agent_squads query error (localPool):", e);
-        // Fallback: return all active squads without tag filter
+        console.error("[squadRouter] agent_squads query error:", e);
         try {
           const [rows] = await localPool.execute(
-            `SELECT id, slug, name, description, industry_key, missionType,
-                    agents, tags, use_cases
-             FROM agent_squads WHERE is_active = 1
-             ORDER BY RAND() LIMIT 60`
+            `SELECT ${selectCols} FROM agent_squads WHERE is_active = 1 ORDER BY RAND() LIMIT 60`
           ) as any[];
           squadRows = rows as any[];
-          console.log("[squadRouter] fallback query returned", squadRows.length, "squads");
-        } catch (e2) {
-          console.error("[squadRouter] fallback query also failed:", e2);
-        }
+        } catch (e2) { console.error("[squadRouter] fallback also failed:", e2); }
       }
 
-      console.log(`[squadRouter] getRecommendedSquads workspace=${input.workspace} found=${squadRows.length} candidates`);
+      console.log(`[squadRouter] getRecommendedSquads effectiveWorkspace=${effectiveWorkspace} total=${squadRows.length}`);
       if (!squadRows.length) return [];
 
       // 5. JS-side scoring
+      const ewsLower = effectiveWorkspace.toLowerCase();
       const candidates = squadRows.map(row => {
         const agents      = safeJsonParse<any[]>(row.agents, []);
         const rowTags     = safeJsonParse<string[]>(row.tags, []);
@@ -164,22 +208,22 @@ export const squadRouter = router({
         const rowDesc     = (row.description ?? "").toLowerCase();
         const rowName     = (row.name ?? "").toLowerCase();
         const methodology = (row.methodology ?? "").toLowerCase();
+        const squadWsLower = squadWs.map(w => w.toLowerCase());
 
         let score = 0;
 
-        // ── Workspace direct match — strongest differentiator ────────────────
-        // Squad's workspace column stores the intended workspace(s) it was built for.
-        // An exact match gives a large bonus; no match at all applies a penalty.
-        const wsLower = input.workspace.toLowerCase();
-        const squadWsLower = squadWs.map(w => w.toLowerCase());
-        if (squadWsLower.some(w => w === wsLower || w.includes(wsLower) || wsLower.includes(w))) {
-          score += 12;  // direct workspace match — very strong signal
+        // ── Workspace match — dominant signal ────────────────────────────────
+        const wsMatch = squadWsLower.some(w =>
+          w === ewsLower || w.includes(ewsLower) || ewsLower.includes(w)
+        );
+        if (wsMatch) {
+          score += 20;  // declared workspace match — overrides almost everything else
         } else if (squadWsLower.length > 0) {
-          score -= 4;   // squad has declared workspace(s) but none match → penalise
+          score -= 8;   // declared but wrong workspace — heavy penalty
         }
 
-        // Workspace tag match — secondary relevance
-        for (const tag of tags) {
+        // ── Workspace tag match — secondary ──────────────────────────────────
+        for (const tag of effectiveTags) {
           const tl = tag.toLowerCase();
           if (rowTags.some((t: string) => t && t.toLowerCase().includes(tl))) score += 3;
           if (rowName.includes(tl)) score += 1;
@@ -191,11 +235,11 @@ export const squadRouter = router({
           if (rowTags.some((t: string) => t && t.toLowerCase().includes(brandIndustry!.toLowerCase()))) score += 2;
         }
 
-        // Mission keyword matching — stronger weight to differentiate within workspace
+        // Mission keyword matching
         for (const word of missionKeywords) {
           const wl = word.toLowerCase();
-          if (rowName.includes(wl)) score += 4;           // name match is strongest signal
-          if (rowDesc.includes(wl)) score += 2;           // description match
+          if (rowName.includes(wl)) score += 4;
+          if (rowDesc.includes(wl)) score += 2;
           if (methodology.includes(wl)) score += 1;
           if (useCases.some((uc: string) => uc && uc.toLowerCase().includes(wl))) score += 3;
           if (rowTags.some((t: string) => t && t.toLowerCase().includes(wl))) score += 2;
