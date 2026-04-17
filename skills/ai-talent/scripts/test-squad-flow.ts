@@ -189,6 +189,16 @@ async function sendMessage(
         Accept: "text/event-stream",
       },
     }, (res) => {
+      // Debug: log status and first chunk
+      if (res.statusCode !== 200) {
+        let errData = "";
+        res.on("data", (c: Buffer) => (errData += c.toString()));
+        res.on("end", () => {
+          console.error(`   [chat] HTTP ${res.statusCode}: ${errData.slice(0, 300)}`);
+          resolve({ agentName: "", agentTitle: "", step: -1, totalSteps: 0, content: "", relayBeforeDelta: false, timeMs: Date.now() - startMs, error: `HTTP ${res.statusCode}` });
+        });
+        return;
+      }
       let buf = "";
       let agentName = "";
       let agentTitle = "";
@@ -198,9 +208,12 @@ async function sendMessage(
       let relaySeenBeforeDelta = false;
       let relaySeen = false;
       let deltaSeen = false;
+      let rawLines: string[] = [];
 
       res.on("data", (chunk: Buffer) => {
-        buf += chunk.toString();
+        const raw = chunk.toString();
+        rawLines.push(raw);
+        buf += raw;
         const lines = buf.split("\n");
         buf = lines.pop() ?? "";
 
@@ -230,6 +243,11 @@ async function sendMessage(
       });
 
       res.on("end", () => {
+        if (content.length === 0 && rawLines.length === 0) {
+          console.error(`   [chat] SSE stream ended with NO data at all`);
+        } else if (content.length === 0) {
+          console.error(`   [chat] SSE stream ended, raw data (first 500 chars): ${rawLines.join("").slice(0, 500)}`);
+        }
         resolve({
           agentName,
           agentTitle,
