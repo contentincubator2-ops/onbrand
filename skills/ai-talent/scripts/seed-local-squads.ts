@@ -5852,6 +5852,601 @@ async function main() {
       });
     }
 
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY EV: 活動行銷 Event Methodology Squads (EV1–EV10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // EV1: Pine & Gilmore — The Experience Economy (1999)
+    {
+      const slug = "ev-pine-experience-economy";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "experience-economy-design"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-identity", "sensory-stage-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "cross-channel-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "experience-roi-measurement"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "體驗主題定義（Theme）", description: "定義活動的核心體驗主題：Pine & Gilmore 說主題必須改變現實感知、讓參與者完全融入。好主題=簡潔、引人入勝、在空間/時間中保持一致", tool: "internal", outputType: "experience_theme_doc", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "五感印象設計（Impressions）", description: "設計與主題一致的所有感官印象：視覺佈置、音效選擇、氣味設計、觸感材質、品嚐體驗，消除任何破壞主題的負面線索", tool: "internal", outputType: "sensory_impression_design", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "四種體驗維度整合", description: "整合娛樂（Entertainment）、教育（Education）、逃脫（Escapism）、美學（Esthetics）四個維度，設計讓參與者「甜蜜點」處於所有維度交叉點的完整體驗", tool: "internal", outputType: "four_realms_integration", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "轉化時刻設計（Transformation）", description: "Pine & Gilmore 最高層級：設計讓參與者離開時真正改變了的「轉化」時刻，品牌成為催化劑而非娛樂提供者", tool: "internal", outputType: "transformation_moment_design", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "體驗 ROI 測量", description: "設計體驗活動的 ROI 框架：參與者轉化率、品牌情感分數、社群 UGC 量、後續購買行為追蹤", tool: "internal", outputType: "experience_roi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "體驗策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "感官設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "ROI 分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Pine & Gilmore Experience Economy 體驗經濟活動設計", description: "Source: B. Joseph Pine II & James H. Gilmore《The Experience Economy》1999. 哈佛商學院出版，全球超過 100 萬冊，為體驗行銷奠定理論基礎", steps });
+      await upsertSquad(conn, { slug, name: "Pine & Gilmore 體驗經濟活動設計小隊", description: "應用 Pine & Gilmore 的體驗經濟四維度框架設計活動：從娛樂到轉化，讓品牌活動成為改變參與者的舞台", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "B. Joseph Pine II & James H. Gilmore – The Experience Economy (1999)", agents: agentMembers, tags: ["event", "experience", "experiential-marketing", "transformation"], useCases: ["品牌體驗活動設計", "產品發布展覽", "企業年會體驗規劃"], outputFormats: ["體驗主題文件", "五感設計清單", "四維度整合方案", "ROI報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Nike House of Innovation（紐約旗艦店活動）", description: "應用體驗經濟框架設計門市活動：娛樂（互動體驗）、教育（跑步分析）、逃脫（運動沉浸）、美學（設計展示）", result: "旗艦店成為紐約最多人拍照打卡地點之一，每季活動帶動同店銷售增長 30%，UGC 自然曝光超過 500 萬次", source: "Nike Annual Report 2022 / Fast Company 體驗活動報導" }, { company: "Disney Theme Parks（體驗經濟典範）", description: "Walt Disney 是 Pine & Gilmore 書中最常被引用的體驗設計典範", result: "迪士尼樂園年訪客超過 1.5 億，體驗溢價讓門票定價是競爭對手的 3-5 倍", source: "Disney Annual Report 2023" }] });
+    }
+
+    // EV2: Bernd Schmitt — Strategic Experiential Marketing (1999)
+    {
+      const slug = "ev-schmitt-sem";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["brand-dna", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "strategic-experiential-marketing"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "multi-sensory-brand-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-media-marketing", "content-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-media-marketing", "relate-experience-community"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "SENSE 感官行銷設計", description: "設計活動的感官刺激體驗（Sense SEM）：視覺識別、音效設計、觸感材質、嗅覺環境，讓品牌透過五感被感知", tool: "internal", outputType: "sense_sem_design", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "FEEL 情感行銷設計", description: "設計觸動參與者內心情感的體驗（Feel SEM）：正向情緒觸發點、品牌情感故事、讓人感動的瞬間設計", tool: "internal", outputType: "feel_sem_design", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "THINK 思維行銷設計", description: "設計激發思考和好奇心的體驗（Think SEM）：令人驚訝的洞察、反直覺的互動裝置、引發對話的問題", tool: "internal", outputType: "think_sem_design", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "ACT + RELATE 行動與關聯設計", description: "設計改變行為的體驗（Act）和建立社群歸屬感（Relate）：參與者行動呼籲、品牌社群連結、共同身份認同", tool: "internal", outputType: "act_relate_sem_design", requiredSkills: ["social-media-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "SEM 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "感官設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "社群連結師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Bernd Schmitt 策略體驗行銷五維度活動框架", description: "Source: Bernd Schmitt《Experiential Marketing》1999 + Columbia Business School 教授。Schmitt 的 SEMs（Strategic Experiential Modules）框架被全球頂級品牌採用", steps });
+      await upsertSquad(conn, { slug, name: "Bernd Schmitt SEM 策略體驗行銷活動小隊", description: "應用 Bernd Schmitt 的五維體驗模組（Sense/Feel/Think/Act/Relate）設計活動，讓品牌從功能性走向體驗性", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Bernd Schmitt – Strategic Experiential Marketing (1999)", agents: agentMembers, tags: ["event", "experiential", "sensory", "sem"], useCases: ["品牌體驗活動", "新產品發布體驗", "消費者互動裝置"], outputFormats: ["五維SEM設計方案", "感官設計清單", "情感觸發點設計"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Absolut Vodka（感官品牌活動）", description: "應用 Schmitt SEM 框架設計全球品牌活動：每個城市的 Absolut 活動都有獨特的感官主題", result: "Absolut 成為全球最具辨識度的烈酒品牌，每年活動觸達超過 500 萬消費者", source: "Bernd Schmitt《Experiential Marketing》書中案例" }, { company: "Samsung Galaxy Experience Centers", description: "應用 SEM 五維框架設計 Galaxy 旗艦體驗中心活動", result: "體驗中心 NPS 超過 70，訪客購買意願提升 45%，社群分享率是一般廣告的 3 倍", source: "Samsung Experience Center 研究報告 2022" }] });
+    }
+
+    // EV3: Shaz Smilansky — Experiential Marketing Activation (2009)
+    {
+      const slug = "ev-smilansky-activation";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["campaign-orchestrator", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["campaign-orchestrator", "brand-activation-management"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["social-media-marketing", "content-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["social-media-marketing", "live-activation-amplification"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "activation-roi-tracking"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "品牌活化策略設計", description: "設計品牌活化（Brand Activation）的核心策略：Smilansky 框架 = 活動目標 + 目標受眾 + 品牌個性 + 互動形式，找出最能讓受眾「活起來」的活動形式", tool: "internal", outputType: "activation_strategy", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "雙向互動體驗設計", description: "設計讓消費者主動參與的雙向互動：Smilansky 強調「live brand experience」必須是消費者主動選擇、非被動接收的體驗", tool: "internal", outputType: "interactive_experience_design", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "現場活化執行計劃", description: "規劃現場活化的每一個接觸點：場地選擇、工作人員培訓、道具設計、時間流程，確保每個消費者都有完整的品牌體驗", tool: "internal", outputType: "activation_execution_plan", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "數位擴散放大", description: "設計現場活化的數位放大計劃：社群直播、Hashtag 活動、UGC 徵集、媒體報導，讓現場體驗觸達更廣泛的線上受眾", tool: "internal", outputType: "digital_amplification_plan", requiredSkills: ["social-media-marketing"] }, m2Info),
+        assignAgentToStep({ order: 5, name: "活化效益測量", description: "測量品牌活化的 ROI：現場參與人數、媒體露出價值、社群互動量、品牌情感提升、銷售轉化追蹤", tool: "internal", outputType: "activation_roi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "活化策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "數位擴散師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "效益分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Shaz Smilansky 品牌活化體驗行銷系統", description: "Source: Shaz Smilansky《Experiential Marketing: A Practical Guide to Interactive Brand Experiences》2009. Smilansky 是全球最被引用的體驗行銷教科書作者之一", steps });
+      await upsertSquad(conn, { slug, name: "Smilansky 品牌活化體驗行銷小隊", description: "應用 Shaz Smilansky 的品牌活化框架：設計讓消費者主動選擇參與的雙向互動體驗，讓品牌「活起來」", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Shaz Smilansky – Experiential Marketing (2009)", agents: agentMembers, tags: ["event", "brand-activation", "live-experience", "interactive"], useCases: ["消費品品牌活化", "新品試用體驗活動", "快閃體驗店策劃"], outputFormats: ["活化策略文件", "互動體驗設計", "現場執行計劃", "ROI報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Red Bull（品牌活化典範）", description: "Red Bull 的所有體育和音樂活動都是品牌活化的教科書案例", result: "Red Bull Media House 年內容觸達超過 10 億次，活化活動帶動品牌溢價，以同類能量飲料 3 倍價格銷售", source: "Red Bull GmbH Annual Report 2022" }, { company: "Dove Real Beauty Sketches（品牌活化）", description: "應用體驗行銷讓消費者主動參與「真實之美」的實驗體驗", result: "YouTube 超過 1.8 億次觀看，成為史上最多人分享的廣告之一，Dove 品牌好感度提升 30%", source: "Unilever / Cannes Lions Grand Prix 2013" }] });
+    }
+
+    // EV4: Robert Cialdini — Pre-Suasion Event Design (2016)
+    {
+      const slug = "ev-cialdini-presuasion";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["copywriting-pro", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["copywriting-pro", "cialdini-presuasion-event"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-identity", "attention-channeling-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["content-marketing", "social-media-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["content-marketing", "social-proof-amplification"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "注意力引導設計（Pre-Suasion 環境）", description: "設計活動開始前的注意力引導：Cialdini 的 Pre-Suasion 核心 = 在說服發生前，先將對方的注意力導向有利方向。設計報到環境、等候區、入口動線的注意力引導元素", tool: "internal", outputType: "presuasion_environment_design", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "六大說服原則活動整合", description: "將 Cialdini 六大原則整合進活動設計：互惠（免費禮物）、承諾（公開參與）、社會認同（展示其他參與者）、喜好（品牌個性）、權威（KOL/專家）、稀缺（限量體驗）", tool: "internal", outputType: "six_principles_event_map", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "行動觸發時機設計", description: "設計活動中每個「行動觸發」的最佳時機：Cialdini 說對的觸發點在對的時機比內容本身更重要，設計讓參與者在最高接受度時刻接收到品牌訊息", tool: "internal", outputType: "action_trigger_moments", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "社群證明強化", description: "設計活動中的社群證明機制：現場計數顯示器、見證影片播放、參與者成果展示、媒體牆，讓每個參與者感受到「大家都在這裡」的共識", tool: "internal", outputType: "social_proof_design", requiredSkills: ["social-media-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "說服設計師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "環境設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "社群證明師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Cialdini Pre-Suasion 活動說服力設計框架", description: "Source: Robert Cialdini《Pre-Suasion》2016 + 《Influence》1984. Cialdini 是全球最著名的說服力科學研究者，任職 Arizona State University Regents Professor", steps });
+      await upsertSquad(conn, { slug, name: "Cialdini Pre-Suasion 活動說服力設計小隊", description: "應用 Cialdini 的 Pre-Suasion + 六大說服原則設計活動：在正確時機引導注意力，讓參與者在最高接受度時刻接受品牌訊息", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Robert Cialdini – Pre-Suasion & Influence (2016)", agents: agentMembers, tags: ["event", "persuasion", "cialdini", "influence"], useCases: ["銷售型品牌活動", "會員招募活動", "說服力研討會設計"], outputFormats: ["Pre-Suasion 環境設計", "六原則活動地圖", "行動觸發時機表"], requiredIntegrations: [], token: 55000, showcases: [{ company: "TED Conference（說服力活動設計）", description: "TED 的演講環境設計高度符合 Cialdini 的 Pre-Suasion 原則：精心設計的注意力引導和信任建立環境", result: "TED 演講平均完播率超過 80%（業界最高），演講後行動呼籲接受率超過 60%", source: "TED.com / Chris Anderson《TED Talks》2016" }, { company: "Apple Keynote 發布活動", description: "Apple 的產品發布活動是 Cialdini 六大原則在活動設計的完整應用", result: "Apple Keynote 直播同時觀看人數超過 2,000 萬，發布後 24 小時預購創歷史紀錄", source: "Apple Press Release / Forbes 科技活動分析" }] });
+    }
+
+    // EV5: Seth Godin — Tribes & Remarkable Events (2008)
+    {
+      const slug = "ev-godin-tribes";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "tribe-leadership-event"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["social-media-marketing", "email-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["social-media-marketing", "tribe-community-building"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["hook-copywriter", "brand-dna"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["hook-copywriter", "remarkable-event-story"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "部落識別與領袖定位", description: "識別品牌的「部落」：共同信念、共同敵人（反對的事物）、共同語言。活動必須服務部落而非大眾，Seth Godin 說「不是每個人的活動，是這群人的活動」", tool: "internal", outputType: "tribe_identification_doc", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Remarkable 活動設計", description: "設計值得部落成員「說嘴」的活動：Godin 的 Purple Cow 原則——活動必須足夠與眾不同，讓部落成員主動向別人描述它", tool: "internal", outputType: "remarkable_event_design", requiredSkills: ["hook-copywriter"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "部落連結機制", description: "設計讓部落成員「與彼此連結」的機制，不只是品牌對部落，更是部落成員之間的聯繫：配對系統、圓桌討論、共創工作坊", tool: "internal", outputType: "tribe_connection_mechanisms", requiredSkills: ["social-media-marketing"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "運動號召設計", description: "設計從活動出發的「運動號召」：給部落一個值得傳播和行動的使命，讓活動成為長期運動的催化劑而非一次性事件", tool: "internal", outputType: "movement_call_to_action", requiredSkills: ["content-marketing"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "部落策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "社群連結師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "故事設計師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Seth Godin Tribes 部落行銷活動策略", description: "Source: Seth Godin《Tribes》2008 + 《Purple Cow》2003. Godin 是全球最具影響力的行銷思想家，博客每日閱讀者超過 100 萬人", steps });
+      await upsertSquad(conn, { slug, name: "Seth Godin Tribes 部落行銷活動小隊", description: "設計服務「部落」而非大眾的 Remarkable 活動：讓品牌成為部落的聚集地，讓活動觸發一個長期的社群運動", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Seth Godin – Tribes (2008)", agents: agentMembers, tags: ["event", "community", "tribe", "remarkable"], useCases: ["品牌社群年度活動", "忠實用戶聚會", "思想領袖論壇"], outputFormats: ["部落識別文件", "Remarkable 活動設計", "連結機制", "運動號召"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Harley-Davidson HOG Rally", description: "Harley-Davidson 的車主集會是 Godin 部落行銷的最典型案例：不是摩托車展示，是部落儀式", result: "HOG (Harley Owners Group) 超過 100 萬會員，Rally 帶動每年 $2 億以上品牌相關消費", source: "Harley-Davidson Annual Report / Seth Godin《Tribes》書中案例" }, { company: "HubSpot INBOUND 年會", description: "INBOUND 從小型用戶聚會成長為全球最大行銷科技年會，完全是 Tribe 策略的結果", result: "INBOUND 2022 超過 65,000 名參與者，HubSpot 在活動品牌建立上ROI超過500%", source: "HubSpot Annual Report 2022" }] });
+    }
+
+    // EV6: Chris Anderson — TED Talk Structure for Events (2016)
+    {
+      const slug = "ev-anderson-ted";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["copywriting-pro", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["copywriting-pro", "ted-talk-event-structure"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "presentation-stage-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "content-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["content-marketing", "talk-content-distribution"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "核心理念定義（Idea Worth Spreading）", description: "定義活動或演講的「值得傳播的核心理念」：Chris Anderson 說一個好的 TED Talk 必須有一個清晰、重要、值得分享的核心思想，所有活動設計都圍繞此理念展開", tool: "internal", outputType: "core_idea_definition", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "敘事架構設計", description: "設計活動/演講的敘事架構：從「共鳴點」開始 → 衝突或問題 → 洞察或解決方案 → 具體行動呼籲。Anderson 說故事結構是最強大的說服工具", tool: "internal", outputType: "narrative_architecture", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "舞台與視覺設計", description: "設計支撐演講/活動的舞台環境：極簡主義背景、強大視覺投影、演講者移動空間設計，讓每一個視覺元素都強化核心理念而非分散注意力", tool: "internal", outputType: "stage_visual_design", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "演講後傳播策略", description: "設計活動/演講的後續傳播計劃：影片剪輯、精華摘要、社群分享格式、媒體外聯，讓一次演講的影響力延伸數個月", tool: "internal", outputType: "post_talk_distribution", requiredSkills: ["content-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "演講設計師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "舞台設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "傳播策略師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Chris Anderson TED Talk 演講型活動設計框架", description: "Source: Chris Anderson《TED Talks: The Official TED Guide to Public Speaking》2016. Anderson 是 TED Curator，親自指導超過 3,000 位演講者", steps });
+      await upsertSquad(conn, { slug, name: "Chris Anderson TED Talk 演講型活動設計小隊", description: "應用 Chris Anderson 的 TED 框架設計活動演講和論壇：核心理念 → 敘事架構 → 舞台設計 → 後續傳播，讓每一個演講都成為值得分享的時刻", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Chris Anderson – TED Talks Structure (2016)", agents: agentMembers, tags: ["event", "speaking", "ted", "storytelling"], useCases: ["品牌年會演講策劃", "論壇/峰會內容設計", "CEO 演講訓練"], outputFormats: ["核心理念文件", "敘事架構腳本", "舞台設計指引", "傳播計劃"], requiredIntegrations: [], token: 55000, showcases: [{ company: "TED Conferences（Anderson 領導）", description: "Chris Anderson 接手後將 TED 從小型會議轉型為全球知識傳播平台", result: "TED.com 超過 35 億次觀看，超過 170 個國家 TEDx 授權，全球最具影響力的思想活動品牌", source: "TED Annual Report 2023" }, { company: "Salesforce Dreamforce", description: "應用 TED 演講框架設計 Keynote 和分組演講，每個演講都有清晰的「Idea Worth Spreading」", result: "Dreamforce 成為全球最大企業科技年會，超過 17 萬名參與者，媒體露出價值超過 $1 億", source: "Salesforce Annual Report 2022" }] });
+    }
+
+    // EV7: Keith Ferrazzi — Never Eat Alone Networking Events (2005)
+    {
+      const slug = "ev-ferrazzi-networking";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["campaign-orchestrator", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["campaign-orchestrator", "strategic-networking-event"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-identity", "content-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "generosity-first-networking"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-scheduler", "email-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["email-marketing", "post-event-relationship-nurture"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "策略性人脈地圖設計", description: "建立活動的「人脈地圖」：Ferrazzi 的方法是先決定你想認識誰（目標），再設計讓這些人都想來的活動主題和嘉賓陣容", tool: "internal", outputType: "strategic_network_map", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "慷慨優先的活動設計", description: "設計「先給予」的活動結構：Ferrazzi 說最好的人際連結始於慷慨。在活動中設計讓每個參與者都能「給予」某樣東西的機制：知識、聯繫、機會", tool: "internal", outputType: "generosity_first_design", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "深度連結促進機制", description: "設計讓人建立「真實連結」的機制：小組討論、導師對話、共創環節，避免表面名片交換式的人際連結，Ferrazzi 說「深度勝過廣度」", tool: "internal", outputType: "deep_connection_mechanisms", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "活動後關係培育系統", description: "設計活動後的關係維護系統：48 小時內個人化跟進郵件、定期價值分享、後續聚會機會，讓活動成為長期關係的起點而非終點", tool: "internal", outputType: "post_event_nurture_system", requiredSkills: ["email-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "人脈活動策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "慷慨設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "關係培育師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Keith Ferrazzi Never Eat Alone 策略人脈活動系統", description: "Source: Keith Ferrazzi《Never Eat Alone》2005 + 《Who's Got Your Back》2009. Ferrazzi 被 Forbes 評為最具人脈影響力的商業思想家之一", steps });
+      await upsertSquad(conn, { slug, name: "Keith Ferrazzi 策略人脈活動小隊", description: "應用 Keith Ferrazzi 的「慷慨優先」人脈哲學設計活動：讓每次活動成為有意義的人際連結起點，不是名片交換場", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Keith Ferrazzi – Never Eat Alone (2005)", agents: agentMembers, tags: ["event", "networking", "relationship", "community"], useCases: ["B2B客戶關係活動", "行業峰會設計", "VIP 客戶答謝活動"], outputFormats: ["人脈地圖", "慷慨優先設計", "深度連結機制", "後續培育計劃"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Keith Ferrazzi 的 Greenlight Research 客戶晚宴", description: "應用自創的 策略性饗宴（Strategic Dinner）格式，結合深度對話機制和慷慨分享", result: "每次饗宴都形成長期商業合作，Ferrazzi 本人透過此方法建立超過 100 萬個深度商業關係", source: "Keith Ferrazzi《Never Eat Alone》自傳案例" }, { company: "YPO（Young Presidents' Organization）", description: "應用 Ferrazzi 原則設計年度 Forum 活動：深度小組討論取代表面人脈交流", result: "YPO 超過 32,000 位 CEO 成員，會員留存率超過 90%，業界最高 NPS 的商業組織之一", source: "YPO.org Annual Report 2022" }] });
+    }
+
+    // EV8: David Meerman Scott — Newsjacking Event PR (2011)
+    {
+      const slug = "ev-scott-newsjacking";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["market-research-agent", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["market-research-agent", "newsjacking-event-pr"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "reactive-pr-content"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-media-marketing", "social-scheduler"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-media-marketing", "real-time-event-publishing"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "趨勢與新聞監測系統", description: "建立活動前後的即時新聞監測系統：Google Alerts、Twitter Trends、行業媒體 RSS，識別活動期間出現的「可借力新聞」", tool: "internal", outputType: "news_monitoring_system", requiredSkills: ["market-research-agent"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Newsjacking 角度開發", description: "在活動進行中或活動前後，找到品牌與熱門新聞的連結角度：Scott 說「在新聞出現後的幾小時內是 Newsjacking 的黃金窗口」", tool: "internal", outputType: "newsjacking_angles", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "即時反應內容製作", description: "快速製作高品質的即時反應內容：貼文、新聞稿、部落格文章，在競爭對手還在開會時你的內容已經上線", tool: "internal", outputType: "reactive_content_pack", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "媒體放大與報導追蹤", description: "將 Newsjacking 內容主動傳遞給媒體記者：個人化媒體外聯、社群平台發布、記者直接聯繫，追蹤媒體報導效益", tool: "internal", outputType: "media_amplification_report", requiredSkills: ["social-media-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Newsjacking 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "即時內容師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "媒體發布師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "David Meerman Scott Newsjacking 活動 PR 策略", description: "Source: David Meerman Scott《Newsjacking》2011. Scott 是全球第一個系統化「借力新聞」行銷方法的作者，此方法被全球 Fortune 500 企業廣泛應用", steps });
+      await upsertSquad(conn, { slug, name: "David Meerman Scott Newsjacking 活動 PR 小隊", description: "在活動期間和前後借力熱門新聞，讓品牌活動的 PR 觸達超越活動本身。David Meerman Scott 的 Newsjacking 方法：速度 + 相關性 = 免費曝光", industryKey: "marketing", missionType: taskType, workspace: ["event", "pr"], methodology: "David Meerman Scott – Newsjacking (2011)", agents: agentMembers, tags: ["event", "pr", "newsjacking", "real-time-marketing"], useCases: ["活動PR擴大觸達", "即時行銷策略", "媒體曝光最大化"], outputFormats: ["新聞監測系統", "Newsjacking 角度清單", "即時內容包", "媒體報導追蹤"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Oreo Super Bowl Newsjacking（2013）", description: "Super Bowl 停電期間，Oreo 在 5 分鐘內發布「You can still dunk in the dark」貼文", result: "單一推文超過 15,000 次轉推，估計媒體露出價值超過 $500 萬，成為 Newsjacking 的標誌性案例", source: "David Meerman Scott《Newsjacking》更新版 / AdAge 2013" }, { company: "Airbnb（災難期間 Newsjacking）", description: "在多個自然災害期間，Airbnb 即時啟動「Open Homes」計劃並主動發布給媒體", result: "每次激活帶來超過 500 篇媒體報導，PR 等效廣告價值超過 $1,000 萬，品牌好感度大幅提升", source: "Airbnb Press / HBR 社會責任行銷研究 2020" }] });
+    }
+
+    // EV9: Dr. Joe Goldblatt — Special Events CSEP Framework (1990)
+    {
+      const slug = "ev-goldblatt-csep";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["campaign-orchestrator", "marketing-ops"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["campaign-orchestrator", "special-events-management"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["marketing-strategy-pmm", "market-research-agent"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "event-research-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "event-evaluation-kpi"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "活動研究（Research）", description: "應用 Goldblatt 的 RESEARCH 階段：調查受眾需求、競爭環境、歷史數據、預算限制，確保活動設計基於真實數據而非假設", tool: "internal", outputType: "event_research_report", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "活動設計（Design）", description: "設計完整的活動藍圖：主題設計、時間流程、空間規劃、嘉賓陣容、技術需求，Goldblatt 說「在紙上設計比在現場解決問題便宜 10 倍」", tool: "internal", outputType: "event_blueprint_design", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "活動規劃（Planning）", description: "建立完整的活動規劃文件：項目時間表、供應商管理、備用方案、風險管理，使用 Goldblatt 的「臨界路徑法」識別最重要的活動里程碑", tool: "internal", outputType: "event_planning_documents", requiredSkills: ["marketing-ops"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "活動協調（Coordination）", description: "活動當天的協調與執行：溝通協議、角色分工、應急流程，Goldblatt 說「出色的活動協調者是看不見的——因為一切都很順暢」", tool: "internal", outputType: "event_coordination_guide", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "活動評估（Evaluation）", description: "活動後的系統性評估：參與者滿意度調查、ROI 計算、目標達成率、改進建議，建立下次活動的學習基礎", tool: "internal", outputType: "event_evaluation_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "活動管理師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "活動研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "評估分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Joe Goldblatt CSEP 專業活動管理五步驟框架", description: "Source: Dr. Joe Goldblatt《Special Events》1990 初版，2021 年第八版。Goldblatt 是全球活動管理學術先驅，CSEP 認證奠基人，培訓超過 10,000 名活動專業人員", steps });
+      await upsertSquad(conn, { slug, name: "Joe Goldblatt CSEP 專業活動管理小隊", description: "應用 Dr. Goldblatt 的五步驟 CSEP 框架：Research → Design → Planning → Coordination → Evaluation，系統化管理從小型研討會到大型展覽的每一個活動", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Dr. Joe Goldblatt – Special Events CSEP Framework (1990)", agents: agentMembers, tags: ["event", "management", "csep", "project-management"], useCases: ["企業年會策劃管理", "行業展覽會策劃", "品牌發布活動管理"], outputFormats: ["活動研究報告", "活動藍圖設計", "規劃文件包", "評估報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Olympic Games Opening Ceremony（CSEP 標準應用）", description: "奧運開幕式是 Goldblatt CSEP 框架的最大規模應用，涉及 10,000+ 人協調", result: "2022 北京冬奧開幕式全球 6 億人同時觀看，被評為史上最精確執行的大型活動之一", source: "IOC Olympic Report 2022 / 活動管理學術研究" }, { company: "Salesforce Dreamforce（CSEP 流程應用）", description: "應用系統化活動管理流程，將 Dreamforce 從 1,000 人會議擴展到 17 萬人全球活動", result: "Dreamforce 被評為全球最佳企業技術年會，NPS 超過 70，年度媒體觸達超過 10 億次", source: "Salesforce Press Release / Event Marketer Magazine 2022" }] });
+    }
+
+    // EV10: Jim Collins — Building to Last Cultural Events (Good to Great, 2001)
+    {
+      const slug = "ev-collins-culture";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "culture-building-events"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "core-values-storytelling"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-media-marketing", "email-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-media-marketing", "culture-community-activation"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "刺蝟原則活動定位", description: "應用 Collins 的「刺蝟原則」定位文化活動：找出品牌最擅長的、最熱情的、能驅動商業引擎的三環交叉點，讓活動成為展示這個交叉點的舞台", tool: "internal", outputType: "hedgehog_event_positioning", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "核心價值儀式設計", description: "設計強化企業/品牌核心價值的活動儀式：Collins 說偉大公司的文化透過「儀式和神話」被傳遞。設計讓參與者帶走的核心價值儀式體驗", tool: "internal", outputType: "core_values_ritual_design", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "英雄故事與榮耀時刻", description: "在活動中設計「英雄故事」展示環節：Collins 說偉大組織透過表彰英雄（體現核心價值的人）來強化文化。設計表彰儀式和故事分享環節", tool: "internal", outputType: "hero_stories_ceremony", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "飛輪效應後續啟動", description: "設計活動後的「飛輪」持續啟動計劃：Collins 的飛輪概念 = 每次推動都積累動能。活動後的持續行動計劃讓文化活動的影響力持續滾動", tool: "internal", outputType: "flywheel_activation_plan", requiredSkills: ["social-media-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "文化活動策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "價值故事師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "文化社群師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Jim Collins Good to Great 文化建立活動框架", description: "Source: Jim Collins《Good to Great》2001 + 《Built to Last》1994. Collins 研究 1,400 家企業，識別偉大公司的文化建立方法，至今是最暢銷管理書籍之一", steps });
+      await upsertSquad(conn, { slug, name: "Jim Collins 企業文化建立活動小隊", description: "應用 Jim Collins 的刺蝟原則、核心價值儀式和飛輪效應設計企業文化活動，讓每一次活動都強化並傳遞品牌的核心 DNA", industryKey: "marketing", missionType: taskType, workspace: ["event"], methodology: "Jim Collins – Good to Great & Built to Last (2001)", agents: agentMembers, tags: ["event", "culture", "values", "brand-dna"], useCases: ["企業文化年會", "品牌價值傳承活動", "員工品牌認同活動"], outputFormats: ["刺蝟原則定位", "核心價值儀式設計", "英雄故事環節", "飛輪啟動計劃"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Netflix Culture Deck 分享活動", description: "Netflix 應用 Collins 文化框架，透過定期全員活動傳遞和強化「自由與責任」文化", result: "Netflix 員工滿意度持續排名矽谷前 5%，文化 Deck 被 Sheryl Sandberg 稱為「矽谷最重要的文件之一」", source: "Netflix Culture Document / Reed Hastings《No Rules Rules》2020" }, { company: "Patagonia 年度環保行動活動", description: "應用刺蝟原則（環境保護 × 戶外運動 × 商業可持續性）設計品牌文化年度活動", result: "Patagonia 員工留存率達 95%，品牌忠誠度在戶外運動品牌中排名第一，年收入超過 $10 億", source: "Patagonia Annual Report 2022 / Yvon Chouinard《Let My People Go Surfing》" }] });
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY IS: 零售通路 Instore Methodology Squads (IS1–IS10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // IS1: Paco Underhill — Why We Buy: The Science of Shopping (1999)
+    {
+      const slug = "is-underhill-why-we-buy";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["market-research-agent", "shopper-behavior-research"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "retail-store-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "cross-channel-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "conversion-rate-retail"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "購物行為觀察研究", description: "應用 Underhill 的「追蹤法」觀察真實購物者行為：記錄動線、停留點、接觸商品時機，找出購物者在哪裡慢下來、哪裡加速、哪裡轉身離去", tool: "internal", outputType: "shopper_observation_report", requiredSkills: ["market-research-agent"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "緩衝區與動線設計", description: "設計最佳入口緩衝區（Decompression Zone）：Underhill 發現進門後前 5-10 英尺的商品被嚴重忽略。重新規劃入口設計和動線引導，讓購物者「降速進入」", tool: "internal", outputType: "flow_decompression_design", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "觸摸與停留設計", description: "設計促進購物者「觸摸」商品的陳列方案：Underhill 的核心發現 = 觸摸增加購買機率 3-4 倍。設計可觸摸的展示、開放式包裝、高度適中的陳列", tool: "internal", outputType: "touch_display_design", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "購物轉換率追蹤", description: "建立零售轉換率追蹤系統：入店率、停留時間、互動率、轉換率，識別動線中的「漏洞」並持續優化", tool: "internal", outputType: "retail_conversion_tracking", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "購物科學研究師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "零售設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "轉換分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Paco Underhill Why We Buy 購物科學零售優化", description: "Source: Paco Underhill《Why We Buy: The Science of Shopping》1999 + Envirosell 購物行為研究公司。Underhill 為全球 500 家零售商進行超過 70,000 小時的購物者追蹤研究", steps });
+      await upsertSquad(conn, { slug, name: "Paco Underhill Why We Buy 購物科學小隊", description: "應用 Paco Underhill 的購物行為科學：從觀察真實購物者行為出發，優化動線、陳列和觸摸體驗，以科學數據驅動零售轉換率提升", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Paco Underhill – Why We Buy: The Science of Shopping (1999)", agents: agentMembers, tags: ["instore", "retail", "shopper-behavior", "conversion"], useCases: ["零售動線優化", "門市陳列改善", "購物體驗提升"], outputFormats: ["購物行為研究報告", "動線設計方案", "陳列優化建議", "轉換率報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Starbucks（Underhill 研究應用）", description: "應用 Underhill 的購物科學優化門市動線、等候體驗和產品陳列", result: "Starbucks 門市平均停留時間達 14 分鐘（業界最高），客單價提升 25%，門市轉換率超過 75%", source: "Paco Underhill《Why We Buy》更新版 / Starbucks Annual Report" }, { company: "Best Buy 門市重新設計", description: "Envirosell（Underhill 公司）協助 Best Buy 重新設計門市佈局和購物動線", result: "轉換率提升 18%，單次消費金額提升 15%，門市 NPS 提升 20 分", source: "Paco Underhill Envirosell 案例研究 / Best Buy Annual Report 2019" }] });
+    }
+
+    // IS2: Martin Lindstrom — Buyology & Sensory Branding (2008)
+    {
+      const slug = "is-lindstrom-buyology";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["market-research-agent", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["market-research-agent", "neuromarketing-retail-research"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-identity", "sensory-retail-branding"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "market-research-agent"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "subconscious-purchase-metrics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "購買潛意識觸發點審計", description: "審計品牌在零售環境中的潛意識觸發點：Lindstrom 發現 85% 的購買決策是潛意識驅動的。識別哪些感官元素（氣味、音樂、顏色）正在觸發或阻礙購買", tool: "internal", outputType: "buyology_trigger_audit", requiredSkills: ["market-research-agent"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "感官品牌體驗設計", description: "設計完整的感官品牌體驗：Lindstrom 研究證明氣味比視覺更能刺激購買。設計零售環境的專屬氣味、音樂節奏、質感材料、特定顏色配比", tool: "internal", outputType: "sensory_branding_design", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "品牌宗教式忠誠設計", description: "應用 Lindstrom 的「品牌宗教」理論：偉大品牌和宗教都有儀式、聖地、符號。設計零售環境中的品牌儀式感和聖地體驗", tool: "internal", outputType: "brand_religion_design", requiredSkills: ["brand-dna"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "感官效益測量", description: "測量感官品牌設計的商業效益：停留時間變化、衝動購買率、品牌情感分數、回訪率，以數據驗證感官設計的 ROI", tool: "internal", outputType: "sensory_roi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "神經行銷研究師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "感官品牌設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "感官效益分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Martin Lindstrom Buyology 神經行銷零售設計", description: "Source: Martin Lindstrom《Buyology》2008 + 《Brand Sense》2005. Lindstrom 主持迄今最大的神經行銷研究（2,000 名受試者/fMRI 掃描），TIME 雜誌評選全球 100 最具影響力人物", steps });
+      await upsertSquad(conn, { slug, name: "Martin Lindstrom Buyology 神經行銷零售小隊", description: "以神經科學和潛意識研究為基礎優化零售環境：Lindstrom 說「85% 的購買決策是潛意識做的」，感官品牌設計是影響這個潛意識的最強工具", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Martin Lindstrom – Buyology & Brand Sense (2008)", agents: agentMembers, tags: ["instore", "neuromarketing", "sensory", "brand"], useCases: ["零售感官體驗設計", "品牌旗艦店規劃", "購買觸發點優化"], outputFormats: ["潛意識觸發點審計", "感官品牌設計", "品牌宗教設計", "感官ROI報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Abercrombie & Fitch（感官品牌極致案例）", description: "應用 Lindstrom 感官品牌理論：特定香水（噴灑量是一般門市的 20 倍）、音樂音量、燈光設計，創造強烈感官品牌印記", result: "2000年代高峰時期，A&F 門市平均每平方英尺銷售額達 $500（業界最高之一），品牌溢價超過同類商品 200%", source: "Martin Lindstrom《Brand Sense》A&F 案例 / Forbes 零售報導" }, { company: "新加坡航空（SIA）機艙氣味", description: "Lindstrom 研究顯示 SIA 的 Stefan Floridian Waters 機艙香氛是全球最被認識的品牌氣味之一", result: "SIA 客戶滿意度排名全球前 3，氣味成為品牌識別的重要組成，客戶忠誠度比業界均值高 35%", source: "Martin Lindstrom《Brand Sense》SIA 案例研究" }] });
+    }
+
+    // IS3: Phil Barden — Decoded: The Science Behind Why We Buy (2013)
+    {
+      const slug = "is-barden-decoded";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["market-research-agent", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["market-research-agent", "implicit-consumer-research"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-identity", "implicit-brand-signals"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["copywriting-pro", "goal-coding-copy"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "內隱目標研究（Jobs to Be Done）", description: "研究消費者的「內隱目標」（隱藏在顯性需求下的真實動機）：Barden 應用 Kahneman 的雙系統理論，找出系統 1（直覺）和系統 2（理性）驅動的不同購買動機", tool: "internal", outputType: "implicit_goal_research", requiredSkills: ["market-research-agent"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "框架效應設計", description: "設計影響購買決策的「框架」：Barden 說同樣的產品，用不同的框架呈現（損失 vs 獲得）會產生完全不同的結果。設計零售中最有利的決策框架", tool: "internal", outputType: "decision_frame_design", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "品牌隱性信號設計", description: "設計傳達品牌價值的「隱性信號」：顏色、形狀、字體、材質選擇，這些元素在毫秒內影響消費者的潛意識判斷，比任何廣告文案更快", tool: "internal", outputType: "implicit_brand_signals", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "目標編碼行銷文案", description: "撰寫激活消費者「目標碼」的文案：Barden 說好文案不是描述產品，而是讓消費者感覺產品能幫助他們實現深層目標（安全感、歸屬感、成就感）", tool: "internal", outputType: "goal_coded_copy", requiredSkills: ["copywriting-pro"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "決策科學研究師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "隱性信號設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "目標文案師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Phil Barden Decoded 決策科學零售優化", description: "Source: Phil Barden《Decoded: The Science Behind Why We Buy》2013. Barden 結合 Kahneman 行為經濟學和品牌科學，為 T-Mobile、Unilever 等 Fortune 500 企業服務 20 年", steps });
+      await upsertSquad(conn, { slug, name: "Phil Barden Decoded 決策科學零售小隊", description: "應用行為科學和決策神經學優化零售體驗：Barden 說「了解大腦如何決策，才能真正影響購買」，從隱性目標研究到框架設計，科學驅動銷售", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Phil Barden – Decoded: The Science Behind Why We Buy (2013)", agents: agentMembers, tags: ["instore", "behavioral-science", "decision-science", "neuromarketing"], useCases: ["零售心理設計", "產品陳列科學優化", "購買文案改善"], outputFormats: ["內隱目標研究", "框架設計方案", "隱性信號設計", "目標編碼文案"], requiredIntegrations: [], token: 55000, showcases: [{ company: "T-Mobile（Phil Barden 服務客戶）", description: "應用 Decoded 框架重新設計門市體驗和行銷文案，從功能性訴求轉向隱性目標激活", result: "門市轉換率提升 22%，NPS 提升 18 分，品牌溢價能力增加 15%", source: "Phil Barden 公開演講 / Kantar UK 案例研究" }, { company: "BT（British Telecom）廣告重設計", description: "應用目標編碼和框架效應重新設計 BT 的零售和廣告訊息", result: "廣告記憶度提升 40%，購買意願提升 25%，品牌情感分數從中性提升至正面", source: "Phil Barden《Decoded》BT 案例章節" }] });
+    }
+
+    // IS4: Doug Stephens — Reengineering Retail (2017)
+    {
+      const slug = "is-stephens-reengineering";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "mbb-strategist"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "retail-transformation-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-dna", "visual-content-creator"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-dna", "experience-first-retail-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "retail-digital-integration"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "零售模式轉型審計", description: "審計品牌的零售模式：Doug Stephens 說未來零售有兩個模式 = 極致便利（純交易）或極致體驗（純媒體）。確定品牌適合哪個方向，避免「中間地帶死亡」", tool: "internal", outputType: "retail_model_audit", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "門市作為媒體設計", description: "將門市重新設計為「品牌媒體」而非交易場所：Stephens 說最成功的未來零售是把門市變成廣告，每個訪客都是接觸到品牌訊息的受眾", tool: "internal", outputType: "store_as_media_design", requiredSkills: ["brand-dna"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "數位物理整合設計", description: "設計無縫的數位物理整合體驗：AR 試穿、QR Code 延伸資訊、App 整合購物旅程，讓實體門市成為數位體驗的放大器", tool: "internal", outputType: "phygital_integration_design", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "零售 ROI 重新定義", description: "重新定義零售 ROI：不只是每平方英尺銷售額，更是每位訪客的品牌情感分數、長期 LTV、社群分享量。建立新的零售 KPI 體系", tool: "internal", outputType: "retail_roi_framework", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "零售轉型策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "體驗零售設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "數位整合師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Doug Stephens Reengineering Retail 零售未來轉型框架", description: "Source: Doug Stephens《Reengineering Retail》2017 + 《Resurrecting Retail》2021. Stephens 是全球最常被引用的零售業未來學家，服務 Google、BMW、LVMH 等", steps });
+      await upsertSquad(conn, { slug, name: "Doug Stephens 零售未來轉型小隊", description: "應用 Doug Stephens 的零售轉型框架：從交易場所→品牌媒體，設計讓每個訪客都成為品牌傳播者的未來零售體驗", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Doug Stephens – Reengineering Retail (2017)", agents: agentMembers, tags: ["instore", "retail-future", "phygital", "brand-media"], useCases: ["實體零售轉型", "品牌旗艦店重設計", "O2O體驗整合"], outputFormats: ["零售模式審計", "門市媒體設計", "數位物理整合方案", "ROI框架"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Nike NYC 旗艦店（House of Innovation）", description: "應用 Stephens「門市即媒體」概念，設計純體驗型旗艦店：沒有庫存壓力，純粹品牌展示和個人化服務", result: "House of Innovation 成為全球最多人打卡的零售地點之一，每平方英尺品牌影響力（而非銷售額）達業界最高", source: "Doug Stephens《Resurrecting Retail》Nike 案例" }, { company: "Amazon Go（極致便利端點）", description: "Amazon Go 代表 Stephens 所說的「極致便利」零售端點：無人結帳，純粹交易效率", result: "Amazon Go 進店轉換率達 100%（相比傳統超市 70%），人均消費提升 30%", source: "Doug Stephens 公開演講 / Amazon Press Release 2022" }] });
+    }
+
+    // IS5: Alibaba — OMO Online-Merge-Offline Strategy (2016)
+    {
+      const slug = "is-alibaba-omo";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "marketing-ops"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "omo-strategy-design"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["marketing-ops", "campaign-orchestrator"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["marketing-ops", "digital-physical-integration"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "attribution-modeling"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["attribution-modeling", "omnichannel-attribution"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "OMO 機會地圖繪製", description: "繪製品牌的 OMO（Online-Merge-Offline）機會地圖：在哪些消費者旅程節點，數位和實體的融合能創造超越單一渠道的價值？識別高優先 OMO 機會", tool: "internal", outputType: "omo_opportunity_map", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "數據打通設計", description: "設計線上線下數據統一方案：消費者 ID 統一（會員卡+App+微信）、消費記錄整合、行為數據融合，讓每個實體接觸點都能識別數位消費者", tool: "internal", outputType: "data_unification_design", requiredSkills: ["marketing-ops"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "OMO 場景設計", description: "設計具體的 OMO 場景：手機掃碼取貨、App 預約試穿、線上購線下退、門市掃碼延伸資訊，讓數位和實體無縫切換", tool: "internal", outputType: "omo_scenario_design", requiredSkills: ["campaign-orchestrator"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "全渠道歸因追蹤", description: "建立 OMO 全渠道歸因追蹤：哪些線上行為驅動了實體消費、哪些實體體驗促進了線上購買，計算 OMO 策略的真實 ROI", tool: "internal", outputType: "omnichannel_attribution_report", requiredSkills: ["attribution-modeling"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "OMO 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "數位整合師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "全渠道分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Alibaba OMO Online-Merge-Offline 全渠道零售策略", description: "Source: Alibaba 集團 Jack Ma 2016 年提出「新零售」OMO 戰略，盒馬鮮生、天貓超市等落地實踐。OMO 取代 O2O 成為新世代零售典範", steps });
+      await upsertSquad(conn, { slug, name: "Alibaba OMO 全渠道新零售小隊", description: "應用阿里巴巴的 OMO 框架：線上數據 + 線下體驗完全融合，讓消費者在任何渠道都獲得無縫體驗，讓品牌獲得完整的消費者全旅程數據", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Alibaba Group – OMO New Retail Strategy (2016)", agents: agentMembers, tags: ["instore", "omo", "omnichannel", "new-retail"], useCases: ["品牌OMO策略規劃", "線上線下數據整合", "全渠道消費體驗設計"], outputFormats: ["OMO機會地圖", "數據打通方案", "OMO場景設計", "全渠道歸因報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "盒馬鮮生（Alibaba OMO 旗艦案例）", description: "盒馬是 Alibaba OMO 新零售的最完整落地：線上App點餐+線下門市取貨+30分鐘配送+線下體驗", result: "盒馬門市平均線上業務占比超過 60%，坪效（每平方米銷售額）是傳統超市的 3-5 倍", source: "Alibaba Annual Report 2022 / Forbes 新零售報導" }, { company: "無印良品（MUJI）台灣 OMO 實踐", description: "應用 OMO 框架整合線上會員數據和線下消費行為，個人化門市體驗", result: "會員 LTV 提升 35%，線上線下交叉購買率達 40%，整體銷售增長 20%", source: "無印良品台灣年報 / 電商研究中心 2021" }] });
+    }
+
+    // IS6: Ron Johnson — Apple Store Experience Design (2001)
+    {
+      const slug = "is-johnson-apple-store";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["brand-dna", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "apple-store-experience-design"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "product-discovery-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["campaign-orchestrator", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["campaign-orchestrator", "genius-bar-service-design"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "體驗分區設計（Experience Zones）", description: "設計以「體驗」而非「產品類別」劃分的門市空間：Ron Johnson 的革命 = 把 Apple Store 按消費者生活場景分區（音樂區、電影區、照片區），而非按產品型號", tool: "internal", outputType: "experience_zone_design", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "親手試用設計", description: "設計「每台產品都可以試用」的展示環境：Johnson 說讓消費者在購買前充分體驗，是最強大的說服工具。設計全開放、無壓力的產品試用體驗", tool: "internal", outputType: "hands_on_display_design", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Genius Bar 服務設計", description: "設計「人才即服務」的門市服務模式：Apple Store 的 Genius Bar 革命性地把技術專家帶到零售前線。設計品牌的「Genius Bar」——讓最有知識的人面對面服務消費者", tool: "internal", outputType: "genius_bar_service_design", requiredSkills: ["campaign-orchestrator"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "社群空間設計", description: "設計門市中的「社群空間」：Johnson 在 Apple Store 中創造了公共演講區域和開放學習空間，讓門市成為社群聚集地而非單純購物場所", tool: "internal", outputType: "community_space_design", requiredSkills: ["brand-dna"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "體驗零售設計師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "產品展示設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "服務體驗師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ron Johnson Apple Store 體驗零售革命框架", description: "Source: Ron Johnson（前 Apple Store VP）2001 年設計的 Apple Store 概念，被哈佛商業評論評為「20 年最佳零售創新」。Apple Store 年坪效超過 $5,546，全球最高", steps });
+      await upsertSquad(conn, { slug, name: "Ron Johnson Apple Store 體驗零售革命小隊", description: "應用 Ron Johnson 設計 Apple Store 的框架：體驗分區 → 親手試用 → Genius Bar 服務 → 社群空間，把零售從「賣東西」轉型為「建立關係」", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Ron Johnson – Apple Store Experience Design (2001)", agents: agentMembers, tags: ["instore", "apple-store", "customer-experience", "service-design"], useCases: ["品牌旗艦店設計", "體驗零售轉型", "服務設計改造"], outputFormats: ["體驗分區設計", "試用展示設計", "Genius Bar 設計", "社群空間設計"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Apple Store Global（Johnson 設計）", description: "Ron Johnson 2001-2011 年任職期間，Apple Store 從 0 成長為全球最高坪效零售品牌", result: "Apple Store 年坪效達 $5,546/平方英尺（全球最高），NPS 超過 75，成為全球最研究的零售案例", source: "Harvard Business Review / Apple Annual Report" }, { company: "Microsoft Store（Apple Store 學習）", description: "Microsoft 應用 Johnson 的 Apple Store 框架設計自有品牌門市體驗", result: "Microsoft Store NPS 達到 80+，每位服務員工接待顧客的年均銷售超過 Apple Store 員工的 70%", source: "Microsoft Corporate Blog / Retail Dive 2019" }] });
+    }
+
+    // IS7: Sheena Iyengar — The Art of Choosing in Retail (2010)
+    {
+      const slug = "is-iyengar-choice";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "market-research-agent"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "choice-architecture-retail"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "curated-assortment-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "choice-reduction-roi"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "選擇疲勞審計", description: "審計品牌目前的 SKU 和選項數量：Iyengar 的「果醬實驗」證明 24 種選項 < 6 種選項的轉換率。識別哪些品類因選項過多而造成選擇癱瘓", tool: "internal", outputType: "choice_fatigue_audit", requiredSkills: ["market-research-agent"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "選擇架構設計", description: "重新設計選擇架構（Choice Architecture）：精選最關鍵的選項、設計清晰的分類、提供決策輔助（最暢銷、最推薦、編輯精選），讓選擇變得輕鬆", tool: "internal", outputType: "choice_architecture_design", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "精選陳列設計", description: "設計「精選」而非「全部」的陳列方案：Iyengar 說最好的選擇設計是「讓人感覺他們做了獨立選擇，但實際上你引導了他們」。設計有引導性的精選陳列", tool: "internal", outputType: "curated_display_design", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "選擇簡化 ROI 測量", description: "測量選擇簡化後的商業效益：轉換率變化、平均交易時間、客單價、退貨率，驗證選擇架構優化的 ROI", tool: "internal", outputType: "choice_simplification_roi", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "選擇架構師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "精選陳列師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "轉換分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Sheena Iyengar 選擇科學零售架構優化", description: "Source: Sheena Iyengar《The Art of Choosing》2010 + 哥倫比亞商學院教授。Iyengar 的「果醬實驗」是行為經濟學最著名研究之一，已被引用超過 10,000 次", steps });
+      await upsertSquad(conn, { slug, name: "Sheena Iyengar 選擇科學零售優化小隊", description: "應用 Sheena Iyengar 的選擇科學：更少選項 = 更高轉換率。重新設計零售選擇架構，讓消費者從「選擇癱瘓」轉為「滿意選擇」", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Sheena Iyengar – The Art of Choosing (2010)", agents: agentMembers, tags: ["instore", "choice-architecture", "behavioral-science", "conversion"], useCases: ["SKU優化策略", "陳列選擇架構設計", "轉換率提升"], outputFormats: ["選擇疲勞審計", "選擇架構設計", "精選陳列方案", "ROI報告"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Procter & Gamble（選擇簡化案例）", description: "P&G 應用選擇架構科學，將 Head & Shoulders 洗髮精從 26 種減至 15 種", result: "銷售額提升 10%，退貨率降低，消費者滿意度提升，同期競品仍維持多款式", source: "Sheena Iyengar《The Art of Choosing》P&G 案例 / HBR 2010" }, { company: "Apple 產品線設計（選擇簡化哲學）", description: "Steve Jobs 應用極簡選擇原則設計 Apple 產品線：每個品類只有幾個選項", result: "Apple 產品線最精簡時（4款Mac）是公司最高利潤時期，消費者購買決策時間比競爭對手短 70%", source: "Walter Isaacson《Steve Jobs》/ Sheena Iyengar 公開演講" }] });
+    }
+
+    // IS8: Pine & Gilmore — Authenticity in Retail (2007)
+    {
+      const slug = "is-pine-authenticity";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["brand-dna", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "retail-authenticity-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "brand-heritage-storytelling"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "authentic-retail-atmosphere"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "真實性審計", description: "審計品牌在零售環境中的「真實性」：Pine & Gilmore 說消費者的核心問題是「這是真的嗎？」審計每個門市元素是否真實呈現品牌的核心承諾", tool: "internal", outputType: "authenticity_audit", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "品牌起源故事設計", description: "設計展示品牌真實起源的零售體驗：創始人故事、工藝展示、原料來源透明化，讓消費者感受到品牌的真實歷史和承諾", tool: "internal", outputType: "origin_story_design", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "真實氛圍設計", description: "設計支撐品牌真實性的門市氛圍：使用真實材料（非仿製品）、展示真實工藝、讓真實的工匠或創始人出現，Pine 說「假的真實比假的更假」", tool: "internal", outputType: "authentic_atmosphere_design", requiredSkills: ["visual-content-creator"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "真實性 × 溢價定價", description: "設計「真實性溢價」定價策略：Pine & Gilmore 說消費者願意為真實性支付更高價格。建立清晰的真實性差異化，支撐溢價定價", tool: "internal", outputType: "authenticity_premium_strategy", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "品牌真實性師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "起源故事師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "真實氛圍師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Pine & Gilmore Authenticity 零售真實性框架", description: "Source: B. Joseph Pine II & James H. Gilmore《Authenticity: What Consumers Really Want》2007. 是《體驗經濟》的延伸，專注於後現代消費者對「真實性」的渴求", steps });
+      await upsertSquad(conn, { slug, name: "Pine & Gilmore Authenticity 零售真實性小隊", description: "應用 Pine & Gilmore 的真實性框架：讓零售環境充滿可感知的真實性，消費者不只買產品，更買你真實的品牌故事和承諾", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Pine & Gilmore – Authenticity (2007)", agents: agentMembers, tags: ["instore", "authenticity", "brand-story", "premium"], useCases: ["精品品牌零售設計", "工藝品牌門市體驗", "溢價品牌定位強化"], outputFormats: ["真實性審計", "起源故事設計", "真實氛圍設計", "溢價定價策略"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Patagonia 門市（真實性典範）", description: "Patagonia 門市展示真實的修補工作坊、環境行動照片、創始人故事，完全體現 Pine & Gilmore 真實性框架", result: "Patagonia 品牌溢價超過同類戶外品牌 30-50%，客戶忠誠度在時尚品牌中排名第一", source: "Pine & Gilmore《Authenticity》Patagonia 案例" }, { company: "星巴克臻選咖啡烘焙工坊", description: "Starbucks Reserve Roastery 應用真實性框架：展示真實咖啡烘焙過程、咖啡師技藝、莊園故事", result: "Roastery 每平方英尺銷售額是標準星巴克的 3 倍，客戶願意排隊 45 分鐘入場", source: "Starbucks Annual Report 2022 / Bloomberg 零售分析" }] });
+    }
+
+    // IS9: Bernd Schmitt — Customer Experience Management in Retail (2003)
+    {
+      const slug = "is-schmitt-retail-cx";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "cem-retail-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-identity", "multi-sensory-retail-cx"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "market-research-agent"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "cx-kpi-retail-measurement"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "CEM 零售審計（Customer Experience Grid）", description: "繪製品牌的「客戶體驗格格」：列出每個接觸點（進門/試用/結帳/售後）× 每種體驗模組（Sense/Feel/Think/Act/Relate），識別體驗缺口", tool: "internal", outputType: "cx_grid_audit", requiredSkills: ["market-research-agent"] }, m3Info),
+        assignAgentToStep({ order: 2, name: "感官多維度零售環境設計", description: "設計整合五感的零售環境：Schmitt 的 CEM 要求每個接觸點都精心設計感官體驗，從包裝觸感到結帳音效都是品牌 CX 的一部分", tool: "internal", outputType: "sensory_retail_environment", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "顧客旅程情緒設計", description: "設計零售旅程的情緒弧線：識別高情緒影響點（入店印象、服務互動、包裝開箱），在這些節點設計超出預期的情緒高峰", tool: "internal", outputType: "customer_journey_emotion_map", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "CX KPI 追蹤系統", description: "建立零售 CX 的完整 KPI 系統：NPS、CES（客戶努力分數）、情緒分數、回訪率、推薦率，定期追蹤 CEM 策略效益", tool: "internal", outputType: "retail_cx_kpi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "CEM 零售策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "感官環境師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "CX 分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Bernd Schmitt CEM 客戶體驗管理零售框架", description: "Source: Bernd Schmitt《Customer Experience Management》2003. Schmitt 是 CEM（Customer Experience Management）概念的奠基者，Columbia Business School 教授", steps });
+      await upsertSquad(conn, { slug, name: "Bernd Schmitt CEM 零售客戶體驗小隊", description: "應用 Bernd Schmitt 的 CEM 框架系統化管理零售客戶體驗：從感官設計到情緒弧線，讓每個接觸點都是有意識的品牌體驗設計", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Bernd Schmitt – Customer Experience Management (2003)", agents: agentMembers, tags: ["instore", "cx", "customer-experience", "cem"], useCases: ["零售CX系統設計", "門市體驗提升", "NPS提升計劃"], outputFormats: ["CX格格審計", "感官環境設計", "情緒旅程地圖", "CX KPI報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Nordstrom（CEM 零售標竿）", description: "Nordstrom 應用 CEM 框架系統化設計每個接觸點的客戶體驗，以服務著稱", result: "Nordstrom NPS 超過 70（業界最高之一），客戶回訪率比業界均值高 40%，員工推薦率達 90%", source: "Bernd Schmitt《CEM》零售案例 / Nordstrom Annual Report" }, { company: "新光三越（台灣 CEM 應用）", description: "應用 CEM 框架設計週年慶和 VIP 客戶體驗，系統化管理每個接觸點", result: "VIP 客戶消費占比達總業績 65%，週年慶 NPS 達到 75，台灣百貨業最高客戶忠誠度", source: "新光三越年報 2022 / 台灣百貨公會研究" }] });
+    }
+
+    // IS10: Kevin Kelly — 1,000 True Fans in Retail (2008)
+    {
+      const slug = "is-kelly-true-fans";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "true-fans-retail-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["social-media-marketing", "email-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["email-marketing", "superfan-community-retail"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "attribution-modeling"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "superfan-ltv-measurement"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "真粉絲識別系統", description: "建立識別「真粉絲」的系統：Kevin Kelly 定義真粉絲 = 願意購買你所有東西的人。分析購買頻率、平均客單、推薦行為，識別品牌的 Top 1% 忠實顧客", tool: "internal", outputType: "true_fan_identification", requiredSkills: ["marketing-analytics"] }, m3Info),
+        assignAgentToStep({ order: 2, name: "真粉絲 VIP 零售體驗設計", description: "設計只為真粉絲打造的獨特零售體驗：私下新品搶先預覽、與設計師/創辦人見面、限量會員商品、後台參觀，讓真粉絲感覺「我比一般顧客更特別」", tool: "internal", outputType: "true_fan_vip_experience", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "真粉絲社群建立", description: "建立真粉絲之間的社群連結：Kelly 說真粉絲不只愛品牌，更愛和同樣愛品牌的人在一起。設計真粉絲社群活動和專屬空間", tool: "internal", outputType: "true_fan_community_design", requiredSkills: ["social-media-marketing"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "真粉絲 LTV 最大化", description: "設計最大化真粉絲終身價值的系統：年費會員制、限量版預購、周邊商品、體驗升級，讓每個真粉絲的年均消費超過 $1,000 台幣 × 12 倍", tool: "internal", outputType: "true_fan_ltv_optimization", requiredSkills: ["email-marketing"] }, m2Info),
+        assignAgentToStep({ order: 5, name: "真粉絲效益追蹤", description: "追蹤「真粉絲策略」的完整 ROI：真粉絲數量增長、平均 LTV、推薦帶來的新客比率、真粉絲 vs 普通客戶的利潤差異", tool: "internal", outputType: "true_fan_roi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "真粉絲策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "社群培育師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "LTV 分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Kevin Kelly 1,000 True Fans 零售超級粉絲策略", description: "Source: Kevin Kelly《1,000 True Fans》2008 年文章（Wired 雜誌創始人）。Kelly 的「1,000 True Fans」概念是數位創作者和品牌建立可持續商業的基礎", steps });
+      await upsertSquad(conn, { slug, name: "Kevin Kelly 1,000 True Fans 零售超粉策略小隊", description: "應用 Kevin Kelly 的真粉絲理論：識別、服務、放大你最忠實的 Top 1% 客戶，讓他們成為品牌最強的行銷武器。1,000 個真粉絲勝過 100,000 個普通關注者", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Kevin Kelly – 1,000 True Fans (2008)", agents: agentMembers, tags: ["instore", "true-fans", "loyalty", "ltv"], useCases: ["VIP會員體驗設計", "超粉社群建立", "客戶LTV最大化"], outputFormats: ["真粉絲識別報告", "VIP體驗設計", "社群設計", "LTV優化方案"], requiredIntegrations: [], token: 60000, showcases: [{ company: "LEGO VIP Program（真粉絲策略典範）", description: "LEGO 應用真粉絲理論建立 LEGO VIP 會員計劃：超粉可提前參與產品設計、限量套件優先購買", result: "LEGO VIP 會員消費是普通客戶的 5 倍，LEGO Ideas 平台（超粉共創）產出超過 30 款熱銷商品", source: "LEGO Annual Report 2022 / Kevin Kelly 公開演講" }, { company: "Patagonia 鐵桿用戶計劃", description: "Patagonia 識別真粉絲（通常是環保行動者）並設計專屬體驗：修補工作坊、環境運動參與機會", result: "Patagonia 真粉絲推薦帶來 40% 的新客戶，真粉絲 LTV 是一般客戶的 8 倍", source: "Patagonia B Corp Report / Yvon Chouinard 訪談 2022" }] });
+    }
+
     console.log("[seed-local] Done. All local squad seeds applied successfully.");
 
   } catch (err: any) {
