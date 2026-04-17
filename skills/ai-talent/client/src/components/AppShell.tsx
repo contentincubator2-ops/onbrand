@@ -952,7 +952,12 @@ function PositioningProgress({ missionId, brandId }: { missionId: number | null 
           background: '#FAFAF9', border: '1px solid #E7E5E4',
           fontSize: 11, color: '#A8A29E', textAlign: 'center' as const,
         }}>
-          <div style={{ fontSize: 16, marginBottom: 4 }}>⏳</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8C7C3" strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
           <div>開始對話後</div>
           <div>步驟進度會顯示在這裡</div>
         </div>
@@ -1112,9 +1117,16 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
   return (
     <div>
       <div style={{
-        fontSize: 10, fontWeight: 600, color: "#C8C7C3",
+        display: "flex", alignItems: "center", gap: 5,
+        fontSize: 10, fontWeight: 600, color: "#9CA3AF",
         textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 10,
-      }}>🧠 品牌大腦</div>
+      }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
+          <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
+        </svg>
+        品牌大腦
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {items.map((item: any) => {
@@ -1143,7 +1155,10 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
                 }}>
                   {fmtDate(date)}
                 </span>
-                <span style={{ fontSize: 9, color: "#9B9990" }}>{isExpanded ? "▲" : "▼"}</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9B9990" strokeWidth="2.5" strokeLinecap="round"
+                  style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s", flexShrink: 0 }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
               </div>
               {isExpanded && (
                 <div style={{
@@ -1285,7 +1300,14 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
     return (
       <div style={{ padding: "20px 8px" }}>
         <div style={{ textAlign: "center" as const, marginBottom: 16 }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>👥</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>召集你的行銷小組</div>
           <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
             PM 已為這個任務推薦了<br />最適合的 Agent 組合
