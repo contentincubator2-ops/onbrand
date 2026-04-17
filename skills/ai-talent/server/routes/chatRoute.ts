@@ -1411,3 +1411,88 @@ chatRouter.post("/save", async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── Email squad results ────────────────────────────────────────────────────────
+// POST /api/chat/email-results  { recipientEmail, subject, content, missionId? }
+chatRouter.post("/email-results", async (req: Request, res: Response) => {
+  const userId = await verifyToken(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const { recipientEmail, subject, content, missionId } = req.body as {
+    recipientEmail: string;
+    subject?: string;
+    content: string;
+    missionId?: number;
+  };
+
+  if (!recipientEmail || !content) {
+    res.status(400).json({ error: "recipientEmail and content are required" });
+    return;
+  }
+
+  // Basic email validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+    res.status(400).json({ error: "Invalid email format" });
+    return;
+  }
+
+  if (!SENDGRID_KEY) {
+    res.status(503).json({ error: "Email service not configured" });
+    return;
+  }
+
+  try {
+    sgMail.setApiKey(SENDGRID_KEY);
+
+    // Convert markdown to simple HTML
+    const htmlContent = content
+      .split("\n\n").map(block => `<p>${block.replace(/\n/g, "<br>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/^#{1,3} (.+)$/, "<strong>$1</strong>")}</p>`).join("\n")
+      .replace(/<p>-\s/g, "<li>").replace(/<\/li>\n<li>/g, "</li><li>");
+
+    await sgMail.send({
+      to: recipientEmail,
+      from: "noreply@sowork.ai",
+      subject: subject ?? `行銷 AI 小組成果報告`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 680px; margin: 0 auto; padding: 24px; color: #1A1A18; }
+          .header { background: linear-gradient(135deg, #1A1A18, #2D2D2A); color: white; padding: 20px 24px; border-radius: 10px; margin-bottom: 24px; }
+          .header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+          .header p { margin: 4px 0 0; font-size: 12px; opacity: 0.6; }
+          .content { line-height: 1.7; font-size: 14px; }
+          .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E4E3E1; font-size: 11px; color: #9B9990; }
+          strong { color: #0A6EFA; }
+          h2, h3 { color: #1A1A18; margin: 1.5em 0 0.5em; }
+        </style></head>
+        <body>
+          <div class="header">
+            <h1>🎯 ${subject ?? "行銷 AI 小組成果報告"}</h1>
+            <p>由 Marketing OS · AI Squad 生成 · ${new Date().toLocaleDateString("zh-TW")}</p>
+          </div>
+          <div class="content">
+            ${htmlContent}
+          </div>
+          <div class="footer">
+            此報告由 Marketing OS 的 AI 小組協作生成。如有問題請聯絡你的行銷顧問。
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    // Log the export
+    if (missionId) {
+      recordMissionExport({
+        missionId, brandId: 0, exportType: "email",
+        title: subject ?? "Email Report",
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true, recipient: recipientEmail });
+  } catch (err: any) {
+    console.error("[email-results]", err?.message ?? err);
+    res.status(500).json({ error: err?.message ?? "Email send failed" });
+  }
+});

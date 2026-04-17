@@ -514,6 +514,11 @@ export default function ChatCore({
   const [positioningBarText, setPositioningBarText] = useState<string | null>(null);
   const [positioningBarIcp, setPositioningBarIcp] = useState<string>("");
   const [positioningMsgId, setPositioningMsgId] = useState<string | null>(null);
+  // ── Email export state ────────────────────────────────────────────────────
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
@@ -937,6 +942,9 @@ export default function ChatCore({
                   // Capture A2A auto-advance signal from server
                   if (data.hasMoreSteps === true) {
                     squadHasMoreSteps = true;
+                  } else if (data.hasMoreSteps === false && typeof data.totalSteps === "number") {
+                    // All steps done — mark squad as complete
+                    setSquadStep((prev) => ({ ...prev, currentStep: data.totalSteps + 1, totalSteps: data.totalSteps + 1, isComplete: true }));
                   }
                   // Only update relaySteps for non-squad relay (squad uses message bubbles)
                   if (typeof data.step !== "number") {
@@ -1010,6 +1018,11 @@ export default function ChatCore({
                   if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
                   if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
                   if (data.label) { setCurrentStepLabel(data.label); }
+                  // Update squad step progress bar
+                  if (typeof data.step === "number" && typeof data.totalSteps === "number") {
+                    setSquadStep({ currentStep: data.step + 1, totalSteps: data.totalSteps + 1, isComplete: false,
+                      agentName: data.agentName, agentTitle: data.agentTitle });
+                  }
                 }
 
               } else if (curEvent === "second_opinion_delta") {
@@ -1931,6 +1944,203 @@ export default function ChatCore({
             </button>
           </div>
         ))}
+
+        {/* ── Squad Completion Panel ── */}
+        {squadStep.isComplete && activeMissionId && !loading && (
+          <div style={{
+            background: "linear-gradient(135deg, #F0FDF4 0%, #EFF6FF 100%)",
+            border: "1px solid #BBF7D0",
+            borderRadius: 14,
+            padding: "16px 20px",
+            animation: "slideInUp 0.3s ease-out",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                background: "linear-gradient(135deg, #059669, #0A6EFA)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, boxShadow: "0 2px 8px rgba(5,150,105,0.25)",
+              }}>✅</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#065F46" }}>Squad 執行完成</div>
+                <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
+                  共 {squadStep.totalSteps - 1} 個步驟 · {squadStepProgress.length} 位 AI Agent 協作完成
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              {/* Copy all outputs */}
+              <button
+                onClick={() => {
+                  const allContent = active?.messages
+                    .filter(m => m.role === "assistant" && m.squadStep !== undefined && m.content)
+                    .map(m => `## ${m.squadStepLabel ?? m.agentName ?? "Agent"}\n\n${m.content}`)
+                    .join("\n\n---\n\n") ?? "";
+                  navigator.clipboard.writeText(allContent).then(() => alert("已複製到剪貼簿！"));
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "7px 14px", borderRadius: 8, fontSize: 12,
+                  background: "#FFFFFF", border: "1px solid #D1FAE5",
+                  color: "#065F46", cursor: "pointer", fontFamily: "inherit",
+                  fontWeight: 500, transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#ECFDF5"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#FFFFFF"; }}
+              >
+                📋 複製全部成果
+              </button>
+
+              {/* Email */}
+              {!emailDialogOpen && !emailSent && (
+                <button
+                  onClick={() => setEmailDialogOpen(true)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "7px 14px", borderRadius: 8, fontSize: 12,
+                    background: "#FFFFFF", border: "1px solid #BFDBFE",
+                    color: "#1D4ED8", cursor: "pointer", fontFamily: "inherit",
+                    fontWeight: 500, transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#EFF6FF"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#FFFFFF"; }}
+                >
+                  📧 Email 給我
+                </button>
+              )}
+              {emailSent && (
+                <span style={{ fontSize: 12, color: "#059669", display: "flex", alignItems: "center", gap: 4 }}>
+                  ✅ Email 已發送！
+                </span>
+              )}
+
+              {/* Save to Brain */}
+              {activeBrand?.id && (
+                <button
+                  onClick={() => {
+                    const allContent = active?.messages
+                      .filter(m => m.role === "assistant" && m.squadStep !== undefined && m.content)
+                      .map(m => `[${m.squadStepLabel ?? m.agentName}] ${m.content}`)
+                      .join("\n\n") ?? "";
+                    if (allContent) {
+                      const token = localStorage.getItem("authToken");
+                      fetch("/api/chat/save-brain", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({
+                          brandId: activeBrand.id, category: "custom",
+                          title: `Squad 完整成果 — ${new Date().toLocaleDateString("zh-TW")}`,
+                          content: allContent.slice(0, 2000), missionId: activeMissionId,
+                        }),
+                      }).then(() => alert("成果已存入品牌大腦！")).catch(() => {});
+                    }
+                  }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "7px 14px", borderRadius: 8, fontSize: 12,
+                    background: "#FFFFFF", border: "1px solid #E9D5FF",
+                    color: "#6B21A8", cursor: "pointer", fontFamily: "inherit",
+                    fontWeight: 500, transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F5F3FF"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#FFFFFF"; }}
+                >
+                  💾 存入品牌大腦
+                </button>
+              )}
+
+              {/* Restart squad */}
+              <button
+                onClick={() => setInput("我想針對某個環節深入分析，或調整方向重新執行")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "7px 14px", borderRadius: 8, fontSize: 12,
+                  background: "transparent", border: "1px solid #E4E3E1",
+                  color: "#9B9990", cursor: "pointer", fontFamily: "inherit",
+                  fontWeight: 500, transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F9F9F8"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                🔁 深入分析 / 調整方向
+              </button>
+            </div>
+
+            {/* Email input dialog */}
+            {emailDialogOpen && !emailSent && (
+              <div style={{
+                marginTop: 12, padding: "12px 14px",
+                background: "#FFFFFF", borderRadius: 10, border: "1px solid #BFDBFE",
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#1D4ED8", marginBottom: 8 }}>
+                  將完整成果 Email 給
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={e => setEmailInput(e.target.value)}
+                    placeholder="your@email.com"
+                    style={{
+                      flex: 1, padding: "7px 10px", borderRadius: 7,
+                      border: "1px solid #BFDBFE", fontSize: 13,
+                      fontFamily: "inherit", outline: "none",
+                      background: "#FAFBFF",
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && emailInput.includes("@")) {
+                        e.preventDefault();
+                        (e.currentTarget.nextElementSibling as HTMLButtonElement)?.click();
+                      }
+                    }}
+                  />
+                  <button
+                    disabled={!emailInput.includes("@") || emailSending}
+                    onClick={async () => {
+                      if (!emailInput.includes("@")) return;
+                      setEmailSending(true);
+                      const allContent = active?.messages
+                        .filter(m => m.role === "assistant" && m.squadStep !== undefined && m.content)
+                        .map(m => `## ${m.squadStepLabel ?? m.agentName ?? "Agent"}\n\n${m.content}`)
+                        .join("\n\n---\n\n") ?? "";
+                      const missionTitle = (missionDataQuery.data as any)?.title ?? "行銷任務";
+                      const token = localStorage.getItem("authToken");
+                      try {
+                        const resp = await fetch("/api/chat/email-results", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({
+                            recipientEmail: emailInput,
+                            subject: `${activeBrand?.name ?? ""} ${missionTitle} — AI Squad 成果報告`,
+                            content: allContent,
+                            missionId: activeMissionId,
+                          }),
+                        });
+                        if (resp.ok) { setEmailSent(true); setEmailDialogOpen(false); }
+                        else { alert("發送失敗，請稍後再試"); }
+                      } catch { alert("發送失敗，請稍後再試"); }
+                      finally { setEmailSending(false); }
+                    }}
+                    style={{
+                      padding: "7px 16px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+                      background: emailInput.includes("@") ? "#1D4ED8" : "#E4E3E1",
+                      color: "#FFFFFF", border: "none", cursor: emailInput.includes("@") ? "pointer" : "not-allowed",
+                      fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4,
+                    }}
+                  >
+                    {emailSending ? "發送中..." : "發送"}
+                  </button>
+                  <button
+                    onClick={() => setEmailDialogOpen(false)}
+                    style={{ background: "none", border: "none", color: "#9B9990", cursor: "pointer", fontSize: 14 }}
+                  >✕</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bottom anchor */}
         <div ref={bottomRef} />
