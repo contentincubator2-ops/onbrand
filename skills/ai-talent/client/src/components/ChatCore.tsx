@@ -1677,48 +1677,67 @@ export default function ChatCore({
           </div>
         ))}
 
-        {/* Loading card (streaming) */}
+        {/* Loading card (streaming) — Perplexity-style thinking indicator */}
         {loading && !teamAssembly && (
           <div style={{
             background: "#FAFAF9",
-            border: "1px solid #ECEAE8",
-            borderRadius: 11,
+            border: "1px solid #E4E3E1",
+            borderRadius: 12,
             overflow: "hidden",
-            maxWidth: 480,
+            maxWidth: 520,
           }}>
+            {/* Agent header strip */}
             <div style={{
-              padding: "8px 12px",
-              borderBottom: "1px solid #F5F5F4",
+              padding: "8px 14px",
+              borderBottom: "1px solid #F0EFEd",
               display: "flex", alignItems: "center", gap: 8,
+              background: "#F5F5F3",
             }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8631A", animation: "pulse 1.5s infinite" }} />
-              {streamingAgentName && <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{streamingAgentName}</span>}
-              {streamingAgentTitle && <span style={{ fontSize: 10, color: "#9B9990" }}>{streamingAgentTitle}</span>}
-              {!streamingAgentName && <span style={{ fontSize: 11, color: "#9B9990" }}>思考中...</span>}
+              {/* Animated avatar */}
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%",
+                background: streamingAgentName ? "#0A6EFA" : "#1A1A18",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 700, color: "white", flexShrink: 0,
+                boxShadow: "0 0 0 4px rgba(10,110,250,0.12)",
+                animation: "pulse 2s ease-in-out infinite",
+              }}>
+                {streamingAgentName ? streamingAgentName.charAt(0) : "·"}
+              </div>
+              {streamingAgentName && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18" }}>{streamingAgentName}</span>
+              )}
+              {streamingAgentTitle && (
+                <span style={{ fontSize: 11, color: "#9B9990" }}>· {streamingAgentTitle}</span>
+              )}
+              {!streamingAgentName && (
+                <span style={{ fontSize: 11, color: "#9B9990" }}>分析任務中...</span>
+              )}
               <button
                 onClick={handleStop}
                 style={{
-                  marginLeft: "auto", fontSize: 10, color: "#C8C7C3",
-                  background: "none", border: "1px solid #E4E3E1", borderRadius: 5,
-                  padding: "2px 7px", cursor: "pointer",
+                  marginLeft: "auto", fontSize: 10, color: "#9B9990",
+                  background: "none", border: "1px solid #E4E3E1", borderRadius: 6,
+                  padding: "2px 8px", cursor: "pointer", fontFamily: "inherit",
+                  display: "flex", alignItems: "center", gap: 3,
                 }}
               >
-                ⏹ 停止
+                <span>⏹</span> 停止
               </button>
             </div>
-            <div style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ display: "flex", gap: 4 }}>
-                {[0, 150, 300].map((d) => (
+            <div style={{ padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+              {/* Typing dots */}
+              <div style={{ display: "flex", gap: 3, paddingTop: 3, flexShrink: 0 }}>
+                {[0, 160, 320].map((d) => (
                   <span key={d} style={{
                     width: 5, height: 5, borderRadius: "50%",
-                    background: "#E8631A", display: "inline-block",
-                    animation: `bounce 1s infinite`,
-                    animationDelay: `${d}ms`,
+                    background: "#0A6EFA", display: "inline-block",
+                    animation: `bounce 1.2s ${d}ms ease-in-out infinite`,
                   }} />
                 ))}
               </div>
-              <span style={{ fontSize: 11, color: "#9B9990", fontStyle: "italic" }}>
-                {streamingThinking ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "") : "分析任務中，請稍候…"}
+              <span style={{ fontSize: 12, color: "#6B6A66", fontStyle: "italic", lineHeight: 1.6 }}>
+                {streamingThinking ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "") : "正在思考最佳策略..."}
               </span>
             </div>
           </div>
@@ -1901,17 +1920,29 @@ export default function ChatCore({
         />
 
         {/* Input box */}
-        <div style={{
-          background: "white",
-          border: "1.5px solid #E4E3E1",
-          borderRadius: 12,
-          padding: "10px 12px 8px",
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 10,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-          transition: "border-color 0.2s, box-shadow 0.2s",
-        }}>
+        <div
+          style={{
+            background: "white",
+            border: "1.5px solid #E4E3E1",
+            borderRadius: 14,
+            padding: "10px 12px 8px",
+            display: "flex",
+            alignItems: "flex-end",
+            gap: 10,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            transition: "border-color 0.2s, box-shadow 0.2s",
+          }}
+          onFocusCapture={e => {
+            const el = e.currentTarget as HTMLDivElement;
+            el.style.borderColor = "#1A1A18";
+            el.style.boxShadow = "0 0 0 4px rgba(26,26,24,0.06), 0 2px 8px rgba(0,0,0,0.06)";
+          }}
+          onBlurCapture={e => {
+            const el = e.currentTarget as HTMLDivElement;
+            el.style.borderColor = "#E4E3E1";
+            el.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
+          }}
+        >
           <textarea
             ref={chatInputRef}
             value={input}
