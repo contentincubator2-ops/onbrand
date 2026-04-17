@@ -17,6 +17,7 @@
     "db:cleanup-legacy": "tsx scripts/cleanup-legacy-squads.ts",
     "db:list-needing-patch": "tsx scripts/list-squads-needing-patch.ts",
     "db:patch-workspace": "tsx scripts/patch-squads-workspace.ts",
+    "db:cleanup-templates": "tsx scripts/cleanup-template-squads.ts",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
     "lint": "tsc --noEmit"
