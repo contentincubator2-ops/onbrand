@@ -1777,8 +1777,10 @@ export default function ChatCore({
               />
             )}
 
-            {/* Suggestion chips */}
-            {msg.suggestions && msg.suggestions.length > 0 && (
+            {/* Suggestion chips — only shown on final step or non-squad messages (auto-advance handles intermediate steps) */}
+            {msg.suggestions && msg.suggestions.length > 0
+              && (msg.squadStep === undefined || squadStep.isComplete)
+              && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
                 {msg.suggestions.map((s, i) => (
                   <button
