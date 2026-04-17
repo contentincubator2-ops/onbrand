@@ -32,13 +32,13 @@ import { SignJWT } from "jose";
 
 // ── 設定 ──────────────────────────────────────────────────────────────────────
 const BASE_URL  = `http://localhost:${process.env.PORT ?? 3001}`;
-const RUNS      = 10;
+const RUNS      = 5;   // 5 輪（每輪 2 turn ≈ 65s，5 輪共約 5 分鐘）
 
 // 測試對話輪次（模擬用戶依序與 squad 互動）
+// 只測 2 個 turn，讓每輪在合理時間內完成
 const USER_TURNS = [
-  "我想開始進行品牌定位分析",                                      // turn 1 → Step 0 Lead
-  "好的，請繼續執行，我們的品牌是 SoWork AI，主打 AI 行銷 OS",     // turn 2 → Step 1
-  "請繼續",                                                          // turn 3 → Step 2
+  "我想開始進行品牌定位分析，品牌是 SoWork AI，主打 AI 行銷 OS",   // turn 1 → Step 0 Lead
+  "好的，請繼續執行下一步",                                          // turn 2 → Step 1
 ];
 
 // 評分標準（每項 0-10 分）
@@ -520,9 +520,16 @@ async function main() {
     console.log(`\n── Run ${i}/${RUNS} ──`);
     const result = await runOnce(i, token, mission.missionId, mission.squadSlug, mission.brandName);
     results.push(result);
-    if (result.fatal && i <= 2) {
-      console.log(`⚠️  前兩輪就失敗，可能 server 未啟動，停止測試`);
-      break;
+    if (result.fatal) {
+      console.log(`  ⚠️  Run ${i} fatal: ${result.fatal}`);
+    }
+    // Only abort if ALL of the first 3 runs fail (server likely down)
+    if (i >= 3) {
+      const recentFailed = results.slice(-3).filter(r => r.fatal).length;
+      if (recentFailed === 3) {
+        console.log(`⛔ 連續 3 輪全部失敗，停止測試（server 可能未啟動）`);
+        break;
+      }
     }
   }
 
