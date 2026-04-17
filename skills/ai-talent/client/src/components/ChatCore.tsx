@@ -17,6 +17,7 @@ import { MissionHomePage } from "./chat/MissionHomePage";
 import { AgentBubbleHeader } from "./chat/AgentBubbleHeader";
 import { SaveToBrainButton } from "./chat/SaveToBrainButton";
 import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./chat/MentionAutocomplete";
+import { PositioningBar } from "./chat/PositioningBar";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -131,6 +132,14 @@ interface SquadStepState {
   isComplete: boolean;
 }
 
+export interface SquadStepProgress {
+  step: number;
+  agentName: string;
+  agentTitle: string;
+  label: string;
+  status: "waiting" | "running" | "done";
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface ChatCoreProps {
@@ -141,6 +150,7 @@ export interface ChatCoreProps {
   onMissionCreated?: (id: number) => void;
   onSquadSelect?: (taskLabel: string, squad: DBSquad) => void;
   onSquadPreview?: (squad: DBSquad | null) => void;
+  onSquadStepProgress?: (progress: SquadStepProgress[]) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -453,6 +463,7 @@ export default function ChatCore({
   onMissionCreated,
   onSquadSelect,
   onSquadPreview,
+  onSquadStepProgress,
 }: ChatCoreProps = {}) {
 
   // ── Conversations state ──────────────────────────────────────────────────
@@ -494,6 +505,12 @@ export default function ChatCore({
 
   const [mentionAnchorRect, setMentionAnchorRect] = useState<DOMRect | null>(null);
 
+  // ── Squad step progress (for RELAY-based sidebar) ─────────────────────────
+  const [squadStepProgress, setSquadStepProgress] = useState<SquadStepProgress[]>([]);
+  // ── PositioningBar state ──────────────────────────────────────────────────
+  const [positioningBarText, setPositioningBarText] = useState<string | null>(null);
+  const [positioningBarIcp, setPositioningBarIcp] = useState<string>("");
+
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -501,6 +518,10 @@ export default function ChatCore({
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const autoStartedRef = useRef<Set<number>>(new Set());
+  // RELAY parsing refs
+  const activeStreamMsgIdRef = useRef<string | null>(null);
+  const relayMsgIdRef = useRef<string | null>(null);
+  const relayStepCountRef = useRef(0);
 
   // ── tRPC hooks ───────────────────────────────────────────────────────────
   const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
@@ -611,6 +632,12 @@ export default function ChatCore({
     setSquadStep({ currentStep: 0, totalSteps: 10, isComplete: false });
     setStreamingAgentName(null);
     setStreamingAgentTitle(null);
+    setSquadStepProgress([]);
+    setPositioningBarText(null);
+    setPositioningBarIcp("");
+    activeStreamMsgIdRef.current = null;
+    relayMsgIdRef.current = null;
+    relayStepCountRef.current = 0;
     setConversations((prev) => {
       const existing = prev.find((c) => c.id === missionConvId);
       if (existing) return prev;
@@ -690,6 +717,12 @@ export default function ChatCore({
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMissionId, (missionDataQuery.data as any)?.squadSlug, missionDataQuery.isLoading, savedMessagesQuery.isLoading, savedMessagesQuery.isSuccess]);
+
+  // Propagate squad step progress to parent
+  useEffect(() => {
+    onSquadStepProgress?.(squadStepProgress);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [squadStepProgress]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -772,9 +805,14 @@ export default function ChatCore({
     setLoading(true);
     setStreamingAgentName(null);
     setStreamingAgentTitle(null);
+    // Reset RELAY state for new squad run
+    setSquadStepProgress([]);
+    relayStepCountRef.current = 0;
+    relayMsgIdRef.current = null;
     let streamBuffer = "";
     let lastAgentModel: string | null = null;
     const streamMsgId = `squad-stream-${Date.now()}`;
+    activeStreamMsgIdRef.current = streamMsgId;
     setConversations((prev) =>
       prev.map((c) =>
         c.id === convId
@@ -782,6 +820,74 @@ export default function ChatCore({
           : c
       )
     );
+    // Helper: process RELAY markers in buffered text and route content to correct bubbles
+    const processRelayMarkers = (buffer: string): string => {
+      const relayRegex = /\[RELAY:([^:\]]+):([^;\]]+);([^;\]]+);([^\]]+)\]/g;
+      let match;
+      let remainderStart = 0;
+      let processed = buffer;
+      const regexCopy = new RegExp(relayRegex.source, relayRegex.flags);
+      while ((match = regexCopy.exec(buffer)) !== null) {
+        const [fullMatch, slug, name, title, layer] = match;
+        const beforeRelay = buffer.slice(remainderStart, match.index);
+        // Flush text before this RELAY marker into the current active bubble
+        const currentMsgId = activeStreamMsgIdRef.current;
+        if (currentMsgId && beforeRelay) {
+          setConversations((prev) => prev.map((c) => c.id === convId
+            ? { ...c, messages: c.messages.map((m) => m.id === currentMsgId
+                ? { ...m, content: (m.content ?? "") + beforeRelay, isStreaming: true }
+                : m
+              )}
+            : c
+          ));
+        }
+        // Mark previous relay bubble as no longer streaming
+        if (currentMsgId) {
+          setConversations((prev) => prev.map((c) => c.id === convId
+            ? { ...c, messages: c.messages.map((m) => m.id === currentMsgId
+                ? { ...m, isStreaming: false }
+                : m
+              )}
+            : c
+          ));
+        }
+        // Create a new bubble for this relay agent
+        const newMsgId = `relay-${Date.now()}-${relayStepCountRef.current}`;
+        relayMsgIdRef.current = newMsgId;
+        relayStepCountRef.current += 1;
+        const stepNum = relayStepCountRef.current;
+        const agentName = name.trim();
+        const agentTitle = title.trim();
+        const layerTrimmed = layer.trim();
+        setConversations((prev) => prev.map((c) => c.id === convId
+          ? { ...c, messages: [...c.messages, {
+              id: newMsgId, role: "assistant" as const, content: "",
+              ts: Date.now(), isStreaming: true,
+              agentName,
+              agentTitle,
+              squadStep: stepNum,
+              squadTotalSteps: undefined,
+              squadStepLabel: `Step ${stepNum}`,
+              isSquadLead: layerTrimmed === "strategy",
+            }]
+          }
+          : c
+        ));
+        activeStreamMsgIdRef.current = newMsgId;
+        // Update step progress: mark previous as done, new as running
+        setSquadStepProgress((prev) => [
+          ...prev.map((s) => s.status === "running" ? { ...s, status: "done" as const } : s),
+          { step: stepNum, agentName, agentTitle, label: `Step ${stepNum}`, status: "running" as const },
+        ]);
+        // Update streaming agent display name
+        setStreamingAgentName(agentName);
+        setStreamingAgentTitle(agentTitle);
+        remainderStart = match.index + fullMatch.length;
+      }
+      // Return remaining text after the last RELAY (or the full buffer if no markers)
+      return buffer.slice(remainderStart);
+    };
+
     try {
       const resp = await fetch("/api/chat", {
         method: "POST",
@@ -800,6 +906,8 @@ export default function ChatCore({
       let buf = "";
       let lastAgentName: string | undefined;
       let lastAgentTitle: string | undefined;
+      // Accumulated delta text — flushed via processRelayMarkers each chunk
+      let pendingDelta = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -825,8 +933,9 @@ export default function ChatCore({
                     ));
                   }
                   if (!isSecondOpinion) {
+                    const curId = activeStreamMsgIdRef.current;
                     setConversations((prev) => prev.map((c) => c.id === convId
-                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId
+                      ? { ...c, messages: c.messages.map((m) => m.id === curId
                           ? { ...m, isStreaming: false, agentName: data.agentName ?? m.agentName, agentTitle: data.agentTitle ?? m.agentTitle }
                           : m
                         )}
@@ -851,8 +960,9 @@ export default function ChatCore({
                   }
 
                   if (!isSecondOpinion) {
+                    const curId = activeStreamMsgIdRef.current;
                     setConversations((prev) => prev.map((c) => c.id === convId
-                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId
+                      ? { ...c, messages: c.messages.map((m) => m.id === curId
                           ? { ...m,
                               isStreaming: true,
                               agentName: data.agentName ?? m.agentName,
@@ -901,33 +1011,70 @@ export default function ChatCore({
                 }
               } else if (curEvent === "suggestions") {
                 const items: string[] = data.items ?? [];
+                const curId = activeStreamMsgIdRef.current;
                 setConversations((prev) => prev.map((c) => c.id === convId
-                  ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId
+                  ? { ...c, messages: c.messages.map((m) => m.id === curId
                       ? { ...m, suggestions: items }
                       : m
                     )}
                   : c
                 ));
               } else if (curEvent === "delta") {
-            streamBuffer += data.text;
-            setConversations((prev) =>
-              prev.map((c) =>
-                c.id === convId
-                  ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer } : m) }
-                  : c
-              )
-            );
-          } else if (curEvent === "done") {
-            setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
+                streamBuffer += data.text ?? "";
+                pendingDelta += data.text ?? "";
+                // Process any RELAY markers embedded in the accumulated delta
+                const remaining = processRelayMarkers(pendingDelta);
+                pendingDelta = "";
+                // Append non-RELAY remainder to the currently active bubble
+                if (remaining) {
+                  const curId = activeStreamMsgIdRef.current;
+                  if (curId) {
+                    setConversations((prev) =>
+                      prev.map((c) =>
+                        c.id === convId
+                          ? { ...c, messages: c.messages.map((m) => m.id === curId
+                              ? { ...m, content: (m.content ?? "") + remaining }
+                              : m
+                            )}
+                          : c
+                      )
+                    );
+                  }
+                }
+              } else if (curEvent === "done") {
+                setRelaySteps((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const, summary: streamBuffer.slice(0, 400) } : s));
+                // Mark all squad step progress as done
+                setSquadStepProgress((prev) => prev.map((s) => s.status === "running" ? { ...s, status: "done" as const } : s));
+              }
+            } catch { /* ignore */ }
           }
-        } catch { /* ignore */ }
+        }
       }
-    }
+      // Flush any remaining text into the active bubble
+      if (pendingDelta) {
+        const curId = activeStreamMsgIdRef.current;
+        if (curId) {
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === convId
+                ? { ...c, messages: c.messages.map((m) => m.id === curId
+                    ? { ...m, content: (m.content ?? "") + pendingDelta }
+                    : m
+                  )}
+                : c
+            )
+          );
+        }
       }
+      // Finalize the last active bubble
+      const finalMsgId = activeStreamMsgIdRef.current ?? streamMsgId;
       setConversations((prev) =>
         prev.map((c) =>
           c.id === convId
-            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: streamBuffer || "（Agent 回覆完成）", agentName: lastAgentName, agentTitle: lastAgentTitle, agentModel: lastAgentModel } : m) }
+            ? { ...c, messages: c.messages.map((m) => m.id === finalMsgId
+                ? { ...m, isStreaming: false, agentName: m.agentName ?? lastAgentName, agentTitle: m.agentTitle ?? lastAgentTitle, agentModel: lastAgentModel }
+                : m
+              )}
             : c
         )
       );
@@ -936,13 +1083,24 @@ export default function ChatCore({
       if (activeMissionId && streamBuffer) {
         saveMissionMsg.mutate({ missionId: activeMissionId, role: "assistant", content: streamBuffer });
       }
+      // PositioningBar detection: show if final output contains positioning statement
+      if (/Positioning Statement|定位陳述|品牌定位書|核心定位句/i.test(streamBuffer)) {
+        // Extract a short snippet for the bar
+        const posMatch = streamBuffer.match(/(?:Positioning Statement|定位陳述|核心定位句)[^\n]*\n?([^\n]{10,120})/i);
+        const posText = posMatch ? posMatch[1].trim() : streamBuffer.slice(0, 120);
+        const icpMatch = streamBuffer.match(/(?:目標客群|ICP|受眾)[^\n：:]*[：:]\s*([^\n]{5,80})/i);
+        const icpText = icpMatch ? icpMatch[1].trim() : "";
+        setPositioningBarText(posText);
+        setPositioningBarIcp(icpText);
+      }
       setLoading(false);
       return true;
     } catch (err: any) {
+      const errMsgId = activeStreamMsgIdRef.current ?? streamMsgId;
       setConversations((prev) =>
         prev.map((c) =>
           c.id === convId
-            ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId ? { ...m, content: `Squad chat 錯誤：${err?.message ?? "未知"}，切換一般模式...` } : m) }
+            ? { ...c, messages: c.messages.map((m) => m.id === errMsgId ? { ...m, content: `Squad chat 錯誤：${err?.message ?? "未知"}，切換一般模式...` } : m) }
             : c
         )
       );
@@ -1348,6 +1506,17 @@ export default function ChatCore({
               等待批准
             </span>
           )}
+        </div>
+      )}
+
+      {/* ── PositioningBar ── */}
+      {positioningBarText && (
+        <div style={{ padding: "0 20px 4px", flexShrink: 0 }}>
+          <PositioningBar
+            positioningText={positioningBarText}
+            icp={positioningBarIcp}
+            onDismiss={() => setPositioningBarText(null)}
+          />
         </div>
       )}
 

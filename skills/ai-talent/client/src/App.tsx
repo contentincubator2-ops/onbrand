@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import AppShell from "./components/AppShell";
 import ChatCore from "./components/ChatCore";
+import type { SquadStepProgress } from "./components/ChatCore";
 import { Navigate, Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { trpc } from "./lib/trpc";
 import type { DBSquad } from "./types/squad";
@@ -24,9 +25,11 @@ function MissionPage() {
   const numericMissionId = missionId ? Number(missionId) : null;
 
   const [activeSquad, setActiveSquad] = useState<DBSquad | null>(null);
+  const [squadStepProgress, setSquadStepProgress] = useState<SquadStepProgress[]>([]);
 
   useEffect(() => {
     setActiveSquad(null);
+    setSquadStepProgress([]);
   }, [numericMissionId]);
 
   const handleMissionSelect = (id: number) => {
@@ -41,6 +44,7 @@ function MissionPage() {
         console.log("new task", _wsKey);
       }}
       activeSquad={activeSquad}
+      squadStepProgress={squadStepProgress}
     >
       <ChatCore
         key={`mission-${numericMissionId}`}
@@ -49,6 +53,7 @@ function MissionPage() {
         onSquadPreview={(squad) => {
           setActiveSquad(squad);
         }}
+        onSquadStepProgress={setSquadStepProgress}
       />
     </AppShell>
   );
