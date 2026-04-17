@@ -23,5 +23,19 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
+            echo "=== 讀取 JWT_SECRET ==="
+            # 從 .env 讀取 JWT_SECRET，確保 test script 跟 server 用同一個 secret
+            ENV_FILE="skills/ai-talent/.env"
+            export JWT_SECRET=$(grep -E '^JWT_SECRET=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+            if [ -z "$JWT_SECRET" ]; then
+              echo "⚠️  JWT_SECRET 不在 $ENV_FILE，嘗試讀取根目錄 .env"
+              export JWT_SECRET=$(grep -E '^JWT_SECRET=' .env | head -1 | cut -d= -f2-)
+            fi
+            if [ -z "$JWT_SECRET" ]; then
+              echo "❌ JWT_SECRET 未找到，無法測試"
+              exit 1
+            fi
+            echo "✅ JWT_SECRET 已設定（長度：${#JWT_SECRET}）"
+
             echo "=== 執行 10 輪 Squad Flow 測試 ==="
             npm run test:squad --prefix skills/ai-talent 2>&1

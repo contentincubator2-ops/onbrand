@@ -21,7 +21,10 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
+// Load .env (dotenv won't override vars already set in shell environment)
 dotenvConfig({ path: resolve(__dirname, "../.env") });
+// Fallback: try root .env
+dotenvConfig({ path: resolve(__dirname, "../../.env") });
 
 import mysql from "mysql2/promise";
 import * as https from "http";
