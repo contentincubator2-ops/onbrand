@@ -1455,40 +1455,99 @@ export default function ChatCore({
     </button>
       </div>
 
-      {/* ── Squad progress bar ── */}
+      {/* ── Squad progress bar — Perplexity-style ── */}
       {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
         <div style={{
-          padding: "8px 20px",
+          padding: "10px 20px",
           borderBottom: "1px solid #ECEAE8",
-          background: "#FAFAF9",
+          background: squadStep.isComplete ? "#F0FDF4" : "#FAFAF9",
           flexShrink: 0,
+          transition: "background 0.4s",
         }}>
           <div style={{ maxWidth: 680, margin: "0 auto" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {streamingAgentName && <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18" }}>{streamingAgentName}</span>}
-                {streamingAgentTitle && <span style={{ fontSize: 11, color: "#9B9990" }}>· {streamingAgentTitle}</span>}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {!squadStep.isComplete && (
+                  <div style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: "#0A6EFA",
+                    animation: "pulse 1.5s ease-in-out infinite",
+                    flexShrink: 0,
+                  }} />
+                )}
+                {squadStep.isComplete && (
+                  <span style={{ fontSize: 14 }}>✅</span>
+                )}
+                <span style={{ fontSize: 12, fontWeight: 600, color: squadStep.isComplete ? "#059669" : "#1A1A18" }}>
+                  {squadStep.isComplete
+                    ? "Squad 執行完成"
+                    : streamingAgentName
+                    ? `${streamingAgentName} 執行中…`
+                    : currentStepLabel || "分析中…"
+                  }
+                </span>
+                {!squadStep.isComplete && streamingAgentTitle && (
+                  <span style={{ fontSize: 11, color: "#9B9990" }}>· {streamingAgentTitle}</span>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 10, color: "#C8C7C3" }}>
-                  {currentStepLabel ? `${currentStepLabel} · ` : ""}Step {squadStep.currentStep}/{squadStep.totalSteps}{squadStep.isComplete ? " ✅" : ""}
+                <span style={{
+                  fontSize: 11, fontWeight: 600,
+                  color: squadStep.isComplete ? "#059669" : "#6B6A66",
+                  background: squadStep.isComplete ? "#ECFDF5" : "#F2F1EF",
+                  border: `1px solid ${squadStep.isComplete ? "#BBF7D0" : "#E4E3E1"}`,
+                  borderRadius: 20, padding: "1px 8px",
+                }}>
+                  {squadStep.currentStep} / {squadStep.totalSteps}
                 </span>
-                <button
-                  onClick={() => setInput("我想換一支不同的小組來執行這個任務，請列出可選的 Squad 選項")}
-                  style={{ fontSize: 10, color: "#9B9990", background: "#F2F1EF", border: "1px solid #E4E3E1", padding: "2px 8px", borderRadius: 20, cursor: "pointer" }}
-                >
-                  換 Squad
-                </button>
+                {!squadStep.isComplete && (
+                  <button
+                    onClick={() => setInput("我想換一支不同的小組來執行這個任務，請列出可選的 Squad 選項")}
+                    style={{ fontSize: 10, color: "#9B9990", background: "transparent", border: "1px solid #E4E3E1", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    換 Squad
+                  </button>
+                )}
               </div>
             </div>
-            <div style={{ height: 3, background: "#ECEAE8", borderRadius: 2, overflow: "hidden" }}>
-              <div style={{
-                height: "100%", background: "#1A1A18", borderRadius: 2,
-                transition: "width 0.5s",
-                width: `${Math.round((squadStep.currentStep / squadStep.totalSteps) * 100)}%`,
-              }} />
+            {/* Step segment bar */}
+            <div style={{ display: "flex", gap: 3, height: 4 }}>
+              {Array.from({ length: squadStep.totalSteps }).map((_, i) => {
+                const isDone = i < squadStep.currentStep;
+                const isActive = i === squadStep.currentStep - 1 && !squadStep.isComplete;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      flex: 1, height: "100%",
+                      borderRadius: 2,
+                      background: isDone
+                        ? (squadStep.isComplete ? "#059669" : "#0A6EFA")
+                        : "#E4E3E1",
+                      transition: "background 0.4s",
+                      position: "relative" as const,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {isActive && (
+                      <div style={{
+                        position: "absolute" as const, top: 0, left: 0, bottom: 0,
+                        width: "60%",
+                        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)",
+                        animation: "shimmer 1.5s infinite",
+                      }} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
+          <style>{`
+            @keyframes shimmer {
+              0%   { transform: translateX(-100%); }
+              100% { transform: translateX(300%); }
+            }
+          `}</style>
         </div>
       )}
 
