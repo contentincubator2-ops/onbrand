@@ -18,6 +18,31 @@ const WS_ICON: Record<string, string> = {
   pr: "📰", event: "🎪", website: "🌐", brand: "🏷️", content: "✍️",
 };
 
+// ─── Resource stat SVG icons ──────────────────────────────────────────────────
+const IconUsers = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
+const IconZap = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+);
+const IconCpu = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+    <rect x="9" y="9" width="6" height="6"/>
+    <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+    <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
+    <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
+    <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+  </svg>
+);
+
 // ─── ResourceBanner ───────────────────────────────────────────────────────────
 function ResourceBanner({ missionId }: { missionId: number }) {
   const { t } = useLang();
@@ -56,54 +81,59 @@ function ResourceBanner({ missionId }: { missionId: number }) {
             />
           ))}
         </div>
-        <div style={{ fontSize: 12, color: "#9B9990", letterSpacing: 0.2 }}>
-          ⚙️ {t("resource_matching")}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 5,
+          fontSize: 12, color: "#9B9990", letterSpacing: 0.2,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z" opacity=".3"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          {t("resource_matching")}
         </div>
-        <style>{`
-          @keyframes pulse-dot {
-            0%, 100% { transform: scale(0.7); opacity: 0.4; }
-            50%       { transform: scale(1.1); opacity: 1; }
-          }
-        `}</style>
       </div>
     );
   }
 
   if (status === "ready" && data.agents > 0) {
     const stats = [
-      { label: "Agents", value: data.agents.toLocaleString(), icon: "👤", color: "#0A6EFA" },
-      { label: t("label_skills"), value: data.skills, icon: "⚡", color: "#7C3AED" },
-      { label: "AI Models", value: data.providers, icon: "🤖", color: "#059669" },
+      { label: "Agents", value: data.agents.toLocaleString(), icon: <IconUsers />, color: "#0A6EFA", bg: "#EFF6FF", border: "#BFDBFE" },
+      { label: t("label_skills"),  value: data.skills,    icon: <IconZap />,   color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
+      { label: "AI Models",        value: data.providers, icon: <IconCpu />,   color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
     ];
 
     return (
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <div style={{ display: "flex", gap: 8 }}>
-          {stats.map(({ label, value, icon, color }) => (
+          {stats.map(({ label, value, icon, color, bg, border }) => (
             <div
               key={label}
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center",
-                gap: 3, padding: "10px 16px",
-                background: "#FAFAF9", border: "1px solid #E4E3E1",
-                borderRadius: 12,
-                minWidth: 72,
+                gap: 4, padding: "10px 18px",
+                background: bg, border: `1px solid ${border}`,
+                borderRadius: 12, minWidth: 76,
+                transition: "transform 0.15s",
               }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ""; }}
             >
-              <span style={{ fontSize: 16 }}>{icon}</span>
-              <span style={{ fontSize: 18, fontWeight: 700, color, lineHeight: 1 }}>{value}</span>
-              <span style={{ fontSize: 10, color: "#9B9990" }}>{label}</span>
+              <span style={{ color }}>{icon}</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.5px" }}>{value}</span>
+              <span style={{ fontSize: 10, color: "#6B7280", fontWeight: 500 }}>{label}</span>
             </div>
           ))}
         </div>
         <div style={{
-          display: "flex", alignItems: "center", gap: 4,
-          fontSize: 11, color: "#059669",
+          display: "flex", alignItems: "center", gap: 5,
+          fontSize: 10.5, color: "#059669",
           background: "#F0FDF4", border: "1px solid #BBF7D0",
-          borderRadius: 20, padding: "3px 10px",
+          borderRadius: 20, padding: "4px 12px", fontWeight: 500,
         }}>
-          <span>✓</span>
-          <span>語意匹配完成 · text-embedding-3-large</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          語意匹配完成 · text-embedding-3-large
         </div>
       </div>
     );
@@ -137,7 +167,13 @@ function SquadChip({
         boxShadow: isSelected ? "0 2px 8px rgba(26,26,24,0.15)" : hovered ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
       }}
     >
-      {"🎯"}
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke={isSelected ? "rgba(255,255,255,0.8)" : "#9B9990"}
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="6"/>
+        <circle cx="12" cy="12" r="2"/>
+      </svg>
       <span>{squad.name}</span>
       {squad.lead?.name && (
         <span style={{
