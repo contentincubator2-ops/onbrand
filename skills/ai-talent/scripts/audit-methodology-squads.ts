@@ -13,30 +13,14 @@ import { createPool } from "mysql2/promise";
 import * as dotenv from "dotenv";
 dotenv.config();
 
-// 已知的方法論型前綴（白名單）
-const METHODOLOGY_PREFIXES = [
-  "fb-", "ig-", "yt-", "li-", "tw-",        // 社群平台
-  "sv-",                                       // 短影音
-  "pr-", "kol-",                               // 公關/KOL
-  "seo-",                                      // SEO
-  "cm-",                                       // 內容行銷
-  "em-",                                       // Email 行銷
-  "brand-", "pos-", "brand-arch-",             // 品牌
-  "mon-", "an-", "ana-",                       // 監測/分析
-  "ev-",                                       // 活動
-  "is-",                                       // 實體零售
-  "slogan-",                                   // 標語
-  "ai-",                                       // AI 行銷
-];
-
-// 已知的模板型前綴（黑名單）
+// 模板型前綴（黑名單）：這些是舊版矩陣格式，應已停用
 const TEMPLATE_PREFIXES = [
   "sq-", "squad-",
 ];
 
-// 10 個標準 workspace 值
+// 11 個標準 workspace 值
 const CANONICAL_WORKSPACES = [
-  "strategy", "facebook", "linkedin", "youtube",
+  "strategy", "facebook", "instagram", "linkedin", "youtube",
   "pr", "event", "website", "monitoring", "analytics", "instore",
 ];
 
@@ -63,10 +47,6 @@ function parseJson(val: string | null): any[] {
   } catch {
     return [];
   }
-}
-
-function isMethodologySlug(slug: string): boolean {
-  return METHODOLOGY_PREFIXES.some(p => slug.startsWith(p));
 }
 
 function isTemplateSlug(slug: string): boolean {
@@ -98,14 +78,13 @@ async function main() {
     console.log(`\n📊 審計開始 — 共 ${squads.length} 個 active squads\n`);
 
     // ── 1. 命名分析 ─────────────────────────────────────────────────────
+    // 判斷標準：只要不是 sq-/squad- 模板型，就視為方法論型（有效 squad）
     const methodologySquads: SquadRow[] = [];
     const templateSquads: SquadRow[] = [];
-    const unknownSquads: SquadRow[] = [];
 
     for (const s of squads) {
       if (isTemplateSlug(s.slug)) templateSquads.push(s);
-      else if (isMethodologySlug(s.slug)) methodologySquads.push(s);
-      else unknownSquads.push(s);
+      else methodologySquads.push(s);
     }
 
     console.log("═══════════════════════════════════════════════════════");
@@ -113,7 +92,6 @@ async function main() {
     console.log("═══════════════════════════════════════════════════════");
     console.log(`  ✅ 方法論型 squads：${methodologySquads.length}`);
     console.log(`  ❌ 模板型 squads（應已停用）：${templateSquads.length}`);
-    console.log(`  ⚠️  未知前綴 squads：${unknownSquads.length}`);
 
     if (templateSquads.length > 0) {
       console.log(`\n  ❌ 仍為 active 的模板型 squads（需停用）：`);
@@ -122,13 +100,6 @@ async function main() {
       }
       if (templateSquads.length > 20) {
         console.log(`     ... 及另外 ${templateSquads.length - 20} 個`);
-      }
-    }
-
-    if (unknownSquads.length > 0) {
-      console.log(`\n  ⚠️  未識別前綴（請確認是否應存在）：`);
-      for (const s of unknownSquads) {
-        console.log(`     [${s.id}] ${s.slug}`);
       }
     }
 
@@ -291,17 +262,16 @@ async function main() {
     console.log(`  Active squads 總數       : ${squads.length}`);
     console.log(`  方法論型（正常）         : ${methodologySquads.length}`);
     console.log(`  模板型（應停用）         : ${templateSquads.length}`);
-    console.log(`  未知前綴（需確認）       : ${unknownSquads.length}`);
     console.log(`  有欄位問題的方法論 squads: ${issues.length}`);
 
     const emptyWorkspaces = CANONICAL_WORKSPACES.filter(ws => !wsCounts[ws]);
     if (emptyWorkspaces.length > 0) {
       console.log(`  ❌ 無 squads 的 workspace : ${emptyWorkspaces.join(", ")}`);
     } else {
-      console.log(`  ✅ 所有 10 個標準 workspace 均有覆蓋`);
+      console.log(`  ✅ 所有 ${CANONICAL_WORKSPACES.length} 個標準 workspace 均有覆蓋`);
     }
 
-    if (templateSquads.length === 0 && issues.length === 0 && unknownSquads.length === 0) {
+    if (templateSquads.length === 0 && issues.length === 0) {
       console.log("\n  🎉 審計通過！所有 squads 命名規範、欄位完整、workspace 全覆蓋。");
     } else {
       console.log("\n  ⚠️  審計發現問題，請依上述報告修正。");
