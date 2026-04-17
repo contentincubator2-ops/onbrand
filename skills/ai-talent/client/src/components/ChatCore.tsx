@@ -645,6 +645,9 @@ export default function ChatCore({
     setSquadStepProgress([]);
     setPositioningBarText(null);
     setPositioningBarIcp("");
+    setEmailDialogOpen(false);
+    setEmailSent(false);
+    setEmailInput("");
     activeStreamMsgIdRef.current = null;
     relayMsgIdRef.current = null;
     relayStepCountRef.current = 0;
@@ -978,6 +981,20 @@ export default function ChatCore({
                       );
                       return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
                     });
+                  }
+                  // Update squad sidebar timeline for squad relay steps (via relay_step SSE,
+                  // not RELAY text markers — without this the sidebar stays empty)
+                  if (isSquadRelay && !isSecondOpinion) {
+                    setSquadStepProgress((prev) => [
+                      ...prev.map((s) => s.status === "running" ? { ...s, status: "done" as const } : s),
+                      {
+                        step: data.step,
+                        agentName: data.agentName ?? "",
+                        agentTitle: data.agentTitle ?? "",
+                        label: data.label ?? `Step ${data.step}`,
+                        status: "running" as const,
+                      },
+                    ]);
                   }
 
                   if (!isSecondOpinion) {
