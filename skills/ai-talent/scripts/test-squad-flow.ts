@@ -25,6 +25,7 @@ dotenvConfig({ path: resolve(__dirname, "../.env") });
 
 import mysql from "mysql2/promise";
 import * as https from "http";
+import { createHash, randomBytes } from "crypto";
 
 // ── 設定 ──────────────────────────────────────────────────────────────────────
 const BASE_URL  = `http://localhost:${process.env.PORT ?? 3001}`;
@@ -95,12 +96,35 @@ async function getTestMission(pool: mysql.Pool) {
   return (rows as any[])[0] ?? null;
 }
 
-// ── 取得測試用 API key（第一個有效的）──────────────────────────────────────
-async function getApiKey(pool: mysql.Pool): Promise<string | null> {
-  const [rows] = await pool.execute(`
-    SELECT apiKey FROM user_api_keys WHERE isActive = 1 LIMIT 1
-  `) as any[];
-  return (rows as any[])[0]?.apiKey ?? null;
+// ── 建立臨時測試 API key（raw key 返回後只存 hash）──────────────────────────
+// API keys 在 DB 以 SHA-256 hash 存儲，raw key 無法從 DB 反推。
+// 因此測試時臨時建立一個 key，用完後清除。
+let _testRawKey: string | null = null;
+async function getOrCreateTestApiKey(pool: mysql.Pool): Promise<{ rawKey: string; userId: number } | null> {
+  if (_testRawKey) {
+    // 重用同一輪的 key（userId 不重要，已有 token）
+    return null;
+  }
+  // 找第一個有效 user
+  const [userRows] = await pool.execute(`SELECT id FROM users WHERE isActive = 1 LIMIT 1`) as any[];
+  const userId: number | undefined = (userRows as any[])[0]?.id;
+  if (!userId) return null;
+
+  const rawKey = "sw-test-" + randomBytes(12).toString("hex");
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+  await pool.execute(
+    `INSERT INTO user_api_keys (userId, apiKey, label, isActive) VALUES (?, ?, ?, 1)`,
+    [userId, keyHash, "auto-test-runner"]
+  );
+  _testRawKey = rawKey;
+  return { rawKey, userId };
+}
+
+async function cleanupTestApiKey(pool: mysql.Pool): Promise<void> {
+  if (!_testRawKey) return;
+  const keyHash = createHash("sha256").update(_testRawKey).digest("hex");
+  await pool.execute(`DELETE FROM user_api_keys WHERE apiKey = ?`, [keyHash]).catch(() => {});
+  _testRawKey = null;
 }
 
 // ── 登入取得 JWT ─────────────────────────────────────────────────────────────
@@ -480,18 +504,23 @@ async function main() {
   }
   console.log(`📋 使用 mission #${mission.missionId}  squad=${mission.squadSlug}  brand=${mission.brandName}`);
 
-  const apiKey = await getApiKey(pool);
-  if (!apiKey) {
-    console.error("❌ 找不到有效的 API key，請在 user_api_keys table 建立一筆");
+  // 建立臨時測試 API key（因為 DB 只存 hash，raw key 無法反推）
+  const keyInfo = await getOrCreateTestApiKey(pool);
+  if (!keyInfo) {
+    console.error("❌ 找不到有效 user 或無法建立測試 API key");
+    await pool.end();
     process.exit(1);
   }
+  console.log(`🔑 已建立臨時 API key for userId=${keyInfo.userId}`);
 
-  const token = await login(apiKey);
+  const token = await login(keyInfo.rawKey);
   if (!token) {
+    await cleanupTestApiKey(pool);
     console.error("❌ 登入失敗，請確認 server 運行在 port", process.env.PORT ?? 3001);
+    await pool.end();
     process.exit(1);
   }
-  console.log("🔑 登入成功，開始測試...\n");
+  console.log("✅ 登入成功，開始測試...\n");
 
   const results: RunResult[] = [];
 
@@ -505,6 +534,7 @@ async function main() {
     }
   }
 
+  await cleanupTestApiKey(pool);
   await pool.end();
   printReport(results);
 }
