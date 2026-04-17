@@ -1,0 +1,20 @@
+name: Admin — Audit Methodology Squads (命名 + 欄位完整性)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH & run audit
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os
+            npm run db:audit-methodology --prefix skills/ai-talent
