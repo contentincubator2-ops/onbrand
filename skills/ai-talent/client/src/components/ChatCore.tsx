@@ -1661,10 +1661,13 @@ export default function ChatCore({
               background: msg.role === "user" ? "#1A1A18" : "transparent",
               color: msg.role === "user" ? "#FFFFFF" : "#1A1A18",
               borderRadius: msg.role === "user" ? 14 : 0,
-              padding: msg.role === "user" ? "10px 14px" : "0",
+              padding: msg.role === "user" ? "10px 14px" : msg.squadStep !== undefined ? "0 0 0 12px" : "0",
               fontSize: 14,
               lineHeight: 1.65,
               whiteSpace: msg.role === "user" ? "pre-wrap" : undefined,
+              borderLeft: msg.squadStep !== undefined
+                ? `3px solid ${msg.isSquadLead ? "#0A6EFA" : msg.isSecondOpinion ? "#7C3AED" : "#E4E3E1"}`
+                : "none",
             }}>
               {msg.role === "assistant" && msg.agentName && msg.squadStep === undefined && (
                 <div style={{
