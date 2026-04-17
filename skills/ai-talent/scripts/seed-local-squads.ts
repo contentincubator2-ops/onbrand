@@ -861,13 +861,24 @@ async function main() {
 
         // Step 2：功能利益轉化（m2：consumer_insight_analyst）
         // requiredSkills = m2Skills（完全一致）
+        // 資料來源優先級 + Fallback：
+        //   Primary  → Google Analytics 行為流（已連接時）
+        //   Fallback → Google Search Console 搜尋查詢報告（GA 未連接）
+        //   Fallback → Google Keyword Planner 公開關鍵字量（Search Console 也沒有）
+        //   Fallback → 競品官網功能頁面分析（octolens）+ 行業報告二手資料
         assignAgentToStep({
           step: 2,
           title: "功能利益轉化（Feature → Functional Benefit Map）",
-          description: "Consumer Insight Analyst 使用 osp_marketing_tools Product Value Map Generator，將每項產品功能轉譯為目標客群能感知的功能利益。查詢 Google Analytics 行為流資料與問卷 survey 結果，確認哪些功能是用戶真正在用且重視的，過濾「工程師認為重要但用戶不在乎」的功能。輸出 Feature → Functional Benefit 對照表。",
+          description: "Consumer Insight Analyst 使用 osp_marketing_tools Product Value Map Generator，將每項產品功能轉譯為目標客群能感知的功能利益。【資料來源優先級】① 若已連接 Google Analytics：讀取行為流報告，確認用戶實際使用頻率最高的功能；② 若無 GA，改用 Google Search Console 搜尋查詢詞，了解用戶搜尋意圖；③ 若兩者皆無，使用 Google Keyword Planner 公開搜尋量 + 競品官網功能頁面分析（octolens）作為替代依據。最終過濾「工程師認為重要但用戶不在乎」的功能，輸出 Feature → Functional Benefit 對照表。",
           owner: "consumer_insight_analyst",
-          output: "功能利益清單（Feature → Functional Benefit Map）",
-          tools: ["osp_marketing_tools: Product Value Map Generator", "google-analytics: 行為流報告"],
+          output: "功能利益清單（Feature → Functional Benefit Map）+ 資料來源說明",
+          tools: [
+            "osp_marketing_tools: Product Value Map Generator",
+            "google-analytics: 行為流報告（primary）",
+            "google-search-console: 搜尋查詢詞（fallback 1）",
+            "google-keyword-planner: 關鍵字搜尋量（fallback 2）",
+            "octolens: 競品功能頁面分析（fallback 3）",
+          ],
           requiredSkills: ["consumer-insights", "customer-research", "market-research", "survey-analysis", "product-analysis"],
         }, m2Info),
 
@@ -898,25 +909,41 @@ async function main() {
         }, leadInfo),
 
         // Step 5：落地文案 + A/B 驗證（m4 主執行 / m5 A/B 驗證）
-        // requiredSkills = m4Skills + m5Skills 的聯集（代表這個步驟需要兩種能力）
+        // 資料來源優先級 + Fallback：
+        //   Primary  → Facebook Ads Manager CTR 歷史數據（已連接時）
+        //   Fallback → Facebook Ads Library 公開廣告素材分析（無 Ads 帳戶連接）
+        //   Fallback → Google Ads 行業平均 CTR 基準（無任何 Ads 連接）
+        //   Fallback → Copywriting heuristics：AIDA / PAS / 情感強度評分框架
         assignAgentToStep({
           step: 5,
           title: "轉換文案落地 + A/B 效力驗證（LP / Ads / Email）",
-          description: "Conversion Copywriter 將 Message Ladder 轉化為 Landing Page Hero Copy（H1 / 副標 / Pain Point Block / CTA）、4 版廣告 Headlines（情感 / 功能 / 競品痛點 / ICP 精準）、Email Subject Lines。Ad Messaging Validator 調用 Facebook Ads 歷史 CTR 基準與 A/B 測試框架，對每版廣告評估情感強度 × 差異化 × 預測轉換率，輸出主推組合建議。",
+          description: "Conversion Copywriter 將 Message Ladder 轉化為 Landing Page Hero Copy（H1 / 副標 / Pain Point Block / CTA）、4 版廣告 Headlines（情感 / 功能 / 競品痛點 / ICP 精準）、Email Subject Lines。Ad Messaging Validator 執行效力驗證：【資料來源優先級】① 若已連接 Facebook Ads：調用帳戶歷史 CTR 數據評估各版本預期效力；② 若無 FB Ads 帳戶，改用 Facebook Ads Library 公開素材分析競品文案模式；③ 若兩者皆無，使用 Google Ads 行業平均 CTR 基準（B2B: 0.9% / B2C: 1.2%）+ AIDA / PAS copywriting 評分框架作為替代驗證。輸出 4 版 Headlines 的情感強度 × 差異化 × 轉換預測評估表。",
           owner: "conversion_copywriter + ad_messaging_validator",
-          output: "廣告文案包（LP Copy / 4版 Ad Headlines / Email Subject Lines）+ A/B 效力評估表",
-          tools: ["marketing-strategy-pmm: Value Proposition Formula", "facebook-ads: CTR 基準數據", "ab-testing: A/B 框架"],
+          output: "廣告文案包（LP Copy / 4版 Ad Headlines / Email Subject Lines）+ A/B 效力評估表 + 主推組合建議",
+          tools: [
+            "marketing-strategy-pmm: Value Proposition Formula",
+            "facebook-ads: 帳戶 CTR 歷史數據（primary）",
+            "facebook-ads-library: 公開競品廣告分析（fallback 1）",
+            "google-ads-benchmark: 行業 CTR 基準（fallback 2）",
+            "ab-testing: AIDA / PAS copywriting 評分框架（fallback 3）",
+          ],
           requiredSkills: ["conversion-copywriting", "facebook-ads", "ad-creative", "ab-testing", "cro"],
         }, m4Info),
 
-        // Step 6：Squad Lead QA & 定位書交付（leadId）
+        // Step 6：Squad Lead QA & 完整交付（leadId）
+        // 交付物：① LP Copy ② 廣告 Headlines ③ 定位書 ④ PPT 簡報架構
+        // 交付方式：Google Drive 分享連結 / Email 附件（依整合連接狀態）
         assignAgentToStep({
           step: 6,
-          title: "Squad Lead QA & 利益階梯定位書交付",
-          description: "Squad Lead 校閱全部輸出：(1) Message Ladder 每層邏輯連貫性 (2) 情感核心是否真實反映 ICP 語言 (3) 廣告文案是否與 Ladder 一致 (4) 競品差異化是否清晰。整合輸出三份交付物：Landing Page Copy 最終版、廣告 4 版 Headlines 最終版、品牌利益階梯定位書。",
+          title: "Squad Lead QA & 利益階梯定位書 + 簡報交付",
+          description: "Squad Lead 校閱全部輸出：(1) Message Ladder 每層邏輯連貫性 (2) 情感核心是否真實反映 ICP 語言 (3) 廣告文案是否與 Ladder 一致 (4) 競品差異化是否清晰。整合輸出四份交付物：Landing Page Copy 最終版、廣告 4 版 Headlines 最終版、品牌利益階梯定位書、Google Slides 簡報架構（9 張投影片：封面 / ICP & 痛點 / Benefit Ladder 視覺 / Message Ladder / LP Hero / 4版廣告 / 各通路原則 / 禁用訊息 / 定位測試 & 下一步）。【交付方式優先級】① 若已連接 Google Drive：自動建立簡報檔案並分享連結；② 若已連接 Gmail：以 Email 附件形式傳送 PDF 版本；③ 若皆未連接：在對話中完整輸出所有文件內容，供手動複製使用。",
           owner: "squad_lead",
-          output: "① Landing Page Copy ② 廣告 4 版 Headlines ③ 品牌利益階梯定位書（含核心定位句 / Ladder / ICP / 競品差異化 / 各通路一致性原則）",
-          tools: [],
+          output: "① Landing Page Copy（最終版）② 廣告 4 版 Headlines（最終版）③ 品牌利益階梯定位書 ④ Google Slides 9 頁簡報架構",
+          tools: [
+            "google-drive: 建立並分享簡報檔案（primary）",
+            "gmail: Email 附件傳送（fallback 1）",
+            "chat-output: 完整文字輸出（fallback 2）",
+          ],
           requiredSkills: ["positioning", "brand-strategy", "messaging"],
         }, leadInfo),
       ];
@@ -939,8 +966,20 @@ async function main() {
         agents: members,
         tags: ["brand", "positioning", "messaging", "copywriting", "emotional-branding", "benefit-ladder", "conversion", "ad-creative", "brand-positioning"],
         useCases: ["新產品上市訊息框架", "廣告文案改版", "Landing Page 轉換優化", "品牌重新定位訊息整合", "品牌故事建立"],
-        outputFormats: ["PDF 策略報告", "Google Slides 簡報", "YouTube 影片腳本"],
-        requiredIntegrations: ["facebook-ads"],
+        outputFormats: [
+          "Landing Page Hero Copy",
+          "廣告 4 版 Headlines（A/B 測試組）",
+          "Email Subject Lines",
+          "品牌利益階梯定位書（PDF）",
+          "Google Slides 簡報（9 頁）",
+          "Google Drive 分享連結",
+        ],
+        // required = 必須連接才能執行；optional = 有更好，沒有有 fallback
+        // facebook-ads: Step 5 CTR 驗證（optional — fallback: FB Ads Library + 行業基準）
+        // google-analytics: Step 2 功能使用率（optional — fallback: Search Console → Keyword Planner）
+        // google-drive: Step 6 簡報交付（optional — fallback: Gmail → chat output）
+        // gmail: Step 6 Email 交付（optional — fallback: chat output）
+        requiredIntegrations: ["facebook-ads", "google-analytics", "google-drive", "gmail"],
         token: 60000,
         showcases: [
           { company: "Apple", description: "iPod 從「5GB MP3 播放器」轉化為「1,000 首歌放口袋」，Feature→功能→情感效益三層轉化", result: "iPod 上市首年銷售超過 600 萬台，改變整個音樂產業", source: "Apple Marketing Case Study" },

@@ -50,6 +50,12 @@ const METHODOLOGY_STEP_FORMATS: Record<string, string> = {
 
   "benefit-based:2": `
 【Step 2 輸出格式（強制）】
+【資料來源規則】在輸出表格之前，先用一行聲明你使用的資料來源：
+  - 若品牌已連接 Google Analytics → 「資料來源：Google Analytics 行為流報告」
+  - 若無 GA 但有關鍵字資料 → 「資料來源：Google Search Console 搜尋查詢詞」
+  - 若皆無 → 「資料來源：Google Keyword Planner 公開數據 + 競品官網分析（octolens）」
+  聲明後直接進入表格，不得再解釋為什麼沒有資料。
+
 你的回應必須包含以下兩個區塊，按順序輸出：
 
 ## Feature → Functional Benefit Map
@@ -141,6 +147,12 @@ const METHODOLOGY_STEP_FORMATS: Record<string, string> = {
 
   "benefit-based:5": `
 【Step 5 輸出格式（強制）】
+【資料來源規則】在 A/B 評估表之前，先用一行聲明效力驗證的資料來源：
+  - 若已連接 Facebook Ads → 「驗證依據：Facebook Ads 帳戶 CTR 歷史數據」
+  - 若無 FB Ads 但可查 Ads Library → 「驗證依據：Facebook Ads Library 競品廣告分析」
+  - 若皆無 → 「驗證依據：Google Ads 行業 CTR 基準（B2B 0.9% / B2C 1.2%）+ AIDA 評分框架」
+  聲明後直接進入表格，不得再解釋為什麼沒有資料。
+
 你的回應必須按順序包含以下四個區塊，每個區塊都必須完整輸出：
 
 ## 🖥️ Landing Page Hero Copy
@@ -218,11 +230,11 @@ CTA：[≤ 6 字]
 **下一步**：Step 6 Squad Lead 將整合所有步驟輸出，完成品牌利益階梯定位書最終交付。
 **確認問題**：4 版 Headlines 中，哪一版最接近你期望品牌呈現的氣質？`,
 
-  // ── 最終步驟：Squad Lead 交付三份文件 ──────────────────────────────────────
+  // ── 最終步驟：Squad Lead 交付四份文件 ──────────────────────────────────────
   "benefit-based:final": `
-【最終交付格式（強制）— 輸出三份完整文件】
-你是 Squad Lead，負責整合所有步驟成果，輸出以下三份完整文件。
-字數上限：1500 字（三份合計）。每份文件必須完整，不得截斷。
+【最終交付格式（強制）— 輸出四份完整文件】
+你是 Squad Lead，負責整合所有步驟成果，輸出以下四份完整文件。
+字數上限：1800 字（四份合計）。每份文件必須完整，不得截斷。
 禁止：不得重述「前面各步驟已說明」，直接輸出文件內容。
 
 ---
@@ -341,6 +353,58 @@ LinkedIn     → [思想領袖層]
 
 ══════════════════════════════════════════════════════
 交付：利益階梯定位小組
+\`\`\`
+
+---
+
+# 📊 文件四：Google Slides 簡報架構（9 頁）
+
+\`\`\`
+Slide 1｜封面
+  標題：[品牌名稱] 品牌利益階梯定位
+  副標：Benefit-Based Positioning Playbook
+  日期：[執行日期]
+
+Slide 2｜目標客群（ICP）& 核心痛點
+  主要 ICP：[職稱 / 情境 / 痛點]
+  次要 ICP：[職稱 / 情境 / 痛點]
+
+Slide 3｜Benefit Ladder 視覺金字塔
+  ▲ 品牌主張
+  ▲ 情感利益（★ 核心層）
+  ▲ 功能利益
+  ▲ 功能特性
+  ▲ CTA
+
+Slide 4｜Message Ladder 完整版
+  [從文件三 Section 二完整複製]
+
+Slide 5｜Landing Page Hero Copy
+  H1 / 副標 / Social Proof / Pain Point Block / CTA
+
+Slide 6｜廣告 4 版 Headlines
+  版本 A B C D 各一格，標註建議用途
+
+Slide 7｜各通路訊息一致性原則
+  [從文件三 Section 五複製]
+
+Slide 8｜禁止使用的訊息方向
+  [從文件三 Section 六複製]
+
+Slide 9｜定位測試 & 下一步行動
+  一句話定位測試：[完整句]
+  立即：[行動 1]
+  30 天：[行動 2]
+  長期：[行動 3]
+\`\`\`
+
+---
+
+**【交付方式說明】**
+\`\`\`
+若已連接 Google Drive → 自動建立 Slides 檔案，分享連結如下：[連結]
+若已連接 Gmail → 已傳送 PDF 至 [信箱]
+若皆未連接 → 以上四份文件已完整輸出於對話中，請手動複製使用
 \`\`\``,
 
   // ═══════════════════════════════════════════════════
