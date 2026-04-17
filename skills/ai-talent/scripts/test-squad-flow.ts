@@ -98,9 +98,9 @@ async function getTestMission(pool: mysql.Pool) {
 // ── 取得測試用 API key（第一個有效的）──────────────────────────────────────
 async function getApiKey(pool: mysql.Pool): Promise<string | null> {
   const [rows] = await pool.execute(`
-    SELECT keyValue FROM user_api_keys WHERE isActive = 1 LIMIT 1
+    SELECT apiKey FROM user_api_keys WHERE isActive = 1 LIMIT 1
   `) as any[];
-  return (rows as any[])[0]?.keyValue ?? null;
+  return (rows as any[])[0]?.apiKey ?? null;
 }
 
 // ── 登入取得 JWT ─────────────────────────────────────────────────────────────
