@@ -815,6 +815,30 @@ ${agentCtx.systemPromptPrefix}`;
       return getSquadRequirements(input.squadSlug || null, input.workspace ?? null);
     }),
 
+  // ── getSessionStep ────────────────────────────────────────────────────────────
+  // Returns the current step index for a mission's squad session.
+  // Used by the right-panel sidebar to highlight the active agent / step.
+  getSessionStep: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .query(async ({ input }) => {
+      try {
+        const [rows] = await localPool.execute(
+          `SELECT currentStep, squadSlug, status
+           FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
+          [input.missionId]
+        ) as any[];
+        const row = (rows as any[])?.[0];
+        if (!row) return { currentStep: 0, status: "intake" as const, found: false };
+        return {
+          currentStep: Number(row.currentStep ?? 0),
+          status: (row.status ?? "intake") as string,
+          found: true,
+        };
+      } catch {
+        return { currentStep: 0, status: "intake" as const, found: false };
+      }
+    }),
+
   // ── logUsage ─────────────────────────────────────────────────────────────────
   // Write a squad_usage_log row when the user starts a squad session.
   logUsage: protectedProcedure

@@ -1483,6 +1483,19 @@ function RightPanel({
   );
   const alternatives = (alternativesQuery.data ?? []) as any[];
 
+  // ── Poll current squad session step (for live sidebar highlighting) ─────────
+  const sessionStepQuery = trpc.squad.getSessionStep.useQuery(
+    { missionId: missionId! },
+    {
+      enabled: !!missionId && !!effectiveSquad,
+      // Poll every 3 seconds while a session exists; slow down to 15s once squad is done
+      refetchInterval: (data: any) =>
+        !data ? 3000 : data.status === "complete" ? 15_000 : 3000,
+      refetchOnWindowFocus: true,
+    }
+  );
+  const activeStep = (sessionStepQuery.data as any)?.currentStep as number | undefined;
+
   // ── Accordion ──────────────────────────────────────────────────────────────
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
     requirements: true, sop: false, agents: false, alternatives: false, brandbrain: false,
@@ -1518,6 +1531,7 @@ function RightPanel({
             steps={agentsData?.steps ?? []}
             showcases={agentsData?.showcases ?? []}
             isLoading={agentsQuery.isLoading}
+            activeStep={activeStep}
           />
         : emptyHint("選擇執行方式\n查看對應流程"),
     },
@@ -1529,6 +1543,7 @@ function RightPanel({
             lead={agentsData?.lead ?? null}
             agents={agentsData?.agents ?? []}
             isLoading={agentsQuery.isLoading}
+            activeStep={activeStep}
           />
         : emptyHint("選擇執行方式\n查看協作成員"),
     },
@@ -1641,7 +1656,7 @@ function RightPanel({
 // Renders methodology steps from squad_workflow_templates (real DB data)
 
 function DBSquadMethodologyPanel({
-  squadName, description, methodology, leadTitle, steps, showcases, isLoading,
+  squadName, description, methodology, leadTitle, steps, showcases, isLoading, activeStep,
 }: {
   squadName: string;
   description: string;
@@ -1650,6 +1665,7 @@ function DBSquadMethodologyPanel({
   steps: any[];
   showcases: any[];
   isLoading: boolean;
+  activeStep?: number; // 0 = lead intake, 1+ = workflow steps
 }) {
   return (
     <div>
@@ -1685,26 +1701,50 @@ function DBSquadMethodologyPanel({
         </div>
       ) : steps.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {steps.map((step: any, i: number) => (
-            <div key={i} style={{ display: "flex", gap: 10 }}>
-              <div style={{
-                width: 20, height: 20, borderRadius: "50%",
-                background: "#1A1A18", color: "#FFFFFF",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
+          {steps.map((step: any, i: number) => {
+            const stepNum = step.step ?? i + 1;
+            // activeStep 0 = lead intake (before step 1), 1+ = step index
+            const isActive = activeStep !== undefined && activeStep > 0 && activeStep === stepNum;
+            const isDone   = activeStep !== undefined && activeStep > stepNum;
+            return (
+              <div key={i} style={{
+                display: "flex", gap: 10,
+                padding: isActive ? "6px 8px" : undefined,
+                background: isActive ? "#F0FDF8" : isDone ? "#FAFAF9" : undefined,
+                borderRadius: isActive ? 8 : undefined,
+                border: isActive ? "1px solid #A7F3D0" : undefined,
+                transition: "all 0.3s ease",
               }}>
-                {step.step ?? i + 1}
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
-                  {step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
+                <div style={{
+                  width: 20, height: 20, borderRadius: "50%",
+                  background: isActive ? "#1DBEAA" : isDone ? "#9B9990" : "#1A1A18",
+                  color: "#FFFFFF",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
+                  boxShadow: isActive ? "0 0 0 3px rgba(29,190,170,0.25)" : undefined,
+                  transition: "all 0.3s ease",
+                }}>
+                  {isDone ? "✓" : stepNum}
                 </div>
-                <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
-                  {step.description ?? ""}
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: 12, fontWeight: 600, marginBottom: 2,
+                    color: isActive ? "#1DBEAA" : isDone ? "#9B9990" : "#1A1A18",
+                  }}>
+                    {step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
+                    {step.description ?? ""}
+                  </div>
+                  {isActive && (
+                    <div style={{ fontSize: 10, color: "#1DBEAA", marginTop: 3, fontWeight: 600 }}>
+                      ⚡ 執行中
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div style={{ fontSize: 11, color: "#C8C7C3", textAlign: "center", padding: "12px 0" }}>
@@ -1762,11 +1802,12 @@ function DBSquadMethodologyPanel({
 // Renders real DB agents: lead (teal card) + members
 
 function DBAgentMembersList({
-  lead, agents, isLoading,
+  lead, agents, isLoading, activeStep,
 }: {
   lead: any | null;
   agents: any[];
   isLoading: boolean;
+  activeStep?: number; // 0 = lead active, 1+ = agent at that step index
 }) {
   if (isLoading) {
     return (
@@ -1790,37 +1831,58 @@ function DBAgentMembersList({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {allMembers.map((agent: any, i: number) => (
+      {allMembers.map((agent: any, i: number) => {
+        // Lead = index 0, members = index 1+
+        // activeStep 0 = lead intake, 1+ = member step
+        const isActive = activeStep !== undefined && (
+          (agent.isLead && activeStep === 0) ||
+          (!agent.isLead && activeStep === i)
+        );
+        const isDone = activeStep !== undefined && !agent.isLead && activeStep > i;
+        return (
         <div
           key={agent.agentId ?? i}
           style={{
             padding: "10px 10px",
-            background: agent.isLead ? "#F0FDF8" : "#FFFFFF",
-            border: `1px solid ${agent.isLead ? "#A7F3D0" : "#E7E5E4"}`,
+            background: isActive ? "#F0FDF8" : isDone ? "#FAFAF9" : agent.isLead ? "#F0FDF8" : "#FFFFFF",
+            border: `1px solid ${isActive ? "#1DBEAA" : isDone ? "#D1FAE5" : agent.isLead ? "#A7F3D0" : "#E7E5E4"}`,
             borderRadius: 8,
+            transition: "all 0.3s ease",
+            boxShadow: isActive ? "0 0 0 2px rgba(29,190,170,0.2)" : undefined,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
             <div style={{
               width: 22, height: 22, borderRadius: "50%",
-              background: agent.isLead ? "#1DBEAA" : "#1A1A18",
+              background: isActive ? "#1DBEAA" : isDone ? "#9B9990" : agent.isLead ? "#1DBEAA" : "#1A1A18",
               color: "white", display: "flex", alignItems: "center",
               justifyContent: "center", fontSize: 9, fontWeight: 700, flexShrink: 0,
+              boxShadow: isActive ? "0 0 0 3px rgba(29,190,170,0.3)" : undefined,
+              transition: "all 0.3s ease",
             }}>
-              {(agent.name ?? "A").charAt(0)}
+              {isDone ? "✓" : (agent.name ?? "A").charAt(0)}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#1DBEAA" : "#1A1A18" }}>
                 {agent.name}
               </div>
               <div style={{ fontSize: 10, color: "#6B6A66" }}>{agent.title}</div>
             </div>
-            {agent.isLead && (
+            {agent.isLead && !isActive && (
               <span style={{
                 fontSize: 9, padding: "1px 6px", borderRadius: 4,
                 background: "#1DBEAA", color: "white", fontWeight: 600,
               }}>
                 Lead
+              </span>
+            )}
+            {isActive && (
+              <span style={{
+                fontSize: 9, padding: "1px 6px", borderRadius: 4,
+                background: "#1DBEAA", color: "white", fontWeight: 600,
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}>
+                ⚡ 執行中
               </span>
             )}
           </div>
@@ -1843,7 +1905,8 @@ function DBAgentMembersList({
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
