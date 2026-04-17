@@ -39,13 +39,20 @@ interface SquadAudit {
   token: number;
 }
 
-function parseJsonArray(val: string | null): any[] {
+function parseJsonArray(val: string | null | Buffer): any[] {
   if (!val) return [];
+  // mysql2 may return LONGTEXT as Buffer — convert to string first
+  const str = Buffer.isBuffer(val) ? val.toString("utf8") : String(val);
+  if (!str || str === "[]" || str === "null" || str === "") return [];
   try {
-    const parsed = JSON.parse(val);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
+    const parsed = JSON.parse(str);
+    if (Array.isArray(parsed)) return parsed;
+    // Fallback: comma-separated string stored without JSON quotes
     return [];
+  } catch {
+    // Fallback: might be comma-separated plain string (old format)
+    const parts = str.split(",").map(s => s.trim()).filter(Boolean);
+    return parts.length > 0 ? parts : [];
   }
 }
 
@@ -68,6 +75,7 @@ async function main() {
     password: process.env.DB_PASSWORD!,
     database: process.env.DB_NAME!,
     ssl: { rejectUnauthorized: false },
+    charset:  "utf8mb4",
   });
 
   const conn = await pool.getConnection();
@@ -88,6 +96,20 @@ async function main() {
     console.log(`\n${"=".repeat(70)}`);
     console.log(`SQUAD 欄位完整性審計  (${squads.length} 個 active squads)`);
     console.log(`${"=".repeat(70)}\n`);
+
+    // ── Debug: print raw tags for 3 representative squads ──────────────────
+    const debugIds = [1, 637, 647]; // old, methodology, new
+    const debugSample = (squads as any[]).filter((s: any) => debugIds.includes(s.id));
+    console.log(`[DEBUG] Raw tags sample (ids ${debugIds.join(",")}):`);
+    for (const s of debugSample) {
+      const rawTags = s.tags;
+      const tagType = Buffer.isBuffer(rawTags) ? "Buffer" : typeof rawTags;
+      const tagSnippet = Buffer.isBuffer(rawTags)
+        ? rawTags.slice(0, 80).toString("utf8")
+        : String(rawTags ?? "").slice(0, 80);
+      console.log(`  [${s.id}] ${s.slug} → type:${tagType} | raw:"${tagSnippet}"`);
+    }
+    console.log("");
 
     const audits: SquadAudit[] = [];
     let perfectCount = 0;
