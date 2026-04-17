@@ -7,13 +7,16 @@
  *   下半：input wrap（固定底部）
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import TaskProgressTracker, { type TaskStep } from "./chat/TaskProgressTracker";
 import TypedThreadCard from "./chat/TypedThreadCard";
 import SquadRecommendCards from "./chat/SquadRecommendCards";
 import { MissionHomePage } from "./chat/MissionHomePage";
+import { AgentBubbleHeader } from "./chat/AgentBubbleHeader";
+import { SaveToBrainButton } from "./chat/SaveToBrainButton";
+import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./chat/MentionAutocomplete";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -63,7 +66,9 @@ export interface Msg {
   model?: string;
   agentName?: string;
   agentTitle?: string;
+  agentAvatar?: string | null;
   agentModel?: string | null;
+  agentRole?: string;
   isStreaming?: boolean;
   pendingApproval?: boolean;
   approved?: boolean;
@@ -71,6 +76,14 @@ export interface Msg {
   sopBuilt?: boolean;
   exportFormat?: "ppt" | "word" | "copy" | "none";
   squadRecommend?: { squads: any[]; missionId: number; brandId: number };
+  // Squad step metadata
+  squadStep?: number;
+  squadTotalSteps?: number;
+  squadStepLabel?: string;
+  isSquadLead?: boolean;
+  isSecondOpinion?: boolean;
+  suggestions?: string[];      // 後續建議選項
+  savedToBrain?: boolean;
 }
 
 interface AssembledAgent {
@@ -479,6 +492,8 @@ export default function ChatCore({
   const [activeWorkspaceKey, setActiveWorkspaceKey] = useState<string>("strategy");
   const [selectedSquadForMission, setSelectedSquadForMission] = useState<DBSquad | null>(null);
 
+  const [mentionAnchorRect, setMentionAnchorRect] = useState<DOMRect | null>(null);
+
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -765,15 +780,92 @@ export default function ChatCore({
               const data = JSON.parse(line.slice(6));
               if (curEvent === "relay_step") {
                 const rsId = data.id ?? 0;
-                setRelaySteps((prev) => {
-                  const exists = prev.find((s) => s.id === rsId);
-                  if (data.status === "done") return prev.map((s) => s.id === rsId ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) } : s);
-                  if (exists) return prev.map((s) => s.id === rsId ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle } : s);
-                  return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
-                });
-            if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
-            if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
-          } else if (curEvent === "delta") {
+                const isSecondOpinion = data.isSecondOpinion ?? false;
+
+                if (data.status === "done") {
+                  setRelaySteps((prev) => prev.map((s) => s.id === rsId
+                    ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) }
+                    : s
+                  ));
+                  if (!isSecondOpinion) {
+                    setConversations((prev) => prev.map((c) => c.id === convId
+                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId
+                          ? { ...m, isStreaming: false, agentName: data.agentName ?? m.agentName, agentTitle: data.agentTitle ?? m.agentTitle }
+                          : m
+                        )}
+                      : c
+                    ));
+                  }
+                } else {
+                  // step running — 把 agent 身份注入 message（串流開始前）
+                  setRelaySteps((prev) => {
+                    const exists = prev.find((s) => s.id === rsId);
+                    if (exists) return prev.map((s) => s.id === rsId
+                      ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle }
+                      : s
+                    );
+                    return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
+                  });
+
+                  if (!isSecondOpinion) {
+                    setConversations((prev) => prev.map((c) => c.id === convId
+                      ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId
+                          ? { ...m,
+                              isStreaming: true,
+                              agentName: data.agentName ?? m.agentName,
+                              agentTitle: data.agentTitle ?? m.agentTitle,
+                              agentAvatar: data.agentAvatar ?? m.agentAvatar,
+                              agentRole: data.agentRole ?? m.agentRole,
+                              squadStep: data.step,
+                              squadTotalSteps: data.totalSteps,
+                              squadStepLabel: data.label,
+                              isSquadLead: data.layer === "strategy" && data.step === 0,
+                            }
+                          : m
+                        )}
+                      : c
+                    ));
+                  } else {
+                    // 第二意見：插入新的 assistant message
+                    const soId = `so-${Date.now()}`;
+                    (window as any).__soMsgId = soId;
+                    const soMsg: Msg = {
+                      id: soId, role: "assistant", content: "", ts: Date.now(),
+                      isStreaming: true, isSecondOpinion: true,
+                      agentName: data.agentName, agentTitle: data.agentTitle,
+                      agentAvatar: data.agentAvatar ?? null,
+                    };
+                    setConversations((prev) => prev.map((c) => c.id === convId
+                      ? { ...c, messages: [...c.messages, soMsg] }
+                      : c
+                    ));
+                  }
+
+                  if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
+                  if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
+                }
+
+              } else if (curEvent === "second_opinion_delta") {
+                const soId = (window as any).__soMsgId;
+                if (soId) {
+                  setConversations((prev) => prev.map((c) => c.id === convId
+                    ? { ...c, messages: c.messages.map((m) => m.id === soId
+                        ? { ...m, content: (m.content ?? "") + (data.text ?? "") }
+                        : m
+                      )}
+                    : c
+                  ));
+                }
+              } else if (curEvent === "suggestions") {
+                const items: string[] = data.items ?? [];
+                setConversations((prev) => prev.map((c) => c.id === convId
+                  ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId
+                      ? { ...m, suggestions: items }
+                      : m
+                    )}
+                  : c
+                ));
+              } else if (curEvent === "delta") {
             streamBuffer += data.text;
             setConversations((prev) =>
               prev.map((c) =>
@@ -980,7 +1072,39 @@ export default function ChatCore({
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    // Update anchor rect for MentionAutocomplete positioning
+    if (e.target.value.includes("@")) {
+      setMentionAnchorRect(el.getBoundingClientRect());
+    }
   };
+
+  // ── @Mention helpers ──────────────────────────────────────────────────────
+  // Derive unique agents seen in this conversation for @mention autocomplete
+  const mentionAgents: MentionAgent[] = useMemo(() => {
+    const seen = new Map<string, MentionAgent>();
+    active?.messages.forEach(m => {
+      if (m.role === "assistant" && m.agentName && !seen.has(m.agentName)) {
+        seen.set(m.agentName, {
+          id: Date.now() + seen.size, // stable-ish key
+          name: m.agentName,
+          title: m.agentTitle ?? "",
+          avatarUrl: m.agentAvatar ?? null,
+          isLead: m.isSquadLead,
+        });
+      }
+    });
+    return Array.from(seen.values());
+  }, [active?.messages]);
+
+  const { isMentioning, query: mentionQuery, mentionStart } = useMentionParser(input);
+
+  const handleMentionSelect = useCallback((agent: MentionAgent) => {
+    const before = input.slice(0, mentionStart);
+    const after = input.slice(mentionStart + 1 + mentionQuery.length);
+    setInput(`${before}@${agent.name} ${after}`);
+    setMentionAnchorRect(null);
+    setTimeout(() => chatInputRef.current?.focus(), 50);
+  }, [input, mentionStart, mentionQuery]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1204,6 +1328,117 @@ export default function ChatCore({
               />
         )}
 
+        {/* ── Chat message bubbles ── */}
+        {!isShowingHomepage && active && active.messages.map((msg) => (
+          <div key={msg.id} style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: msg.role === "user" ? "flex-end" : "flex-start",
+            gap: 4,
+          }}>
+            {/* Squad AgentBubbleHeader — shown before assistant content */}
+            {msg.role === "assistant" && msg.squadStep !== undefined && (
+              <AgentBubbleHeader
+                agentName={msg.agentName ?? "Agent"}
+                agentTitle={msg.agentTitle}
+                agentAvatar={msg.agentAvatar}
+                stepLabel={msg.squadStepLabel}
+                stepIndex={msg.squadStep}
+                totalSteps={msg.squadTotalSteps}
+                isStreaming={msg.isStreaming}
+                isSecondOpinion={msg.isSecondOpinion}
+                isLead={msg.isSquadLead}
+              />
+            )}
+
+            {/* Message bubble */}
+            <div style={{
+              maxWidth: msg.role === "user" ? 480 : "100%",
+              background: msg.role === "user" ? "#1A1A18" : "transparent",
+              color: msg.role === "user" ? "#FFFFFF" : "#1A1A18",
+              borderRadius: msg.role === "user" ? 14 : 0,
+              padding: msg.role === "user" ? "10px 14px" : "0",
+              fontSize: 14,
+              lineHeight: 1.65,
+              whiteSpace: msg.role === "user" ? "pre-wrap" : undefined,
+            }}>
+              {msg.role === "assistant" && msg.agentName && msg.squadStep === undefined && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  marginBottom: 6, fontSize: 12, color: "#6B6A66",
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: "50%",
+                    background: "#1A1A18", display: "flex", alignItems: "center",
+                    justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff",
+                    flexShrink: 0,
+                  }}>
+                    {msg.agentName.charAt(0)}
+                  </div>
+                  <span style={{ fontWeight: 600 }}>{msg.agentName}</span>
+                  {msg.agentTitle && <span style={{ color: "#9CA3AF" }}>· {msg.agentTitle}</span>}
+                </div>
+              )}
+              <div style={{ fontSize: 14, lineHeight: 1.65, color: msg.role === "user" ? "#fff" : "#1A1A18" }}>
+                {msg.role === "user" ? (
+                  <span>{msg.content}</span>
+                ) : (
+                  <pre style={{
+                    fontFamily: "inherit", whiteSpace: "pre-wrap",
+                    margin: 0, fontSize: 14, lineHeight: 1.65,
+                  }}>{msg.content}</pre>
+                )}
+              </div>
+              {/* Streaming cursor */}
+              {msg.isStreaming && (
+                <span style={{
+                  display: "inline-block", width: 2, height: 14,
+                  background: "#1A1A18", marginLeft: 2,
+                  animation: "blink 1s step-end infinite", verticalAlign: "middle",
+                }} />
+              )}
+            </div>
+
+            {/* SaveToBrainButton — shown below completed squad step messages */}
+            {msg.role === "assistant" && !msg.isStreaming && msg.squadStep !== undefined && activeBrand?.id && (
+              <SaveToBrainButton
+                brandId={activeBrand.id}
+                content={msg.content ?? ""}
+                title={msg.squadStepLabel ?? `Step ${msg.squadStep} 輸出`}
+                missionId={activeMissionId ?? undefined}
+              />
+            )}
+
+            {/* Suggestion chips */}
+            {msg.suggestions && msg.suggestions.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                {msg.suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInput(s)}
+                    style={{
+                      fontSize: 12, padding: "5px 12px", borderRadius: 20,
+                      border: "1px solid #E4E3E1", background: "#FAFAF9",
+                      cursor: "pointer", color: "#4A4A45", fontFamily: "inherit",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = "#1A1A18";
+                      (e.currentTarget as HTMLElement).style.background = "#F5F5F3";
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = "#E4E3E1";
+                      (e.currentTarget as HTMLElement).style.background = "#FAFAF9";
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+
         {/* Loading card (streaming) */}
         {loading && !teamAssembly && (
           <div style={{
@@ -1416,6 +1651,16 @@ export default function ChatCore({
             </div>
           );
         })()}
+
+        {/* @mention autocomplete — rendered in portal-like fixed position */}
+        <MentionAutocomplete
+          visible={isMentioning && mentionAgents.length > 0}
+          query={mentionQuery}
+          agents={mentionAgents}
+          anchorRect={mentionAnchorRect}
+          onSelect={handleMentionSelect}
+          onClose={() => setMentionAnchorRect(null)}
+        />
 
         {/* Input box */}
         <div style={{

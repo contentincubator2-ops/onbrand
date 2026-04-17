@@ -31,6 +31,8 @@ import sgMail from "@sendgrid/mail";
 import { writeBrandBrainEntry } from "./brandBrainRoute";
 import { recordMissionExport } from "./exportsRoute";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
+import { getOrCreateSquadSession, saveStepAndAdvance } from "../_core/squadSessionManager";
+import { buildSquadAgentPrompt, buildSecondOpinionPrompt } from "../_core/agentPromptBuilder";
 
 export const chatRouter = Router();
 
@@ -721,6 +723,374 @@ async function executePositioningStep(params: {
   }
 }
 
+// ── Squad Chat 執行器 ─────────────────────────────────────────────────────────
+/**
+ * 當 mission 有 squadSlug 時，走 squad agent 分工流程
+ * 回傳 true 表示已處理，false 表示沒有 squad（讓 caller 走一般路徑）
+ */
+async function tryExecuteSquadChat(params: {
+  userId: number;
+  missionId: number;
+  userMessage: string;
+  conversationHistory: { role: string; content: string }[];
+  workspace?: string;
+  send: (event: string, data: unknown) => void;
+  sessionId: string;
+}): Promise<boolean> {
+  const { userId, missionId, userMessage, conversationHistory, workspace, send } = params;
+
+  // ── 1. 從 mission 讀取 squadSlug 與品牌資料 ─────────────────────────────────
+  let squadSlug: string | null = null;
+  let brandId = 0;
+  let brand: Record<string, string> = {};
+  let missionTitle = "";
+
+  try {
+    const [mRows] = await localPool.execute(
+      `SELECT m.squadSlug, m.title, m.brandId,
+              b.name, b.industry, b.description, b.targetAudience,
+              b.brandVoice, b.tagline, b.positioningSummary, b.website
+       FROM missions m
+       LEFT JOIN brands b ON b.id = m.brandId
+       WHERE m.id = ? LIMIT 1`,
+      [missionId]
+    ) as any[];
+    const m = (mRows as any[])?.[0];
+    if (!m?.squadSlug) return false; // 沒有 squad，讓 caller 走一般路徑
+
+    squadSlug    = m.squadSlug;
+    missionTitle = m.title ?? "";
+    brandId      = m.brandId ?? 0;
+    brand = {
+      name:               m.name ?? "",
+      industry:           m.industry ?? "",
+      description:        m.description ?? "",
+      targetAudience:     m.targetAudience ?? "",
+      brandVoice:         m.brandVoice ?? "",
+      tagline:            m.tagline ?? "",
+      positioningSummary: m.positioningSummary ?? "",
+      website:            m.website ?? "",
+    };
+  } catch (e: any) {
+    console.warn("[squadChat] mission/brand fetch:", e?.message);
+    return false;
+  }
+
+  // ── 2. 讀取 squad 定義與 workflow ──────────────────────────────────────────
+  let squadName = squadSlug!;
+  let squadMethodology = "";
+  let squadAgents: any[] = [];
+  let workflowSteps: any[] = [];
+
+  try {
+    const [sRows] = await localPool.execute(
+      `SELECT s.name, s.methodology, s.agents,
+              wt.steps as workflowSteps
+       FROM agent_squads s
+       LEFT JOIN squad_workflow_templates wt ON wt.missionType = s.slug
+       WHERE s.slug = ? AND s.is_active = 1 LIMIT 1`,
+      [squadSlug]
+    ) as any[];
+    const s = (sRows as any[])?.[0];
+    if (s) {
+      squadName        = s.name ?? squadSlug;
+      squadMethodology = s.methodology ?? "";
+      squadAgents      = safeJson(s.agents);
+      workflowSteps    = safeJson(s.workflowSteps);
+    }
+  } catch (e: any) {
+    console.warn("[squadChat] squad fetch:", e?.message);
+  }
+
+  // squad agents 依 order 排序
+  squadAgents.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+  const leadSlot = squadAgents.find((a: any) => a.is_lead === 1 || a.is_lead === true);
+
+  // ── 3. 取得 / 建立 squad session（步驟狀態）──────────────────────────────────
+  const session = await getOrCreateSquadSession(localPool as any, missionId, squadSlug!);
+  const currentStep = session.currentStep;
+  const isLeadStep  = currentStep === 0;
+  const totalSteps  = workflowSteps.length;
+
+  // 決定本步驟的 agent slot
+  let currentSlot: any = null;
+  if (isLeadStep) {
+    currentSlot = leadSlot ?? squadAgents[0] ?? null;
+  } else {
+    // workflow step index (step 1 → workflowSteps[0])
+    const wsIdx = Math.min(currentStep - 1, workflowSteps.length - 1);
+    // 找對應 workflow step 的 owner agent
+    const wStep = workflowSteps[wsIdx];
+    const ownerRole = wStep?.owner ?? wStep?.agentRole ?? "";
+    currentSlot = squadAgents.find((a: any) => a.role === ownerRole)
+               ?? squadAgents[wsIdx % squadAgents.length]
+               ?? squadAgents[0]
+               ?? null;
+  }
+
+  // ── 4. 讀取 agent 詳細資料 ──────────────────────────────────────────────────
+  let agentDetail: any = null;
+  if (currentSlot?.agent_id) {
+    try {
+      const [aRows] = await localPool.execute(
+        `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill
+         FROM agents WHERE id = ? LIMIT 1`,
+        [currentSlot.agent_id]
+      ) as any[];
+      agentDetail = (aRows as any[])?.[0] ?? null;
+    } catch (e: any) {
+      console.warn("[squadChat] agent fetch:", e?.message);
+    }
+  }
+
+  const agentName  = agentDetail?.name  ?? (squadName + " Agent");
+  const agentTitle = agentDetail?.title ?? currentSlot?.role ?? "";
+  const agentAvatar = agentDetail?.avatarUrl ?? null;
+
+  // ── 5. 讀取品牌大腦 ──────────────────────────────────────────────────────────
+  const brandBrain: Record<string, string[]> = {};
+  if (brandId) {
+    try {
+      const [bRows] = await localPool.execute(
+        `SELECT category, content FROM brand_brain WHERE brandId = ? ORDER BY updatedAt DESC LIMIT 30`,
+        [brandId]
+      ) as any[];
+      for (const r of (bRows as any[])) {
+        const cat = r.category ?? "custom";
+        if (!brandBrain[cat]) brandBrain[cat] = [];
+        brandBrain[cat].push(r.content);
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  // ── 6. 取得本步驟的 workflow step 定義 ──────────────────────────────────────
+  const workflowStep = isLeadStep
+    ? { title: "任務確認", description: `啟動「${squadName}」小組，確認任務目標與執行方向`, outputType: "任務目標確認" }
+    : (workflowSteps[Math.min(currentStep - 1, workflowSteps.length - 1)] ?? {});
+
+  // ── 7. 送出 relay_step（在 streaming 開始之前）─────────────────────────────
+  const stepLabel = isLeadStep
+    ? `${squadName} — 任務確認`
+    : (workflowStep.title ?? workflowStep.name ?? `Step ${currentStep}`);
+
+  send("relay_step", {
+    id:          currentStep,
+    step:        currentStep,
+    totalSteps,
+    label:       stepLabel,
+    agentId:     agentDetail?.id ?? null,
+    agentName,
+    agentTitle,
+    agentAvatar,
+    agentRole:   currentSlot?.role ?? "",
+    squadName,
+    layer:       isLeadStep ? "strategy" : "execution",
+    status:      "running",
+  });
+
+  // ── 8. 建構 system prompt（品牌 + workspace + mission + 步驟任務）───────────
+  const systemPrompt = buildSquadAgentPrompt({
+    agent:           { name: agentName, title: agentTitle, specialty: agentDetail?.specialty, aiModel: agentDetail?.aiModel },
+    brand,
+    workspace:       workspace ?? "strategy",
+    missionTitle,
+    squadName,
+    squadMethodology,
+    agentRole:       currentSlot?.role ?? agentTitle,
+    workflowStep,
+    stepIndex:       currentStep,
+    totalSteps,
+    previousResults: session.stepResults,
+    brandBrain,
+    isLead:          isLeadStep,
+  });
+
+  // ── 9. 串流 LLM 回應 ────────────────────────────────────────────────────────
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory.slice(-10),
+    { role: "user", content: userMessage },
+  ];
+
+  let fullOutput = "";
+  try {
+    for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
+      send(event, data);
+      if (event === "delta") fullOutput += (data as any).text ?? "";
+    }
+  } catch (e: any) {
+    // gateway 失敗，fallback 到直接 LLM
+    console.warn("[squadChat] gateway fallback:", e?.message);
+    for await (const chunk of streamFromLLM(systemPrompt, conversationHistory.slice(-10), userMessage)) {
+      fullOutput += chunk;
+      send("delta", { text: chunk });
+    }
+  }
+
+  // ── 10. 儲存步驟結果，推進步驟 ────────────────────────────────────────────
+  await saveStepAndAdvance(localPool as any, missionId, currentStep, fullOutput, totalSteps);
+
+  send("relay_step", {
+    id: currentStep, status: "done",
+    agentName, agentTitle,
+    summary: fullOutput.slice(0, 400),
+  });
+
+  // ── 11. 自動存入品牌大腦（關鍵步驟成果）──────────────────────────────────
+  if (brandId && fullOutput.length > 100 && !isLeadStep) {
+    const STEP_TO_BRAIN_CATEGORY: Record<number, string> = {
+      1: "audience",    // 研究步驟 → 受眾
+      2: "competitors", // 競品分析 → 競品
+      3: "positioning", // 定位步驟 → 定位
+      4: "voice",       // 文案步驟 → 聲音
+    };
+    const category = STEP_TO_BRAIN_CATEGORY[currentStep] ?? "custom";
+    try {
+      await writeBrandBrainEntry({
+        brandId,
+        category,
+        title: `${squadName} — ${stepLabel}`,
+        content: fullOutput.slice(0, 1500),
+        sourceMissionId: missionId,
+      });
+    } catch (e: any) {
+      console.warn("[squadChat] brain write:", e?.message);
+    }
+  }
+
+  // ── 12. 偵測 @mention → 第二意見 ─────────────────────────────────────────
+  const mentionMatch = userMessage.match(/@([\u4e00-\u9fa5\w\s]{1,20})/);
+  if (mentionMatch) {
+    const mentionedName = mentionMatch[1].trim();
+    await handleMentionSecondOpinion({
+      mentionedName, primaryResponse: fullOutput, userMessage,
+      brand, squadAgents, send, conversationHistory,
+    });
+  }
+
+  // ── 13. 送出後續建議 ─────────────────────────────────────────────────────
+  const nextStep = workflowSteps[currentStep]; // currentStep 已推進，指向下一步
+  const suggestions = nextStep
+    ? [
+        `繼續執行：${nextStep.title ?? nextStep.name ?? "下一步"}`,
+        `深入分析剛才的結果`,
+        `調整方向後重新執行這一步`,
+      ]
+    : [
+        `💾 將完整成果存入品牌大腦`,
+        `📄 匯出完整報告`,
+        `🔁 針對某個環節深入分析`,
+      ];
+
+  send("suggestions", { items: suggestions });
+
+  return true; // 已處理
+}
+
+// ── @mention 第二意見處理 ─────────────────────────────────────────────────────
+async function handleMentionSecondOpinion(params: {
+  mentionedName: string;
+  primaryResponse: string;
+  userMessage: string;
+  brand: Record<string, string>;
+  squadAgents: any[];
+  send: (event: string, data: unknown) => void;
+  conversationHistory: { role: string; content: string }[];
+}): Promise<void> {
+  const { mentionedName, primaryResponse, userMessage, brand, squadAgents, send, conversationHistory } = params;
+
+  // 先在 squad members 裡找
+  let secondaryAgent: any = null;
+  let secondaryAgentData: any = null;
+
+  // 嘗試在 squad 成員裡找同名 agent
+  for (const slot of squadAgents) {
+    if (!slot.agent_id) continue;
+    try {
+      const [aRows] = await localPool.execute(
+        `SELECT id, name, title, specialty, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+        [slot.agent_id]
+      ) as any[];
+      const a = (aRows as any[])?.[0];
+      if (a && (a.name?.includes(mentionedName) || mentionedName.includes(a.name?.split(" ")[0] ?? ""))) {
+        secondaryAgent = slot;
+        secondaryAgentData = a;
+        break;
+      }
+    } catch { /* skip */ }
+  }
+
+  // 若 squad 裡沒找到，從 agents 表模糊搜尋
+  if (!secondaryAgentData) {
+    try {
+      const [aRows] = await localPool.execute(
+        `SELECT id, name, title, specialty, avatarUrl FROM agents
+         WHERE name LIKE ? AND isAvailable = 1 LIMIT 1`,
+        [`%${mentionedName}%`]
+      ) as any[];
+      secondaryAgentData = (aRows as any[])?.[0] ?? null;
+    } catch { /* skip */ }
+  }
+
+  if (!secondaryAgentData) return; // 找不到就略過
+
+  // 送出第二 relay_step
+  send("relay_step", {
+    id:          99,
+    step:        99,
+    label:       `@${secondaryAgentData.name} 的第二意見`,
+    agentId:     secondaryAgentData.id,
+    agentName:   secondaryAgentData.name,
+    agentTitle:  secondaryAgentData.title,
+    agentAvatar: secondaryAgentData.avatarUrl ?? null,
+    agentRole:   "second_opinion",
+    layer:       "review",
+    status:      "running",
+    isSecondOpinion: true,
+  });
+
+  const secondPrompt = buildSecondOpinionPrompt(
+    { name: secondaryAgentData.name, title: secondaryAgentData.title, specialty: secondaryAgentData.specialty },
+    primaryResponse,
+    brand,
+    userMessage,
+  );
+
+  const secondMessages = [
+    { role: "system", content: secondPrompt },
+    ...conversationHistory.slice(-4),
+    { role: "user", content: userMessage },
+  ];
+
+  let secondOutput = "";
+  try {
+    for await (const { event, data } of streamFromGateway("openclaw/pm", secondMessages)) {
+      if (event === "delta") {
+        send("second_opinion_delta", data);
+        secondOutput += (data as any).text ?? "";
+      }
+    }
+  } catch {
+    // silent fallback
+  }
+
+  send("relay_step", {
+    id: 99, status: "done",
+    agentName: secondaryAgentData.name,
+    summary: secondOutput.slice(0, 400),
+    isSecondOpinion: true,
+  });
+}
+
+// ── Helper ───────────────────────────────────────────────────────────────────
+function safeJson(val: string | null | undefined): any[] {
+  if (!val) return [];
+  try {
+    const p = JSON.parse(val);
+    return Array.isArray(p) ? p : [];
+  } catch { return []; }
+}
+
 // ── Main chat endpoint ────────────────────────────────────────────────────────
 chatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
@@ -818,6 +1188,18 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
       send("done", { sessionId, isComplete: true });
       return;
+    }
+
+    // ── Squad 任務（missionId 有 squadSlug，且非 strategy workspace）───────────
+    // 偵測是否有 squad 選定，有則走 agent 分工流程
+    if (missionId) {
+      const squadResult = await tryExecuteSquadChat({
+        userId, missionId, userMessage, conversationHistory, workspace, send, sessionId,
+      });
+      if (squadResult) {
+        send("done", { sessionId, isComplete: true });
+        return;
+      }
     }
 
     // ── 一般任務（非 strategy workspace）──────────────────────────────────────
