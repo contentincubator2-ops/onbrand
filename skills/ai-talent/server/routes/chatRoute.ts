@@ -938,13 +938,14 @@ async function tryExecuteSquadChat(params: {
 
   // ── 11. 自動存入品牌大腦（關鍵步驟成果）──────────────────────────────────
   if (brandId && fullOutput.length > 100 && !isLeadStep) {
-    const STEP_TO_BRAIN_CATEGORY: Record<number, string> = {
+    type BrainCategory = "custom" | "audience" | "positioning" | "voice" | "competitors";
+    const STEP_TO_BRAIN_CATEGORY: Record<number, BrainCategory> = {
       1: "audience",    // 研究步驟 → 受眾
       2: "competitors", // 競品分析 → 競品
       3: "positioning", // 定位步驟 → 定位
       4: "voice",       // 文案步驟 → 聲音
     };
-    const category = STEP_TO_BRAIN_CATEGORY[currentStep] ?? "custom";
+    const category: BrainCategory = STEP_TO_BRAIN_CATEGORY[currentStep] ?? "custom";
     try {
       await writeBrandBrainEntry({
         brandId,
@@ -960,7 +961,7 @@ async function tryExecuteSquadChat(params: {
 
   // ── 12. 偵測 @mention → 第二意見 ─────────────────────────────────────────
   const mentionMatch = userMessage.match(/@([\u4e00-\u9fa5\w\s]{1,20})/);
-  if (mentionMatch) {
+  if (mentionMatch && mentionMatch[1]) {
     const mentionedName = mentionMatch[1].trim();
     await handleMentionSecondOpinion({
       mentionedName, primaryResponse: fullOutput, userMessage,

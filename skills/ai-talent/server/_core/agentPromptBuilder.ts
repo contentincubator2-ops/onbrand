@@ -174,7 +174,7 @@ function buildBrainSection(brandBrain: Record<string, string[]>): string {
   const lines = ["【品牌大腦（累積知識）】"];
   for (const cat of categories) {
     const label = CATEGORY_LABELS[cat] ?? cat;
-    const entries = brandBrain[cat].slice(0, 3); // 每類最多 3 條
+    const entries = (brandBrain[cat] ?? []).slice(0, 3); // 每類最多 3 條
     lines.push(`${label}：`);
     for (const e of entries) {
       lines.push(`  · ${e.slice(0, 200)}`);
