@@ -125,12 +125,14 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
           </div>
         </div>
         <div style={{
-          width: 44, height: 44, borderRadius: 8,
+          width: 40, height: 40, borderRadius: 8,
           background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 22,
         }}>
-          🎯
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+            <polyline points="13 2 13 9 20 9"/>
+          </svg>
         </div>
       </div>
 
@@ -282,12 +284,19 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
               display: "flex", alignItems: "center", gap: 5,
             }}
           >
-            🧠 存入品牌大腦
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
+              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
+            </svg>
+            存入品牌大腦
           </button>
         )}
         {saved && (
-          <span style={{ fontSize: 11, color: "#059669", fontWeight: 500 }}>
-            ✓ 已存入品牌大腦
+          <span style={{ fontSize: 11, color: "#059669", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            已存入品牌大腦
           </span>
         )}
         {!confirmed && (
@@ -301,12 +310,18 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
               display: "flex", alignItems: "center", gap: 5,
             }}
           >
-            ✓ 確認定位書
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            確認定位書
           </button>
         )}
         {confirmed && (
-          <span style={{ fontSize: 11, color: "#059669", fontWeight: 500 }}>
-            ✓ 品牌定位已確認
+          <span style={{ fontSize: 11, color: "#059669", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            品牌定位已確認
           </span>
         )}
       </div>
