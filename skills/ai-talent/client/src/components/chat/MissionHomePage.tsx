@@ -137,7 +137,7 @@ function SquadChip({
         boxShadow: isSelected ? "0 2px 8px rgba(26,26,24,0.15)" : hovered ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
       }}
     >
-      {squad.lead?.avatar || "🎯"}
+      {"🎯"}
       <span>{squad.name}</span>
       {squad.lead?.name && (
         <span style={{
