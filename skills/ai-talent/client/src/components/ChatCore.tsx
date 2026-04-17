@@ -709,9 +709,11 @@ export default function ChatCore({
     });
   };
 
-  const executeSquadChat = async (text: string, convId: string): Promise<boolean> => {
+  const executeSquadChat = async (text: string, convId: string, squadSlugOverride?: string): Promise<boolean> => {
     const missionData = missionDataQuery.data as any;
-    const squadSlug: string = missionData?.squadSlug ?? "";
+    // On first message, missionData.squadSlug may not yet be in cache (updateMission.mutate is async).
+    // Accept an explicit override so the first message still reaches the squad path.
+    const squadSlug: string = squadSlugOverride ?? missionData?.squadSlug ?? "";
     if (!squadSlug) return false;
     const token = localStorage.getItem("authToken");
     if (!token) return false;
@@ -758,6 +760,7 @@ export default function ChatCore({
           conversationHistory: conversationHistory.slice(-12),
           missionId: activeMissionId ?? undefined,
           workspace: (missionDataQuery.data as any)?.workspace ?? undefined,
+          squadSlug: squadSlug || undefined, // pass to server as hint (first-message race condition fix)
         }),
       });
       if (!resp.ok || !resp.body) throw new Error(`chat HTTP ${resp.status}`);
@@ -1043,9 +1046,12 @@ export default function ChatCore({
       saveMissionMsg.mutate({ missionId: activeMissionId, role: "user", content: text });
     }
 
-    const missionSlug = (missionDataQuery.data as any)?.squadSlug;
+    // On first message, updateMission.mutate() (squad slug) hasn't propagated to query cache yet.
+    // Fall back to selectedSquadForMission.slug so the first message still routes to squadChat.
+    const missionSlug = (missionDataQuery.data as any)?.squadSlug
+      ?? (isFirstUserMsg && selectedSquadForMission ? selectedSquadForMission.slug : null);
     if (activeMissionId && missionSlug) {
-      const handled = await executeSquadChat(text, convId);
+      const handled = await executeSquadChat(text, convId, missionSlug);
       if (handled) return;
     }
     if (isTaskLike(text)) {
@@ -1085,7 +1091,7 @@ export default function ChatCore({
     active?.messages.forEach(m => {
       if (m.role === "assistant" && m.agentName && !seen.has(m.agentName)) {
         seen.set(m.agentName, {
-          id: Date.now() + seen.size, // stable-ish key
+          id: m.agentName.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0), // stable name-based id
           name: m.agentName,
           title: m.agentTitle ?? "",
           avatarUrl: m.agentAvatar ?? null,

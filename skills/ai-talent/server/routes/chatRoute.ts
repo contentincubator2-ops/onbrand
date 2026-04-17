@@ -38,7 +38,7 @@ export const chatRouter = Router();
 
 const GATEWAY_HTTP = "http://localhost:18790";
 const GATEWAY_TOKEN = "mos-pm-claw-2026";
-const SENDGRID_KEY = "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";
+const SENDGRID_KEY = process.env.SENDGRID_API_KEY ?? "";
 const PPT_EMAIL = "cjwang@sowork.tw";
 
 // P0 fix: use localPool (mos_db) for all DB operations
@@ -734,10 +734,11 @@ async function tryExecuteSquadChat(params: {
   userMessage: string;
   conversationHistory: { role: string; content: string }[];
   workspace?: string;
+  squadSlugHint?: string; // client-supplied hint for first-message race condition
   send: (event: string, data: unknown) => void;
   sessionId: string;
 }): Promise<boolean> {
-  const { userId, missionId, userMessage, conversationHistory, workspace, send } = params;
+  const { userId, missionId, userMessage, conversationHistory, workspace, squadSlugHint, send } = params;
 
   // ── 1. 從 mission 讀取 squadSlug 與品牌資料 ─────────────────────────────────
   let squadSlug: string | null = null;
@@ -756,9 +757,20 @@ async function tryExecuteSquadChat(params: {
       [missionId]
     ) as any[];
     const m = (mRows as any[])?.[0];
-    if (!m?.squadSlug) return false; // 沒有 squad，讓 caller 走一般路徑
+    // Prefer DB value; fall back to client hint (first-message race: updateMission mutation
+    // may not have committed before the chat request arrives on the server).
+    const resolvedSlug = m?.squadSlug ?? squadSlugHint ?? null;
+    if (!resolvedSlug) return false; // 沒有 squad，讓 caller 走一般路徑
 
-    squadSlug    = m.squadSlug;
+    // If slug came from hint, persist it now so future calls see it in DB
+    if (!m?.squadSlug && squadSlugHint) {
+      await localPool.execute(
+        `UPDATE missions SET squadSlug = ? WHERE id = ?`,
+        [squadSlugHint, missionId]
+      ).catch(() => {}); // non-fatal
+    }
+
+    squadSlug    = resolvedSlug;
     missionTitle = m.title ?? "";
     brandId      = m.brandId ?? 0;
     brand = {
@@ -1097,13 +1109,14 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {} } = req.body as {
+  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {}, squadSlug: bodySquadSlug } = req.body as {
     userMessage: string;
     conversationHistory: { role: string; content: string }[];
     sessionId?: string;
     missionId?: number;
     workspace?: string;
     brandContext?: Record<string, string>;
+    squadSlug?: string; // client hint for first-message race condition
   };
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
@@ -1195,7 +1208,9 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     // 偵測是否有 squad 選定，有則走 agent 分工流程
     if (missionId) {
       const squadResult = await tryExecuteSquadChat({
-        userId, missionId, userMessage, conversationHistory, workspace, send, sessionId,
+        userId, missionId, userMessage, conversationHistory, workspace,
+        squadSlugHint: bodySquadSlug,
+        send, sessionId,
       });
       if (squadResult) {
         send("done", { sessionId, isComplete: true });

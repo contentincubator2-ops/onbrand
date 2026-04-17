@@ -9,7 +9,7 @@
  * - 可讓用戶選擇存入哪個類別（定位/受眾/聲音/競品/其他）
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Brain, Check, ChevronDown } from "lucide-react";
 
 const CATEGORIES = [
@@ -41,14 +41,20 @@ export function SaveToBrainButton({
 }: SaveToBrainButtonProps) {
   const [status, setStatus] = useState<"idle" | "picking" | "saving" | "saved">("idle");
   const [selectedCat, setSelectedCat] = useState<Category>(defaultCategory);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Cleanup in-flight request on unmount
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   const handleSave = async (cat: Category) => {
     setSelectedCat(cat);
     setStatus("saving");
+    abortRef.current = new AbortController();
     try {
       const token = localStorage.getItem("authToken");
       const resp = await fetch(`/api/brand-brain/${brandId}`, {
         method: "POST",
+        signal: abortRef.current.signal,
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -63,7 +69,8 @@ export function SaveToBrainButton({
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       setStatus("saved");
       onSaved?.();
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.name === "AbortError") return; // unmounted, ignore
       console.error("[SaveToBrain]", e);
       setStatus("idle"); // 失敗回到 idle 讓用戶重試
     }
