@@ -1687,7 +1687,7 @@ export default function ChatCore({
                 isStreaming={msg.isStreaming}
                 isSecondOpinion={msg.isSecondOpinion}
                 isLead={msg.isSquadLead}
-                showHandoff={!msg.isSquadLead && !msg.isSecondOpinion && (msg.squadStep ?? 0) > 1}
+                showHandoff={!msg.isSquadLead && !msg.isSecondOpinion && (msg.squadStep ?? 0) >= 1}
               />
             )}
 

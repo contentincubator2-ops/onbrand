@@ -53,7 +53,7 @@ export function AgentBubbleHeader({
     : "#F5F5F3";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: "fit-content" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: "fit-content", marginBottom: 6 }}>
       {/* A2A handoff indicator — shown for non-lead specialist steps */}
       {showHandoff && !isLead && !isSecondOpinion && (
         <div style={{
@@ -72,7 +72,6 @@ export function AgentBubbleHeader({
         display: "flex",
         alignItems: "center",
         gap: 8,
-        marginBottom: 8,
         padding: "6px 10px",
         borderRadius: 8,
         background: bgColor,

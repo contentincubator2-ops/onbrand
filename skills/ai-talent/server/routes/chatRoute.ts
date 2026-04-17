@@ -1482,10 +1482,10 @@ chatRouter.post("/email-results", async (req: Request, res: Response) => {
       `,
     });
 
-    // Log the export
+    // Log the export (best-effort, non-blocking)
     if (missionId) {
       recordMissionExport({
-        missionId, brandId: 0, exportType: "email",
+        missionId, brandId: 0, exportType: "text",
         title: subject ?? "Email Report",
       }).catch(() => {});
     }
