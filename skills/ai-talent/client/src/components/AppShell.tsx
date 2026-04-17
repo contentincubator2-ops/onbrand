@@ -1720,7 +1720,7 @@ function RightPanel({
         onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "rgba(26,26,24,0.08)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
       />
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto" }} className="right-panel-scroll">
         {sections.map((section, idx) => (
           <div key={section.key} style={{ borderBottom: "1px solid #E4E3E1" }}>
             {/* Section header */}

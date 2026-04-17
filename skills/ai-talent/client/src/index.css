@@ -41,12 +41,12 @@ body {
   body {
     overflow: hidden;
   }
-  
+
   /* Chat messages area needs bottom padding for tab bar */
   .messages-area {
     padding-bottom: 80px !important;
   }
-  
+
   /* Input wrap needs bottom padding */
   .input-wrap {
     padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
@@ -72,4 +72,93 @@ body {
   --v7-text-secondary: #6B6A66;
   --v7-text-muted: #9B9990;
   --v7-text-faint: #C8C7C3;
+}
+
+/* ─── Global Animations ──────────────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(0.7); opacity: 0.4; }
+  50%       { transform: scale(1.1); opacity: 1; }
+}
+
+/* ─── Scrollbar Styling ──────────────────────────────────────────────────── */
+.messages-scroll::-webkit-scrollbar,
+.right-panel-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.messages-scroll::-webkit-scrollbar-track,
+.right-panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.messages-scroll::-webkit-scrollbar-thumb,
+.right-panel-scroll::-webkit-scrollbar-thumb {
+  background: #E4E3E1;
+  border-radius: 2px;
+}
+.messages-scroll::-webkit-scrollbar-thumb:hover,
+.right-panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: #C8C7C3;
+}
+
+/* ─── Markdown body ──────────────────────────────────────────────────────── */
+.markdown-body {
+  line-height: 1.7;
+}
+
+.markdown-body > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* ─── Message bubbles animation ──────────────────────────────────────────── */
+.message-enter {
+  animation: slideInUp 0.2s ease-out;
+}
+
+/* ─── Button base resets ─────────────────────────────────────────────────── */
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid #0A6EFA;
+  outline-offset: 2px;
 }
