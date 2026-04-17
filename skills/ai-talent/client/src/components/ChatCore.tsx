@@ -19,6 +19,7 @@ import { SaveToBrainButton } from "./chat/SaveToBrainButton";
 import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./chat/MentionAutocomplete";
 import { PositioningBar } from "./chat/PositioningBar";
 import { MarkdownRenderer } from "./chat/MarkdownRenderer";
+import { BrandPositioningBook, parsePositioningData } from "./chat/BrandPositioningBook";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -1618,6 +1619,22 @@ export default function ChatCore({
                   />
                 )}
               </div>
+
+              {/* BrandPositioningBook — shown after final positioning output */}
+              {msg.role === "assistant" && !msg.isStreaming && (() => {
+                const bookData = parsePositioningData(msg.content);
+                if (!bookData) return null;
+                return (
+                  <BrandPositioningBook
+                    data={{ ...bookData, brandName: activeBrand?.name }}
+                    onSaveToBrain={() => {
+                      if (activeBrand?.id) {
+                        // Fire save to brain
+                      }
+                    }}
+                  />
+                );
+              })()}
             </div>
 
             {/* SaveToBrainButton — shown below completed squad step messages */}

@@ -1450,6 +1450,93 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
   );
 }
 
+// ─── AgentExecutionTimeline ────────────────────────────────────────────────────
+// Claude Code–style vertical step timeline with agent avatars
+
+const AGENT_COLORS = [
+  '#E8631A', '#0A6EFA', '#7C3AED', '#059669', '#DC2626', '#0891B2', '#D97706', '#BE185D',
+];
+
+function AgentExecutionTimeline({ steps }: { steps: SquadStepProgress[] }) {
+  return (
+    <div style={{ padding: '8px 0 4px 0' }}>
+      {steps.map((step, idx) => {
+        const isDone = step.status === 'done';
+        const isRunning = step.status === 'running';
+        const isLast = idx === steps.length - 1;
+        const accentColor = isDone ? '#059669' : isRunning ? '#0A6EFA' : '#C8C7C3';
+        const bgColor = isDone ? '#ECFDF5' : isRunning ? '#EFF6FF' : '#F2F1EF';
+        const borderColor = isDone ? '#BBF7D0' : isRunning ? '#BFDBFE' : '#E4E3E1';
+
+        return (
+          <div key={step.step} style={{ display: 'flex', gap: 0 }}>
+            {/* Left track: avatar + connector line */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 40, flexShrink: 0 }}>
+              {/* Avatar circle */}
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%',
+                background: bgColor,
+                border: `2px solid ${accentColor}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: isDone ? 13 : 12, fontWeight: 700,
+                color: accentColor, flexShrink: 0, zIndex: 1,
+                boxShadow: isRunning ? `0 0 0 5px rgba(10,110,250,0.10)` : 'none',
+                transition: 'box-shadow 0.4s',
+              }}>
+                {isDone ? '✓' : isRunning ? (
+                  <span style={{ display: 'inline-block', animation: 'spin 1.4s linear infinite' }}>↻</span>
+                ) : step.agentName.charAt(0)}
+              </div>
+              {/* Connector line */}
+              {!isLast && (
+                <div style={{
+                  width: 2, flex: 1, minHeight: 14,
+                  background: isDone ? '#BBF7D0' : '#E4E3E1',
+                  margin: '3px 0',
+                  transition: 'background 0.4s',
+                }} />
+              )}
+            </div>
+            {/* Content */}
+            <div style={{
+              flex: 1,
+              paddingLeft: 10,
+              paddingBottom: isLast ? 8 : 14,
+              paddingTop: 3,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' as const }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: isDone ? '#059669' : isRunning ? '#0A6EFA' : '#9B9990' }}>
+                  {step.agentName}
+                </span>
+                <span style={{
+                  fontSize: 9, padding: '1px 6px', borderRadius: 10,
+                  background: bgColor, color: accentColor, border: `1px solid ${borderColor}`,
+                  fontWeight: 600, letterSpacing: 0.3,
+                }}>
+                  {isDone ? '完成' : isRunning ? '執行中' : '等待'}
+                </span>
+              </div>
+              {step.agentTitle && (
+                <div style={{ fontSize: 10, color: '#9B9990', lineHeight: 1.4, marginBottom: step.label ? 3 : 0 }}>
+                  {step.agentTitle}
+                </div>
+              )}
+              {step.label && (
+                <div style={{
+                  fontSize: 10, color: isRunning ? '#3B82F6' : isDone ? '#6EE7B7' : '#C8C7C3',
+                  fontStyle: 'italic', marginTop: 1,
+                }}>
+                  {step.label}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function RightPanel({
   missionId, brandId, activeSquad, missionSquadSlug, missionWorkspace,
   width, onWidthChange, squadStepProgress = [],
@@ -1545,101 +1632,17 @@ function RightPanel({
           />
         : emptyHint("選擇執行方式\n查看對應流程"),
     },
-    // Live execution progress panel — shown when squadStepProgress has data
+    // Live execution timeline — shown when squadStepProgress has data
     ...(squadStepProgress.length > 0 ? [{
       key: "live-progress",
-      label: "執行進度",
-      content: (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {squadStepProgress.map((step) => {
-            const isDone = step.status === "done";
-            const isRunning = step.status === "running";
-            return (
-              <div key={step.step} style={{
-                display: "flex", alignItems: "flex-start", gap: 8,
-                padding: "6px 8px", borderRadius: 7,
-                background: isRunning ? "#EFF6FF" : isDone ? "#F0FDF4" : "#F9F9F8",
-                border: isRunning ? "1px solid #BFDBFE" : isDone ? "1px solid #BBF7D0" : "1px solid #E4E3E1",
-              }}>
-                <div style={{
-                  width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: isDone ? "#059669" : isRunning ? "#0A6EFA" : "#C8C7C3",
-                  fontSize: 9, color: "white",
-                }}>
-                  {isDone ? "✓" : isRunning ? (
-                    <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>↻</span>
-                  ) : "○"}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: isDone ? "#059669" : isRunning ? "#0A6EFA" : "#9B9990" }}>
-                    {step.agentName}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#9B9990", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {step.agentTitle}
-                  </div>
-                </div>
-                <span style={{
-                  fontSize: 9, color: isDone ? "#059669" : isRunning ? "#0A6EFA" : "#C8C7C3",
-                  fontWeight: 600, flexShrink: 0,
-                }}>
-                  {isDone ? "完成" : isRunning ? "執行中" : "等待"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ),
+      label: `執行進度 · ${squadStepProgress.filter(s => s.status === 'done').length}/${squadStepProgress.length}`,
+      content: <AgentExecutionTimeline steps={squadStepProgress} />,
     }] : []),
     {
       key: "agents",
       label: "協作成員",
       content: (
         <div>
-          {/* 本次執行成員 — real-time from RELAY markers */}
-          {squadStepProgress.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 6 }}>
-                本次執行成員
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {squadStepProgress.map((step) => (
-                  <div key={step.step} style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "4px 6px", borderRadius: 6,
-                    background: step.status === "running" ? "#EFF6FF" : "transparent",
-                  }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-                      background: step.status === "done" ? "#059669" : step.status === "running" ? "#0A6EFA" : "#C8C7C3",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 9, fontWeight: 700, color: "white",
-                    }}>
-                      {step.agentName.charAt(0)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {step.agentName}
-                      </div>
-                      <div style={{ fontSize: 10, color: "#9B9990", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {step.agentTitle}
-                      </div>
-                    </div>
-                    <span style={{
-                      fontSize: 8, padding: "1px 5px", borderRadius: 10,
-                      background: step.status === "done" ? "#ECFDF5" : step.status === "running" ? "#EFF6FF" : "#F2F1EF",
-                      color: step.status === "done" ? "#059669" : step.status === "running" ? "#0A6EFA" : "#9B9990",
-                      border: step.status === "done" ? "1px solid #BBF7D0" : step.status === "running" ? "1px solid #BFDBFE" : "1px solid #E4E3E1",
-                      flexShrink: 0,
-                    }}>
-                      {step.status === "done" ? "✅" : step.status === "running" ? "🔄" : "⌛"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ height: 1, background: "#E4E3E1", margin: "10px 0" }} />
-            </div>
-          )}
           {/* Static squad members from DB */}
           {effectiveSquad
             ? <DBAgentMembersList
