@@ -251,6 +251,8 @@ async function main() {
       `ALTER TABLE agent_squads ADD COLUMN showcases             LONGTEXT NULL`,
       // Squad semantic embedding (text-embedding-3-large, computed by embed:squads script)
       `ALTER TABLE agent_squads ADD COLUMN embedding             LONGTEXT NULL`,
+      // Expand methodology from VARCHAR(100) to TEXT (methodology strings can exceed 100 chars)
+      `ALTER TABLE agent_squads MODIFY COLUMN methodology TEXT NULL`,
       // Add missionType to workflow templates (mirror of taskType)
       `ALTER TABLE squad_workflow_templates ADD COLUMN missionType VARCHAR(100) NULL`,
       `UPDATE squad_workflow_templates SET missionType = taskType WHERE missionType IS NULL`,
@@ -5216,7 +5218,7 @@ async function main() {
         description: "用 HVCT 框架每月系統性測試 50-100 個 Meta 廣告素材，72 小時識別勝出創意並快速放大，同時監控創意疲勞，確保 ROAS 持續最大化。",
         industryKey: "marketing", missionType: taskType,
         workspace: ["facebook", "analytics"],
-        methodology: "High-Velocity Creative Testing (HVCT) — Motion App / Common Thread Collective / Tier 11 (2022-present)",
+        methodology: "High-Velocity Creative Testing (HVCT) — Motion App / Common Thread / Tier 11 (2022)",
         agents: agentMembers,
         tags: ["facebook", "meta", "Meta廣告", "Facebook廣告", "素材測試", "創意測試", "creative-testing", "HVCT", "DTC", "ROAS", "hook-rate", "UGC", "廣告素材", "paid-social", "analytics"],
         useCases: ["Facebook廣告創意優化", "Meta廣告素材測試", "DTC品牌廣告投放", "社群廣告 ROAS 提升", "廣告素材迭代"],
@@ -5333,7 +5335,7 @@ async function main() {
         description: "診斷 Google Ads 品質分數三維根因（CTR / 相關性 / 落地頁），優化後 CPC 可降 28-50%；搭配智慧出價協議導入 Target ROAS，讓 Google 算法在護欄內自主優化。",
         industryKey: "marketing", missionType: taskType,
         workspace: ["analytics", "website"],
-        methodology: "Google Quality Score Diagnostic + Smart Bidding Ramp Protocol (Google / Store Growers / iMarkInfotech)",
+        methodology: "Google Quality Score Diagnostic + Smart Bidding Ramp (Google / Store Growers / iMarkInfotech)",
         agents: agentMembers,
         tags: ["google-ads", "Quality-Score", "品質分數", "Smart-Bidding", "智慧出價", "CPC優化", "Target-ROAS", "tCPA", "PPC", "SEM", "Google廣告優化", "analytics"],
         useCases: ["Google Ads CPC 降低", "品質分數提升", "Target ROAS 智慧出價導入", "廣告帳戶效益優化"],
