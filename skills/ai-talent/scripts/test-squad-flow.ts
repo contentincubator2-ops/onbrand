@@ -129,23 +129,30 @@ async function cleanupTestApiKey(pool: mysql.Pool): Promise<void> {
 
 // ── 登入取得 JWT ─────────────────────────────────────────────────────────────
 async function login(apiKey: string): Promise<string | null> {
+  const port = +(process.env.PORT ?? 3001);
+  console.log(`   → 嘗試登入 http://localhost:${port}/api/auth/login`);
   return new Promise((resolve) => {
     const body = JSON.stringify({ apiKey });
     const req = https.request({
       hostname: "localhost",
-      port: +(process.env.PORT ?? 3001),
+      port,
       path: "/api/auth/login",
       method: "POST",
       headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
     }, (res) => {
       let data = "";
+      console.log(`   → 登入回應狀態: ${res.statusCode}`);
       res.on("data", (c) => (data += c));
       res.on("end", () => {
+        console.log(`   → 登入回應內容: ${data.slice(0, 200)}`);
         try { resolve(JSON.parse(data).token ?? null); }
         catch { resolve(null); }
       });
     });
-    req.on("error", () => resolve(null));
+    req.on("error", (e) => {
+      console.error(`   → 登入連線錯誤: ${e.message}`);
+      resolve(null);
+    });
     req.write(body);
     req.end();
   });
