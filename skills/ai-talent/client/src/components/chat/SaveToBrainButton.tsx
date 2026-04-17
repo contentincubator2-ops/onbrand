@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Brain, Check, ChevronDown } from "lucide-react";
+import { useToast } from "../ui/Toast";
 
 const CATEGORIES = [
   { value: "positioning", label: "📍 品牌定位" },
@@ -42,6 +43,7 @@ export function SaveToBrainButton({
   const [status, setStatus] = useState<"idle" | "picking" | "saving" | "saved">("idle");
   const [selectedCat, setSelectedCat] = useState<Category>(defaultCategory);
   const abortRef = useRef<AbortController | null>(null);
+  const { showToast } = useToast();
 
   // Cleanup in-flight request on unmount
   useEffect(() => () => { abortRef.current?.abort(); }, []);
@@ -68,6 +70,7 @@ export function SaveToBrainButton({
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       setStatus("saved");
+      showToast("✓ 已存入品牌大腦", "success");
       onSaved?.();
     } catch (e: any) {
       if (e?.name === "AbortError") return; // unmounted, ignore

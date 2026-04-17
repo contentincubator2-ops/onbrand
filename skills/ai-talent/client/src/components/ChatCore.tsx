@@ -18,6 +18,7 @@ import { AgentBubbleHeader } from "./chat/AgentBubbleHeader";
 import { SaveToBrainButton } from "./chat/SaveToBrainButton";
 import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./chat/MentionAutocomplete";
 import { PositioningBar } from "./chat/PositioningBar";
+import { MarkdownRenderer } from "./chat/MarkdownRenderer";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -493,6 +494,7 @@ export default function ChatCore({
 
   // ── Squad state ──────────────────────────────────────────────────────────
   const [squadStep, setSquadStep] = useState<SquadStepState>({ currentStep: 0, totalSteps: 10, isComplete: false });
+  const [currentStepLabel, setCurrentStepLabel] = useState<string | null>(null);
   const [streamingAgentName, setStreamingAgentName] = useState<string | null>(null);
   const [streamingAgentTitle, setStreamingAgentTitle] = useState<string | null>(null);
   const [streamingModel, setStreamingModel] = useState<string | null>(null);
@@ -630,6 +632,7 @@ export default function ChatCore({
     setPendingTask("");
     setAwaitingApproval(false);
     setSquadStep({ currentStep: 0, totalSteps: 10, isComplete: false });
+    setCurrentStepLabel(null);
     setStreamingAgentName(null);
     setStreamingAgentTitle(null);
     setSquadStepProgress([]);
@@ -996,6 +999,7 @@ export default function ChatCore({
 
                   if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
                   if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
+                  if (data.label) { setCurrentStepLabel(data.label); }
                 }
 
               } else if (curEvent === "second_opinion_delta") {
@@ -1465,7 +1469,9 @@ export default function ChatCore({
                 {streamingAgentTitle && <span style={{ fontSize: 11, color: "#9B9990" }}>· {streamingAgentTitle}</span>}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 10, color: "#C8C7C3" }}>Step {squadStep.currentStep}/{squadStep.totalSteps}{squadStep.isComplete ? " ✅" : ""}</span>
+                <span style={{ fontSize: 10, color: "#C8C7C3" }}>
+                  {currentStepLabel ? `${currentStepLabel} · ` : ""}Step {squadStep.currentStep}/{squadStep.totalSteps}{squadStep.isComplete ? " ✅" : ""}
+                </span>
                 <button
                   onClick={() => setInput("我想換一支不同的小組來執行這個任務，請列出可選的 Squad 選項")}
                   style={{ fontSize: 10, color: "#9B9990", background: "#F2F1EF", border: "1px solid #E4E3E1", padding: "2px 8px", borderRadius: 20, cursor: "pointer" }}
@@ -1606,20 +1612,12 @@ export default function ChatCore({
                 {msg.role === "user" ? (
                   <span>{msg.content}</span>
                 ) : (
-                  <pre style={{
-                    fontFamily: "inherit", whiteSpace: "pre-wrap",
-                    margin: 0, fontSize: 14, lineHeight: 1.65,
-                  }}>{msg.content}</pre>
+                  <MarkdownRenderer
+                    content={msg.content}
+                    isStreaming={msg.isStreaming}
+                  />
                 )}
               </div>
-              {/* Streaming cursor */}
-              {msg.isStreaming && (
-                <span style={{
-                  display: "inline-block", width: 2, height: 14,
-                  background: "#1A1A18", marginLeft: 2,
-                  animation: "blink 1s step-end infinite", verticalAlign: "middle",
-                }} />
-              )}
             </div>
 
             {/* SaveToBrainButton — shown below completed squad step messages */}
