@@ -786,33 +786,56 @@ async function main() {
     // ── 4a. Benefit-Based Positioning ─────────────────────────────────────────
     // Tools: osp_marketing_tools (Value Map Generator), marketing-strategy-pmm (Messaging Hierarchy)
     // Ladder: feature → functional benefit → emotional benefit → conversion copy
+    //
+    // 設計原則：findAgent skills == step requiredSkills（一對一對齊）
+    // Agent 配對依據 = 步驟所需資料能力，而非抽象行銷概念
+    //
+    // Step 1 (Lead Intake)      → leadId   skills: messaging / pmm / positioning / brand-voice
+    // Step 2 (功能利益轉化)      → m2      skills: consumer-insights / market-research / survey-analysis / product-analysis
+    // Step 3 (情感利益挖掘)      → m3      skills: emotional-branding / brand-psychology / sentiment-analysis / consumer-psychology
+    // Step 4 (Message Ladder)   → leadId   skills: messaging / brand-voice / copywriting / positioning / content-strategy
+    // Step 5 (落地文案 + A/B)   → m4 + m5 skills: conversion-copywriting / facebook-ads / ad-creative / ab-testing / cro
+    // Step 6 (QA & 定位書)       → leadId   skills: positioning / brand-strategy / messaging
     {
       const slug = "benefit-based-positioning";
       const taskType = "benefit-based-positioning";
       const used: number[] = [];
 
+      // ── Lead：訊息定位策略師（Steps 1 / 4 / 6）
       const leadSkills = ["messaging", "brand-voice", "content-strategy", "pmm", "copywriting", "positioning"];
       const leadId = await findAgent(conn, leadSkills, used);
       if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
-      const m2Skills = ["consumer-insights", "customer-research", "ux-research", "insight"];
+
+      // ── m2：消費者洞察 × 市場研究師（Step 2：功能利益轉化）
+      // 資料來源：問卷資料、客戶訪談記錄、產品使用數據、Google Analytics 行為流
+      const m2Skills = ["consumer-insights", "customer-research", "market-research", "survey-analysis", "product-analysis"];
       const m2 = await findAgent(conn, m2Skills, used);
       if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
-      const m3Skills = ["emotional-branding", "brand-dna", "brand-strategy", "emotional"];
+
+      // ── m3：情感品牌 × 情緒分析師（Step 3：情感利益挖掘）
+      // 資料來源：社群情緒資料、客戶評論（G2/Trustpilot）、品牌感知調查
+      const m3Skills = ["emotional-branding", "brand-psychology", "sentiment-analysis", "brand-narrative", "consumer-psychology"];
       const m3 = await findAgent(conn, m3Skills, used);
       if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
-      const m4Skills = ["copywriting", "conversion", "cro", "ad-creative", "performance-marketing"];
+
+      // ── m4：轉換文案師（Step 5 主執行：LP / Ad Headlines / Email）
+      // 資料來源：競品廣告素材、Landing Page 轉換基準、廣告文案資料庫
+      const m4Skills = ["copywriting", "conversion-copywriting", "ad-creative", "cro", "landing-page"];
       const m4 = await findAgent(conn, m4Skills, used);
       if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
-      const m5Skills = ["ad-creative", "paid-social", "facebook-ads", "messaging", "performance"];
+
+      // ── m5：廣告效力驗證師（Step 5 驗證：A/B 框架 + FB Ads 數據）
+      // 資料來源：Facebook Ads Manager 數據、A/B 測試歷史結果、廣告 CTR 基準
+      const m5Skills = ["facebook-ads", "paid-social", "ab-testing", "ad-performance", "performance-marketing"];
       const m5 = await findAgent(conn, m5Skills, used);
       if (m5) { used.push(m5); await assignSkillsToAgent(conn, m5, m5Skills); }
 
       const members = [
-        leadId && { agent_id: leadId, is_lead: true,  role: "messaging_strategist",   order: 1 },
-        m2     && { agent_id: m2,     is_lead: false, role: "consumer_insight_analyst", order: 2 },
-        m3     && { agent_id: m3,     is_lead: false, role: "emotional_brand_specialist", order: 3 },
-        m4     && { agent_id: m4,     is_lead: false, role: "conversion_copywriter",    order: 4 },
-        m5     && { agent_id: m5,     is_lead: false, role: "ad_messaging_validator",   order: 5 },
+        leadId && { agent_id: leadId, is_lead: true,  role: "messaging_strategist",      order: 1 },
+        m2     && { agent_id: m2,     is_lead: false, role: "consumer_insight_analyst",   order: 2 },
+        m3     && { agent_id: m3,     is_lead: false, role: "emotional_brand_specialist",  order: 3 },
+        m4     && { agent_id: m4,     is_lead: false, role: "conversion_copywriter",       order: 4 },
+        m5     && { agent_id: m5,     is_lead: false, role: "ad_messaging_validator",      order: 5 },
       ].filter(Boolean);
 
       const [leadInfo, m2Info, m3Info, m4Info, m5Info] = await Promise.all([
@@ -824,12 +847,78 @@ async function main() {
       ]);
 
       const bbpSteps = [
-        assignAgentToStep({ step: 1, title: "Squad Lead Intake：產品功能與受眾盤點", description: "Squad Lead 收集產品功能清單、目標受眾、現有訊息，評估目前定位成熟度，Brief 成員任務範疇", owner: "squad_lead", output: "任務簡報（Brief）", tools: [], requiredSkills: ["benefit-laddering", "consumer-psychology", "feature-analysis"] }, leadInfo),
-        assignAgentToStep({ step: 2, title: "功能利益轉化", description: "Consumer Insight Analyst 將每項產品功能轉譯為明確的功能利益（Functional Benefit），使用 osp_marketing_tools Product Value Map Generator：features → position statements", owner: "consumer_insight_analyst", output: "功能利益清單（Feature → Functional Benefit Map）", tools: ["osp_marketing_tools: Product Value Map Generator"], requiredSkills: ["emotional-branding", "brand-psychology", "consumer-insights"] }, m2Info),
-        assignAgentToStep({ step: 3, title: "情感利益挖掘", description: "Emotional Brand Specialist 對每項功能利益往上挖掘對應的情感利益，依 marketing-strategy-pmm Messaging Hierarchy（Headline → Benefits → Features → Proof）整合", owner: "emotional_brand_specialist", output: "情感利益映射表（Functional → Emotional Benefit）", tools: ["marketing-strategy-pmm: Messaging Hierarchy"], requiredSkills: ["messaging", "brand-voice", "copywriting", "positioning"] }, leadInfo),
-        assignAgentToStep({ step: 4, title: "利益階梯訊息框架建構", description: "Messaging Strategist 整合前兩步，產出完整 Message Ladder：品牌主張 → 功能利益 → 情感利益 → 社會認同 → 行動呼籲", owner: "messaging_strategist", output: "完整 Message Ladder 文件", tools: ["osp_marketing_tools: Tagline Generator", "marketing-strategy-pmm: Messaging Hierarchy"], requiredSkills: ["copywriting", "brand-voice", "positioning", "brand-strategy"] }, m3Info),
-        assignAgentToStep({ step: 5, title: "轉換文案與廣告訊息落地", description: "Conversion Copywriter 將 Message Ladder 轉化為廣告 Headline、Landing Page Copy、Email Subject Lines；Ad Messaging Validator 用 A/B 框架評估效力", owner: "conversion_copywriter", output: "廣告文案包（Ads / LP / Email）", tools: ["marketing-strategy-pmm: Messaging Hierarchy"], requiredSkills: ["content-strategy", "omnichannel", "messaging", "ad-creative"] }, m4Info),
-        assignAgentToStep({ step: 6, title: "Squad Lead QA & 利益階梯定位書交付", description: "Squad Lead 校閱全部輸出，確保階梯一致性與情感共鳴，輸出最終品牌利益定位書", owner: "squad_lead", output: "利益階梯定位書（Benefit-Based Positioning Deck）", tools: [] }, null),
+        // Step 1：Lead Intake（leadId）
+        // requiredSkills = leadSkills 的核心子集，對齊 findAgent 搜尋
+        assignAgentToStep({
+          step: 1,
+          title: "Squad Lead Intake：產品功能與受眾盤點",
+          description: "Squad Lead 用品牌大腦資料盤點產品功能清單、目標受眾定義、現有訊息成熟度。確認 ICP 優先順序，評估目前定位缺口，Brief 各成員任務範疇與資料蒐集方向。",
+          owner: "squad_lead",
+          output: "任務簡報（Brief）+ ICP 初稿 + 功能清單確認",
+          tools: ["osp_marketing_tools: Product Value Map Generator（預覽）"],
+          requiredSkills: ["messaging", "pmm", "positioning", "brand-voice"],
+        }, leadInfo),
+
+        // Step 2：功能利益轉化（m2：consumer_insight_analyst）
+        // requiredSkills = m2Skills（完全一致）
+        assignAgentToStep({
+          step: 2,
+          title: "功能利益轉化（Feature → Functional Benefit Map）",
+          description: "Consumer Insight Analyst 使用 osp_marketing_tools Product Value Map Generator，將每項產品功能轉譯為目標客群能感知的功能利益。查詢 Google Analytics 行為流資料與問卷 survey 結果，確認哪些功能是用戶真正在用且重視的，過濾「工程師認為重要但用戶不在乎」的功能。輸出 Feature → Functional Benefit 對照表。",
+          owner: "consumer_insight_analyst",
+          output: "功能利益清單（Feature → Functional Benefit Map）",
+          tools: ["osp_marketing_tools: Product Value Map Generator", "google-analytics: 行為流報告"],
+          requiredSkills: ["consumer-insights", "customer-research", "market-research", "survey-analysis", "product-analysis"],
+        }, m2Info),
+
+        // Step 3：情感利益挖掘（m3：emotional_brand_specialist）
+        // requiredSkills = m3Skills（完全一致）
+        // 修正：原本錯誤分配給 leadInfo，正確應為 m3Info
+        assignAgentToStep({
+          step: 3,
+          title: "情感利益挖掘（Functional → Emotional Benefit Map）",
+          description: "Emotional Brand Specialist 對每項功能利益往上挖掘對應的情感利益。查詢社群情緒資料（social listening）、客戶評論平台（G2、Trustpilot、Google Reviews）中用戶的真實情感語言，找出他們使用產品後的自我描述詞彙。依 marketing-strategy-pmm Messaging Hierarchy 整合，定錨最強情感利益作為定位核心。",
+          owner: "emotional_brand_specialist",
+          output: "情感利益映射表（Functional → Emotional Benefit）+ 核心情感定錨句",
+          tools: ["marketing-strategy-pmm: Messaging Hierarchy", "sentiment-analysis: 社群情緒掃描", "review-mining: G2 / Trustpilot"],
+          requiredSkills: ["emotional-branding", "brand-psychology", "sentiment-analysis", "brand-narrative", "consumer-psychology"],
+        }, m3Info),
+
+        // Step 4：Message Ladder 框架建構（leadId：messaging_strategist）
+        // requiredSkills = leadSkills 核心（對齊 findAgent）
+        // 修正：原本錯誤分配給 m3Info，正確應為 leadInfo
+        assignAgentToStep({
+          step: 4,
+          title: "利益階梯訊息框架建構（Complete Message Ladder）",
+          description: "Messaging Strategist 整合 Step 2 功能利益 + Step 3 情感利益，產出完整 Message Ladder：品牌主張（Brand Promise）→ 社會認同（Social Proof）→ 情感利益（核心層）→ 功能利益 → 功能特性 → 行動呼籲。使用 osp_marketing_tools Tagline Generator 生成品牌主張候選句，marketing-strategy-pmm Messaging Hierarchy 驗證每層邏輯連貫性。",
+          owner: "messaging_strategist",
+          output: "完整 Message Ladder 文件 + 品牌主張候選句（3 版）",
+          tools: ["osp_marketing_tools: Tagline Generator", "marketing-strategy-pmm: Messaging Hierarchy"],
+          requiredSkills: ["messaging", "brand-voice", "copywriting", "positioning", "content-strategy"],
+        }, leadInfo),
+
+        // Step 5：落地文案 + A/B 驗證（m4 主執行 / m5 A/B 驗證）
+        // requiredSkills = m4Skills + m5Skills 的聯集（代表這個步驟需要兩種能力）
+        assignAgentToStep({
+          step: 5,
+          title: "轉換文案落地 + A/B 效力驗證（LP / Ads / Email）",
+          description: "Conversion Copywriter 將 Message Ladder 轉化為 Landing Page Hero Copy（H1 / 副標 / Pain Point Block / CTA）、4 版廣告 Headlines（情感 / 功能 / 競品痛點 / ICP 精準）、Email Subject Lines。Ad Messaging Validator 調用 Facebook Ads 歷史 CTR 基準與 A/B 測試框架，對每版廣告評估情感強度 × 差異化 × 預測轉換率，輸出主推組合建議。",
+          owner: "conversion_copywriter + ad_messaging_validator",
+          output: "廣告文案包（LP Copy / 4版 Ad Headlines / Email Subject Lines）+ A/B 效力評估表",
+          tools: ["marketing-strategy-pmm: Value Proposition Formula", "facebook-ads: CTR 基準數據", "ab-testing: A/B 框架"],
+          requiredSkills: ["conversion-copywriting", "facebook-ads", "ad-creative", "ab-testing", "cro"],
+        }, m4Info),
+
+        // Step 6：Squad Lead QA & 定位書交付（leadId）
+        assignAgentToStep({
+          step: 6,
+          title: "Squad Lead QA & 利益階梯定位書交付",
+          description: "Squad Lead 校閱全部輸出：(1) Message Ladder 每層邏輯連貫性 (2) 情感核心是否真實反映 ICP 語言 (3) 廣告文案是否與 Ladder 一致 (4) 競品差異化是否清晰。整合輸出三份交付物：Landing Page Copy 最終版、廣告 4 版 Headlines 最終版、品牌利益階梯定位書。",
+          owner: "squad_lead",
+          output: "① Landing Page Copy ② 廣告 4 版 Headlines ③ 品牌利益階梯定位書（含核心定位句 / Ladder / ICP / 競品差異化 / 各通路一致性原則）",
+          tools: [],
+          requiredSkills: ["positioning", "brand-strategy", "messaging"],
+        }, leadInfo),
       ];
 
       await upsertWorkflow(conn, {
