@@ -23,13 +23,22 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            echo "=== 讀取 JWT_SECRET ==="
-            # 從 .env 讀取 JWT_SECRET，確保 test script 跟 server 用同一個 secret
-            ENV_FILE="skills/ai-talent/.env"
-            export JWT_SECRET=$(grep -E '^JWT_SECRET=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+            echo "=== 讀取 JWT_SECRET（從 PM2 運行中的 server process）==="
+            # 優先從 PM2 的 running process 環境取得 JWT_SECRET（與 server 完全一致）
+            export JWT_SECRET=$(pm2 jlist 2>/dev/null | node -e "
+              let d=''; process.stdin.on('data',c=>d+=c);
+              process.stdin.on('end',()=>{
+                try{
+                  const procs=JSON.parse(d);
+                  const p=procs.find(x=>x.pm2_env&&x.pm2_env.JWT_SECRET);
+                  if(p) process.stdout.write(p.pm2_env.JWT_SECRET);
+                }catch(e){}
+              });
+            " 2>/dev/null)
+            # Fallback: 從 .env 讀取
             if [ -z "$JWT_SECRET" ]; then
-              echo "⚠️  JWT_SECRET 不在 $ENV_FILE，嘗試讀取根目錄 .env"
-              export JWT_SECRET=$(grep -E '^JWT_SECRET=' .env | head -1 | cut -d= -f2-)
+              echo "⚠️  PM2 無 JWT_SECRET，嘗試 .env"
+              export JWT_SECRET=$(grep -E '^JWT_SECRET=' skills/ai-talent/.env | head -1 | cut -d= -f2-)
             fi
             if [ -z "$JWT_SECRET" ]; then
               echo "❌ JWT_SECRET 未找到，無法測試"
