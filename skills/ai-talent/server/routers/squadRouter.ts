@@ -24,6 +24,7 @@ import { invokeLLM } from "../_core/llm";
 import { randomBytes } from "crypto";
 import { loadAgentContext } from "../agentContextLoader";
 import { getSquadRequirements } from "../_core/squadRequirements";
+import { getEmbedding, cosineSimilarity } from "../_core/embedding";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -88,66 +89,94 @@ export const squadRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
 
-      const tags = WORKSPACE_TAGS[input.workspace] ?? WORKSPACE_TAGS.strategy;
-
-      // 1. Get brand industry (app DB — brands lives in sowork_db)
+      // ── 1. Full brand profile (sowork_db) ───────────────────────────────────
       let brandIndustry: string | null = null;
+      let brandContext  = "";
       if (input.brandId && db) {
         try {
           const [bRows] = await db.execute(
-            sql`SELECT industry FROM brands WHERE id = ${input.brandId} LIMIT 1`
+            sql`SELECT name, industry, description, positioningSummary, targetAudience,
+                       brandVoice, tagline
+                FROM brands WHERE id = ${input.brandId} LIMIT 1`
           ) as any[];
-          const raw = (bRows as any[])?.[0]?.industry ?? null;
-          brandIndustry = raw ? raw.replace(/['"\\;]/g, "") : null;
+          const b = (bRows as any[])?.[0];
+          if (b) {
+            brandIndustry = b.industry ? String(b.industry).replace(/['"\\;]/g, "") : null;
+            const parts: string[] = [];
+            if (b.name)               parts.push(`品牌：${b.name}`);
+            if (b.industry)           parts.push(`產業：${b.industry}`);
+            if (b.description)        parts.push(`品牌描述：${b.description}`);
+            if (b.positioningSummary) parts.push(`品牌定位：${b.positioningSummary}`);
+            if (b.targetAudience)     parts.push(`目標受眾：${b.targetAudience}`);
+            if (b.brandVoice)         parts.push(`品牌語氣：${b.brandVoice}`);
+            if (b.tagline)            parts.push(`品牌標語：${b.tagline}`);
+            brandContext = parts.join(" | ");
+          }
         } catch (e) {
           console.error("[squadRouter] brand lookup error:", e);
         }
       }
 
-      // 2. Get mission keywords + workspace hint (app DB)
+      // ── 2. Full mission context + keyword extraction + workspace hint ────────
       let missionKeywords: string[] = [];
       let missionWorkspaceHint: string | null = null;
+      let missionContext = "";
 
       if (input.missionId && db) {
         try {
           const [mRows] = await db.execute(
-            sql`SELECT title, description FROM missions WHERE id = ${input.missionId} LIMIT 1`
+            sql`SELECT title, description, objective, audience, offer, workspace
+                FROM missions WHERE id = ${input.missionId} LIMIT 1`
           ) as any[];
           const m = (mRows as any[])?.[0];
-          const text = [m?.title ?? "", m?.description ?? ""].join(" ");
+          if (m) {
+            // Collect all mission text fields
+            const mParts: string[] = [];
+            if (m.title)     mParts.push(`任務：${m.title}`);
+            if (m.description) mParts.push(`任務描述：${m.description}`);
+            if (m.objective) mParts.push(`目標：${m.objective}`);
+            if (m.audience)  mParts.push(`受眾：${m.audience}`);
+            if (m.offer)     mParts.push(`提案：${m.offer}`);
+            missionContext = mParts.join(" | ");
 
-          // Split on whitespace + Chinese punctuation
-          const parts = text.split(/[\s，,。、！？：:；;「」【】()[\]]+/).filter(Boolean);
-          const kws = new Set<string>();
-          for (const part of parts) {
-            const p = part.toLowerCase();
-            if (p.length >= 2 && p.length <= 30) kws.add(p);
-            // Chinese bigrams (2-char substrings) for non-split CJK runs
-            if (p.length > 3 && /[\u4e00-\u9fff]/.test(p)) {
-              for (let i = 0; i < p.length - 1; i++) {
-                const bi = p.slice(i, i + 2);
-                if (/[\u4e00-\u9fff]{2}/.test(bi)) kws.add(bi);
+            // Keyword extraction (handles Chinese + English)
+            const rawText = [m.title ?? "", m.description ?? "", m.objective ?? ""].join(" ");
+            const parts = rawText.split(/[\s，,。、！？：:；;「」【】()[\]]+/).filter(Boolean);
+            const kws = new Set<string>();
+            for (const part of parts) {
+              const p = part.toLowerCase();
+              if (p.length >= 2 && p.length <= 30) kws.add(p);
+              // Chinese bigrams for non-space CJK text
+              if (p.length > 3 && /[\u4e00-\u9fff]/.test(p)) {
+                for (let i = 0; i < p.length - 1; i++) {
+                  const bi = p.slice(i, i + 2);
+                  if (/[\u4e00-\u9fff]{2}/.test(bi)) kws.add(bi);
+                }
               }
             }
-          }
-          missionKeywords = [...kws];
+            missionKeywords = [...kws];
 
-          // Detect workspace from mission text (Chinese & English keywords)
-          const tl = text.toLowerCase();
-          if (/臉書|facebook|\bfb\b|meta.*ads|fb.*貼文/.test(tl))         missionWorkspaceHint = "facebook";
-          else if (/linkedin/.test(tl))                                    missionWorkspaceHint = "linkedin";
-          else if (/youtube|yt\b|影片|youtube/.test(tl))                   missionWorkspaceHint = "youtube";
-          else if (/公關|媒體關係|\bpr\b|kol|news.*release/.test(tl))      missionWorkspaceHint = "pr";
-          else if (/seo|搜尋引擎|網站|website|landing.*page/.test(tl))     missionWorkspaceHint = "website";
-          else if (/活動|event|展覽|conference/.test(tl))                  missionWorkspaceHint = "event";
-          else if (/instagram|\bIG\b|ig.*貼文/.test(tl))                   missionWorkspaceHint = "facebook"; // IG squads are under facebook ws
-          console.log(`[squadRouter] mission ${input.missionId} keywords=${missionKeywords.slice(0,8).join(",")} hint=${missionWorkspaceHint}`);
+            // Workspace hint: from stored workspace OR detected from text
+            const storedWs = m.workspace ? String(m.workspace) : null;
+            const tl = rawText.toLowerCase();
+            const textHint =
+              /臉書|facebook|\bfb\b|meta.*ads/.test(tl)            ? "facebook"  :
+              /linkedin/.test(tl)                                    ? "linkedin"  :
+              /youtube|\byt\b|影片/.test(tl)                        ? "youtube"   :
+              /公關|媒體關係|\bpr\b|kol/.test(tl)                   ? "pr"        :
+              /seo|搜尋引擎|網站|website/.test(tl)                   ? "website"   :
+              /活動|event|展覽/.test(tl)                             ? "event"     :
+              /instagram|\big\b/.test(tl)                            ? "facebook"  :
+              null;
+            missionWorkspaceHint = textHint ?? storedWs;
+            console.log(`[squadRouter] mission ${input.missionId} ws=${storedWs} textHint=${textHint} kws=${missionKeywords.slice(0,6).join(",")}`);
+          }
         } catch (e) {
           console.error("[squadRouter] mission lookup error:", e);
         }
       }
 
-      // Effective workspace = hint from mission text (strongest signal) OR passed-in workspace
+      // Effective workspace = text hint (strongest) → stored mission ws → passed-in ws
       const effectiveWorkspace = missionWorkspaceHint ?? input.workspace;
       const effectiveTags      = WORKSPACE_TAGS[effectiveWorkspace] ?? WORKSPACE_TAGS[input.workspace] ?? WORKSPACE_TAGS.strategy;
 
@@ -157,7 +186,7 @@ export const squadRouter = router({
       const industryClause = brandIndustry ? ` OR industry_key = '${brandIndustry}'` : "";
 
       const selectCols = `id, slug, name, description, industry_key, missionType,
-                          agents, tags, use_cases, methodology, workspace`;
+                          agents, tags, use_cases, methodology, workspace, embedding`;
 
       // 4. Two-pass fetch — workspace-declared squads first, then tag-based supplement
       let squadRows: any[] = [];
@@ -251,7 +280,47 @@ export const squadRouter = router({
         return { row, agents, score, leadAgentId: leadAgent?.agent_id ?? null };
       });
 
-      // 6. Sort + take top N
+      // ── 6. Semantic re-ranking (text-embedding-3-large) ─────────────────────
+      // Build a rich query vector from brand profile + mission context.
+      // Compare against each squad's pre-computed embedding (stored in agent_squads.embedding).
+      // Squads with embeddings get a cosine-similarity bonus on top of the keyword score.
+      // Squads without embeddings fall back to keyword score only.
+      let semanticEnabled = false;
+      try {
+        const queryParts = [
+          brandContext,
+          missionContext,
+          `工作區：${effectiveWorkspace}`,
+        ].filter(Boolean);
+        const queryText = queryParts.join(" | ").slice(0, 2000);
+
+        if (queryText.length > 10) {
+          const queryVec = await getEmbedding(queryText);
+          if (queryVec) {
+            semanticEnabled = true;
+            for (const c of candidates) {
+              const embRaw = c.row.embedding;
+              if (!embRaw) continue;
+              const squadVec = safeJsonParse<number[]>(embRaw, []);
+              if (!squadVec.length) continue;
+              const sim = cosineSimilarity(queryVec, squadVec); // 0–1
+              // Map cosine sim [0.2, 0.9] → additive score [0, 30]
+              // A sim of 0.7+ (very relevant) adds ~25 pts
+              const bonus = Math.max(0, (sim - 0.2) / 0.7) * 30;
+              c.score += bonus;
+            }
+            console.log(`[squadRouter] Semantic re-ranking applied (${candidates.filter(c => c.row.embedding).length} squads with embeddings)`);
+          }
+        }
+      } catch (e) {
+        console.error("[squadRouter] Semantic re-ranking failed, falling back to keyword score:", e);
+      }
+
+      if (!semanticEnabled) {
+        console.log("[squadRouter] No semantic re-ranking (no query embedding or embeddings not computed yet)");
+      }
+
+      // 7. Sort + take top N
       const top = [...candidates].sort((a, b) => b.score - a.score).slice(0, input.limit);
 
       // 7. Batch-fetch lead agents via localPool

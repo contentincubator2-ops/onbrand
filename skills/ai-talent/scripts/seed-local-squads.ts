@@ -249,6 +249,8 @@ async function main() {
       `ALTER TABLE agent_squads ADD COLUMN required_integrations LONGTEXT NULL`,
       `ALTER TABLE agent_squads ADD COLUMN token                 INT NOT NULL DEFAULT 0`,
       `ALTER TABLE agent_squads ADD COLUMN showcases             LONGTEXT NULL`,
+      // Squad semantic embedding (text-embedding-3-large, computed by embed:squads script)
+      `ALTER TABLE agent_squads ADD COLUMN embedding             LONGTEXT NULL`,
       // Add missionType to workflow templates (mirror of taskType)
       `ALTER TABLE squad_workflow_templates ADD COLUMN missionType VARCHAR(100) NULL`,
       `UPDATE squad_workflow_templates SET missionType = taskType WHERE missionType IS NULL`,
