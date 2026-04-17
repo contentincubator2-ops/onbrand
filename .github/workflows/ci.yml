@@ -48,6 +48,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             npm install --prefix skills/ai-talent
+            npm install --prefix skills/ai-talent/client
             npm run db:migrate --prefix skills/ai-talent
             npm run db:seed-local --prefix skills/ai-talent
             npm run embed:squads --prefix skills/ai-talent
