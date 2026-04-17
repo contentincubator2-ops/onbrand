@@ -1531,7 +1531,16 @@ export default function ChatCore({
                   }} />
                 )}
                 {squadStep.isComplete && (
-                  <span style={{ fontSize: 14 }}>✅</span>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: "50%",
+                    background: "#059669",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
                 )}
                 <span style={{ fontSize: 12, fontWeight: 600, color: squadStep.isComplete ? "#059669" : "#1A1A18" }}>
                   {squadStep.isComplete
@@ -1858,7 +1867,10 @@ export default function ChatCore({
                   display: "flex", alignItems: "center", gap: 3,
                 }}
               >
-                <span>⏹</span> 停止
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                </svg>
+                停止
               </button>
             </div>
             <div style={{ padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -1932,7 +1944,12 @@ export default function ChatCore({
         )}
 
         {isStopped && (
-          <div style={{ fontSize: 11, color: "#C8C7C3", textAlign: "center", padding: "8px 0" }}>⏹ 已停止生成</div>
+          <div style={{ fontSize: 11, color: "#C8C7C3", textAlign: "center", padding: "8px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="#C8C7C3">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+            </svg>
+            已停止生成
+          </div>
         )}
 
         {/* Layer 2: Pin to requirements — shown after each completed relay step */}
@@ -1959,7 +1976,10 @@ export default function ChatCore({
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0"; }}
             >
-              📌 更新需求
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+              </svg>
+              更新需求
             </button>
           </div>
         ))}
@@ -2333,7 +2353,9 @@ export default function ChatCore({
                 borderRadius: 10, padding: "1px 8px", fontWeight: 600,
                 display: "flex", alignItems: "center", gap: 4,
               }}>
-                <span>📋</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
                 <span>任務需求已套用 ({count} 項)</span>
               </span>
             </div>
