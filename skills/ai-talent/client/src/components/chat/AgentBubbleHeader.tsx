@@ -25,6 +25,7 @@ interface AgentBubbleHeaderProps {
   isStreaming?: boolean;
   isSecondOpinion?: boolean;
   isLead?: boolean;
+  showHandoff?: boolean;  // true when receiving from previous agent
 }
 
 export function AgentBubbleHeader({
@@ -37,6 +38,7 @@ export function AgentBubbleHeader({
   isStreaming = false,
   isSecondOpinion = false,
   isLead = false,
+  showHandoff = false,
 }: AgentBubbleHeaderProps) {
   const accentColor = isSecondOpinion
     ? "#7C5FF0"
@@ -51,6 +53,20 @@ export function AgentBubbleHeader({
     : "#F5F5F3";
 
   return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: "fit-content" }}>
+      {/* A2A handoff indicator — shown for non-lead specialist steps */}
+      {showHandoff && !isLead && !isSecondOpinion && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 5,
+          fontSize: 10, color: "#9B9990",
+          paddingLeft: 2,
+        }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9B9990" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+          <span>接收上一步成果 · A2A 交接</span>
+        </div>
+      )}
     <div
       style={{
         display: "flex",
@@ -157,6 +173,7 @@ export function AgentBubbleHeader({
           <CheckCircle2 size={13} style={{ color: "#22C55E" }} />
         )}
       </div>
+    </div>
     </div>
   );
 }

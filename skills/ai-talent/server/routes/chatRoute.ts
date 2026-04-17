@@ -918,12 +918,25 @@ async function tryExecuteSquadChat(params: {
   });
 
   // ── 9. 串流 LLM 回應 ────────────────────────────────────────────────────────
-  // Squad agents do NOT receive raw conversationHistory — the system prompt already
-  // contains all previous step results. Passing history causes the model to interpret
-  // multi-agent turns as a "Group Chat Context" and lose its own identity.
+  // A2A Handoff: non-lead steps receive previous agent's output as explicit handoff
+  // context in the user message. This models true agent-to-agent communication where
+  // each agent explicitly receives the prior agent's deliverable and acts on it.
+  let effectiveUserMessage = userMessage;
+  if (!isLeadStep && Object.keys(session.stepResults).length > 0) {
+    const prevKey = currentStep - 1;
+    const prevOutput = session.stepResults[prevKey]
+      ?? session.stepResults[Math.max(...Object.keys(session.stepResults).map(Number))]
+      ?? null;
+    if (prevOutput) {
+      const prevWorkflowStep = workflowSteps[Math.min(currentStep - 2, workflowSteps.length - 1)];
+      const prevStepTitle = prevWorkflowStep?.title ?? prevWorkflowStep?.name ?? `Step ${currentStep - 1}`;
+      effectiveUserMessage = `【A2A 交接文件 — 來自「${prevStepTitle}」的成果】\n\n${prevOutput.slice(0, 2500)}\n\n${"─".repeat(40)}\n【你的任務】${workflowStep.description ?? stepLabel}\n\n請基於上方的交接成果，執行你負責的步驟。用戶原始請求：${userMessage}`;
+    }
+  }
+
   const messages = [
     { role: "system", content: systemPrompt },
-    { role: "user", content: userMessage },
+    { role: "user", content: effectiveUserMessage },
   ];
 
   let fullOutput = "";
@@ -948,6 +961,10 @@ async function tryExecuteSquadChat(params: {
     id: currentStep, status: "done",
     agentName, agentTitle,
     summary: fullOutput.slice(0, 400),
+    totalSteps,
+    // Signal to the client whether more steps remain (enables auto-advance A2A)
+    hasMoreSteps: currentStep + 1 <= totalSteps,
+    nextStepIndex: currentStep + 1,
   });
 
   // ── 11. 自動存入品牌大腦（關鍵步驟成果）──────────────────────────────────

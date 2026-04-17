@@ -778,7 +778,7 @@ export default function ChatCore({
     });
   };
 
-  const executeSquadChat = async (text: string, convId: string, squadSlugOverride?: string): Promise<boolean> => {
+  const executeSquadChat = async (text: string, convId: string, squadSlugOverride?: string, isAutoAdvance?: boolean): Promise<boolean> => {
     const missionData = missionDataQuery.data as any;
     // On first message, missionData.squadSlug may not yet be in cache (updateMission.mutate is async).
     // Accept an explicit override so the first message still reaches the squad path.
@@ -807,13 +807,17 @@ export default function ChatCore({
       );
       return true;
     }
-    setLoading(true);
-    setStreamingAgentName(null);
-    setStreamingAgentTitle(null);
-    // Reset RELAY state for new squad run
-    setSquadStepProgress([]);
-    relayStepCountRef.current = 0;
-    relayMsgIdRef.current = null;
+    // For auto-advance: loading is already true, agents cleared — skip redundant sets
+    if (!isAutoAdvance) {
+      setLoading(true);
+      setStreamingAgentName(null);
+      setStreamingAgentTitle(null);
+      setSquadStepProgress([]);
+      relayStepCountRef.current = 0;
+      relayMsgIdRef.current = null;
+    }
+    // Track A2A auto-advance signal from server
+    let squadHasMoreSteps = false;
     let streamBuffer = "";
     let lastAgentModel: string | null = null;
     const streamMsgId = `squad-stream-${Date.now()}`;
@@ -930,6 +934,10 @@ export default function ChatCore({
                 const isSecondOpinion = data.isSecondOpinion ?? false;
 
                 if (data.status === "done") {
+                  // Capture A2A auto-advance signal from server
+                  if (data.hasMoreSteps === true) {
+                    squadHasMoreSteps = true;
+                  }
                   // Only update relaySteps for non-squad relay (squad uses message bubbles)
                   if (typeof data.step !== "number") {
                     setRelaySteps((prev) => prev.map((s) => s.id === rsId
@@ -1101,7 +1109,21 @@ export default function ChatCore({
         // Track which message ID contains the positioning book
         setPositioningMsgId(activeStreamMsgIdRef.current ?? streamMsgId);
       }
-      setLoading(false);
+      // ── A2A Auto-advance ───────────────────────────────────────────────────
+      // If the server signals more steps remain (hasMoreSteps: true), automatically
+      // trigger the next squad step after a brief pause — no user click needed.
+      // Keep loading=true during the gap so the loading card stays visible.
+      if (squadHasMoreSteps) {
+        // Brief "handoff" pause — show "交接中" state in loading card
+        setStreamingAgentName(null);
+        setStreamingAgentTitle(null);
+        // loading stays true (no setLoading(false)) for seamless transition
+        setTimeout(() => {
+          executeSquadChat("繼續", convId, squadSlug, /* isAutoAdvance */ true);
+        }, 1600);
+      } else {
+        setLoading(false);
+      }
       return true;
     } catch (err: any) {
       const errMsgId = activeStreamMsgIdRef.current ?? streamMsgId;
@@ -1652,6 +1674,7 @@ export default function ChatCore({
                 isStreaming={msg.isStreaming}
                 isSecondOpinion={msg.isSecondOpinion}
                 isLead={msg.isSquadLead}
+                showHandoff={!msg.isSquadLead && !msg.isSecondOpinion && (msg.squadStep ?? 0) > 1}
               />
             )}
 
@@ -1788,7 +1811,11 @@ export default function ChatCore({
                 <span style={{ fontSize: 11, color: "#9B9990" }}>· {streamingAgentTitle}</span>
               )}
               {!streamingAgentName && (
-                <span style={{ fontSize: 11, color: "#9B9990" }}>分析任務中...</span>
+                <span style={{ fontSize: 11, color: "#9B9990" }}>
+                  {activeMissionId && (missionDataQuery.data as any)?.squadSlug
+                    ? "A2A 交接中，準備下一位 Agent…"
+                    : "分析任務中..."}
+                </span>
               )}
               <button
                 onClick={handleStop}
@@ -1814,7 +1841,11 @@ export default function ChatCore({
                 ))}
               </div>
               <span style={{ fontSize: 12, color: "#6B6A66", fontStyle: "italic", lineHeight: 1.6 }}>
-                {streamingThinking ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "") : "正在思考最佳策略..."}
+                {streamingThinking
+                  ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "")
+                  : (!streamingAgentName && activeMissionId && (missionDataQuery.data as any)?.squadSlug)
+                  ? "正在將成果交給下一位 Agent，請稍候…"
+                  : "正在思考最佳策略..."}
               </span>
             </div>
           </div>
