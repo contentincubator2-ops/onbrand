@@ -2045,13 +2045,13 @@ export default function ChatCore({
                       .join("\n\n") ?? "";
                     if (allContent) {
                       const token = localStorage.getItem("authToken");
-                      fetch("/api/chat/save-brain", {
+                      fetch(`/api/brand-brain/${activeBrand.id}`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                         body: JSON.stringify({
-                          brandId: activeBrand.id, category: "custom",
+                          category: "custom",
                           title: `Squad 完整成果 — ${new Date().toLocaleDateString("zh-TW")}`,
-                          content: allContent.slice(0, 2000), missionId: activeMissionId,
+                          content: allContent.slice(0, 2000), sourceMissionId: activeMissionId,
                         }),
                       }).then(() => alert("成果已存入品牌大腦！")).catch(() => {});
                     }
