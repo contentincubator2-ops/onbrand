@@ -15,6 +15,7 @@
     "db:analyze-squads": "tsx scripts/analyze-existing-squads.ts",
     "db:audit-squads": "tsx scripts/audit-squads.ts",
     "db:cleanup-legacy": "tsx scripts/cleanup-legacy-squads.ts",
+    "db:list-needing-patch": "tsx scripts/list-squads-needing-patch.ts",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
     "lint": "tsc --noEmit"
