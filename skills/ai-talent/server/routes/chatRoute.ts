@@ -31,7 +31,7 @@ import sgMail from "@sendgrid/mail";
 import { writeBrandBrainEntry } from "./brandBrainRoute";
 import { recordMissionExport } from "./exportsRoute";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
-import { getOrCreateSquadSession, saveStepAndAdvance } from "../_core/squadSessionManager";
+import { getOrCreateSquadSession, saveStepAndAdvance, resetSquadSession } from "../_core/squadSessionManager";
 import { buildSquadAgentPrompt, buildSecondOpinionPrompt } from "../_core/agentPromptBuilder";
 
 export const chatRouter = Router();
@@ -918,9 +918,11 @@ async function tryExecuteSquadChat(params: {
   });
 
   // ── 9. 串流 LLM 回應 ────────────────────────────────────────────────────────
+  // Squad agents do NOT receive raw conversationHistory — the system prompt already
+  // contains all previous step results. Passing history causes the model to interpret
+  // multi-agent turns as a "Group Chat Context" and lose its own identity.
   const messages = [
     { role: "system", content: systemPrompt },
-    ...conversationHistory.slice(-10),
     { role: "user", content: userMessage },
   ];
 
@@ -933,7 +935,7 @@ async function tryExecuteSquadChat(params: {
   } catch (e: any) {
     // gateway 失敗，fallback 到直接 LLM
     console.warn("[squadChat] gateway fallback:", e?.message);
-    for await (const chunk of streamFromLLM(systemPrompt, conversationHistory.slice(-10), userMessage)) {
+    for await (const chunk of streamFromLLM(systemPrompt, [], userMessage)) {
       fullOutput += chunk;
       send("delta", { text: chunk });
     }
@@ -1350,6 +1352,21 @@ chatRouter.post("/reset-positioning", async (req: Request, res: Response) => {
     res.json({ ok: true, message: "定位展期已重置" });
   } catch (err: any) {
     console.error("[chatRoute] reset-positioning error:", err?.message);
+    res.status(500).json({ error: err?.message });
+  }
+});
+
+// ── Reset squad session (called when user selects a new squad + sends first message) ──
+chatRouter.post("/reset-squad-session", async (req: Request, res: Response) => {
+  const userId = await verifyToken(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { missionId } = req.body as { missionId?: number };
+  if (!missionId) { res.status(400).json({ error: "missionId required" }); return; }
+  try {
+    await resetSquadSession(localPool as any, missionId);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[chatRoute] reset-squad-session:", err?.message);
     res.status(500).json({ error: err?.message });
   }
 });

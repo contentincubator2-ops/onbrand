@@ -786,10 +786,13 @@ export default function ChatCore({
                 const isSecondOpinion = data.isSecondOpinion ?? false;
 
                 if (data.status === "done") {
-                  setRelaySteps((prev) => prev.map((s) => s.id === rsId
-                    ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) }
-                    : s
-                  ));
+                  // Only update relaySteps for non-squad relay (squad uses message bubbles)
+                  if (typeof data.step !== "number") {
+                    setRelaySteps((prev) => prev.map((s) => s.id === rsId
+                      ? { ...s, status: "done" as const, summary: data.summary ?? streamBuffer.slice(0, 400) }
+                      : s
+                    ));
+                  }
                   if (!isSecondOpinion) {
                     setConversations((prev) => prev.map((c) => c.id === convId
                       ? { ...c, messages: c.messages.map((m) => m.id === streamMsgId
@@ -801,14 +804,20 @@ export default function ChatCore({
                   }
                 } else {
                   // step running — 把 agent 身份注入 message（串流開始前）
-                  setRelaySteps((prev) => {
-                    const exists = prev.find((s) => s.id === rsId);
-                    if (exists) return prev.map((s) => s.id === rsId
-                      ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle }
-                      : s
-                    );
-                    return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
-                  });
+                  // Squad relay steps (have data.step + data.totalSteps) are rendered via
+                  // AgentBubbleHeader in message bubbles — do NOT add to relaySteps to
+                  // avoid double rendering in TypedThreadCards.
+                  const isSquadRelay = typeof data.step === "number" && typeof data.totalSteps === "number";
+                  if (!isSquadRelay) {
+                    setRelaySteps((prev) => {
+                      const exists = prev.find((s) => s.id === rsId);
+                      if (exists) return prev.map((s) => s.id === rsId
+                        ? { ...s, status: "running" as const, agentName: data.agentName ?? s.agentName, agentTitle: data.agentTitle ?? s.agentTitle }
+                        : s
+                      );
+                      return [...prev, { id: rsId, label: data.label ?? `Step ${rsId}`, agentName: data.agentName ?? "", agentTitle: data.agentTitle ?? "", layer: data.layer ?? "execution", status: "running" as const, eta: "", summary: "" }];
+                    });
+                  }
 
                   if (!isSecondOpinion) {
                     setConversations((prev) => prev.map((c) => c.id === convId
@@ -1020,6 +1029,13 @@ export default function ChatCore({
         squadSlug: selectedSquadForMission.slug,
       });
       onSquadSelect?.(rawText, selectedSquadForMission);
+      // Reset squad session so the workflow always starts from Step 0 (Lead intake)
+      const _tok = localStorage.getItem("authToken");
+      fetch("/api/chat/reset-squad-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(_tok ? { Authorization: `Bearer ${_tok}` } : {}) },
+        body: JSON.stringify({ missionId: activeMissionId }),
+      }).catch(() => {});
     }
 
     stopRef.current = false;
