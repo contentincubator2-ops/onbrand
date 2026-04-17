@@ -45,16 +45,17 @@ function escapeLike(s: string): string {
 // ── Workspace → tag keywords mapping ─────────────────────────────────────────
 
 const WORKSPACE_TAGS: Record<string, string[]> & { strategy: string[] } = {
-  strategy:   ["brand", "strategy", "gtm", "b2b", "full-funnel", "positioning", "market", "saas"],
-  website:    ["seo", "website", "content", "web", "ux", "cro", "copywriting", "conversion"],
-  facebook:   ["meta-ads", "facebook", "social", "ads", "community", "ecom", "creative"],
-  linkedin:   ["linkedin", "b2b", "thought-leadership", "demand-gen", "b2b_saas"],
-  youtube:    ["youtube", "video", "content", "yt", "影片"],
-  pr:         ["pr", "公關", "媒體", "新聞", "media"],
-  event:      ["event", "活動", "展覽"],
-  instore:    ["retail", "門市", "實體"],
-  monitoring: ["monitoring", "social-listening", "sentiment", "intelligence", "輿情", "監測", "情報", "競品", "crisis", "brand-tracking"],
-  analytics:  ["analytics", "data", "attribution", "CLV", "LTV", "RFM", "cohort", "A/B", "MMM", "AARRR", "conversion", "experimentation", "North-Star", "Kano", "NPS", "incrementality", "分析", "歸因", "用戶研究"],
+  strategy:          ["brand", "strategy", "gtm", "b2b", "full-funnel", "positioning", "market", "saas"],
+  "brand-positioning": ["brand-positioning", "positioning", "brand-strategy", "differentiation", "perceptual-mapping", "category-design", "jtbd", "purpose-driven", "mind-positioning", "segmentation", "value-proposition", "benefit-based"],
+  website:           ["seo", "website", "content", "web", "ux", "cro", "copywriting", "conversion"],
+  facebook:          ["meta-ads", "facebook", "social", "ads", "community", "ecom", "creative"],
+  linkedin:          ["linkedin", "b2b", "thought-leadership", "demand-gen", "b2b_saas"],
+  youtube:           ["youtube", "video", "content", "yt", "影片"],
+  pr:                ["pr", "公關", "媒體", "新聞", "media"],
+  event:             ["event", "活動", "展覽"],
+  instore:           ["retail", "門市", "實體"],
+  monitoring:        ["monitoring", "social-listening", "sentiment", "intelligence", "輿情", "監測", "情報", "競品", "crisis", "brand-tracking"],
+  analytics:         ["analytics", "data", "attribution", "CLV", "LTV", "RFM", "cohort", "A/B", "MMM", "AARRR", "conversion", "experimentation", "North-Star", "Kano", "NPS", "incrementality", "分析", "歸因", "用戶研究"],
 };
 
 /**
@@ -66,6 +67,8 @@ function normalizeWorkspace(ws: string): string {
   if (WORKSPACE_TAGS[ws]) return ws;   // already a known key
 
   const s = ws.toLowerCase();
+  // Brand positioning / methodology signals
+  if (/brand.position|品牌定位|品牌策略|定位方法|positioning|differentiat|perceptual|category.design|品類設計|jtbd|jobs.to.be.done|purpose.driven|mind.position|心智定位|segmentation.based|benefit.based|value.proposition/.test(s)) return "brand-positioning";
   // Analytics / data signals
   if (/analytics|數據分析|資料分析|\babi\b|attribution|歸因|clv|ltv|rfm|cohort|同期群|aarrr|north.star|kano|a\/b.test|a\/b測試|mmm|marketing.mix|incrementalit|留存分析|用戶研究|consumer.research/.test(s)) return "analytics";
   // Monitoring / intelligence signals
