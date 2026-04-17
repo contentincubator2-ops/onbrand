@@ -1458,73 +1458,137 @@ const AGENT_COLORS = [
 ];
 
 function AgentExecutionTimeline({ steps }: { steps: SquadStepProgress[] }) {
+  const doneCount = steps.filter(s => s.status === 'done').length;
+
   return (
-    <div style={{ padding: '8px 0 4px 0' }}>
+    <div style={{ padding: '4px 0' }}>
+      {/* Progress header */}
+      {steps.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginBottom: 12, padding: '6px 8px',
+          background: doneCount === steps.length ? '#ECFDF5' : '#EFF6FF',
+          borderRadius: 6,
+          border: `1px solid ${doneCount === steps.length ? '#BBF7D0' : '#BFDBFE'}`,
+        }}>
+          {/* Progress bar */}
+          <div style={{
+            flex: 1, height: 4, background: '#E5E7EB', borderRadius: 2, overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', borderRadius: 2,
+              width: steps.length > 0 ? `${(doneCount / steps.length) * 100}%` : '0%',
+              background: doneCount === steps.length
+                ? 'linear-gradient(90deg, #059669, #10B981)'
+                : 'linear-gradient(90deg, #3B82F6, #60A5FA)',
+              transition: 'width 0.5s ease',
+            }} />
+          </div>
+          <span style={{
+            fontSize: 10, fontWeight: 600, flexShrink: 0,
+            color: doneCount === steps.length ? '#065F46' : '#1D4ED8',
+          }}>
+            {doneCount}/{steps.length}
+          </span>
+        </div>
+      )}
+
       {steps.map((step, idx) => {
         const isDone = step.status === 'done';
         const isRunning = step.status === 'running';
+        const isWaiting = step.status === 'waiting';
         const isLast = idx === steps.length - 1;
-        const accentColor = isDone ? '#059669' : isRunning ? '#0A6EFA' : '#C8C7C3';
-        const bgColor = isDone ? '#ECFDF5' : isRunning ? '#EFF6FF' : '#F2F1EF';
-        const borderColor = isDone ? '#BBF7D0' : isRunning ? '#BFDBFE' : '#E4E3E1';
+        const accentColor = isDone ? '#059669' : isRunning ? '#3B82F6' : '#9CA3AF';
+        const bgColor = isDone ? '#ECFDF5' : isRunning ? '#EFF6FF' : '#F9FAFB';
+        const borderColor = isDone ? '#6EE7B7' : isRunning ? '#93C5FD' : '#E5E7EB';
 
         return (
           <div key={step.step} style={{ display: 'flex', gap: 0 }}>
-            {/* Left track: avatar + connector line */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 40, flexShrink: 0 }}>
-              {/* Avatar circle */}
+            {/* Left track: avatar + connector */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 36, flexShrink: 0 }}>
+              {/* Avatar */}
               <div style={{
-                width: 30, height: 30, borderRadius: '50%',
+                width: 28, height: 28, borderRadius: '50%',
                 background: bgColor,
                 border: `2px solid ${accentColor}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: isDone ? 13 : 12, fontWeight: 700,
-                color: accentColor, flexShrink: 0, zIndex: 1,
-                boxShadow: isRunning ? `0 0 0 5px rgba(10,110,250,0.10)` : 'none',
-                transition: 'box-shadow 0.4s',
+                flexShrink: 0, zIndex: 1, position: 'relative',
+                boxShadow: isRunning ? '0 0 0 4px rgba(59,130,246,0.12)' : 'none',
+                transition: 'all 0.3s',
               }}>
-                {isDone ? '✓' : isRunning ? (
-                  <span style={{ display: 'inline-block', animation: 'spin 1.4s linear infinite' }}>↻</span>
-                ) : step.agentName.charAt(0)}
+                {isDone ? (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                ) : isRunning ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round"
+                    style={{ animation: 'spin 1.2s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                  </svg>
+                ) : (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF' }}>
+                    {step.agentName?.charAt(0) ?? '·'}
+                  </span>
+                )}
+                {/* Pulse ring when running */}
+                {isRunning && (
+                  <span style={{
+                    position: 'absolute', inset: -5,
+                    borderRadius: '50%', border: '1.5px solid rgba(59,130,246,0.4)',
+                    animation: 'pulseRing 1.8s ease-out infinite',
+                  }} />
+                )}
               </div>
-              {/* Connector line */}
+              {/* Connector */}
               {!isLast && (
                 <div style={{
-                  width: 2, flex: 1, minHeight: 14,
-                  background: isDone ? '#BBF7D0' : '#E4E3E1',
+                  width: 2, flex: 1, minHeight: 12,
+                  background: isDone
+                    ? 'linear-gradient(to bottom, #6EE7B7, #BBF7D0)'
+                    : '#E5E7EB',
                   margin: '3px 0',
                   transition: 'background 0.4s',
                 }} />
               )}
             </div>
+
             {/* Content */}
             <div style={{
               flex: 1,
               paddingLeft: 10,
-              paddingBottom: isLast ? 8 : 14,
-              paddingTop: 3,
+              paddingBottom: isLast ? 4 : 12,
+              paddingTop: 2,
+              minWidth: 0,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' as const }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: isDone ? '#059669' : isRunning ? '#0A6EFA' : '#9B9990' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
+                <span style={{
+                  fontSize: 12, fontWeight: 600,
+                  color: isDone ? '#065F46' : isRunning ? '#1D4ED8' : '#6B7280',
+                  whiteSpace: 'nowrap' as const,
+                  overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120,
+                }}>
                   {step.agentName}
                 </span>
                 <span style={{
-                  fontSize: 9, padding: '1px 6px', borderRadius: 10,
+                  fontSize: 9, padding: '1px 5px', borderRadius: 8,
                   background: bgColor, color: accentColor, border: `1px solid ${borderColor}`,
-                  fontWeight: 600, letterSpacing: 0.3,
+                  fontWeight: 600, letterSpacing: 0.2, flexShrink: 0,
                 }}>
                   {isDone ? '完成' : isRunning ? '執行中' : '等待'}
                 </span>
               </div>
               {step.agentTitle && (
-                <div style={{ fontSize: 10, color: '#9B9990', lineHeight: 1.4, marginBottom: step.label ? 3 : 0 }}>
+                <div style={{ fontSize: 10, color: '#9CA3AF', lineHeight: 1.4, marginTop: 1 }}>
                   {step.agentTitle}
                 </div>
               )}
               {step.label && (
                 <div style={{
-                  fontSize: 10, color: isRunning ? '#3B82F6' : isDone ? '#6EE7B7' : '#C8C7C3',
-                  fontStyle: 'italic', marginTop: 1,
+                  fontSize: 10.5,
+                  color: isRunning ? '#2563EB' : isDone ? '#6B7280' : '#D1D5DB',
+                  marginTop: 2, lineHeight: 1.3,
+                  fontStyle: isWaiting ? 'italic' : 'normal',
                 }}>
                   {step.label}
                 </div>
@@ -1737,14 +1801,17 @@ function RightPanel({
               <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", letterSpacing: 0.3 }}>
                 {section.label}
               </span>
-              <span style={{
-                fontSize: 10, color: "#9B9990",
-                transform: openSections[section.key] ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s",
-                display: "inline-block",
-              }}>
-                ▾
-              </span>
+              <svg
+                width="11" height="11" viewBox="0 0 24 24" fill="none"
+                stroke="#9B9990" strokeWidth="2.5" strokeLinecap="round"
+                style={{
+                  transform: openSections[section.key] ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.2s",
+                  flexShrink: 0,
+                }}
+              >
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
             </button>
 
             {/* Section body */}
@@ -1833,9 +1900,15 @@ function DBSquadMethodologyPanel({
                     transition: "all 0.3s",
                     zIndex: 1,
                   }}>
-                    {isDone ? "✓" : isActive ? (
-                      <span style={{ animation: "pulse 1.5s infinite", display: "inline-block" }}>●</span>
-                    ) : stepNum}
+                    {isDone ? (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={nodeColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    ) : isActive ? (
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3B82F6", display: "inline-block", animation: "pulse 1.2s infinite" }} />
+                    ) : (
+                      <span style={{ fontSize: 10, fontWeight: 700 }}>{stepNum}</span>
+                    )}
                   </div>
                   {/* Connector */}
                   {!isLast && (
@@ -1861,8 +1934,12 @@ function DBSquadMethodologyPanel({
                     </div>
                   )}
                   {isActive && (
-                    <div style={{ fontSize: 10, color: "#0A6EFA", marginTop: 3, fontWeight: 600 }}>
-                      ⚡ 執行中
+                    <div style={{ fontSize: 10, color: "#2563EB", marginTop: 3, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                        <path d="M21 3v5h-5"/>
+                      </svg>
+                      執行中
                     </div>
                   )}
                 </div>
@@ -1992,7 +2069,11 @@ function DBAgentMembersList({
                   boxShadow: isActive ? "0 0 0 4px rgba(10,110,250,0.1)" : "none",
                   transition: "all 0.3s",
                 }}>
-                  {isDone ? "✓" : (agent.name ?? "A").charAt(0)}
+                  {isDone ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={avatarColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  ) : (agent.name ?? "A").charAt(0)}
                 </div>
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -2006,8 +2087,13 @@ function DBAgentMembersList({
                     </span>
                   )}
                   {isActive && (
-                    <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: "#EFF6FF", color: "#0A6EFA", fontWeight: 600 }}>
-                      ⚡
+                    <span style={{
+                      fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                      background: "#EFF6FF", color: "#2563EB", fontWeight: 600,
+                      display: "inline-flex", alignItems: "center", gap: 2,
+                    }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#3B82F6", display: "inline-block", animation: "pulse 1.2s infinite" }} />
+                      執行中
                     </span>
                   )}
                 </div>

@@ -115,6 +115,17 @@ body {
   50%       { transform: scale(1.1); opacity: 1; }
 }
 
+@keyframes pulseRing {
+  0%   { transform: scale(0.9); opacity: 0.5; }
+  70%  { transform: scale(1.2); opacity: 0; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ─── Scrollbar Styling ──────────────────────────────────────────────────── */
 .messages-scroll::-webkit-scrollbar,
 .right-panel-scroll::-webkit-scrollbar {

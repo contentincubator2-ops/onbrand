@@ -1967,30 +1967,73 @@ export default function ChatCore({
         {/* ── Squad Completion Panel ── */}
         {squadStep.isComplete && activeMissionId && !loading && (
           <div style={{
-            background: "linear-gradient(135deg, #F0FDF4 0%, #EFF6FF 100%)",
-            border: "1px solid #BBF7D0",
+            background: "#FFFFFF",
+            border: "1px solid #E5E7EB",
             borderRadius: 14,
-            padding: "16px 20px",
-            animation: "slideInUp 0.3s ease-out",
+            overflow: "hidden",
+            animation: "slideInUp 0.35s cubic-bezier(0.16,1,0.3,1)",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            {/* Green success header bar */}
+            <div style={{
+              background: "linear-gradient(135deg, #059669 0%, #0A6EFA 100%)",
+              padding: "14px 20px",
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              {/* Checkmark icon */}
               <div style={{
-                width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                background: "linear-gradient(135deg, #059669, #0A6EFA)",
+                width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                background: "rgba(255,255,255,0.2)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 16, boxShadow: "0 2px 8px rgba(5,150,105,0.25)",
-              }}>✅</div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#065F46" }}>Squad 執行完成</div>
-                <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
-                  共 {squadStep.totalSteps - 1} 個步驟 · {squadStepProgress.length} 位 AI Agent 協作完成
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>Squad 執行完成</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 1 }}>
+                  {squadStepProgress.length} 位 Agent · {squadStep.totalSteps - 1} 個步驟全部完成
                 </div>
+              </div>
+              {/* Agent avatar row */}
+              <div style={{ display: "flex", marginLeft: "auto" }}>
+                {squadStepProgress.slice(0, 4).map((sp, i) => (
+                  <div
+                    key={i}
+                    title={sp.agentName}
+                    style={{
+                      width: 26, height: 26, borderRadius: "50%",
+                      background: ["#7C3AED", "#0A6EFA", "#059669", "#D97706"][i % 4],
+                      border: "2px solid rgba(255,255,255,0.5)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 10, fontWeight: 700, color: "white",
+                      marginLeft: i === 0 ? 0 : -8,
+                      zIndex: 4 - i,
+                      position: "relative",
+                    }}
+                  >
+                    {sp.agentName?.charAt(0) ?? "A"}
+                  </div>
+                ))}
+                {squadStepProgress.length > 4 && (
+                  <div style={{
+                    width: 26, height: 26, borderRadius: "50%",
+                    background: "rgba(255,255,255,0.25)",
+                    border: "2px solid rgba(255,255,255,0.5)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 9, fontWeight: 700, color: "white",
+                    marginLeft: -8, position: "relative",
+                  }}>
+                    +{squadStepProgress.length - 4}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Action buttons */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-              {/* Copy all outputs */}
+            {/* Action buttons grid */}
+            <div style={{ padding: "14px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {/* Copy all */}
               <button
                 onClick={() => {
                   const allContent = active?.messages
@@ -2000,16 +2043,20 @@ export default function ChatCore({
                   navigator.clipboard.writeText(allContent).then(() => alert("已複製到剪貼簿！"));
                 }}
                 style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  padding: "7px 14px", borderRadius: 8, fontSize: 12,
-                  background: "#FFFFFF", border: "1px solid #D1FAE5",
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px", borderRadius: 8, fontSize: 12,
+                  background: "#F0FDF4", border: "1px solid #BBF7D0",
                   color: "#065F46", cursor: "pointer", fontFamily: "inherit",
                   fontWeight: 500, transition: "all 0.15s",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#ECFDF5"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#FFFFFF"; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#DCFCE7"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#F0FDF4"; }}
               >
-                📋 複製全部成果
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                複製全部成果
               </button>
 
               {/* Email */}
@@ -2017,21 +2064,33 @@ export default function ChatCore({
                 <button
                   onClick={() => setEmailDialogOpen(true)}
                   style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "7px 14px", borderRadius: 8, fontSize: 12,
-                    background: "#FFFFFF", border: "1px solid #BFDBFE",
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 14px", borderRadius: 8, fontSize: 12,
+                    background: "#EFF6FF", border: "1px solid #BFDBFE",
                     color: "#1D4ED8", cursor: "pointer", fontFamily: "inherit",
                     fontWeight: 500, transition: "all 0.15s",
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#EFF6FF"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#FFFFFF"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#DBEAFE"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#EFF6FF"; }}
                 >
-                  📧 Email 給我
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                  </svg>
+                  Email 給我
                 </button>
               )}
               {emailSent && (
-                <span style={{ fontSize: 12, color: "#059669", display: "flex", alignItems: "center", gap: 4 }}>
-                  ✅ Email 已發送！
+                <span style={{
+                  fontSize: 12, color: "#059669",
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "8px 14px", borderRadius: 8,
+                  background: "#F0FDF4", border: "1px solid #BBF7D0",
+                }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  Email 已送出
                 </span>
               )}
 
@@ -2057,44 +2116,60 @@ export default function ChatCore({
                     }
                   }}
                   style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "7px 14px", borderRadius: 8, fontSize: 12,
-                    background: "#FFFFFF", border: "1px solid #E9D5FF",
-                    color: "#6B21A8", cursor: "pointer", fontFamily: "inherit",
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 14px", borderRadius: 8, fontSize: 12,
+                    background: "#F5F3FF", border: "1px solid #DDD6FE",
+                    color: "#6D28D9", cursor: "pointer", fontFamily: "inherit",
                     fontWeight: 500, transition: "all 0.15s",
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F5F3FF"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#FFFFFF"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#EDE9FE"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#F5F3FF"; }}
                 >
-                  💾 存入品牌大腦
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
+                    <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
+                  </svg>
+                  存入品牌大腦
                 </button>
               )}
 
-              {/* Restart squad */}
+              {/* Deep analysis */}
               <button
                 onClick={() => setInput("我想針對某個環節深入分析，或調整方向重新執行")}
                 style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  padding: "7px 14px", borderRadius: 8, fontSize: 12,
-                  background: "transparent", border: "1px solid #E4E3E1",
-                  color: "#9B9990", cursor: "pointer", fontFamily: "inherit",
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px", borderRadius: 8, fontSize: 12,
+                  background: "transparent", border: "1px solid #E5E7EB",
+                  color: "#6B7280", cursor: "pointer", fontFamily: "inherit",
                   fontWeight: 500, transition: "all 0.15s",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F9F9F8"; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F9FAFB"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
               >
-                🔁 深入分析 / 調整方向
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                深入分析 / 調整方向
               </button>
             </div>
 
             {/* Email input dialog */}
             {emailDialogOpen && !emailSent && (
               <div style={{
-                marginTop: 12, padding: "12px 14px",
-                background: "#FFFFFF", borderRadius: 10, border: "1px solid #BFDBFE",
+                margin: "0 20px 16px",
+                padding: "12px 14px",
+                background: "#F8FAFF",
+                borderRadius: 10,
+                border: "1px solid #BFDBFE",
+                animation: "slideInUp 0.2s ease",
               }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#1D4ED8", marginBottom: 8 }}>
-                  將完整成果 Email 給
+                <div style={{
+                  fontSize: 11, fontWeight: 600, color: "#1D4ED8",
+                  marginBottom: 8, textTransform: "uppercase" as const,
+                  letterSpacing: "0.06em",
+                }}>
+                  將完整成果 Email 發送至
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input
@@ -2102,17 +2177,22 @@ export default function ChatCore({
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     placeholder="your@email.com"
+                    autoFocus
                     style={{
-                      flex: 1, padding: "7px 10px", borderRadius: 7,
-                      border: "1px solid #BFDBFE", fontSize: 13,
+                      flex: 1, padding: "8px 12px", borderRadius: 7,
+                      border: "1.5px solid #BFDBFE", fontSize: 13,
                       fontFamily: "inherit", outline: "none",
-                      background: "#FAFBFF",
+                      background: "#FFFFFF",
+                      transition: "border-color 0.15s",
                     }}
+                    onFocus={e => { e.target.style.borderColor = "#3B82F6"; }}
+                    onBlur={e => { e.target.style.borderColor = "#BFDBFE"; }}
                     onKeyDown={e => {
                       if (e.key === "Enter" && emailInput.includes("@")) {
                         e.preventDefault();
                         (e.currentTarget.nextElementSibling as HTMLButtonElement)?.click();
                       }
+                      if (e.key === "Escape") setEmailDialogOpen(false);
                     }}
                   />
                   <button
@@ -2143,18 +2223,32 @@ export default function ChatCore({
                       finally { setEmailSending(false); }
                     }}
                     style={{
-                      padding: "7px 16px", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                      background: emailInput.includes("@") ? "#1D4ED8" : "#E4E3E1",
-                      color: "#FFFFFF", border: "none", cursor: emailInput.includes("@") ? "pointer" : "not-allowed",
-                      fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4,
+                      padding: "8px 16px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+                      background: emailInput.includes("@") && !emailSending ? "#1D4ED8" : "#E5E7EB",
+                      color: emailInput.includes("@") && !emailSending ? "#FFFFFF" : "#9CA3AF",
+                      border: "none",
+                      cursor: emailInput.includes("@") && !emailSending ? "pointer" : "not-allowed",
+                      fontFamily: "inherit",
+                      display: "flex", alignItems: "center", gap: 5,
+                      transition: "all 0.15s",
+                      flexShrink: 0,
                     }}
                   >
-                    {emailSending ? "發送中..." : "發送"}
+                    {emailSending ? (
+                      <>
+                        <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
+                        發送中
+                      </>
+                    ) : "發送"}
                   </button>
                   <button
                     onClick={() => setEmailDialogOpen(false)}
-                    style={{ background: "none", border: "none", color: "#9B9990", cursor: "pointer", fontSize: 14 }}
-                  >✕</button>
+                    style={{
+                      background: "none", border: "none", color: "#9CA3AF",
+                      cursor: "pointer", fontSize: 16, padding: "4px", lineHeight: 1,
+                    }}
+                    title="取消"
+                  >×</button>
                 </div>
               </div>
             )}
