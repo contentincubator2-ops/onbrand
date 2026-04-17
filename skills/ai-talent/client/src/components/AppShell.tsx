@@ -1658,9 +1658,7 @@ function DBSquadMethodologyPanel({
         <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", marginBottom: 2 }}>
           {squadName}
         </div>
-        {leadTitle && (
-          <div style={{ fontSize: 11, color: "#9B9990", marginBottom: 4 }}>{leadTitle}</div>
-        )}
+
         {description && (
           <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5 }}>{description}</div>
         )}
