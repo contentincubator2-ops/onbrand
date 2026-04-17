@@ -513,6 +513,7 @@ export default function ChatCore({
   // ── PositioningBar state ──────────────────────────────────────────────────
   const [positioningBarText, setPositioningBarText] = useState<string | null>(null);
   const [positioningBarIcp, setPositioningBarIcp] = useState<string>("");
+  const [positioningMsgId, setPositioningMsgId] = useState<string | null>(null);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
@@ -1097,6 +1098,8 @@ export default function ChatCore({
         const icpText = icpMatch ? icpMatch[1].trim() : "";
         setPositioningBarText(posText);
         setPositioningBarIcp(icpText);
+        // Track which message ID contains the positioning book
+        setPositioningMsgId(activeStreamMsgIdRef.current ?? streamMsgId);
       }
       setLoading(false);
       return true;
@@ -1582,6 +1585,18 @@ export default function ChatCore({
             positioningText={positioningBarText}
             icp={positioningBarIcp}
             onDismiss={() => setPositioningBarText(null)}
+            onViewBook={positioningMsgId ? () => {
+              // Scroll to the message containing the positioning book
+              const el = document.getElementById(`msg-${positioningMsgId}`);
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                // Brief highlight animation
+                el.style.background = "rgba(10,110,250,0.06)";
+                el.style.borderRadius = "10px";
+                el.style.transition = "background 0.5s";
+                setTimeout(() => { el.style.background = ""; el.style.borderRadius = ""; }, 1500);
+              }
+            } : undefined}
           />
         </div>
       )}
@@ -1619,7 +1634,7 @@ export default function ChatCore({
 
         {/* ── Chat message bubbles ── */}
         {!isShowingHomepage && active && active.messages.map((msg) => (
-          <div key={msg.id} style={{
+          <div key={msg.id} id={`msg-${msg.id}`} style={{
             display: "flex",
             flexDirection: "column",
             alignItems: msg.role === "user" ? "flex-end" : "flex-start",
