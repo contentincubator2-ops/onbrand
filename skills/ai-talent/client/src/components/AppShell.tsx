@@ -1485,13 +1485,15 @@ function RightPanel({
 
   // ── Poll current squad session step (for live sidebar highlighting) ─────────
   const sessionStepQuery = trpc.squad.getSessionStep.useQuery(
-    { missionId: missionId! },
+    { missionId: missionId ?? 0 },
     {
       enabled: !!missionId && !!effectiveSquad,
-      // Poll every 3 seconds while a session exists; slow down to 15s once squad is done
-      refetchInterval: (data: any) =>
-        !data ? 3000 : data.status === "complete" ? 15_000 : 3000,
-      refetchOnWindowFocus: true,
+      // Poll every 3s. React Query v5: refetchInterval callback receives Query object.
+      refetchInterval: (query: any) => {
+        const status = (query?.state?.data as any)?.status;
+        return status === "complete" ? 15_000 : 3_000;
+      },
+      refetchOnWindowFocus: false,
     }
   );
   const activeStep = (sessionStepQuery.data as any)?.currentStep as number | undefined;
