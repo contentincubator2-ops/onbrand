@@ -1105,7 +1105,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
     if (!d) return "未建立";
     try {
       const dt = new Date(d);
-      return ;
+      return dt.toLocaleDateString("zh-TW", { month: "short", day: "numeric" });
     } catch { return d; }
   };
 
@@ -1800,52 +1800,68 @@ function DBSquadMethodologyPanel({
 
       <div style={{ height: 1, background: "#E7E5E4", marginBottom: 12 }} />
 
-      {/* Steps */}
+      {/* Steps — Timeline style */}
       {isLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {[1,2,3,4].map(i => (
-            <div key={i} style={{ height: 36, background: "#F2F1EF", borderRadius: 8, opacity: 0.6 }} />
+            <div key={i} style={{ height: 36, background: "#F2F1EF", borderRadius: 8, opacity: 0.6, animation: "pulse 1.5s infinite" }} />
           ))}
         </div>
       ) : steps.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {steps.map((step: any, i: number) => {
             const stepNum = step.step ?? i + 1;
-            // activeStep 0 = lead intake (before step 1), 1+ = step index
             const isActive = activeStep !== undefined && activeStep > 0 && activeStep === stepNum;
             const isDone   = activeStep !== undefined && activeStep > stepNum;
+            const isLast   = i === steps.length - 1;
+            const nodeColor = isActive ? "#0A6EFA" : isDone ? "#059669" : "#D4D3D0";
+            const textColor = isActive ? "#0A6EFA" : isDone ? "#059669" : "#1A1A18";
+
             return (
-              <div key={i} style={{
-                display: "flex", gap: 10,
-                padding: isActive ? "6px 8px" : undefined,
-                background: isActive ? "#F0FDF8" : isDone ? "#FAFAF9" : undefined,
-                borderRadius: isActive ? 8 : undefined,
-                border: isActive ? "1px solid #A7F3D0" : undefined,
-                transition: "all 0.3s ease",
-              }}>
-                <div style={{
-                  width: 20, height: 20, borderRadius: "50%",
-                  background: isActive ? "#1DBEAA" : isDone ? "#9B9990" : "#1A1A18",
-                  color: "#FFFFFF",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1,
-                  boxShadow: isActive ? "0 0 0 3px rgba(29,190,170,0.25)" : undefined,
-                  transition: "all 0.3s ease",
-                }}>
-                  {isDone ? "✓" : stepNum}
-                </div>
-                <div style={{ flex: 1 }}>
+              <div key={i} style={{ display: "flex" }}>
+                {/* Left track */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 32, flexShrink: 0 }}>
+                  {/* Node */}
                   <div style={{
-                    fontSize: 12, fontWeight: 600, marginBottom: 2,
-                    color: isActive ? "#1DBEAA" : isDone ? "#9B9990" : "#1A1A18",
+                    width: 22, height: 22, borderRadius: "50%",
+                    background: isActive ? "#EFF6FF" : isDone ? "#ECFDF5" : "#F2F1EF",
+                    border: `2px solid ${nodeColor}`,
+                    color: nodeColor,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: isDone ? 12 : 10, fontWeight: 700, flexShrink: 0,
+                    boxShadow: isActive ? "0 0 0 4px rgba(10,110,250,0.1)" : "none",
+                    transition: "all 0.3s",
+                    zIndex: 1,
                   }}>
+                    {isDone ? "✓" : isActive ? (
+                      <span style={{ animation: "pulse 1.5s infinite", display: "inline-block" }}>●</span>
+                    ) : stepNum}
+                  </div>
+                  {/* Connector */}
+                  {!isLast && (
+                    <div style={{
+                      width: 2, flex: 1, minHeight: 10,
+                      background: isDone ? "#BBF7D0" : "#E4E3E1",
+                      margin: "2px 0",
+                      transition: "background 0.4s",
+                    }} />
+                  )}
+                </div>
+                {/* Content */}
+                <div style={{
+                  flex: 1, paddingLeft: 8,
+                  paddingBottom: isLast ? 4 : 12, paddingTop: 2,
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: textColor, marginBottom: 2, transition: "color 0.3s" }}>
                     {step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
                   </div>
-                  <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
-                    {step.description ?? ""}
-                  </div>
+                  {step.description && (
+                    <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.5 }}>
+                      {step.description}
+                    </div>
+                  )}
                   {isActive && (
-                    <div style={{ fontSize: 10, color: "#1DBEAA", marginTop: 3, fontWeight: 600 }}>
+                    <div style={{ fontSize: 10, color: "#0A6EFA", marginTop: 3, fontWeight: 600 }}>
                       ⚡ 執行中
                     </div>
                   )}
@@ -1937,82 +1953,85 @@ function DBAgentMembersList({
     );
   }
 
+  const AGENT_AVATAR_COLORS = ["#0A6EFA", "#E8631A", "#7C3AED", "#059669", "#DC2626", "#0891B2"];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {allMembers.map((agent: any, i: number) => {
-        // Lead = index 0, members = index 1+
-        // activeStep 0 = lead intake, 1+ = member step
         const isActive = activeStep !== undefined && (
           (agent.isLead && activeStep === 0) ||
           (!agent.isLead && activeStep === i)
         );
         const isDone = activeStep !== undefined && !agent.isLead && activeStep > i;
+        const avatarColor = isDone ? "#9B9990" : isActive ? "#0A6EFA" : AGENT_AVATAR_COLORS[i % AGENT_AVATAR_COLORS.length];
+
         return (
-        <div
-          key={agent.agentId ?? i}
-          style={{
-            padding: "10px 10px",
-            background: isActive ? "#F0FDF8" : isDone ? "#FAFAF9" : agent.isLead ? "#F0FDF8" : "#FFFFFF",
-            border: `1px solid ${isActive ? "#1DBEAA" : isDone ? "#D1FAE5" : agent.isLead ? "#A7F3D0" : "#E7E5E4"}`,
-            borderRadius: 8,
-            transition: "all 0.3s ease",
-            boxShadow: isActive ? "0 0 0 2px rgba(29,190,170,0.2)" : undefined,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-            <div style={{
-              width: 22, height: 22, borderRadius: "50%",
-              background: isActive ? "#1DBEAA" : isDone ? "#9B9990" : agent.isLead ? "#1DBEAA" : "#1A1A18",
-              color: "white", display: "flex", alignItems: "center",
-              justifyContent: "center", fontSize: 9, fontWeight: 700, flexShrink: 0,
-              boxShadow: isActive ? "0 0 0 3px rgba(29,190,170,0.3)" : undefined,
-              transition: "all 0.3s ease",
-            }}>
-              {isDone ? "✓" : (agent.name ?? "A").charAt(0)}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#1DBEAA" : "#1A1A18" }}>
-                {agent.name}
+          <div
+            key={agent.agentId ?? i}
+            style={{
+              padding: "8px 10px",
+              background: isActive ? "#EFF6FF" : agent.isLead ? "#F0FDF4" : "#FFFFFF",
+              border: `1px solid ${isActive ? "#BFDBFE" : agent.isLead ? "#BBF7D0" : "#E4E3E1"}`,
+              borderRadius: 8,
+              transition: "all 0.3s",
+              boxShadow: isActive ? "0 0 0 2px rgba(10,110,250,0.08)" : "none",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Avatar with avatar URL support */}
+              {agent.avatarUrl ? (
+                <img src={agent.avatarUrl} alt={agent.name}
+                  style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${avatarColor}22` }} />
+              ) : (
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: isDone ? "#ECFDF5" : isActive ? "#EFF6FF" : "#F2F1EF",
+                  border: `2px solid ${avatarColor}`,
+                  color: avatarColor, display: "flex", alignItems: "center",
+                  justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0,
+                  boxShadow: isActive ? "0 0 0 4px rgba(10,110,250,0.1)" : "none",
+                  transition: "all 0.3s",
+                }}>
+                  {isDone ? "✓" : (agent.name ?? "A").charAt(0)}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 1 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#0A6EFA" : "#1A1A18" }}>
+                    {agent.name}
+                  </span>
+                  {agent.isLead && (
+                    <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: "#DCFCE7", color: "#059669", fontWeight: 600 }}>
+                      Lead
+                    </span>
+                  )}
+                  {isActive && (
+                    <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: "#EFF6FF", color: "#0A6EFA", fontWeight: 600 }}>
+                      ⚡
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 10, color: "#9B9990", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                  {agent.title}
+                </div>
               </div>
-              <div style={{ fontSize: 10, color: "#6B6A66" }}>{agent.title}</div>
             </div>
-            {agent.isLead && !isActive && (
-              <span style={{
-                fontSize: 9, padding: "1px 6px", borderRadius: 4,
-                background: "#1DBEAA", color: "white", fontWeight: 600,
-              }}>
-                Lead
-              </span>
-            )}
-            {isActive && (
-              <span style={{
-                fontSize: 9, padding: "1px 6px", borderRadius: 4,
-                background: "#1DBEAA", color: "white", fontWeight: 600,
-                animation: "pulse 1.5s ease-in-out infinite",
-              }}>
-                ⚡ 執行中
-              </span>
+            {/* Skill chips - compact row */}
+            {(agent.primarySkill || agent.aiModel) && (
+              <div style={{ display: "flex", gap: 3, marginTop: 5, flexWrap: "wrap" as const }}>
+                {agent.primarySkill && (
+                  <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: "#F0F4FF", color: "#4A6FA5", border: "1px solid #D0DCEF" }}>
+                    {agent.primarySkill}
+                  </span>
+                )}
+                {agent.aiModel && (
+                  <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: "#F5F0FF", color: "#6B4FA5", border: "1px solid #DDD0EF" }}>
+                    {fmtModel(agent.aiModel)}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
-            {agent.primarySkill && (
-              <span style={{
-                fontSize: 10, padding: "2px 7px", borderRadius: 20,
-                background: "#F0F4FF", color: "#4A6FA5", border: "1px solid #D0DCEF",
-              }}>
-                {agent.primarySkill}
-              </span>
-            )}
-            {agent.aiModel && (
-              <span style={{
-                fontSize: 10, padding: "2px 7px", borderRadius: 20,
-                background: "#F5F0FF", color: "#6B4FA5", border: "1px solid #DDD0EF",
-              }}>
-                {agent.aiModel}
-              </span>
-            )}
-          </div>
-        </div>
         );
       })}
     </div>
