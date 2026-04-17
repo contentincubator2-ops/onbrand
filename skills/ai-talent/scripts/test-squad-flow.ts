@@ -25,7 +25,7 @@ dotenvConfig({ path: resolve(__dirname, "../.env") });
 
 import mysql from "mysql2/promise";
 import * as https from "http";
-import { createHash, randomBytes } from "crypto";
+import { SignJWT } from "jose";
 
 // ── 設定 ──────────────────────────────────────────────────────────────────────
 const BASE_URL  = `http://localhost:${process.env.PORT ?? 3001}`;
@@ -96,66 +96,33 @@ async function getTestMission(pool: mysql.Pool) {
   return (rows as any[])[0] ?? null;
 }
 
-// ── 建立臨時測試 API key（raw key 返回後只存 hash）──────────────────────────
-// API keys 在 DB 以 SHA-256 hash 存儲，raw key 無法從 DB 反推。
-// 因此測試時臨時建立一個 key，用完後清除。
-let _testRawKey: string | null = null;
-async function getOrCreateTestApiKey(pool: mysql.Pool): Promise<{ rawKey: string; userId: number } | null> {
-  if (_testRawKey) {
-    // 重用同一輪的 key（userId 不重要，已有 token）
+// ── 直接用 JWT_SECRET 簽發測試用 token（繞過 API key 系統）────────────────────
+// 原因：API keys 在 DB 以 SHA-256 hash 存儲，raw key 不存在於 DB，
+// 無法從 DB 取出直接使用。測試環境直接用 JWT_SECRET 簽發 token 最簡單。
+async function createTestToken(userId: number): Promise<string | null> {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    console.error("❌ JWT_SECRET 未設定在 .env 中");
     return null;
   }
-  // 找第一個有效 user
-  const [userRows] = await pool.execute(`SELECT id FROM users WHERE isActive = 1 LIMIT 1`) as any[];
-  const userId: number | undefined = (userRows as any[])[0]?.id;
-  if (!userId) return null;
-
-  const rawKey = "sw-test-" + randomBytes(12).toString("hex");
-  const keyHash = createHash("sha256").update(rawKey).digest("hex");
-  await pool.execute(
-    `INSERT INTO user_api_keys (userId, apiKey, label, isActive) VALUES (?, ?, ?, 1)`,
-    [userId, keyHash, "auto-test-runner"]
-  );
-  _testRawKey = rawKey;
-  return { rawKey, userId };
+  try {
+    const secret = new TextEncoder().encode(jwtSecret);
+    const token = await new SignJWT({ sub: String(userId) })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("2h")
+      .sign(secret);
+    return token;
+  } catch (e) {
+    console.error("❌ 無法簽發 JWT:", e);
+    return null;
+  }
 }
 
-async function cleanupTestApiKey(pool: mysql.Pool): Promise<void> {
-  if (!_testRawKey) return;
-  const keyHash = createHash("sha256").update(_testRawKey).digest("hex");
-  await pool.execute(`DELETE FROM user_api_keys WHERE apiKey = ?`, [keyHash]).catch(() => {});
-  _testRawKey = null;
-}
-
-// ── 登入取得 JWT ─────────────────────────────────────────────────────────────
-async function login(apiKey: string): Promise<string | null> {
-  const port = +(process.env.PORT ?? 3001);
-  console.log(`   → 嘗試登入 http://localhost:${port}/api/auth/login`);
-  return new Promise((resolve) => {
-    const body = JSON.stringify({ apiKey });
-    const req = https.request({
-      hostname: "localhost",
-      port,
-      path: "/api/auth/login",
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
-    }, (res) => {
-      let data = "";
-      console.log(`   → 登入回應狀態: ${res.statusCode}`);
-      res.on("data", (c) => (data += c));
-      res.on("end", () => {
-        console.log(`   → 登入回應內容: ${data.slice(0, 200)}`);
-        try { resolve(JSON.parse(data).token ?? null); }
-        catch { resolve(null); }
-      });
-    });
-    req.on("error", (e) => {
-      console.error(`   → 登入連線錯誤: ${e.message}`);
-      resolve(null);
-    });
-    req.write(body);
-    req.end();
-  });
+// ── 找第一個有效 user ──────────────────────────────────────────────────────────
+async function getTestUserId(pool: mysql.Pool): Promise<number | null> {
+  const [rows] = await pool.execute(`SELECT id FROM users WHERE isActive = 1 LIMIT 1`) as any[];
+  return (rows as any[])[0]?.id ?? null;
 }
 
 // ── 重置 squad session ────────────────────────────────────────────────────────
@@ -511,23 +478,20 @@ async function main() {
   }
   console.log(`📋 使用 mission #${mission.missionId}  squad=${mission.squadSlug}  brand=${mission.brandName}`);
 
-  // 建立臨時測試 API key（因為 DB 只存 hash，raw key 無法反推）
-  const keyInfo = await getOrCreateTestApiKey(pool);
-  if (!keyInfo) {
-    console.error("❌ 找不到有效 user 或無法建立測試 API key");
+  // 取得測試用 userId，直接簽發 JWT（不需要 API key）
+  const userId = await getTestUserId(pool);
+  if (!userId) {
+    console.error("❌ 找不到有效 user（isActive=1），請確認 DB 有資料");
     await pool.end();
     process.exit(1);
   }
-  console.log(`🔑 已建立臨時 API key for userId=${keyInfo.userId}`);
 
-  const token = await login(keyInfo.rawKey);
+  const token = await createTestToken(userId);
   if (!token) {
-    await cleanupTestApiKey(pool);
-    console.error("❌ 登入失敗，請確認 server 運行在 port", process.env.PORT ?? 3001);
     await pool.end();
     process.exit(1);
   }
-  console.log("✅ 登入成功，開始測試...\n");
+  console.log(`🔑 已為 userId=${userId} 簽發測試 JWT，開始測試...\n`);
 
   const results: RunResult[] = [];
 
@@ -541,7 +505,6 @@ async function main() {
     }
   }
 
-  await cleanupTestApiKey(pool);
   await pool.end();
   printReport(results);
 }
