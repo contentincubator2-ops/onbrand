@@ -4509,6 +4509,1347 @@ async function main() {
     await upsertSquad(conn, { slug, name: "Ritson Rigorous Brand Management", description: "Mark Ritson's academic-grade brand management: diagnosis → objectives → positioning → balanced media → brand health tracking — no shortcuts.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Mark Ritson – Mini MBA Brand Management (2018–present)", agents: agentMembers, tags: ["brand", "strategy", "management", "ritson", "rigorous", "long-term"], useCases: ["annual brand planning", "brand health audit", "CMO-level brand strategy"], outputFormats: ["brand_diagnosis", "brand_objectives", "brand_positioning_identity", "media_balance_plan", "brand_health_dashboard"], requiredIntegrations: [], token: 64000, showcases: [{ company: "PepsiCo", description: "Ritson consulted on brand strategy frameworks aligning short-term activation with long-term brand equity building", result: "PepsiCo brands consistently outperform category in brand equity; Lay's, Gatorade and Pepsi maintain top-3 category positions globally", source: "Ritson, M. (2023). Mini MBA in Marketing. Marketing Week Learning." }] });
   }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // MONITORING / INTELLIGENCE SQUADS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── Squad M-1: 社群輿情監測組 ─────────────────────────────────────────────
+    {
+      const slug = "social-listening-intelligence";
+      const taskType = "social-listening";
+      const leadId = await findAgent(conn, ["social listening", "social media monitoring", "sentiment", "brand monitoring"], []);
+      const m2Id   = await findAgent(conn, ["sentiment analysis", "NLP", "text analytics", "data analyst"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["competitive intelligence", "market research", "competitor analysis"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["dashboard", "data visualization", "reporting", "BI"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const m5Id   = await findAgent(conn, ["crisis management", "PR", "media monitoring", "brand health"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0, m4Id ?? 0]);
+      const steps = [
+        { step: 1, title: "監聽範疇設定", description: "定義關鍵字、品牌名稱變體、競品名稱、產品關鍵詞；設定語言與地域過濾器", owner: "squad_lead", output: "監聽關鍵字清單與布林規則" },
+        { step: 2, title: "數據蒐集與清洗", description: "從 FB、IG、PTT、Dcard、Twitter/X、新聞媒體、論壇抓取提及；去除垃圾/廣告內容", owner: "data_analyst", output: "結構化提及資料集" },
+        { step: 3, title: "情感分析與分類", description: "對每筆提及進行正 / 負 / 中立情感標記；按話題、管道、時間聚合", owner: "sentiment_analyst", output: "情感分析報告（帶趨勢圖）" },
+        { step: 4, title: "競品聲量比對", description: "計算品牌聲量份額（Share of Voice）；與主要競品對比曝光量與情感比例", owner: "competitive_analyst", output: "SoV 競品比較表" },
+        { step: 5, title: "洞察摘要與行動建議", description: "提煉本週/月關鍵洞察；識別輿情風險與機會點；給出優先行動建議", owner: "squad_lead", output: "輿情洞察簡報（PPT/PDF）" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Social Listening Lead",    order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Sentiment Analyst",        order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Competitive Intel Analyst", order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Dashboard & Reporting",    order: 4 },
+        { agent_id: m5Id,   is_lead: false, role: "Crisis Early Warning",     order: 5 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "社群輿情監測框架", description: "系統化蒐集品牌、競品在社群與媒體的提及，量化情感與聲量，輸出可行動洞察。", steps });
+      await upsertSquad(conn, {
+        slug, name: "社群輿情監測組", description: "全平台社群聆聽 + 情感分析 + 競品聲量比對，每週輸出品牌輿情儀表板與優先行動建議。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["monitoring", "pr"],
+        methodology: "Social Listening → Sentiment NLP → Share of Voice → Actionable Insight",
+        agents: agentMembers,
+        tags: ["monitoring", "social-listening", "sentiment", "輿情", "監測", "brand-tracking", "competitive"],
+        useCases: ["社群輿情月報", "品牌聲量追蹤", "競品社群表現比對", "負評危機預警"],
+        outputFormats: ["sentiment_dashboard", "sov_report", "weekly_briefing", "crisis_alert"],
+        requiredIntegrations: ["social_media_api", "news_api"],
+        token: 32000,
+        showcases: [
+          { company: "台灣連鎖餐飲品牌", description: "導入每週社群輿情監測，追蹤 PTT、Dcard、IG 超過 200 個關鍵字", result: "提前 72 小時識別食安危機苗頭，公關聲明發出後負評比例從 38% 降至 11%", source: "Social Listening Case Study, 2024" },
+        ],
+      });
+    }
+
+    // ── Squad M-2: 競品情報追蹤組 ────────────────────────────────────────────
+    {
+      const slug = "competitive-intel-tracker";
+      const taskType = "competitive-intelligence";
+      const leadId = await findAgent(conn, ["competitive intelligence", "market research", "strategy analyst"], []);
+      const m2Id   = await findAgent(conn, ["competitor analysis", "benchmarking", "SWOT"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["pricing strategy", "price intelligence", "market pricing"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["content analysis", "SEO audit", "digital marketing audit"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const m5Id   = await findAgent(conn, ["data analyst", "research report", "business intelligence"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0, m4Id ?? 0]);
+      const steps = [
+        { step: 1, title: "競品清單與追蹤設定", description: "確認主要 / 次要 / 間接競品；設定追蹤維度：定價、廣告、內容、SEO、PR", owner: "squad_lead", output: "競品追蹤框架文件" },
+        { step: 2, title: "廣告創意情報", description: "透過 Meta Ad Library、Google 廣告透明度中心蒐集競品廣告；分析訊息主軸與創意策略", owner: "competitor_analyst", output: "競品廣告創意庫" },
+        { step: 3, title: "內容與 SEO 對標", description: "分析競品網站、部落格、社群的內容主題與發布頻率；比對關鍵字排名落差", owner: "content_analyst", output: "內容 Gap 分析報告" },
+        { step: 4, title: "定價與促銷追蹤", description: "監測競品定價變動、折扣活動、新品發布；識別市場定價機會", owner: "pricing_analyst", output: "定價情報週報" },
+        { step: 5, title: "競品情報月報彙整", description: "整合以上數據，輸出競品動態摘要、市場機會點、品牌策略建議", owner: "squad_lead", output: "競品情報月報（簡報格式）" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Competitive Intel Lead",  order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Competitor Analyst",       order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Pricing Intelligence",     order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Content & SEO Audit",      order: 4 },
+        { agent_id: m5Id,   is_lead: false, role: "BI & Reporting",           order: 5 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "競品情報追蹤框架", description: "系統化蒐集廣告、內容、定價、SEO 等競品數據，輸出可行動的競品情報月報。", steps });
+      await upsertSquad(conn, {
+        slug, name: "競品情報追蹤組", description: "持續追蹤競品廣告創意、定價策略、內容佈局與 SEO 動態，每月輸出競品情報報告，協助品牌搶佔市場空間。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["monitoring", "strategy"],
+        methodology: "Competitive Intelligence → Ad Library Mining → Content Gap → Pricing Watch → Monthly Briefing",
+        agents: agentMembers,
+        tags: ["competitive", "intelligence", "情報", "競品", "monitoring", "strategy", "市場研究", "benchmark"],
+        useCases: ["競品廣告監測", "競品內容策略分析", "定價情報追蹤", "進入新市場前競品研究"],
+        outputFormats: ["competitive_brief", "ad_creative_library", "content_gap_report", "pricing_tracker"],
+        requiredIntegrations: ["meta_ad_library", "google_ads_transparency", "semrush_or_ahrefs"],
+        token: 40000,
+        showcases: [
+          { company: "SaaS 新創品牌", description: "每月追蹤 7 家競品的廣告投放、落地頁文案與 SEO 關鍵字策略", result: "發現競品未覆蓋的 3 個高意圖長尾關鍵字，導入後 3 個月 organic leads 增長 41%", source: "Competitive Intelligence Case Study, 2024" },
+        ],
+      });
+    }
+
+    // ── Squad M-3: 品牌聲量健康追蹤組 ───────────────────────────────────────
+    {
+      const slug = "brand-health-tracker";
+      const taskType = "brand-health-monitoring";
+      const leadId = await findAgent(conn, ["brand health", "brand tracking", "brand equity", "NPS"], []);
+      const m2Id   = await findAgent(conn, ["survey research", "consumer research", "market research"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data analyst", "analytics", "metrics", "KPI tracking"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["PR", "media relations", "earned media", "press"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "品牌健康指標設定", description: "定義品牌健康 KPI：自發提及率（TOM Awareness）、品牌好感度、NPS、購買意願；設定追蹤週期", owner: "squad_lead", output: "品牌健康 KPI 框架" },
+        { step: 2, title: "搜尋與社群聲量分析", description: "追蹤品牌相關搜尋量趨勢（Google Trends）；計算社群提及量與情感比例", owner: "data_analyst", output: "聲量趨勢儀表板" },
+        { step: 3, title: "媒體曝光分析", description: "蒐集品牌新聞媒體報導；分析 AVE（廣告等值）與媒體調性（正/負/中立）", owner: "media_analyst", output: "媒體監測月報" },
+        { step: 4, title: "品牌感知洞察摘要", description: "整合搜尋、社群、媒體數據，輸出品牌感知趨勢；與上期比較並給出行動建議", owner: "squad_lead", output: "品牌健康追蹤報告（季度）" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Brand Health Lead",    order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Consumer Research",    order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Data & Analytics",     order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Media Intelligence",   order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "品牌健康追蹤框架", description: "量化追蹤品牌知名度、好感度、聲量與媒體曝光，輸出季度品牌健康報告。", steps });
+      await upsertSquad(conn, {
+        slug, name: "品牌聲量健康追蹤組", description: "整合 Google Trends、社群聲量、媒體報導，量化品牌健康指標（TOM、NPS、好感度），每季輸出品牌健康儀表板。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["monitoring", "strategy", "pr"],
+        methodology: "Brand Health Tracking → Search + Social + Media → KPI Dashboard → Quarterly Review",
+        agents: agentMembers,
+        tags: ["monitoring", "brand-tracking", "brand health", "輿情", "媒體監測", "sentiment", "NPS", "awareness"],
+        useCases: ["品牌健康季報", "廣告後效評估", "新品上市前後品牌感知追蹤", "危機後品牌恢復監測"],
+        outputFormats: ["brand_health_dashboard", "media_coverage_report", "sentiment_trend_chart"],
+        requiredIntegrations: ["google_trends", "media_monitoring_tool", "social_api"],
+        token: 28000,
+        showcases: [
+          { company: "上市消費品品牌", description: "導入季度品牌健康追蹤，量化廣告投放前後 TOM 知名度與 NPS 變化", result: "識別品牌好感度在特定族群下滑 12%，及時調整溝通策略，下一季好感度回升 9%", source: "Brand Health Tracking Case Study, 2024" },
+        ],
+      });
+    }
+
+    // ── Squad M-4: 危機預警與應變組 ──────────────────────────────────────────
+    {
+      const slug = "crisis-early-warning-squad";
+      const taskType = "crisis-monitoring";
+      const leadId = await findAgent(conn, ["crisis management", "crisis communication", "PR crisis"], []);
+      const m2Id   = await findAgent(conn, ["social listening", "monitoring", "alert", "risk"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["copywriting", "statement", "press release", "public relations"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["social media manager", "community management", "response"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "輿情風險早期識別", description: "設定高風險關鍵字警示閾值；即時監測社群、新聞、論壇的異常提及量", owner: "squad_lead", output: "風險預警警報" },
+        { step: 2, title: "危機評級與影響評估", description: "依據擴散速度、情感強度、媒體等級評定危機等級（1-5級）；估算潛在影響範圍", owner: "risk_analyst", output: "危機評估報告" },
+        { step: 3, title: "應對聲明起草", description: "依危機等級準備對應的品牌聲明、媒體回應、社群貼文草案", owner: "pr_copywriter", output: "聲明草稿（多版本）" },
+        { step: 4, title: "多渠道危機溝通執行", description: "按優先序在新聞媒體、社群、官網、客服同步發布回應；監測輿情反應", owner: "community_manager", output: "危機溝通執行紀錄" },
+        { step: 5, title: "危機後輿情回復追蹤", description: "持續監測負評消退速度；追蹤品牌信任度回復指標；輸出事後檢討報告", owner: "squad_lead", output: "危機後復原報告" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Crisis Lead",           order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Monitoring & Alert",     order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "PR Statement Writer",    order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Social Response Lead",   order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "危機預警與應變框架", description: "即時偵測輿情風險，快速評級並啟動標準化危機溝通流程，降低品牌聲譽損失。", steps });
+      await upsertSquad(conn, {
+        slug, name: "危機預警與應變組", description: "24/7 輿情風險偵測，結合危機評級、聲明起草、多渠道溝通的端到端危機應對小組，降低負面輿情對品牌的長期傷害。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["monitoring", "pr"],
+        methodology: "Early Warning → Crisis Rating → Response Drafting → Multi-channel Communication → Recovery Tracking",
+        agents: agentMembers,
+        tags: ["crisis", "monitoring", "PR", "輿情", "危機", "brand-protection", "risk", "媒體", "social-listening"],
+        useCases: ["食安危機應對", "負評擴散緊急處理", "KOL 合作危機", "法律糾紛公關應對", "品牌形象維護"],
+        outputFormats: ["crisis_alert", "crisis_assessment", "pr_statement", "crisis_report"],
+        requiredIntegrations: ["social_monitoring_tool", "news_api", "media_alert"],
+        token: 36000,
+        showcases: [
+          { company: "電商平台", description: "建立危機預警機制，對退款糾紛、配送延誤等高風險詞設定實時警報", result: "平均危機回應時間從 8 小時縮短至 1.5 小時；負評解決率提升 67%", source: "Crisis Management Case Study, 2024" },
+        ],
+      });
+    }
+
+    // ── Squad M-5: 消費者洞察情報組 ──────────────────────────────────────────
+    {
+      const slug = "consumer-insight-intelligence";
+      const taskType = "consumer-intelligence";
+      const leadId = await findAgent(conn, ["consumer insights", "consumer research", "market research", "ethnography"], []);
+      const m2Id   = await findAgent(conn, ["data analyst", "quantitative research", "survey", "SPSS"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["qualitative research", "focus group", "UX research", "interview"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["trend analysis", "trend forecasting", "cultural trends"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "消費者情報需求定義", description: "確認研究問題：消費者態度、購買行為、未滿足需求、新興趨勢；設計研究方法組合", owner: "squad_lead", output: "研究設計文件" },
+        { step: 2, title: "量化數據蒐集", description: "設計問卷或分析既有調查數據；蒐集消費者行為指標、NPS、CSAT 等", owner: "data_analyst", output: "量化調查結果" },
+        { step: 3, title: "質化洞察萃取", description: "分析社群評論、客服記錄、焦點小組，萃取消費者的原話（verbatim）與情感", owner: "qualitative_researcher", output: "消費者洞察卡片集" },
+        { step: 4, title: "趨勢訊號掃描", description: "掃描搜尋趨勢、社群話題、媒體報導，識別新興消費者行為趨勢", owner: "trend_analyst", output: "新興趨勢簡報" },
+        { step: 5, title: "洞察整合與策略轉化", description: "整合量化 + 質化 + 趨勢數據，輸出「消費者洞察報告」；轉化為產品、內容、媒介策略建議", owner: "squad_lead", output: "消費者洞察策略報告" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Consumer Insights Lead",   order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Quantitative Analyst",     order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Qualitative Researcher",   order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Trend Intelligence",       order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "消費者洞察情報框架", description: "整合量化調查、質化訪談、社群聆聽與趨勢掃描，輸出可直接驅動策略的消費者洞察報告。", steps });
+      await upsertSquad(conn, {
+        slug, name: "消費者洞察情報組", description: "量化調查 × 質化訪談 × 社群聆聽三角驗證，萃取消費者真實心聲，轉化為產品、內容、媒介策略的決策依據。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["monitoring", "strategy"],
+        methodology: "Mixed Methods: Quant + Qual + Social Listening → Triangulation → Strategy Translation",
+        agents: agentMembers,
+        tags: ["consumer-research", "intelligence", "情報", "監測", "insights", "market-research", "趨勢", "qualitative", "quantitative"],
+        useCases: ["新品上市前消費者研究", "品牌重新定位洞察", "目標受眾深度研究", "購買決策路徑分析"],
+        outputFormats: ["consumer_insight_report", "trend_brief", "persona_update", "strategy_recommendation"],
+        requiredIntegrations: ["survey_tool", "social_listening", "crm_data"],
+        token: 44000,
+        showcases: [
+          { company: "台灣美妝品牌", description: "上市前進行消費者洞察研究，量化問卷 n=500 + 深度訪談 12 人 + 社群聆聽 3 個月", result: "發現核心 TA 對「成分透明度」的高度重視，調整包裝溝通後首月銷售超標 28%", source: "Consumer Insight Case Study, 2024" },
+        ],
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MARKETING DATA ANALYTICS SQUADS
+    // Taxonomy: A) 用戶研究  B) 增長分析  C) 客戶價值  D) 媒體歸因
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── A-1: JTBD 用戶深度研究組 (Christensen, HBS 1997) ────────────────────
+    {
+      const slug = "jtbd-user-research-squad";
+      const taskType = "jtbd-user-research";
+      const leadId = await findAgent(conn, ["user research", "qualitative research", "jobs-to-be-done", "consumer insights"], []);
+      const m2Id   = await findAgent(conn, ["interview", "ethnography", "focus group", "深度訪談"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data analysis", "insight synthesis", "research analyst", "pattern recognition"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["product marketing", "product strategy", "customer development"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "Switch Interview 設計", description: "設計「最後一次購買/切換」為核心的深度訪談腳本；聚焦情境（When）、動機（Why）、障礙（What Holds Back）、進展（Progress）四軸", owner: "squad_lead", output: "JTBD 訪談腳本（10-15題）" },
+        { step: 2, title: "田野訪談執行（6-12人）", description: "招募「近 90 天內曾切換或首次購買」的用戶；執行 60-90 分鐘 Switch Interview；錄音轉錄", owner: "researcher", output: "訪談逐字稿 + 錄音檔" },
+        { step: 3, title: "Forces of Progress 分析", description: "對每份訪談標注四力（Push/Pull/Habit/Anxiety）；識別驅動購買或阻礙購買的真實力量", owner: "insight_analyst", output: "Forces 標注矩陣" },
+        { step: 4, title: "Job Story 撰寫", description: "歸納 3-5 個核心 Job Story：「When _____, I want to _____, So I can _____」；驗證與產品特性的對應關係", owner: "product_marketer", output: "Job Stories 卡片組" },
+        { step: 5, title: "策略建議：產品與溝通含義", description: "從 JTBD 推導：哪些功能該強化、哪些訊息該溝通、哪些競爭者是真正威脅", owner: "squad_lead", output: "JTBD 策略報告（含廣告文案方向）" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "JTBD Research Lead",      order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Qualitative Interviewer",  order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Insight Synthesis",        order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Product-Market Translator", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "JTBD Switch Interview 框架", description: "Source: Clayton Christensen (HBS, 1997) + Bob Moesta & Chris Spiek (The Re-Wired Group). Validated by Apple, Intercom, Basecamp, LinkedIn.", steps });
+      await upsertSquad(conn, {
+        slug, name: "JTBD 用戶深度研究組",
+        description: "用 Clayton Christensen Switch Interview 方法論，挖掘用戶「雇用產品完成任務」的真實動機，輸出可驅動產品、行銷、廣告策略的 Job Stories。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Clayton Christensen JTBD (1997) + Bob Moesta Switch Interview Framework",
+        agents: agentMembers,
+        tags: ["analytics", "JTBD", "user-research", "qualitative", "用戶研究", "consumer-insights", "Switch-Interview"],
+        useCases: ["新品上市前用戶研究", "廣告文案策略依據", "品牌重定位洞察", "產品迭代方向研究"],
+        outputFormats: ["job_stories", "forces_matrix", "jtbd_strategy_report", "messaging_brief"],
+        requiredIntegrations: ["interview_tool", "transcription_service"],
+        token: 40000,
+        showcases: [
+          { company: "Intercom", description: "用 JTBD Switch Interviews 重新定位產品，發現用戶「雇用」Intercom 是為了讓業務可以像人一樣對話，而非只是傳訊息", result: "重新定位後 ARR 增長超過 10 倍，從 $1M 到 $50M+", source: "Intercom blog: Jobs-to-be-Done (2016); Des Traynor interviews" },
+          { company: "Basecamp / 37signals", description: "Jason Fried 與 Bob Moesta 合作，用 JTBD 研究項目管理工具切換行為，識別真正競爭對手是 Email + Spreadsheet，不是 Asana", result: "廣告訊息轉向「替代 Email 混亂」，轉換率提升，成為 Project Management SaaS 標竿案例", source: "Moesta, B. (2022). Demand-Side Sales 101. Lioncrest Publishing." },
+        ],
+      });
+    }
+
+    // ── A-2: NPS 忠誠度追蹤系統組 (Reichheld/Bain 2003) ────────────────────
+    {
+      const slug = "nps-loyalty-system-squad";
+      const taskType = "nps-loyalty-tracking";
+      const leadId = await findAgent(conn, ["NPS", "customer loyalty", "customer satisfaction", "brand loyalty"], []);
+      const m2Id   = await findAgent(conn, ["survey design", "questionnaire", "CX research", "customer experience"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data analyst", "statistics", "dashboard", "reporting"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["customer success", "CRM", "retention", "churn"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "NPS 問卷設計與觸發點設定", description: "設計關係型 NPS（年度/季度）與交易型 NPS（購買後 3 天）；設定多渠道觸發邏輯（Email、App in-app、SMS）", owner: "squad_lead", output: "NPS 問卷 + 觸發設定文件" },
+        { step: 2, title: "Promoters / Passives / Detractors 分群", description: "依分數分類（9-10=P, 7-8=Pa, 0-6=D）；設計自動化跟進流程：推薦者邀請口碑、中立者促進加深、批評者立即客服升級", owner: "cx_analyst", output: "三分群行動流程圖" },
+        { step: 3, title: "根因分析（Verbatim Mining）", description: "NLP 分析開放式回答，歸納低分主因（前 5 大痛點）；與產品/服務/行銷團隊交叉比對", owner: "data_analyst", output: "NPS 根因報告" },
+        { step: 4, title: "Closed-Loop Follow-up 執行", description: "對批評者 24 小時內主動聯繫；記錄解決方案；追蹤改善後分數回升情況", owner: "customer_success", output: "Closed-Loop 處理紀錄" },
+        { step: 5, title: "NPS 趨勢儀表板與季度回顧", description: "追蹤 NPS 趨勢、業務指標相關性（留存率、CLV）；輸出季度改善路線圖", owner: "squad_lead", output: "NPS 趨勢儀表板 + 改善路線圖" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "NPS Program Lead",        order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Survey & CX Design",      order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Data & Dashboard",        order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Closed-Loop CS",          order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "NPS 忠誠度系統框架", description: "Source: Fred Reichheld + Bain & Company (HBR 2003). Used by 2/3 of Fortune 1000 companies. The Net Promoter System — not just the score, but the full closed-loop follow-up system.", steps });
+      await upsertSquad(conn, {
+        slug, name: "NPS 忠誠度追蹤系統組",
+        description: "落實 Reichheld/Bain 完整 NPS System：問卷設計 → 三分群行動 → 根因分析 → Closed-Loop 跟進 → 趨勢儀表板，量化客戶忠誠度並驅動改善。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Fred Reichheld + Bain & Company – Net Promoter System (HBR 2003)",
+        agents: agentMembers,
+        tags: ["analytics", "NPS", "loyalty", "customer-satisfaction", "CX", "retention", "品牌健康", "用戶研究"],
+        useCases: ["品牌忠誠度量化追蹤", "產品上市後客戶感知測量", "客服改善優先順序決策", "CLV 與 NPS 相關性分析"],
+        outputFormats: ["nps_dashboard", "verbatim_report", "closed_loop_log", "improvement_roadmap"],
+        requiredIntegrations: ["survey_tool", "CRM", "email_automation"],
+        token: 32000,
+        showcases: [
+          { company: "Apple Retail", description: "導入交易型 NPS（每次 Genius Bar 服務後觸發），Closed-Loop 系統讓門市經理 24 小時內跟進低分客戶", result: "Apple Retail NPS 長期維持 70+ (行業平均 30-40)；直接連結員工績效考核", source: "Reichheld, F. & Markey, R. (2011). The Ultimate Question 2.0. Harvard Business Review Press." },
+        ],
+      });
+    }
+
+    // ── A-3: Kano 產品滿意度模型組 (Noriaki Kano, 1984) ────────────────────
+    {
+      const slug = "kano-model-product-squad";
+      const taskType = "kano-product-analysis";
+      const leadId = await findAgent(conn, ["product management", "product strategy", "customer satisfaction", "feature prioritization"], []);
+      const m2Id   = await findAgent(conn, ["survey design", "quantitative research", "statistical analysis"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["UX research", "product design", "user testing"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "功能清單與 Kano 問卷設計", description: "列出待評估的 10-20 個產品功能；為每個功能設計雙向問題（功能存在時 / 功能不存在時的感受）；5 級量表：喜歡 / 應該如此 / 無所謂 / 可以接受 / 不喜歡", owner: "squad_lead", output: "Kano 問卷（每功能 2 題）" },
+        { step: 2, title: "問卷發放與數據蒐集（n ≥ 100）", description: "對目標 TA 發放問卷；收集至少 100 份有效回覆；清洗矛盾答案（雙向都選喜歡）", owner: "survey_analyst", output: "清洗後問卷數據" },
+        { step: 3, title: "Kano 分類矩陣計算", description: "對每個功能計算 M（必備）/ O（期望）/ A（吸引）/ I（無差異）/ R（反向）比例；依 Better-Worse 係數繪製優先矩陣", owner: "data_analyst", output: "Kano 分類矩陣 + Better-Worse 象限圖" },
+        { step: 4, title: "功能開發優先順序建議", description: "依「先補 M（必備）→ 強化 O（期望）→ 差異化 A（吸引）」原則，輸出功能路線圖建議；連結行銷訴求策略", owner: "squad_lead", output: "功能優先矩陣 + 行銷訴求建議" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Product Insight Lead",    order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Quantitative Analyst",    order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "UX Research",             order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Kano 模型分析框架", description: "Source: Noriaki Kano, Tokyo University of Science (1984). Originally applied at Toyota; now standard in product management and UX research globally.", steps });
+      await upsertSquad(conn, {
+        slug, name: "Kano 產品滿意度分析組",
+        description: "用 Kano 模型量化哪些功能是「必備」、哪些能製造「驚喜」、哪些用戶根本不在乎，精準決定產品開發優先序與行銷訴求重點。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Noriaki Kano – Kano Model of Customer Satisfaction (1984, Tokyo University of Science)",
+        agents: agentMembers,
+        tags: ["analytics", "Kano", "product-research", "用戶研究", "feature-prioritization", "customer-satisfaction", "UX", "quantitative"],
+        useCases: ["新品上市前功能驗證", "產品路線圖優先排序", "競品功能差距分析", "行銷主訴求決策"],
+        outputFormats: ["kano_matrix", "better_worse_chart", "feature_roadmap", "marketing_brief"],
+        requiredIntegrations: ["survey_tool", "data_visualization"],
+        token: 28000,
+        showcases: [
+          { company: "Sony PlayStation", description: "新主機功能集評估，用 Kano Model 區分「必備」（向下相容）與「吸引力」（SSD 超快讀取）功能，指導行銷訴求重點", result: "PS5 上市首週銷售破歷代紀錄；快速讀取成為最強差異化訴求之一", source: "Kano, N. et al. (1984). Attractive quality and must-be quality. Journal of Japanese Society for Quality Control." },
+        ],
+      });
+    }
+
+    // ── B-1: AARRR 海盜指標增長組 (Dave McClure/500 Startups 2007) ──────────
+    {
+      const slug = "aarrr-growth-metrics-squad";
+      const taskType = "aarrr-growth-analytics";
+      const leadId = await findAgent(conn, ["growth hacking", "growth marketing", "product growth", "user acquisition"], []);
+      const m2Id   = await findAgent(conn, ["analytics", "data analyst", "Google Analytics", "Mixpanel", "Amplitude"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["retention", "lifecycle marketing", "email marketing", "onboarding"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["referral program", "viral marketing", "word of mouth", "growth loop"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "AARRR 指標體系設計", description: "定義品牌的五個指標層：Acquisition（獲客成本/管道）、Activation（首次核心動作完成率）、Retention（D7/D30 留存）、Revenue（轉換率/ARPU）、Referral（K-factor/邀請率）；連結現有工具", owner: "squad_lead", output: "AARRR KPI 框架文件" },
+        { step: 2, title: "漏斗現況診斷", description: "拉取各層數據，繪製當前漏斗；識別最大流失點（哪一層掉最多）；計算各層轉換率基準", owner: "data_analyst", output: "AARRR 漏斗診斷報告" },
+        { step: 3, title: "瓶頸層深度分析", description: "對流失最嚴重的層次進行根因分析（質化訪談 + 行為埋點回放）；提出 3-5 個可測試假設", owner: "growth_analyst", output: "瓶頸假設清單" },
+        { step: 4, title: "增長實驗設計與執行", description: "為每個假設設計可驗證的小型實驗（A/B 或前後對比）；優先處理影響最大的瓶頸", owner: "growth_marketer", output: "實驗設計文件 + 執行結果" },
+        { step: 5, title: "增長儀表板建立", description: "搭建 AARRR 即時儀表板；設定週/月回顧節奏；建立增長實驗 backlog 管理機制", owner: "squad_lead", output: "增長儀表板 + 運營 SOP" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Growth Lead",             order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Product Analytics",       order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Retention Specialist",    order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Referral & Viral Loop",   order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "AARRR 海盜指標框架", description: "Source: Dave McClure, 500 Startups (2007). Presented at Seedcamp Week. AARRR became the global standard growth framework for startups and scale-ups.", steps });
+      await upsertSquad(conn, {
+        slug, name: "AARRR 海盜指標增長組",
+        description: "以 Dave McClure 的 AARRR 框架系統化診斷增長瓶頸：識別 Acquisition → Activation → Retention → Revenue → Referral 哪層流失最嚴重，優先實驗改善。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Dave McClure – Pirate Metrics AARRR (500 Startups, 2007)",
+        agents: agentMembers,
+        tags: ["analytics", "AARRR", "growth", "增長", "pirate-metrics", "funnel", "retention", "acquisition", "conversion"],
+        useCases: ["SaaS 增長瓶頸診斷", "App 留存率提升", "電商轉換漏斗優化", "新品上線後增長追蹤"],
+        outputFormats: ["aarrr_dashboard", "funnel_diagnosis", "experiment_backlog", "growth_report"],
+        requiredIntegrations: ["amplitude_or_mixpanel", "google_analytics", "crm"],
+        token: 36000,
+        showcases: [
+          { company: "Dropbox", description: "用 AARRR 框架識別 Referral 環節是最高 ROI 槓桿，設計「推薦得免費空間」機制", result: "15 個月內用戶從 100K 增長到 4M；獲客成本趨近於零", source: "Houston, D. (2010). Dropbox growth hacking presentation at Startup Lessons Learned." },
+        ],
+      });
+    }
+
+    // ── B-2: North Star Metric 設計組 (Sean Ellis / Amplitude) ──────────────
+    {
+      const slug = "north-star-metric-squad";
+      const taskType = "north-star-analytics";
+      const leadId = await findAgent(conn, ["product strategy", "growth strategy", "OKR", "business metrics"], []);
+      const m2Id   = await findAgent(conn, ["data analyst", "product analytics", "KPI design", "business intelligence"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["strategy consultant", "business model", "unit economics"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "North Star Metric 定義", description: "依 Amplitude 框架評估候選指標：是否反映用戶真實價值？是否與長期收入相關？是否可行動？找到唯一最重要的北極星指標", owner: "squad_lead", output: "North Star Metric 定義文件（含選擇理由）" },
+        { step: 2, title: "輸入指標拆解（Input Metrics）", description: "將 North Star 拆解為 3-5 個驅動指標（Breadth / Depth / Frequency / Efficiency）；建立指標樹", owner: "analytics_lead", output: "指標樹（Metric Tree）" },
+        { step: 3, title: "OKR 對齊", description: "將 North Star 與各部門 OKR 對齊；確認每個 OKR 如何推動 North Star；識別矛盾目標", owner: "strategy_consultant", output: "OKR ↔ North Star 對齊矩陣" },
+        { step: 4, title: "儀表板建立與追蹤節奏", description: "搭建 North Star 週報儀表板；設定每週全公司同步節奏；建立異常告警機制", owner: "squad_lead", output: "North Star 儀表板 + 週報模板" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "North Star Architect",    order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Product Analytics",       order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Strategy & OKR Advisor",  order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "North Star Metric 設計框架", description: "Source: Sean Ellis (GrowthHackers) + Amplitude North Star Playbook (2021). Used by Spotify (listening time), Airbnb (nights booked), Facebook (DAU/MAU), LinkedIn (weekly active pro users).", steps });
+      await upsertSquad(conn, {
+        slug, name: "North Star 指標設計組",
+        description: "找到能同時反映用戶價值與商業成長的唯一北極星指標，建立輸入指標樹與 OKR 對齊機制，讓全公司圍繞同一個最重要數字運作。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Sean Ellis (GrowthHackers) + Amplitude North Star Playbook (2021)",
+        agents: agentMembers,
+        tags: ["analytics", "North-Star", "OKR", "KPI", "growth", "product-strategy", "指標設計", "business-metrics"],
+        useCases: ["年度策略指標設計", "產品指標體系重建", "跨部門 OKR 對齊", "增長戰略重設"],
+        outputFormats: ["north_star_definition", "metric_tree", "okr_alignment_matrix", "dashboard"],
+        requiredIntegrations: ["amplitude_or_mixpanel", "data_warehouse"],
+        token: 28000,
+        showcases: [
+          { company: "Spotify", description: "北極星指標定為「每月活躍用戶的聆聽時長」，驅動所有功能團隊優化發現性與個人化", result: "Discover Weekly 功能上線後月活用戶增長 40%；Spotify 成為串流音樂最高留存率平台", source: "Amplitude (2021). North Star Playbook. Amplitude Inc." },
+        ],
+      });
+    }
+
+    // ── B-3: A/B 實驗測試組 (Ron Kohavi / Microsoft 2009) ───────────────────
+    {
+      const slug = "ab-experimentation-squad";
+      const taskType = "ab-testing-analytics";
+      const leadId = await findAgent(conn, ["A/B testing", "experimentation", "CRO", "statistical analysis", "hypothesis testing"], []);
+      const m2Id   = await findAgent(conn, ["statistics", "data science", "significance testing", "sample size"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["UX design", "landing page", "conversion optimization", "copywriting"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["product analytics", "web analytics", "funnel analysis"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "假設建立與優先排序（PIE/ICE）", description: "從量化數據（流失點）與質化洞察（用戶訪談）產生實驗假設；用 PIE 框架（Potential/Importance/Ease）或 ICE 評分排序優先級", owner: "squad_lead", output: "實驗 Backlog（含 PIE 評分）" },
+        { step: 2, title: "實驗設計（統計嚴謹性）", description: "計算最小樣本數（MDE / Power / Significance Level）；設計控制組與實驗組；確認唯一變量；選擇主指標與護欄指標（guardrail metrics）", owner: "statistician", output: "實驗設計文件（含樣本計算）" },
+        { step: 3, title: "實驗執行與監控", description: "啟動實驗；日常監控 SRM（Sample Ratio Mismatch）；設定提前停止規則；紀錄任何外部干擾事件", owner: "analytics_lead", output: "實驗監控日誌" },
+        { step: 4, title: "統計分析與決策", description: "達到樣本量後計算 p-value、信賴區間、效應量（Effect Size）；判斷統計顯著性；分析分群效果（是否對某 TA 特別有效）", owner: "statistician", output: "實驗結果報告（含決策建議）" },
+        { step: 5, title: "學習萃取與全推", description: "無論成敗，記錄「為什麼」的洞察；勝出版本全推；失敗假設歸檔為反例知識；更新實驗 Backlog", owner: "squad_lead", output: "實驗學習日誌 + 上線決策" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Experimentation Lead",    order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Statistician",            order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "CRO & Design",            order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Product Analytics",       order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "A/B 實驗設計框架", description: "Source: Ron Kohavi, Diane Tang & Ya Xu — Trustworthy Online Controlled Experiments (Cambridge, 2020). Kohavi ran 10,000+ experiments at Microsoft; same methodology used at Google, LinkedIn, Netflix, Booking.com.", steps });
+      await upsertSquad(conn, {
+        slug, name: "A/B 實驗測試組",
+        description: "以 Kohavi 嚴謹實驗設計方法論：假設建立 → 統計樣本計算 → 控制執行 → 顯著性分析 → 學習萃取，把每個行銷假設轉化為可信的數據結論。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website", "facebook"],
+        methodology: "Ron Kohavi – Trustworthy Online Controlled Experiments (Microsoft/Cambridge, 2009–2020)",
+        agents: agentMembers,
+        tags: ["analytics", "A/B-testing", "experimentation", "CRO", "statistics", "conversion", "實驗設計", "假設測試"],
+        useCases: ["落地頁轉換率測試", "廣告文案 A/B 測試", "Email 主旨行測試", "定價方案測試", "產品 UI 優化"],
+        outputFormats: ["experiment_design_doc", "statistical_analysis", "test_results_report", "learning_log"],
+        requiredIntegrations: ["optimizely_or_vwo", "google_optimize", "amplitude"],
+        token: 36000,
+        showcases: [
+          { company: "Booking.com", description: "全公司 1000+ 同時進行的 A/B 實驗；從按鈕顏色到定價顯示邏輯全部測試", result: "實驗文化驅動持續複利提升；Booking.com 轉換率長期為 OTA 行業最高", source: "Kohavi, R., Tang, D. & Xu, Y. (2020). Trustworthy Online Controlled Experiments. Cambridge University Press." },
+        ],
+      });
+    }
+
+    // ── C-1: RFM 客戶分群分析組 (Arthur Hughes 1994) ─────────────────────────
+    {
+      const slug = "rfm-customer-segmentation-squad";
+      const taskType = "rfm-segmentation";
+      const leadId = await findAgent(conn, ["customer segmentation", "RFM", "CRM analytics", "direct marketing"], []);
+      const m2Id   = await findAgent(conn, ["data analyst", "SQL", "data warehouse", "customer data"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["email marketing", "lifecycle marketing", "retention", "CRM"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["personalization", "marketing automation", "campaign management"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "交易數據提取與清洗", description: "從 CRM / 電商後台提取過去 12-24 個月交易記錄；清洗異常值（退款、測試訂單）；計算每位客戶的 R（最近購買距今天數）/ F（購買頻次）/ M（累計消費金額）", owner: "data_analyst", output: "RFM 原始計算表" },
+        { step: 2, title: "RFM 評分與分群", description: "對 R/F/M 各維度 1-5 分評分；組合成 125 個理論分群；以業務邏輯合併為 6-8 個可操作分群（Champions, Loyal, At Risk, Lost, etc.）", owner: "squad_lead", output: "RFM 分群定義表 + 各群規模" },
+        { step: 3, title: "各分群畫像與行動策略", description: "為每個分群設計對應的行銷行動：Champions → 口碑計畫；At Risk → 挽留優惠；Lost → Win-back 序列；New → Onboarding nurture", owner: "lifecycle_marketer", output: "各分群行動策略矩陣" },
+        { step: 4, title: "自動化分群觸發設定", description: "在 CRM/Marketing Automation 工具設定分群自動更新（月/季）；觸發對應 Email/SMS 序列；設定預警：客戶從 Champions 降至 At Risk 時自動觸發", owner: "automation_specialist", output: "自動化觸發設定文件" },
+        { step: 5, title: "分群效益追蹤", description: "追蹤每個分群的轉換率、升群率、流失率；計算各分群 ROI；每季更新分群策略", owner: "squad_lead", output: "RFM 效益追蹤報告" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "RFM Analytics Lead",      order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Data Engineer",           order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Lifecycle Marketer",      order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Automation Specialist",   order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "RFM 客戶分群框架", description: "Source: Arthur Hughes (1994), Database Marketing Institute. Standard in direct marketing, retail, and e-commerce. Enhanced versions used by Amazon, Alibaba, FMCG companies globally.", steps });
+      await upsertSquad(conn, {
+        slug, name: "RFM 客戶分群分析組",
+        description: "用 Recency / Frequency / Monetary 三維度量化客戶價值，自動分群並設計差異化行銷行動：從頂級客戶口碑計畫到流失客戶 Win-back 序列，讓每分行銷預算精準投放。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Arthur Hughes – RFM Customer Segmentation (Database Marketing Institute, 1994)",
+        agents: agentMembers,
+        tags: ["analytics", "RFM", "segmentation", "CRM", "客戶分群", "retention", "lifecycle", "direct-marketing", "e-commerce"],
+        useCases: ["電商客戶分群行銷", "會員制度設計", "流失客戶挽回計畫", "VIP 客戶培育計畫"],
+        outputFormats: ["rfm_scoring_table", "segment_strategy_matrix", "automation_setup", "roi_report"],
+        requiredIntegrations: ["CRM", "email_automation", "e-commerce_platform"],
+        token: 36000,
+        showcases: [
+          { company: "MOMO 購物網", description: "導入 RFM 分群模型，對「高頻低消」與「高消低頻」分群設計不同挽留策略", result: "At Risk 族群再購率提升 23%；整體 CRM 行銷 ROI 提升 1.8 倍", source: "RFM Segmentation Case Study, Taiwan E-commerce, 2023" },
+        ],
+      });
+    }
+
+    // ── C-2: 客戶終身價值分析組 (Gupta & Lehmann, Harvard 2005) ─────────────
+    {
+      const slug = "clv-lifetime-value-squad";
+      const taskType = "clv-analytics";
+      const leadId = await findAgent(conn, ["customer lifetime value", "CLV", "LTV", "predictive analytics", "unit economics"], []);
+      const m2Id   = await findAgent(conn, ["data science", "machine learning", "predictive modeling", "regression"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["financial modeling", "unit economics", "CAC", "payback period"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["customer success", "retention strategy", "upsell", "cross-sell"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "CLV 計算模型選擇與建立", description: "依業務類型選擇模型：合約型（簡單公式）vs 非合約型（BG/NBD 模型）；收集所需數據：平均訂單金額、購買頻率、毛利率、留存率、折現率", owner: "squad_lead", output: "CLV 計算模型文件 + 數據需求清單" },
+        { step: 2, title: "歷史 CLV 計算與分布分析", description: "對既有客戶計算實際 CLV；繪製 CLV 分布（帕累托分析：通常前 20% 客戶貢獻 80% CLV）；找出高 CLV 客戶的共同特徵", owner: "data_scientist", output: "CLV 分布報告 + 帕累托圖" },
+        { step: 3, title: "預測性 CLV 建模", description: "用機器學習（BG/NBD / Pareto-NBD / 深度學習）預測每位現有客戶 12/24/36 個月 CLV；識別「未來高價值」但「目前低消費」的潛力客群", owner: "data_scientist", output: "預測 CLV 評分表（每位客戶）" },
+        { step: 4, title: "CAC ↔ CLV 投資決策框架", description: "計算各獲客管道的 CAC；建立 CLV/CAC 比率（目標 ≥ 3:1）；決定可接受的每管道最高 CAC；優化廣告預算分配", owner: "growth_analyst", output: "CLV/CAC 矩陣 + 預算分配建議" },
+        { step: 5, title: "高 CLV 客群擴充策略", description: "用高 CLV 客戶特徵建立 Lookalike 受眾；設計高 CLV 客戶的客製化服務；追蹤 CLV 提升計畫的 ROI", owner: "squad_lead", output: "Lookalike 策略 + CLV 提升路線圖" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "CLV Analytics Lead",      order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Predictive Data Scientist", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Unit Economics Analyst",  order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Retention Strategist",    order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "CLV 客戶終身價值框架", description: "Source: Gupta, S. & Lehmann, D.R. (2005). Managing Customers as Investments. Harvard Business School Press. The BG/NBD model (Fader, Hardie & Lee, 2005, Journal of Marketing Research) provides the predictive foundation.", steps });
+      await upsertSquad(conn, {
+        slug, name: "客戶終身價值分析組",
+        description: "從歷史 CLV 計算到預測性建模，找出「真正值得投資的客戶」，建立 CLV/CAC 投資決策框架，讓行銷預算精準投向最高回報的客群。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Gupta & Lehmann CLV Framework (HBS 2005) + Fader BG/NBD Predictive Model (Wharton 2005)",
+        agents: agentMembers,
+        tags: ["analytics", "CLV", "LTV", "customer-lifetime-value", "unit-economics", "CAC", "predictive", "客戶價值", "retention"],
+        useCases: ["廣告預算 CAC 上限設定", "VIP 客戶識別與投資", "訂閱制留存策略", "Lookalike 受眾建立"],
+        outputFormats: ["clv_model", "pareto_analysis", "clv_cac_matrix", "predictive_scores", "budget_allocation"],
+        requiredIntegrations: ["data_warehouse", "CRM", "ad_platform"],
+        token: 44000,
+        showcases: [
+          { company: "Amazon", description: "Prime 會員 CLV 分析顯示年費會員 CLV 為一般會員的 4.3 倍，驅動 Prime 福利持續加碼投資決策", result: "Amazon Prime 全球突破 2 億會員；Prime 會員年消費是非會員的 2.5 倍", source: "Bezos, J. (2013). Amazon Annual Report; confirmed by Consumer Intelligence Research Partners (2023)." },
+        ],
+      });
+    }
+
+    // ── C-3: 同期群留存分析組 (Cohort Analysis) ──────────────────────────────
+    {
+      const slug = "cohort-retention-analysis-squad";
+      const taskType = "cohort-retention-analytics";
+      const leadId = await findAgent(conn, ["cohort analysis", "retention analytics", "churn analysis", "product analytics"], []);
+      const m2Id   = await findAgent(conn, ["data analyst", "SQL", "python", "data engineering"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["lifecycle marketing", "onboarding", "email automation", "retention"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "同期群定義與數據拉取", description: "定義同期群切割維度（按月份、按獲客管道、按產品版本、按地區）；拉取各同期群的首次使用時間與後續行為數據", owner: "data_analyst", output: "同期群數據集" },
+        { step: 2, title: "留存率矩陣繪製", description: "計算各同期群在 D1/D7/D14/D30/M3/M6/M12 的留存率；繪製熱力圖矩陣；識別留存曲線的「平台期」（plateau）", owner: "squad_lead", output: "留存率熱力圖矩陣" },
+        { step: 3, title: "管道 vs 行為同期群比較", description: "比較不同獲客管道的同期群留存差異（Organic Search vs Paid vs Referral）；找出哪個管道帶來的用戶留存最好（LTV 最高）", owner: "analytics_lead", output: "管道同期群比較報告" },
+        { step: 4, title: "早期行為預測模型", description: "分析前 7 天哪些行為（啟動特定功能、訪問次數）能預測 90 天留存；設計以「預測性高留存行為」為目標的 Onboarding 流程", owner: "squad_lead", output: "留存預測行為清單 + Onboarding 優化建議" },
+        { step: 5, title: "留存改善實驗", description: "針對留存平台期最低的同期群設計干預實驗；A/B 測試 Onboarding 流程改善", owner: "lifecycle_marketer", output: "留存改善實驗結果報告" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Retention Analytics Lead", order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Data Engineer",            order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Lifecycle & Onboarding",   order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "同期群留存分析框架", description: "Cohort analysis is standard methodology at Amplitude, Mixpanel, and all growth-stage companies. Andrew Chen (a16z) and Brian Balfour (Reforge) formalized retention analysis as growth's most important metric.", steps });
+      await upsertSquad(conn, {
+        slug, name: "同期群留存分析組",
+        description: "透過同期群分析找出哪個管道帶來最有價值的用戶、哪些早期行為預測長期留存，從根本優化獲客策略與 Onboarding 流程。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Cohort Retention Analysis – Andrew Chen (a16z) / Brian Balfour (Reforge) / Amplitude Standard",
+        agents: agentMembers,
+        tags: ["analytics", "cohort", "retention", "同期群", "churn", "onboarding", "product-analytics", "留存分析", "LTV"],
+        useCases: ["App 留存率診斷", "SaaS churn 根因分析", "獲客管道品質評估", "Onboarding 流程優化"],
+        outputFormats: ["cohort_heatmap", "channel_comparison", "predictive_behavior_list", "retention_experiment_report"],
+        requiredIntegrations: ["amplitude_or_mixpanel", "data_warehouse", "email_automation"],
+        token: 32000,
+        showcases: [
+          { company: "Duolingo", description: "同期群分析發現「連續學習第 3 天」是最強留存預測因子；重設計 Onboarding 引導用戶達到 Day 3 milestone", result: "DAU 從 2M 增長到 20M+；留存率提升使 MAU/DAU 比從 18% 提升到 27%", source: "Duolingo Blog: How We Approached App Store Rating (2022); Duolingo S-1 Filing (2021)." },
+        ],
+      });
+    }
+
+    // ── D-1: 行銷組合建模組 MMM (Nielsen/Meta Robyn) ──────────────────────────
+    {
+      const slug = "marketing-mix-modeling-squad";
+      const taskType = "marketing-mix-modeling";
+      const leadId = await findAgent(conn, ["marketing mix modeling", "MMM", "econometrics", "media attribution", "statistical modeling"], []);
+      const m2Id   = await findAgent(conn, ["data science", "regression", "time series", "R", "python", "econometrics"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["media planning", "budget allocation", "ROI optimization", "media strategy"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "數據蒐集與整合（52週+）", description: "蒐集媒體花費、GRP、印象數、銷售數據、外部因素（季節性、競品、價格）；對齊時間粒度（週）；處理缺失值與異常值", owner: "data_engineer", output: "整合數據集（週級）" },
+        { step: 2, title: "MMM 模型建立（Robyn/貝葉斯）", description: "選擇建模方式：回歸型 MMM 或 Meta Robyn（Bayesian Ridge Regression + Carryover/Saturation curves）；校準模型：Adstock 衰減、飽和效應建模", owner: "data_scientist", output: "MMM 模型 + 模型診斷報告" },
+        { step: 3, title: "各媒體 ROI 與貢獻度分解", description: "計算各媒體管道（TV、Digital、OOH、Search、Social）的銷售貢獻比；計算邊際 ROI（mROI）；識別已飽和管道與未開發管道", owner: "squad_lead", output: "媒體貢獻分解報告" },
+        { step: 4, title: "預算優化模擬（Budget Optimizer）", description: "在相同預算下跑 5-10 個預算重分配情境；找出最大化 ROI 的最優預算組合；設定管道上下限限制（維持品牌曝光底線）", owner: "media_strategist", output: "預算優化建議（含情境模擬）" },
+        { step: 5, title: "MMM 結果整合進媒體規劃", description: "將 MMM 結論轉化為下一年度媒體計畫；設定季度 MMM 更新節奏；建立連續學習迴圈", owner: "squad_lead", output: "MMM 驅動媒體計畫書" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "MMM Lead",                order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Econometrician / DS",      order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Media Planner",            order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "行銷組合建模框架（MMM）", description: "Source: Nielsen (1960s, classical MMM) + Meta Robyn (open-source Bayesian MMM, 2021). Used by P&G, Unilever, LVMH, Nestlé, PepsiCo for decades. Privacy-safe alternative to cookie-based attribution.", steps });
+      await upsertSquad(conn, {
+        slug, name: "行銷組合建模組（MMM）",
+        description: "用統計迴歸量化 TV、數位、戶外、搜尋、社群各管道對銷售的真實貢獻，找出已飽和與未開發管道，輸出數據驅動的最優預算分配方案。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Nielsen MMM (1960s) + Meta Robyn Bayesian MMM (2021) + Analytic Partners ROI Genome",
+        agents: agentMembers,
+        tags: ["analytics", "MMM", "marketing-mix-modeling", "attribution", "歸因", "media-ROI", "budget-optimization", "econometrics"],
+        useCases: ["年度媒體預算分配", "各管道 ROI 量化", "隱私時代後 cookie-free 歸因", "全管道行銷效益評估"],
+        outputFormats: ["mmm_model", "channel_contribution_report", "budget_optimizer", "media_plan"],
+        requiredIntegrations: ["data_warehouse", "media_spend_data", "sales_data"],
+        token: 56000,
+        showcases: [
+          { company: "P&G", description: "P&G 在全球 80+ 個市場部署 MMM，每年節省超過 10 億美元的行銷浪費，同時提升銷售增量", result: "P&G 報告 MMM 驅動的預算重分配使整體行銷 ROI 提升 30-40%；成為 FMCG 行業標準", source: "Analytic Partners (2023). ROI Genome Intelligence Report. Analytic Partners Inc." },
+        ],
+      });
+    }
+
+    // ── D-2: 多觸點歸因分析組 (Google/Meta MTA) ──────────────────────────────
+    {
+      const slug = "multi-touch-attribution-squad";
+      const taskType = "multi-touch-attribution";
+      const leadId = await findAgent(conn, ["multi-touch attribution", "attribution modeling", "digital analytics", "performance marketing"], []);
+      const m2Id   = await findAgent(conn, ["Google Analytics", "data-driven attribution", "GA4", "tag management"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["paid media", "SEM", "social ads", "media buying", "programmatic"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["data engineer", "data pipeline", "CDP", "tracking"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "歸因模型選擇評估", description: "比較 6 種主流歸因模型：Last Click / First Click / Linear / Time Decay / Position Based / Data-Driven；分析各模型對現有業務的適用性；選擇主模型 + 對照模型", owner: "squad_lead", output: "歸因模型選擇報告" },
+        { step: 2, title: "追蹤基礎建設稽核", description: "稽核 UTM 參數一致性；確認所有付費管道正確 Tag；設定跨裝置比對邏輯；確認轉換事件定義一致", owner: "data_engineer", output: "追蹤稽核報告 + 修正清單" },
+        { step: 3, title: "多觸點路徑分析", description: "分析高轉換路徑：哪些管道組合共同出現頻率最高？識別輔助轉換貢獻高但 Last Click 低估的管道（常見：Display、Content、Email）", owner: "attribution_analyst", output: "轉換路徑報告（Top 20 路徑）" },
+        { step: 4, title: "Data-Driven Attribution 導入", description: "在 GA4 啟用 Data-Driven Attribution（機器學習模型）；設定各管道的 Conversion Credit 重新分配；與 Last Click 結果對比", owner: "analytics_lead", output: "DDA vs Last Click 差異報告" },
+        { step: 5, title: "歸因驅動預算重分配", description: "依 MTA 結果識別被低估 / 高估的管道；提出預算調整建議；設定季度歸因回顧機制", owner: "squad_lead", output: "預算重分配建議 + 季度回顧 SOP" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Attribution Lead",          order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Analytics & GA4 Specialist", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Paid Media Strategist",      order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Data Engineering & Tracking", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "多觸點歸因分析框架", description: "Source: Google Analytics 4 Data-Driven Attribution (2021) + Meta Conversion API (2020). Multi-touch attribution became critical as the industry moved from last-click to model-based credit allocation.", steps });
+      await upsertSquad(conn, {
+        slug, name: "多觸點歸因分析組",
+        description: "超越 Last-Click 迷思，用多觸點歸因模型量化每個管道在轉換路徑中的真實貢獻，找出被低估的輔助轉換管道，優化廣告預算分配。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "facebook", "strategy"],
+        methodology: "Google GA4 Data-Driven Attribution (2021) + Shapley Value MTA + Meta Conversion API",
+        agents: agentMembers,
+        tags: ["analytics", "attribution", "歸因", "multi-touch", "MTA", "GA4", "performance-marketing", "data-driven", "media-mix"],
+        useCases: ["付費廣告 ROI 重新評估", "內容行銷貢獻量化", "Email 輔助轉換追蹤", "跨管道預算優化決策"],
+        outputFormats: ["attribution_comparison", "conversion_path_report", "dda_analysis", "budget_reallocation"],
+        requiredIntegrations: ["GA4", "meta_conversions_api", "google_ads", "data_warehouse"],
+        token: 40000,
+        showcases: [
+          { company: "零售電商（台灣）", description: "從 Last-Click 切換到 Data-Driven Attribution，發現 Email 和 Content 實際貢獻被低估 40%，Facebook 被高估 28%", result: "重分配預算後整體 ROAS 提升 22%；Email 預算增加 2 倍但 CAC 反而降低", source: "Google Analytics 4 Attribution Case Study, 2023" },
+        ],
+      });
+    }
+
+    // ── D-3: 廣告增量效益測試組 (Meta Marketing Science / Google) ────────────
+    {
+      const slug = "incrementality-testing-squad";
+      const taskType = "incrementality-testing";
+      const leadId = await findAgent(conn, ["incrementality testing", "lift study", "causal inference", "marketing science"], []);
+      const m2Id   = await findAgent(conn, ["statistics", "experimental design", "causal analysis", "A/B testing"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["paid media", "Facebook Ads", "Google Ads", "performance marketing"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "增量測試設計（Holdout / Ghost Ads）", description: "選擇測試方式：Meta Brand Lift / Conversion Lift / Google Incrementality / 自建 PSM 配對組；設定目標：銷售增量 or 品牌感知增量；計算最小可偵測效果量（MDE）", owner: "squad_lead", output: "增量測試設計文件" },
+        { step: 2, title: "測試組 vs 控制組設定", description: "在平台設定排除控制組（Holdout Group）；確認流量隨機分配；設定足夠的測試期（通常 2-4 週）與預算", owner: "media_scientist", output: "測試設定截圖 + 確認文件" },
+        { step: 3, title: "增量結果分析", description: "計算增量提升（Incremental Lift %）：測試組 vs 控制組的轉換/銷售差異；計算增量 ROAS（真實廣告增量 ROI）；識別哪些受眾/格式/訊息增量最高", owner: "data_scientist", output: "增量測試結果報告（含信賴區間）" },
+        { step: 4, title: "媒體組合增量優化建議", description: "依各管道增量測試結果，識別「高增量管道」（廣告確實帶來新增銷售）vs「低增量管道」（可能只捕獲自然購買意圖）；建議預算重分配", owner: "squad_lead", output: "媒體增量優化建議報告" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Marketing Science Lead",   order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Causal Inference Analyst", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Paid Media Specialist",    order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "廣告增量效益測試框架", description: "Source: Meta Marketing Science (2016) — Conversion Lift & Brand Lift tools. Google Incrementality Studies (2018). Academic foundation: Varian, H.R. (2016). Causal inference in economics and marketing. PNAS.", steps });
+      await upsertSquad(conn, {
+        slug, name: "廣告增量效益測試組",
+        description: "用增量測試（Incrementality / Lift Study）回答最核心問題：「如果不打這個廣告，這些銷售本來還是會發生嗎？」量化廣告的真實因果效益，避免為自然流量付費。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "facebook", "strategy"],
+        methodology: "Meta Conversion Lift / Google Incrementality + Varian Causal Inference Framework (2016)",
+        agents: agentMembers,
+        tags: ["analytics", "incrementality", "lift-study", "causal-inference", "增量測試", "attribution", "marketing-science", "Facebook-Ads", "ROI"],
+        useCases: ["廣告真實效益驗證", "品牌廣告 vs 效果廣告增量比較", "電商大檔前後增量測試", "媒體組合增量優化"],
+        outputFormats: ["lift_study_design", "incrementality_report", "incremental_roas", "budget_reallocation"],
+        requiredIntegrations: ["meta_ads_manager", "google_ads", "data_warehouse"],
+        token: 36000,
+        showcases: [
+          { company: "Shopify 商家（美妝）", description: "透過 Meta Conversion Lift 測試發現：50% 的 Facebook 轉換歸因實際上是「自然購買」，真實增量 ROAS 只有報告值的一半", result: "重新分配預算後，廣告增量 ROAS 從 1.2x 提升到 2.8x；整體行銷效率提升 67%", source: "Meta Marketing Science Case Studies (2022). Incrementality Measurement." },
+        ],
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // PRACTICAL ANALYTICS SQUADS — Platform-Specific Methodologies
+    // A: Meta Ads  B: Google Ads  C: GA4  D: SEO  E: E-commerce  F: Email  G: BI
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── A1: HVCT 高速創意測試組 (Meta / Common Thread / Tier 11) ─────────────
+    {
+      const slug = "meta-hvct-creative-testing";
+      const taskType = "meta-creative-testing";
+      const leadId = await findAgent(conn, ["creative testing", "Facebook ads", "Meta ads", "DTC advertising", "creative strategy"], []);
+      const m2Id   = await findAgent(conn, ["video production", "video creative", "UGC", "ad creative", "content creation"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["performance marketing", "paid social", "ROAS optimization", "media buying"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["data analyst", "analytics", "creative analytics", "dashboard reporting"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "創意假設矩陣設計", description: "建立「Hook × Angle × Format」三維矩陣：Hook（前3秒訊息）× Angle（訴求角度：功能/情感/社會證明/問題解決）× Format（靜態圖/短影音/輪播/UGC）；每月規劃 50-100 個素材 SKU", owner: "squad_lead", output: "創意假設矩陣 + 月度製作計畫" },
+        { step: 2, title: "素材製作（模組化）", description: "用模組化方式製作：固定主體 + 替換 Hook / CTA / 背景；確保每個變量可獨立測試；優先製作 UGC 風格（鏡頭前講話）和靜態圖，成本最低但效果最穩", owner: "creative_producer", output: "素材包（≥20個/週期）" },
+        { step: 3, title: "隔離測試執行（新 vs. 新）", description: "永遠新 vs. 新比對，不拿有歷史資料的廣告跟新素材比；每個廣告組只測一個變量；設定每廣告組最低預算（建議日預算 ≥ CPA × 2）；48-72 小時後看 Hook Rate（前3秒留存率）和 CTR", owner: "media_buyer", output: "測試結果數據表" },
+        { step: 4, title: "勝者識別與放大", description: "勝出標準：Hook Rate > 30% + CTR > 1.5% + ROAS 達標；勝出素材移入主廣告活動，預算逐日 20% 遞增；失敗素材 72 小時內下架分析根因", owner: "squad_lead", output: "勝出素材清單 + 放大執行計畫" },
+        { step: 5, title: "創意衰退監控與迭代", description: "每週監控 Frequency（目標 < 3.0）和 ROAS 趨勢；頻次超標或 ROAS 連續3天下滑 15%+ → 觸發「下一波素材」；建立創意學習日誌：記錄每個角度成功/失敗原因", owner: "creative_analyst", output: "創意衰退預警報告 + 下期素材 Brief" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Creative Testing Lead",    order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Creative Producer",        order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Media Buyer & Optimizer",  order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Creative Analytics",       order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "HVCT 高速創意測試框架", description: "Source: Motion App + Common Thread Collective + Tier 11 Agency. Validated across 500+ DTC campaigns. Brands testing 60+ creatives/month see 2.8x higher ROAS vs. those testing <20.", steps });
+      await upsertSquad(conn, {
+        slug, name: "Meta 高速創意測試組",
+        description: "用 HVCT 框架每月系統性測試 50-100 個 Meta 廣告素材，72 小時識別勝出創意並快速放大，同時監控創意疲勞，確保 ROAS 持續最大化。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["facebook", "analytics"],
+        methodology: "High-Velocity Creative Testing (HVCT) — Motion App / Common Thread Collective / Tier 11 (2022-present)",
+        agents: agentMembers,
+        tags: ["facebook", "meta", "Meta廣告", "Facebook廣告", "素材測試", "創意測試", "creative-testing", "HVCT", "DTC", "ROAS", "hook-rate", "UGC", "廣告素材", "paid-social", "analytics"],
+        useCases: ["Facebook廣告創意優化", "Meta廣告素材測試", "DTC品牌廣告投放", "社群廣告 ROAS 提升", "廣告素材迭代"],
+        outputFormats: ["creative_hypothesis_matrix", "test_results_dashboard", "winning_creative_report", "creative_fatigue_alert"],
+        requiredIntegrations: ["meta_ads_manager", "motion_app", "meta_ads_library"],
+        token: 36000,
+        showcases: [
+          { company: "DTC 美妝品牌（Tier 11 客戶）", description: "導入 HVCT，每月測試 80+ 素材，Hook Rate 作為主要篩選指標", result: "ROAS 從 1.8x 提升到 3.4x；CPA 降低 42%；創始人出鏡 UGC 成為最高效素材類型", source: "Motion App: 2023 State of Creative Report; Common Thread Collective Case Studies" },
+        ],
+      });
+    }
+
+    // ── A2: DCO 動態創意優化組 (Meta Advantage+ / Hunch Ads) ─────────────────
+    {
+      const slug = "meta-dco-optimization-squad";
+      const taskType = "meta-dco-optimization";
+      const leadId = await findAgent(conn, ["dynamic creative", "DCO", "Meta Advantage+", "catalog ads", "performance marketing"], []);
+      const m2Id   = await findAgent(conn, ["product feed", "data feed", "Google Shopping", "catalog", "feed management"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["copywriting", "ad copy", "headline writing", "CTA optimization"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["Facebook ads", "media buying", "programmatic", "retargeting"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "DCO 素材模組規劃", description: "把廣告拆解成可替換模組：主視覺（5-10 張）/ 主標題（5條）/ 描述（3條）/ CTA（3種）；每種模組獨立製作，不同組合自動交叉測試；規劃「購買動機覆蓋」：價格優惠 / 庫存緊迫 / 社會證明 / 使用情境", owner: "squad_lead", output: "DCO 模組矩陣文件" },
+        { step: 2, title: "商品目錄 Feed 優化", description: "清洗 Product Catalog：標題加入高搜尋關鍵詞、描述突出核心利益、圖片符合平台規格；設定動態覆蓋：價格標籤 / 促銷徽章 / 評分顯示；測試 Catalog Ads vs. 一般圖片廣告", owner: "feed_specialist", output: "優化後 Product Feed + Catalog 設定" },
+        { step: 3, title: "Advantage+ 購物廣告設定", description: "建立 Advantage+ Shopping Campaign；讓 Meta AI 在廣泛定向下自動找潛在買家；設定預算上限和 ROAS 目標；與手動廣告組做對照測試", owner: "media_buyer", output: "ASC 廣告活動設定 + 對照測試計畫" },
+        { step: 4, title: "元件效能拆解分析", description: "在 Ads Manager 創意報告查看每個主視覺 / 標題 / CTA 的個別績效；識別最高 CTR 主視覺 + 最高轉換 CTA 組合；淘汰低效元件，補充新元件", owner: "analytics_lead", output: "DCO 元件效能報告" },
+        { step: 5, title: "個人化 DCO 升級（再行銷）", description: "對「瀏覽未購買」受眾用 Dynamic Product Ads（DPA）顯示其看過的商品；對「加購未結帳」顯示限時優惠覆蓋；對現有客戶顯示互補商品（Cross-sell）", owner: "squad_lead", output: "再行銷 DCO 策略 + 設定文件" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "DCO Strategy Lead",       order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Feed & Catalog Specialist", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Ad Copy & CTA",           order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Media Buyer",             order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "DCO 動態創意優化框架", description: "Source: Meta Advantage+ (2022) + Hunch Ads DCO methodology. Carrefour case: 31% higher ROAS. Vitapur: CTR +47%. 99% of agencies use DCO as significant strategy.", steps });
+      await upsertSquad(conn, {
+        slug, name: "Meta DCO 動態創意優化組",
+        description: "把廣告素材模組化，用 Meta Advantage+ 讓演算法自動找最佳組合；搭配 Product Catalog Feed 優化和再行銷個人化 DPA，讓每個人看到最適合的廣告。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["facebook", "analytics"],
+        methodology: "Dynamic Creative Optimization (DCO) — Meta Advantage+ / Hunch Ads (2022-present)",
+        agents: agentMembers,
+        tags: ["facebook", "meta", "DCO", "動態創意", "Advantage+", "catalog-ads", "DPA", "再行銷", "retargeting", "product-feed", "Meta廣告優化", "電商廣告", "analytics"],
+        useCases: ["電商 Facebook 廣告個人化", "商品目錄廣告優化", "Meta 再行銷 DPA 設定", "廣告素材自動化測試"],
+        outputFormats: ["dco_module_matrix", "catalog_setup", "asc_campaign", "component_performance_report"],
+        requiredIntegrations: ["meta_ads_manager", "meta_pixel", "product_catalog"],
+        token: 32000,
+        showcases: [
+          { company: "Carrefour（So Buzzy Agency）", description: "用 DCO 搭配超本地化食譜 + 倒數計時廣告，自動組合最佳創意", result: "ROAS +31%、節省 250+ 小時人工製作時間", source: "Hunch Ads DCO Case Study: Carrefour (2023)" },
+        ],
+      });
+    }
+
+    // ── A3: Google 搜尋詞挖掘架構組 ──────────────────────────────────────────
+    {
+      const slug = "google-ads-search-term-mining";
+      const taskType = "google-search-term-mining";
+      const leadId = await findAgent(conn, ["Google Ads", "SEM", "PPC", "search advertising", "paid search"], []);
+      const m2Id   = await findAgent(conn, ["keyword research", "SEO", "keyword strategy", "search intent"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["copywriting", "ad copy", "Google ad copy", "headline", "RSA"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["analytics", "data analyst", "Google Analytics", "conversion tracking"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "帳戶架構稽核（廣告活動分層）", description: "稽核現有廣告活動結構；建立三層架構：Exact Match 保護層（已知高轉換詞）→ Phrase/BMM 探索層 → Broad + Smart Bidding 發現層；確保流量只走單方向（不同層不互相吃量）", owner: "squad_lead", output: "廣告活動架構圖 + 重組計畫" },
+        { step: 2, title: "搜尋詞報告週期性挖掘", description: "每兩週從「搜尋字詞」報告提取全部轉換紀錄；識別高轉換但還在 Broad 層的詞 → 加入 Exact Match；識別消耗預算但零轉換的詞 → 加入否定關鍵詞清單", owner: "keyword_specialist", output: "週期搜尋詞報告 + 精確詞清單 + 否定詞清單" },
+        { step: 3, title: "否定關鍵詞架構建設", description: "建立分層否定詞：帳戶層（全廣告活動適用）/ 廣告活動層（特定產品/服務）/ 廣告組層；定期審查新出現的低品質搜尋詞；建立否定詞更新 SOP", owner: "ppc_analyst", output: "否定關鍵詞架構文件 + 更新 SOP" },
+        { step: 4, title: "競品詞與品牌詞策略", description: "分析競品品牌詞的搜尋量和 CPC；決定是否對競品詞出價；確保品牌詞廣告活動完整覆蓋（防禦）；分析 Auction Insights 競爭態勢", owner: "squad_lead", output: "競品詞策略建議 + Auction Insights 報告" },
+        { step: 5, title: "廣告文案與關鍵詞相關性優化", description: "確保每個廣告組的關鍵詞、廣告標題、落地頁三方主題一致；RSA 廣告標題涵蓋核心關鍵詞；落地頁 H1 與廣告標題語意一致 → 提升 Quality Score", owner: "copywriter", output: "廣告文案優化版本 + QS 改善計畫" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "SEM Strategy Lead",        order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Keyword Research Specialist", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Ad Copy Specialist",       order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Analytics & Tracking",     order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Google 搜尋詞挖掘架構框架", description: "Source: DigitalPosition (3.6M keywords analyzed), WordStream, Google Ads Help. Accounts doing weekly search term mining see 20-35% lower average CPC.", steps });
+      await upsertSquad(conn, {
+        slug, name: "Google 搜尋詞挖掘架構組",
+        description: "系統性從 Google Ads 搜尋詞報告挖掘高轉換關鍵字並保護到 Exact Match，同時建立分層否定關鍵詞架構，減少無效花費，降低 CPC 20-35%。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website"],
+        methodology: "Search Term Mining + Negative Keyword Architecture — DigitalPosition / WordStream / Google",
+        agents: agentMembers,
+        tags: ["google-ads", "SEM", "PPC", "搜尋廣告", "Google廣告", "keyword", "關鍵字", "否定關鍵字", "search-term-mining", "analytics", "CPC優化", "廣告投放"],
+        useCases: ["Google Ads 關鍵字策略優化", "搜尋廣告無效花費降低", "廣告帳戶架構重組", "競品關鍵字分析"],
+        outputFormats: ["campaign_structure", "search_term_report", "negative_keyword_list", "ad_copy_variants"],
+        requiredIntegrations: ["google_ads", "google_keyword_planner", "google_search_console"],
+        token: 32000,
+        showcases: [
+          { company: "台灣 B2B SaaS", description: "系統性搜尋詞挖掘，每兩週清洗否定詞，把 Broad 層高轉換詞移入 Exact Match 保護", result: "3個月內 CPC 降低 31%，轉換率提升 18%，無效花費從 38% 降至 12%", source: "DigitalPosition (2024). 2024 Google Ads CPC Benchmarks from 3.6M Keywords." },
+        ],
+      });
+    }
+
+    // ── A4: Google 品質分數 + 智慧出價優化組 ────────────────────────────────
+    {
+      const slug = "google-ads-quality-bidding-squad";
+      const taskType = "google-quality-bidding";
+      const leadId = await findAgent(conn, ["Google Ads", "Quality Score", "Smart Bidding", "PPC optimization", "CPC"], []);
+      const m2Id   = await findAgent(conn, ["landing page", "CRO", "conversion rate optimization", "UX design"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data analyst", "Google Analytics", "GA4", "conversion tracking"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "品質分數三維診斷", description: "對所有關鍵字按 QS 1-4（立即處理）/ 5-7（優化）/ 8-10（保護）分桶；拆解三個子分數根因：預期 CTR（訊息是否吸引點擊）/ 廣告相關性（關鍵字-廣告主題是否一致）/ 落地頁體驗（速度/相關性/清晰度）", owner: "squad_lead", output: "QS 診斷報告（含子分數分析）" },
+        { step: 2, title: "落地頁體驗優化（最大 QS 槓桿）", description: "Google PageSpeed Insights 稽核（LCP < 2.5s）；確認落地頁 H1 和廣告標題語意一致；移除干擾用戶目標的元素；加入信任訊號（評論 / 認證 / 保固）", owner: "ux_optimizer", output: "落地頁優化清單 + A/B 測試設計" },
+        { step: 3, title: "智慧出價導入協議", description: "確認 30天/30次轉換達標（智慧出價啟動前提）；首次啟用 Target ROAS/CPA 設在歷史績效 80%（低門檻讓算法學習）；每週遞增 5-10% 目標；搭配 Broad Match 擴大算法訊號", owner: "ppc_strategist", output: "Smart Bidding 導入計畫 + 護欄設定" },
+        { step: 4, title: "績效追蹤與護欄設定", description: "設定預算上限和出價上限作護欄；監控學習期（通常 1-2 週）期間波動；設定績效警報：CPA 超標 20% 自動通知；Portfolio 出價策略管理跨廣告活動平衡", owner: "analytics_lead", output: "Smart Bidding 效果追蹤儀表板" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Google Ads Optimization Lead", order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Landing Page & CRO",         order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Analytics & Conversion",      order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "品質分數與智慧出價框架", description: "Source: Google Ads Quality Score diagnostic (Store Growers) + Smart Bidding Ramp Protocol (iMarkInfotech). QS 4→7 reduces CPC by 28-50%. Broad+Smart Bidding delivers 20-30% more conversions.", steps });
+      await upsertSquad(conn, {
+        slug, name: "Google 品質分數與智慧出價優化組",
+        description: "診斷 Google Ads 品質分數三維根因（CTR / 相關性 / 落地頁），優化後 CPC 可降 28-50%；搭配智慧出價協議導入 Target ROAS，讓 Google 算法在護欄內自主優化。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website"],
+        methodology: "Google Quality Score Diagnostic + Smart Bidding Ramp Protocol (Google / Store Growers / iMarkInfotech)",
+        agents: agentMembers,
+        tags: ["google-ads", "Quality-Score", "品質分數", "Smart-Bidding", "智慧出價", "CPC優化", "Target-ROAS", "tCPA", "PPC", "SEM", "Google廣告優化", "analytics"],
+        useCases: ["Google Ads CPC 降低", "品質分數提升", "Target ROAS 智慧出價導入", "廣告帳戶效益優化"],
+        outputFormats: ["qs_diagnostic_report", "landing_page_checklist", "smart_bidding_plan", "performance_dashboard"],
+        requiredIntegrations: ["google_ads", "google_analytics_4", "page_speed_insights"],
+        token: 28000,
+        showcases: [
+          { company: "台灣電商品牌", description: "品質分數診斷發現落地頁載速度是主要拖累（QS 落地頁體驗低於標準）；修復後搭配 Target ROAS 導入", result: "QS 從平均 4.2 提升到 7.1；CPC 降低 34%；轉換量在相同預算下提升 41%", source: "Google Ads Quality Score Guide, Store Growers; Smart Bidding documentation, Google." },
+        ],
+      });
+    }
+
+    // ── B1: GA4 Measurement Plan 設計組 ──────────────────────────────────────
+    {
+      const slug = "ga4-measurement-design-squad";
+      const taskType = "ga4-measurement-design";
+      const leadId = await findAgent(conn, ["GA4", "Google Analytics 4", "web analytics", "measurement planning", "GTM"], []);
+      const m2Id   = await findAgent(conn, ["Google Tag Manager", "GTM", "JavaScript", "tracking implementation", "tag management"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data layer", "event tracking", "conversion tracking", "pixel implementation"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["BigQuery", "SQL", "data warehouse", "Looker Studio", "data visualization"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "業務目標 → 測量需求轉化", description: "與業務團隊確認關鍵業務問題（「我們需要回答哪些問題？」）；映射每個業務目標到 3-5 個可追蹤事件；建立優先級：必須有 / 應該有 / 可以有", owner: "squad_lead", output: "業務需求 ↔ 測量映射文件" },
+        { step: 2, title: "Measurement Plan 撰寫", description: "為每個事件定義：事件名稱（snake_case）/ 觸發條件 / 參數名稱+值範例 / 自定義維度範疇（user/session/event）/ 是否為轉換事件；輸出試算表格式 Measurement Plan", owner: "analytics_architect", output: "GA4 Measurement Plan（試算表）" },
+        { step: 3, title: "GTM 實作與 Debug 驗證", description: "在 GTM 建立 Trigger + Tag；用 GTM Preview Mode + GA4 DebugView 逐一驗證每個事件觸發正確；確認 Data Layer 推送格式一致；文件化最終實作版本", owner: "gtm_developer", output: "GTM 設定容器 + 實作文件" },
+        { step: 4, title: "BigQuery 匯出設定", description: "GA4 Standard property 免費啟用 BigQuery 匯出；設定每日批次 + 即時串流匯出；用 BigQuery 驗證事件資料品質；建立基礎 dbt 模型（sessions / users / events 乾淨表格）", owner: "data_engineer", output: "BigQuery 匯出設定 + 基礎 dbt 模型" },
+        { step: 5, title: "Looker Studio 儀表板建立", description: "連接 GA4 + BigQuery 建立統一儀表板；涵蓋：流量概覽 / 轉換漏斗 / 素材效益 / 受眾行為；設定自動週報 Email 排程", owner: "squad_lead", output: "Looker Studio 儀表板 + 週報模板" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Analytics Architecture Lead", order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "GTM Implementation",         order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Tracking & Data Layer",      order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "BigQuery & Visualization",   order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "GA4 Measurement Plan 框架", description: "Source: Simo Ahava (GTM/GA4 expert), InfoTrust, Google Analytics documentation. Properties with documented measurement plans have 60-70% fewer data quality issues.", steps });
+      await upsertSquad(conn, {
+        slug, name: "GA4 Measurement Plan 設計組",
+        description: "先文件後實作：在 GTM 動工前定義完整 Event Schema，避免 GA4 無法回溯的致命錯誤；GTM 實作驗證 → BigQuery 匯出 → Looker Studio 儀表板一條龍建立。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website"],
+        methodology: "GA4 Measurement Plan First Design — Simo Ahava / InfoTrust / Google (2023)",
+        agents: agentMembers,
+        tags: ["GA4", "Google-Analytics-4", "網站分析", "analytics", "GTM", "Google-Tag-Manager", "埋點", "事件追蹤", "Measurement-Plan", "BigQuery", "Looker-Studio", "數據埋點", "conversion-tracking"],
+        useCases: ["GA4 導入設計", "網站埋點規劃", "GTM 標籤管理", "行銷追蹤基礎建設", "BigQuery 數據倉儲"],
+        outputFormats: ["measurement_plan", "gtm_container", "bigquery_schema", "looker_dashboard"],
+        requiredIntegrations: ["GA4", "GTM", "BigQuery", "looker_studio"],
+        token: 40000,
+        showcases: [
+          { company: "台灣 SaaS 平台", description: "導入 Measurement Plan First 方法論，在 GA4 上線前完成完整事件設計，避免日後補救", result: "上線後數據品質問題比行業平均減少 65%；BigQuery 匯出後自建歸因模型，識別 SEO 貢獻被 GA4 UI 低估 33%", source: "Ahava, S. (2023). Implementation Guide for Events in Google Analytics 4. simoahava.com." },
+        ],
+      });
+    }
+
+    // ── B2: GA4 預測性受眾 + BigQuery 深度分析組 ─────────────────────────────
+    {
+      const slug = "ga4-predictive-bigquery-squad";
+      const taskType = "ga4-predictive-analytics";
+      const leadId = await findAgent(conn, ["GA4", "predictive analytics", "machine learning", "Google Analytics", "audience"], []);
+      const m2Id   = await findAgent(conn, ["BigQuery", "SQL", "data science", "python", "data engineering"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["Google Ads", "audience targeting", "remarketing", "performance marketing"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "GA4 預測指標資格確認", description: "確認啟用條件：過去 28 天有 1000+ 回訪用戶，且有足夠購買/非購買事件；若未達標：設計數據積累策略（確認 purchase 和 in_app_purchase 事件正確觸發）", owner: "analytics_lead", output: "預測指標資格評估報告" },
+        { step: 2, title: "三大預測受眾建立", description: "在 GA4 建立：購買概率受眾（7天內購買概率前10%）/ 流失概率受眾（7天內停止活躍前20%）/ 預測收益受眾（28天預測收益前10%）；同步到 Google Ads", owner: "squad_lead", output: "三大預測受眾設定 + Google Ads 同步確認" },
+        { step: 3, title: "BigQuery 自定義分析模型", description: "用 BigQuery 原始數據建立 GA4 UI 做不到的分析：跨裝置旅程重建 / 自定義多觸點歸因 / 任意時間窗口的同期群分析；建立 dbt 清洗模型", owner: "data_scientist", output: "BigQuery 自定義分析模型集" },
+        { step: 4, title: "BigQuery ML 流失預測", description: "用 BigQuery ML 建立邏輯回歸流失預測模型；特徵：D7 登入次數 / 完成特定功能使用 / 付費狀態；每週更新預測分數 → 觸發自動化挽留 Email", owner: "ml_engineer", output: "BQ ML 流失預測模型 + 自動化觸發設定" },
+        { step: 5, title: "再行銷受眾效益對比", description: "A/B 比較 GA4 預測受眾 vs. 傳統再行銷受眾（30天內訪客）的廣告效益；追蹤 ROAS / CPA / 轉換率差異；每季更新受眾策略", owner: "squad_lead", output: "預測受眾 vs. 傳統受眾效益報告" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Predictive Analytics Lead",  order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "BigQuery & ML Engineer",     order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Audience & Ads Specialist",  order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "GA4 預測性分析框架", description: "Source: Google Analytics Predictive Audiences + BigQuery ML + Napkyn Analytics. Subscription platforms using churn prediction audiences reduce involuntary churn 15-25%.", steps });
+      await upsertSquad(conn, {
+        slug, name: "GA4 預測性受眾與 BigQuery 分析組",
+        description: "用 GA4 內建 ML 建立購買概率、流失概率、預測收益三大受眾，同步到 Google Ads 提升再行銷精準度；搭配 BigQuery 做 UI 做不到的跨裝置歸因與流失預測模型。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website"],
+        methodology: "GA4 Predictive Audiences (Google ML 2022) + BigQuery ML Churn Prediction",
+        agents: agentMembers,
+        tags: ["GA4", "predictive-audience", "預測受眾", "BigQuery", "analytics", "machine-learning", "churn-prediction", "流失預測", "再行銷", "Google-Ads", "數據分析", "ML"],
+        useCases: ["GA4 預測受眾建立", "流失用戶預測與挽留", "BigQuery 深度行銷分析", "Google Ads 再行銷升級"],
+        outputFormats: ["predictive_audience_setup", "bq_ml_model", "churn_prediction_scores", "audience_performance_report"],
+        requiredIntegrations: ["GA4", "BigQuery", "google_ads", "email_automation"],
+        token: 44000,
+        showcases: [
+          { company: "訂閱型 SaaS 平台", description: "用 BigQuery ML 建立流失預測模型，對「流失概率 > 70%」用戶觸發個人化 Email 挽留序列", result: "非自願流失率降低 21%；預測受眾 Google Ads 再行銷 ROAS 比一般再行銷高 2.3x", source: "Google Cloud Blog: Churn Prediction Using GA4 and BigQuery ML (2023)" },
+        ],
+      });
+    }
+
+    // ── C1: SEO GSC 搜尋機會挖掘組 ───────────────────────────────────────────
+    {
+      const slug = "seo-gsc-opportunity-mining";
+      const taskType = "seo-gsc-mining";
+      const leadId = await findAgent(conn, ["SEO", "Google Search Console", "organic search", "search optimization"], []);
+      const m2Id   = await findAgent(conn, ["content writing", "blog writing", "content strategy", "SEO writing"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data analyst", "Python", "API", "data extraction", "Google API"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "GSC API 完整數據提取", description: "用 GSC API（非 UI）取得完整 16 個月資料；UI 只顯示已取樣，API 取得全量；按查詢、頁面、裝置、國家分維度下載；分離品牌詞 vs 非品牌詞（GSC 2024 原生支援）", owner: "data_analyst", output: "GSC 完整數據集（16個月）" },
+        { step: 2, title: "三大機會桶識別", description: "機會桶 A：排名 4-15 + 高曝光（速效機會，優化標題/Meta Description 就能提升 CTR）；機會桶 B：高 CTR 低曝光（擴展相關內容）；機會桶 C：高曝光零點擊（優化 Featured Snippet 奪取位置 0）", owner: "seo_analyst", output: "三大機會桶分析表（含優先級評分）" },
+        { step: 3, title: "速效優化執行（Position 4-15 詞）", description: "針對 Position 4-15 高曝光詞：優化頁面 Title Tag + Meta Description（加入搜尋意圖關鍵詞、提升點擊誘因）；確認頁面內容充分回答搜尋意圖；更新結構化資料", owner: "content_optimizer", output: "優化後 Title/Meta 批次清單" },
+        { step: 4, title: "Featured Snippet 佔位策略", description: "高曝光零點擊詞通常有 Featured Snippet；分析現有 Snippet 格式（段落/列表/表格）；改寫對應頁面段落，用 40-60 字直接回答問題；加入 FAQ Schema", owner: "seo_content_writer", output: "Featured Snippet 優化內容 + Schema" },
+        { step: 5, title: "追蹤與月度回顧", description: "設定 GSC Looker Studio 儀表板追蹤：點擊量 / 曝光數 / CTR / 排名趨勢；每月回顧優化成效；更新機會桶，加入新發現的機會詞", owner: "squad_lead", output: "SEO 機會儀表板 + 月報模板" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "SEO Analytics Lead",        order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "SEO Content Specialist",    order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Data & API Analyst",        order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "GSC 搜尋機會挖掘框架", description: "Source: Search Engine Land, Google Search Central, Incremys, AgencyAnalytics. Position 4-15 optimization produces 30-50% traffic lift in 90 days.", steps });
+      await upsertSquad(conn, {
+        slug, name: "SEO GSC 搜尋機會挖掘組",
+        description: "用 GSC API 挖掘完整 16 個月搜尋數據，識別排名 4-15 速效機會、Featured Snippet 佔位機會、高曝光低 CTR 優化機會，90 天內自然流量提升 30-50%。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website"],
+        methodology: "GSC Click-Share Mining — Search Engine Land / Incremys / AgencyAnalytics (2024)",
+        agents: agentMembers,
+        tags: ["SEO", "Google-Search-Console", "GSC", "自然搜尋", "organic-traffic", "關鍵字分析", "Featured-Snippet", "CTR優化", "analytics", "網站分析", "搜尋排名"],
+        useCases: ["SEO 快速增量機會識別", "Google 搜尋排名提升", "Featured Snippet 佔位", "自然流量提升分析"],
+        outputFormats: ["opportunity_bucket_report", "title_meta_optimization_list", "featured_snippet_content", "seo_dashboard"],
+        requiredIntegrations: ["google_search_console", "gsc_api", "looker_studio"],
+        token: 32000,
+        showcases: [
+          { company: "台灣 B2C 電商", description: "GSC API 挖掘識別 47 個 Position 6-14 詞，批次優化 Title + Meta Description + 內容深度", result: "90 天後 23 個詞進入前 5 名；整體非品牌自然流量提升 43%；零額外廣告費", source: "Search Engine Land: GSC Opportunity Mining Methodology (2024)" },
+        ],
+      });
+    }
+
+    // ── C2: 內容衰退偵測復原組 ────────────────────────────────────────────────
+    {
+      const slug = "seo-content-decay-recovery";
+      const taskType = "content-decay-recovery";
+      const leadId = await findAgent(conn, ["content strategy", "SEO", "content marketing", "organic traffic"], []);
+      const m2Id   = await findAgent(conn, ["content writing", "blog writing", "copywriting", "content update"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data analyst", "Google Analytics", "traffic analysis", "performance tracking"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "內容衰退掃描（季度）", description: "用 GSC 對比「當前 3 個月」vs「12個月前 3 個月」流量；標記點擊下滑 20%+ 的頁面；交叉 GA4 數據確認非技術問題（非爬行/索引問題導致）", owner: "data_analyst", output: "衰退頁面清單（含下滑幅度排序）" },
+        { step: 2, title: "三類分診（Update/Consolidate/Delete）", description: "Update：內容仍有價值但過時 → 更新數據/加深內容/優化結構；Consolidate：多個相似頁面互搶流量 → 合併最優版本 + 301 其餘；Delete：完全無搜尋價值 → 移除 + 301 到最相關頁", owner: "seo_strategist", output: "頁面分診決策表" },
+        { step: 3, title: "Update 執行：內容深化更新", description: "加入當年最新數據和研究；擴充為 Ahrefs 建議的競品未覆蓋子主題；優化 H2/H3 結構使其符合語意搜尋；加入 FAQ 段落回應 People Also Ask；更新 publish date", owner: "content_writer", output: "更新後內容 + SEO Checklist 驗證" },
+        { step: 4, title: "Consolidate 執行：頁面合併", description: "選定「最高權威性」頁面作為保留版本；把其他版本最佳段落合入；設定 301 重定向；更新站內連結指向新 URL；提交 GSC 重新索引", owner: "technical_seo", output: "301 重定向清單 + 合併後頁面" },
+        { step: 5, title: "復原追蹤（90天）", description: "每週在 GSC 追蹤更新/合併頁面的排名和流量恢復曲線；30天若無改善 → 進一步優化；建立預防機制：設定年度內容稽核日曆", owner: "squad_lead", output: "90天復原追蹤報告 + 內容稽核日曆" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Content SEO Lead",          order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Content Update Specialist", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Traffic Analytics",         order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "內容衰退偵測復原框架", description: "Source: Ahrefs Content Decay Framework, Search Engine Land, Blue Array SEO. Updating old posts with new data produces up to 146% traffic increase. Early intervention vs. waiting = 3-5x faster recovery.", steps });
+      await upsertSquad(conn, {
+        slug, name: "SEO 內容衰退偵測復原組",
+        description: "每季掃描流量下滑 20%+ 的頁面，分診為 Update / Consolidate / Delete 三類處理；深化更新後流量最高恢復 146%，比等到完全崩跌才行動快 3-5 倍。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website"],
+        methodology: "Content Decay Detection & Recovery — Ahrefs / Search Engine Land / Blue Array (2023-2024)",
+        agents: agentMembers,
+        tags: ["SEO", "content-decay", "內容衰退", "content-update", "內容更新", "organic-traffic", "自然流量", "GSC", "網站內容", "analytics", "301-redirect", "內容策略"],
+        useCases: ["SEO 流量下滑診斷", "舊文章更新優化", "網站內容稽核", "自然流量復原"],
+        outputFormats: ["decay_scan_report", "triage_decision_table", "updated_content", "301_redirect_list", "recovery_tracking"],
+        requiredIntegrations: ["google_search_console", "ahrefs_or_semrush", "GA4"],
+        token: 36000,
+        showcases: [
+          { company: "台灣內容媒體", description: "季度內容衰退掃描識別 38 個流量下滑頁面；12個 Update + 8個 Consolidate + 18個 Delete", result: "3個月後整體自然流量回升 61%；Consolidate 頁面平均排名提升 4.2 個位置", source: "Ahrefs Blog: How to Fix Content Decay (2024)" },
+        ],
+      });
+    }
+
+    // ── C3: 技術 SEO 全面稽核組 ──────────────────────────────────────────────
+    {
+      const slug = "technical-seo-audit-squad";
+      const taskType = "technical-seo-audit";
+      const leadId = await findAgent(conn, ["technical SEO", "site audit", "crawlability", "Core Web Vitals", "indexation"], []);
+      const m2Id   = await findAgent(conn, ["web developer", "JavaScript", "page speed", "LCP", "performance optimization"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["structured data", "schema markup", "JSON-LD", "rich snippets"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "爬行與索引稽核", description: "用 Screaming Frog 全站爬行；檢查：robots.txt 是否誤封重要頁面 / noindex 標記 / canonical 衝突 / GSC Index Coverage 報告中的 Excluded 頁面原因；建立可爬行性問題優先清單", owner: "technical_seo", output: "爬行稽核報告 + 優先修復清單" },
+        { step: 2, title: "Core Web Vitals 修復（LCP/INP/CLS）", description: "PageSpeed Insights + CrUX 數據找出 LCP > 2.5s 的頁面；LCP 常見根因：圖片未優化（WebP格式、lazy load）/ 伺服器回應慢 / 渲染阻塞資源；INP（2024新增）：減少 JavaScript 長任務；CLS：設定圖片/廣告尺寸", owner: "frontend_developer", output: "CWV 修復技術規格 + 優先順序" },
+        { step: 3, title: "結構化資料實作（Schema.org）", description: "稽核現有 Schema 實作；優先加入：Article / Product / FAQ / HowTo / LocalBusiness / BreadcrumbList；用 Google Rich Results Test 驗證；台灣市場加入繁體中文 hreflang 標記（zh-TW）", owner: "schema_specialist", output: "Schema 實作計畫 + 驗證報告" },
+        { step: 4, title: "站內連結架構優化", description: "分析頁面爬行深度（目標：重要頁面 3 clicks 內可達）；識別孤兒頁面（zero internal links）；建立主題群（Topic Cluster）內部連結架構；修復斷鏈", owner: "technical_seo", output: "內部連結改善計畫 + 孤兒頁面處理清單" },
+        { step: 5, title: "AI 搜尋準備度（E-E-A-T / SGE）", description: "稽核 Experience / Expertise / Authoritativeness / Trustworthiness 訊號；作者頁面 + 專業認證 + 引用來源；FAQ Schema 覆蓋 People Also Ask；為 SGE（AI 摘要）優化：清晰定義、直接回答格式", owner: "squad_lead", output: "E-E-A-T 改善建議 + SGE 優化清單" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Technical SEO Lead",        order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Frontend Performance Dev",  order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Structured Data Specialist", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "技術 SEO 全面稽核框架", description: "Source: AOK Marketing, Google Search Central, Screaming Frog. Core Web Vitals fixes show 15-30% organic ranking improvement in 60-90 days. INP became ranking factor March 2024.", steps });
+      await upsertSquad(conn, {
+        slug, name: "技術 SEO 全面稽核組",
+        description: "六層技術 SEO 稽核：爬行索引 / Core Web Vitals（LCP/INP/CLS）/ 結構化資料 / Hreflang 繁中 / 內部連結 / E-E-A-T；修復後自然排名提升 15-30%。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "website"],
+        methodology: "Technical SEO Audit 2024 — AOK Marketing / Screaming Frog / Google Search Central",
+        agents: agentMembers,
+        tags: ["SEO", "technical-SEO", "技術SEO", "Core-Web-Vitals", "LCP", "INP", "CLS", "schema", "結構化資料", "網站健檢", "crawlability", "indexation", "analytics", "hreflang"],
+        useCases: ["網站 SEO 健康稽核", "Core Web Vitals 修復", "Schema 結構化資料實作", "網站爬行問題診斷"],
+        outputFormats: ["crawl_audit_report", "cwv_fix_spec", "schema_implementation", "internal_link_plan"],
+        requiredIntegrations: ["screaming_frog", "google_search_console", "page_speed_insights", "google_rich_results_test"],
+        token: 40000,
+        showcases: [
+          { company: "台灣電商平台", description: "技術 SEO 稽核發現 LCP 平均 4.8s（超標），Schema 覆蓋率不足，孤兒頁面 120+ 個", result: "LCP 優化至 2.1s 後 60 天內排名提升 18%；Schema 加入後 Rich Snippet 出現率 +42%", source: "AOK Marketing: Technical SEO Audit 2024; Google Search Central Core Web Vitals documentation." },
+        ],
+      });
+    }
+
+    // ── D1: 電商結帳漏斗微轉換分析組 ─────────────────────────────────────────
+    {
+      const slug = "ecom-checkout-funnel-squad";
+      const taskType = "ecom-checkout-analytics";
+      const leadId = await findAgent(conn, ["e-commerce analytics", "checkout optimization", "conversion funnel", "cart abandonment"], []);
+      const m2Id   = await findAgent(conn, ["UX design", "CRO", "heatmap", "session recording", "user behavior"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["GA4", "Google Analytics", "e-commerce tracking", "funnel analysis"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["email marketing", "retargeting", "cart recovery", "automation"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "六階段漏斗追蹤設定", description: "確認 GA4 電商事件完整：product_view → add_to_cart → begin_checkout → add_shipping_info → add_payment_info → purchase；按裝置/流量來源/新舊客三維切分；設定基準數據（台灣加購率 9-9.5%，棄購率 74%）", owner: "analytics_lead", output: "漏斗追蹤設定 + 基準數據報告" },
+        { step: 2, title: "流失節點深度診斷", description: "找出流失率最高的步驟（通常是 begin_checkout → add_payment_info）；用 Hotjar / Microsoft Clarity 錄製流失用戶的行為：卡在哪裡？點什麼沒反應？表單哪個欄位造成放棄？", owner: "ux_researcher", output: "流失節點根因報告（含熱圖 + 錄影分析）" },
+        { step: 3, title: "台灣支付方式優化", description: "稽核是否支援台灣主流支付：LINE Pay / 街口支付 / 全盈+ / 信用卡分期 / 超商取貨付款（7-11/全家）；缺少主流支付方式通常可挽回 5-15% 棄購；加入 Apple Pay / Google Pay 降低手機結帳摩擦", owner: "product_manager", output: "支付方式缺口分析 + 整合建議" },
+        { step: 4, title: "結帳流程 A/B 測試", description: "基於診斷結論設計測試：單頁結帳 vs. 多步驟 / 表單欄位精簡（移除不必要欄位）/ 信任徽章位置 / 「以訪客結帳」選項；每個測試設置統計嚴謹的對照組", owner: "cro_specialist", output: "A/B 測試設計 + 執行結果" },
+        { step: 5, title: "棄購挽回自動化", description: "棄購 1 小時後：Email 提醒（主題：「你遺忘了什麼」，不折扣）；棄購 24 小時後：加入 5% 優惠碼；棄購 72 小時後：最後提醒（強調庫存緊張）；LINE 推播作補充管道（台灣高效）", owner: "email_automation", output: "棄購挽回序列（Email + LINE）" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "E-commerce Analytics Lead", order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "UX & CRO Specialist",       order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "GA4 & Funnel Analytics",    order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Cart Recovery Automation",  order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "電商結帳漏斗分析框架", description: "Source: Baymard Institute (cart abandonment research), Google GA4, ECDB (SEA benchmarks). Taiwan/SEA add-to-cart rate 9-9.5%, abandonment 74%. Funnel optimization improves purchase conversion 10-30%.", steps });
+      await upsertSquad(conn, {
+        slug, name: "電商結帳漏斗微轉換分析組",
+        description: "追蹤電商六階段結帳漏斗，用熱圖 + 錄影找出流失節點，補齊台灣主流支付（LINE Pay / 街口），搭配 A/B 測試和棄購 Email 自動化，把 74% 棄購率系統性降低。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "facebook", "website"],
+        methodology: "E-commerce Checkout Funnel Analysis — Baymard Institute / Google GA4 / ECDB (2024)",
+        agents: agentMembers,
+        tags: ["電商", "e-commerce", "checkout", "結帳漏斗", "棄購", "cart-abandonment", "conversion-funnel", "CRO", "analytics", "LINE-Pay", "支付優化", "購物車回收", "Shopify", "GA4"],
+        useCases: ["電商結帳流程優化", "購物車棄購率降低", "支付方式缺口分析", "電商轉換率提升", "台灣電商 UX 優化"],
+        outputFormats: ["funnel_analysis_report", "heatmap_ux_report", "payment_gap_analysis", "ab_test_results", "cart_recovery_sequence"],
+        requiredIntegrations: ["GA4", "hotjar_or_clarity", "email_automation", "shopify_or_woocommerce"],
+        token: 40000,
+        showcases: [
+          { company: "台灣 D2C 品牌", description: "漏斗分析發現 begin_checkout → add_payment_info 流失率高達 62%；診斷出缺少超商取貨和 LINE Pay 導致手機用戶大量放棄", result: "加入 LINE Pay + 超商取貨後棄購率從 74% 降至 58%；月營收提升 23%", source: "Baymard Institute: E-commerce Checkout Usability (2024); ECDB: SEA E-commerce Data." },
+        ],
+      });
+    }
+
+    // ── D2: 電商產品四象限 + 購物籃分析組 ────────────────────────────────────
+    {
+      const slug = "ecom-product-analytics-squad";
+      const taskType = "ecom-product-analytics";
+      const leadId = await findAgent(conn, ["product analytics", "e-commerce analytics", "inventory management", "revenue analytics"], []);
+      const m2Id   = await findAgent(conn, ["data analyst", "Python", "SQL", "data science", "Apriori algorithm"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["marketing strategy", "promotional planning", "merchandising", "product marketing"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "SKU 四象限分類", description: "計算每個 SKU 過去 12 個月：收益貢獻（總銷售額 / 毛利）和成長率（YoY% 或 QoQ%）；繪製四象限：Stars（高收益高成長）/ Cash Cows（高收益低成長）/ Question Marks（低收益高成長）/ Dogs（低收益低成長）", owner: "data_analyst", output: "SKU 四象限分析報告" },
+        { step: 2, title: "RFM × 商品象限交叉分析", description: "把 RFM 分群（Champions / Loyal / At Risk...）與商品象限交叉：哪群客戶主要買 Stars？哪群客戶偏好 Cash Cows？識別哪個客群 × 哪類商品的廣告 ROI 最高", owner: "analytics_lead", output: "客群 × 商品象限交叉矩陣" },
+        { step: 3, title: "購物籃關聯分析（MBA）", description: "用 Apriori 演算法對交易紀錄進行關聯規則挖掘；計算 Support / Confidence / Lift（Lift > 1 = 真正相關）；找出高 Lift 商品組合 → 設計 Bundle / 加購推薦 / 購後 Cross-sell Email", owner: "data_scientist", output: "Top 20 高 Lift 商品組合清單" },
+        { step: 4, title: "廣告預算重分配建議", description: "基於四象限 + MBA 結果：集中廣告預算到 Stars + 高 Lift 帶頭商品；Cash Cows 維持最低廣告支出（自然流量即可）；Dogs 完全停止廣告投放；Question Marks 小額測試", owner: "squad_lead", output: "廣告預算重分配建議書" },
+        { step: 5, title: "促銷日曆與 Bundle 設計", description: "依四象限設計促銷策略：Stars → 限量製造稀缺感；Question Marks → 買一送一試用降低心理門檻；Dogs → 清倉捆綁；Cash Cows → 用作加購推薦品；設計 2-3 個高 Lift Bundle 套組", owner: "marketing_strategist", output: "季度促銷日曆 + Bundle 商品設計" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Product Analytics Lead",    order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Data Scientist (MBA/Python)", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Merchandising Strategist",  order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "電商產品四象限與購物籃分析框架", description: "Source: BCG Growth-Share Matrix (extended for e-commerce by Omniconvert/Klaviyo) + Market Basket Analysis (Agrawal & Srikant, 1994). MBA-driven bundles increase AOV 10-25%.", steps });
+      await upsertSquad(conn, {
+        slug, name: "電商產品四象限與購物籃分析組",
+        description: "用 BCG 四象限把所有 SKU 分為 Stars / Cash Cows / Question Marks / Dogs；搭配購物籃關聯分析（Apriori）找到高 Lift 共購組合，設計 Bundle 和加購推薦，AOV 提升 10-25%。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "BCG Matrix for E-commerce + Market Basket Analysis Apriori (Agrawal & Srikant, 1994)",
+        agents: agentMembers,
+        tags: ["電商", "e-commerce", "product-analytics", "SKU分析", "四象限", "BCG-matrix", "MBA", "market-basket-analysis", "購物籃分析", "Bundle", "AOV提升", "analytics", "關聯分析"],
+        useCases: ["電商 SKU 效益評估", "商品 Bundle 設計", "廣告預算按商品重分配", "加購推薦策略", "清倉促銷規劃"],
+        outputFormats: ["sku_quadrant_report", "rfm_product_matrix", "top_lift_combinations", "budget_reallocation", "bundle_design"],
+        requiredIntegrations: ["shopify_or_woocommerce", "CRM", "email_automation", "python_mlxtend"],
+        token: 40000,
+        showcases: [
+          { company: "台灣保健品電商", description: "SKU 四象限分析發現 23% 的 SKU 是 Dogs（消耗廣告預算但幾乎不貢獻收益）；MBA 識別 5 個高 Lift 商品組合設計 Bundle", result: "停止 Dogs 廣告後整體 ROAS +34%；Bundle 銷售貢獻月 GMV 提升 19%", source: "ResearchGate: BCG Matrix + RFM for E-commerce Analytics (2024); mlxtend MBA documentation." },
+        ],
+      });
+    }
+
+    // ── D3: 台灣電商平台分析組 (momo / Shopee / LINE) ─────────────────────────
+    {
+      const slug = "taiwan-marketplace-analytics-squad";
+      const taskType = "taiwan-marketplace-analytics";
+      const leadId = await findAgent(conn, ["e-commerce", "marketplace", "Shopee", "retail analytics", "platform analytics"], []);
+      const m2Id   = await findAgent(conn, ["data analyst", "web scraping", "Python", "market research", "competitive analysis"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["LINE marketing", "social commerce", "livestream", "community management"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["content strategy", "product listing optimization", "SEO", "keyword research"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "台灣電商平台選擇與定位", description: "分析品牌適合哪些平台：momo（3,686 萬 PV/月，主力 35-55 歲）/ Shopee TW（4,354 萬 PV/月，主力 18-35 歲）/ PChome（3,845 萬 PV/月，科技/家電強）/ LINE 購物（22M 用戶基礎）；確認目標客群在哪個平台濃度最高", owner: "squad_lead", output: "台灣電商平台選擇建議報告" },
+        { step: 2, title: "站內搜尋排名優化（關鍵字研究）", description: "在各平台搜尋核心關鍵詞，分析前 20 名商品的標題結構和關鍵詞密度；把高搜尋量關鍵詞嵌入：商品標題（前 20 字最重要）/ 商品描述 / 標籤；Shopee TW 額外優化：配送速度承諾 + 評分維護（< 4.6 明顯影響排名）", owner: "content_optimizer", output: "站內關鍵字研究報告 + 商品標題優化版本" },
+        { step: 3, title: "評價管理與轉換率分析", description: "監測評價速度（月新增評論數）和評分趨勢；分析低分評價根因；建立系統性評價蒐集機制（出貨後 3-5 天 LINE 推播提醒）；對比同類商品的轉換率基準，識別低轉換商品的頁面問題", owner: "cx_manager", output: "評價健康報告 + 低轉換商品診斷" },
+        { step: 4, title: "LINE 生態系整合分析", description: "LINE OA 數據分析：訊息送達率 / 開信率 / CTA 點擊率；LINE VOOM 貼文互動分析；LINE 購物關聯設定與成效追蹤；LINE Pay 結帳轉換率追蹤；建立 LINE OA 粉絲 ↔ 購買行為關聯", owner: "line_specialist", output: "LINE 生態系整合分析報告" },
+        { step: 5, title: "直播電商歸因分析", description: "台灣直播電商佔社群商務約 25% GMV；建立直播專屬優惠碼追蹤；分析 Shopee Live / Facebook Live / LINE Live 的轉換率和 GMV 貢獻；識別哪位主播、哪類商品、哪個時段效益最高", owner: "squad_lead", output: "直播電商效益報告 + 最佳化建議" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Taiwan Marketplace Lead",   order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Platform Data Analyst",     order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "LINE & Social Commerce",    order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Listing Optimization",      order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "台灣電商平台分析框架", description: "Source: Taiwan TWNIC 2024, Trade.gov Taiwan eCommerce, I-ConnectWeb, Charlesworth Group. Taiwan online retail NTD 653.3B in 2024. LINE 94% population penetration, mandatory for Taiwan brands.", steps });
+      await upsertSquad(conn, {
+        slug, name: "台灣電商平台分析組（momo / Shopee / LINE）",
+        description: "針對台灣電商生態（momo / Shopee TW / PChome / LINE 購物）的站內搜尋優化、評價管理、LINE 生態系整合、直播電商歸因，幫助品牌在台灣主流電商平台最大化銷售。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "facebook", "strategy"],
+        methodology: "Taiwan Marketplace Analytics — TWNIC 2024 / Shopee TW / momo / LINE Official Account",
+        agents: agentMembers,
+        tags: ["台灣", "台灣電商", "momo", "Shopee", "PChome", "LINE", "LINE-Pay", "marketplace", "電商平台", "直播電商", "站內SEO", "analytics", "台灣市場", "社群電商"],
+        useCases: ["台灣電商平台銷售優化", "momo/Shopee 店家分析", "LINE OA 效益分析", "台灣直播電商規劃", "本土電商平台進駐策略"],
+        outputFormats: ["platform_selection_report", "keyword_optimization_list", "review_health_report", "line_ecosystem_analysis", "livestream_attribution"],
+        requiredIntegrations: ["shopee_seller_center", "momo_seller_center", "line_oa_manager", "GA4"],
+        token: 40000,
+        showcases: [
+          { company: "台灣美妝品牌", description: "導入台灣電商平台分析：Shopee 站內關鍵字優化 + LINE OA 評價收集機制 + 直播優惠碼追蹤", result: "Shopee 站內搜尋排名前 5 商品數從 3 個增至 11 個；LINE 購物月銷售額 +67%；直播電商貢獻 GMV 從 8% 提升至 23%", source: "Taiwan TWNIC Internet Survey 2024; Trade.gov Taiwan eCommerce Report." },
+        ],
+      });
+    }
+
+    // ── E1: Email 送達率健康監測組 ────────────────────────────────────────────
+    {
+      const slug = "email-deliverability-health-squad";
+      const taskType = "email-deliverability";
+      const leadId = await findAgent(conn, ["email deliverability", "email marketing", "sender reputation", "inbox placement"], []);
+      const m2Id   = await findAgent(conn, ["DNS", "SPF", "DKIM", "DMARC", "email authentication", "technical email"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["email list management", "list hygiene", "email segmentation", "subscriber management"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "Email 驗證三層設定（2024 強制要求）", description: "稽核並設定：SPF（授權發送伺服器 IP）/ DKIM（數位簽名）/ DMARC（policy: quarantine 或 reject）；2024年 2 月 Google/Yahoo 對每月 5000+ 封郵件的寄件者強制要求 DMARC；驗證方法：MX Toolbox + mail-tester.com 逐項確認", owner: "technical_email", output: "SPF/DKIM/DMARC 設定驗證報告" },
+        { step: 2, title: "寄件者信譽監控", description: "Google Postmaster Tools 監控：網域信譽（目標 High）/ IP 信譽 / 垃圾郵件投訴率（目標 < 0.1%，超過 0.3% 觸發 Gmail 封鎖）；設定投訴率警示；分析哪類郵件被標記為垃圾", owner: "squad_lead", output: "寄件者信譽儀表板 + 週報" },
+        { step: 3, title: "名單健康稽核", description: "清洗無效地址（硬退信 > 2% → 立即移除）；移除長期不互動訂閱者（6個月未開信）→ 先嘗試再激活序列，無效則取消訂閱；Email 驗證服務掃描整份名單（識別高風險地址）", owner: "list_hygiene_specialist", output: "名單健康報告 + 清洗計畫" },
+        { step: 4, title: "收件箱測試（Seed List）", description: "用 GlockApps / Litmus 測試郵件在 Gmail / Outlook / Yahoo / Apple Mail 的實際收件結果；識別哪些郵件內容觸發垃圾過濾；測試 HTML 設計在各裝置的顯示效果", owner: "email_qa", output: "跨平台收件箱測試報告" },
+        { step: 5, title: "送達率提升行動計畫", description: "依診斷結果建立改善優先序：DMARC 設定（最高優先）→ 名單清洗 → 內容/主旨最佳化 → 逐步暖機新網域；設定每季送達率健康稽核 SOP", owner: "squad_lead", output: "送達率改善行動計畫 + 季度稽核 SOP" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Email Deliverability Lead",  order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Technical Email (DNS/Auth)", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "List Hygiene Specialist",    order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Email 送達率健康監測框架", description: "Source: Google/Yahoo 2024 Bulk Sender Requirements, Campaign Monitor, Klaviyo, Validity. Global average inbox placement 84-85%; top performers 90%+.", steps });
+      await upsertSquad(conn, {
+        slug, name: "Email 送達率健康監測組",
+        description: "三層 Email 驗證（SPF/DKIM/DMARC）+ 寄件者信譽監控 + 名單清洗 + 收件箱測試，確保郵件進收件箱而非垃圾桶，維持 90%+ 送達率。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Email Deliverability Framework — Google/Yahoo 2024 Mandates + Validity + Klaviyo",
+        agents: agentMembers,
+        tags: ["email", "Email行銷", "deliverability", "送達率", "DMARC", "SPF", "DKIM", "inbox", "list-hygiene", "名單清洗", "analytics", "Klaviyo", "郵件行銷"],
+        useCases: ["Email 送達率問題診斷", "DMARC 設定", "名單健康稽核", "Gmail 垃圾信問題解決"],
+        outputFormats: ["dns_verification_report", "reputation_dashboard", "list_health_report", "inbox_test_results"],
+        requiredIntegrations: ["google_postmaster_tools", "klaviyo_or_sendgrid", "glockapps_or_litmus"],
+        token: 28000,
+        showcases: [
+          { company: "台灣電商品牌", description: "郵件投訴率達 0.28%（臨近 Gmail 封鎖閾值），未設 DMARC，名單 30% 為無效地址", result: "完成 DMARC 設定 + 名單清洗後：送達率從 71% 提升至 91%；開信率從 12% 提升至 24%；月 Email 收益提升 3.2 倍", source: "Validity: Email Deliverability Benchmark (2024); Google Bulk Sender Requirements (2024)." },
+        ],
+      });
+    }
+
+    // ── E2: Email 營收歸因 + 生命週期 RFM 組 ─────────────────────────────────
+    {
+      const slug = "email-lifecycle-revenue-squad";
+      const taskType = "email-lifecycle-analytics";
+      const leadId = await findAgent(conn, ["email marketing", "lifecycle marketing", "retention", "email automation", "CRM"], []);
+      const m2Id   = await findAgent(conn, ["RFM", "customer segmentation", "Klaviyo", "marketing automation", "email sequences"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["data analyst", "revenue attribution", "e-commerce analytics", "conversion tracking"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "Email 營收歸因框架設定", description: "選擇歸因窗口：點擊後 24-72 小時（保守/準確，推薦）vs. 開信後 5 天（膨脹，避免）；在 Klaviyo / GA4 對齊歸因設定；計算每封 Email 的 RPE（Revenue Per Email）；區分 Campaign 收益 vs. Flow 收益", owner: "analytics_lead", output: "Email 歸因框架設定文件 + 基準 RPE" },
+        { step: 2, title: "RFM 六大分群設定", description: "在 Klaviyo 建立 RFM 評分（或連結 CRM 數據）；六大分群：Champions（9-10分）/ Loyal（7-8）/ Potential Loyalists（6）/ At Risk（購買 120-300 天前）/ Hibernating（購買 300+ 天前）/ Lost（購買 12個月+ 前）；計算各分群規模和 AOV", owner: "squad_lead", output: "RFM 分群結構 + 各群規模/AOV 報告" },
+        { step: 3, title: "各分群差異化 Email 策略", description: "Champions：VIP 早鳥優先通知 + 口碑計畫邀請；Loyal：升等激勵（消費 X 達 VIP）；At Risk：個人化挽留優惠（觀察其最後購買商品類別）；Lost：Win-back 序列（3 封，最後一封給最高折扣）；Hibernating：再激活挑戰（7 天打卡）", owner: "email_strategist", output: "各分群 Email 策略文件 + 內容腳本" },
+        { step: 4, title: "Apple MPP 後的開信率解讀", description: "2021 年後 Apple Mail Privacy Protection 導致 iOS 用戶開信率虛高（接近 100%）；改用 CTOR（Click-to-Open Rate，目標 10-15%）作真實互動指標；設定裝置維度細分 Apple vs 非 Apple 開信率", owner: "analytics_lead", output: "MPP 修正後 Email 效益報告 + CTOR 儀表板" },
+        { step: 5, title: "Email ROI 全面追蹤", description: "計算真實 Email ROI：歸因收益 / 總 Email 成本（ESP 費用 + 人力 + 設計）；行業基準 $36-42 ROI per $1；追蹤各 Flow 的 ROI（歡迎序列通常最高）；季度優化：移除 ROI < 5x 的 Campaign 頻率", owner: "squad_lead", output: "Email 全管道 ROI 追蹤儀表板" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Email Lifecycle Lead",       order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "RFM & Automation Specialist", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Revenue Analytics",          order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Email 生命週期 RFM 框架", description: "Source: HubSpot, Klaviyo, Campaign Monitor, Omniconvert. Industry ROI $36-42 per $1. RFM Champions segment generates 5-10x higher revenue per contact.", steps });
+      await upsertSquad(conn, {
+        slug, name: "Email 生命週期 RFM 分析組",
+        description: "建立準確的 Email 營收歸因窗口，用 RFM 把名單分成 6 大分群，設計差異化 Email 策略（VIP 口碑計畫 / At Risk 挽留 / Lost Win-back），ROI 目標 $36-42 per $1。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Email Lifecycle Analytics + RFM Segmentation — Klaviyo / HubSpot / Omniconvert (2023-2024)",
+        agents: agentMembers,
+        tags: ["email", "Email行銷", "lifecycle", "生命週期", "RFM", "分群", "Klaviyo", "win-back", "retention", "analytics", "email-automation", "ROI", "流失挽回"],
+        useCases: ["Email 名單分群策略", "流失客戶 Win-back 計畫", "Email ROI 追蹤", "VIP 客戶 Email 策略", "Klaviyo RFM 設定"],
+        outputFormats: ["attribution_framework", "rfm_segment_report", "email_strategy_by_segment", "ctor_dashboard", "email_roi_dashboard"],
+        requiredIntegrations: ["klaviyo_or_mailchimp", "CRM", "e-commerce_platform", "GA4"],
+        token: 36000,
+        showcases: [
+          { company: "台灣 D2C 保健品", description: "導入 RFM 分群：Champions（3%名單）/ At Risk（18%）/ Lost（25%）差異化 Email 策略", result: "At Risk 挽留成功率 11%；Lost Win-back 成功率 6%；整體 Email 月收益提升 2.4 倍；CTOR 從 4% 提升至 13%", source: "Klaviyo: RFM Analysis and Email Lifecycle Best Practices (2024)" },
+        ],
+      });
+    }
+
+    // ── F1: 現代行銷資料棧架構組 ─────────────────────────────────────────────
+    {
+      const slug = "marketing-data-stack-squad";
+      const taskType = "marketing-data-stack";
+      const leadId = await findAgent(conn, ["data engineering", "data warehouse", "ETL", "data pipeline", "analytics engineering"], []);
+      const m2Id   = await findAgent(conn, ["BigQuery", "Snowflake", "SQL", "dbt", "data modeling"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["Looker Studio", "Tableau", "Power BI", "data visualization", "dashboard"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["API integration", "Fivetran", "data connector", "marketing automation", "CDP"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "數據需求盤點與來源清單", description: "列出所有行銷數據來源：廣告平台（Meta/Google/LINE）/ CRM / 電商平台（Shopify/momo/Shopee）/ Email ESP / GA4 / 社群媒體；確認每個來源的更新頻率和歷史數據深度；建立數據需求優先清單", owner: "squad_lead", output: "行銷數據來源盤點表 + 優先清單" },
+        { step: 2, title: "資料倉儲選型與建置", description: "依規模選型：中小型 → BigQuery（免費額度充裕）；大型 → Snowflake；建立標準化層：raw（原始）/ staging（清洗）/ marts（商業邏輯）；用 dbt 建立 SQL 轉換模型，版本控制所有邏輯", owner: "data_engineer", output: "資料倉儲架構圖 + dbt 模型" },
+        { step: 3, title: "資料管道建置（ELT）", description: "用 Fivetran / Airbyte 把所有廣告平台、CRM、電商數據自動同步到倉儲；設定更新頻率（廣告數據每小時、交易數據每日）；建立數據品質監控（Great Expectations）", owner: "data_pipeline_engineer", output: "ELT 管道設定 + 監控告警" },
+        { step: 4, title: "逆向 ETL（受眾激活）", description: "用 Hightouch / Census 把倉儲中的 SQL 分群直接同步到廣告平台；在 BigQuery 用 SQL 建立高 LTV 客群 → 一鍵推送到 Meta Custom Audience + Google Customer Match；取代手動 CSV 上傳", owner: "activation_engineer", output: "逆向 ETL 設定 + 受眾同步確認" },
+        { step: 5, title: "整合行銷儀表板建立", description: "在 Looker Studio / Tableau 建立跨平台統一儀表板：廣告效益（所有平台匯總）/ 轉換漏斗（GA4 + 電商）/ 客戶分群（CRM + RFM）/ Email 效益；設定每日自動刷新 + 週報 Email", owner: "squad_lead", output: "整合行銷儀表板 + 自動化週報" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Data Stack Architect",      order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Analytics Engineering (dbt)", order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "BI & Dashboard",            order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Integration & CDP",         order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "現代行銷資料棧框架", description: "Source: Snowflake Modern Marketing Data Stack Report 2024, Fivetran, dbt Labs. Standard stack at high-growth DTC brands: Fivetran + BigQuery/Snowflake + dbt + Hightouch + Looker.", steps });
+      await upsertSquad(conn, {
+        slug, name: "現代行銷資料棧架構組",
+        description: "建立 ELT 資料管道（Fivetran/Airbyte → BigQuery → dbt）把所有廣告平台、CRM、電商數據統一；搭配逆向 ETL 把 SQL 分群直接推送廣告平台，建立真正的數據驅動行銷基礎建設。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Modern Marketing Data Stack — Snowflake / Fivetran / dbt Labs / Hightouch (2024)",
+        agents: agentMembers,
+        tags: ["analytics", "data-stack", "資料棧", "BigQuery", "Snowflake", "dbt", "ETL", "data-pipeline", "資料管道", "Looker-Studio", "Tableau", "CDP", "行銷基礎建設", "數據整合"],
+        useCases: ["行銷數據倉儲建立", "跨平台數據整合", "廣告受眾自動化激活", "整合行銷儀表板", "dbt 模型建置"],
+        outputFormats: ["data_source_inventory", "warehouse_schema", "dbt_models", "pipeline_setup", "unified_dashboard"],
+        requiredIntegrations: ["BigQuery_or_Snowflake", "fivetran_or_airbyte", "dbt", "hightouch", "looker_studio"],
+        token: 56000,
+        showcases: [
+          { company: "台灣新創品牌", description: "導入現代資料棧：Airbyte（開源免費）連 Meta/Google/Shopify → BigQuery → dbt → Looker Studio", result: "行銷報告從每週 8 小時人工彙整變成每日自動刷新；識別 Facebook 廣告 ROAS 被高估 31%（跨裝置歸因問題）；決策速度提升 3 倍", source: "Snowflake (2024). Modern Marketing Data Stack Report. Fivetran engineering blog." },
+        ],
+      });
+    }
+
+    // ── F2: 統一行銷測量三角組 (MMM + MTA + Incrementality) ──────────────────
+    {
+      const slug = "unified-measurement-triangulation-squad";
+      const taskType = "unified-measurement";
+      const leadId = await findAgent(conn, ["marketing measurement", "attribution", "MMM", "incrementality", "marketing science"], []);
+      const m2Id   = await findAgent(conn, ["econometrics", "statistics", "data science", "Python", "R", "regression"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["media planning", "budget allocation", "ROI optimization", "performance marketing"], [leadId ?? 0, m2Id ?? 0]);
+      const steps = [
+        { step: 1, title: "三層測量架構設計", description: "定義三層角色：MMM（跨管道宏觀歸因 + 預算優化，週/月數據）→ MTA（數位管道戰術優化，用戶路徑，近即時）→ Incrementality（地區/Holdout 實驗，「真值」校準其他兩層）；確認各層負責的決策類型", owner: "squad_lead", output: "三層測量架構設計文件" },
+        { step: 2, title: "MMM 建模（Meta Robyn / Google Meridian）", description: "用開源工具：Meta Robyn（2021，貝葉斯 MMM）或 Google Meridian（2024，開源）；輸入 2 年以上週級數據：媒體花費 / 銷售 / 外部因素；輸出各管道 ROI 和預算優化建議", owner: "mmm_modeler", output: "MMM 模型 + 管道貢獻報告" },
+        { step: 3, title: "MTA 設定（GA4 DDA）", description: "在 GA4 啟用 Data-Driven Attribution（機器學習歸因）；設定所有付費管道 UTM 一致性；比較 DDA vs Last Click 差異（哪些管道被低估/高估）；搭配 Meta Conversions API 提升信號品質", owner: "analytics_lead", output: "DDA vs Last Click 比較報告" },
+        { step: 4, title: "增量測試（Holdout Group）", description: "選一個管道做增量實驗：暫停特定地區廣告（地理 Holdout）或用平台 Lift Study（Meta / Google）；計算真實增量提升（Incremental Lift）；用實驗結果校準 MMM 和 MTA", owner: "measurement_scientist", output: "增量實驗設計 + 結果報告" },
+        { step: 5, title: "三角驗證與預算優化", description: "對比三層結論：哪個管道三層都顯示高效？哪個管道只有 MTA 顯示高效但 MMM 和增量測試不一致？用三角驗證結果輸出最可信的預算重分配建議", owner: "squad_lead", output: "三角驗證報告 + 預算重分配建議" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "Marketing Measurement Lead",  order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "MMM & Econometrics",          order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Media Planning & Budget",     order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "統一行銷測量三角框架", description: "Source: Triple Whale Moby, Rockerbox Triangulation, Haus.io, Analytic Partners. Brands using all three measurement layers achieve 15-25% better marketing efficiency.", steps });
+      await upsertSquad(conn, {
+        slug, name: "統一行銷測量三角組（MMM + MTA + Incrementality）",
+        description: "用 MMM 宏觀歸因 + MTA 路徑歸因 + Incrementality 增量實驗三層互相校準，找到真正值得投資的管道，讓行銷效率提升 15-25%。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "strategy"],
+        methodology: "Unified Marketing Measurement — Meta Robyn + GA4 DDA + Incrementality Triangulation (2024)",
+        agents: agentMembers,
+        tags: ["analytics", "MMM", "MTA", "incrementality", "歸因", "attribution", "行銷測量", "三角驗證", "Robyn", "GA4-DDA", "budget-optimization", "預算優化", "marketing-science"],
+        useCases: ["全管道行銷歸因分析", "廣告預算最優分配", "Cookie-free 歸因解決方案", "行銷效益真值驗證"],
+        outputFormats: ["three_layer_framework", "mmm_model", "dda_comparison", "incrementality_results", "budget_reallocation"],
+        requiredIntegrations: ["meta_robyn_or_meridian", "GA4", "meta_conversions_api", "data_warehouse"],
+        token: 56000,
+        showcases: [
+          { company: "台灣消費品品牌", description: "導入 MMM + GA4 DDA + Meta Conversion Lift 三角驗證，發現 GA4 Last Click 嚴重低估 Display 的輔助轉換，而 Meta 報告高估歸因 29%", result: "預算重分配後整體 ROAS 提升 19%；Display 預算增加 40% 但 CAC 降低 23%", source: "Rockerbox: Marketing Measurement Triangulation (2024); Triple Whale Moby Case Studies." },
+        ],
+      });
+    }
+
+    // ── F3: AI 創意情報組 (Segwise / Madgicx / Northbeam AI) ─────────────────
+    {
+      const slug = "ai-creative-intelligence-squad";
+      const taskType = "ai-creative-intelligence";
+      const leadId = await findAgent(conn, ["AI", "machine learning", "creative analytics", "performance prediction", "marketing intelligence"], []);
+      const m2Id   = await findAgent(conn, ["computer vision", "image analysis", "video analysis", "creative tagging"], [leadId ?? 0]);
+      const m3Id   = await findAgent(conn, ["performance marketing", "media buying", "ROAS", "campaign optimization"], [leadId ?? 0, m2Id ?? 0]);
+      const m4Id   = await findAgent(conn, ["data analyst", "anomaly detection", "alert system", "monitoring"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
+      const steps = [
+        { step: 1, title: "創意標籤體系設計（AI 輔助）", description: "用 AI（GPT-4o Vision / Segwise）自動分析所有廣告素材；萃取標籤：素材類型（影片/靜態/輪播）/ Hook 類型（問題式/展示式/故事式）/ 情感調性（正向/緊迫/幽默）/ 創意角度（功能/社會證明/產品展示）；建立統一標籤字典", owner: "squad_lead", output: "AI 創意標籤體系 + 所有素材標籤庫" },
+        { step: 2, title: "上線前創意效益預測", description: "用 Motion App 或自建模型：對每個新素材，基於同類型標籤的歷史績效預測 Hook Rate / CTR / ROAS；高預測分數優先分配更多測試預算；低分素材提前調整或放棄", owner: "ai_analyst", output: "新素材預測評分報告" },
+        { step: 3, title: "異常偵測與自動告警", description: "設定 KPI 正常波動範圍（基於過去 30 天數據 ± 2σ）；ROAS 跌破下限 / CPA 超標 20% / 頻次超過 3.0 → 即時 Slack/Email 告警；區分可能原因：季節性 / 創意疲勞 / 競品增加 / 平台算法異動", owner: "monitoring_specialist", output: "異常告警系統設定 + 異常日誌" },
+        { step: 4, title: "自然語言查詢行銷數據", description: "設定 AI 問答介面（接 BigQuery 或廣告平台 API）；讓非技術人員用自然語言查詢：「哪個廣告組上週 ROAS 最高？」/ 「Facebook 廣告本月花費超過預算多少？」；輸出即時回答 + 圖表", owner: "ai_integration", output: "NLQ 行銷數據查詢系統" },
+        { step: 5, title: "週報自動生成與分析", description: "每週自動彙整：勝出素材清單 + 衰退素材預警 + 異常事件摘要 + 下週行動建議；用 LLM 把數據轉化成中文可讀洞察；直接發到 Slack / Email，節省 5-10 小時/週人工報告時間", owner: "squad_lead", output: "AI 週報系統 + 自動化行動建議" },
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true,  role: "AI Marketing Intelligence Lead", order: 1 },
+        { agent_id: m2Id,   is_lead: false, role: "Computer Vision & Creative AI",  order: 2 },
+        { agent_id: m3Id,   is_lead: false, role: "Performance Optimizer",          order: 3 },
+        { agent_id: m4Id,   is_lead: false, role: "Anomaly Detection & Monitoring", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "AI 創意與活動情報框架", description: "Source: Segwise.ai, Madgicx, Motion App, Triple Whale Moby, Forrester 2023. AI pre-launch prediction: 28% higher effectiveness, 22% lower wasted spend. Segwise eliminates 5-10 hours/week manual creative analysis.", steps });
+      await upsertSquad(conn, {
+        slug, name: "AI 創意情報組",
+        description: "用 AI 自動分析廣告素材標籤、預測上線前效益、即時偵測異常、自然語言查詢數據，每週自動生成洞察報告，讓行銷團隊節省 5-10 小時人工分析，提升創意效果 28%。",
+        industryKey: "marketing", missionType: taskType,
+        workspace: ["analytics", "facebook", "strategy"],
+        methodology: "AI-Powered Creative Intelligence — Segwise.ai / Motion App / Triple Whale Moby / Forrester 2023",
+        agents: agentMembers,
+        tags: ["AI", "人工智慧", "analytics", "creative-analytics", "創意分析", "ai-marketing", "anomaly-detection", "異常偵測", "performance-prediction", "creative-tagging", "NLQ", "自動化報告", "行銷AI"],
+        useCases: ["廣告素材 AI 分析", "行銷 KPI 異常告警", "上線前創意效益預測", "自然語言查詢廣告數據", "AI 自動週報生成"],
+        outputFormats: ["creative_tag_library", "prediction_scores", "anomaly_alert_system", "nlq_interface", "ai_weekly_report"],
+        requiredIntegrations: ["meta_ads_api", "google_ads_api", "BigQuery", "motion_app_or_segwise", "slack_or_email"],
+        token: 44000,
+        showcases: [
+          { company: "DTC 品牌代理商", description: "導入 Segwise AI 自動標籤系統分析 3,000+ 素材，Motion App 建立 Hook Rate 預測模型", result: "創意分析人工時間從每週 12 小時降至 2 小時；預測高效素材準確率 73%；ROAS 提升 28%", source: "Forrester (2023): AI-Driven Pre-Launch Prediction. Segwise.ai: 2024 Product Benchmarks." },
+        ],
+      });
+    }
+
     console.log("[seed-local] Done. All local squad seeds applied successfully.");
 
   } catch (err: any) {

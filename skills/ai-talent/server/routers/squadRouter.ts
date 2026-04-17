@@ -45,15 +45,48 @@ function escapeLike(s: string): string {
 // ── Workspace → tag keywords mapping ─────────────────────────────────────────
 
 const WORKSPACE_TAGS: Record<string, string[]> & { strategy: string[] } = {
-  strategy:  ["brand", "strategy", "gtm", "b2b", "full-funnel", "positioning", "market", "saas"],
-  website:   ["seo", "website", "content", "web", "ux", "cro", "copywriting", "conversion"],
-  facebook:  ["meta-ads", "facebook", "social", "ads", "community", "ecom", "creative"],
-  linkedin:  ["linkedin", "b2b", "thought-leadership", "demand-gen", "b2b_saas"],
-  youtube:   ["youtube", "video", "content", "yt", "影片"],
-  pr:        ["pr", "公關", "媒體", "新聞", "media"],
-  event:     ["event", "活動", "展覽"],
-  instore:   ["retail", "門市", "實體"],
+  strategy:   ["brand", "strategy", "gtm", "b2b", "full-funnel", "positioning", "market", "saas"],
+  website:    ["seo", "website", "content", "web", "ux", "cro", "copywriting", "conversion"],
+  facebook:   ["meta-ads", "facebook", "social", "ads", "community", "ecom", "creative"],
+  linkedin:   ["linkedin", "b2b", "thought-leadership", "demand-gen", "b2b_saas"],
+  youtube:    ["youtube", "video", "content", "yt", "影片"],
+  pr:         ["pr", "公關", "媒體", "新聞", "media"],
+  event:      ["event", "活動", "展覽"],
+  instore:    ["retail", "門市", "實體"],
+  monitoring: ["monitoring", "social-listening", "sentiment", "intelligence", "輿情", "監測", "情報", "競品", "crisis", "brand-tracking"],
+  analytics:  ["analytics", "data", "attribution", "CLV", "LTV", "RFM", "cohort", "A/B", "MMM", "AARRR", "conversion", "experimentation", "North-Star", "Kano", "NPS", "incrementality", "分析", "歸因", "用戶研究"],
 };
+
+/**
+ * Normalize a workspace key to a known WORKSPACE_TAGS key.
+ * Handles user-created workspaces with CJK labels (e.g. "情報監測", "公關通路")
+ * or arbitrary slugs that don't map 1:1 to our built-in workspace keys.
+ */
+function normalizeWorkspace(ws: string): string {
+  if (WORKSPACE_TAGS[ws]) return ws;   // already a known key
+
+  const s = ws.toLowerCase();
+  // Analytics / data signals
+  if (/analytics|數據分析|資料分析|\babi\b|attribution|歸因|clv|ltv|rfm|cohort|同期群|aarrr|north.star|kano|a\/b.test|a\/b測試|mmm|marketing.mix|incrementalit|留存分析|用戶研究|consumer.research/.test(s)) return "analytics";
+  // Monitoring / intelligence signals
+  if (/監測|情報|輿情|listening|monitor|sentiment|intelligence|追蹤|brand.track/.test(s)) return "monitoring";
+  // Social / Facebook
+  if (/臉書|facebook|\bfb\b|meta|ig|instagram|社群/.test(s)) return "facebook";
+  // LinkedIn
+  if (/linkedin/.test(s)) return "linkedin";
+  // YouTube / Video
+  if (/youtube|\byt\b|影片|video/.test(s)) return "youtube";
+  // PR
+  if (/公關|媒體關係|\bpr\b|kol|媒體/.test(s)) return "pr";
+  // Website / SEO
+  if (/官網|website|web|seo|搜尋/.test(s)) return "website";
+  // Event
+  if (/活動|event|展覽/.test(s)) return "event";
+  // In-store / Retail
+  if (/門市|實體|retail|instore/.test(s)) return "instore";
+
+  return "strategy"; // final fallback
+}
 
 // ── Fallback squad lead definition ───────────────────────────────────────────
 
@@ -160,15 +193,19 @@ export const squadRouter = router({
             const storedWs = m.workspace ? String(m.workspace) : null;
             const tl = rawText.toLowerCase();
             const textHint =
-              /臉書|facebook|\bfb\b|meta.*ads/.test(tl)            ? "facebook"  :
-              /linkedin/.test(tl)                                    ? "linkedin"  :
-              /youtube|\byt\b|影片/.test(tl)                        ? "youtube"   :
-              /公關|媒體關係|\bpr\b|kol/.test(tl)                   ? "pr"        :
-              /seo|搜尋引擎|網站|website/.test(tl)                   ? "website"   :
-              /活動|event|展覽/.test(tl)                             ? "event"     :
-              /instagram|\big\b/.test(tl)                            ? "facebook"  :
+              /臉書|facebook|\bfb\b|meta.*ads/.test(tl)             ? "facebook"   :
+              /linkedin/.test(tl)                                     ? "linkedin"   :
+              /youtube|\byt\b|影片/.test(tl)                         ? "youtube"    :
+              /公關|媒體關係|\bpr\b|kol/.test(tl)                    ? "pr"         :
+              /seo|搜尋引擎|網站|website/.test(tl)                    ? "website"    :
+              /活動|event|展覽/.test(tl)                              ? "event"      :
+              /instagram|\big\b/.test(tl)                             ? "facebook"   :
+              /社群監測|輿情|情報監測|social.listen|brand.monitor|sentiment|monitoring/.test(tl) ? "monitoring" :
+              /數據分析|資料分析|rfm|clv|ltv|aarrr|cohort|同期群|a\/b測試|north.star|kano|歸因分析|行銷組合|marketing.mix|用戶研究|留存分析|增量測試|incrementalit/.test(tl) ? "analytics" :
               null;
-            missionWorkspaceHint = textHint ?? storedWs;
+            // Normalize stored workspace key (handles CJK labels like "情報監測")
+            const normalizedStoredWs = storedWs ? normalizeWorkspace(storedWs) : null;
+            missionWorkspaceHint = textHint ?? normalizedStoredWs;
             console.log(`[squadRouter] mission ${input.missionId} ws=${storedWs} textHint=${textHint} kws=${missionKeywords.slice(0,6).join(",")}`);
           }
         } catch (e) {
@@ -176,9 +213,9 @@ export const squadRouter = router({
         }
       }
 
-      // Effective workspace = text hint (strongest) → stored mission ws → passed-in ws
-      const effectiveWorkspace = missionWorkspaceHint ?? input.workspace;
-      const effectiveTags      = WORKSPACE_TAGS[effectiveWorkspace] ?? WORKSPACE_TAGS[input.workspace] ?? WORKSPACE_TAGS.strategy;
+      // Effective workspace = text hint (strongest) → stored mission ws → passed-in ws (all normalized)
+      const effectiveWorkspace = missionWorkspaceHint ?? normalizeWorkspace(input.workspace);
+      const effectiveTags      = WORKSPACE_TAGS[effectiveWorkspace] ?? WORKSPACE_TAGS.strategy;
 
       // 3. Build LIKE conditions
       const tagLikes      = effectiveTags.map(t => `tags LIKE '%${escapeLike(t)}%'`).join(" OR ");

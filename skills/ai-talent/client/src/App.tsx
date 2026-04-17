@@ -9,6 +9,7 @@ import ChatCore from "./components/ChatCore";
 import { Navigate, Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { trpc } from "./lib/trpc";
 import type { DBSquad } from "./types/squad";
+import { LanguageProvider } from "./lib/i18n";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem("authToken");
@@ -104,26 +105,28 @@ function IndexPage() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/onboarding" element={<RequireAuth><OnboardingWizard onComplete={() => window.location.href = "/"} /></RequireAuth>} />
-      <Route
-        path="/m/:missionId"
-        element={
-          <RequireAuth>
-            <MissionPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/"
-        element={
-          <RequireAuth>
-            <IndexPage />
-          </RequireAuth>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <LanguageProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<RequireAuth><OnboardingWizard onComplete={() => window.location.href = "/"} /></RequireAuth>} />
+        <Route
+          path="/m/:missionId"
+          element={
+            <RequireAuth>
+              <MissionPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <IndexPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </LanguageProvider>
   );
 }

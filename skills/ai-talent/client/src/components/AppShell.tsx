@@ -7,6 +7,7 @@ import React, { useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import { MissionModal } from "./MissionModal";
 import type { DBSquad } from '../types/squad';
+import { useLang } from "../lib/i18n";
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -187,6 +188,7 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   onTabChange: (t: string) => void;
   notifCount: number;
 }) {
+  const { t } = useLang();
   const railStyle: React.CSSProperties = {
     width: 48, minWidth: 48,
     background: "#F2F1EF",
@@ -219,10 +221,10 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   };
 
   const tabs = [
-    { id: "tasks",        icon: <IconTasks />,        badge: false, label: "任務" },
-    { id: "chat",         icon: <IconChat />,         badge: false, label: "對話" },
-    { id: "outputs",      icon: <IconPackage />,      badge: false, label: "產出" },
-    { id: "settings",     icon: <IconSettings />,     badge: false, label: "設定" },
+    { id: "tasks",        icon: <IconTasks />,        badge: false, label: t("tab_tasks") },
+    { id: "chat",         icon: <IconChat />,         badge: false, label: t("tab_chat") },
+    { id: "outputs",      icon: <IconPackage />,      badge: false, label: t("tab_outputs") },
+    { id: "settings",     icon: <IconSettings />,     badge: false, label: t("tab_settings") },
   ];
 
   return (
@@ -360,6 +362,7 @@ function WorkspaceMissions({
   onMissionSelect?: (missionId: number) => void;
   onNewTask?: (wsKey: string) => void;
 }) {
+  const { t } = useLang();
   const { data: missions, isLoading, refetch: refetchMissions } = trpc.mission.list.useQuery(
     { workspace: wsKey, brandId: brandId ?? undefined },
     { enabled: !!brandId, refetchOnWindowFocus: false }
@@ -372,7 +375,7 @@ function WorkspaceMissions({
   return (
     <div style={{ paddingLeft: 10, borderLeft: "1px solid #DEDDDA", margin: "2px 5px 2px 17px" }}>
       {isLoading && (
-        <div style={{ padding: "3px 6px", fontSize: 10, color: "#C8C7C3" }}>載入中…</div>
+        <div style={{ padding: "3px 6px", fontSize: 10, color: "#C8C7C3" }}>{t("loading")}</div>
       )}
       {(missions ?? []).map((mission: any) => (
         <div
@@ -404,7 +407,7 @@ function WorkspaceMissions({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm("刪除此任務？")) {
+              if (window.confirm(t("confirm_delete_mission"))) {
                 deleteMission.mutate({ id: mission.id });
               }
             }}
@@ -416,7 +419,7 @@ function WorkspaceMissions({
               transition: "opacity 0.1s",
               flexShrink: 0,
             }}
-            title="刪除任務"
+            title={t("delete_mission_btn")}
           >×</button>
         </div>
       ))}
@@ -440,6 +443,7 @@ function RecentMissions({
   onNewImpromptu?: () => void;
   workspaces: any[];
 }) {
+  const { t } = useLang();
   const queryResult = (trpc as any).mission?.listUncategorized?.useQuery
     ? (trpc as any).mission.listUncategorized.useQuery(
         { brandId: brandId ?? undefined },
@@ -468,10 +472,10 @@ function RecentMissions({
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 10, fontWeight: 600, color: '#B0AFA9', textTransform: 'uppercase' as const, letterSpacing: '0.07em', padding: '8px 13px 3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8 }}>
-        <span>即興任務</span>
+        <span>{t("section_impromptu")}</span>
         <button
           onClick={onNewImpromptu}
-          title="開始即興任務"
+          title={t("start_impromptu")}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9B9990', display: 'flex', alignItems: 'center', padding: '1px 3px', borderRadius: 4 }}
         >
           <IconCompose />
@@ -482,7 +486,7 @@ function RecentMissions({
           onClick={onNewImpromptu}
           style={{ padding: '4px 13px 8px', fontSize: 11, color: '#E8631A', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 500 }}
         >
-          <IconCompose /> 開始即興任務
+          <IconCompose /> {t("start_impromptu")}
         </div>
       )}
       {missionList.map((m: any) => (
@@ -685,6 +689,7 @@ function Drawer({
   };
 
   // 拖曳移動：即興任務 → 工作區
+  const { t } = useLang();
   const [dragOverWs, setDragOverWs] = useState<string | null>(null);
   const moveMission = (trpc as any).mission?.move?.useMutation
     ? (trpc as any).mission.move.useMutation({
@@ -700,7 +705,7 @@ function Drawer({
       {/* Brand Switcher Header */}
       <div style={{ padding: "13px 10px 8px", position: "relative" }}>
         {brandsLoading ? (
-          <div style={{ padding: "5px 8px", fontSize: 11, color: "#9B9990" }}>載入品牌中…</div>
+          <div style={{ padding: "5px 8px", fontSize: 11, color: "#9B9990" }}>{t("loading_brands")}</div>
         ) : brandList.length === 0 ? (
           <button
             onClick={() => { window.location.href = "/onboarding"; }}
@@ -711,7 +716,7 @@ function Drawer({
               display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
             }}
           >
-            <IconPlus /> 建立品牌
+            <IconPlus /> {t("create_brand")}
           </button>
         ) : (
           <div style={{ position: "relative" }}>
@@ -731,7 +736,7 @@ function Drawer({
                 {(selectedBrand?.name ?? "?").charAt(0).toUpperCase()}
               </div>
               <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A18", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {selectedBrand?.name ?? "選擇品牌"}
+                {selectedBrand?.name ?? t("select_brand")}
               </span>
               <span style={{ color: "#9B9990", display: "flex", alignItems: "center" }}>
                 <IconChevronDown />
@@ -790,7 +795,7 @@ function Drawer({
                   onClick={() => { window.location.href = "/onboarding"; setBrandDropdownOpen(false); }}
                   style={{ padding: "8px 12px", cursor: "pointer", fontSize: 11, color: "#9B9990", borderTop: "1px solid #F2F1EF", display: "flex", alignItems: "center", gap: 5 }}
                 >
-                  <IconPlus /> 建立新品牌
+                  <IconPlus /> {t("create_new_brand")}
                 </div>
               </div>
             )}
@@ -813,10 +818,10 @@ function Drawer({
 
         {/* Workspaces header row */}
         <div style={{ ...secLabel, display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 8 }}>
-          <span>工作區</span>
+          <span>{t("section_workspace")}</span>
           <button
             onClick={onNewWorkspace}
-            title="新增工作區"
+            title={t("add_workspace")}
             style={{ background: "none", border: "none", cursor: "pointer", color: "#9B9990", display: "flex", alignItems: "center", padding: "1px 3px", borderRadius: 4 }}
           >
             <IconFolder />
@@ -824,7 +829,7 @@ function Drawer({
         </div>
 
         {wsLoading && (
-          <div style={{ padding: "5px 13px", fontSize: 11, color: "#9B9990" }}>載入中…</div>
+          <div style={{ padding: "5px 13px", fontSize: 11, color: "#9B9990" }}>{t("loading")}</div>
         )}
 
         {wsList.map((ws: any) => {
@@ -880,7 +885,7 @@ function Drawer({
         {/* Fallback if no workspaces loaded yet */}
         {!wsLoading && wsList.length === 0 && (
           <div style={{ padding: "5px 13px", fontSize: 11, color: "#C8C7C3" }}>
-            暫無工作區
+            {t("no_workspaces")}
           </div>
         )}
 
@@ -896,7 +901,7 @@ function Drawer({
             }}
           >
             <IconCompose />
-            新任務
+            {t("new_mission")}
           </button>
         </div>
 
@@ -905,9 +910,9 @@ function Drawer({
       {/* 可用資源 — 固定在 drawer 底部 */}
       <div style={{ borderTop: "1px solid #E4E3E1", flexShrink: 0 }}>
         <div style={{ ...secLabel, display: "flex", alignItems: "center", gap: 5, marginTop: 0 }}>
-          <span>可用資源</span>
+          <span>{t("section_resources")}</span>
           {isMissionPending && (
-            <span style={{ fontSize: 9, color: "#9B9990", fontWeight: 400, letterSpacing: 0 }}>⚙ 配對中…</span>
+            <span style={{ fontSize: 9, color: "#9B9990", fontWeight: 400, letterSpacing: 0 }}>⚙ {t("matching")}</span>
           )}
         </div>
         <div style={{ padding: "0 10px 6px" }}>

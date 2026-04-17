@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { trpc } from "../../lib/trpc";
 import type { DBSquad } from "../../types/squad";
+import { useLang } from "../../lib/i18n";
 
 interface MissionHomePageProps {
   workspace?:        string;
@@ -13,6 +14,7 @@ interface MissionHomePageProps {
 
 // ── Tiny resource badge shown below squad chips ───────────────────────────────
 function ResourceBanner({ missionId }: { missionId: number }) {
+  const { t } = useLang();
   const resourceQuery = trpc.resource.summaryByMission.useQuery(
     { missionId },
     {
@@ -49,7 +51,7 @@ function ResourceBanner({ missionId }: { missionId: number }) {
             />
           ))}
         </span>
-        <span>正在為此任務配對最佳 AI 代理人選…</span>
+        <span>{t("resource_matching")}</span>
         <style>{`
           @keyframes bounce {
             0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
@@ -66,9 +68,9 @@ function ResourceBanner({ missionId }: { missionId: number }) {
         display: "flex", gap: 6, marginTop: 18, flexWrap: "wrap", justifyContent: "center",
       }}>
         {[
-          { label: "Agents",    value: data.agents.toLocaleString() },
-          { label: "技能",      value: data.skills },
-          { label: "AI Models", value: data.providers },
+          { label: "Agents",          value: data.agents.toLocaleString() },
+          { label: t("label_skills"), value: data.skills },
+          { label: "AI Models",       value: data.providers },
         ].map(({ label, value }) => (
           <div
             key={label}
@@ -88,7 +90,7 @@ function ResourceBanner({ missionId }: { missionId: number }) {
           fontSize: 10, color: "#C8C7C3", alignSelf: "center",
         }}>
           <span>✓</span>
-          <span>語意配對完成</span>
+          <span>{t("resource_ready")}</span>
         </div>
       </div>
     );
@@ -107,11 +109,12 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
   onMissionSelect,
   onSquadPreview,
 }) => {
+  const { t } = useLang();
   const [inputValue, setInputValue]       = useState("");
   const [selectedSquad, setSelectedSquad] = useState<DBSquad | null>(null);
 
   const shortTitle = missionTitle ? missionTitle.slice(0, 10) : "";
-  const titleText  = `${shortTitle} 啟動任務`;
+  const titleText  = shortTitle ? `${shortTitle} · ${t("mission_start")}` : t("mission_start");
 
   // ── DB-driven squad chips ──────────────────────────────────────────────────
   const squadQuery = trpc.squad.getRecommendedSquads.useQuery(
@@ -158,7 +161,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
           {titleText}
         </div>
         <div style={{ fontSize: 13, color: "#9B9990" }}>
-          選擇執行方式，輸入任務需求
+          {t("mission_subtitle")}
         </div>
       </div>
 
@@ -178,7 +181,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="描述你的任務需求..."
+          placeholder={t("mission_placeholder")}
           rows={2}
           style={{
             width: "100%", border: "none", outline: "none",
@@ -200,7 +203,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
               fontFamily: "inherit",
             }}
           >
-            啟動任務 →
+            {t("mission_submit_btn")}
           </button>
         </div>
       </div>
@@ -260,7 +263,7 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
         <ResourceBanner missionId={missionId} />
       ) : (
         <div style={{ fontSize: 12, color: "#C8C7C3", marginTop: 18 }}>
-          建立任務後顯示推薦小隊
+          {t("mission_no_squad")}
         </div>
       )}
     </div>
