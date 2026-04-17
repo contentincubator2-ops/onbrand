@@ -1,0 +1,27 @@
+name: Squad Flow 自動化測試 (10輪)
+
+on:
+  workflow_dispatch:   # 手動觸發
+  schedule:
+    - cron: "0 2 * * *"  # 每天 UTC 02:00（台灣時間 10:00）自動跑
+
+jobs:
+  run-squad-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run squad flow test on VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os
+            echo "=== 拉最新代碼 ==="
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "=== 執行 10 輪 Squad Flow 測試 ==="
+            npm run test:squad --prefix skills/ai-talent 2>&1

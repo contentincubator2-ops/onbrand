@@ -10,6 +10,14 @@
  *   5. 品牌大腦（累積的品牌知識）
  *   6. 前步驟成果（本次 session 已完成的內容）
  *   7. 本步驟任務（具體要做什麼、輸出什麼）
+ *
+ * Prompt quality principles applied (2026-04):
+ *   - Hard identity lock: "這是你唯一的身份" prevents role drift
+ *   - Previous results framed as "參考文件" (documents), not conversation turns
+ *   - Every behavior guide starts with language + word-count hard constraints
+ *   - Forbidden opener lists address all observed failure-mode phrases
+ *   - Lead intake forces specialty-specific questions, not generic PM questions
+ *   - Specialist steps forced to open with ## Markdown heading to kill filler openers
  */
 
 // ── Workspace 描述 ────────────────────────────────────────────────────────────
@@ -78,9 +86,9 @@ export interface SquadPromptInput {
   missionTitle: string;
   squadName: string;
   squadMethodology: string;
-  agentRole: string;             // 在這個 squad 裡的角色
-  workflowStep: WorkflowStepDef; // 本步驟定義
-  stepIndex: number;             // 0 = lead intake, 1+ = workflow steps
+  agentRole: string;              // 在這個 squad 裡的角色
+  workflowStep: WorkflowStepDef;  // 本步驟定義
+  stepIndex: number;              // 0 = lead intake, 1+ = workflow steps
   totalSteps: number;
   previousResults: Record<number, string>; // 前步驟成果摘要
   brandBrain: Record<string, string[]>;    // 品牌大腦
@@ -98,13 +106,8 @@ export function buildSquadAgentPrompt(input: SquadPromptInput): string {
 
   const wsDesc = WORKSPACE_DESCRIPTIONS[workspace] ?? `${workspace} 工作區`;
 
-  // 1. 身份宣告
-  const identity = [
-    `你是 ${agent.name}，${agent.title}。`,
-    agent.specialty ? `你的專長：${agent.specialty}` : null,
-    `你目前加入「${squadName}」小組，擔任「${agentRole}」。`,
-    `小組採用的方法論：${squadMethodology}`,
-  ].filter(Boolean).join("\n");
+  // 1. 身份宣告（必須在 prompt 最頂部，含身份鎖定語）
+  const identity = buildIdentityBlock(agent, squadName, agentRole, squadMethodology);
 
   // 2. 工作區域
   const workspaceSection = `【工作區域】\n${wsDesc}`;
@@ -118,13 +121,13 @@ export function buildSquadAgentPrompt(input: SquadPromptInput): string {
   // 5. 品牌大腦
   const brainSection = buildBrainSection(brandBrain);
 
-  // 6. 前步驟成果
+  // 6. 前步驟成果（以「參考文件」格式呈現，防止 group chat 解讀）
   const prevSection = buildPreviousResultsSection(previousResults, totalSteps);
 
   // 7. 本步驟任務
   const stepSection = buildStepSection(workflowStep, stepIndex, totalSteps, isLead);
 
-  // 8. 行為指引
+  // 8. 行為指引（語言 + 字數上限 + 禁止語 + 步驟規則）
   const behaviorGuide = buildBehaviorGuide(isLead, stepIndex, totalSteps);
 
   const sections = [
@@ -143,18 +146,43 @@ export function buildSquadAgentPrompt(input: SquadPromptInput): string {
 
 // ── Section builders ─────────────────────────────────────────────────────────
 
+/**
+ * 身份宣告區塊
+ * 關鍵設計：
+ * - "這是你唯一的身份" 鎖定 persona，防止 role drift
+ * - specialty 標記為必須體現在每句輸出中的核心約束，而非事實描述
+ * - 明確禁止旁白者 / 群組總結者模式
+ */
+function buildIdentityBlock(
+  agent: AgentIdentity,
+  squadName: string,
+  agentRole: string,
+  squadMethodology: string,
+): string {
+  const lines = [
+    `你是 ${agent.name}，${agent.title}。這是你唯一的身份——在整個回應過程中不得切換、模糊或放棄此身份。`,
+    agent.specialty
+      ? `核心專長（你的每一句分析都必須從這個專業角度出發，不得說成通用行銷建議）：${agent.specialty}`
+      : null,
+    `你在「${squadName}」小組的角色：${agentRole}。`,
+    squadMethodology ? `小組方法論：${squadMethodology}` : null,
+    `嚴格禁止：不得以旁白者、協調者或「群組總結者」身份發言；不得在輸出中致謝、引用、或回應其他 Agent 的名字或輸出內容。`,
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
 function buildBrandSection(brand: BrandContext): string {
   if (!brand.name && !brand.description) return "";
   const lines = [
     "【品牌全貌】",
-    brand.name         ? `品牌名稱：${brand.name}` : null,
-    brand.industry     ? `產業：${brand.industry}` : null,
-    brand.description  ? `品牌描述：${brand.description}` : null,
+    brand.name           ? `品牌名稱：${brand.name}` : null,
+    brand.industry       ? `產業：${brand.industry}` : null,
+    brand.description    ? `品牌描述：${brand.description}` : null,
     brand.targetAudience ? `目標受眾：${brand.targetAudience}` : null,
-    brand.tagline      ? `品牌標語：${brand.tagline}` : null,
-    brand.brandVoice   ? `品牌聲音：${brand.brandVoice}` : null,
+    brand.tagline        ? `品牌標語：${brand.tagline}` : null,
+    brand.brandVoice     ? `品牌聲音：${brand.brandVoice}` : null,
     brand.positioningSummary ? `現有定位摘要：${brand.positioningSummary}` : null,
-    brand.website      ? `官網：${brand.website}` : null,
+    brand.website        ? `官網：${brand.website}` : null,
   ].filter(Boolean);
   return lines.join("\n");
 }
@@ -164,17 +192,17 @@ function buildBrainSection(brandBrain: Record<string, string[]>): string {
   if (categories.length === 0) return "";
 
   const CATEGORY_LABELS: Record<string, string> = {
-    positioning: "📍 定位",
-    audience:    "👥 目標受眾",
-    voice:       "🗣️  品牌聲音",
-    competitors: "⚔️  競品",
-    custom:      "📝 其他",
+    positioning: "定位",
+    audience:    "目標受眾",
+    voice:       "品牌聲音",
+    competitors: "競品",
+    custom:      "其他",
   };
 
   const lines = ["【品牌大腦（累積知識）】"];
   for (const cat of categories) {
     const label = CATEGORY_LABELS[cat] ?? cat;
-    const entries = (brandBrain[cat] ?? []).slice(0, 3); // 每類最多 3 條
+    const entries = (brandBrain[cat] ?? []).slice(0, 3);
     lines.push(`${label}：`);
     for (const e of entries) {
       lines.push(`  · ${e.slice(0, 200)}`);
@@ -183,6 +211,14 @@ function buildBrainSection(brandBrain: Record<string, string[]>): string {
   return lines.join("\n");
 }
 
+/**
+ * 前步驟成果區塊
+ * 關鍵設計：
+ * - 重命名為「參考文件」而非「前步驟成果」，防止模型將其解讀為群組對話
+ * - 每個條目用 --- 分隔線包裹，強化「文件」而非「訊息」的視覺語義
+ * - Header 明確指示：這些是閱讀材料，不是對話對象
+ * - 禁止以「根據以上」「根據 Group Chat Context」開頭的迴響行為
+ */
 function buildPreviousResultsSection(
   previousResults: Record<number, string>,
   totalSteps: number
@@ -193,15 +229,25 @@ function buildPreviousResultsSection(
 
   if (steps.length === 0) return "";
 
-  const lines = ["【本次任務前步驟成果】"];
+  const lines = [
+    "【參考文件：已完成步驟的書面記錄】",
+    "（以下是本 session 中其他 Agent 已產出的文件。這些是你的閱讀材料，不是對話對象。" +
+    "不得致謝、引用 Agent 名稱、或以「根據以上」「根據 Group Chat Context」「根據 Squad Lead」開頭。）",
+  ];
+
   for (const step of steps) {
     const summary = previousResults[step];
     if (summary) {
-      const label = step === 0 ? "Squad Lead 確認" : `Step ${step}`;
-      lines.push(`${label}：${summary.slice(0, 500)}`);
+      const label = step === 0
+        ? "文件 0：Squad Lead 需求確認"
+        : `文件 ${step}：Step ${step} 分析輸出`;
+      lines.push(`--- ${label} ---`);
+      lines.push(summary.slice(0, 500));
     }
   }
-  lines.push("（以上是已確認的分析基礎，請在此基礎上繼續深化）");
+
+  lines.push("--- 參考文件結束 ---");
+  lines.push("（以上文件僅供參考。你的任務是在此基礎上產出你這一步的【新內容】，不得重述已有結論。）");
   return lines.join("\n");
 }
 
@@ -211,53 +257,82 @@ function buildStepSection(
   totalSteps: number,
   isLead: boolean
 ): string {
-  const stepTitle = step.title ?? step.name ?? (isLead ? "任務確認" : `Step ${stepIndex}`);
-  const stepDesc  = step.description ?? "";
+  const stepTitle  = step.title ?? step.name ?? (isLead ? "任務確認" : `Step ${stepIndex}`);
+  const stepDesc   = step.description ?? "";
   const outputType = step.outputType ?? step.output ?? "";
-  const skills = step.requiredSkills?.join("、") ?? "";
+  const skills     = step.requiredSkills?.join("、") ?? "";
 
   const lines = [
     isLead
       ? "【你的任務：Squad Lead 開場確認】"
       : `【你的任務：Step ${stepIndex} / ${totalSteps} — ${stepTitle}】`,
-    stepDesc ? `任務說明：${stepDesc}` : null,
-    outputType ? `預期輸出：${outputType}` : null,
-    skills ? `需要的技能：${skills}` : null,
+    stepDesc   ? `任務說明：${stepDesc}` : null,
+    outputType ? `預期輸出格式：${outputType}` : null,
+    skills     ? `本步驟必要技能：${skills}` : null,
   ].filter(Boolean);
 
   return lines.join("\n");
 }
 
+/**
+ * 行為指引區塊
+ * 關鍵設計：
+ * - 語言約束永遠是第一條（硬性規定）
+ * - 字數上限緊接語言約束
+ * - 禁止開頭語列表針對所有已觀察到的 failure mode 短語
+ * - Lead 開場：強制問具體問題，不得問泛問題，結尾固定語
+ * - 執行步驟：強制第一字符為 ## 標題，從根源殺死 filler openers
+ * - 最終步驟：有完整輸出結構骨架
+ */
 function buildBehaviorGuide(isLead: boolean, stepIndex: number, totalSteps: number): string {
   if (isLead) {
     return [
-      "【執行指引】",
-      "1. 用 2-3 句確認你已掌握的品牌資料",
-      "2. 說明本次任務的小組執行流程（共幾步）",
-      "3. 提出 2-3 個關鍵確認問題，幫助你了解用戶的核心目標",
-      "4. 語氣：專業但親近，像一位資深顧問在啟動項目",
-      "5. 不超過 250 字，結尾只問問題，等待用戶回答",
+      "【執行指引 — Squad Lead 開場】",
+      "語言：繁體中文（硬性規定，不得使用簡體中文或英文）。",
+      "字數上限：200 字（含標點）。超過即截止，不得加附錄。",
+      "禁止開頭語：不得以「作為您的 Squad Lead」「很高興為您服務」「好的，我來」「根據您提供的資料」「我已了解您的需求」開頭。",
+      "執行順序（嚴格依照）：",
+      "  1. 用 1 句話說明你是誰、你的小組在【哪個具體專業領域】的能力（必須使用你的 specialty，不得說成通用的「行銷顧問」或「AI 助手」）。",
+      "  2. 指出品牌資料中【缺失或模糊】的 1-2 個關鍵欄位；若資料完整，改為點出最需深化的 1 個面向。",
+      "  3. 用一行說明：本次任務共幾步，大致由哪類專家負責（不需列出每一步細節）。",
+      "  4. 提出恰好 2 個確認問題。問題必須具體、針對你的專業領域，不得是「有什麼想說的嗎？」「有沒有其他補充？」等開放泛問。",
+      "  5. 最後一句固定為：「請告訴我以上兩個問題的答案，我們就立即開始。」然後停止，等待用戶回應。",
     ].join("\n");
   }
 
   const isLastStep = stepIndex >= totalSteps;
   if (isLastStep) {
     return [
-      "【執行指引】",
-      "1. 整合所有前步驟成果，輸出最終完整分析",
-      "2. 格式：清晰的 Markdown，有標題、子標題、要點",
-      "3. 結尾提供 3 個用戶可以採取的下一步行動",
-      "4. 語氣：專業、精煉、有說服力",
+      "【執行指引 — 最終輸出步驟】",
+      "語言：繁體中文（硬性規定）。",
+      "字數上限：900 字。不得有冗長前言、致謝語或「補充說明」附錄。",
+      "禁止開頭語：不得以「好的」「根據以上所有分析」「綜合各步驟」「作為最終總結者」「根據 Group Chat Context」開頭。",
+      "輸出結構（固定骨架，按順序輸出）：",
+      "  # [報告標題：品牌名稱 + 任務名稱]",
+      "  ## 執行摘要（50 字以內，核心定位一句話）",
+      "  ## [每個前步驟一個區塊，用你自己的語言陳述核心結論，不得逐字複製前步驟文件，每區塊加入至少 1 個新洞察]",
+      "  ## 下一步行動",
+      "  1. [立即可執行，具體動作，含負責人或部門]",
+      "  2. [30 天內，具體動作]",
+      "  3. [長期（3 個月以上），具體動作]",
+      "  （下一步行動區塊結束後停止，不得有其他補充）",
     ].join("\n");
   }
 
   return [
-    "【執行指引】",
-    "1. 直接執行你負責的這一步，不要問「是否開始」",
-    "2. 輸出結構化的分析結果，使用 Markdown 格式",
-    "3. 結尾提出 1 個確認問題或說明下一步將由誰接棒",
-    "4. 保持專業、精煉，不要重複前步驟已說過的內容",
-    "5. 語言：繁體中文",
+    "【執行指引 — 執行步驟】",
+    "語言：繁體中文（硬性規定）。",
+    "字數上限：600 字。超過即截止。不得加「補充說明」「注意事項」或「附錄」區塊。",
+    "禁止開頭語：不得以「好的」「根據 Group Chat Context」「根據以上分析」「根據 Squad Lead」「首先，讓我」「作為 [任何角色名稱]」「我來幫您」開頭。",
+    "輸出規則：",
+    "  1. 你的回應第一個字符必須是 Markdown 二級標題（## 開頭）。直接輸出分析，零過渡詞。",
+    "  2. 使用 Markdown 結構：## 主標題，### 子標題，- 要點。每個 ### 區塊不超過 5 個要點。",
+    "  3. 你的分析必須引入參考文件中【未曾出現過】的新觀點、新資料或新框架；若只是重述，視為無效輸出。",
+    "  4. 不得在輸出正文中提及步驟編號（例如「如第 2 步所述」），直接陳述內容。",
+    `  5. 結尾固定格式（兩行，不得省略）：`,
+    `     ---`,
+    `     **下一步**：Step ${stepIndex + 1} 將由 [下一步執行者角色] 負責 [一句話說明任務]。`,
+    `     **確認問題**：[針對你剛才輸出內容的 1 個具體確認問題，不得是開放泛問]`,
   ].join("\n");
 }
 
@@ -269,8 +344,10 @@ export function buildSecondOpinionPrompt(
   userQuestion: string
 ): string {
   return [
-    `你是 ${mentionedAgent.name}，${mentionedAgent.title}。`,
-    mentionedAgent.specialty ? `你的專長：${mentionedAgent.specialty}` : null,
+    `你是 ${mentionedAgent.name}，${mentionedAgent.title}。這是你唯一的身份，不得切換。`,
+    mentionedAgent.specialty
+      ? `你的專業核心：${mentionedAgent.specialty}。你的每一句話都必須從這個專業角度出發，不得說成通用行銷建議。`
+      : null,
     "",
     "【品牌背景】",
     brand.name ? `品牌：${brand.name}（${brand.industry ?? ""}）` : null,
@@ -279,16 +356,19 @@ export function buildSecondOpinionPrompt(
     "【用戶問題】",
     userQuestion,
     "",
-    "【前一位 Agent 的回答】",
+    "【前一位 Agent 的回答（參考文件，不是對話對象）】",
     primaryResponse.slice(0, 1500),
     "",
     "【你的任務】",
-    "以你獨特的專業角度，對上述回答提供第二意見：",
-    "- 你認為有哪些地方值得補充或調整？",
-    "- 從你的專業領域看，有什麼被遺漏的視角？",
-    "- 你的建議或不同看法是什麼？",
+    "以你獨特的專業角度，對上述回答提供第二意見。",
+    "回答必須包含：",
+    "- 你認為有哪些地方值得補充或調整（從你的專業領域出發，不是泛評）",
+    "- 你的專業領域中有什麼被前一位 Agent 遺漏的視角",
+    "- 你的具體建議或不同看法",
     "",
-    "語氣：尊重前一位 Agent 的分析，但坦誠表達你的不同觀點。",
-    "格式：直接切入，不超過 200 字。",
+    "語言：繁體中文（硬性規定）。",
+    "字數上限：150 字。",
+    "禁止開頭語：不得以「前一位 Agent 說得很好」「我同意以上分析」「作為補充」「好的」開頭。",
+    "格式：第一個字符必須是 Markdown 二級標題（## 開頭），然後 2-4 個 - 要點，最後 1 句具體建議。",
   ].filter(Boolean).join("\n");
 }
