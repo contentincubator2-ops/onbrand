@@ -1,0 +1,46 @@
+name: Admin — Inspect Existing squads Table
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+
+            echo "=== 1. All tables with 'squad' in name ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SHOW TABLES LIKE '%squad%';
+            " 2>&1
+
+            echo ""
+            echo "=== 2. Existing squads table schema ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              DESCRIBE squads;
+            " 2>&1
+
+            echo ""
+            echo "=== 3. squads row count + sample ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT COUNT(*) as row_count FROM squads;
+            " 2>&1
+
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT * FROM squads LIMIT 2\G
+            " 2>&1 | head -30
+
+            echo ""
+            echo "=== 4. squad_members if exists ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT COUNT(*) as sm_count FROM squad_members;
+            " 2>&1 || echo "(no squad_members table)"
