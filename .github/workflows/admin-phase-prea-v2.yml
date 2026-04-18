@@ -1,0 +1,117 @@
+name: Admin — Phase PreA v2 (mysqldump)
+
+# Phase PreA simplified with mysqldump (no Node.js, no npm install)
+# Much faster: expected 1-3 minutes total
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (only show counts, no migration)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  phase-prea-mysqldump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Phase PreA on mos_vm (mysqldump)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            echo "🚀 Phase PreA v2: mysqldump Migration"
+            echo "Dry run: ${{ github.event.inputs.dry_run }}"
+            echo ""
+
+            # Database credentials (from .env on VM)
+            SOWORK_HOST="ytcreator-ai-server.mysql.database.azure.com"
+            SOWORK_USER="lahbqgrqit"
+            SOWORK_PASS="SoWork2026db"
+            SOWORK_DB="sowork_db"
+
+            MOS_HOST="localhost"
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+
+            TABLES="agent_squads agents missions"
+
+            echo "=== Step 1: Count rows in both databases ==="
+            for table in $TABLES; do
+              echo ""
+              echo "Table: $table"
+
+              # Try to count sowork_db
+              sowork_count=$(mysql -h "$SOWORK_HOST" -u "$SOWORK_USER" -p"$SOWORK_PASS" --ssl-mode=REQUIRED "$SOWORK_DB" -se "SELECT COUNT(*) FROM $table" 2>/dev/null || echo "ERROR")
+              echo "  sowork_db.$table: $sowork_count rows"
+
+              # Count mos_db
+              mos_count=$(mysql -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -se "SELECT COUNT(*) FROM $table" 2>/dev/null || echo "ERROR")
+              echo "  mos_db.$table:    $mos_count rows"
+
+              if [ "$sowork_count" != "ERROR" ] && [ "$mos_count" != "ERROR" ]; then
+                diff=$((sowork_count - mos_count))
+                echo "  差異: $diff"
+              fi
+            done
+
+            echo ""
+            echo "=== Step 2: Check data integrity (mos_db) ==="
+            mysql -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT 'Duplicate slugs' as Check_Type, COUNT(*) as Count
+              FROM (SELECT slug FROM agent_squads WHERE is_active=1 GROUP BY slug HAVING COUNT(*)>1) as x
+              UNION ALL
+              SELECT 'Empty agents',
+                COUNT(*) FROM agent_squads WHERE is_active=1 AND (agents='[]' OR agents IS NULL);
+            " 2>&1 || echo "⚠️ Integrity check failed"
+
+            echo ""
+
+            if [ "${{ github.event.inputs.dry_run }}" = "false" ]; then
+              echo "=== Step 3: Execute mysqldump migration ==="
+
+              mkdir -p /tmp/phase-prea
+              cd /tmp/phase-prea
+
+              # Backup current mos_db (safety)
+              echo "📦 Backing up mos_db..."
+              mysqldump -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" agent_squads agents missions > mos_backup_$(date +%Y%m%d_%H%M%S).sql
+              echo "✅ Backup saved"
+
+              # Export each table individually for better control
+              for table in $TABLES; do
+                echo ""
+                echo "📤 Exporting $table from sowork_db..."
+                mysqldump -h "$SOWORK_HOST" -u "$SOWORK_USER" -p"$SOWORK_PASS" --ssl-mode=REQUIRED \
+                  --no-create-info --insert-ignore --skip-triggers \
+                  "$SOWORK_DB" "$table" > "sowork_${table}.sql" 2>&1 | head -5 || echo "⚠️ Export issue"
+
+                size=$(du -h "sowork_${table}.sql" | cut -f1)
+                echo "  Export size: $size"
+
+                echo "📥 Importing $table to mos_db..."
+                mysql -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" < "sowork_${table}.sql"
+                echo "  ✅ Imported"
+              done
+
+              echo ""
+              echo "=== Step 4: Verify migration ==="
+              for table in $TABLES; do
+                mos_count=$(mysql -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -se "SELECT COUNT(*) FROM $table")
+                echo "$table: $mos_count rows (post-migration)"
+              done
+
+              # Cleanup temporary files (keep backup)
+              rm -f sowork_*.sql
+
+              echo ""
+              echo "✅ Phase PreA Migration Complete"
+            else
+              echo "⏸️  Dry run only. Re-run with dry_run=false to execute migration."
+            fi
