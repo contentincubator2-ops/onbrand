@@ -1,0 +1,57 @@
+name: Admin — Check Dunford Steps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query Dunford workflow steps
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+
+            echo "=== 1. Dunford squad row ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, slug, missionType, LEFT(methodology, 50) as method
+              FROM agent_squads
+              WHERE slug LIKE '%dunford%' OR name LIKE '%Dunford%'
+              LIMIT 5;
+            " 2>&1
+
+            echo ""
+            echo "=== 2. Dunford workflow_templates ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT taskType, name, JSON_LENGTH(steps) as step_count
+              FROM squad_workflow_templates
+              WHERE taskType LIKE '%dunford%' OR name LIKE '%Dunford%'
+              LIMIT 5;
+            " 2>&1
+
+            echo ""
+            echo "=== 3. Dunford steps content (truncated) ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT taskType, LEFT(steps, 800) as steps_preview
+              FROM squad_workflow_templates
+              WHERE taskType LIKE '%dunford%'
+              LIMIT 1\G
+            " 2>&1
+
+            echo ""
+            echo "=== 4. Step count distribution across ALL squads ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT JSON_LENGTH(steps) as step_count, COUNT(*) as squads
+              FROM squad_workflow_templates
+              WHERE isActive=1
+              GROUP BY JSON_LENGTH(steps)
+              ORDER BY step_count;
+            " 2>&1
