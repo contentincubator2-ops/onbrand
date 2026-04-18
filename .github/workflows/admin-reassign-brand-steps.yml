@@ -44,7 +44,7 @@ jobs:
                 LEFT(COALESCE(specialty,'—'), 100) AS specialty_preview,
                 skills
               FROM agents
-              WHERE is_active = 1
+              WHERE isAvailable = 1
               ORDER BY FIELD(layer,'strategy','execution','training'), id;
             " 2>&1
 
