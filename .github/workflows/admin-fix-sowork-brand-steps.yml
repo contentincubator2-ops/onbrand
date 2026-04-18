@@ -1,0 +1,119 @@
+name: Admin — Fix sowork-brand-positioning Steps
+
+# sowork-brand-positioning has 11 null step objects.
+# This workflow rewrites it with a proper 6-step brand positioning flow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type FIX to rewrite sowork-brand-positioning steps'
+        required: true
+        type: string
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'FIX'
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+
+            echo "=== 1. Check current sowork-brand-positioning steps ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT slug, JSON_LENGTH(steps) as step_count,
+                LEFT(steps, 100) as steps_preview
+              FROM squads WHERE slug = 'sowork-brand-positioning';
+            " 2>&1
+
+            echo ""
+            echo "=== 2. Rewrite with proper 6-step SoWork brand positioning flow ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              UPDATE squads SET steps = JSON_ARRAY(
+                JSON_OBJECT(
+                  'order', 1,
+                  'name', 'SoWork AI 品牌現況盤點',
+                  'description', '深入分析 SoWork AI 現有品牌認知、競爭對手定位、用戶心智佔有率，建立定位基準線。',
+                  'outputType', 'brand_audit',
+                  'requiredSkills', JSON_ARRAY('brand-strategy', 'competitive-analysis', 'market-research'),
+                  'assignedAgentId', 90052,
+                  'assignedAgentSlug', 'ai-head-of-brand-insights-kantar',
+                  'assignedAgentName', '[AI] Head of Brand Insights'
+                ),
+                JSON_OBJECT(
+                  'order', 2,
+                  'name', '目標客群深度定義',
+                  'description', '鎖定 SoWork AI 最佳契合客群（1-50 人行銷團隊的品牌行銷主管），建立精準 ICP Profile 與使用場景。',
+                  'outputType', 'icp_profile',
+                  'requiredSkills', JSON_ARRAY('segmentation', 'customer-research', 'consumer-insights', 'icp'),
+                  'assignedAgentId', 30003,
+                  'assignedAgentSlug', 'david-data',
+                  'assignedAgentName', '王志豪'
+                ),
+                JSON_OBJECT(
+                  'order', 3,
+                  'name', '差異化定位建立',
+                  'description', '運用 April Dunford 方法論：找出 SoWork AI 的獨特屬性，建立「For 台灣中小企業 / Who 需要 AI 執行力 / Unlike 傳統工具」定位聲明。',
+                  'outputType', 'positioning_statement',
+                  'requiredSkills', JSON_ARRAY('positioning', 'brand-strategy', 'differentiation'),
+                  'assignedAgentId', 30002,
+                  'assignedAgentSlug', 'sarah-brand',
+                  'assignedAgentName', '劉品妤'
+                ),
+                JSON_OBJECT(
+                  'order', 4,
+                  'name', '核心訊息框架設計',
+                  'description', '制定 SoWork AI 品牌核心訊息架構：品牌承諾、情感連結點、功能差異化訊息、銷售賦能話語。',
+                  'outputType', 'messaging_framework',
+                  'requiredSkills', JSON_ARRAY('messaging', 'copywriting', 'brand-voice', 'pmm'),
+                  'assignedAgentId', 29,
+                  'assignedAgentSlug', 'pm-pr-saas',
+                  'assignedAgentName', '蘇雅玲'
+                ),
+                JSON_OBJECT(
+                  'order', 5,
+                  'name', '視覺識別與品牌敘事',
+                  'description', '建立 SoWork AI 視覺語言規範（色彩、字型、圖像風格）與品牌故事敘事框架，確保跨渠道一致性。',
+                  'outputType', 'brand_identity_guide',
+                  'requiredSkills', JSON_ARRAY('brand-purpose', 'brand-narrative', 'storytelling', 'content-strategy'),
+                  'assignedAgentId', 30002,
+                  'assignedAgentSlug', 'sarah-brand',
+                  'assignedAgentName', '劉品妤'
+                ),
+                JSON_OBJECT(
+                  'order', 6,
+                  'name', '品牌落地策略',
+                  'description', '制定 GTM 品牌落地計畫：官網更新、社群定調、Sales Deck 優化、媒體公關策略，確保品牌定位在所有接觸點落實。',
+                  'outputType', 'brand_gtm_plan',
+                  'requiredSkills', JSON_ARRAY('gtm', 'sales-enablement', 'b2b', 'product-marketing'),
+                  'assignedAgentId', 60001,
+                  'assignedAgentSlug', 'cmo-vivian-shen',
+                  'assignedAgentName', '沈奕蓁'
+                )
+              )
+              WHERE slug = 'sowork-brand-positioning';
+            " 2>&1
+
+            echo ""
+            echo "=== 3. Verify ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT
+                JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.order'))             AS step_no,
+                JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.name'))              AS step_name,
+                JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.assignedAgentSlug')) AS agent
+              FROM squads s,
+                JSON_TABLE(s.steps, '\$[*]' COLUMNS (step_val JSON PATH '\$')) AS jt
+              WHERE s.slug = 'sowork-brand-positioning';
+            " 2>&1
+
+            echo ""
+            echo "✅ sowork-brand-positioning steps fixed"
