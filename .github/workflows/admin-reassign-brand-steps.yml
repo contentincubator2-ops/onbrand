@@ -1,7 +1,11 @@
 name: Admin — Audit & Reassign Brand Squad Steps
 
 # Phase H: Brand-type squads step-agent skills audit and reassignment
-# Mode: type AUDIT to view report, APPLY to reassign agents
+# Audit reveals real requiredSkills: positioning, brand-strategy, market-research,
+# competitive-analysis, copywriting, brand-voice, messaging, pmm, gtm, etc.
+#
+# Mode: type AUDIT to view agents + current assignments
+#       type APPLY to reassign steps to best-match agents
 
 on:
   workflow_dispatch:
@@ -33,23 +37,7 @@ jobs:
             echo "======================================================"
 
             echo ""
-            echo "=== 1. All Active Agents + Specialty/Skills (strategy layer first) ==="
-            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              SELECT
-                id,
-                slug,
-                name,
-                title,
-                layer,
-                LEFT(COALESCE(specialty,'—'), 100) AS specialty_preview,
-                skills
-              FROM agents
-              WHERE isAvailable = 1
-              ORDER BY FIELD(layer,'strategy','execution','training'), id;
-            " 2>&1
-
-            echo ""
-            echo "=== 2. Brand Squads — Current Step Agent Assignments ==="
+            echo "=== 1. Brand Squads — Current Step Assignments ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT
                 s.slug AS squad_slug,
@@ -67,7 +55,7 @@ jobs:
             " 2>&1
 
             echo ""
-            echo "=== 3. Required Skills Frequency in Brand Squads ==="
+            echo "=== 2. Required Skills Frequency ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT skill_val, COUNT(*) AS occurrences
               FROM squads s,
@@ -87,152 +75,115 @@ jobs:
             if [ "$MODE" = "apply" ]; then
               echo ""
               echo "======================================================"
-              echo "APPLY MODE: Reassigning brand squad steps to matched agents"
+              echo "APPLY MODE: Reassigning brand squad steps"
               echo "======================================================"
-
               echo ""
-              echo "--- Finding best-match agents by specialty ---"
-
-              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-                SELECT
-                  'brand-strategy' AS skill_key,
-                  id, slug, name, LEFT(specialty,80) AS specialty
-                FROM agents
-                WHERE is_active=1
-                  AND (specialty LIKE '%品牌策略%' OR specialty LIKE '%品牌定位%'
-                    OR specialty LIKE '%品牌顧問%' OR title LIKE '%品牌策略%')
-                ORDER BY (specialty LIKE '%品牌策略%') DESC, layer='strategy' DESC, rating DESC
-                LIMIT 1;
-
-                SELECT
-                  'market-research' AS skill_key,
-                  id, slug, name, LEFT(specialty,80) AS specialty
-                FROM agents
-                WHERE is_active=1
-                  AND (specialty LIKE '%市場研究%' OR specialty LIKE '%市場調查%'
-                    OR specialty LIKE '%消費者研究%' OR title LIKE '%市場研究%')
-                ORDER BY (specialty LIKE '%市場研究%') DESC, layer='strategy' DESC, rating DESC
-                LIMIT 1;
-
-                SELECT
-                  'copywriting' AS skill_key,
-                  id, slug, name, LEFT(specialty,80) AS specialty
-                FROM agents
-                WHERE is_active=1
-                  AND (specialty LIKE '%文案%' OR specialty LIKE '%Copywriting%'
-                    OR specialty LIKE '%品牌文字%' OR title LIKE '%文案%')
-                ORDER BY (specialty LIKE '%品牌文案%') DESC, (specialty LIKE '%文案%') DESC, rating DESC
-                LIMIT 1;
-
-                SELECT
-                  'content-marketing' AS skill_key,
-                  id, slug, name, LEFT(specialty,80) AS specialty
-                FROM agents
-                WHERE is_active=1
-                  AND (specialty LIKE '%內容行銷%' OR specialty LIKE '%社群行銷%'
-                    OR specialty LIKE '%內容策略%' OR title LIKE '%內容行銷%')
-                ORDER BY (specialty LIKE '%內容行銷%') DESC, layer='strategy' DESC, rating DESC
-                LIMIT 1;
-
-                SELECT
-                  'brand-identity' AS skill_key,
-                  id, slug, name, LEFT(specialty,80) AS specialty
-                FROM agents
-                WHERE is_active=1
-                  AND (specialty LIKE '%品牌識別%' OR specialty LIKE '%視覺設計%'
-                    OR specialty LIKE '%視覺識別%' OR title LIKE '%設計%')
-                ORDER BY (specialty LIKE '%品牌識別%') DESC, rating DESC
-                LIMIT 1;
-              " 2>&1
-
+              echo "Agent mapping:"
+              echo "  positioning / brand-strategy / brand-voice  → sarah-brand (30002 劉品妤)"
+              echo "  market-research / competitive-analysis        → ai-head-of-brand-insights-kantar (90052)"
+              echo "  copywriting / messaging / storytelling        → pm-pr-saas (29 蘇雅玲)"
+              echo "  pmm / gtm / sales-enablement / b2b            → cmo-vivian-shen (60001)"
+              echo "  content-strategy / brand-narrative            → david-hubspot (180005 David Lee)"
+              echo "  jtbd / customer-research / consumer-insights  → david-data (30003 王志豪)"
+              echo "  competitive-intelligence / competitive-anal   → ai-head-of-brand-insights-kantar (90052)"
               echo ""
-              echo "--- Applying reassignment to brand squad steps ---"
 
               mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
                 UPDATE squads sq
                 SET sq.steps = (
                   SELECT JSON_ARRAYAGG(
                     CASE
-                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-dna\"')
-                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"mbb-strategist\"')
+                      -- positioning / brand-strategy / brand-voice / messaging / brand-purpose
+                      -- → sarah-brand (30002 劉品妤) 品牌定位、品牌敘事、情感行銷
+                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"positioning\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-strategy\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-voice\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-purpose\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"emotional-branding\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-narrative\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-positioning\"')
                       THEN JSON_SET(jt.step_val,
-                        '\$.assignedAgentId',
-                          (SELECT id FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%品牌策略%' OR specialty LIKE '%品牌定位%' OR specialty LIKE '%品牌顧問%' OR title LIKE '%品牌策略%')
-                            ORDER BY (specialty LIKE '%品牌策略%') DESC, layer='strategy' DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentSlug',
-                          (SELECT slug FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%品牌策略%' OR specialty LIKE '%品牌定位%' OR specialty LIKE '%品牌顧問%' OR title LIKE '%品牌策略%')
-                            ORDER BY (specialty LIKE '%品牌策略%') DESC, layer='strategy' DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentName',
-                          (SELECT name FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%品牌策略%' OR specialty LIKE '%品牌定位%' OR specialty LIKE '%品牌顧問%' OR title LIKE '%品牌策略%')
-                            ORDER BY (specialty LIKE '%品牌策略%') DESC, layer='strategy' DESC, rating DESC LIMIT 1)
+                        '\$.assignedAgentId',   30002,
+                        '\$.assignedAgentSlug', 'sarah-brand',
+                        '\$.assignedAgentName', '劉品妤'
                       )
-                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"market-research-agent\"')
-                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"marketing-analytics\"')
+                      -- market-research / competitive-analysis / competitive-intelligence
+                      -- → ai-head-of-brand-insights-kantar (90052) Brand Strategy, Market Research, Competitive Analysis
+                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"market-research\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"competitive-analysis\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"competitive-intelligence\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"competitor-intelligence\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"competitor-analysis\"')
                       THEN JSON_SET(jt.step_val,
-                        '\$.assignedAgentId',
-                          (SELECT id FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%市場研究%' OR specialty LIKE '%市場調查%' OR specialty LIKE '%消費者研究%' OR title LIKE '%市場研究%')
-                            ORDER BY (specialty LIKE '%市場研究%') DESC, layer='strategy' DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentSlug',
-                          (SELECT slug FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%市場研究%' OR specialty LIKE '%市場調查%' OR specialty LIKE '%消費者研究%' OR title LIKE '%市場研究%')
-                            ORDER BY (specialty LIKE '%市場研究%') DESC, layer='strategy' DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentName',
-                          (SELECT name FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%市場研究%' OR specialty LIKE '%市場調查%' OR specialty LIKE '%消費者研究%' OR title LIKE '%市場研究%')
-                            ORDER BY (specialty LIKE '%市場研究%') DESC, layer='strategy' DESC, rating DESC LIMIT 1)
+                        '\$.assignedAgentId',   90052,
+                        '\$.assignedAgentSlug', 'ai-head-of-brand-insights-kantar',
+                        '\$.assignedAgentName', '[AI] Head of Brand Insights'
                       )
-                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"copywriting-pro\"')
-                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"hook-copywriter\"')
+                      -- copywriting / messaging / storytelling / conversion-copywriting
+                      -- → pm-pr-saas (29 蘇雅玲) 新聞稿、b2b、pmm
+                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"copywriting\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"messaging\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"storytelling\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"conversion-copywriting\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"thought-leadership\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-narrative\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"narrative\"')
                       THEN JSON_SET(jt.step_val,
-                        '\$.assignedAgentId',
-                          (SELECT id FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%文案%' OR specialty LIKE '%Copywriting%' OR specialty LIKE '%品牌文字%' OR title LIKE '%文案%')
-                            ORDER BY (specialty LIKE '%品牌文案%') DESC, (specialty LIKE '%文案%') DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentSlug',
-                          (SELECT slug FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%文案%' OR specialty LIKE '%Copywriting%' OR specialty LIKE '%品牌文字%' OR title LIKE '%文案%')
-                            ORDER BY (specialty LIKE '%品牌文案%') DESC, (specialty LIKE '%文案%') DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentName',
-                          (SELECT name FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%文案%' OR specialty LIKE '%Copywriting%' OR specialty LIKE '%品牌文字%' OR title LIKE '%文案%')
-                            ORDER BY (specialty LIKE '%品牌文案%') DESC, (specialty LIKE '%文案%') DESC, rating DESC LIMIT 1)
+                        '\$.assignedAgentId',   29,
+                        '\$.assignedAgentSlug', 'pm-pr-saas',
+                        '\$.assignedAgentName', '蘇雅玲'
                       )
-                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"content-marketing\"')
-                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"social-media-marketing\"')
+                      -- pmm / gtm / sales-enablement / b2b / product-marketing / battlecard / demand-gen
+                      -- → cmo-vivian-shen (60001) 全通路整合行銷策略, pmm, gtm, sales-enablement
+                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"pmm\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"gtm\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"go-to-market\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"sales-enablement\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"b2b\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"battlecard\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"demand-gen\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"sales-deck\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"product-marketing\"')
                       THEN JSON_SET(jt.step_val,
-                        '\$.assignedAgentId',
-                          (SELECT id FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%內容行銷%' OR specialty LIKE '%社群行銷%' OR specialty LIKE '%內容策略%' OR title LIKE '%內容行銷%')
-                            ORDER BY (specialty LIKE '%內容行銷%') DESC, layer='strategy' DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentSlug',
-                          (SELECT slug FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%內容行銷%' OR specialty LIKE '%社群行銷%' OR specialty LIKE '%內容策略%' OR title LIKE '%內容行銷%')
-                            ORDER BY (specialty LIKE '%內容行銷%') DESC, layer='strategy' DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentName',
-                          (SELECT name FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%內容行銷%' OR specialty LIKE '%社群行銷%' OR specialty LIKE '%內容策略%' OR title LIKE '%內容行銷%')
-                            ORDER BY (specialty LIKE '%內容行銷%') DESC, layer='strategy' DESC, rating DESC LIMIT 1)
+                        '\$.assignedAgentId',   60001,
+                        '\$.assignedAgentSlug', 'cmo-vivian-shen',
+                        '\$.assignedAgentName', '沈奕蓁'
                       )
-                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"brand-identity\"')
-                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"visual-content-creator\"')
+                      -- content-strategy / campaign-strategy / ad-strategy / media-planning / channel-strategy
+                      -- → david-hubspot (180005 David Lee) 內容策略規劃, 品牌故事敘述, 跨平台內容整合
+                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"content-strategy\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"campaign-strategy\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"ad-strategy\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"media-planning\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"channel-strategy\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"omnichannel\"')
                       THEN JSON_SET(jt.step_val,
-                        '\$.assignedAgentId',
-                          (SELECT id FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%品牌識別%' OR specialty LIKE '%視覺設計%' OR specialty LIKE '%視覺識別%' OR title LIKE '%設計%')
-                            ORDER BY (specialty LIKE '%品牌識別%') DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentSlug',
-                          (SELECT slug FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%品牌識別%' OR specialty LIKE '%視覺設計%' OR specialty LIKE '%視覺識別%' OR title LIKE '%設計%')
-                            ORDER BY (specialty LIKE '%品牌識別%') DESC, rating DESC LIMIT 1),
-                        '\$.assignedAgentName',
-                          (SELECT name FROM agents WHERE is_active=1
-                            AND (specialty LIKE '%品牌識別%' OR specialty LIKE '%視覺設計%' OR specialty LIKE '%視覺識別%' OR title LIKE '%設計%')
-                            ORDER BY (specialty LIKE '%品牌識別%') DESC, rating DESC LIMIT 1)
+                        '\$.assignedAgentId',   180005,
+                        '\$.assignedAgentSlug', 'david-hubspot',
+                        '\$.assignedAgentName', 'David Lee'
                       )
+                      -- jtbd / customer-research / consumer-insights / qualitative-research / quantitative-research
+                      -- segmentation / icp / persona / behavioral-analysis / user-research
+                      -- → david-data (30003 王志豪) analytics, consumer-insights, segmentation, research
+                      WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"jtbd\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"customer-research\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"consumer-insights\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"qualitative-research\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"quantitative-research\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"segmentation\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"icp\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"persona\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"behavioral-analysis\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"user-research\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"jobs-to-be-done\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"survey-analysis\"')
+                        OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'), '\"audience-analysis\"')
+                      THEN JSON_SET(jt.step_val,
+                        '\$.assignedAgentId',   30003,
+                        '\$.assignedAgentSlug', 'david-data',
+                        '\$.assignedAgentName', '王志豪'
+                      )
+                      -- Default: keep as-is
                       ELSE jt.step_val
                     END
                     ORDER BY CAST(JSON_EXTRACT(jt.step_val, '\$.order') AS UNSIGNED)
@@ -246,7 +197,7 @@ jobs:
               " 2>&1
 
               echo ""
-              echo "=== Verification: Updated brand squad step assignments ==="
+              echo "=== Verification: Updated Brand Squad Step Assignments ==="
               mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
                 SELECT
                   s.slug AS squad_slug,
@@ -266,5 +217,5 @@ jobs:
               echo "✅ Brand squad steps reassigned successfully"
             else
               echo ""
-              echo "✅ Audit complete. Review the report above, then run APPLY mode to reassign."
+              echo "✅ Audit complete. Run APPLY mode to reassign agents to correct roles."
             fi
