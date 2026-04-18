@@ -22,6 +22,7 @@ import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./miss
 import { PositioningBar } from "./mission-chat/PositioningBar";
 import { MarkdownRenderer } from "./mission-chat/MarkdownRenderer";
 import { BrandPositioningBook, parsePositioningData } from "./mission-chat/BrandPositioningBook";
+import DeliverableBlock, { type DeliverableItem } from "./mission-chat/DeliverableBlock";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -1790,6 +1791,29 @@ export default function MissionChatCore({
                 missionId={activeMissionId ?? undefined}
               />
             )}
+
+            {/* DeliverableBlock — Squad Lead 最終輸出成品卡（Canva 模式：任務有終點） */}
+            {msg.role === "assistant" && !msg.isStreaming && msg.isSquadLead && msg.content && msg.content.length > 50 && (() => {
+              const deliverableItems: DeliverableItem[] = [{
+                id: parseInt(msg.id.replace(/\D/g, "").slice(-8) || "1"),
+                title: msg.squadStepLabel ?? "任務成品",
+                content: msg.content,
+                outputType: "text",
+                deliverableLevel: 1,
+                deliverableTool: "none",
+                finalizedStatus: "draft",
+              }];
+              return (
+                <div style={{ marginTop: 8 }}>
+                  <DeliverableBlock
+                    items={deliverableItems}
+                    onCopy={(text) => {
+                      navigator.clipboard.writeText(text);
+                    }}
+                  />
+                </div>
+              );
+            })()}
 
             {/* Suggestion chips — only shown on final step or non-squad messages (auto-advance handles intermediate steps) */}
             {msg.suggestions && msg.suggestions.length > 0
