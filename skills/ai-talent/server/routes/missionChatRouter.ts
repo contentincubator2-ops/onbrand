@@ -1,6 +1,15 @@
 /**
- * chatRoute.ts — 統一對話入口（v3 with positioning state machine）
- * POST /api/chat
+ * missionChatRouter.ts — Mission Chat 統一入口（v4: squad-first routing）
+ * POST /api/chat (mounted at missionChatRouter)
+ *
+ * Renamed from chatRoute.ts / missionChatRouter (2026-04-19) to align with mission-centric
+ * architecture. All mission chat goes through this router regardless of workspace.
+ *
+ * Routing priority (unified across ALL workspaces):
+ *   1. Squad present (missions.squadSlug)  → tryExecuteSquadChat() reads squads.steps
+ *      → Squad Lead opens chat, step agents execute per squads.steps[].assignedAgentId
+ *   2. No squad + workspace=strategy       → legacy executePositioningStep (6-step hardcoded)
+ *   3. No squad + other workspace          → generic LLM chat
  *
  * 品牌定位 6 步驟流程（workspace=strategy）：
  * Step 1: PM recap + 問目標
@@ -34,7 +43,7 @@ import { getEmbedding, cosineSimilarity } from "../_core/embedding";
 import { getOrCreateSquadSession, saveStepAndAdvance, resetSquadSession } from "../_core/squadSessionManager";
 import { buildSquadAgentPrompt, buildSecondOpinionPrompt } from "../_core/agentPromptBuilder";
 
-export const chatRouter = Router();
+export const missionChatRouter = Router();
 
 const GATEWAY_HTTP = "http://localhost:18790";
 const GATEWAY_TOKEN = "mos-pm-claw-2026";
@@ -500,9 +509,9 @@ async function generateAndSendPPT(
         },
       ],
     });
-    console.log(`[chatRoute] PPT sent to ${PPT_EMAIL}`);
+    console.log(`[missionChatRouter] PPT sent to ${PPT_EMAIL}`);
   } catch (err: any) {
-    console.error("[chatRoute] PPT generation/send error:", err?.message);
+    console.error("[missionChatRouter] PPT generation/send error:", err?.message);
     throw err;
   }
 }
@@ -539,7 +548,7 @@ async function executePositioningStep(params: {
       } catch { stepResultsRaw = {}; }
     }
   } catch (e: any) {
-    console.error("[chatRoute] DB read error:", e?.message);
+    console.error("[missionChatRouter] DB read error:", e?.message);
   }
 
   // 如果沒有 session，建立一個
@@ -551,7 +560,7 @@ async function executePositioningStep(params: {
         [missionId, brandId, userId]
       );
     } catch (e: any) {
-      console.error("[chatRoute] DB insert error:", e?.message);
+      console.error("[missionChatRouter] DB insert error:", e?.message);
     }
     currentStep = 0;
   }
@@ -584,7 +593,7 @@ async function executePositioningStep(params: {
       [missionId, userId]
     );
   } catch (e: any) {
-    console.error("[chatRoute] DB update status error:", e?.message);
+    console.error("[missionChatRouter] DB update status error:", e?.message);
   }
 
   // 建立前步脈絡
@@ -626,7 +635,7 @@ async function executePositioningStep(params: {
       }
       if (fullContent.length >= 50) gatewayOk = true;
     } catch {
-      console.warn("[chatRoute] Gateway failed, falling back to LLM");
+      console.warn("[missionChatRouter] Gateway failed, falling back to LLM");
     }
 
     if (!gatewayOk) {
@@ -655,7 +664,7 @@ async function executePositioningStep(params: {
         [nextCurrentStep, newStatus, JSON.stringify(newResults), missionId, userId]
       );
     } catch (e: any) {
-      console.error("[chatRoute] DB save step error:", e?.message);
+      console.error("[missionChatRouter] DB save step error:", e?.message);
     }
   }
 
@@ -696,7 +705,7 @@ async function executePositioningStep(params: {
           });
         })
       );
-      console.log(`[chatRoute] Brand Brain auto-written for brandId=${brandId}`);
+      console.log(`[missionChatRouter] Brand Brain auto-written for brandId=${brandId}`);
     }
 
     try {
@@ -1151,7 +1160,7 @@ function safeJson(val: string | null | undefined): any[] {
 }
 
 // ── Main chat endpoint ────────────────────────────────────────────────────────
-chatRouter.post("/", async (req: Request, res: Response) => {
+missionChatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
@@ -1233,9 +1242,9 @@ chatRouter.post("/", async (req: Request, res: Response) => {
           ) as any[];
           resolvedMissionId = (insertResult as any).insertId;
           send("status", { message: `已自動建立任務 #${resolvedMissionId}` });
-          console.log(`[chatRoute] P3: auto-created missionId=${resolvedMissionId} for userId=${userId}`);
+          console.log(`[missionChatRouter] P3: auto-created missionId=${resolvedMissionId} for userId=${userId}`);
         } catch (e: any) {
-          console.error("[chatRoute] P3 auto-create mission error:", e?.message);
+          console.error("[missionChatRouter] P3 auto-create mission error:", e?.message);
           resolvedMissionId = 0;
         }
       }
@@ -1261,7 +1270,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
             enrichedBrandCtx.website = m.website ?? "";
           }
         } catch (e: any) {
-          console.error("[chatRoute] strategy brand fetch:", e?.message);
+          console.error("[missionChatRouter] strategy brand fetch:", e?.message);
         }
       }
 
@@ -1318,7 +1327,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
           enrichedBrandCtx.website = mb.website ?? "";
         }
       } catch (e: any) {
-        console.warn("[chatRoute] general brand fetch:", e?.message);
+        console.warn("[missionChatRouter] general brand fetch:", e?.message);
       }
     }
 
@@ -1356,7 +1365,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         agentCtxPrefix = agentCtx.systemPromptPrefix;
         agentDepthLabel = agentCtx.depthLabel;
       } catch (e: any) {
-        console.warn('[chatRoute] agentCtx error:', (e as any)?.message);
+        console.warn('[missionChatRouter] agentCtx error:', (e as any)?.message);
       }
     }
 
@@ -1397,7 +1406,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 });
 
 // ── Reset positioning session ────────────────────────────────────────────────
-chatRouter.post("/reset-positioning", async (req: Request, res: Response) => {
+missionChatRouter.post("/reset-positioning", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
@@ -1426,13 +1435,13 @@ chatRouter.post("/reset-positioning", async (req: Request, res: Response) => {
     }
     res.json({ ok: true, message: "定位展期已重置" });
   } catch (err: any) {
-    console.error("[chatRoute] reset-positioning error:", err?.message);
+    console.error("[missionChatRouter] reset-positioning error:", err?.message);
     res.status(500).json({ error: err?.message });
   }
 });
 
 // ── Reset squad session (called when user selects a new squad + sends first message) ──
-chatRouter.post("/reset-squad-session", async (req: Request, res: Response) => {
+missionChatRouter.post("/reset-squad-session", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { missionId } = req.body as { missionId?: number };
@@ -1441,13 +1450,13 @@ chatRouter.post("/reset-squad-session", async (req: Request, res: Response) => {
     await resetSquadSession(localPool as any, missionId);
     res.json({ ok: true });
   } catch (err: any) {
-    console.error("[chatRoute] reset-squad-session:", err?.message);
+    console.error("[missionChatRouter] reset-squad-session:", err?.message);
     res.status(500).json({ error: err?.message });
   }
 });
 
 // ── Save conversation ─────────────────────────────────────────────────────────
-chatRouter.post("/save", async (req: Request, res: Response) => {
+missionChatRouter.post("/save", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
@@ -1472,7 +1481,7 @@ chatRouter.post("/save", async (req: Request, res: Response) => {
 
 // ── Email squad results ────────────────────────────────────────────────────────
 // POST /api/chat/email-results  { recipientEmail, subject, content, missionId? }
-chatRouter.post("/email-results", async (req: Request, res: Response) => {
+missionChatRouter.post("/email-results", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
