@@ -1,0 +1,349 @@
+name: Admin — Audit & Reassign Brand Squad Steps
+
+# Phase H: 審核並重新指派 brand-type squads 中每個步驟的 agent
+# Mode:
+#   audit = 只看報告（agents 技能清單 + 當前指派狀況），不做任何修改
+#   apply = 根據 requiredSkills 匹配最佳 agent，更新 squads.steps
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'audit = 只看報告 | apply = 執行重新指派'
+        required: true
+        type: choice
+        options:
+          - audit
+          - apply
+
+jobs:
+  reassign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+            MODE="${{ github.event.inputs.mode }}"
+
+            echo "======================================================"
+            echo "Mode: $MODE"
+            echo "======================================================"
+
+            # ─── PHASE 1: 所有 agents 技能清單（audit + apply 都跑）────
+            echo ""
+            echo "=== 1. 所有活躍 Agents 與技能（strategy layer 優先）==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT
+                id,
+                slug,
+                name,
+                title,
+                layer,
+                LEFT(COALESCE(specialty,'—'), 100) AS specialty_preview,
+                skills
+              FROM agents
+              WHERE is_active = 1
+              ORDER BY
+                FIELD(layer,'strategy','execution','training'),
+                id;
+            " 2>&1
+
+            # ─── PHASE 2: brand squads 步驟當前指派狀況 ────────────────
+            echo ""
+            echo "=== 2. Brand Squads — 每步驟當前 agent 指派 vs requiredSkills ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT
+                s.slug AS squad_slug,
+                JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.order'))           AS step_no,
+                LEFT(JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.name')), 30)  AS step_name,
+                JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.assignedAgentSlug')) AS current_agent,
+                JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'))   AS required_skills
+              FROM squads s,
+                JSON_TABLE(s.steps, '\$[*]' COLUMNS (step_val JSON PATH '\$')) AS jt
+              WHERE s.workspace LIKE '%brand%'
+                AND s.is_active = 1
+                AND s.steps IS NOT NULL
+                AND JSON_LENGTH(s.steps) > 0
+              ORDER BY s.id, CAST(JSON_EXTRACT(jt.step_val, '\$.order') AS UNSIGNED);
+            " 2>&1
+
+            # ─── PHASE 3: 技能類別快速統計 ──────────────────────────────
+            echo ""
+            echo "=== 3. 各 requiredSkills 出現次數（找出最常見的需求）==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT
+                skill_val,
+                COUNT(*) AS occurrences
+              FROM squads s,
+                JSON_TABLE(s.steps,    '\$[*]' COLUMNS (step_val JSON PATH '\$')) AS jt,
+                JSON_TABLE(
+                  JSON_EXTRACT(jt.step_val, '\$.requiredSkills'),
+                  '\$[*]' COLUMNS (skill_val VARCHAR(80) PATH '\$')
+                ) AS sk
+              WHERE s.workspace LIKE '%brand%'
+                AND s.is_active = 1
+                AND s.steps IS NOT NULL
+                AND JSON_LENGTH(s.steps) > 0
+              GROUP BY skill_val
+              ORDER BY occurrences DESC;
+            " 2>&1
+
+            # ─── PHASE 4: apply 模式 — 動態匹配並更新 ──────────────────
+            if [ "$MODE" = "apply" ]; then
+              echo ""
+              echo "======================================================"
+              echo "APPLY MODE: 開始重新指派 brand squad steps"
+              echo "======================================================"
+
+              # Step A: 找出各技能類別的最佳 agent
+              echo ""
+              echo "--- 找最佳 agents ---"
+
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" << 'FINDEOF'
+              -- 建立臨時 mapping table
+              DROP TABLE IF EXISTS tmp_skill_agent_map;
+              CREATE TEMPORARY TABLE tmp_skill_agent_map (
+                skill_key   VARCHAR(60) PRIMARY KEY,
+                agent_id    INT,
+                agent_slug  VARCHAR(64),
+                agent_name  VARCHAR(64)
+              );
+
+              -- 品牌策略 / 品牌定位 agent
+              -- requiredSkills: brand-dna, mbb-strategist
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'brand-strategy',
+                id, slug, name
+              FROM agents
+              WHERE is_active = 1
+                AND (
+                  specialty LIKE '%品牌策略%' OR specialty LIKE '%品牌定位%'
+                  OR specialty LIKE '%品牌顧問%' OR specialty LIKE '%品牌%策略%'
+                  OR title    LIKE '%品牌策略%' OR title    LIKE '%品牌顧問%'
+                )
+              ORDER BY
+                (specialty LIKE '%品牌策略%') DESC,
+                (specialty LIKE '%品牌定位%') DESC,
+                layer = 'strategy' DESC,
+                rating DESC
+              LIMIT 1
+              ON DUPLICATE KEY UPDATE agent_id=VALUES(agent_id), agent_slug=VALUES(agent_slug), agent_name=VALUES(agent_name);
+
+              -- 市場研究 agent
+              -- requiredSkills: market-research-agent, marketing-analytics
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'market-research',
+                id, slug, name
+              FROM agents
+              WHERE is_active = 1
+                AND (
+                  specialty LIKE '%市場研究%' OR specialty LIKE '%市場調查%'
+                  OR specialty LIKE '%消費者研究%' OR specialty LIKE '%用戶研究%'
+                  OR specialty LIKE '%市場分析%'
+                  OR title    LIKE '%市場研究%' OR title LIKE '%研究員%'
+                )
+              ORDER BY
+                (specialty LIKE '%市場研究%') DESC,
+                layer = 'strategy' DESC,
+                rating DESC
+              LIMIT 1
+              ON DUPLICATE KEY UPDATE agent_id=VALUES(agent_id), agent_slug=VALUES(agent_slug), agent_name=VALUES(agent_name);
+
+              -- 品牌文案 / Copywriting agent
+              -- requiredSkills: copywriting-pro, hook-copywriter
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'copywriting',
+                id, slug, name
+              FROM agents
+              WHERE is_active = 1
+                AND (
+                  specialty LIKE '%文案%' OR specialty LIKE '%Copywriting%'
+                  OR specialty LIKE '%品牌文字%' OR specialty LIKE '%廣告文案%'
+                  OR title    LIKE '%文案%'
+                )
+              ORDER BY
+                (specialty LIKE '%品牌文案%') DESC,
+                (specialty LIKE '%文案%') DESC,
+                layer = 'strategy' DESC,
+                rating DESC
+              LIMIT 1
+              ON DUPLICATE KEY UPDATE agent_id=VALUES(agent_id), agent_slug=VALUES(agent_slug), agent_name=VALUES(agent_name);
+
+              -- 內容行銷 / 社群 agent
+              -- requiredSkills: content-marketing, social-media-marketing
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'content-marketing',
+                id, slug, name
+              FROM agents
+              WHERE is_active = 1
+                AND (
+                  specialty LIKE '%內容行銷%' OR specialty LIKE '%社群行銷%'
+                  OR specialty LIKE '%內容策略%'
+                  OR title    LIKE '%內容行銷%' OR title LIKE '%社群%'
+                )
+              ORDER BY
+                (specialty LIKE '%內容行銷%') DESC,
+                layer = 'strategy' DESC,
+                rating DESC
+              LIMIT 1
+              ON DUPLICATE KEY UPDATE agent_id=VALUES(agent_id), agent_slug=VALUES(agent_slug), agent_name=VALUES(agent_name);
+
+              -- 品牌識別 / 視覺 agent
+              -- requiredSkills: brand-identity, visual-content-creator
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'brand-identity',
+                id, slug, name
+              FROM agents
+              WHERE is_active = 1
+                AND (
+                  specialty LIKE '%品牌識別%' OR specialty LIKE '%視覺設計%'
+                  OR specialty LIKE '%視覺識別%' OR specialty LIKE '%設計%品牌%'
+                  OR title    LIKE '%設計%' OR title LIKE '%品牌視覺%'
+                )
+              ORDER BY
+                (specialty LIKE '%品牌識別%') DESC,
+                layer = 'strategy' DESC,
+                rating DESC
+              LIMIT 1
+              ON DUPLICATE KEY UPDATE agent_id=VALUES(agent_id), agent_slug=VALUES(agent_slug), agent_name=VALUES(agent_name);
+
+              -- 顯示 mapping 結果
+              SELECT skill_key, agent_id, agent_slug, agent_name FROM tmp_skill_agent_map;
+FINDEOF
+
+              echo ""
+              echo "--- 開始更新 brand squads steps ---"
+
+              # Step B: 動態 UPDATE — 對每個 brand squad 的 steps 進行重新指派
+              # 使用 JSON_TABLE + JSON_ARRAYAGG + CASE WHEN 依 requiredSkills 條件替換 agent
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" << 'UPDATEEOF'
+              -- 重新建立臨時 map（因為上面的連線可能已關閉）
+              DROP TABLE IF EXISTS tmp_skill_agent_map;
+              CREATE TEMPORARY TABLE tmp_skill_agent_map (
+                skill_key   VARCHAR(60) PRIMARY KEY,
+                agent_id    INT,
+                agent_slug  VARCHAR(64),
+                agent_name  VARCHAR(64)
+              );
+
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'brand-strategy', id, slug, name FROM agents
+              WHERE is_active=1 AND (specialty LIKE '%品牌策略%' OR specialty LIKE '%品牌定位%' OR specialty LIKE '%品牌顧問%' OR title LIKE '%品牌策略%')
+              ORDER BY (specialty LIKE '%品牌策略%') DESC, layer='strategy' DESC, rating DESC LIMIT 1;
+
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'market-research', id, slug, name FROM agents
+              WHERE is_active=1 AND (specialty LIKE '%市場研究%' OR specialty LIKE '%市場調查%' OR specialty LIKE '%消費者研究%' OR title LIKE '%市場研究%')
+              ORDER BY (specialty LIKE '%市場研究%') DESC, layer='strategy' DESC, rating DESC LIMIT 1;
+
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'copywriting', id, slug, name FROM agents
+              WHERE is_active=1 AND (specialty LIKE '%文案%' OR specialty LIKE '%Copywriting%' OR specialty LIKE '%品牌文字%' OR title LIKE '%文案%')
+              ORDER BY (specialty LIKE '%品牌文案%') DESC, (specialty LIKE '%文案%') DESC, rating DESC LIMIT 1;
+
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'content-marketing', id, slug, name FROM agents
+              WHERE is_active=1 AND (specialty LIKE '%內容行銷%' OR specialty LIKE '%社群行銷%' OR specialty LIKE '%內容策略%' OR title LIKE '%內容行銷%')
+              ORDER BY (specialty LIKE '%內容行銷%') DESC, layer='strategy' DESC, rating DESC LIMIT 1;
+
+              INSERT INTO tmp_skill_agent_map (skill_key, agent_id, agent_slug, agent_name)
+              SELECT 'brand-identity', id, slug, name FROM agents
+              WHERE is_active=1 AND (specialty LIKE '%品牌識別%' OR specialty LIKE '%視覺設計%' OR specialty LIKE '%視覺識別%' OR title LIKE '%設計%')
+              ORDER BY (specialty LIKE '%品牌識別%') DESC, rating DESC LIMIT 1;
+
+              -- ⭐ 核心 UPDATE: 對每個 brand squad 重建 steps JSON，按技能替換 agent
+              UPDATE squads sq
+              SET sq.steps = (
+                SELECT JSON_ARRAYAGG(
+                  CASE
+                    -- brand-dna 或 mbb-strategist → 品牌策略師
+                    WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"brand-dna"')
+                      OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"mbb-strategist"')
+                    THEN JSON_SET(
+                      jt.step_val,
+                      '$.assignedAgentId',   (SELECT agent_id   FROM tmp_skill_agent_map WHERE skill_key='brand-strategy'),
+                      '$.assignedAgentSlug', (SELECT agent_slug  FROM tmp_skill_agent_map WHERE skill_key='brand-strategy'),
+                      '$.assignedAgentName', (SELECT agent_name  FROM tmp_skill_agent_map WHERE skill_key='brand-strategy')
+                    )
+                    -- market-research-agent 或 marketing-analytics → 市場研究員
+                    WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"market-research-agent"')
+                      OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"marketing-analytics"')
+                    THEN JSON_SET(
+                      jt.step_val,
+                      '$.assignedAgentId',   (SELECT agent_id   FROM tmp_skill_agent_map WHERE skill_key='market-research'),
+                      '$.assignedAgentSlug', (SELECT agent_slug  FROM tmp_skill_agent_map WHERE skill_key='market-research'),
+                      '$.assignedAgentName', (SELECT agent_name  FROM tmp_skill_agent_map WHERE skill_key='market-research')
+                    )
+                    -- copywriting-pro 或 hook-copywriter → 品牌文案師
+                    WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"copywriting-pro"')
+                      OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"hook-copywriter"')
+                    THEN JSON_SET(
+                      jt.step_val,
+                      '$.assignedAgentId',   (SELECT agent_id   FROM tmp_skill_agent_map WHERE skill_key='copywriting'),
+                      '$.assignedAgentSlug', (SELECT agent_slug  FROM tmp_skill_agent_map WHERE skill_key='copywriting'),
+                      '$.assignedAgentName', (SELECT agent_name  FROM tmp_skill_agent_map WHERE skill_key='copywriting')
+                    )
+                    -- content-marketing 或 social-media-marketing → 內容行銷師
+                    WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"content-marketing"')
+                      OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"social-media-marketing"')
+                    THEN JSON_SET(
+                      jt.step_val,
+                      '$.assignedAgentId',   (SELECT agent_id   FROM tmp_skill_agent_map WHERE skill_key='content-marketing'),
+                      '$.assignedAgentSlug', (SELECT agent_slug  FROM tmp_skill_agent_map WHERE skill_key='content-marketing'),
+                      '$.assignedAgentName', (SELECT agent_name  FROM tmp_skill_agent_map WHERE skill_key='content-marketing')
+                    )
+                    -- brand-identity 或 visual-content-creator → 品牌設計師
+                    WHEN JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"brand-identity"')
+                      OR JSON_CONTAINS(JSON_EXTRACT(jt.step_val, '$.requiredSkills'), '"visual-content-creator"')
+                    THEN JSON_SET(
+                      jt.step_val,
+                      '$.assignedAgentId',   (SELECT agent_id   FROM tmp_skill_agent_map WHERE skill_key='brand-identity'),
+                      '$.assignedAgentSlug', (SELECT agent_slug  FROM tmp_skill_agent_map WHERE skill_key='brand-identity'),
+                      '$.assignedAgentName', (SELECT agent_name  FROM tmp_skill_agent_map WHERE skill_key='brand-identity')
+                    )
+                    -- 無法匹配 → 保持原值
+                    ELSE jt.step_val
+                  END
+                  ORDER BY CAST(JSON_EXTRACT(jt.step_val, '$.order') AS UNSIGNED)
+                )
+                FROM JSON_TABLE(sq.steps, '$[*]' COLUMNS (step_val JSON PATH '$')) AS jt
+              )
+              WHERE sq.workspace LIKE '%brand%'
+                AND sq.is_active = 1
+                AND sq.steps IS NOT NULL
+                AND JSON_LENGTH(sq.steps) > 0;
+
+              SELECT ROW_COUNT() AS rows_updated;
+UPDATEEOF
+
+              echo ""
+              echo "=== 驗證：更新後每個 brand squad 的步驟指派 ==="
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                SELECT
+                  s.slug AS squad_slug,
+                  JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.order'))             AS step_no,
+                  LEFT(JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.name')), 28)    AS step_name,
+                  JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.assignedAgentSlug')) AS new_agent,
+                  JSON_UNQUOTE(JSON_EXTRACT(jt.step_val, '\$.requiredSkills'))    AS skills
+                FROM squads s,
+                  JSON_TABLE(s.steps, '\$[*]' COLUMNS (step_val JSON PATH '\$')) AS jt
+                WHERE s.workspace LIKE '%brand%'
+                  AND s.is_active = 1
+                  AND s.steps IS NOT NULL
+                ORDER BY s.id, CAST(JSON_EXTRACT(jt.step_val, '\$.order') AS UNSIGNED);
+              " 2>&1
+
+              echo ""
+              echo "✅ Brand squad steps 重新指派完成"
+            else
+              echo ""
+              echo "✅ Audit 完成。請查閱上方報告後，選 apply 模式執行重新指派。"
+            fi
