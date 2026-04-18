@@ -9,12 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'audit = 只看報告 | apply = 執行重新指派'
+        description: 'Type AUDIT to view report only, or APPLY to reassign agents'
         required: true
-        type: choice
-        options:
-          - audit
-          - apply
+        type: string
 
 jobs:
   reassign:
@@ -31,7 +28,7 @@ jobs:
             MOS_USER="mos_user"
             MOS_PASS="mos_secure_2026"
             MOS_DB="mos_db"
-            MODE="${{ github.event.inputs.mode }}"
+            MODE=$(echo "${{ github.event.inputs.mode }}" | tr '[:upper:]' '[:lower:]')
 
             echo "======================================================"
             echo "Mode: $MODE"
@@ -97,7 +94,7 @@ jobs:
             " 2>&1
 
             # ─── PHASE 4: apply 模式 — 動態匹配並更新 ──────────────────
-            if [ "$MODE" = "apply" ]; then
+            if [ "$MODE" = "apply" ] || [ "${{ github.event.inputs.mode }}" = "APPLY" ]; then
               echo ""
               echo "======================================================"
               echo "APPLY MODE: 開始重新指派 brand squad steps"
