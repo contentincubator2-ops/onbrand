@@ -1186,7 +1186,38 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   logEvent({ sessionId, userId, eventType: "session_start" });
 
   try {
-    // ── 品牌定位 6 步驟（workspace=strategy）──────────────────────────────────
+    // ── Phase C+ fix (2026-04-19): UNIFIED squad-first routing for ALL workspaces ──
+    //
+    // Regardless of workspace (strategy, linkedin, youtube, facebook, etc.), if the
+    // mission has a squad selected, chat MUST read steps from squads.steps — same
+    // field as the right-side "執行流程" panel. This guarantees left/right parity.
+    //
+    // Resolution order:
+    //   1. bodySquadSlug (client hint, avoids first-message race)
+    //   2. missions.squadSlug (authoritative DB value, looked up inside tryExecuteSquadChat)
+    //
+    // Only when NO squad is selected does workspace-specific legacy flow activate.
+    if ((bodySquadSlug || missionId) && missionId) {
+      const squadHandled = await tryExecuteSquadChat({
+        userId,
+        missionId,
+        userMessage,
+        conversationHistory,
+        workspace,
+        squadSlugHint: bodySquadSlug,
+        send,
+        sessionId,
+      });
+      if (squadHandled) {
+        clearInterval(keepalive);
+        res.end();
+        logEvent({ sessionId, userId, eventType: "session_end" });
+        return;
+      }
+      // Fall through to legacy workspace-specific flows only if mission has no squad
+    }
+
+    // ── Legacy: 品牌定位 6 步驟（no squad on mission, workspace=strategy）──────
     if (workspace === "strategy") {
       // P3 fix: 若沒有 missionId，自動建立 strategy mission
       let resolvedMissionId = missionId;
