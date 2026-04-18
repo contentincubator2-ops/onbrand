@@ -1,6 +1,8 @@
 /**
- * squadRoute.ts — Squad 成員資料 API
+ * missionSquadRoute.ts — Mission's Squad Resource REST API
  * GET /api/missions/:missionId/squad — 回傳該任務的 squad 成員資訊
+ *
+ * Renamed from squadRoute.ts in Phase A (2026-04-18)
  */
 
 import { Router, type Request, type Response } from "express";
@@ -8,7 +10,7 @@ import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 
-export const squadRouter = Router();
+export const missionSquadRouter = Router();
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 async function verifyToken(req: Request): Promise<number | null> {
@@ -74,7 +76,7 @@ const POSITIONING_SQUAD: Record<number, {
 };
 
 // ── GET /api/missions/:missionId/squad ────────────────────────────────────────
-squadRouter.get("/:missionId/squad", async (req: Request, res: Response) => {
+missionSquadRouter.get("/:missionId/squad", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
@@ -198,7 +200,7 @@ squadRouter.get("/:missionId/squad", async (req: Request, res: Response) => {
       message: "尚無執行紀錄",
     });
   } catch (err: any) {
-    console.error("[squadRoute] GET error:", err?.message);
+    console.error("[missionSquadRoute] GET error:", err?.message);
     res.status(500).json({ error: err?.message });
   }
 });

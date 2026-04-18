@@ -18,129 +18,13 @@ const WS_ICON: Record<string, string> = {
   pr: "📰", event: "🎪", website: "🌐", brand: "🏷️", content: "✍️",
 };
 
-// ─── Resource stat SVG icons ──────────────────────────────────────────────────
-const IconUsers = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-  </svg>
-);
-const IconZap = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-  </svg>
-);
-const IconCpu = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-    <rect x="9" y="9" width="6" height="6"/>
-    <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
-    <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
-    <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
-    <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
-  </svg>
-);
-
-// ─── ResourceBanner ───────────────────────────────────────────────────────────
-function ResourceBanner({ missionId }: { missionId: number }) {
-  const { t } = useLang();
-  const resourceQuery = trpc.resource.summaryByMission.useQuery(
-    { missionId },
-    {
-      enabled: true,
-      refetchOnWindowFocus: false,
-      refetchInterval: (query: any) => {
-        const s = (query.state.data as any)?.status;
-        return s === "ready" || s === "error" ? false : 2000;
-      },
-    }
-  );
-
-  const data   = resourceQuery.data as any;
-  const status = data?.status ?? "pending";
-
-  if (status === "pending") {
-    return (
-      <div style={{
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 24,
-      }}>
-        {/* Animated orbs */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[0, 1, 2, 3, 4].map(i => (
-            <div
-              key={i}
-              style={{
-                width: i === 2 ? 10 : 7, height: i === 2 ? 10 : 7,
-                borderRadius: "50%",
-                background: i === 2 ? "#0A6EFA" : "#BFDBFE",
-                animation: `pulse-dot 1.6s ${i * 0.15}s ease-in-out infinite`,
-                transition: "all 0.3s",
-              }}
-            />
-          ))}
-        </div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 5,
-          fontSize: 12, color: "#9B9990", letterSpacing: 0.2,
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z" opacity=".3"/>
-            <path d="M12 6v6l4 2"/>
-          </svg>
-          {t("resource_matching")}
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "ready" && data.agents > 0) {
-    const stats = [
-      { label: "Agents", value: data.agents.toLocaleString(), icon: <IconUsers />, color: "#0A6EFA", bg: "#EFF6FF", border: "#BFDBFE" },
-      { label: t("label_skills"),  value: data.skills,    icon: <IconZap />,   color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
-      { label: "AI Models",        value: data.providers, icon: <IconCpu />,   color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
-    ];
-
-    return (
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {stats.map(({ label, value, icon, color, bg, border }) => (
-            <div
-              key={label}
-              style={{
-                display: "flex", flexDirection: "column", alignItems: "center",
-                gap: 4, padding: "10px 18px",
-                background: bg, border: `1px solid ${border}`,
-                borderRadius: 12, minWidth: 76,
-                transition: "transform 0.15s",
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ""; }}
-            >
-              <span style={{ color }}>{icon}</span>
-              <span style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.5px" }}>{value}</span>
-              <span style={{ fontSize: 10, color: "#6B7280", fontWeight: 500 }}>{label}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 5,
-          fontSize: 10.5, color: "#059669",
-          background: "#F0FDF4", border: "1px solid #BBF7D0",
-          borderRadius: 20, padding: "4px 12px", fontWeight: 500,
-        }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          語意匹配完成 · text-embedding-3-large
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
+// ─── ResourceBanner REMOVED in Phase B Step 7 (2026-04-18) ───────────────────
+// Reason: Squad agents are pre-configured in squad templates — no dynamic
+// "matching" is needed. Users pick a squad chip and its members are used.
+// Old behavior: showed "正在為此任務配對最佳 AI 代理人選…" loading animation
+//               followed by agents/skills/providers count banner.
+// New behavior: squad chips display directly; squad.lead name shows on chip.
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ─── SquadChip ────────────────────────────────────────────────────────────────
 function SquadChip({
@@ -357,10 +241,9 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
         </div>
       )}
 
-      {/* Resource matching banner */}
-      {missionId ? (
-        <ResourceBanner missionId={missionId} />
-      ) : (
+      {/* Squad members are pre-configured — no dynamic matching needed.
+          Users pick a squad chip above and its members are used directly. */}
+      {!missionId && (
         <div style={{ fontSize: 12, color: "#C8C7C3", marginTop: 20 }}>
           {t("mission_no_squad")}
         </div>

@@ -29,7 +29,7 @@ import { chatRouter } from "./routes/chatRoute";
 import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
-import { squadRouter } from "./routes/squadRoute";
+import { missionSquadRouter } from "./routes/missionSquadRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
@@ -144,7 +144,7 @@ app.use("/api/chat", chatRouter);  // 新統一入口
 app.use("/api/pm", pmRouter);
 app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);
-app.use("/api/missions", squadRouter);
+app.use("/api/missions", missionSquadRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 app.get("/health", healthLimiter, async (_req, res) => {
