@@ -358,43 +358,72 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
     return undefined;
   };
 
-  // Positioning statement — supports colon format, paragraph under heading, and Moore-template format
-  const positioningStatement = extract([
-    // "主定位宣言\n為中小企業..."
-    /(?:\*\*)?(?:主定位宣言|完整定位宣言|核心定位陳述|Positioning Statement|定位陳述)(?:\*\*)?[：:\s（(][^\n]*\n+>?\s*([^\n]{10,400})/i,
-    // Colon format: "定位陳述：..."
+  // Helper: extract text after a specific heading (##/###/****, colon, or bold)
+  // Scans from heading position for the pattern within the next 1500 chars
+  const extractAfterHeading = (headings: string[], valuePatterns: RegExp[]): string | undefined => {
+    for (const heading of headings) {
+      const headingRe = new RegExp(`(?:^|\\n)\\s*(?:#{2,4}|\\*\\*|)\\s*(?:${heading})(?:\\*\\*)?(?:（[^）]*）|\\s*\\([^)]*\\))?[：:\\s]*\\n?`, "i");
+      const m = markdown.match(headingRe);
+      if (!m || m.index === undefined) continue;
+      const start = m.index + m[0].length;
+      const chunk = markdown.slice(start, start + 1500);
+      for (const vp of valuePatterns) {
+        const vm = chunk.match(vp);
+        if (vm && vm[1]) return vm[1].trim();
+      }
+    }
+    return undefined;
+  };
+
+  // Positioning statement — prefer paragraph under "主定位宣言" / "完整定位宣言" headings
+  const positioningStatement = extractAfterHeading(
+    ["主定位宣言", "完整定位宣言", "核心定位陳述", "定位陳述", "Positioning Statement", "Core Positioning"],
+    [
+      // Multi-line paragraph up to next heading or blank-blank
+      /^\s*>?\s*([\s\S]{20,500}?)(?=\n\s*(?:#{1,4}|\*\*[A-Za-z\u4e00-\u9fff])|\n\n)/,
+      /^\s*>?\s*([^\n]{20,500})/,
+    ]
+  ) ?? extract([
+    // Colon format inline
     /(?:核心定位陳述|Positioning Statement|定位陳述|主定位宣言)[：:]\s*([^\n]{10,400})/i,
-    // Bold-wrapped colon format
-    /\*\*(?:定位陳述|核心定位|主定位宣言)[：:]\*\*\s*([^\n]{10,400})/i,
-    // Moore-template paragraph "For...Who...is an...That...Unlike...Our product"
+    // Moore-template paragraph inline
     /(For\s+[^\n]{20,400}(?:Unlike|Our\s+product)[^\n]{5,200})/i,
   ]);
 
-  // Tagline — supports colon, bold headline in quotes (「」 or ""), table row A
-  const tagline = extract([
-    // Colon format: "中文標語：..."
-    /(?:中文標語|品牌標語|主訊息|Headline)(?:（[^）]*）)?[：:]\s*([^\n]{5,100})/i,
-    // "🚀「一個人的行銷部門，十個 AI 代理人的執行力」"
-    /[🚀🎯💡⚡✨📣]?\s*「([^」\n]{5,80})」/,
-    // Table row: "| A | 「XXX」 | ... |" (first tagline option)
-    /\|\s*(?:A|1)\s*\|\s*[\*｜「"]?([^「」\|\n]{5,80}?)[\*｜」"]?\s*\|/,
-    // Markdown heading "### 主訊息" followed by content
-    /#{2,4}\s*(?:主訊息|Headline|品牌標語)[^\n]*\n+>?\s*[🚀🎯💡⚡✨📣]?「?([^」\n]{5,80})」?/i,
-    // Plain "Tagline" format
-    /(?:Tagline)[：:（(（\s]+([^\n）)）]{5,80})/i,
+  // Tagline — MUST come after "主訊息" / "Headline" / "品牌標語" heading to avoid noise
+  const tagline = extractAfterHeading(
+    ["主訊息", "Headline", "中文標語", "品牌標語", "Tagline"],
+    [
+      // "🚀「XXX」" style
+      /^\s*>?\s*[🚀🎯💡⚡✨📣]?\s*「([^」\n]{5,80})」/,
+      // "「XXX」" without emoji
+      /^\s*>?\s*「([^」\n]{5,80})」/,
+      // Plain line (no 「」 quotes)
+      /^\s*>?\s*([^\n：:]{5,80})(?=\n|$)/,
+    ]
+  ) ?? extract([
+    // Fallback: colon format inline
+    /(?:中文標語|品牌標語)[：:]\s*([^\n]{5,100})/i,
+    // Fallback: table row A in Tagline Options section
+    /(?:Tagline\s*選項)[\s\S]{0,200}?\|\s*A\s*\|\s*[\*｜「"]?([^「」\|\n]{5,80}?)[\*｜」"]?\s*\|/i,
   ]);
 
-  const englishTagline = extract([
-    /(?:英文標語|English Tagline)[：:]\s*([^\n]{5,100})/i,
-    // Table row D (英文版) in Tagline Options
-    /\|\s*D\s*\|\s*[\*｜「"]?([^「」\|\n]*(?:for|OS|Era|AI)[^「」\|\n]*?)[\*｜」"]?\s*\|/i,
+  // English tagline — table row D or "英文標語"
+  const englishTagline = extractAfterHeading(
+    ["英文標語", "English Tagline"],
+    [/^\s*>?\s*([^\n]{5,100})/],
+  ) ?? extract([
+    // Table row D in Tagline Options section
+    /(?:Tagline\s*選項)[\s\S]{0,500}?\|\s*D\s*\|\s*[\*｜「"]?([^「」\|\n]{5,80}?)[\*｜」"]?\s*\|/i,
   ]);
 
-  // Target audience — supports Dunford "主力 ICP" blockquote format
-  const targetAudience = extract([
-    // "主力 ICP（Ideal Customer Profile）：\n> 台灣/華語圈中小企業..."
-    /(?:主力\s*ICP|Ideal\s+Customer\s+Profile|理想客戶|目標受眾|Target\s+Audience)(?:（[^）]*）)?[：:\s]*\n+>?\s*([^\n]{10,300})/i,
-    // Colon format
+  // Target audience — Dunford "主力 ICP" or 目標受眾
+  const targetAudience = extractAfterHeading(
+    ["主力\\s*ICP", "目標受眾", "Target\\s+Audience", "Ideal\\s+Customer\\s+Profile"],
+    [
+      /^\s*>?\s*([^\n]{10,300})/,
+    ]
+  ) ?? extract([
     /(?:目標受眾|Target Audience|主力\s*ICP|ICP)[：:]\s*([^\n]{10,300})/i,
   ]);
 
