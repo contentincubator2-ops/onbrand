@@ -362,7 +362,8 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
   const cleanValue = (s: string): string =>
     s
       .replace(/^[#>\s]+/, "")                    // leading #, >, whitespace
-      .replace(/^\*+|\*+$/g, "")                  // bold markers
+      .replace(/\*\*([^*]+)\*\*/g, "$1")          // paired **bold** → bold
+      .replace(/\*+/g, "")                        // stray unpaired *
       .replace(/^[🚀🎯💡⚡✨📣🔥💎🌟]+\s*/, "")    // leading emoji
       .replace(/^「|」$/g, "")                    // Chinese quotes if still present
       .replace(/^"|"$/g, "")                      // straight quotes
@@ -390,6 +391,7 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
     s
       .replace(/\*\*([^*]+)\*\*/g, "$1")  // **bold** → bold
       .replace(/\*([^*]+)\*/g, "$1")       // *italic* → italic
+      .replace(/\*+/g, "")                 // any stray unpaired *
       .replace(/`([^`]+)`/g, "$1")         // `code` → code
       .replace(/^#{1,6}\s*/gm, "")         // remove markdown headings
       .replace(/\s*>\s*/g, " · ")          // Moore template "> " separator → " · "
@@ -453,11 +455,18 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
     /【(?:轉機|價值)】\s*([^\n]{10,300})/,
   ]);
 
-  const differentiator = extract([
-    /(?:差異化|競爭優勢|獨特屬性|Differentiator|Unique\s+Attributes)[：:]?\s*([^\n]{10,300})/i,
-    // From Moore template "Unlike X, Our product..."
+  const differentiatorRaw = extractAfterHeading(
+    ["差異化訊息架構", "差異化", "競爭優勢", "獨特屬性", "Differentiator", "Unique\\s+Attributes"],
+    [
+      // Paragraph after heading, skip table header rows (lines starting with |)
+      /^(?:(?!\|)[\s\S]){0,500}?(?:^|\n)\s*((?!\|)[^\n]{15,300})/m,
+      /^\s*>?\s*([^\n|]{15,300})/,
+    ]
+  ) ?? extract([
+    /(?:差異化|競爭優勢|獨特屬性|Differentiator|Unique\s+Attributes)[：:]\s*([^\n|]{10,300})/i,
     /Unlike\s+([^\n]{10,200}Our\s+product[^\n]{10,200})/i,
   ]);
+  const differentiator = differentiatorRaw ? cleanMarkdown(differentiatorRaw) : undefined;
 
   const brandVoice = extract([
     /(?:品牌語調|Brand Voice|語調|Tone)[：:]\s*([^\n]{10,200})/i,
