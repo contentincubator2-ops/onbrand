@@ -1,0 +1,42 @@
+name: Admin — Schema Inspect (squad_workflow_templates + agent_squads)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+
+            echo "=== 1. squad_workflow_templates 欄位 ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              DESCRIBE squad_workflow_templates;
+            " 2>&1
+
+            echo ""
+            echo "=== 2. agent_squads 欄位 ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              DESCRIBE agent_squads;
+            " 2>&1
+
+            echo ""
+            echo "=== 3. Dunford agent_squads 所有欄位內容 ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT * FROM agent_squads WHERE slug='brand-dunford-positioning' LIMIT 1\G
+            " 2>&1 | head -80
+
+            echo ""
+            echo "=== 4. Dunford squad_workflow_templates 所有欄位 ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT * FROM squad_workflow_templates WHERE taskType='brand-dunford-positioning' LIMIT 1\G
+            " 2>&1 | head -30
