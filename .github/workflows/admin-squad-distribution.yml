@@ -1,0 +1,73 @@
+name: Admin — Squad Distribution Analysis
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Analyze squad distribution in mos_db
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+
+            echo "=== 1. Total squads by workspace ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT workspace, COUNT(*) as count
+              FROM agent_squads
+              WHERE is_active=1
+              GROUP BY workspace
+              ORDER BY count DESC;
+            " 2>&1
+
+            echo ""
+            echo "=== 2. Squads by methodology (top 20) ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT methodology, COUNT(*) as count
+              FROM agent_squads
+              WHERE is_active=1 AND methodology IS NOT NULL AND methodology != ''
+              GROUP BY methodology
+              ORDER BY count DESC
+              LIMIT 20;
+            " 2>&1
+
+            echo ""
+            echo "=== 3. Squads without methodology ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT COUNT(*) as no_methodology
+              FROM agent_squads
+              WHERE is_active=1 AND (methodology IS NULL OR methodology = '');
+            " 2>&1
+
+            echo ""
+            echo "=== 4. Squads with agents but short methodology (possible template squads) ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT slug, name, LEFT(methodology, 40) as method, JSON_LENGTH(agents) as agent_count
+              FROM agent_squads
+              WHERE is_active=1 AND agents IS NOT NULL AND agents != '[]'
+              ORDER BY JSON_LENGTH(agents) DESC, name
+              LIMIT 10;
+            " 2>&1
+
+            echo ""
+            echo "=== 5. Agents usage statistics ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT 'Total active agents' as Metric, COUNT(*) as Value FROM agents WHERE isAvailable=1
+              UNION ALL
+              SELECT 'Agents with primarySkill', COUNT(*) FROM agents WHERE isAvailable=1 AND primarySkill IS NOT NULL
+              UNION ALL
+              SELECT 'Agents with aiModel', COUNT(*) FROM agents WHERE isAvailable=1 AND aiModel IS NOT NULL AND aiModel != ''
+              UNION ALL
+              SELECT 'Unique primarySkills', COUNT(DISTINCT primarySkill) FROM agents WHERE isAvailable=1
+              UNION ALL
+              SELECT 'Unique aiModels', COUNT(DISTINCT aiModel) FROM agents WHERE isAvailable=1 AND aiModel != '';
+            " 2>&1
