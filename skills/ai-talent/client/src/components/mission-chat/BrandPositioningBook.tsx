@@ -352,6 +352,7 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
         return m[1]
           .split(/\n/)
           .map(l => l.replace(/^[\d\-\*\•]+\s*/, "").trim())
+          .map(l => l.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*+/g, "").trim())  // clean ** markers
           .filter(Boolean);
       }
     }
