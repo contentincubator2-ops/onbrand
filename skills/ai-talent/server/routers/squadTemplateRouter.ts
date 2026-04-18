@@ -675,7 +675,7 @@ export const squadTemplateRouter = router({
 
       // Insert squads record
       await db.execute(sql`
-        INSERT INTO squads (squad_uid, mission_id, brand_id, user_id, workspace, squad_type, title, status, squad_lead)
+        INSERT INTO squad_sessions (squad_uid, mission_id, brand_id, user_id, workspace, squad_type, title, status, squad_lead)
         VALUES (
           ${squadUid}, ${input.missionId}, ${input.brandId}, ${userId},
           ${input.workspace}, ${input.squadType}, ${squadTitle},
@@ -707,7 +707,7 @@ export const squadTemplateRouter = router({
 
       // Mark ready
       await db.execute(sql`
-        UPDATE squads SET status = 'ready', updated_at = NOW()
+        UPDATE squad_sessions SET status = 'ready', updated_at = NOW()
         WHERE squad_uid = ${squadUid}
       `);
 
@@ -722,7 +722,7 @@ export const squadTemplateRouter = router({
       if (!db) return null;
       const [rows] = await db.execute(
         sql`SELECT squad_uid, title, status, squad_lead, created_at
-            FROM squads
+            FROM squad_sessions
             WHERE mission_id = ${input.missionId} AND user_id = ${ctx.user.id}
             ORDER BY created_at DESC LIMIT 1`
       ) as any[];
@@ -765,7 +765,7 @@ export const squadTemplateRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const [sqRows] = await db.execute(
-        sql`SELECT brand_id, title, squad_lead FROM squads
+        sql`SELECT brand_id, title, squad_lead FROM squad_sessions
             WHERE squad_uid = ${input.squadUid} AND user_id = ${ctx.user.id} LIMIT 1`
       ) as any[];
       const sq = (sqRows as any[])?.[0];
@@ -810,7 +810,7 @@ ${agentCtx.systemPromptPrefix}`;
       `);
 
       await db.execute(sql`
-        UPDATE squads SET status = 'running', updated_at = NOW()
+        UPDATE squad_sessions SET status = 'running', updated_at = NOW()
         WHERE squad_uid = ${input.squadUid} AND user_id = ${ctx.user.id}
       `);
 
