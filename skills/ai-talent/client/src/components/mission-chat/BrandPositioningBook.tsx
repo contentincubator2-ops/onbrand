@@ -479,7 +479,12 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
     // Try to extract "柱子 1: XXX\n柱子 2: XXX\n柱子 3: XXX"
     const pillars = markdown.match(/柱子\s*\d[：:\s]+([^\n]{5,150})/g);
     if (pillars && pillars.length >= 2) {
-      return pillars.map(p => p.replace(/^柱子\s*\d[：:\s]+/, "").trim());
+      return pillars.map(p =>
+        p.replace(/^\**\s*柱子\s*\d[：:\s]+/, "")  // strip "**柱子 1：" prefix
+         .replace(/\*\*([^*]+)\*\*/g, "$1")         // paired **
+         .replace(/\*+/g, "")                       // any stray *
+         .trim()
+      );
     }
     return undefined;
   })();
