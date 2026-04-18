@@ -1,4 +1,10 @@
 /**
+ * squadTemplateRouter.ts — Squad 模板管理 + DB-driven 推薦 (mission 內執行的團隊)
+ *
+ * Renamed from squadRouter in Phase A (2026-04-18)
+ * Purpose: Manages squad templates (the team composition recommendations) used within missions.
+ *
+ * Original header:
  * squadRouter.ts — Squad 生命週期管理 + DB-driven 推薦
  *
  * 查詢流程：
@@ -111,7 +117,7 @@ function genAgentKey(squadUid: string, agentName: string): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const squadRouter = router({
+export const squadTemplateRouter = router({
 
   // ── getRecommendedSquads ─────────────────────────────────────────────────────
   // 從 agent_squads 按 workspace + brand + mission 評分，回傳前 N 個 squad chips
@@ -401,14 +407,22 @@ export const squadRouter = router({
     .query(async ({ input }) => {
       // agent_squads and agents live on VM local DB (localPool)
       const [squadRows] = await localPool.execute(
-        `SELECT name, agents, missionType, showcases, methodology FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+        `SELECT id, slug, name, agents, missionType, showcases, methodology FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
         [input.squadId]
       ) as any[];
       const squad = (squadRows as any[])?.[0];
-      if (!squad) return { squadName: "", lead: null, agents: [], steps: [], showcases: [], methodology: "" };
+      if (!squad) {
+        console.warn(`[squadRouter.getMembersById] Squad not found for squadId=${input.squadId}`);
+        return { squadName: "", lead: null, agents: [], steps: [], showcases: [], methodology: "" };
+      }
 
+      console.log(`[squadRouter.getMembersById] Loaded squad id=${squad.id}, slug=${squad.slug}, name=${squad.name}`);
       const agentsJson = safeJsonParse<any[]>(squad.agents, []);
       const agentIds = agentsJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
+
+      if (!agentIds.length) {
+        console.warn(`[squadRouter.getMembersById] Squad ${squad.id} (${squad.slug}) has NO agents in agents JSON`);
+      }
 
       // Fetch real agent data
       let agentMap: Record<number, any> = {};

@@ -1,6 +1,9 @@
 /**
- * squadChatRoute — SSE endpoint for A2A Squad 逐步確認對話
+ * missionChatHandler — SSE endpoint for Mission's Squad 逐步確認對話
  * POST /api/stream/squad-chat
+ *
+ * Renamed from squadChatRoute in Phase A (2026-04-18)
+ * Purpose: Handle real-time squad execution during mission chat streaming.
  *
  * 設計原則：「先做再問」
  * Agent 主動執行分析 → 帶結果給用戶 → 等用戶確認/調整 → 繼續下一步
@@ -83,7 +86,7 @@ async function streamViaGateway(
 import { getDb, getSoworkDb } from "../db";
 import mysql from "mysql2/promise";
 
-export const squadChatRouter = Router();
+export const missionChatHandler = Router();
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function getSecretBytes() {
@@ -209,7 +212,7 @@ function getAgentForStep(
 }
 
 // ── Main route ────────────────────────────────────────────────────────────────
-squadChatRouter.post("/squad-chat", async (req: Request, res: Response) => {
+missionChatHandler.post("/squad-chat", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
