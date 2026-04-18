@@ -1,0 +1,304 @@
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY D: LinkedIn 行銷 Methodology Squads (D1–D10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // D1: Justin Welsh — The Content Operating System (2022)
+    {
+      const slug = "li-welsh-content-os";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "linkedin-content-os"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "linkedin-post-copywriting"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["email-marketing", "social-scheduler"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["email-marketing", "newsletter-linkedin-bridge"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["marketing-analytics", "cross-channel-analytics"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["marketing-analytics", "linkedin-content-analytics"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "內容支柱定義（Content Pillars）", description: "定義 3 個內容支柱：專業知識（Expertise）、個人故事（Story）、行業觀點（Opinion）。Welsh 每週各發一篇，維持多維度的個人品牌形象", tool: "internal", outputType: "content_pillars_doc", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "週貼文格式輪換", description: "規劃每週 3-5 篇貼文的格式輪換：條列型、故事型、觀點型、數據型、問答型，確保受眾不疲乏", tool: "internal", outputType: "weekly_format_rotation", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "LinkedIn 貼文文案撰寫", description: "撰寫符合 LinkedIn 演算法的貼文：強力第一行（不截斷）、每段落 1-2 句、白行分隔、清晰 CTA", tool: "internal", outputType: "linkedin_posts_copy", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "Newsletter 橋接設計", description: "在 LinkedIn 貼文結尾引導至 Newsletter：Welsh 策略是 LinkedIn 吸引受眾，Newsletter 留住受眾，建立不受平台風險的讀者群", tool: "internal", outputType: "newsletter_cta_design", requiredSkills: ["email-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "LinkedIn 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Newsletter 師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "效益分析師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Justin Welsh LinkedIn Content OS 個人品牌系統", description: "Source: Justin Welsh《The Content OS》2022 課程。Welsh 以每週 4 小時投入，達到 LinkedIn 50 萬追蹤者和年收 $5M", steps });
+      await upsertSquad(conn, { slug, name: "Justin Welsh LinkedIn Content OS 個人品牌小隊", description: "應用 Justin Welsh 的 Content OS：3 個內容支柱 × 週格式輪換 × Newsletter 橋接，以系統取代靈感，每週 4 小時維持 LinkedIn 個人品牌", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Justin Welsh – The Content Operating System (2022)", agents: agentMembers, tags: ["linkedin", "personal-brand", "content-os", "newsletter"], useCases: ["個人品牌LinkedIn建立", "B2B顧問品牌", "Solopreneur LinkedIn成長"], outputFormats: ["內容支柱文件", "週貼文計劃", "LinkedIn 文案", "Newsletter CTA"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Justin Welsh 個人品牌 @JustinWelsh", description: "2019 年從零開始應用 Content OS 系統建立 LinkedIn 個人品牌", result: "LinkedIn 超過 50 萬追蹤，年收入超過 $5M，每篇貼文平均觸達 20-50 萬人", source: "Justin Welsh 公開收入報告 2022 / JustinWelsh.me" }, { company: "Lara Acosta（Welsh 方法論學員）", description: "應用 Content OS 從 0 建立 LinkedIn 個人品牌，4 個月達到 5 萬追蹤", result: "LinkedIn 超過 20 萬追蹤，個人品牌課程月收入超過 $30,000", source: "Lara Acosta LinkedIn / 公開訪談 2023" }] });
+    }
+
+    // D2: Richard van der Blom — LinkedIn Algorithm Methodology (2020–2023)
+    {
+      const slug = "li-vanderblom-algorithm";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-analytics", "social-media-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-analytics", "linkedin-algorithm-optimization"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "linkedin-format-scoring"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-scheduler", "cross-channel-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-scheduler", "linkedin-posting-window"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "LinkedIn 演算法格式評分", description: "依 van der Blom 年度 Algorithm Report 評估各貼文格式的演算法權重：文件/Carousel 最高 → 影片 → 圖片 → 純文字", tool: "internal", outputType: "format_scoring_guide", requiredSkills: ["marketing-analytics"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "演算法友好貼文撰寫", description: "應用 van der Blom 洞察撰寫高分貼文：前 3 行無連結、強力互動問題結尾、標籤不超過 3 個、第 1 小時互動衝刺", tool: "internal", outputType: "algorithm_friendly_posts", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "最佳發布時段設定", description: "依 van der Blom 研究找出行業最佳發布時窗：週二/三/四早上 7-9 點為大多數行業最高觸達窗口", tool: "internal", outputType: "optimal_posting_schedule", requiredSkills: ["social-scheduler"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "互動速度優化（Golden Hour）", description: "設計發布後第一小時的「黃金小時」互動計劃：主動回覆留言、手動連結親友互動，送出強烈社交訊號給演算法", tool: "internal", outputType: "golden_hour_plan", requiredSkills: ["cross-channel-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "LinkedIn 演算法師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "貼文優化師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "排程互動師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Richard van der Blom LinkedIn 演算法科學優化法", description: "Source: Richard van der Blom 年度《LinkedIn Algorithm Insights Report》2020-2023，分析超過 88,000 篇貼文，是全球最被引用的 LinkedIn 演算法研究", steps });
+      await upsertSquad(conn, { slug, name: "van der Blom LinkedIn 演算法科學優化小隊", description: "以 Richard van der Blom 分析 88,000+ 篇貼文的科學報告為基礎，優化貼文格式、發布時段和互動策略，最大化 LinkedIn 有機觸達", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Richard van der Blom – LinkedIn Algorithm Insights Report (2020–2023)", agents: agentMembers, tags: ["linkedin", "algorithm", "analytics", "organic-reach"], useCases: ["LinkedIn觸達率提升", "演算法友好內容優化", "企業LinkedIn帳號管理"], outputFormats: ["格式評分指南", "演算法友好貼文", "黃金小時計劃"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Just Connecting（van der Blom 公司）客戶群", description: "企業客戶應用 Algorithm Report 洞察優化 LinkedIn 內容策略", result: "平均有機觸達率提升 150-300%，貼文互動率提升 200%", source: "Just Connecting 官網 / van der Blom Algorithm Report 2023" }, { company: "IBM（類似演算法優化案例）", description: "應用 LinkedIn 演算法最佳化策略，優化企業帳號貼文格式和時間", result: "LinkedIn 帳號觸達增長 180%，員工倡議貼文互動率達業界 Top 10%", source: "LinkedIn Business Solutions Case Studies 2022" }] });
+    }
+
+    // D3: Daniel Disney — Social Selling Method (The Ultimate LinkedIn Sales Guide, 2021)
+    {
+      const slug = "li-disney-social-selling";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "mbb-strategist"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "social-selling-linkedin"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-identity", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-identity", "linkedin-profile-optimization"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["content-marketing", "hook-copywriter"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["content-marketing", "authority-content-linkedin"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["marketing-analytics", "campaign-orchestrator"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["campaign-orchestrator", "pipeline-tracking-linkedin"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "LinkedIn 個人資料優化", description: "建立以買家為中心（非求職者）的 LinkedIn 個人資料：Headline 說「我幫誰解決什麼問題」，About 說故事，Experience 說成果", tool: "internal", outputType: "optimized_linkedin_profile", requiredSkills: ["brand-identity"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "內容權威建立", description: "系統化發布展示行業專業知識的內容，建立「找這類問題就找我」的思維定位，讓目標客戶主動找上門", tool: "internal", outputType: "authority_content_plan", requiredSkills: ["content-marketing"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "關係連結策略", description: "設計精準的連結請求策略：個人化訊息 + 共同連結 + 價值先行，建立真實商業關係而非垃圾連結", tool: "internal", outputType: "connection_strategy", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "對話轉換流程", description: "設計從內容互動到私訊對話的自然轉換流程：回應留言 → 感謝訊息 → 建立對話 → 發現需求 → 提案通話", tool: "internal", outputType: "conversation_conversion_flow", requiredSkills: ["campaign-orchestrator"] }, m4Info),
+        assignAgentToStep({ order: 5, name: "銷售管道追蹤", description: "建立 LinkedIn Social Selling Index (SSI) 追蹤，以數據衡量社群銷售效果並持續優化", tool: "internal", outputType: "ssi_pipeline_report", requiredSkills: ["marketing-analytics"] }, m4Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "社群銷售策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "個人資料師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "內容權威師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "管道分析師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Daniel Disney LinkedIn Social Selling B2B 銷售系統", description: "Source: Daniel Disney《The Ultimate LinkedIn Sales Guide》2021. Disney 是全球 LinkedIn Social Selling 最知名導師，訓練超過 100,000 位 B2B 銷售人員", steps });
+      await upsertSquad(conn, { slug, name: "Daniel Disney LinkedIn Social Selling 小隊", description: "應用 Daniel Disney 的 LinkedIn Social Selling 系統，從個人資料優化到管道建立，用內容吸引目標客戶主動聯繫", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Daniel Disney – The Ultimate LinkedIn Sales Guide (2021)", agents: agentMembers, tags: ["linkedin", "social-selling", "b2b", "pipeline"], useCases: ["B2B銷售LinkedIn開發", "顧問服務客戶獲取", "企業BD LinkedIn策略"], outputFormats: ["LinkedIn個人資料優化", "內容計劃", "對話腳本", "SSI報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Daniel Disney 個人品牌 / Daily Sales", description: "應用自創的 LinkedIn Social Selling 方法，從銷售員到全球最知名 LinkedIn 培訓師", result: "LinkedIn 超過 90 萬粉絲，培訓超過 100,000 銷售人員，Daily Sales 年收超過 £200 萬", source: "Daniel Disney LinkedIn / TheDailySales.com 2023" }, { company: "Salesforce（Daniel Disney 企業客戶）", description: "應用 Social Selling 框架培訓銷售團隊在 LinkedIn 建立個人品牌和管道", result: "Sales Team LinkedIn SSI 平均提升 40%，LinkedIn 來源的管道增加 25%", source: "Daniel Disney 企業培訓案例 2022" }] });
+    }
+
+    // D4: Gary Vaynerchuk — Day Trading Attention (LinkedIn Edition, 2023)
+    {
+      const slug = "li-garyvee-daytrading";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["social-media-marketing", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["social-media-marketing", "day-trading-attention-linkedin"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "short-video-scriptwriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "linkedin-native-video"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "paid-ads"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "linkedin-attention-arbitrage"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "LinkedIn 注意力機會偵測", description: "每週分析 LinkedIn 趨勢內容和演算法偏愛格式，識別注意力成本最低的內容機會（GaryVee：「在沒人的地方搶佔注意力」）", tool: "internal", outputType: "attention_opportunity_map", requiredSkills: ["social-media-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "LinkedIn 原生影片內容", description: "製作 LinkedIn 平台原生影片（而非 YouTube 外鏈），應用 GaryVee 原則：原生內容獲得 3x 有機觸達", tool: "internal", outputType: "native_video_scripts", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "留言互動搶佔策略", description: "在高熱度帖子下留下高品質評論（GaryVee「Comments as Content」），讓個人品牌在更大受眾面前曝光", tool: "internal", outputType: "comment_strategy", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "注意力套利 ROI 追蹤", description: "追蹤各類內容的「注意力成本比」：觸達 / 時間投入，持續優化投資報酬最高的內容形式", tool: "internal", outputType: "attention_roi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "LinkedIn 注意力策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "原生影片師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "ROI 分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "GaryVee Day Trading Attention LinkedIn 策略", description: "Source: Gary Vaynerchuk《Day Trading Attention》2024. VaynerMedia 協助企業在 LinkedIn 以最低成本搶佔行業注意力", steps });
+      await upsertSquad(conn, { slug, name: "GaryVee Day Trading Attention LinkedIn 小隊", description: "在 LinkedIn 上像交易股票一樣交易注意力：在演算法偏愛的格式和時機以最低成本搶佔最大曝光。Gary Vee 2024 最新方法論", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Gary Vaynerchuk – Day Trading Attention (2024)", agents: agentMembers, tags: ["linkedin", "organic-reach", "attention", "native-content"], useCases: ["B2B品牌LinkedIn有機成長", "個人品牌快速曝光", "企業思想領導力建立"], outputFormats: ["注意力機會地圖", "原生影片腳本", "留言策略", "ROI報告"], requiredIntegrations: [], token: 55000, showcases: [{ company: "VaynerMedia B2B 客戶組合", description: "應用 Day Trading Attention 框架幫助 B2B 品牌在 LinkedIn 搶佔有機流量", result: "客戶平均 LinkedIn 觸達提升 400%，廣告支出同期降低 30%", source: "VaynerMedia LinkedIn 案例研究 2023" }, { company: "Gary Vaynerchuk 個人 LinkedIn", description: "系統執行原生影片+留言策略，以最低摩擦成本維持 LinkedIn 頂級影響力", result: "LinkedIn 超過 500 萬追蹤者，每篇貼文觸達 50-200 萬人", source: "GaryVee LinkedIn 公開數據 2024" }] });
+    }
+
+    // D5: Alex Hormozi — LinkedIn Lead Magnet to DM Pipeline (2023)
+    {
+      const slug = "li-hormozi-lead-magnet";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["hook-copywriter", "campaign-orchestrator"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["hook-copywriter", "linkedin-lead-magnet-post"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "email-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["email-marketing", "linkedin-dm-sequence"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-ops", "linkedin-pipeline-ops"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "LinkedIn Lead Magnet 貼文設計", description: "設計「評論取得免費資源」的 LinkedIn 貼文格式（Hormozi 2023 病毒貼文公式）：高感知價值免費品 + 評論觸發機制", tool: "internal", outputType: "lead_magnet_post", requiredSkills: ["hook-copywriter"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "自動 DM 序列設計", description: "設計評論後觸發的自動私訊序列：Lead Magnet 交付 → 建立關係 → 了解需求 → 服務引導", tool: "internal", outputType: "dm_automation_sequence", requiredSkills: ["email-marketing"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "通話預約流程設計", description: "設計從 DM 對話到通話預約的轉換流程：問資格問題 → 匹配確認 → Calendly 連結 → 確認郵件", tool: "internal", outputType: "call_booking_flow", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "LinkedIn 管道效益追蹤", description: "建立 LinkedIn 潛客管道追蹤：Lead Magnet 評論數→DM 開啟率→通話預約率→成交率，優化每個轉換節點", tool: "internal", outputType: "pipeline_tracking_dashboard", requiredSkills: ["marketing-ops"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Lead Magnet 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "DM 序列師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "管道追蹤師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Hormozi LinkedIn Lead Magnet to DM Pipeline", description: "Source: Alex Hormozi 2023 年 LinkedIn 病毒貼文公式，單篇貼文觸達 5,000+ 評論的實際案例", steps });
+      await upsertSquad(conn, { slug, name: "Hormozi LinkedIn Lead Magnet 管道小隊", description: "以 Alex Hormozi 的「評論觸發 Lead Magnet」公式在 LinkedIn 建立自動化潛客管道，從貼文觸達到通話預約全流程優化", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Alex Hormozi – LinkedIn Lead Magnet DM Pipeline (2023)", agents: agentMembers, tags: ["linkedin", "lead-generation", "dm-automation", "pipeline"], useCases: ["B2B服務潛客開發", "顧問/教練客戶獲取", "SaaS試用引導"], outputFormats: ["Lead Magnet 貼文", "DM 序列腳本", "管道追蹤儀表板"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Alex Hormozi LinkedIn @hormozi", description: "應用「評論取得免費資源」格式，單篇貼文觸發 5,000+ 評論和 DM", result: "LinkedIn 超過 100 萬追蹤，單次貼文產生 500+ 商業詢問", source: "Hormozi LinkedIn 公開貼文數據 2023" }, { company: "Adam Robinson（RB2B）", description: "應用類似 LinkedIn Lead Magnet + DM 自動化流程", result: "LinkedIn 貼文帶來 $1M ARR 增長，潛客獲取成本低於 $50/人", source: "Adam Robinson LinkedIn / RB2B.com 2023" }] });
+    }
+
+    // D6: Viveka von Rosen — LinkedIn Optimization System (Linked Into Business, 2013)
+    {
+      const slug = "li-vonrosen-optimization";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["brand-identity", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-identity", "linkedin-profile-seo"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "linkedin-keyword-content"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "market-research-agent"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "linkedin-seo-analytics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "LinkedIn SEO 個人/企業頁面審計", description: "審計 LinkedIn 頁面的 SEO 完整度：關鍵字分佈、All-Star 個人資料狀態、自訂 URL、Featured 版塊使用", tool: "internal", outputType: "linkedin_seo_audit", requiredSkills: ["brand-identity"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "關鍵字策略與嵌入", description: "研究目標受眾在 LinkedIn 搜索的關鍵字，系統化嵌入 Headline/About/Experience 中，提升 LinkedIn 搜索排名", tool: "internal", outputType: "keyword_optimization_plan", requiredSkills: ["market-research-agent"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "LinkedIn 內容 SEO 系統", description: "設計以目標關鍵字為核心的內容策略，讓貼文在 LinkedIn 搜索中排名，吸引主動搜尋的潛在客戶", tool: "internal", outputType: "content_seo_calendar", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "參與度信號最大化", description: "設計讓 LinkedIn 演算法將帳號視為高價值創作者的參與度信號：回覆率、連結接受率、內容互動頻率", tool: "internal", outputType: "engagement_signal_plan", requiredSkills: ["marketing-analytics"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "LinkedIn 效益月報", description: "追蹤個人資料瀏覽量、搜索出現次數、SSI 分數、內容觸達率等核心 KPI，每月優化策略", tool: "internal", outputType: "linkedin_monthly_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "LinkedIn SEO 師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "關鍵字內容師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "效益分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Viveka von Rosen LinkedIn 全方位優化系統", description: "Source: Viveka von Rosen《Linked Into Business》2013. LinkedIn 認證她為全球最知名的 LinkedIn 專家之一", steps });
+      await upsertSquad(conn, { slug, name: "Viveka von Rosen LinkedIn 全方位優化小隊", description: "應用 Viveka von Rosen 的 LinkedIn 優化系統：從個人資料 SEO 到內容關鍵字策略，讓 LinkedIn 成為穩定的 B2B 潛客來源", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Viveka von Rosen – LinkedIn Optimization System (Linked Into Business, 2013)", agents: agentMembers, tags: ["linkedin", "seo", "profile-optimization", "b2b"], useCases: ["LinkedIn個人資料優化", "企業LinkedIn頁面SEO", "B2B搜索流量獲取"], outputFormats: ["LinkedIn SEO 審計報告", "關鍵字優化方案", "內容SEO行事曆", "月報"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Viveka von Rosen 個人品牌 / Vengreso", description: "應用自創 LinkedIn 優化框架建立全球 LinkedIn 培訓品牌", result: "被 LinkedIn 認證為 LinkedIn 最知名專家，Vengreso 培訓 1,000+ 企業客戶", source: "Viveka von Rosen LinkedIn / Vengreso.com 2023" }, { company: "HP（Hewlett-Packard）企業 LinkedIn 優化", description: "應用 LinkedIn SEO 優化企業頁面和員工個人資料", result: "LinkedIn 搜索可見度提升 300%，企業頁面追蹤者增長 200%", source: "Viveka von Rosen 企業客戶案例 2020" }] });
+    }
+
+    // D7: Tim Hughes — Social Selling Revolution (2016)
+    {
+      const slug = "li-hughes-social-selling";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["mbb-strategist", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["mbb-strategist", "social-selling-revolution"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "brand-dna"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "digital-reputation-building"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["campaign-orchestrator", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["campaign-orchestrator", "b2b-pipeline-linkedin"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Digital Body Language 建立", description: "Tim Hughes 強調「數位體語言」：個人資料如何讓買家第一眼就信任你。優化頭像、Banner、Headline、About 呈現", tool: "internal", outputType: "digital_body_language_guide", requiredSkills: ["brand-dna"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "網絡建立策略", description: "設計精準的 LinkedIn 網絡建立計劃：每天連結 5-10 個目標潛客，個人化訊息而非群發，質量優於數量", tool: "internal", outputType: "network_building_plan", requiredSkills: ["mbb-strategist"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "觸發事件行銷", description: "監測潛在客戶的 LinkedIn 活動觸發事件：換工作、升職、發文、公司新聞，在對的時機以對的方式接觸", tool: "internal", outputType: "trigger_event_playbook", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "管道建立與追蹤", description: "建立完整的 LinkedIn Social Selling 管道追蹤系統，從初次連結到通話預約的每個節點", tool: "internal", outputType: "pipeline_tracking_system", requiredSkills: ["campaign-orchestrator"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "社群銷售革命師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "數位聲譽師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "管道建立師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Tim Hughes Social Selling Revolution LinkedIn B2B 策略", description: "Source: Tim Hughes《Social Selling: Techniques to Influence Buyers and Changemakers》2016. DLA Ignite 培訓超過 50,000 B2B 銷售人員", steps });
+      await upsertSquad(conn, { slug, name: "Tim Hughes Social Selling Revolution LinkedIn 小隊", description: "以 Tim Hughes 的社群銷售革命框架，建立數位體語言→精準網絡→觸發事件行銷的完整 B2B LinkedIn 銷售系統", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Tim Hughes – Social Selling Revolution (2016)", agents: agentMembers, tags: ["linkedin", "b2b", "social-selling", "pipeline"], useCases: ["企業銷售團隊LinkedIn策略", "B2B業務開發", "企業客戶維護"], outputFormats: ["數位體語言指南", "網絡建立計劃", "觸發事件劇本", "管道追蹤"], requiredIntegrations: [], token: 55000, showcases: [{ company: "DLA Ignite（Tim Hughes 共同創辦）", description: "應用 Social Selling Revolution 框架培訓全球 B2B 銷售團隊", result: "培訓超過 50,000 B2B 銷售人員，客戶管道平均增長 30-40%", source: "DLA Ignite 官網 / Tim Hughes LinkedIn 2023" }, { company: "Oracle EMEA 銷售團隊", description: "Tim Hughes 協助 Oracle 歐洲銷售團隊應用 Social Selling 方法", result: "LinkedIn 獲得的管道機會增加 40%，銷售週期縮短 25%", source: "Tim Hughes《Social Selling》書中案例" }] });
+    }
+
+    // D8: John Nemo — LinkedIn Riches (2014)
+    {
+      const slug = "li-nemo-riches";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["copywriting-pro", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["copywriting-pro", "linkedin-riches-method"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "content-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "linkedin-connection-message"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "campaign-orchestrator"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["campaign-orchestrator", "linkedin-outreach-sequence"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "理想客戶 LinkedIn 搜索", description: "設計精準的 LinkedIn 搜索策略：職位、行業、公司規模、地區組合，找到最匹配的潛在客戶名單", tool: "internal", outputType: "ideal_client_linkedin_search", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "個人化連結訊息設計", description: "設計每個目標客戶的個人化連結訊息：引用其最近貼文、共同連結、相關背景，避免任何銷售感", tool: "internal", outputType: "personalized_connection_messages", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Value-First 跟進序列", description: "連結成功後的 3-步跟進序列：感謝→分享相關資源→發現需求，每步都提供價值，不直接推銷", tool: "internal", outputType: "followup_sequence", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "Outreach 效益追蹤優化", description: "追蹤連結接受率、回覆率、通話預約率，A/B 測試不同訊息版本，持續優化外聯效率", tool: "internal", outputType: "outreach_performance_report", requiredSkills: ["campaign-orchestrator"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "LinkedIn 開發師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "個人化訊息師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "外聯優化師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "John Nemo LinkedIn Riches 潛客開發系統", description: "Source: John Nemo《LinkedIn Riches》2014. Nemo 應用自創系統 90 天內從 LinkedIn 產出 $135,000 業績，後教授超過 150,000 人", steps });
+      await upsertSquad(conn, { slug, name: "John Nemo LinkedIn Riches 潛客開發小隊", description: "應用 John Nemo 的 LinkedIn Riches 系統：精準搜索→個人化連結→價值優先序列，打造高轉換率的 LinkedIn 外聯機器", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "John Nemo – LinkedIn Riches (2014)", agents: agentMembers, tags: ["linkedin", "outreach", "lead-generation", "personalization"], useCases: ["B2B潛客外聯", "顧問服務客戶開發", "銷售外聯自動化"], outputFormats: ["目標客戶搜索策略", "個人化連結訊息", "跟進序列腳本", "效益報告"], requiredIntegrations: [], token: 50000, showcases: [{ company: "John Nemo 個人案例", description: "應用 LinkedIn Riches 方法，90 天內從 LinkedIn 純有機外聯產出業績", result: "90 天產出 $135,000 業績，後培訓超過 150,000 人此方法，LinkedIn 超過 20 萬追蹤", source: "John Nemo《LinkedIn Riches》/ Nemo Radio Podcast 2014-2023" }, { company: "中小企業服務業（匿名）via Nemo 培訓", description: "應用 LinkedIn Riches 外聯系統開發本地企業客戶", result: "3 個月 LinkedIn 外聯產出 $80,000 新業績，外聯回覆率達 35%（業界均值 5%）", source: "John Nemo LinkedIn Riches 學員案例 2021" }] });
+    }
+
+    // D9: Chris Walker — Dark Social B2B Demand Generation (2021)
+    {
+      const slug = "li-walker-dark-social";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["mbb-strategist", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["mbb-strategist", "dark-social-demand-gen"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "linkedin-thought-leadership"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["attribution-modeling", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["attribution-modeling", "dark-social-measurement"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Thought Leadership 內容策略", description: "設計 LinkedIn 思想領導力內容策略：分享反直覺觀點、行業批評、真實數據，讓潛客「在Slack 轉發你的貼文」", tool: "internal", outputType: "thought_leadership_strategy", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "需求創造內容製作", description: "製作能改變買家思維框架的內容（非產品廣告）：讓目標受眾意識到他們有一個他們不知道的問題", tool: "internal", outputType: "demand_creation_content", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Dark Social 測量框架", description: "建立無法被 UTM 追蹤的 Dark Social 測量方法：自我申報的管道調查（「你從哪裡聽說我們的？」）、品牌搜尋量趨勢", tool: "internal", outputType: "dark_social_measurement", requiredSkills: ["attribution-modeling"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "需求創造策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "思想領導力師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Dark Social 分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Chris Walker Dark Social LinkedIn B2B 需求創造", description: "Source: Chris Walker（Refine Labs 創辦人）2021 年提出 Dark Social + Demand Generation 理論，顛覆 B2B 行銷歸因思維", steps });
+      await upsertSquad(conn, { slug, name: "Chris Walker Dark Social B2B 需求創造小隊", description: "應用 Chris Walker 的 Dark Social 理論：在 LinkedIn 創造真正的需求（而非捕捉需求），讓品牌在看不見的地方建立影響力", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Chris Walker – Dark Social Demand Generation (Refine Labs, 2021)", agents: agentMembers, tags: ["linkedin", "b2b", "demand-generation", "thought-leadership"], useCases: ["B2B SaaS需求創造", "企業品牌市場佔位", "行業思想領袖建立"], outputFormats: ["思想領導力策略", "需求創造內容", "Dark Social 測量框架"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Refine Labs（Chris Walker 創辦）自身案例", description: "應用 Dark Social 需求創造策略，透過 LinkedIn 思想領導力建立業界影響力", result: "Refine Labs 年收入超過 $1,000 萬，客戶無需付費廣告依靠 Dark Social 自然增長", source: "Chris Walker LinkedIn / Refine Labs Revenue Report 2022" }, { company: "Metadata.io（Chris Walker 客戶）", description: "應用需求創造框架，Walker 思想領導力帶動 Metadata B2B SaaS 成長", result: "年 ARR 超過 $3,000 萬，LinkedIn 成為最大潛客來源之一", source: "Metadata.io 公開案例 2022" }] });
+    }
+
+    // D10: Ross Simmonds — Distribution First Strategy (Foundation, 2019)
+    {
+      const slug = "li-simmonds-distribution";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-repurposing", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-repurposing", "distribution-first-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "platform-native-distribution"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "cross-channel-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["cross-channel-analytics", "distribution-roi-tracking"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "內容盤點與分發機會識別", description: "盤點現有內容資產，為每篇高價值內容識別 5-10 個適合的分發管道：Reddit 社群、Quora 問答、Medium、LinkedIn 原生文章", tool: "internal", outputType: "content_distribution_inventory", requiredSkills: ["content-repurposing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "平台原生格式改編", description: "把每篇高價值內容改寫為各平台的原生格式：LinkedIn 貼文 = 條列重點，Quora = 詳細解答，Reddit = 真誠問題回覆", tool: "internal", outputType: "platform_native_content", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "分發執行排程", description: "建立 30 天分發執行排程：每天把 1-2 篇重新格式化的內容發布到不同管道，建立全渠道品牌觸點", tool: "internal", outputType: "distribution_execution_schedule", requiredSkills: ["cross-channel-analytics"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "分發效益追蹤優化", description: "追蹤每個分發管道帶來的流量、潛客、品牌提及，識別 ROI 最高的分發組合並集中資源", tool: "internal", outputType: "distribution_roi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "長青內容更新再分發", description: "識別 6-12 個月前的高效分發內容，更新數據和洞察後重新分發，讓長青內容持續創造價值", tool: "internal", outputType: "evergreen_republishing_plan", requiredSkills: ["content-repurposing"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "分發策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "原生格式師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "分發分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ross Simmonds Distribution First 內容分發第一策略", description: "Source: Ross Simmonds《Foundation Marketing》2019. Simmonds 說「Create Once, Distribute Forever」，Foundation Inc. 幫助 B2B 企業透過分發策略提升內容 ROI 10 倍", steps });
+      await upsertSquad(conn, { slug, name: "Ross Simmonds Distribution First LinkedIn 分發小隊", description: "應用 Ross Simmonds 的 Distribution First 哲學：「最好的內容不是製作最多，而是分發最廣」。把一篇好內容分發到 10 個平台，ROI 提升 10 倍", industryKey: "marketing", missionType: taskType, workspace: ["linkedin"], methodology: "Ross Simmonds – Distribution First Strategy (Foundation, 2019)", agents: agentMembers, tags: ["linkedin", "content-distribution", "repurposing", "roi"], useCases: ["B2B內容ROI最大化", "多平台分發策略", "長青內容再利用"], outputFormats: ["分發機會清單", "平台原生格式包", "分發排程", "ROI報告"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Foundation Inc.（Ross Simmonds 創辦）", description: "應用 Distribution First 策略，幫助 B2B 客戶最大化每篇內容的觸達範圍", result: "客戶內容觸達平均提升 10 倍，內容 ROI 從 2x 提升至 15-20x", source: "Foundation Inc. 官網 / Ross Simmonds 公開案例 2023" }, { company: "Shopify（Foundation 客戶）", description: "應用 Distribution First 將部落格內容分發到 20+ 個管道", result: "有機流量增長 40%，內容帶來的潛客轉換率提升 60%", source: "Foundation Inc. 案例研究 2021" }] });
+    }

@@ -9,3 +9,4 @@ dist/
 skills/ai-talent/public/
 google-service-account.json
 google-service-account.json
+.claude/

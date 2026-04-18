@@ -24,7 +24,7 @@ import { authRouter } from "./auth/authRouter";
 import { exportRouter } from "./routes/exportRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
-import { squadChatRouter } from "./routes/squadChatRoute";
+import { missionChatHandler } from "./routes/missionChatHandler";
 import { chatRouter } from "./routes/chatRoute";
 import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
@@ -139,7 +139,7 @@ app.use("/api/a2a", a2aStreamRouter);
 
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
-app.use("/api/stream", squadChatRouter);
+app.use("/api/stream", missionChatHandler);
 app.use("/api/chat", chatRouter);  // 新統一入口
 app.use("/api/pm", pmRouter);
 app.use("/api/brand-brain", brandBrainRouter);

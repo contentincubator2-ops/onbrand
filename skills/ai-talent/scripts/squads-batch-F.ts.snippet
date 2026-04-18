@@ -1,0 +1,285 @@
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY F: Email 行銷 Methodology Squads (F1–F10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // F1: Ryan Deiss — The Email Machine (DigitalMarketer, 2014)
+    {
+      const slug = "em-deiss-email-machine";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "campaign-orchestrator"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "email-machine-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "automated-email-sequence-copy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "attribution-modeling"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "email-funnel-analytics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "入門認識序列（Indoctrination）", description: "設計新訂閱者的 5-7 封歡迎序列：介紹品牌核心故事、價值觀、期待設定，讓訂閱者 24 小時內理解「為什麼要關注你」", tool: "internal", outputType: "indoctrination_sequence", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "互動參與序列（Engagement）", description: "設計持續提供價值的互動序列：教育→案例→見證→工具，讓訂閱者養成開信習慣並視品牌為可信資源", tool: "internal", outputType: "engagement_sequence", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "升級轉換序列（Ascension）", description: "設計從免費訂閱者到付費客戶的升級序列：針對有互動行為的訂閱者發送優惠，推動購買行動", tool: "internal", outputType: "ascension_sequence", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "細分再互動序列（Segmentation + Re-engagement）", description: "依行為細分訂閱者，並設計 30/60/90 天無互動的喚回序列：「我們想念你」+ 特別優惠", tool: "internal", outputType: "segmentation_reengagement", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "Email 機器效益優化", description: "追蹤整個 Email Machine 各節點的開信率、點擊率、轉換率、退訂率，識別最需要優化的序列節點", tool: "internal", outputType: "email_machine_performance", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Email 機器師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "Email 文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "效益分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ryan Deiss Email Machine 自動化行銷系統", description: "Source: Ryan Deiss / DigitalMarketer《Email Machine》2014. DigitalMarketer 應用此框架管理超過 700 萬訂閱者 Email 系統", steps });
+      await upsertSquad(conn, { slug, name: "Ryan Deiss Email Machine 自動化小隊", description: "建立 Indoctrinate → Engage → Ascend → Segment → Re-engage 的完整自動化 Email 系統，把 Email 名單轉化為可預期的收入引擎", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Ryan Deiss / DigitalMarketer – Email Machine (2014)", agents: agentMembers, tags: ["email", "automation", "funnel", "retention"], useCases: ["電商Email行銷系統", "SaaS訂閱者培育", "教育品牌Email序列"], outputFormats: ["5套Email序列", "細分策略", "效益追蹤報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "DigitalMarketer 自身（Ryan Deiss）", description: "應用 Email Machine 框架管理 700 萬+ 訂閱者，每週發送數百萬封行銷郵件", result: "Email 貢獻 DM 年收入超過 $20M，平均開信率超過 25%，訂閱者 LTV 是業界均值 2 倍", source: "DigitalMarketer.com / Ryan Deiss Traffic & Conversion Summit 演講" }, { company: "Agora Financial", description: "應用相同 Indoctrinate + Ascend 序列框架管理龐大訂閱者名單", result: "Email 系統年收入超過 $1 億，每位訂閱者平均 LTV 超過 $200", source: "Agora Publishing Annual Reports" }] });
+    }
+
+    // F2: Andre Chaperon — Soap Opera Sequence (AutoResponder Madness, 2010)
+    {
+      const slug = "em-chaperon-soap-opera";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "copywriting-pro"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "soap-opera-sequence"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "ad-copywriting-formulas"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "cliffhanger-email-copy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "大 Hook + 背景故事", description: "Email 1：一個戲劇性的開場 Big Hook，緊接著引入主角（你或品牌）的背景故事，讓讀者立刻代入", tool: "internal", outputType: "hook_backstory_email", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "衝突事件 + 懸念", description: "Email 2：發生了什麼關鍵事件/轉折點？引發衝突，並在結尾留下懸念：「明天我會告訴你我是怎麼解決的…」", tool: "internal", outputType: "conflict_cliffhanger_email", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "頓悟時刻", description: "Email 3：分享改變一切的頓悟/發現/解決方案，讓讀者感覺他們也即將擁有同樣的突破", tool: "internal", outputType: "epiphany_email", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "隱藏好處揭示", description: "Email 4：揭示訂閱者還不知道自己需要的「隱藏好處」，深化對解決方案的渴望", tool: "internal", outputType: "hidden_benefit_email", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "呼籲行動", description: "Email 5：在故事高潮後自然推出 Call to Action，Chaperon 說「如果故事說得好，銷售會自然發生」", tool: "internal", outputType: "cta_email", requiredSkills: ["hook-copywriter"] }, m2Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Soap Opera 序列師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "懸念文案師", order: 2 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Andre Chaperon Soap Opera Sequence 故事型 Email 序列", description: "Source: Andre Chaperon《AutoResponder Madness》2010. Chaperon 被 Email 行銷界稱為「天才」，其 SOS 框架讓開信率提升 3-5 倍", steps });
+      await upsertSquad(conn, { slug, name: "Andre Chaperon Soap Opera Email 序列小隊", description: "用戲劇性故事結構寫 Email 序列：大 Hook → 背景故事 → 衝突懸念 → 頓悟 → 隱藏好處 → 行動呼籲。Andre Chaperon 的方法讓人捨不得退訂", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Andre Chaperon – Soap Opera Sequence (AutoResponder Madness, 2010)", agents: agentMembers, tags: ["email", "storytelling", "autoresponder", "conversion"], useCases: ["新訂閱者Welcome序列", "線上課程Email行銷", "高單價服務Email銷售"], outputFormats: ["5封 Soap Opera 序列", "懸念文案模板"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Andre Chaperon 個人品牌（AutoResponder Madness）", description: "應用自創的 Soap Opera Sequence，打造全球最具影響力的 Email 行銷課程品牌", result: "AutoResponder Madness 銷售超過 $1,000 萬，業界被稱為「有史以來最好的 Email 行銷教程」", source: "Andre Chaperon 網站 / Rich Schefren、Jeff Walker 公開見證" }, { company: "Russell Brunson（採用 SOS 框架）", description: "在《DotCom Secrets》中推廣 Chaperon 的 SOS 框架並大規模應用", result: "ClickFunnels 的 Email 序列應用 SOS 後，轉換率提升 300%，開信率超過 40%", source: "Russell Brunson《DotCom Secrets》Chapter on Email" }] });
+    }
+
+    // F3: Ramit Sethi — Email Course + Teach First Sell Second (2009)
+    {
+      const slug = "em-sethi-email-course";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "teach-first-sell-second"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "email-course-copywriting"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "campaign-orchestrator"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["campaign-orchestrator", "email-course-funnel"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Email 課程概念設計", description: "設計一個能在 5-7 天解決訂閱者核心問題的免費 Email 課程。Ramit Sethi 原則：「給他們你的最好，他們會信任你的一切」", tool: "internal", outputType: "email_course_concept", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "日課內容撰寫", description: "撰寫每天的課程內容：結構清晰、有具體行動步驟、有 Ramit 特色的直接語氣，讓訂閱者每天都期待下一封", tool: "internal", outputType: "daily_course_emails", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "信任建立橋接", description: "在課程的第 4-5 天自然引入品牌的付費產品：不是廣告，而是「如果你想要更深入，我有一個方法可以幫你加速」", tool: "internal", outputType: "trust_bridge_email", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "課程轉換序列", description: "課程完成後的 3-5 封轉換序列：強調課程成果 → 指出訂閱者下一步痛點 → 付費解決方案介紹 → 限時優惠", tool: "internal", outputType: "post_course_conversion", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "Email 課程效益追蹤", description: "追蹤課程完成率、每日開信率、付費轉換率，優化課程內容和轉換序列", tool: "internal", outputType: "email_course_analytics", requiredSkills: ["campaign-orchestrator"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Email 課程策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "課程文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "漏斗分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ramit Sethi 先教後賣 Email 課程漏斗", description: "Source: Ramit Sethi（IWillTeachYouToBeRich）2009 年起的先教後賣 Email 策略。Sethi 年收入超過 $1 億應用此方法", steps });
+      await upsertSquad(conn, { slug, name: "Ramit Sethi 先教後賣 Email 課程小隊", description: "以免費 Email 課程先建立信任，再自然推出付費升級。Ramit Sethi 的方法：充分展示你的好，才能要求付費", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Ramit Sethi – Teach First, Sell Second Email Course (2009)", agents: agentMembers, tags: ["email", "course", "trust-building", "conversion"], useCases: ["知識型產品Email行銷", "線上課程潛客培育", "B2B服務信任建立"], outputFormats: ["Email 課程大綱", "7封課程Email", "轉換序列", "效益報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "IWillTeachYouToBeRich（Ramit Sethi）", description: "長期應用 Email 課程框架，每次新產品發布前先提供大量免費教育內容", result: "Email 名單超過 100 萬，每次課程發布年收入超過 $1 億，轉換率是業界 5 倍", source: "Ramit Sethi 公開訪談 / IWillTeachYouToBeRich.com" }, { company: "Amy Porterfield（採用類似框架）", description: "以 Email 課程序列培育 Facebook 廣告引來的潛客，再推出 $997 課程", result: "年收入超過 $3,000 萬，Email 課程轉換率超過 8%（業界均值 1-2%）", source: "Amy Porterfield 公開收入報告 2022" }] });
+    }
+
+    // F4: Jeff Walker — Product Launch Formula Email (2005)
+    {
+      const slug = "em-walker-plf-email";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "campaign-orchestrator"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "product-launch-formula-email"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "plf-launch-sequence-copy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "paid-ads"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "launch-performance-analytics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Pre-pre-launch 暖身", description: "發布開放前 2 週的預熱序列：建立期待、調查受眾需求、製造消息流傳感，讓受眾在開放前就渴望購買", tool: "internal", outputType: "preprelaunch_sequence", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Launch Conversation 1：機會（Opportunity）", description: "開放前第一封 Launch 內容：分享令人興奮的機會/洞察，引導受眾意識到為什麼現在是改變的時機", tool: "internal", outputType: "launch_email_1_opportunity", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Launch Conversation 2：轉變（Transformation）", description: "第二封 Launch 內容：展示客戶使用你的方法後發生了哪些轉變，真實案例和見證", tool: "internal", outputType: "launch_email_2_transformation", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "Launch Conversation 3：體驗（Experience）", description: "第三封 Launch 內容：讓受眾體驗產品的一小部分，建立「我需要更多」的渴望", tool: "internal", outputType: "launch_email_3_experience", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "開放購買 + 關閉序列", description: "開放日的促銷序列：開放通知→24 小時補充→關閉前 24 小時→最後一小時緊迫提醒，Walker 說「關閉日是銷售最多的一天」", tool: "internal", outputType: "open_close_sequence", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Launch 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "Launch 文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Launch 分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Jeff Walker Product Launch Formula Email 上市策略", description: "Source: Jeff Walker《Launch》2014 + Product Launch Formula 2005. Walker 的 PLF 方法幫助學員產出超過 $1 億美元銷售額", steps });
+      await upsertSquad(conn, { slug, name: "Jeff Walker PLF Email 產品上市小隊", description: "應用 Jeff Walker 的 Product Launch Formula：Pre-pre-launch → 三個 Launch Conversations → 開放購買 → 關閉序列，用 Email 製造購買衝潮", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Jeff Walker – Product Launch Formula (2005)", agents: agentMembers, tags: ["email", "launch", "conversion", "urgency"], useCases: ["課程/產品Email上市", "限時優惠推廣", "新品發布行銷"], outputFormats: ["5套Launch Email序列", "緊迫性 CTA", "Launch報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Jeff Walker 個人案例（網球訓練課程）", description: "第一次應用 PLF，從自家倉庫發送 Email 序列銷售網球訓練課程", result: "一週 $1,800 銷售額（當時創紀錄），後發展成 PLF 培訓系統", source: "Jeff Walker《Launch》書中第一章自傳" }, { company: "PLF 學員群體（Walker 培訓）", description: "全球學員應用 PLF 框架進行課程和產品發布", result: "超過 1,000 名學員收入超過 $1M，PLF 社群總銷售超過 $1 億", source: "JeffWalker.com Launch Mastermind 數據 2022" }] });
+    }
+
+    // F5: Joanna Wiebe — Voice of Customer Conversion Copywriting Email (Copyhackers, 2011)
+    {
+      const slug = "em-wiebe-conversion-copy";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["copywriting-pro", "ad-copywriting-formulas"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["copywriting-pro", "voice-of-customer-copywriting"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "voc-research-mining"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["hook-copywriter", "email-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["hook-copywriter", "email-subject-line-testing"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Voice of Customer 數據挖掘", description: "Joanna Wiebe 的核心：不要猜，去挖掘客戶的真實語言。收集來源：Amazon 評論、G2 評論、用戶訪談、問卷調查，截取客戶自己的詞彙", tool: "internal", outputType: "voc_data_mining", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "訊息架構設計", description: "依 VOC 數據建立訊息架構：客戶最常說的「Jobs to be Done」、阻力點、期望成果，用客戶的語言組成 Email 核心訊息", tool: "internal", outputType: "message_architecture", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "轉換優化 Email 撰寫", description: "依 VOC 數據撰寫 Email：每個字都是目標受眾說過的或直接回應他們說過的，消除任何公司自說自話", tool: "internal", outputType: "voc_driven_email_copy", requiredSkills: ["ad-copywriting-formulas"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "Subject Line A/B 測試", description: "設計 5 個 Subject Line 變體 A/B 測試：問句 vs 數字 vs 個人化 vs 好奇心 vs 直接利益，找出最高開信率組合", tool: "internal", outputType: "subject_line_test", requiredSkills: ["hook-copywriter"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "Email 轉換率優化報告", description: "每月分析 Email 序列的轉換率，識別可用 VOC 改進的文案節點，持續迭代優化", tool: "internal", outputType: "email_cro_report", requiredSkills: ["marketing-analytics"] }, m2Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "VOC 文案師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "VOC 研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Subject Line 師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Joanna Wiebe Voice of Customer Email 轉換文案", description: "Source: Joanna Wiebe（Copyhackers）2011 年創立，被稱為「Conversion Copywriting 的第一人」，幫助 Wistia、Unbounce 等 SaaS 企業提升轉換率", steps });
+      await upsertSquad(conn, { slug, name: "Joanna Wiebe VOC Email 轉換文案小隊", description: "用客戶自己說的話寫 Email。Joanna Wiebe 的 Voice of Customer 文案方法：最好的行銷語言是從客戶口中挖掘出來的，不是品牌自己發明的", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Joanna Wiebe – Voice of Customer Copywriting (Copyhackers, 2011)", agents: agentMembers, tags: ["email", "copywriting", "conversion", "voc"], useCases: ["Email文案優化", "訂閱轉換率提升", "SaaS Email行銷"], outputFormats: ["VOC 研究報告", "訊息架構", "Email 文案", "Subject Line 測試"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Wistia（Copyhackers 客戶）", description: "應用 VOC 文案方法重寫 Email 培育序列和 Trial 轉換 Email", result: "Trial-to-Paid 轉換率提升 30%，Email 點擊率提升 45%", source: "Joanna Wiebe Copyhackers 案例研究 2016" }, { company: "Unbounce（Copyhackers 客戶）", description: "應用 VOC 研究優化 Landing Page 和 Email 文案", result: "首頁轉換率提升 25%，Email 開信率提升 60%", source: "Copyhackers.com Unbounce 案例研究" }] });
+    }
+
+    // F6: Amy Porterfield — Digital Course Email Launch Sequence (2013)
+    {
+      const slug = "em-porterfield-launch";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "campaign-orchestrator"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "digital-course-launch-email"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "launch-email-sequence-copy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "預熱期 Email 序列（Pre-launch）", description: "開放前 2 週的預熱序列：分享「幕後故事」、揭示課程創作過程、建立早鳥名單，讓潛在學員感覺是「圈內人」", tool: "internal", outputType: "prelaunch_emails", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "早鳥優惠期 Email（Early Bird）", description: "發布後 24-48 小時的早鳥優惠序列：開放通知 → 早鳥優惠強調 → 早鳥截止提醒，催促快速決策", tool: "internal", outputType: "early_bird_emails", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "購物車開放期（Open Cart）", description: "5-7 天開放期的每日 Email：價值強調 → 客戶見證 → 常見問題解答 → 倒數計時，每封都有不同角度的說服", tool: "internal", outputType: "open_cart_sequence", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "購物車關閉前（Cart Close）", description: "關閉前 48 小時的緊迫序列：最後機會 → 最後 24 小時 → 最後幾小時，創造真實的緊迫感", tool: "internal", outputType: "cart_close_sequence", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "關閉後跟進（Post-close）", description: "關閉後的 2 封 Email：感謝購買者（建立社群感）+ 告知未購買者下次開放通知，維護關係", tool: "internal", outputType: "post_close_emails", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Launch Email 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "Launch 文案師", order: 2 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Amy Porterfield 數位課程 Email 發布序列", description: "Source: Amy Porterfield 2013 年起的數位課程 Email 上市方法論。Porterfield 年收入超過 $3,000 萬，應用此框架", steps });
+      await upsertSquad(conn, { slug, name: "Amy Porterfield 課程 Email Launch 小隊", description: "應用 Amy Porterfield 的數位課程 Email 上市序列：Pre-launch → Early Bird → Open Cart → Cart Close → Post-close，系統化將 Email 名單轉為課程收入", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Amy Porterfield – Digital Course Launch Email (2013)", agents: agentMembers, tags: ["email", "launch", "digital-course", "conversion"], useCases: ["線上課程Email上市", "會員制產品發布", "數位產品行銷"], outputFormats: ["5階段Launch Email套組", "緊迫性CTA模板"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Amy Porterfield 個人品牌（Digital Course Academy）", description: "每次課程發布應用此精確 Email 序列，已進行 10+ 次成功發布", result: "年收入超過 $3,000 萬，單次發布 Email 序列帶來 $2-5M 銷售額", source: "Amy Porterfield 公開收入報告 / Online Marketing Made Easy Podcast" }, { company: "Jasmine Star（Online Business Launchpad）", description: "應用 Porterfield 框架的 Email Launch 序列發布商業課程", result: "首次應用後課程收入達到 $500,000，Email 序列開信率超過 45%", source: "Jasmine Star 公開發布分享 2021" }] });
+    }
+
+    // F7: Bob Bly — Direct Response Email (The Copywriter's Handbook, 1985/2020)
+    {
+      const slug = "em-bly-direct-response";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["ad-copywriting-formulas", "copywriting-pro"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["ad-copywriting-formulas", "bly-direct-response-email"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "market-research-agent"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "direct-mail-to-email-principles"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "email-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["email-marketing", "response-rate-optimization"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "USP 核心訊息定義", description: "應用 Bly 的直效回應原則：先定義清晰的 USP（獨特銷售主張），Email 的每個元素都圍繞 USP 展開", tool: "internal", outputType: "usp_definition", requiredSkills: ["ad-copywriting-formulas"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "強力主旨行設計", description: "應用 Bly 的主旨行公式：包含利益承諾、好奇心、新鮮感或緊迫感之一。測試 4 種主旨行變體", tool: "internal", outputType: "subject_line_copy", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "直效回應 Email 正文", description: "依 Bly 的 AIDA 框架撰寫 Email：注意力（主旨）→ 興趣（利益堆疊）→ 渴望（社會證明）→ 行動（清晰CTA）", tool: "internal", outputType: "aida_email_copy", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "直效回應效益測試", description: "A/B 測試 Email 的關鍵元素：主旨行、CTA 用語、發送時間、個人化程度，以數據優化回應率", tool: "internal", outputType: "dr_email_test_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "Email 系列最佳化", description: "依測試結果建立最佳化的 Email 模板庫，標準化品牌的直效回應 Email 寫作流程", tool: "internal", outputType: "email_template_library", requiredSkills: ["email-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "直效回應文案師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "主旨行師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "效益追蹤師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Bob Bly 直效回應 Email 文案框架", description: "Source: Bob Bly《The Copywriter's Handbook》1985/2020 更新版. Bly 撰寫超過 100 本書籍，被 McGraw-Hill 稱為「美國最頂尖的文案師之一」", steps });
+      await upsertSquad(conn, { slug, name: "Bob Bly 直效回應 Email 文案小隊", description: "應用 Bob Bly 60 年直效行銷智慧於 Email：每封都有清晰的 USP、強力主旨行、AIDA 結構、單一清晰 CTA，最大化 Email 回應率", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Bob Bly – The Copywriter's Handbook (1985/2020)", agents: agentMembers, tags: ["email", "direct-response", "copywriting", "conversion"], useCases: ["B2B Email 潛客開發", "電商促銷 Email", "服務業 Email 行銷"], outputFormats: ["USP 定義文件", "主旨行變體", "AIDA Email 模板", "測試報告"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Bob Bly 自身（700+ 直效行銷客戶）", description: "60 年來應用直效回應文案原則為各行各業撰寫 Email 行銷材料", result: "平均客戶 Email 回應率達業界 3-5 倍，AWAI 頂級文案師認證，超過 100 本著作", source: "Bob Bly 個人網站 Bly.com / The Copywriter's Handbook 2020 版" }, { company: "Agora Publishing（Bly 長期合作）", description: "應用 Bly 的直效回應 Email 文案原則管理龐大訂閱者行銷系統", result: "年 Email 行銷收入超過 $1 億，客戶 Email ROI 達到 4,200%（業界均值 3,800%）", source: "Agora Publishing / DMA Email Marketing Report 2021" }] });
+    }
+
+    // F8: Ben Settle — Email Players Daily Email Method (2010)
+    {
+      const slug = "em-settle-email-players";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "copywriting-pro"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "daily-email-entertainment"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-dna", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-dna", "personal-email-voice"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "個人 Email 聲音建立", description: "建立獨特的個人 Email 寫作聲音：Ben Settle 說「你的個性就是你最大的競爭優勢」，用真實個性而非公司語氣寫 Email", tool: "internal", outputType: "personal_email_voice", requiredSkills: ["brand-dna"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "每日一個訊息的 Email 習慣", description: "建立每天發送 Email 的習慣：Settle 的方法是每封 Email 只有一個核心訊息，一個故事，一個 CTA，寫 250-500 字足夠", tool: "internal", outputType: "daily_email_system", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "娛樂性 + 教育性的 Email 內容", description: "撰寫讓人期待開信的 Email：Settle 的「娛樂第一，銷售第二」原則，每封都有讓人想分享的故事或洞察", tool: "internal", outputType: "entertainment_edu_emails", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "持續軟性銷售", description: "每封 Email 結尾都有輕量的 CTA：不強迫，只是提醒「如果你想要更多，這裡有個方法」，Settle 說「銷售應該是 Email 的附帶品，不是主軸」", tool: "internal", outputType: "soft_sell_cta_templates", requiredSkills: ["hook-copywriter"] }, m2Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "每日 Email 師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "Email 個性師", order: 2 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ben Settle Email Players 每日一封娛樂 Email 方法", description: "Source: Ben Settle《Email Players》2010 年起的每日 Email 系統。Settle 用每日 Email 建立高收益 Email 名單業務，年收超過 $500K", steps });
+      await upsertSquad(conn, { slug, name: "Ben Settle Email Players 每日 Email 小隊", description: "每天發送一封讓人期待的 Email：娛樂優先、個性鮮明、軟性銷售。Ben Settle 的方法：一個人的名單，勝過別人的百萬粉絲頁面", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Ben Settle – Email Players Daily Email Method (2010)", agents: agentMembers, tags: ["email", "daily-email", "entertainment", "personal-brand"], useCases: ["個人品牌Email行銷", "知識型企業名單培育", "創業家每日Email"], outputFormats: ["個人Email聲音指南", "每日Email模板", "軟銷售CTA庫"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Ben Settle Email Players 本身", description: "應用自創的每日 Email 方法，維持高黏性小眾訂閱者群體", result: "Email Players 訂閱制年收入超過 $500K，訂閱者退訂率低於業界均值的 10%", source: "Ben Settle BenSettle.com 公開數據 2022" }, { company: "Frank Kern（類似每日 Email 方法）", description: "應用個性化每日 Email 風格建立高信任度名單", result: "Email 名單超過 20 萬，每次發布 Email 序列產出 $1-5M 銷售額", source: "Frank Kern 公開訪談 / FrankKern.com" }] });
+    }
+
+    // F9: Justin Goff — High Frequency Email Testing (2020)
+    {
+      const slug = "em-goff-high-frequency";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "marketing-analytics"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "high-frequency-email-testing"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "story-email-formula"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Email 名單細分策略", description: "依行為細分名單：活躍購買者、活躍非購買者、沉默 30/60/90 天，針對不同細分設計不同 Email 頻率和內容", tool: "internal", outputType: "list_segmentation_plan", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "故事型 Email 批量製作", description: "Goff 方法：每封 Email = 一個真實或半真實的短故事 + 橋接到產品的連結。設計 30 封故事型 Email 庫", tool: "internal", outputType: "story_email_library", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "高頻率測試計劃", description: "設計每日或每週多次 Email 測試計劃，快速測試哪類故事主題、主旨行格式、發送時間對名單最有效果", tool: "internal", outputType: "high_frequency_test_plan", requiredSkills: ["marketing-analytics"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Email 頻率策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "故事Email師", order: 2 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Justin Goff 高頻率 Email 測試與優化方法", description: "Source: Justin Goff 2020 年的高頻率 Email 方法，曾管理超過 2,000 萬的 Email 名單，擅長以故事 Email 維持高開信率", steps });
+      await upsertSquad(conn, { slug, name: "Justin Goff 高頻率 Email 測試小隊", description: "以高頻率、故事型 Email 持續測試優化。Justin Goff 的方法：Email 是測試的遊樂場，不發送就不知道什麼有效", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Justin Goff – High Frequency Email Testing (2020)", agents: agentMembers, tags: ["email", "frequency", "testing", "storytelling"], useCases: ["電商每日促銷Email", "名單活化再互動", "Email頻率優化"], outputFormats: ["名單細分策略", "故事Email庫", "測試計劃"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Justin Goff 個人名單管理", description: "應用高頻率故事 Email 方法管理多個行業的 Email 名單", result: "管理超過 2,000 萬 Email 地址，客戶 Email 行銷 ROI 平均達到 10x", source: "Justin Goff 公開演講 / JustinGoff.com 2021" }, { company: "電商客戶（匿名）via Goff", description: "將 Email 發送頻率從每週 1 次提升至每天 1 次，搭配故事型 Email", result: "月 Email 收入提升 3 倍，退訂率僅增加 0.3%（遠低於業界預期）", source: "Justin Goff 客戶案例研究 2020" }] });
+    }
+
+    // F10: Russell Brunson — DotCom Secrets Email Sequences (2015)
+    {
+      const slug = "em-brunson-dotcom-email";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["email-marketing", "campaign-orchestrator"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["email-marketing", "dotcom-secrets-email"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "attractive-character-email"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-ops", "email-broadcast-ops"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Attractive Character 人物設計", description: "建立品牌的「Attractive Character」：有缺陷但奮鬥中的真實人物，讓訂閱者感同身受。Brunson 說「完美的人無法被連結，掙扎中的人才能」", tool: "internal", outputType: "attractive_character_profile", requiredSkills: ["brand-dna"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "Soap Opera Sequence 實作", description: "應用 Brunson 版本的 SOS 序列：AC 介紹 → 欲望建立 → 頓悟時刻 → 隱藏好處 → 緊迫呼籲", tool: "internal", outputType: "sos_email_sequence", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Seinfeld Email 系統", description: "設計每日廣播 Email（Brunson 稱為 Seinfeld Email）：像 Seinfeld 影集一樣「講什麼都不相關的事情」，但每封末尾都有軟性 CTA", tool: "internal", outputType: "seinfeld_email_system", requiredSkills: ["email-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "Offer Stack 組合優惠設計", description: "設計 Offer Stack 組合優惠：主產品 + 加值品 + 保證，讓感知價值遠超過實際售價，Email 推廣時重複強調 Stack 價值", tool: "internal", outputType: "offer_stack_design", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 5, name: "Email 漏斗效益報告", description: "追蹤整個 DotCom Secrets Email 漏斗：SOS 完成率、廣播開信率、Offer Stack 轉換率，完整歸因優化", tool: "internal", outputType: "email_funnel_report", requiredSkills: ["marketing-ops"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "DotCom Email 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "Attractive Character 師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Email 運營師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Russell Brunson DotCom Secrets Email 漏斗系統", description: "Source: Russell Brunson《DotCom Secrets》2015. ClickFunnels 應用此 Email 框架達到 $1 億 ARR，全球超過 10 萬 ClickFunnels 用戶應用此序列", steps });
+      await upsertSquad(conn, { slug, name: "Russell Brunson DotCom Secrets Email 漏斗小隊", description: "應用 Russell Brunson 的完整 DotCom Secrets Email 系統：Attractive Character 建立 + Soap Opera Sequence + Seinfeld 廣播 + Offer Stack，讓 Email 名單持續產生可預期收入", industryKey: "marketing", missionType: taskType, workspace: ["email-marketing"], methodology: "Russell Brunson – DotCom Secrets Email System (2015)", agents: agentMembers, tags: ["email", "funnel", "dotcom", "automation"], useCases: ["知識型企業Email系統", "線上課程Email行銷", "ClickFunnels漏斗Email"], outputFormats: ["Attractive Character 設計", "SOS序列", "Seinfeld Email系統", "Offer Stack設計"], requiredIntegrations: [], token: 60000, showcases: [{ company: "ClickFunnels（Russell Brunson）", description: "應用 DotCom Secrets Email 系統，以 SOS + 每日廣播 Email 持續培育 ClickFunnels 用戶", result: "ClickFunnels 達到 $1 億 ARR，Email 名單超過 100 萬，每月 Email 貢獻 30% 新訂閱", source: "ClickFunnels Annual Report / Russell Brunson《DotCom Secrets》" }, { company: "Expert Secrets 課程（Brunson）", description: "應用 Offer Stack 設計搭配 Email 序列推廣 $997 課程", result: "首次發布 24 小時銷售超過 $3M，Email 序列 ROI 超過 50 倍", source: "Russell Brunson 公開發布報告 2017" }] });
+    }

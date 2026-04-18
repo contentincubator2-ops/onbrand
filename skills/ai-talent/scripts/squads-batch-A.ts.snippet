@@ -1,0 +1,324 @@
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY A: Facebook/Meta 廣告 Methodology Squads (A1–A10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // A1: Gary Vaynerchuk — Jab, Jab, Jab, Right Hook (2013)
+    {
+      const slug = "fb-garyvee-jab-hook";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["paid-ads", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["paid-ads", "jab-right-hook", "facebook-content-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "jab-content-creation"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "visual-ad-brief"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "native-creative"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["marketing-analytics", "meta-ads-paid-ads"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["marketing-analytics", "fb-campaign-optimization"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Jab 內容策略規劃", description: "依 GaryVee 框架設計 3 輪 Jab 內容：教育型、娛樂型、情感型，建立受眾信任，不出現任何銷售訊息", tool: "internal", outputType: "jab_content_calendar", requiredSkills: ["paid-ads", "brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Jab 貼文文案撰寫", description: "為每個 Jab 類型撰寫原生感強的 Facebook 文案，純粹提供價值，文案風格貼近真人分享而非廣告", tool: "internal", outputType: "jab_post_copy", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Jab 視覺素材製作", description: "製作與 Facebook 動態流融合的原生視覺，最大化有機觸及與互動率", tool: "internal", outputType: "jab_creative_assets", requiredSkills: ["visual-content-creator"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "Right Hook 廣告出擊", description: "在充分給予後精準出擊：高轉換 Right Hook 廣告，直接要求行動（購買/報名/下載），搭配自訂受眾再行銷", tool: "internal", outputType: "right_hook_ad_set", requiredSkills: ["paid-ads", "marketing-analytics"] }, m4Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "社群策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "視覺設計師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "廣告投放師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "GaryVee Jab Jab Jab Right Hook Facebook 策略", description: "Source: Gary Vaynerchuk《Jab, Jab, Jab, Right Hook》2013. VaynerMedia 應用此框架為百威啤酒、雪碧等品牌帶來互動率提升 400%", steps });
+      await upsertSquad(conn, { slug, name: "GaryVee Jab Jab Right Hook Facebook 策略小隊", description: "先用 3 次價值內容（Jab）建立信任，再精準一擊（Right Hook）促成轉換。Gary Vaynerchuk 2013 年商業驗證框架", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Gary Vaynerchuk – Jab, Jab, Jab, Right Hook (2013)", agents: agentMembers, tags: ["facebook", "content-marketing", "paid-ads", "social-media"], useCases: ["品牌社群溫熱", "電商Facebook促銷", "活動報名推廣"], outputFormats: ["Facebook貼文排程", "廣告素材套組", "投放報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "百威啤酒（Budweiser）via VaynerMedia", description: "應用 Jab 框架，70% 內容為純價值給予，30% 為 Right Hook 促銷", result: "Facebook 互動率提升 400%，廣告轉換成本降低 45%", source: "VaynerMedia Case Studies / Jab Jab Jab Right Hook (2013)" }, { company: "Gary Vaynerchuk 個人品牌", description: "長期執行 Give First 策略，1,000+ 日每天在 Facebook/YouTube 輸出免費內容", result: "累積 900 萬+ Facebook 粉絲，VaynerMedia 年營收超過 $2.5 億", source: "GaryVee.com / Inc. Magazine 2022" }] });
+    }
+
+    // A2: Eugene Schwartz — Breakthrough Advertising Awareness Levels (1966)
+    {
+      const slug = "fb-schwartz-awareness";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["ad-copywriting-formulas", "copywriting-pro"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["ad-copywriting-formulas", "schwartz-awareness-levels"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "mbb-strategist"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "audience-awareness-mapping"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["hook-copywriter", "paid-ads"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["hook-copywriter", "awareness-based-messaging"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["visual-ad-brief", "visual-content-creator"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["visual-ad-brief", "cold-warm-hot-creative"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const m5Id = await findAgent(conn, ["attribution-modeling", "marketing-analytics"], usedIds);
+      if (m5Id) { usedIds.push(m5Id); await assignSkillsToAgent(conn, m5Id, ["attribution-modeling", "funnel-stage-analytics"]); }
+      const m5Info = await getAgentInfo(conn, m5Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "受眾意識層級診斷", description: "分析目標受眾處於 5 個意識階段的哪一層：完全不知情→問題意識→解決方案意識→產品意識→最意識", tool: "internal", outputType: "awareness_level_map", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "分層廣告訊息架構", description: "為每個意識層級設計專屬訊息架構：冷受眾用問題勾起、溫受眾比較方案、熱受眾直接促購", tool: "internal", outputType: "layered_message_framework", requiredSkills: ["ad-copywriting-formulas"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "分層廣告文案撰寫", description: "按意識層級撰寫 5 套廣告文案，Hook 強度從軟性教育→強力促銷逐步升級", tool: "internal", outputType: "layered_ad_copy", requiredSkills: ["hook-copywriter"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "分層創意素材製作", description: "為冷/溫/熱受眾製作相應視覺風格：冷=教育感、溫=比較感、熱=緊迫感", tool: "internal", outputType: "awareness_creatives", requiredSkills: ["visual-ad-brief"] }, m4Info),
+        assignAgentToStep({ order: 5, name: "漏斗歸因優化", description: "設定各意識層追蹤像素事件，監測受眾在漏斗中的移動，持續優化每層廣告", tool: "internal", outputType: "awareness_funnel_report", requiredSkills: ["attribution-modeling"] }, m5Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "廣告文案師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "受眾研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Hook 文案師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "廣告素材師", order: 4 },
+        { agent_id: m5Id, is_lead: false, role: "歸因分析師", order: 5 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Eugene Schwartz 意識層級 Facebook 廣告框架", description: "Source: Eugene Schwartz《Breakthrough Advertising》1966. Agora Publishing 應用此框架年創直效廣告營收超過 $10 億", steps });
+      await upsertSquad(conn, { slug, name: "Schwartz 意識層級 Facebook 廣告小隊", description: "依 Eugene Schwartz 5 層意識框架，為不同認知階段受眾投放精準廣告，避免對冷受眾促銷、對熱受眾只講教育", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Eugene Schwartz – Breakthrough Advertising Awareness Levels (1966)", agents: agentMembers, tags: ["facebook", "paid-ads", "copywriting", "funnel"], useCases: ["新品牌冷受眾開發", "教育型產品廣告", "高客單價B2C廣告"], outputFormats: ["分層廣告文案套組", "廣告素材包", "漏斗歸因報告"], requiredIntegrations: [], token: 65000, showcases: [{ company: "Agora Publishing", description: "旗下 50+ 出版品持續應用 Schwartz 框架撰寫廣告文案，針對不同意識層精準投放", result: "年營收突破 $10 億，直效廣告 ROAS 長年維持 4-8x", source: "Agora Financial / Breakthrough Advertising (Schwartz 1966)" }, { company: "ClickFunnels", description: "Russell Brunson 公開承認 Schwartz 意識框架是其廣告策略核心", result: "ClickFunnels 在 3 年內達到 $1 億 ARR，Facebook 廣告 CPA 優化 60%", source: "Russell Brunson《Traffic Secrets》2020" }] });
+    }
+
+    // A3: Ryan Deiss (DigitalMarketer) — Customer Value Optimization (2015)
+    {
+      const slug = "fb-deiss-cvo";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["campaign-orchestrator", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["campaign-orchestrator", "customer-value-optimization"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["paid-ads", "meta-ads-paid-ads"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["paid-ads", "tripwire-offer-ads"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["hook-copywriter", "ad-copywriting-formulas"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["hook-copywriter", "oto-upsell-copy"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["email-marketing", "remarketing-strategy"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["email-marketing", "ascension-sequence"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Lead Magnet 設計", description: "設計高感知價值免費品（Lead Magnet），解決受眾單一痛點，換取 Email/聯絡資訊", tool: "internal", outputType: "lead_magnet_brief", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Tripwire 低門檻產品設定", description: "設計 $1-$20 低門檻入門產品，讓潛客從訪客轉為付費顧客，消除心理消費門檻", tool: "internal", outputType: "tripwire_offer", requiredSkills: ["paid-ads"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Core Offer 主力產品廣告", description: "撰寫主力產品廣告文案，針對已購買 Tripwire 的顧客再行銷，轉化率通常提升 3-5 倍", tool: "internal", outputType: "core_offer_ad", requiredSkills: ["hook-copywriter"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "Profit Maximizer OTO 設計", description: "設計購買後立即出現的加購/升級方案（OTO），最大化每筆訂單價值（AOV）", tool: "internal", outputType: "oto_upsell_flow", requiredSkills: ["ad-copywriting-formulas"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "Return Path 回購序列", description: "設計 Email 自動化回購序列，透過持續提供價值讓顧客重複購買，提升 LTV", tool: "internal", outputType: "return_path_email_sequence", requiredSkills: ["email-marketing"] }, m4Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "CVO 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "廣告投放師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "文案師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "Email 行銷師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ryan Deiss Customer Value Optimization Facebook 漏斗", description: "Source: Ryan Deiss / DigitalMarketer《Customer Value Optimization》2015. DigitalMarketer 應用此框架培訓超過 100 萬行銷人，自身年收入超過 $20M", steps });
+      await upsertSquad(conn, { slug, name: "Deiss CVO Facebook 漏斗小隊", description: "應用 DigitalMarketer 的 Customer Value Optimization 框架，從 Lead Magnet → Tripwire → Core Offer → OTO → Return Path 完整優化顧客終生價值", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Ryan Deiss / DigitalMarketer – Customer Value Optimization (2015)", agents: agentMembers, tags: ["facebook", "funnel", "cvo", "paid-ads", "email"], useCases: ["電商全漏斗優化", "線上課程銷售漏斗", "SaaS 免費試用轉付費"], outputFormats: ["漏斗策略圖", "廣告文案套組", "Email 序列", "OTO 頁面文案"], requiredIntegrations: [], token: 70000, showcases: [{ company: "DigitalMarketer 自身", description: "應用 CVO 框架，以 $7 Tripwire 獲取顧客，再透過 Core Offer 升級至 $997 認證課程", result: "年營收超過 $20M，學員超過 100 萬，Facebook 廣告 ROAS 穩定在 4-6x", source: "DigitalMarketer.com / Ryan Deiss 公開演講 Traffic & Conversion Summit" }, { company: "Agora Financial", description: "採用 Tripwire + Ascension 模型銷售財務出版品", result: "年營收超過 $10 億，顧客 LTV 是業界平均的 3 倍", source: "Inc. Magazine / Agora Publishing Annual Reports" }] });
+    }
+
+    // A4: Perry Marshall — 80/20 Sales and Marketing Facebook Method (2013)
+    {
+      const slug = "fb-marshall-8020";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-analytics", "mbb-strategist"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-analytics", "8020-marketing-analysis"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["lookalike-audience-strategy", "paid-ads"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["lookalike-audience-strategy", "top20-audience-targeting"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["smart-bidding-strategy", "attribution-modeling"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["smart-bidding-strategy", "bid-optimization-8020"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "80/20 顧客分析", description: "識別創造 80% 營收的頂端 20% 顧客，分析其人口特徵、行為模式、購買觸發點", tool: "internal", outputType: "top20_customer_profile", requiredSkills: ["marketing-analytics"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "80/20 受眾精準鎖定", description: "以 Top 20% 顧客建立 Lookalike 受眾，並排除低價值訪客，把廣告預算集中投放高潛力受眾", tool: "internal", outputType: "precision_audience_set", requiredSkills: ["lookalike-audience-strategy"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "高價值廣告投資組合", description: "依 80/20 原則優化出價策略：對高意圖受眾提高出價，對低轉換受眾降低預算，最大化 ROAS", tool: "internal", outputType: "optimized_campaign_portfolio", requiredSkills: ["smart-bidding-strategy"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "80/20 分析師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "受眾策略師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "競價優化師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Perry Marshall 80/20 Facebook 廣告效益最大化", description: "Source: Perry Marshall《80/20 Sales and Marketing》2013. Marshall 是 Google AdWords 最早期大師，其 80/20 方法幫助數千家企業將廣告 ROAS 提升 2-4 倍", steps });
+      await upsertSquad(conn, { slug, name: "Perry Marshall 80/20 Facebook 廣告小隊", description: "應用 Perry Marshall 的 80/20 法則，把廣告預算集中在創造最大價值的 20% 頂端受眾，大幅提升 ROAS", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Perry Marshall – 80/20 Sales and Marketing (2013)", agents: agentMembers, tags: ["facebook", "paid-ads", "audience-targeting", "8020"], useCases: ["廣告預算效益優化", "高單價產品Facebook廣告", "LTV-based受眾投放"], outputFormats: ["80/20 顧客分析報告", "受眾策略方案", "競價優化設定"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Perry Marshall 客戶群（B2B SaaS）", description: "應用 80/20 受眾篩選，將廣告預算從散投改為集中投放 Top 20% 高價值受眾", result: "廣告 ROAS 從 1.8x 提升至 5.2x，同期廣告支出減少 30%", source: "Perry Marshall《80/20 Sales and Marketing》案例章節" }, { company: "Infusionsoft（現 Keap）", description: "Perry Marshall 擔任顧問，協助 Infusionsoft 以 80/20 原則重建 Facebook 廣告架構", result: "潛客獲取成本降低 55%，企業達到 $1 億 ARR 里程碑", source: "Keap.com History / Inc. Magazine" }] });
+    }
+
+    // A5: Dan Kennedy — Magnetic Marketing (1992, updated 2018)
+    {
+      const slug = "fb-kennedy-magnetic";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "mbb-strategist"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "magnetic-marketing-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["ad-copywriting-formulas", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["ad-copywriting-formulas", "kennedy-direct-response"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["market-research-agent", "brand-dna"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["market-research-agent", "ideal-client-avatar"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["paid-ads", "remarketing-strategy"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["paid-ads", "magnetic-media-buying"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "磁石訊息定義（Message）", description: "定義明確區隔訊息：你服務誰、解決什麼問題、為何選你。Kennedy 要求訊息必須「讓對的人無法不回應」", tool: "internal", outputType: "magnetic_message", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "理想顧客畫像（Market）", description: "精確定義理想顧客：人口特徵、心理特徵、媒體消費習慣、購買觸發點，建立完整 ICA", tool: "internal", outputType: "ideal_client_avatar", requiredSkills: ["market-research-agent"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "直效回應廣告文案", description: "應用 Kennedy 直效回應原則撰寫 Facebook 廣告：強力 Headline + 利益堆疊 + 社會證明 + 緊迫 CTA", tool: "internal", outputType: "direct_response_ad_copy", requiredSkills: ["ad-copywriting-formulas"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "媒體投放策略（Media）", description: "選擇正確媒體管道與版位，針對 ICA 的媒體習慣設計 Facebook 投放策略，確保訊息觸及對的人", tool: "internal", outputType: "media_strategy", requiredSkills: ["paid-ads"] }, m4Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "磁石行銷策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "直效回應文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "受眾研究師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "媒體投放師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Dan Kennedy Magnetic Marketing Facebook 策略", description: "Source: Dan Kennedy《Magnetic Marketing》1992，2018 年更新版。GKIC（Kennedy 學員社群）超過 25,000 名企業主應用此框架，平均收入提升 47%", steps });
+      await upsertSquad(conn, { slug, name: "Kennedy Magnetic Marketing Facebook 小隊", description: "應用 Dan Kennedy 的 Message-Market-Media 三角框架，吸引對的客戶主動靠近，而非追逐所有人", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Dan Kennedy – Magnetic Marketing (1992/2018)", agents: agentMembers, tags: ["facebook", "direct-response", "paid-ads", "copywriting"], useCases: ["本地商家Facebook廣告", "服務業客戶獲取", "高端B2C廣告"], outputFormats: ["磁石訊息定義書", "ICA 文件", "廣告文案", "媒體策略"], requiredIntegrations: [], token: 60000, showcases: [{ company: "GKIC（Glazer-Kennedy 社群）25,000+ 企業主", description: "應用 Magnetic Marketing 框架重塑廣告策略，從廣撒改為精準磁吸", result: "會員企業平均收入提升 47%，廣告 ROI 提升 200%+", source: "GKIC Annual Conference / No B.S. Marketing Newsletter" }, { company: "Magnetic Marketing 公司本身", description: "Russell Brunson 收購 Magnetic Marketing 品牌後應用 Kennedy 框架", result: "品牌年營收超過 $1 億，線上課程銷售量翻 3 倍", source: "Russell Brunson 公開訪談 2022" }] });
+    }
+
+    // A6: Alex Hormozi — $100M Offers Facebook Strategy (2021)
+    {
+      const slug = "fb-hormozi-offer-first";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["hook-copywriter", "ad-copywriting-formulas"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["hook-copywriter", "grand-slam-offer-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["paid-ads", "meta-ads-paid-ads"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["paid-ads", "offer-first-ad-strategy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-ad-brief", "visual-content-creator"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-ad-brief", "proof-stack-creative"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Grand Slam Offer 設計", description: "依 Hormozi 框架建立無法拒絕的報價：夢想結果 + 高感知價值 + 低阻力 + 強力保證。目標：讓人覺得「不買才蠢」", tool: "internal", outputType: "grand_slam_offer_doc", requiredSkills: ["hook-copywriter"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Proof Stack 社會證明堆疊", description: "收集並組織所有社會證明：客戶見證、before/after 數據、案例研究，建立不可反駁的信任牆", tool: "internal", outputType: "proof_stack", requiredSkills: ["paid-ads"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "廣告投放與 A/B 測試", description: "以 Grand Slam Offer 為核心投放 Facebook 廣告，測試不同 Headline 與 Visual，找出最高 CTR/CVR 組合", tool: "internal", outputType: "fb_ad_test_results", requiredSkills: ["meta-ads-paid-ads"] }, m2Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Offer 設計師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "廣告投放師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "素材設計師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Hormozi $100M Offers Facebook 廣告策略", description: "Source: Alex Hormozi《$100M Offers》2021. Hormozi 應用此框架讓 Gym Launch 在 6 個月達到 $1.7M/月收入，Acquisition.com 旗下企業組合估值超過 $1 億", steps });
+      await upsertSquad(conn, { slug, name: "Hormozi $100M Offer Facebook 小隊", description: "先打造無法拒絕的 Grand Slam Offer，再用 Facebook 廣告擴大觸達。Offer 對了，廣告費用可以降低 60%+", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Alex Hormozi – $100M Offers (2021)", agents: agentMembers, tags: ["facebook", "offer-design", "paid-ads", "conversion"], useCases: ["健身房/服務業客戶獲取", "線上課程銷售", "高單價服務廣告"], outputFormats: ["Grand Slam Offer 文件", "廣告文案組合", "A/B 測試報告"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Gym Launch（Hormozi 創辦）", description: "以 Grand Slam Offer「免費設備 + 100% 保證」搭配 Facebook 廣告投放", result: "6 個月從 $0 達到 $1.7M/月，首年破 $17M", source: "Alex Hormozi《$100M Offers》Chapter 1 + YouTube 訪談" }, { company: "Acquisition.com 投資組合", description: "所有被投資企業強制執行 Offer-First 策略後再跑 Facebook 廣告", result: "平均企業估值提升 3-5 倍，廣告獲客成本降低 40-65%", source: "Acquisition.com 官網 / Hormozi 公開 Podcast 2023" }] });
+    }
+
+    // A7: David Ogilvy — Long-Copy Direct Response (Confessions of an Advertising Man, 1963)
+    {
+      const slug = "fb-ogilvy-long-copy";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["copywriting-pro", "ad-copywriting-formulas"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["copywriting-pro", "ogilvy-long-copy-method"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "brand-dna"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "consumer-insight-research"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-ad-brief", "brand-identity"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-ad-brief", "editorial-ad-design"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["marketing-analytics", "attribution-modeling"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["marketing-analytics", "long-copy-performance-tracking"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "深度消費者洞察研究", description: "Ogilvy 要求廣告人做 homework：研究產品、研究競品、研究消費者。找出讓人分享給朋友的「Big Idea」", tool: "internal", outputType: "consumer_insight_report", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "Big Idea + Headline 創作", description: "依 Ogilvy 準則撰寫廣告標題：平均 5 倍讀者看標題多於內文，標題決定廣告成敗", tool: "internal", outputType: "headline_variants", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "長文案正文撰寫", description: "撰寫充滿事實、功效說明、見證的長篇廣告文案。Ogilvy 說「消費者不是白痴，她是你的妻子」，用尊重的方式說服", tool: "internal", outputType: "long_form_ad_copy", requiredSkills: ["ad-copywriting-formulas"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "編輯風格視覺設計", description: "設計帶有雜誌編輯感的廣告素材：清晰排版、高品質攝影、圖說文字，提升廣告信任度", tool: "internal", outputType: "editorial_creative", requiredSkills: ["visual-ad-brief"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "廣告效益追蹤", description: "追蹤長文案 vs 短文案效益，測量閱讀完成率、點擊率、轉換率，優化最佳廣告版本", tool: "internal", outputType: "copy_performance_report", requiredSkills: ["marketing-analytics"] }, m4Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "長文案撰寫師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "消費者研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "編輯設計師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "廣告效益分析師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ogilvy 長文案直效回應 Facebook 廣告", description: "Source: David Ogilvy《Confessions of an Advertising Man》1963. Ogilvy & Mather 應用長文案原則為 Rolls-Royce、IBM、American Express 創造數十億廣告價值", steps });
+      await upsertSquad(conn, { slug, name: "Ogilvy 長文案 Facebook 廣告小隊", description: "應用 David Ogilvy 深度研究+長文案方法，讓 Facebook 廣告像一篇有說服力的雜誌文章，建立品牌信任同時促進轉換", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "David Ogilvy – Confessions of an Advertising Man (1963)", agents: agentMembers, tags: ["facebook", "long-copy", "direct-response", "brand"], useCases: ["高單價產品廣告", "品牌形象廣告", "B2B服務廣告"], outputFormats: ["廣告長文案", "Headline 變體", "編輯風格素材"], requiredIntegrations: [], token: 65000, showcases: [{ company: "Rolls-Royce（Ogilvy & Mather）", description: "「在時速60英里時，這輛新 Rolls-Royce 最大的噪音是電子鐘的滴答聲」— 719 字長文案廣告", result: "刊出後 Rolls-Royce 銷量增加 50%，成為史上最被引用的廣告之一", source: "Ogilvy《Confessions of an Advertising Man》1963" }, { company: "American Express（Ogilvy 操刀）", description: "長文案直效郵件廣告強調身份象徵與實用性", result: "卡片申請量提升 30%，直效廣告 ROI 業界最高", source: "Ogilvy & Mather Agency Records / David Ogilvy《Ogilvy on Advertising》1983" }] });
+    }
+
+    // A8: Jon Loomer — Facebook Custom Audiences Mastery (2013–2020)
+    {
+      const slug = "fb-loomer-custom-audience";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["remarketing-strategy", "paid-ads"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["remarketing-strategy", "custom-audience-mastery"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["lookalike-audience-strategy", "meta-ads-paid-ads"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["lookalike-audience-strategy", "pixel-audience-strategy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["attribution-modeling", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["attribution-modeling", "retargeting-analytics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Pixel 事件架構設計", description: "設計完整 Facebook Pixel 事件追蹤架構，記錄每個有意義的用戶行為：瀏覽→加購→結帳→購買", tool: "internal", outputType: "pixel_event_architecture", requiredSkills: ["remarketing-strategy"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "自訂受眾分層策略", description: "建立 10+ 個自訂受眾分層：網站訪客（1/7/14/30天）、觀看影片受眾、名單受眾、高價值購買者", tool: "internal", outputType: "custom_audience_segments", requiredSkills: ["lookalike-audience-strategy"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "再行銷廣告序列設計", description: "為每個受眾層設計專屬再行銷訊息：訪客用誘因、加購未付款用緊迫、舊顧客用回購優惠", tool: "internal", outputType: "retargeting_ad_sequences", requiredSkills: ["remarketing-strategy"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "相似受眾拓展", description: "以最高價值顧客建立 1%/2%/3% Lookalike 受眾，測試不同相似度的冷受眾開發效益", tool: "internal", outputType: "lookalike_expansion_plan", requiredSkills: ["attribution-modeling"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "受眾策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "Lookalike 專家", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "歸因分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Jon Loomer Facebook 自訂受眾精準投放系統", description: "Source: Jon Loomer《Facebook Custom Audiences》2013–2020. JonLoomer.com 是 Facebook 進階廣告最權威教學平台，超過 80 萬行銷人學習此方法", steps });
+      await upsertSquad(conn, { slug, name: "Loomer Facebook 自訂受眾精準投放小隊", description: "應用 Jon Loomer 的 Custom Audiences 精通方法：Pixel 架構 → 受眾分層 → 再行銷序列 → Lookalike 拓展，讓每一分廣告費都精準觸達最有可能轉換的受眾", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Jon Loomer – Facebook Custom Audiences Mastery (2013)", agents: agentMembers, tags: ["facebook", "retargeting", "custom-audience", "paid-ads"], useCases: ["電商再行銷", "廢棄購物車轉換", "高LTV顧客複購"], outputFormats: ["受眾分層策略", "Pixel 設定文件", "再行銷廣告序列"], requiredIntegrations: [], token: 60000, showcases: [{ company: "JonLoomer.com 自身案例", description: "應用多層自訂受眾系統，對不同訪客行為投放專屬廣告", result: "廣告 ROAS 達到 8-12x，Email 名單年增長 200%+", source: "JonLoomer.com 部落格公開案例研究" }, { company: "電商品牌（匿名）via Jon Loomer 認證", description: "實施完整 Pixel + 自訂受眾架構，加購未購再行銷優化", result: "購物車棄置回收率從 8% 提升至 31%，廣告支出降低 40%", source: "Jon Loomer 課程案例研究 2019" }] });
+    }
+
+    // A9: Molly Pittman — Facebook Traffic System (DigitalMarketer, 2016)
+    {
+      const slug = "fb-pittman-traffic";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["campaign-orchestrator", "paid-ads"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["campaign-orchestrator", "traffic-system-design"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-ad-brief", "visual-content-creator"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-ad-brief", "ad-creative-testing"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["smart-bidding-strategy", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["smart-bidding-strategy", "traffic-optimization"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Traffic 系統架構規劃", description: "依 Pittman 框架設計三層流量系統：冷流量（Cold）→ 暖流量（Warm）→ 熱流量（Hot），每層有不同目標與訊息", tool: "internal", outputType: "traffic_system_blueprint", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "廣告素材測試矩陣", description: "建立廣告素材測試矩陣：3 種 Hook 形式 × 2 種格式 × 2 種受眾，快速找出最高效率的廣告組合", tool: "internal", outputType: "creative_test_matrix", requiredSkills: ["visual-ad-brief"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "漏斗流量優化", description: "分析每層流量的 CPC/CTR/CVR，優化預算分配，把錢投在最高 ROAS 的廣告組合", tool: "internal", outputType: "traffic_optimization_report", requiredSkills: ["smart-bidding-strategy"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "縮放贏家廣告", description: "識別 ROAS 最高的廣告組合，逐步縮放預算（不超過每日 20% 增幅避免演算法重置），擴大成功廣告", tool: "internal", outputType: "scaling_strategy", requiredSkills: ["marketing-analytics"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "Traffic 報告與復盤", description: "每週輸出完整 Traffic 報告：各層漏斗表現、成本趨勢、受眾疲乏指數、下一步行動清單", tool: "internal", outputType: "traffic_weekly_report", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "流量系統師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "創意測試師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "投放優化師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Molly Pittman Facebook Traffic System", description: "Source: Molly Pittman / DigitalMarketer《Facebook Traffic System》2016. Pittman 擔任 DigitalMarketer CMO 時，協助客戶管理超過 $5M/月 Facebook 廣告支出", steps });
+      await upsertSquad(conn, { slug, name: "Molly Pittman Facebook 流量系統小隊", description: "應用 Molly Pittman 的三層流量系統：結構化設計冷/暖/熱受眾漏斗，搭配創意測試矩陣快速找出最高效廣告", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Molly Pittman – Facebook Traffic System (DigitalMarketer, 2016)", agents: agentMembers, tags: ["facebook", "paid-ads", "traffic", "funnel-optimization"], useCases: ["Facebook廣告架構重建", "大型帳戶效益提升", "多產品線廣告管理"], outputFormats: ["流量系統架構圖", "創意測試矩陣", "週報"], requiredIntegrations: [], token: 65000, showcases: [{ company: "DigitalMarketer 客戶組合", description: "Pittman 擔任 CMO 期間設計並管理多客戶 Facebook 流量系統", result: "管理超過 $5M/月廣告支出，平均客戶 ROAS 達到 4.5x", source: "Molly Pittman 個人網站 / DigitalMarketer.com" }, { company: "Train My Traffic Person（Pittman 課程）", description: "超過 5,000 名廣告師學習此流量系統並應用於客戶帳戶", result: "學員客戶廣告成效平均提升 67%", source: "TrainMyTrafficPerson.com 學員案例 2022" }] });
+    }
+
+    // A10: Frank Kern — Mass Control / Core Influence (2008)
+    {
+      const slug = "fb-kern-mass-control";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "core-influence-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "results-in-advance-content"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["email-marketing", "social-media-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["email-marketing", "indoctrination-sequence"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["paid-ads", "campaign-orchestrator"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["paid-ads", "launch-amplification"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Bond 建立情感連結", description: "先建立真實的人際關係：分享真實故事、展示個性、讓受眾感覺你是「自己人」而非廣告機器", tool: "internal", outputType: "bond_content_plan", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Results in Advance 預先展示成果", description: "在銷售前免費給予真實有用的內容，讓受眾先看到結果。Kern 說「給他們魚，讓他們想要整片湖」", tool: "internal", outputType: "ria_content", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Indoctrination 信念建立序列", description: "透過 Facebook 影片/貼文系列建立受眾對你方法論的信念，讓他們在購買前就相信你的解決方案", tool: "internal", outputType: "indoctrination_sequence", requiredSkills: ["email-marketing"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "Mass Control 促銷出擊", description: "在情感連結＋信念建立完成後，精準釋放促銷訊息，應用社會證明和限時稀缺最大化轉換率", tool: "internal", outputType: "mass_control_campaign", requiredSkills: ["paid-ads"] }, m4Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "影響力策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "內容文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "序列行銷師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "廣告投放師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Frank Kern Mass Control Facebook 影響力行銷", description: "Source: Frank Kern《Mass Control》2008. Kern 的 Mass Control 課程一次促銷創造 $23.8M 銷售額，創下當時數位行銷記錄", steps });
+      await upsertSquad(conn, { slug, name: "Frank Kern Mass Control Facebook 小隊", description: "應用 Frank Kern 的 Bond → Results in Advance → Indoctrinate → Promote 框架，在建立真實關係後才促銷，轉換率大幅超越傳統廣告", industryKey: "marketing", missionType: taskType, workspace: ["facebook-ads"], methodology: "Frank Kern – Mass Control (2008)", agents: agentMembers, tags: ["facebook", "influence", "content-marketing", "paid-ads"], useCases: ["知識型產品銷售", "高端服務推廣", "個人品牌貨幣化"], outputFormats: ["影響力內容計劃", "信念建立序列", "促銷廣告套組"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Frank Kern Mass Control 課程發售", description: "應用 Bond + RIA + Indoctrination 三步曲，建立受眾信念後發售課程", result: "單次促銷 $23.8M 銷售額，24 小時內售罄，當時數位行銷最高紀錄", source: "Frank Kern 公開訪談 / Mass Control 課程 2008" }, { company: "Russell Brunson（模仿應用）", description: "學習 Kern 的 Core Influence 框架後應用於 ClickFunnels 上市推廣", result: "ClickFunnels 首年達到 $10M ARR，創辦人個人品牌粉絲超過 100 萬", source: "Russell Brunson《Expert Secrets》2017" }] });
+    }

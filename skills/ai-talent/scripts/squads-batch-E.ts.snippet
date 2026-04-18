@@ -1,0 +1,308 @@
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY E: 內容行銷 Methodology Squads (E1–E10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // E1: Joe Pulizzi — Content Inc. (2015)
+    {
+      const slug = "cm-pulizzi-content-inc";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "content-inc-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "mbb-strategist"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "content-tilt-identification"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["email-marketing", "social-scheduler"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["email-marketing", "audience-building-email"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["copywriting-pro", "content-platform-pillar"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "甜蜜點定位（Sweet Spot）", description: "找出品牌知識優勢與受眾需求的交集「甜蜜點」。Pulizzi 說先有受眾才有產品，先找甜蜜點再做內容", tool: "internal", outputType: "sweet_spot_definition", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "內容傾斜確立（Content Tilt）", description: "在甜蜜點中找到競爭對手沒有佔領的角度（Content Tilt）：這是讓品牌成為「唯一」而非「其中之一」的關鍵", tool: "internal", outputType: "content_tilt_strategy", requiredSkills: ["mbb-strategist"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "核心平台內容製作", description: "選定一個核心平台（部落格/Podcast/YouTube），每週系統輸出高品質內容，聚焦在甜蜜點+Content Tilt", tool: "internal", outputType: "platform_content_plan", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "Email 受眾建立", description: "透過核心平台內容建立 Email 訂閱名單，這是 Pulizzi 的重點：擁有受眾比在社群平台上借用受眾更重要", tool: "internal", outputType: "email_list_building_plan", requiredSkills: ["email-marketing"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "受眾多元化分發", description: "在核心平台成功後，開始向 2-3 個次要平台分發，擴大受眾覆蓋", tool: "internal", outputType: "diversification_plan", requiredSkills: ["social-scheduler"] }, m3Info),
+        assignAgentToStep({ order: 6, name: "內容商業化策略", description: "設計受眾商業化路徑：廣告、贊助、付費課程、書籍、活動，把受眾變成收入引擎", tool: "internal", outputType: "monetization_strategy", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Content Inc. 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "甜蜜點研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Email 受眾師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "內容創作師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Joe Pulizzi Content Inc. 受眾優先內容行銷框架", description: "Source: Joe Pulizzi《Content Inc.》2015 年書籍 + Content Marketing Institute 創辦。CMI 被收購前估值超過 $17M，應用 Content Inc. 框架", steps });
+      await upsertSquad(conn, { slug, name: "Joe Pulizzi Content Inc. 受眾建立小隊", description: "先建立受眾，再建立產品。應用 Joe Pulizzi 的 Content Inc. 六步框架：甜蜜點→Content Tilt→核心平台→受眾建立→分發多元化→商業化", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Joe Pulizzi – Content Inc. (2015)", agents: agentMembers, tags: ["content-marketing", "audience-building", "email", "brand"], useCases: ["新品牌內容策略", "媒體型企業建立", "個人品牌商業化"], outputFormats: ["甜蜜點分析", "Content Tilt 策略", "內容計劃", "商業化方案"], requiredIntegrations: [], token: 65000, showcases: [{ company: "Content Marketing Institute（Pulizzi 創辦）", description: "以 Content Inc. 框架，從零建立業界最具影響力的 B2B 內容行銷媒體", result: "CMI 年收入超過 $8M，被 UBM 以 $17.6M 收購，年度活動 Content Marketing World 1,000+ 名企業出席", source: "Joe Pulizzi《Content Inc.》/ CMI Annual Report" }, { company: "HubSpot Blog（類似 Content Inc. 路徑）", description: "以 Sweet Spot（行銷/銷售/服務知識）+ Content Tilt（免費工具+教育內容）建立媒體型行銷", result: "HubSpot Blog 月流量超過 500 萬，Email 名單超過 300 萬，貢獻超過 30% 的新客戶", source: "HubSpot Annual Report 2022 / CEO Brian Halligan 訪談" }] });
+    }
+
+    // E2: Marcus Sheridan — They Ask You Answer (2012/2017)
+    {
+      const slug = "cm-sheridan-they-ask";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "mbb-strategist"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "they-ask-you-answer"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "buyer-question-research"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["hook-copywriter", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["hook-copywriter", "sales-enablement-content"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "買家問題大挖掘", description: "系統化收集目標受眾所有問題：Cost、Problems、Comparisons、Best、Reviews（Big Five 主題）。Sheridan：「消費者在買你產品前有什麼問題？把全部都回答了」", tool: "internal", outputType: "buyer_question_bank", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "誠實回答內容製作（包括 Cost/Pricing）", description: "製作業界最誠實的內容：包括競品比較、缺點、定價透明，這是大多數競爭對手不敢做的。Sheridan 的護城河：誠實即權威", tool: "internal", outputType: "honest_answer_content", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "銷售賦能內容設計", description: "設計幫助業務人員在銷售過程中使用的內容：作業治 Assignment Selling，讓潛客在見面前先看指定文章，提升會議品質", tool: "internal", outputType: "sales_enablement_materials", requiredSkills: ["hook-copywriter"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "SEO 追蹤與優化", description: "追蹤每篇回答內容的 SEO 效益：搜尋流量、閱讀時間、表單轉換率，識別哪些問題帶來最多高質量潛客", tool: "internal", outputType: "seo_content_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "They Ask You Answer 師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "買家問題研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "銷售賦能師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Marcus Sheridan They Ask You Answer 內容行銷方法", description: "Source: Marcus Sheridan《They Ask You Answer》2012/2017. Sheridan 的 River Pools and Spas 應用此方法在金融危機期間變成全球最多人造訪的游泳池網站", steps });
+      await upsertSquad(conn, { slug, name: "Marcus Sheridan They Ask You Answer 內容小隊", description: "回答買家所有問題，包括競爭對手不敢碰的定價和缺點。Marcus Sheridan 的誠實框架：透明度即競爭優勢", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Marcus Sheridan – They Ask You Answer (2012/2017)", agents: agentMembers, tags: ["content-marketing", "seo", "inbound", "sales-enablement"], useCases: ["B2B服務業內容行銷", "高考慮度消費品牌", "電商品牌信任建立"], outputFormats: ["買家問題庫", "誠實回答內容", "銷售賦能材料", "SEO報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "River Pools and Spas（Sheridan 自創）", description: "2008 金融危機期間，以 They Ask You Answer 框架回答游泳池買家所有問題", result: "成為全球最多人造訪的游泳池網站，節省 $200,000 廣告費，銷售從危機中恢復", source: "Marcus Sheridan《They Ask You Answer》Chapter 1 + 公開演講" }, { company: "Yale Appliance（Sheridan 客戶）", description: "應用 They Ask You Answer 策略，誠實回答買家問題包括競品比較", result: "有機流量從 15 萬提升至 300 萬/月，年銷售額增長 40%", source: "Marcus Sheridan 客戶案例研究 2019" }] });
+    }
+
+    // E3: Brian Dean — Skyscraper Technique (Backlinko, 2015)
+    {
+      const slug = "cm-dean-skyscraper";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "skyscraper-technique"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "mbb-strategist"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "linkable-content-research"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["copywriting-pro", "10x-content-creation"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const m4Id = await findAgent(conn, ["marketing-ops", "marketing-analytics"], usedIds);
+      if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["marketing-ops", "link-outreach-ops"]); }
+      const m4Info = await getAgentInfo(conn, m4Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "高連結潛力內容偵察", description: "尋找目標關鍵字中被大量網站引用的「磁石內容」：Ahrefs 反向連結分析找出有 50+ 個連結的現有文章", tool: "internal", outputType: "linkable_content_targets", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "10x 優越內容創作", description: "製作比現有最佳內容「明顯更好」的版本：更新的數據、更深的分析、更清晰的視覺、更完整的涵蓋範圍", tool: "internal", outputType: "skyscraper_content_draft", requiredSkills: ["copywriting-pro"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "連結外聯名單建立", description: "建立連結到舊版文章的所有網站名單，這些是最可能連結你更好版本的潛在來源", tool: "internal", outputType: "link_prospect_list", requiredSkills: ["marketing-ops"] }, m4Info),
+        assignAgentToStep({ order: 4, name: "個人化連結外聯", description: "寄發個人化外聯郵件：說明你創建了更好的版本、提供具體改進點，請求他們更新連結到你的內容", tool: "internal", outputType: "link_outreach_emails", requiredSkills: ["marketing-ops"] }, m4Info),
+        assignAgentToStep({ order: 5, name: "連結建立效益追蹤", description: "追蹤外聯後的反向連結增長、Domain Authority 提升、有機排名變化，報告 Skyscraper 效益", tool: "internal", outputType: "link_building_report", requiredSkills: ["marketing-analytics"] }, m4Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Skyscraper 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "內容研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "10x 內容師", order: 3 },
+        { agent_id: m4Id, is_lead: false, role: "外聯執行師", order: 4 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Brian Dean Skyscraper Technique 超越競爭對手內容策略", description: "Source: Brian Dean（Backlinko）2015 年提出 Skyscraper Technique，首次應用案例獲得 110% 有機流量增長", steps });
+      await upsertSquad(conn, { slug, name: "Brian Dean Skyscraper Technique 內容連結建立小隊", description: "找到最多人連結的內容，做一個明顯更好的版本，然後告訴連結舊版的人換連結到你這裡。Brian Dean 的 Skyscraper 技術：以品質換連結", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Brian Dean – Skyscraper Technique (Backlinko, 2015)", agents: agentMembers, tags: ["content-marketing", "seo", "link-building", "backlinks"], useCases: ["SEO 連結建立", "內容行銷 ROI 提升", "競爭激烈關鍵字突破"], outputFormats: ["Skyscraper 內容", "外聯名單", "外聯郵件模板", "效益報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Backlinko（Brian Dean 自身）首次案例", description: "應用 Skyscraper Technique 為「Google Ranking Factors」文章建立反向連結", result: "2 週內有機流量增長 110%，獲得 300+ 個新反向連結，成為行業最被引用研究之一", source: "Brian Dean《Skyscraper Technique》Backlinko.com 2015" }, { company: "Ahrefs 部落格", description: "系統應用 Skyscraper 方法創作 SEO 研究類內容，持續獲得業界最多反向連結", result: "Ahrefs Blog 月流量超過 200 萬，DA 達到 79，每篇研究文章平均獲得 500+ 個反向連結", source: "Ahrefs Blog 公開案例 2022" }] });
+    }
+
+    // E4: Ann Handley — Everybody Writes (2014)
+    {
+      const slug = "cm-handley-everybody-writes";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["copywriting-pro", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["copywriting-pro", "everybody-writes-standards"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "brand-dna"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "audience-empathy-research"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["hook-copywriter", "ad-copywriting-formulas"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["hook-copywriter", "editorial-quality-copywriting"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "受眾深度同理心研究", description: "Ann Handley 的核心：「Pathological Empathy（病態式同理心）」— 在寫任何字之前，深刻理解受眾是誰、他們相信什麼、他們想要什麼", tool: "internal", outputType: "pathological_empathy_profile", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "品牌聲音與寫作標準", description: "建立品牌寫作標準：具體的語氣指引（不只說「有趣」，而是「像真人朋友解釋，帶一點幽默但不低俗」）", tool: "internal", outputType: "brand_voice_writing_guide", requiredSkills: ["brand-dna"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "內容草稿創作", description: "依 Handley 的「草稿為王」原則：先寫出 ugly first draft，再反覆打磨，好內容是寫出來再編輯出來的", tool: "internal", outputType: "content_drafts", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "編輯與品質把關", description: "應用 Handley 的編輯清單：是否有獨特觀點、是否為讀者而寫（非公司角度）、是否真的有用、語氣是否一致", tool: "internal", outputType: "edited_final_content", requiredSkills: ["hook-copywriter"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "寫作文化建立", description: "建立組織內的寫作文化：Ann Handley 說每個人都需要寫作能力。設計寫作訓練計劃和品質標準", tool: "internal", outputType: "writing_culture_program", requiredSkills: ["content-marketing"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "品質寫作師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "受眾研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "編輯師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Ann Handley Everybody Writes 內容品質標準框架", description: "Source: Ann Handley《Everybody Writes》2014 年紐約時報暢銷書。Handley 是全球最有影響力的內容行銷人之一（Forbes 評選）", steps });
+      await upsertSquad(conn, { slug, name: "Ann Handley Everybody Writes 寫作品質小隊", description: "以 Ann Handley 的病態式同理心為起點，建立品牌聲音標準，產出真正為受眾而非為公司而寫的高品質內容", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Ann Handley – Everybody Writes (2014)", agents: agentMembers, tags: ["content-marketing", "copywriting", "brand-voice", "quality"], useCases: ["品牌寫作標準建立", "內容品質提升", "寫作文化培訓"], outputFormats: ["受眾同理心研究", "品牌聲音指南", "品質內容", "寫作訓練計劃"], requiredIntegrations: [], token: 55000, showcases: [{ company: "MarketingProfs（Ann Handley 擔任 CCO）", description: "應用 Everybody Writes 標準系統化提升 MarketingProfs 所有內容品質", result: "Email Newsletter 訂閱超過 60 萬，開信率超過 35%，年度活動 B2B Marketing Forum 1,000+ 人", source: "MarketingProfs.com / Ann Handley LinkedIn" }, { company: "REI（戶外品牌）", description: "應用 Everybody Writes 原則讓品牌內容聽起來像熱情的戶外愛好者而非企業宣傳", result: "博客月流量超過 500 萬，會員數量突破 2,000 萬，電商轉換率提升 25%", source: "REI Co-op Journal / Content Marketing Institute Case Study 2019" }] });
+    }
+
+    // E5: Andy Crestodina — Brain Food Data-Driven Content (Orbit Media, 2009)
+    {
+      const slug = "cm-crestodina-brain-food";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "marketing-analytics"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "data-driven-content-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "mbb-strategist"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "content-research-methodology"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "copywriting-pro"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "data-visualization-content"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "原創研究設計", description: "設計能產生原創數據的研究調查：Crestodina 的 Blogging Statistics 年度調查成為業界最被引用的內容，原創數據等於天然反向連結磁石", tool: "internal", outputType: "research_survey_design", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "數據收集與分析", description: "執行調查、收集行業數據或分析現有公開數據集，產出業界少見的獨家洞察", tool: "internal", outputType: "research_data_analysis", requiredSkills: ["marketing-analytics"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "數據視覺化內容製作", description: "將原創數據製作為高分享性的視覺內容：資訊圖表、圖表組合、互動數據，Crestodina 說視覺化讓數據說話", tool: "internal", outputType: "data_visualization_content", requiredSkills: ["visual-content-creator"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "研究報告發布與推廣", description: "發布完整研究報告並制定推廣計劃：媒體外聯、行業意見領袖分享、Email 通告，最大化原創研究的觸達範圍", tool: "internal", outputType: "research_promotion_plan", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 5, name: "研究影響力追蹤", description: "追蹤研究報告帶來的反向連結、媒體引用、社群分享和 Email 訂閱者增長，評估研究 ROI", tool: "internal", outputType: "research_impact_report", requiredSkills: ["marketing-analytics"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "數據研究策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "研究設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "數據視覺師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Andy Crestodina 數據驅動原創研究內容策略", description: "Source: Andy Crestodina（Orbit Media）2009 年起系統化數據驅動內容策略，年度 Blogging Statistics 調查被超過 10,000 個網站引用", steps });
+      await upsertSquad(conn, { slug, name: "Andy Crestodina 數據驅動內容研究小隊", description: "以原創研究和真實數據為核心製作業界最被引用的內容。Andy Crestodina 的框架：數據是內容的護城河，原創數據等於天然的反向連結磁鐵", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Andy Crestodina – Data-Driven Content (Orbit Media, 2009)", agents: agentMembers, tags: ["content-marketing", "research", "data", "link-building"], useCases: ["行業研究報告製作", "思想領導力建立", "SEO 連結建立"], outputFormats: ["研究調查設計", "數據分析報告", "視覺化資訊圖表", "推廣計劃"], requiredIntegrations: [], token: 60000, showcases: [{ company: "Orbit Media 年度 Blogging Statistics（Crestodina）", description: "每年調查 1,000+ 位部落客，發布行業最完整的部落格數據報告", result: "報告被 10,000+ 個網站引用，為 Orbit Media 帶來超過 2,000 個反向連結，部落格月流量超過 100 萬", source: "OrbitMedia.com / Ahrefs 反向連結分析 2023" }, { company: "HubSpot State of Marketing（類似方法）", description: "每年發布《State of Marketing》年度研究報告，提供行業數據洞察", result: "年度報告每次發布吸引 10,000+ 次下載，為 HubSpot 帶來 50,000+ 個新 Lead", source: "HubSpot Annual Marketing Report 2022" }] });
+    }
+
+    // E6: Rand Fishkin — Sparktoro Audience Research Method (2019)
+    {
+      const slug = "cm-fishkin-sparktoro";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["market-research-agent", "mbb-strategist"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["market-research-agent", "audience-intelligence-research"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "marketing-strategy-pmm"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "audience-centered-content"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-media-marketing", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-media-marketing", "influencer-channel-mapping"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "受眾情報深度研究", description: "應用 Sparktoro 方法研究受眾：他們看哪些 YouTube、聽哪些 Podcast、追蹤哪些 Instagram、分享哪些主題，在哪裡接受資訊", tool: "internal", outputType: "audience_intelligence_report", requiredSkills: ["market-research-agent"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "受眾影響渠道地圖", description: "繪製目標受眾的「影響渠道地圖」：列出 Top 20 個影響他們的媒體、KOL、社群、Podcast，這些是內容分發的最高優先渠道", tool: "internal", outputType: "influence_channel_map", requiredSkills: ["social-media-marketing"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "受眾語言與關心主題建立", description: "研究受眾如何描述他們的問題（真實語言），以此撰寫內容標題和描述，確保內容能被受眾「一眼認出是為我寫的」", tool: "internal", outputType: "audience_language_guide", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "渠道優先內容策略", description: "依影響渠道地圖設計內容策略：在受眾常去的渠道發布內容，而非只在自己的管道等受眾來", tool: "internal", outputType: "channel_first_content_strategy", requiredSkills: ["marketing-strategy-pmm"] }, m2Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "受眾情報師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "受眾導向內容師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "渠道地圖師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Rand Fishkin Sparktoro 受眾情報驅動內容策略", description: "Source: Rand Fishkin（Sparktoro 創辦人）2019 年開創受眾情報驅動行銷方法。Sparktoro 分析 1.4 億社群帳號的受眾行為", steps });
+      await upsertSquad(conn, { slug, name: "Rand Fishkin Sparktoro 受眾情報內容小隊", description: "先了解受眾在哪裡、受誰影響、用什麼語言，再決定做什麼內容、在哪裡分發。Rand Fishkin 的受眾情報驅動框架：情報在前，內容在後", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Rand Fishkin – Audience Intelligence Research (Sparktoro, 2019)", agents: agentMembers, tags: ["content-marketing", "audience-research", "channel-strategy", "data"], useCases: ["內容策略制定", "目標受眾研究", "渠道分發優化"], outputFormats: ["受眾情報報告", "影響渠道地圖", "受眾語言指南", "渠道優先策略"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Sparktoro 自身（Rand Fishkin 創辦）", description: "應用自創受眾情報方法建立 Sparktoro 品牌，完全依靠有機內容行銷成長", result: "Sparktoro 在沒有付費廣告的情況下，年 ARR 超過 $300 萬", source: "Rand Fishkin 公開財務數據 2022 / SparkToro.com" }, { company: "Moz（Rand Fishkin 創辦）", description: "應用受眾情報研究制定 Moz Blog 的內容策略", result: "Moz Blog 成為 SEO 業界最被引用的內容資源，月流量超過 300 萬，被 iContact 以 $67.5M 收購", source: "Moz.com / TechCrunch 報導 2021" }] });
+    }
+
+    // E7: Mark Schaefer — Content Shock Differentiation (The Content Code, 2015)
+    {
+      const slug = "cm-schaefer-content-shock";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "content-shock-differentiation"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "mbb-strategist"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "content-niche-gap-analysis"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["content-marketing", "copywriting-pro"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["content-marketing", "differentiated-content-creation"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "內容飽和度競爭分析", description: "分析目標內容領域的「內容衝擊」程度：已有多少內容競爭同樣受眾的注意力？找出過度競爭區和真正的藍海缺口", tool: "internal", outputType: "content_shock_analysis", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "獨特差異化角度定位", description: "找出只有你能做的差異化內容角度：獨特視角、特殊經歷、稀缺數據、反常識觀點。Schaefer：「Content Shock 後，只有差異化才能生存」", tool: "internal", outputType: "differentiation_positioning", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "差異化內容製作", description: "製作展現獨特差異化的旗艦內容：不只比競爭對手「更好」，而是「根本不同」", tool: "internal", outputType: "differentiated_flagship_content", requiredSkills: ["content-marketing"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "社群護城河建立", description: "建立難以複製的社群護城河：忠實讀者、專屬社群、獨家研究，讓差異化難以被抄走", tool: "internal", outputType: "community_moat_plan", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "差異化策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "競爭分析師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "差異化內容師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Mark Schaefer Content Shock 差異化內容策略", description: "Source: Mark Schaefer《The Content Code》2015 年提出 Content Shock 理論。Schaefer 的 Businessesgrow.com 月流量超過 100 萬", steps });
+      await upsertSquad(conn, { slug, name: "Mark Schaefer Content Shock 差異化內容小隊", description: "在內容洪流中建立真正的差異化護城河。Mark Schaefer 的框架：Content Shock 時代，不差異化就消失", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Mark Schaefer – Content Shock Differentiation (The Content Code, 2015)", agents: agentMembers, tags: ["content-marketing", "differentiation", "brand", "strategy"], useCases: ["競爭激烈市場的內容策略", "品牌思想領袖定位", "內容投資優化"], outputFormats: ["內容衝擊分析", "差異化定位", "旗艦內容", "護城河計劃"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Schaefer 的 Businessesgrow.com 自身", description: "應用 Content Shock 框架，以「行銷人性化」獨特角度在擁擠的行銷內容市場中差異化", result: "月流量超過 100 萬，每年僅靠有機內容帶來諮詢業務超過 $500,000", source: "Mark Schaefer 個人網站 / Known (Schaefer, 2017)" }, { company: "Drift（Chris Walker 以 Content Shock 理論為基礎）", description: "在 B2B SaaS 市場中找到「對話行銷」獨特差異化角度，而非跟進已飽和的內容行銷路線", result: "Drift 估值達 $10 億，年 ARR 超過 $1 億，「對話行銷」成為業界新品類", source: "Drift.com / Forbes 2020" }] });
+    }
+
+    // E8: Robert Rose — Chief Content Officer Method (Content Marketing Institute, 2017)
+    {
+      const slug = "cm-rose-cco";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "campaign-orchestrator"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "cco-content-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "brand-dna"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "content-mission-statement"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "content-business-roi"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "內容行銷使命聲明", description: "撰寫清晰的內容行銷使命聲明：「我們向【目標受眾】提供【內容類型】，讓他們能夠【受眾收益】」。Rose 說使命聲明是內容策略的北極星", tool: "internal", outputType: "content_mission_statement", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "受眾人格建立", description: "建立具體的受眾人格（Persona）：不只是人口特徵，還有他們的信念系統、決策過程、內容消費習慣", tool: "internal", outputType: "audience_personas", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "內容策略架構", description: "建立完整的企業內容策略架構：內容主題層級、格式矩陣、頻道組合、資源分配，讓內容成為真正的商業資產", tool: "internal", outputType: "content_strategy_architecture", requiredSkills: ["campaign-orchestrator"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "編輯行事曆設計", description: "設計結構化的編輯行事曆：整合業務行事曆、季節性主題、受眾旅程階段，確保每篇內容都有策略目的", tool: "internal", outputType: "editorial_calendar", requiredSkills: ["marketing-ops"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "內容 ROI 測量框架", description: "建立內容 ROI 測量框架：定義內容對哪些業務指標有貢獻（潛客、留存、擴張），讓 C-Suite 理解內容的商業價值", tool: "internal", outputType: "content_roi_framework", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "CCO 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "內容使命師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "ROI 測量師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Robert Rose CCO 企業內容策略框架", description: "Source: Robert Rose & Joe Pulizzi《Managing Content Marketing》2011 / Content Marketing Institute CMO 方法論。Rose 諮詢服務全球 Top 500 企業", steps });
+      await upsertSquad(conn, { slug, name: "Robert Rose CCO 企業內容策略小隊", description: "以首席內容官的思維建立企業級內容策略：從使命聲明到 ROI 框架，讓內容成為可量化的業務驅動引擎", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Robert Rose – Chief Content Officer Method (CMI, 2017)", agents: agentMembers, tags: ["content-marketing", "strategy", "enterprise", "roi"], useCases: ["企業內容策略建立", "CMO/CCO 內容規劃", "內容 ROI 報告"], outputFormats: ["使命聲明", "受眾人格", "內容策略架構", "編輯行事曆", "ROI框架"], requiredIntegrations: [], token: 65000, showcases: [{ company: "Salesforce（Robert Rose 顧問）", description: "應用 CCO 框架建立企業級內容行銷策略，讓 Trailhead 平台成為業界最好的學習內容品牌", result: "Trailhead 超過 700 萬用戶，Salesforce 品牌教育內容成為業界標桿", source: "Robert Rose 公開演講 Dreamforce 2019" }, { company: "LinkedIn Marketing Solutions", description: "應用 CCO 方法建立完整的 B2B 行銷內容策略架構", result: "LinkedIn Marketing Blog 月讀者超過 100 萬，成為 B2B 行銷人首選學習資源", source: "LinkedIn Marketing Blog / Content Marketing Institute 2020" }] });
+    }
+
+    // E9: Jay Baer — Talk Triggers (Word-of-Mouth Marketing, 2018)
+    {
+      const slug = "cm-baer-talk-triggers";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-strategy-pmm", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "talk-trigger-design"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["market-research-agent", "content-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "word-of-mouth-research"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-media-marketing", "copywriting-pro"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-media-marketing", "talk-trigger-amplification"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "口碑觸發點研究", description: "研究現有客戶最常分享哪些品牌體驗：調查「你最常和朋友分享我們的什麼事？」找出自然發生的口碑觸發點", tool: "internal", outputType: "talk_trigger_research", requiredSkills: ["market-research-agent"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "Talk Trigger 設計", description: "設計一個超出預期的差異化行動：必須是 Remarkable（值得說嘴）、Repeatable（每次都做）、Relevant（與品牌有關）、Reasonable（合理可行）", tool: "internal", outputType: "talk_trigger_design", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "內容支援系統設計", description: "設計支援 Talk Trigger 的內容系統：讓客戶能輕鬆分享的 IG Stories 格式、客戶故事特輯、UGC 徵集活動", tool: "internal", outputType: "content_support_system", requiredSkills: ["content-marketing"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "口碑擴散追蹤", description: "追蹤 Talk Trigger 帶來的口碑效益：品牌提及量、自然推薦量、社群 UGC 數量、NPS 評分變化", tool: "internal", outputType: "word_of_mouth_tracking", requiredSkills: ["social-media-marketing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Talk Trigger 設計師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "口碑研究師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "口碑擴散師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Jay Baer Talk Triggers 口碑觸發行銷系統", description: "Source: Jay Baer & Daniel Lemin《Talk Triggers》2018. Baer 研究分析超過 1,000 家企業的口碑行銷案例", steps });
+      await upsertSquad(conn, { slug, name: "Jay Baer Talk Triggers 口碑行銷小隊", description: "設計讓客戶情不自禁分享的「Talk Trigger」，讓口碑行銷系統化。Jay Baer 的框架：最便宜的廣告是你現有的客戶", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Jay Baer – Talk Triggers (2018)", agents: agentMembers, tags: ["content-marketing", "word-of-mouth", "customer-experience", "viral"], useCases: ["服務業口碑策略", "品牌客戶體驗設計", "UGC 行銷計劃"], outputFormats: ["Talk Trigger 設計文件", "內容支援系統", "口碑追蹤報告"], requiredIntegrations: [], token: 55000, showcases: [{ company: "DoubleTree by Hilton（溫暖巧克力餅乾 Talk Trigger）", description: "每位入住客人在 Check-in 時獲得一塊溫熱巧克力餅乾，一個超越預期的簡單行動", result: "每年在社群媒體上產生數百萬次有機提及，客戶滿意度 NPS 高於業界均值 30%", source: "Jay Baer《Talk Triggers》DoubleTree 案例章節 + DoubleTree 公開數據" }, { company: "Cheesecake Factory（菜單 Talk Trigger）", description: "超過 250 道菜的超級龐大菜單成為 Talk Trigger：客人拿到菜單就想分享照片", result: "Instagram 每年獲得超過 100 萬張菜單相關 UGC，品牌記憶度是業界競爭對手的 3 倍", source: "Jay Baer《Talk Triggers》Cheesecake Factory 案例" }] });
+    }
+
+    // E10: Jeff Bullas — Power Blogging Method (2010–2019)
+    {
+      const slug = "cm-bullas-power-blogging";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "social-media-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "power-blogging-method"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "blog-headline-mastery"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-scheduler", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-scheduler", "blog-amplification-system"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "SEO 關鍵字部落格計劃", description: "研究目標受眾搜索的長尾關鍵字，建立以搜尋流量為基礎的部落格發布計劃，確保每篇文章都針對真實搜索需求", tool: "internal", outputType: "keyword_blog_plan", requiredSkills: ["market-research-agent"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "磁力標題設計", description: "設計點擊率極高的部落格標題：數字清單型、How-to 型、秘密揭示型、問題型，Bullas 說標題決定 80% 的文章成敗", tool: "internal", outputType: "power_headline_variants", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "長篇深度文章創作", description: "撰寫 2,000-3,000 字以上的深度文章：包含原創洞察、清晰結構、視覺支援，比競爭對手的淺薄文章更完整", tool: "internal", outputType: "long_form_blog_post", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "社群擴散系統", description: "設計發布後的社群擴散計劃：多次在不同時間分享到社群媒體，加入 Email 通告，邀請合作夥伴分享", tool: "internal", outputType: "blog_amplification_plan", requiredSkills: ["social-scheduler"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Power Blogging 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "標題文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "擴散排程師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Jeff Bullas Power Blogging 流量增長系統", description: "Source: Jeff Bullas《Blogging the Smart Way》2012. JeffBullas.com 月流量超過 400 萬，Forbes 評為全球 Top 50 社群媒體影響者", steps });
+      await upsertSquad(conn, { slug, name: "Jeff Bullas Power Blogging 流量增長小隊", description: "應用 Jeff Bullas 的 Power Blogging 方法：SEO 關鍵字 + 磁力標題 + 深度內容 + 社群擴散，從零建立超過 100 萬月流量的行銷部落格", industryKey: "marketing", missionType: taskType, workspace: ["content-marketing"], methodology: "Jeff Bullas – Power Blogging Method (2010)", agents: agentMembers, tags: ["content-marketing", "blogging", "seo", "amplification"], useCases: ["企業部落格流量建立", "個人品牌部落格", "SEO 驅動內容行銷"], outputFormats: ["SEO 部落格計劃", "磁力標題清單", "深度文章", "擴散計劃"], requiredIntegrations: [], token: 55000, showcases: [{ company: "JeffBullas.com（自身案例）", description: "應用 Power Blogging 方法，系統化建立高流量社群媒體行銷部落格", result: "月流量超過 400 萬，Email 名單超過 30 萬，Forbes Top 50 社群媒體影響者", source: "JeffBullas.com / Forbes 評選 2018" }, { company: "Social Media Examiner（Mike Stelzner）", description: "應用類似 Power Blogging 框架，系統化建立業界最大的社群媒體行銷部落格", result: "月流量超過 100 萬，Email 名單超過 40 萬，年度 Social Media Marketing World 大會 5,000+ 出席", source: "SocialMediaExaminer.com 公開數據 2022" }] });
+    }

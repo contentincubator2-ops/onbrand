@@ -3,7 +3,7 @@
  * 當用戶在 textarea 輸入 @ 時，顯示可 @mention 的 agent 下拉選單
  *
  * 使用方式：
- *   - 由 ChatCore 傳入 squadMembers（從 missionHomePage squad data 取得）
+ *   - 由 MissionChatCore 傳入 squadMembers（從 missionHomePage squad data 取得）
  *   - 監聽 textarea 的 input event，解析 @ 後的文字
  *   - 用戶點選後，自動補全 @AgentName 到 textarea
  */

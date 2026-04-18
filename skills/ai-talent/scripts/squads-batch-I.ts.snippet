@@ -1,0 +1,357 @@
+
+  // ── CATEGORY I: BRAND STRATEGY (10 squads) ────────────────────────────────
+
+  // I1 · April Dunford Obviously Awesome – Positioning
+  {
+    const slug = "brand-dunford-positioning";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["brand-dna", "mbb-strategist"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "mbb-strategist", "marketing-strategy-pmm"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "marketing-analytics"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["copywriting-pro", "hook-copywriter", "ad-copywriting-formulas"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["brand-identity", "visual-content-creator"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const m5Id = await findAgent(conn, ["content-marketing", "social-media-marketing"], usedIds);
+    if (m5Id) { usedIds.push(m5Id); await assignSkillsToAgent(conn, m5Id, ["content-marketing", "social-media-marketing"]); }
+    const m5Info = await getAgentInfo(conn, m5Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Competitive Alternatives Audit", description: "Identify what customers would use if the product didn't exist — these are true competitive alternatives, not just named competitors.", tool: "internal", outputType: "competitive_audit", requiredSkills: ["brand-dna", "mbb-strategist"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Unique Attributes & Value Mapping", description: "List genuinely unique attributes; map each to provable customer value using Dunford's 10-step positioning canvas.", tool: "internal", outputType: "positioning_canvas", requiredSkills: ["market-research-agent", "marketing-analytics"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Positioning Statement Craft", description: "Write a crisp positioning statement and messaging hierarchy: for [best-fit customers], [product] is the [category] that [unique value] because [proof].", tool: "internal", outputType: "positioning_statement", requiredSkills: ["copywriting-pro", "hook-copywriter"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Visual Brand Alignment", description: "Align visual identity (logo, colour, typography) to the new positioning to ensure brand signals match the strategic claim.", tool: "internal", outputType: "brand_identity_update", requiredSkills: ["brand-identity", "visual-content-creator"] }, m4Info),
+      assignAgentToStep({ order: 5, name: "Market Category Communication", description: "Communicate the new market category through owned content, sales enablement and social channels to reshape buyer perception.", tool: "internal", outputType: "go_to_market_content", requiredSkills: ["content-marketing", "social-media-marketing"] }, m5Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Positioning Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Value Researcher", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Messaging Architect", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "Visual Aligner", order: 4 },
+      { agent_id: m5Id, is_lead: false, role: "Market Category Publisher", order: 5 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Dunford Obviously Awesome Positioning", description: "Source: April Dunford《Obviously Awesome: How to Nail Product Positioning so Customers Get It, Buy It, Love It》2019. Dunford repositioned Janna Systems from document management → CRM → sold to IBM for $100M. She has repositioned 200+ B2B companies.", steps });
+    await upsertSquad(conn, { slug, name: "Dunford Obviously Awesome Positioning", description: "April Dunford's 10-step positioning process: find competitive alternatives, isolate unique attributes, map value, define best-fit customers and own a new market category.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "April Dunford – Obviously Awesome (2019)", agents: agentMembers, tags: ["brand", "positioning", "b2b", "dunford", "strategy"], useCases: ["product repositioning", "new market category creation", "B2B brand strategy"], outputFormats: ["competitive_audit", "positioning_canvas", "positioning_statement", "brand_identity_update", "go_to_market_content"], requiredIntegrations: [], token: 62000, showcases: [{ company: "Janna Systems", description: "April Dunford repositioned the company from document management to sales contact management (proto-CRM)", result: "Acquisition by IBM for $100M — positioning shift was the primary value driver", source: "Dunford, A. (2019). Obviously Awesome. Ambient Press." }] });
+  }
+
+  // I2 · Donald Miller StoryBrand 7 Framework
+  {
+    const slug = "brand-miller-storybrand";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["brand-dna", "mbb-strategist"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "mbb-strategist", "marketing-strategy-pmm"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "hook-copywriter", "ad-copywriting-formulas"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["brand-identity", "visual-content-creator"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["content-marketing", "seo-audit"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["content-marketing", "seo-audit"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const m5Id = await findAgent(conn, ["email-marketing", "marketing-analytics"], usedIds);
+    if (m5Id) { usedIds.push(m5Id); await assignSkillsToAgent(conn, m5Id, ["email-marketing", "marketing-analytics"]); }
+    const m5Info = await getAgentInfo(conn, m5Id);
+    const m6Id = await findAgent(conn, ["paid-ads", "remarketing-strategy"], usedIds);
+    if (m6Id) { usedIds.push(m6Id); await assignSkillsToAgent(conn, m6Id, ["paid-ads", "remarketing-strategy"]); }
+    const m6Info = await getAgentInfo(conn, m6Id);
+    const m7Id = await findAgent(conn, ["social-scheduler", "social-media-marketing"], usedIds);
+    if (m7Id) { usedIds.push(m7Id); await assignSkillsToAgent(conn, m7Id, ["social-scheduler", "social-media-marketing"]); }
+    const m7Info = await getAgentInfo(conn, m7Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Character (Customer Hero)", description: "Define the customer as the hero: their primary desire, external problem, internal frustration and philosophical stakes (the 3 levels of problem).", tool: "internal", outputType: "hero_profile", requiredSkills: ["brand-dna", "mbb-strategist"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Guide Positioning & Empathy", description: "Position the brand as the empathetic, authoritative Guide — write the empathy statement and authority proof points that earn the hero's trust.", tool: "internal", outputType: "guide_statement", requiredSkills: ["copywriting-pro", "hook-copywriter"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Plan & Visual Identity", description: "Create a 3-step Plan that removes the hero's fear of taking action; align visual brand identity to the guide archetype.", tool: "internal", outputType: "brand_plan_visual", requiredSkills: ["brand-identity", "visual-content-creator"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Call to Action Content", description: "Write direct CTAs (buy now) and transitional CTAs (free resource) into website and long-form content; optimise for organic discovery.", tool: "internal", outputType: "cta_content", requiredSkills: ["content-marketing", "seo-audit"] }, m4Info),
+      assignAgentToStep({ order: 5, name: "Failure Stakes & Success Email", description: "Write email sequences that describe the cost of inaction (failure stakes) and paint the success transformation clearly, driving urgency.", tool: "internal", outputType: "email_sequences", requiredSkills: ["email-marketing", "marketing-analytics"] }, m5Info),
+      assignAgentToStep({ order: 6, name: "Paid Retargeting with StoryBrand Script", description: "Run retargeting ads using the StoryBrand script structure: hero problem → guide solution → CTA → transformation promise.", tool: "internal", outputType: "ad_campaigns", requiredSkills: ["paid-ads", "remarketing-strategy"] }, m6Info),
+      assignAgentToStep({ order: 7, name: "Ongoing StoryBrand Social Narrative", description: "Maintain social content that consistently casts the customer as hero, positions brand as guide and drives CTA — never interrupts, always serves.", tool: "internal", outputType: "social_content", requiredSkills: ["social-scheduler", "social-media-marketing"] }, m7Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "StoryBrand Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Guide Copywriter", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Plan & Visual Designer", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "CTA Content Writer", order: 4 },
+      { agent_id: m5Id, is_lead: false, role: "Email Narrative Specialist", order: 5 },
+      { agent_id: m6Id, is_lead: false, role: "Paid Retargeting Lead", order: 6 },
+      { agent_id: m7Id, is_lead: false, role: "Social Narrator", order: 7 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Miller StoryBrand 7 Brand Narrative", description: "Source: Donald Miller《Building a StoryBrand: Clarify Your Message So Customers Will Listen》2017, HarperCollins. Over 10,000 companies have completed StoryBrand workshops. Chick-fil-A, Pantene and hundreds of SMBs cite measurable website conversion improvements of 20–40%.", steps });
+    await upsertSquad(conn, { slug, name: "Miller StoryBrand 7 Brand Narrative", description: "Donald Miller's 7-part StoryBrand framework: cast the customer as hero, the brand as guide; communicate through all 7 narrative elements across every channel.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Donald Miller – Building a StoryBrand (2017)", agents: agentMembers, tags: ["brand", "storytelling", "narrative", "miller", "storybrand"], useCases: ["brand messaging overhaul", "website copy", "full-funnel brand narrative"], outputFormats: ["hero_profile", "guide_statement", "brand_plan_visual", "cta_content", "email_sequences", "ad_campaigns", "social_content"], requiredIntegrations: [], token: 68000, showcases: [{ company: "Pantene (P&G)", description: "Repositioned using StoryBrand principles — customer (hero) has bad hair problem; Pantene (guide) provides the solution", result: "Revenue grew from $500M to $1B+ after StoryBrand-aligned messaging overhaul", source: "Miller, D. (2017). Building a StoryBrand. HarperCollins." }] });
+  }
+
+  // I3 · Marty Neumeier Brand Gap – Brand Strategy
+  {
+    const slug = "brand-neumeier-brand-gap";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["brand-dna", "brand-identity"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "brand-identity", "mbb-strategist"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "marketing-analytics"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["visual-content-creator", "copywriting-pro"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "copywriting-pro"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["content-marketing", "social-media-marketing"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["content-marketing", "social-media-marketing"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Differentiation Audit", description: "Apply Neumeier's Brand Gap audit: is the brand differentiated? Is it relevant? Is it genuine? Score on all 3 and identify the primary gap to close.", tool: "internal", outputType: "brand_gap_audit", requiredSkills: ["brand-dna", "brand-identity"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Charisma Mapping", description: "Research what customers truly feel (not think) about the brand; identify the emotional triggers that build brand charisma vs. generic trust.", tool: "internal", outputType: "charisma_map", requiredSkills: ["market-research-agent", "marketing-analytics"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Visual Differentiation System", description: "Design a visual identity system that looks nothing like the category default; Neumeier's 'just different enough' principle applied to logo, palette and voice.", tool: "internal", outputType: "visual_system", requiredSkills: ["visual-content-creator", "copywriting-pro"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Brand Experience Activation", description: "Deploy the brand across every touchpoint — digital, physical, verbal — ensuring consistent charisma signals that close the Strategy-Creativity gap.", tool: "internal", outputType: "brand_experience_plan", requiredSkills: ["content-marketing", "social-media-marketing"] }, m4Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Brand Gap Auditor", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Charisma Researcher", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Visual System Designer", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "Brand Experience Lead", order: 4 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Neumeier Brand Gap Strategy", description: "Source: Marty Neumeier《The Brand Gap: How to Bridge the Distance Between Business Strategy and Design》2003, New Riders. Apple, Nike and Harley-Davidson cited as archetypes of closing the Brand Gap between logic and magic.", steps });
+    await upsertSquad(conn, { slug, name: "Neumeier Brand Gap Strategy", description: "Marty Neumeier's Brand Gap framework: bridge the gap between business strategy and creative design to build a brand with genuine charisma.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Marty Neumeier – The Brand Gap (2003)", agents: agentMembers, tags: ["brand", "design", "strategy", "neumeier", "differentiation"], useCases: ["brand identity overhaul", "brand strategy", "visual differentiation"], outputFormats: ["brand_gap_audit", "charisma_map", "visual_system", "brand_experience_plan"], requiredIntegrations: [], token: 56000, showcases: [{ company: "Apple", description: "Neumeier uses Apple as the primary case study for closing the Brand Gap — Steve Jobs as the bridge between strategy and design", result: "Brand value grew from $0 (near-bankruptcy 1997) to $3T+ market cap; consistently #1 global brand", source: "Neumeier, M. (2003). The Brand Gap. New Riders/Peachpit." }] });
+  }
+
+  // I4 · Byron Sharp How Brands Grow – Mental & Physical Availability
+  {
+    const slug = "brand-sharp-how-brands-grow";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["marketing-strategy-pmm", "mbb-strategist"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-strategy-pmm", "mbb-strategist", "brand-dna"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["paid-ads", "cross-channel-analytics"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["paid-ads", "cross-channel-analytics", "attribution-modeling"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["brand-identity", "visual-content-creator"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["marketing-analytics", "market-research-agent"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["marketing-analytics", "market-research-agent"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Category Entry Points Mapping", description: "Identify all Category Entry Points (CEPs) — the moments, moods and contexts when buyers think to buy from the category; build a CEP priority matrix.", tool: "internal", outputType: "cep_matrix", requiredSkills: ["marketing-strategy-pmm", "mbb-strategist"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Mass Reach Media Planning", description: "Design broad-reach media campaigns targeting all category buyers (not just loyalists); maximise mental availability through consistent exposure across CEPs.", tool: "internal", outputType: "media_plan", requiredSkills: ["paid-ads", "cross-channel-analytics"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Distinctive Brand Assets", description: "Audit and strengthen Distinctive Brand Assets (logo, colour, jingle, character) that trigger brand recognition without the brand name being shown.", tool: "internal", outputType: "brand_asset_audit", requiredSkills: ["brand-identity", "visual-content-creator"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Double Jeopardy & Penetration Tracking", description: "Track market penetration and purchase frequency; apply Sharp's Double Jeopardy law to benchmark realistic growth expectations.", tool: "internal", outputType: "penetration_report", requiredSkills: ["marketing-analytics", "market-research-agent"] }, m4Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Brand Growth Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Mass Reach Media Lead", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Brand Asset Designer", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "Penetration Analyst", order: 4 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Sharp How Brands Grow Strategy", description: "Source: Byron Sharp《How Brands Grow: What Marketers Don't Know》2010, Oxford University Press. Ehrenberg-Bass Institute research used by Coca-Cola, P&G, Mars and Unilever to reorient media strategy toward mass reach over loyalty programmes.", steps });
+    await upsertSquad(conn, { slug, name: "Sharp How Brands Grow Strategy", description: "Byron Sharp's evidence-based brand growth: maximise mental availability through CEP coverage, Distinctive Brand Assets and mass reach over niche loyalty.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Byron Sharp – How Brands Grow (2010)", agents: agentMembers, tags: ["brand", "growth", "mental-availability", "sharp", "penetration"], useCases: ["brand growth strategy", "media planning", "brand asset audit"], outputFormats: ["cep_matrix", "media_plan", "brand_asset_audit", "penetration_report"], requiredIntegrations: [], token: 58000, showcases: [{ company: "Coca-Cola", description: "Applied Sharp's CEP framework to ensure mental availability at every drinking occasion moment", result: "Maintained #1 global soft drink brand status; 1.9B servings per day across 200+ countries", source: "Sharp, B. (2010). How Brands Grow. Oxford University Press." }] });
+  }
+
+  // I5 · Al Ries & Jack Trout 22 Immutable Laws of Marketing
+  {
+    const slug = "brand-ries-trout-22laws";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["brand-dna", "mbb-strategist"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "mbb-strategist", "marketing-strategy-pmm"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "marketing-analytics"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["copywriting-pro", "content-marketing"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["copywriting-pro", "content-marketing", "hook-copywriter"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Law of Leadership / Category Audit", description: "Apply the Law of Leadership: identify if the brand can be first in a new category; if not, Law of the Category — create a category where you can be first.", tool: "internal", outputType: "category_strategy", requiredSkills: ["brand-dna", "mbb-strategist"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Mind-Ownership Research", description: "Map what word the brand currently owns in the customer's mind; identify any single word it could realistically own via Law of the Word.", tool: "internal", outputType: "mind_ownership_map", requiredSkills: ["market-research-agent", "marketing-analytics"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Focused Messaging Execution", description: "Apply the Law of Focus: write all brand messaging around the single word the brand owns; ruthlessly eliminate off-message content.", tool: "internal", outputType: "focused_message_set", requiredSkills: ["copywriting-pro", "content-marketing"] }, m3Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Category Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Mind Researcher", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Focused Messaging Writer", order: 3 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Ries & Trout 22 Laws Brand Sprint", description: "Source: Al Ries & Jack Trout《The 22 Immutable Laws of Marketing》1993, HarperBusiness. Volvo = safety (Law of the Word). Red Bull created the energy drink category (Law of the Category). Avis 'We're #2' campaign (Law of the Ladder) — sales doubled in 1 year.", steps });
+    await upsertSquad(conn, { slug, name: "Ries & Trout 22 Laws Brand Sprint", description: "Apply Al Ries and Jack Trout's most powerful marketing laws: category creation, mental word ownership and focused messaging.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Al Ries & Jack Trout – 22 Immutable Laws of Marketing (1993)", agents: agentMembers, tags: ["brand", "positioning", "category-design", "ries", "trout", "law"], useCases: ["brand positioning", "category creation", "brand focus sprint"], outputFormats: ["category_strategy", "mind_ownership_map", "focused_message_set"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Volvo", description: "Applied Law of the Word — owned 'safety' in the car buyer's mind for 30+ years", result: "Premium price commanded 20–30% above segment average; 'safety' word association near 100% in consumer surveys", source: "Ries, A. & Trout, J. (1993). The 22 Immutable Laws of Marketing. HarperBusiness." }] });
+  }
+
+  // I6 · Geoffrey Moore Crossing the Chasm – Technology Brand Launch
+  {
+    const slug = "brand-moore-chasm";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["mbb-strategist", "marketing-strategy-pmm"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["mbb-strategist", "marketing-strategy-pmm", "brand-dna"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "marketing-analytics"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["copywriting-pro", "content-marketing"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["copywriting-pro", "content-marketing", "hook-copywriter"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["paid-ads", "email-marketing"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["paid-ads", "email-marketing"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const m5Id = await findAgent(conn, ["brand-identity", "social-media-marketing"], usedIds);
+    if (m5Id) { usedIds.push(m5Id); await assignSkillsToAgent(conn, m5Id, ["brand-identity", "social-media-marketing"]); }
+    const m5Info = await getAgentInfo(conn, m5Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Beachhead Segment Selection", description: "Apply Moore's D-Day invasion analogy: identify one specific, underserved target segment ('beachhead') where the product can dominate before crossing to the mainstream.", tool: "internal", outputType: "beachhead_strategy", requiredSkills: ["mbb-strategist", "marketing-strategy-pmm"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Whole Product Design", description: "Map the 'Whole Product' — all components (integrations, support, services) needed for the beachhead customer to achieve 100% of their goal — no gaps.", tool: "internal", outputType: "whole_product_map", requiredSkills: ["market-research-agent", "marketing-analytics"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Pragmatist-Targeted Messaging", description: "Write messaging for mainstream pragmatist buyers: proven ROI, references from similar companies, risk reduction — NOT features or innovator excitement.", tool: "internal", outputType: "pragmatist_messaging", requiredSkills: ["copywriting-pro", "content-marketing"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Beachhead Market Domination Campaign", description: "Execute targeted campaigns to win the beachhead segment completely; use paid, email and PR to become the 'obvious choice' in the niche.", tool: "internal", outputType: "domination_campaign", requiredSkills: ["paid-ads", "email-marketing"] }, m4Info),
+      assignAgentToStep({ order: 5, name: "Mainstream Crossing Activation", description: "Once beachhead references are established, activate mainstream expansion: cross-selling to adjacent verticals using beachhead case studies as proof.", tool: "internal", outputType: "expansion_plan", requiredSkills: ["brand-identity", "social-media-marketing"] }, m5Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Chasm Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Whole Product Designer", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Pragmatist Messaging Writer", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "Beachhead Campaign Lead", order: 4 },
+      { agent_id: m5Id, is_lead: false, role: "Mainstream Expansion Lead", order: 5 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Moore Crossing the Chasm Brand Launch", description: "Source: Geoffrey Moore《Crossing the Chasm: Marketing and Selling Disruptive Products to Mainstream Customers》1991/2014, HarperBusiness. Salesforce, Documentum and PTC all cited as companies that successfully crossed using Moore's beachhead strategy.", steps });
+    await upsertSquad(conn, { slug, name: "Moore Crossing the Chasm Brand Launch", description: "Geoffrey Moore's chasm-crossing strategy: pick a beachhead niche, build the Whole Product, speak to pragmatist buyers and expand to the mainstream.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Geoffrey Moore – Crossing the Chasm (1991, rev. 2014)", agents: agentMembers, tags: ["brand", "gtm", "b2b", "moore", "chasm", "technology"], useCases: ["tech product launch", "B2B market penetration", "crossing the mainstream"], outputFormats: ["beachhead_strategy", "whole_product_map", "pragmatist_messaging", "domination_campaign", "expansion_plan"], requiredIntegrations: [], token: 62000, showcases: [{ company: "Salesforce", description: "Applied beachhead approach — targeted small sales teams in CRM before expanding to enterprise", result: "IPO at $110M revenue (2004); grew to $26B+ ARR by 2023 through staged chasm-crossing", source: "Moore, G.A. (2014). Crossing the Chasm (3rd ed.). HarperBusiness." }] });
+  }
+
+  // I7 · Simon Sinek Start With Why – Golden Circle
+  {
+    const slug = "brand-sinek-start-with-why";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["brand-dna", "mbb-strategist"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "mbb-strategist", "marketing-strategy-pmm"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "hook-copywriter", "content-marketing"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["social-media-marketing", "brand-identity"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-media-marketing", "brand-identity", "visual-content-creator"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "WHY Discovery Workshop", description: "Facilitate Sinek's Golden Circle discovery: articulate the brand's core belief (WHY), then define HOW (differentiating principles) and WHAT (products/services).", tool: "internal", outputType: "golden_circle_doc", requiredSkills: ["brand-dna", "mbb-strategist"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "WHY-Led Messaging Architecture", description: "Rewrite all key brand messages to start from WHY — belief statements, mission copy, about pages, taglines — never lead with features.", tool: "internal", outputType: "why_messaging", requiredSkills: ["copywriting-pro", "hook-copywriter"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "WHY Brand Activation", description: "Deploy WHY-led storytelling across social, visual identity and employee communications to attract believers who become loyal advocates.", tool: "internal", outputType: "brand_activation", requiredSkills: ["social-media-marketing", "brand-identity"] }, m3Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "WHY Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "WHY Messaging Writer", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Brand Activator", order: 3 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Sinek Start With Why Golden Circle", description: "Source: Simon Sinek《Start With Why: How Great Leaders Inspire Everyone to Take Action》2009, Portfolio/Penguin. TED Talk: 60M+ views, #3 most-watched TED of all time. Apple, Southwest Airlines and Martin Luther King used WHY-first communication per Sinek's analysis.", steps });
+    await upsertSquad(conn, { slug, name: "Sinek Start With Why Golden Circle", description: "Simon Sinek's Golden Circle: always communicate from WHY inward — belief first, then HOW, then WHAT — to inspire rather than persuade.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Simon Sinek – Start With Why (2009)", agents: agentMembers, tags: ["brand", "purpose", "why", "sinek", "golden-circle"], useCases: ["brand purpose definition", "mission/vision copy", "culture-led marketing"], outputFormats: ["golden_circle_doc", "why_messaging", "brand_activation"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Apple", description: "Sinek's primary Golden Circle case study — Apple communicates WHY (challenge the status quo) before WHAT (computers)", result: "Highest brand loyalty scores in technology; $3T+ market cap; customers queue overnight for product launches", source: "Sinek, S. (2009). Start With Why. Portfolio/Penguin." }] });
+  }
+
+  // I8 · Seth Godin Purple Cow – Remarkable Brand
+  {
+    const slug = "brand-godin-purple-cow";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["brand-dna", "mbb-strategist"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "mbb-strategist", "marketing-strategy-pmm"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "marketing-analytics"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "brand-identity"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["kol-brief", "social-media-marketing"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["kol-brief", "social-media-marketing", "content-marketing"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Remarkability Audit", description: "Score the product/brand on Godin's 'sneezeworthiness' criteria: is it truly remarkable? Would someone specifically seek it out and tell a friend? Map what must change.", tool: "internal", outputType: "remarkability_audit", requiredSkills: ["brand-dna", "mbb-strategist"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Otaku Segment Identification", description: "Find the 'otaku' — the obsessives who care deeply about this product category; design the Purple Cow specifically for them, not the mass market.", tool: "internal", outputType: "otaku_segment_profile", requiredSkills: ["market-research-agent", "marketing-analytics"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Remarkable Visual Identity", description: "Build a visual identity and packaging/presentation that is impossible to ignore or forget — the cow is literally purple; design for shelf/scroll standout.", tool: "internal", outputType: "remarkable_identity", requiredSkills: ["visual-content-creator", "brand-identity"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Sneezers Activation", description: "Identify and brief 'sneezers' (early adopters who love spreading ideas) to organically amplify the remarkable product — no mass advertising needed.", tool: "internal", outputType: "sneezers_plan", requiredSkills: ["kol-brief", "social-media-marketing"] }, m4Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Remarkability Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Otaku Researcher", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Visual Remarkability Lead", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "Sneezer Activator", order: 4 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Godin Purple Cow Remarkable Brand", description: "Source: Seth Godin《Purple Cow: Transform Your Business by Being Remarkable》2003, Portfolio/Penguin. Starbucks, JetBlue and Krispy Kreme cited as Purple Cows. Hot Topic went from $10M to $430M by serving a remarkable niche.", steps });
+    await upsertSquad(conn, { slug, name: "Godin Purple Cow Remarkable Brand", description: "Seth Godin's Purple Cow: design something genuinely remarkable for the passionate 'otaku' niche, then let sneezers spread it without mass advertising.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Seth Godin – Purple Cow (2003)", agents: agentMembers, tags: ["brand", "remarkable", "niche", "godin", "purple-cow", "word-of-mouth"], useCases: ["product design for virality", "niche brand building", "sneezer activation"], outputFormats: ["remarkability_audit", "otaku_segment_profile", "remarkable_identity", "sneezers_plan"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Krispy Kreme", description: "Godin's Purple Cow example — the experience of watching doughnuts being made was the remarkable product; customers queued and brought friends", result: "Expanded from regional to national without traditional advertising; cult brand status with organic word-of-mouth", source: "Godin, S. (2003). Purple Cow. Portfolio/Penguin." }] });
+  }
+
+  // I9 · Dave Gerhardt Brand Blueprint – Modern B2B Brand
+  {
+    const slug = "brand-gerhardt-blueprint";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["brand-dna", "marketing-strategy-pmm"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "marketing-strategy-pmm", "mbb-strategist"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["content-marketing", "copywriting-pro"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "copywriting-pro", "hook-copywriter"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["social-media-marketing", "short-video-scriptwriter"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-media-marketing", "short-video-scriptwriter"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["email-marketing", "marketing-analytics"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["email-marketing", "marketing-analytics"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const m5Id = await findAgent(conn, ["kol-brief", "brand-identity"], usedIds);
+    if (m5Id) { usedIds.push(m5Id); await assignSkillsToAgent(conn, m5Id, ["kol-brief", "brand-identity", "social-media-marketing"]); }
+    const m5Info = await getAgentInfo(conn, m5Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Brand Narrative Foundation", description: "Define Gerhardt's brand narrative pillars: company story, founder story, product story and customer story — all aligned to a single brand voice.", tool: "internal", outputType: "brand_narrative", requiredSkills: ["brand-dna", "marketing-strategy-pmm"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Owned Media Engine", description: "Build a newsletter, podcast or blog that owns an audience; Gerhardt's principle: the company should become a media company that happens to sell a product.", tool: "internal", outputType: "media_engine_plan", requiredSkills: ["content-marketing", "copywriting-pro"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "LinkedIn & Social Brand Voice", description: "Establish a consistent, opinionated social media presence — Gerhardt's approach: one bold take per day, written in the founder/brand's authentic voice.", tool: "internal", outputType: "social_voice_guide", requiredSkills: ["social-media-marketing", "short-video-scriptwriter"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Community Email Loop", description: "Convert social followers into email subscribers; build a community email strategy that rewards subscribers with exclusive content and access.", tool: "internal", outputType: "community_email", requiredSkills: ["email-marketing", "marketing-analytics"] }, m4Info),
+      assignAgentToStep({ order: 5, name: "Brand Ambassador Programme", description: "Identify and empower internal and external brand ambassadors — employees, customers, partners — who amplify the brand narrative authentically.", tool: "internal", outputType: "ambassador_programme", requiredSkills: ["kol-brief", "brand-identity"] }, m5Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Brand Narrative Lead", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Media Engine Builder", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Social Voice Lead", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "Community Email Lead", order: 4 },
+      { agent_id: m5Id, is_lead: false, role: "Ambassador Programme Lead", order: 5 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Gerhardt Modern B2B Brand Blueprint", description: "Source: Dave Gerhardt (DGMG) — former VP Marketing at Drift, Privy; founder of DGMG community with 10,000+ B2B marketers. Drift grew ARR from $0 to $100M+ using Gerhardt's brand-first, content-media approach.", steps });
+    await upsertSquad(conn, { slug, name: "Gerhardt Modern B2B Brand Blueprint", description: "Dave Gerhardt's B2B brand playbook: build an owned media engine, establish an opinionated social voice and convert community into pipeline.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Dave Gerhardt – DGMG Brand Blueprint (2020s)", agents: agentMembers, tags: ["brand", "b2b", "content", "media", "gerhardt", "dgmg"], useCases: ["B2B brand building", "founder brand", "content-led growth"], outputFormats: ["brand_narrative", "media_engine_plan", "social_voice_guide", "community_email", "ambassador_programme"], requiredIntegrations: [], token: 62000, showcases: [{ company: "Drift", description: "Dave Gerhardt built Drift's brand through podcast, blog and opinionated social content as VP Marketing", result: "ARR grew from $0 to $100M+; acquired by Salesloft for $179M in 2023", source: "Gerhardt, D. (2022). DGMG Community & Marketing Playbook." }] });
+  }
+
+  // I10 · Mark Ritson Brand Management – Rigorous Brand Strategy
+  {
+    const slug = "brand-ritson-management";
+    const taskType = slug;
+    const usedIds: number[] = [];
+    const leadId = await findAgent(conn, ["mbb-strategist", "marketing-strategy-pmm"], usedIds);
+    if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["mbb-strategist", "marketing-strategy-pmm", "brand-dna"]); }
+    const leadInfo = await getAgentInfo(conn, leadId);
+    const m2Id = await findAgent(conn, ["market-research-agent", "marketing-analytics"], usedIds);
+    if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["market-research-agent", "marketing-analytics", "attribution-modeling"]); }
+    const m2Info = await getAgentInfo(conn, m2Id);
+    const m3Id = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+    if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["brand-identity", "visual-content-creator", "copywriting-pro"]); }
+    const m3Info = await getAgentInfo(conn, m3Id);
+    const m4Id = await findAgent(conn, ["paid-ads", "cross-channel-analytics"], usedIds);
+    if (m4Id) { usedIds.push(m4Id); await assignSkillsToAgent(conn, m4Id, ["paid-ads", "cross-channel-analytics", "remarketing-strategy"]); }
+    const m4Info = await getAgentInfo(conn, m4Id);
+    const m5Id = await findAgent(conn, ["content-marketing", "social-scheduler"], usedIds);
+    if (m5Id) { usedIds.push(m5Id); await assignSkillsToAgent(conn, m5Id, ["content-marketing", "social-scheduler"]); }
+    const m5Info = await getAgentInfo(conn, m5Id);
+    const steps = [
+      assignAgentToStep({ order: 1, name: "Brand Diagnosis (Insight-First)", description: "Apply Ritson's Phase 1: deep market orientation — customer segmentation, brand health tracking, competitive mapping — before any creative decisions.", tool: "internal", outputType: "brand_diagnosis", requiredSkills: ["mbb-strategist", "marketing-strategy-pmm"] }, leadInfo),
+      assignAgentToStep({ order: 2, name: "Target & Objectives Setting", description: "Set brand objectives with Ritson's 3-level framework: corporate objectives → marketing objectives → comms objectives; define trackable KPIs for each level.", tool: "internal", outputType: "brand_objectives", requiredSkills: ["market-research-agent", "marketing-analytics"] }, m2Info),
+      assignAgentToStep({ order: 3, name: "Brand Positioning & Identity", description: "Develop brand positioning (for whom, against whom, what benefit, why believe) and translate into visual and verbal identity system.", tool: "internal", outputType: "brand_positioning_identity", requiredSkills: ["brand-identity", "visual-content-creator"] }, m3Info),
+      assignAgentToStep({ order: 4, name: "Long & Short Balanced Media", description: "Apply Binet & Field / Ritson's 60:40 principle — 60% long-term brand building, 40% short-term activation — across paid media budget allocation.", tool: "internal", outputType: "media_balance_plan", requiredSkills: ["paid-ads", "cross-channel-analytics"] }, m4Info),
+      assignAgentToStep({ order: 5, name: "Brand Health Tracking & Iteration", description: "Set up quarterly brand health tracking (awareness, consideration, preference, loyalty); use data to iterate strategy rather than chasing short-term metrics.", tool: "internal", outputType: "brand_health_dashboard", requiredSkills: ["content-marketing", "social-scheduler"] }, m5Info),
+    ];
+    const agentMembers = [
+      { agent_id: leadId, is_lead: true, role: "Brand Strategist", order: 1 },
+      { agent_id: m2Id, is_lead: false, role: "Insights & Objectives Lead", order: 2 },
+      { agent_id: m3Id, is_lead: false, role: "Brand Positioning Lead", order: 3 },
+      { agent_id: m4Id, is_lead: false, role: "Media Balance Lead", order: 4 },
+      { agent_id: m5Id, is_lead: false, role: "Brand Health Tracker", order: 5 },
+    ].filter(a => a.agent_id);
+    await upsertWorkflow(conn, { missionType: taskType, name: "Ritson Rigorous Brand Management", description: "Source: Mark Ritson — Mini MBA in Marketing (25,000+ graduates); columnist Marketing Week; brand consultant (LVMH, Unilever, PepsiCo). The Mini MBA is the highest-rated online marketing programme in the world per course review aggregators.", steps });
+    await upsertSquad(conn, { slug, name: "Ritson Rigorous Brand Management", description: "Mark Ritson's academic-grade brand management: diagnosis → objectives → positioning → balanced media → brand health tracking — no shortcuts.", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Mark Ritson – Mini MBA Brand Management (2018–present)", agents: agentMembers, tags: ["brand", "strategy", "management", "ritson", "rigorous", "long-term"], useCases: ["annual brand planning", "brand health audit", "CMO-level brand strategy"], outputFormats: ["brand_diagnosis", "brand_objectives", "brand_positioning_identity", "media_balance_plan", "brand_health_dashboard"], requiredIntegrations: [], token: 64000, showcases: [{ company: "PepsiCo", description: "Ritson consulted on brand strategy frameworks aligning short-term activation with long-term brand equity building", result: "PepsiCo brands consistently outperform category in brand equity; Lay's, Gatorade and Pepsi maintain top-3 category positions globally", source: "Ritson, M. (2023). Mini MBA in Marketing. Marketing Week Learning." }] });
+  }

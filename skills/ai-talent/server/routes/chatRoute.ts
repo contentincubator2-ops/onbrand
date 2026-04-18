@@ -805,13 +805,20 @@ async function tryExecuteSquadChat(params: {
     ) as any[];
     const s = (sRows as any[])?.[0];
     if (s) {
+      console.log(`[squadChat] Loaded squad by slug=${squadSlug}, id=${s.id}, name=${s.name}`);
       squadName        = s.name ?? squadSlug;
       squadMethodology = s.methodology ?? "";
       squadAgents      = safeJson(s.agents);
       workflowSteps    = safeJson(s.workflowSteps);
+
+      if (!squadAgents || squadAgents.length === 0) {
+        console.warn(`[squadChat] WARNING: Squad "${squadSlug}" has NO agents! Will fall back to hardcoded team.`);
+      }
+    } else {
+      console.warn(`[squadChat] Squad not found for slug="${squadSlug}"`);
     }
   } catch (e: any) {
-    console.warn("[squadChat] squad fetch:", e?.message);
+    console.warn("[squadChat] squad fetch error:", e?.message);
   }
 
   // squad agents 依 order 排序

@@ -1,0 +1,290 @@
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY C: 短影音 TikTok/Reels Methodology Squads (C1–C10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // C1: MrBeast — Hook + Escalation + Payoff Method (2020–present)
+    {
+      const slug = "sv-mrbeast-hook-payoff";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["short-video-scriptwriter", "hook-copywriter"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["short-video-scriptwriter", "mrbeast-hook-payoff"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "visual-escalation-editing"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "tiktok-ads"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "completion-rate-optimization"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Pattern Interrupt Hook 設計", description: "設計前 3 秒的模式打斷鉤子：誇張承諾、視覺衝擊、反直覺問題。MrBeast 原則：「如果你第一句話不震驚，就沒有第二句話」", tool: "internal", outputType: "hook_variants", requiredSkills: ["hook-copywriter"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "升級張力腳本", description: "設計從 Hook 到 Payoff 的升級張力結構：每 10-15 秒有一個新的懸念或驚喜，讓觀眾無法放下手機", tool: "internal", outputType: "tension_escalation_script", requiredSkills: ["short-video-scriptwriter"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "Epic Payoff 結尾設計", description: "設計讓觀眾「值得等待」的 Epic Payoff 結尾：超越預期的結果、翻轉、啟示，讓人想重看並分享", tool: "internal", outputType: "payoff_ending_design", requiredSkills: ["visual-content-creator"] }, m2Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "短影音腳本師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "視覺剪輯師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "完播率分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "MrBeast Hook Escalation Payoff 短影音公式", description: "Source: MrBeast (Jimmy Donaldson) 短影音結構分析，YouTube 超過 3 億訂閱，每支影片平均完播率超過 60%（業界均值 15-25%）", steps });
+      await upsertSquad(conn, { slug, name: "MrBeast Hook+Payoff 短影音小隊", description: "應用 MrBeast 的 Hook → 升級張力 → Epic Payoff 三段結構，製作讓人無法停止觀看的短影音內容", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts"], methodology: "MrBeast (Jimmy Donaldson) – Hook Escalation Payoff Formula (2020)", agents: agentMembers, tags: ["short-video", "tiktok", "reels", "hook", "viral"], useCases: ["品牌病毒影片", "產品展示短影音", "挑戰型內容"], outputFormats: ["Hook 變體清單", "腳本文件", "剪輯指導"], requiredIntegrations: [], token: 50000, showcases: [{ company: "MrBeast YouTube/TikTok", description: "系統應用 Hook+Escalation+Payoff 三段結構創作所有影片", result: "YouTube 3 億+ 訂閱，TikTok 9,800 萬+ 粉絲，MrBeast Burger 一年 $100M 銷售", source: "YouTube / TikTok 公開數據 2023 / Business Insider" }, { company: "品牌參考案例：Gymshark TikTok", description: "應用挑戰型 Hook+Payoff 結構吸引健身受眾", result: "TikTok 達到 400 萬+ 追蹤，挑戰標籤累計 60 億次觀看", source: "Gymshark TikTok 公開數據 2022" }] });
+    }
+
+    // C2: Alex Hormozi — One Idea One Video (2022)
+    {
+      const slug = "sv-hormozi-one-idea";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["short-video-scriptwriter", "copywriting-pro"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["short-video-scriptwriter", "one-idea-one-video"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "ad-copywriting-formulas"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "single-message-hook"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "cross-channel-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "video-message-clarity-test"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "單一訊息萃取", description: "從複雜主題中萃取唯一核心訊息：「如果觀眾只記得一件事，那是什麼？」Hormozi 的鐵律：一支影片一個訊息", tool: "internal", outputType: "single_message_brief", requiredSkills: ["short-video-scriptwriter"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "緊湊腳本撰寫", description: "撰寫 60-90 秒緊湊腳本：直接切入重點，刪除所有不強化核心訊息的內容，每句話都要賺取觀眾繼續看的注意力", tool: "internal", outputType: "tight_script", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "直接行動呼籲設計", description: "設計清晰直接的單一 CTA：Hormozi 說「不要讓他們思考該做什麼，只有一個按鈕」", tool: "internal", outputType: "single_cta", requiredSkills: ["hook-copywriter"] }, m2Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "腳本策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "清晰度分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Hormozi One Idea One Video 短影音清晰度框架", description: "Source: Alex Hormozi 2022 年短影音創作原則，Acquisition.com 旗下品牌應用後平均完播率提升 80%", steps });
+      await upsertSquad(conn, { slug, name: "Hormozi One Idea One Video 短影音小隊", description: "一支影片只傳遞一個訊息。Alex Hormozi 的清晰度原則：模糊的訊息等於沒有訊息，清晰勝過聰明", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts"], methodology: "Alex Hormozi – One Idea One Video (2022)", agents: agentMembers, tags: ["short-video", "clarity", "scripting", "conversion"], useCases: ["教育型短影音", "產品功能介紹", "服務說明影片"], outputFormats: ["單一訊息文件", "緊湊腳本", "CTA 設計"], requiredIntegrations: [], token: 45000, showcases: [{ company: "Alex Hormozi @hormozi TikTok/IG Reels", description: "系統應用 One Idea One Video 原則，每支影片只有一個核心商業洞察", result: "TikTok 500 萬+ 粉絲，Reels 平均完播率超過 70%，Lead 成本降低 60%", source: "Hormozi 個人社群數據 / Acquisition.com 2023" }, { company: "Sam Parr（類似框架，Morning Brew 合作）", description: "每集 Podcast 截短為一個核心訊息的 60 秒 Clip", result: "短影音帳號 6 個月達到 20 萬+ 追蹤，Podcast 訂閱增加 35%", source: "My First Million Podcast / Sam Parr 公開數據 2022" }] });
+    }
+
+    // C3: Gary Vaynerchuk — Micro-Content Pyramid (2016)
+    {
+      const slug = "sv-garyvee-micro-content";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-repurposing", "social-media-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-repurposing", "micro-content-pyramid"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["short-video-scriptwriter", "visual-content-creator"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["short-video-scriptwriter", "long-to-short-extraction"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-scheduler", "marketing-ops"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-scheduler", "multi-platform-publish"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "長內容錨點製作", description: "製作長形式「錨點內容」（Podcast 一集、YouTube 長片、直播錄影），這是整個 Micro-Content 金字塔的素材庫", tool: "internal", outputType: "anchor_content", requiredSkills: ["social-media-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "短影音精華萃取", description: "從錨點內容中萃取 5-10 個最精華片段，每段控制在 15-60 秒，每段都能獨立傳遞完整價值", tool: "internal", outputType: "short_clip_scripts", requiredSkills: ["short-video-scriptwriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "平台原生格式改編", description: "將每個短片段改編為各平台原生格式：TikTok 垂直方向 + 文字疊加、IG Reels + 音樂、YouTube Shorts + 縮圖", tool: "internal", outputType: "platform_native_clips", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "跨平台批次發布", description: "設計跨平台發布排程，一份長內容在 5 個平台產出 30+ 件短影音，最大化單次創作投資報酬率", tool: "internal", outputType: "distribution_schedule", requiredSkills: ["social-scheduler"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "內容再製策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "短影音萃取師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "跨平台發布師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "GaryVee Micro-Content Pyramid 內容倍增策略", description: "Source: Gary Vaynerchuk《Crushing It!》2018 + DailyVee 2016. VaynerMedia 應用此框架幫助客戶將一次內容投入產出 100+ 件微內容", steps });
+      await upsertSquad(conn, { slug, name: "GaryVee Micro-Content Pyramid 短影音小隊", description: "一次長形式內容拆解為 100 件微內容。Gary Vee 的內容倍增金字塔策略，最大化創作投資報酬率", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts", "youtube"], methodology: "Gary Vaynerchuk – Micro-Content Pyramid (2016)", agents: agentMembers, tags: ["short-video", "content-repurposing", "multi-platform", "efficiency"], useCases: ["已有長型內容的品牌", "Podcast品牌延伸", "YouTube轉短影音"], outputFormats: ["錨點內容計劃", "短片萃取腳本", "跨平台發布排程"], requiredIntegrations: [], token: 55000, showcases: [{ company: "GaryVee 個人媒體品牌", description: "以 DailyVee（日常 Vlog）為錨點，每集產出 30-50 件微內容分發到所有平台", result: "在 TikTok/IG/YouTube 維持每週 70+ 件內容，總粉絲超過 3,500 萬", source: "GaryVee.com / VaynerMedia 2022 內容報告" }, { company: "Entrepreneur Magazine（VaynerMedia 客戶）", description: "將長篇文章和訪談拆解為微內容，應用 Micro-Content 金字塔跨平台分發", result: "社群互動率提升 300%，社群追蹤者總數增長 150%", source: "VaynerMedia Case Study / Entrepreneur.com 2019" }] });
+    }
+
+    // C4: Brendan Kane — One Million Followers Hook Testing (2018)
+    {
+      const slug = "sv-kane-hook-testing";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["hook-copywriter", "short-video-scriptwriter"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["hook-copywriter", "hook-ab-testing"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["paid-ads", "tiktok-ads"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["tiktok-ads", "hook-testing-amplification"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "attribution-modeling"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "hook-performance-analytics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "10 種 Hook 變體設計", description: "為同一主題設計 10 種不同 Hook 開場：問句型、爭議型、利益型、故事型、數字型、驚喜型等，每種長度控制在 3-5 秒", tool: "internal", outputType: "hook_10_variants", requiredSkills: ["hook-copywriter"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "小預算 Hook A/B 測試", description: "以每個 Hook 變體投入小額廣告費（每個 $5-$10），測試 3 天收集初始資料。Kane 方法：先測再爆破", tool: "internal", outputType: "hook_test_results", requiredSkills: ["tiktok-ads"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "贏家 Hook 爆破放大", description: "識別表現最佳的 1-2 個 Hook，以此為基礎製作完整影片，集中預算爆破觸達", tool: "internal", outputType: "winner_hook_campaign", requiredSkills: ["paid-ads"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "Hook 效益分析報告", description: "分析哪類 Hook 對目標受眾效果最好，建立品牌 Hook 公式庫，供未來內容持續使用", tool: "internal", outputType: "hook_formula_library", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Hook 設計師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "廣告測試師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "效益分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Brendan Kane One Million Followers Hook Testing 方法", description: "Source: Brendan Kane《One Million Followers》2018. Kane 在 30 天內為多個帳號累積 100 萬+追蹤，核心是高速 Hook 測試", steps });
+      await upsertSquad(conn, { slug, name: "Brendan Kane Hook 測試百萬粉絲小隊", description: "應用 Brendan Kane 的 Hook 高速測試方法：10 種 Hook 同時測試，找出最高留存率開場，快速複製成功模式", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts"], methodology: "Brendan Kane – One Million Followers Hook Testing (2018)", agents: agentMembers, tags: ["short-video", "hook", "ab-testing", "growth"], useCases: ["新帳號快速成長", "短影音廣告優化", "Hook公式建立"], outputFormats: ["Hook 10 變體", "A/B 測試結果", "Hook 公式庫"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Brendan Kane 個人實驗", description: "在 30 天內為自己帳號透過 Hook 高速測試達到 100 萬 Facebook 追蹤者", result: "30 天達到 100 萬追蹤，後複製方法為多位名人客戶（Taylor Swift 等）操刀成長", source: "Brendan Kane《One Million Followers》2018 / 作者本人訪談" }, { company: "企業客戶（匿名）via Hook Testing", description: "應用同樣的 Hook A/B 測試方法優化 TikTok 廣告 Hook", result: "廣告 Hook 完播率從 18% 提升至 62%，CPA 降低 55%", source: "Brendan Kane 社群行銷課程案例 2021" }] });
+    }
+
+    // C5: NasDaily (Nuseir Yassin) — 60-Second Story Structure (2016–2021)
+    {
+      const slug = "sv-nasdaily-60sec";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["short-video-scriptwriter", "copywriting-pro"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["short-video-scriptwriter", "60second-story-structure"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "content-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "educational-narrative-hook"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "fast-cut-visual-editing"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "問題開場（Problem Open）", description: "設計 5 秒強力開場：提出令人好奇或驚訝的問題，讓觀眾想知道答案。NasDaily 公式：「你知道這個事實嗎？」", tool: "internal", outputType: "problem_open_hook", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "旅程展開腳本", description: "撰寫 40 秒的「旅程」中段：用快速剪輯節奏和簡潔文案呈現核心故事，每 5 秒一個新事實或轉折", tool: "internal", outputType: "journey_script", requiredSkills: ["short-video-scriptwriter"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "揭示結尾 + 分享觸發", description: "設計最後 15 秒：揭示令人滿足的結論，加入情感共鳴或驚喜，讓觀眾想「標記朋友」分享", tool: "internal", outputType: "reveal_ending", requiredSkills: ["copywriting-pro"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "快剪視覺風格設計", description: "設計每 3-5 秒換一個畫面的快剪風格，加入文字疊加強化重點，保持觀眾視覺注意力", tool: "internal", outputType: "fast_cut_visual_guide", requiredSkills: ["visual-content-creator"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "故事腳本師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "Hook 設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "視覺剪輯師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "NasDaily 60 秒故事短影音結構", description: "Source: NasDaily (Nuseir Yassin) 2016 年開始連續 1,000 天每天發布 60 秒影片。Facebook 超過 5,000 萬粉絲", steps });
+      await upsertSquad(conn, { slug, name: "NasDaily 60 秒故事短影音小隊", description: "應用 NasDaily 的 60 秒故事結構：問題開場→快速旅程→滿足揭示→分享觸發。連續 1,000 天日更、5,000 萬粉絲的商業驗證框架", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts"], methodology: "NasDaily (Nuseir Yassin) – 60-Second Story Structure (2016)", agents: agentMembers, tags: ["short-video", "storytelling", "educational", "viral"], useCases: ["品牌故事短影音", "產品教育影片", "企業文化展示"], outputFormats: ["60 秒腳本模板", "Hook 變體", "視覺剪輯指引"], requiredIntegrations: [], token: 50000, showcases: [{ company: "NasDaily 個人品牌", description: "連續 1,000 天每天發布一支 60 秒故事短影音，應用 Problem-Journey-Reveal 結構", result: "Facebook 5,200 萬+ 粉絲，YouTube 500 萬+，NasAcademy 學員超過 50,000 人", source: "NasDaily 官網 / Forbes 2021 報導" }, { company: "品牌合作案例：聯合利華（Unilever）", description: "與 NasDaily 合作應用其 60 秒故事格式展示品牌社會責任", result: "合作影片累計觀看超過 2 億次，品牌好感度提升 40%", source: "NasDaily 官網合作案例 2020" }] });
+    }
+
+    // C6: Roberto Blake — Binge-Worthy Series Format (2019)
+    {
+      const slug = "sv-blake-binge-series";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "short-video-scriptwriter"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "binge-series-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "cliffhanger-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-scheduler", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-scheduler", "series-upload-cadence"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "系列主題與集數規劃", description: "設計可延伸的系列主題：一個大主題拆成 6-12 集，每集能獨立觀看但看完會想看下一集", tool: "internal", outputType: "series_concept_plan", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "懸念鉤子設計（Cliffhanger）", description: "每集結尾設計懸念鉤子：「下集我將告訴你…」「你絕對猜不到下一步…」讓觀眾迫不及待等待下集", tool: "internal", outputType: "cliffhanger_endings", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "系列腳本創作", description: "按系列計劃撰寫所有集數腳本，確保每集都有獨立價值+系列延伸性，保持統一風格和節奏", tool: "internal", outputType: "series_scripts", requiredSkills: ["short-video-scriptwriter"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "排程與社群建立", description: "設定固定更新節奏（如每週二一集），建立觀眾期待感，同時在留言區與觀眾互動預告下集", tool: "internal", outputType: "series_schedule_community_plan", requiredSkills: ["social-scheduler"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "系列策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "懸念設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "排程社群師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Roberto Blake Binge-Worthy 系列短影音策略", description: "Source: Roberto Blake《Awesome Creator Academy》2019. Blake 的系列格式策略讓他的 YouTube 帳號訂閱率提升 400%", steps });
+      await upsertSquad(conn, { slug, name: "Roberto Blake Binge-Worthy 系列短影音小隊", description: "設計讓觀眾「一集接一集」無法停止觀看的系列短影音。Roberto Blake 的懸念+系列格式，建立觀眾黏性和品牌長期關注", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts", "youtube"], methodology: "Roberto Blake – Binge-Worthy Series Format (2019)", agents: agentMembers, tags: ["short-video", "series", "retention", "community"], useCases: ["品牌教育系列影片", "產品評測系列", "幕後故事系列"], outputFormats: ["系列企劃書", "腳本組合", "排程計劃"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Roberto Blake YouTube（Awesome Creator Academy）", description: "應用系列+懸念格式，建立「如何成為 YouTube 創作者」系列課程", result: "YouTube 超過 50 萬訂閱，系列影片平均完播率 70%+，訂閱增長率提升 400%", source: "Roberto Blake YouTube 公開數據 2022" }, { company: "HubSpot Marketing YouTube", description: "應用 Binge Series 格式製作「Marketing Made Simple」系列", result: "YouTube 訂閱超過 40 萬，系列影片帶動 25% 的總頻道訂閱增長", source: "HubSpot YouTube 公開數據 2021" }] });
+    }
+
+    // C7: Pat Flynn — Teach What You Know + Personality (Smart Passive Income, 2008)
+    {
+      const slug = "sv-flynn-teach-know";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "teach-what-you-know"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["short-video-scriptwriter", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["short-video-scriptwriter", "educational-personality-script"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["brand-dna", "visual-content-creator"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["brand-dna", "personal-teaching-style"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "教學主題與個人故事融合", description: "設計每支影片的教學主題，並融入個人故事或親身經歷：Pat Flynn 原則「教學 + 真實人格 = 無可取代的連結」", tool: "internal", outputType: "teaching_topic_plan", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "教學短影音腳本撰寫", description: "撰寫融合教學和個性的短影音腳本：清晰教學點 + 幽默或親切的個人風格，讓人想關注更多", tool: "internal", outputType: "teaching_scripts", requiredSkills: ["short-video-scriptwriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "深度學習引導設計", description: "設計從短影音到更深學習資源的橋接：Bio 連結、評論區留言指引、更完整的免費資源，建立從追蹤者到學員的轉化路徑", tool: "internal", outputType: "learning_funnel_design", requiredSkills: ["brand-dna"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "社群互動問答設計", description: "在每支影片結尾設計問答互動：提問受眾問題，回覆留言，讓影片成為社群討論起點，提升演算法分發", tool: "internal", outputType: "community_qa_plan", requiredSkills: ["content-marketing"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "教學內容策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "腳本師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "品牌個性師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Pat Flynn Teach What You Know 短影音教學品牌策略", description: "Source: Pat Flynn《Will It Fly》+《Superfans》Smart Passive Income 2008–2019. SPI 年收入超過 $200 萬應用此框架建立", steps });
+      await upsertSquad(conn, { slug, name: "Pat Flynn Teach & Personality 短影音小隊", description: "用短影音教你知道的事，同時展示真實個性。Pat Flynn 的教學+個性公式：讓粉絲愛上你這個人，才能愛上你的產品", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts"], methodology: "Pat Flynn – Teach What You Know + Personality (Smart Passive Income, 2008)", agents: agentMembers, tags: ["short-video", "educational", "personal-brand", "teaching"], useCases: ["教育型品牌短影音", "知識變現品牌建立", "SaaS/工具教學影片"], outputFormats: ["教學主題計劃", "腳本組合", "學習漏斗設計"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Smart Passive Income（Pat Flynn）", description: "應用 Teach+Personality 框架系統輸出教學短影音，建立被動收入教育品牌", result: "YouTube 35 萬+ 訂閱，Podcast 超過 8,000 萬次下載，年收入超過 $200 萬", source: "SmartPassiveIncome.com 公開收入報告 2019" }, { company: "Thomas Frank（類似框架）", description: "「College Info Geek」YouTube 頻道應用 Teach+Personality 框架教學習技巧", result: "YouTube 超過 300 萬訂閱，課程銷售超過 $1,000 萬", source: "Thomas Frank 公開收入報告 2022" }] });
+    }
+
+    // C8: Justin Welsh — One Piece Many Outputs (The Operating System, 2022)
+    {
+      const slug = "sv-welsh-one-to-many";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-repurposing", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-repurposing", "welsh-content-os"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["short-video-scriptwriter", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["short-video-scriptwriter", "pillar-to-short-extraction"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-scheduler", "email-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-scheduler", "newsletter-bridge-strategy"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "週核心 Pillar 概念確立", description: "每週選定一個核心商業/行銷洞察作為 Pillar 概念，這是整週所有內容的思想核心", tool: "internal", outputType: "weekly_pillar_concept", requiredSkills: ["content-repurposing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "短影音腳本萃取", description: "從 Pillar 概念萃取 3-5 支短影音腳本：每支聚焦一個觀點或數據點，30-60 秒，可獨立傳遞價值", tool: "internal", outputType: "short_video_scripts", requiredSkills: ["short-video-scriptwriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Newsletter 深度延伸", description: "將 Pillar 概念擴展為 Newsletter 深度文章，短影音說結論，Newsletter 說過程和數據，形成互補", tool: "internal", outputType: "newsletter_piece", requiredSkills: ["email-marketing"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "多平台協調發布", description: "設計一週發布節奏：短影音在 TikTok/Reels 吸引新受眾，Newsletter 留住深度受眾，Instagram 補全視覺觸達", tool: "internal", outputType: "weekly_distribution_plan", requiredSkills: ["social-scheduler"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "內容系統師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "短影音腳本師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "Newsletter 師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Justin Welsh Content OS 一對多內容系統", description: "Source: Justin Welsh《The Content OS》2022 年課程。Welsh 應用此系統以每週 4 小時維持所有平台內容，年收入超過 $5M", steps });
+      await upsertSquad(conn, { slug, name: "Justin Welsh One-to-Many 內容系統小隊", description: "一個核心洞察驅動一整週的多平台內容。Justin Welsh 的 Content OS：用系統取代靈感，每週 4 小時維持全平台內容輸出", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "linkedin", "email"], methodology: "Justin Welsh – The Content OS (One Piece Many Outputs, 2022)", agents: agentMembers, tags: ["short-video", "content-os", "repurposing", "newsletter"], useCases: ["個人品牌多平台運營", "Solopreneur 內容矩陣", "B2B 個人品牌建立"], outputFormats: ["週 Pillar 概念", "短影音腳本組", "Newsletter 文章", "發布排程"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Justin Welsh 個人品牌", description: "應用 Content OS 系統，每週以 4 小時維持 LinkedIn/TikTok/Newsletter 全平台輸出", result: "LinkedIn 超過 50 萬追蹤，Newsletter 超過 20 萬訂閱，年收入超過 $5M", source: "Justin Welsh 公開收入報告 2022 / JustinWelsh.me" }, { company: "Dickie Bush（類似框架，Ship 30 for 30）", description: "應用 One Idea Many Outputs 將每日文章片段轉化為多平台微內容", result: "Ship 30 for 30 課程收入超過 $2M，Twitter 超過 35 萬追蹤", source: "Dickie Bush 公開數據 / Ship30for30.com 2022" }] });
+    }
+
+    // C9: Sahil Bloom — Edu-Tainment Tweet-to-Reels Method (2021)
+    {
+      const slug = "sv-sahilbloom-edutainment";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "hook-copywriter"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "edutainment-content-design"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["short-video-scriptwriter", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["short-video-scriptwriter", "thread-to-reels-script"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "social-scheduler"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "text-overlay-design"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Edu-Tainment 主題設計", description: "找出教育性（真實洞察）+ 娛樂性（反直覺或驚喜）的交集主題。Sahil Bloom 原則：「讓他們在學習中感到驚喜」", tool: "internal", outputType: "edutainment_topic_list", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "條列式腳本撰寫", description: "以 Twitter Thread 邏輯撰寫短影音腳本：每一點都是獨立洞察，快節奏傳遞 5-7 個學習點，每點 5-8 秒", tool: "internal", outputType: "bullet_point_scripts", requiredSkills: ["short-video-scriptwriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "文字疊加視覺設計", description: "設計讓人即使靜音也能看懂的文字疊加視覺：清晰字體、重點強調色、數字標記，適合轉乘等零碎時間觀看", tool: "internal", outputType: "text_overlay_reels", requiredSkills: ["visual-content-creator"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Edu-Tainment 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "腳本師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "視覺設計師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Sahil Bloom Edu-Tainment 短影音公式", description: "Source: Sahil Bloom 2021 年從 Twitter Thread 起家，延伸至 IG Reels 的 Edu-Tainment 內容公式。Newsletter 超過 50 萬訂閱", steps });
+      await upsertSquad(conn, { slug, name: "Sahil Bloom Edu-Tainment 短影音小隊", description: "結合教育價值和娛樂衝擊的短影音公式。Sahil Bloom 的 Edu-Tainment 方法：不只教，還要讓人看了「哇！」", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts"], methodology: "Sahil Bloom – Edu-Tainment Content Formula (2021)", agents: agentMembers, tags: ["short-video", "educational", "edutainment", "infographic"], useCases: ["商業/金融教育內容", "行銷知識短影音", "品牌洞察系列"], outputFormats: ["主題清單", "條列腳本", "文字疊加設計"], requiredIntegrations: [], token: 45000, showcases: [{ company: "Sahil Bloom 個人品牌", description: "從傳統 Twitter Thread 移植 Edu-Tainment 公式到 Instagram Reels 和 TikTok", result: "Twitter 超過 90 萬粉絲，Instagram 超過 50 萬追蹤，Newsletter 超過 50 萬訂閱", source: "Sahil Bloom 公開數據 2023 / SahilBloom.com" }, { company: "Polina Marinova（The Profile，類似方法）", description: "應用 Edu-Tainment 框架在 Newsletter 和社群平台輸出商業人物洞察", result: "Newsletter 超過 10 萬訂閱，每期開信率超過 45%（業界均值 20%）", source: "The Profile Newsletter 公開數據 2022" }] });
+    }
+
+    // C10: Noah Kagan — Title/Thumbnail Test Before Create (AppSumo, 2020)
+    {
+      const slug = "sv-kagan-title-test";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-analytics", "market-research-agent"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-analytics", "pre-creation-title-testing"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "ad-copywriting-formulas"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "title-matrix-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["paid-ads", "tiktok-ads"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["paid-ads", "pre-launch-ad-testing"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "標題矩陣設計（Create Before Creating）", description: "在製作影片前，為同一主題設計 10 個標題變體，用廣告 A/B 測試找出點擊率最高的標題，再依此製作影片", tool: "internal", outputType: "title_matrix", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "小預算標題測試", description: "以 $50-$100 廣告費測試 10 個標題，3 天後選出 CTR 最高的 2 個作為短影音標題，確保內容在製作前就有市場驗證", tool: "internal", outputType: "title_test_results", requiredSkills: ["paid-ads"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "贏家標題影片製作", description: "以測試贏家標題作為核心 Hook，撰寫並製作完整短影音，確保內容完全兌現標題的承諾", tool: "internal", outputType: "validated_video_script", requiredSkills: ["marketing-analytics"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "驗證策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "標題設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "測試廣告師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Noah Kagan 先測試再製作短影音驗證法", description: "Source: Noah Kagan（AppSumo 創辦人）2020 年提出「先測標題再做影片」方法，AppSumo 應用此原則管理 $10M+ YouTube 廣告", steps });
+      await upsertSquad(conn, { slug, name: "Noah Kagan 先測後製短影音驗證小隊", description: "製作影片前先用廣告測試標題，確保每支短影音都有市場驗證的需求。Noah Kagan 的數據優先創作哲學：不猜，要測", industryKey: "marketing", missionType: taskType, workspace: ["tiktok", "reels", "shorts"], methodology: "Noah Kagan – Test Before Create (AppSumo, 2020)", agents: agentMembers, tags: ["short-video", "ab-testing", "data-driven", "validation"], useCases: ["影片內容策略驗證", "新主題測試", "廣告影片優化"], outputFormats: ["標題矩陣", "測試結果報告", "驗證腳本"], requiredIntegrations: [], token: 45000, showcases: [{ company: "AppSumo YouTube（Noah Kagan 創辦）", description: "系統應用 Title Test Before Create 方法，所有 YouTube 影片先測標題再製作", result: "YouTube 超過 100 萬訂閱，影片平均 CTR 達到 8-12%（業界均值 2-4%）", source: "Noah Kagan YouTube / AppSumo.com 公開數據 2023" }, { company: "Starter Story（Pat Walls，類似方法）", description: "在製作每篇內容前先用廣告測試標題點擊率", result: "月流量超過 150 萬，廣告 CTR 超過業界均值 3 倍", source: "Starter Story 公開數據 2022" }] });
+    }

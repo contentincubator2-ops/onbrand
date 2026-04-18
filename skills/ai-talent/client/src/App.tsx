@@ -5,8 +5,8 @@ import React, { useEffect, useState } from "react";
 import Login from "./pages/Login";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import AppShell from "./components/AppShell";
-import ChatCore from "./components/ChatCore";
-import type { SquadStepProgress } from "./components/ChatCore";
+import MissionChatCore from "./components/MissionChatCore";
+import type { SquadStepProgress } from "./components/MissionChatCore";
 import { Navigate, Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { trpc } from "./lib/trpc";
 import type { DBSquad } from "./types/squad";
@@ -46,7 +46,7 @@ function MissionPage() {
       activeSquad={activeSquad}
       squadStepProgress={squadStepProgress}
     >
-      <ChatCore
+      <MissionChatCore
         key={`mission-${numericMissionId}`}
         activeMissionId={numericMissionId}
         onMissionCreated={(id) => navigate(`/m/${id}`)}
@@ -100,7 +100,7 @@ function IndexPage() {
       onMissionSelect={handleMissionSelect}
       onNewTask={(_wsKey) => {}}
     >
-      <ChatCore
+      <MissionChatCore
         activeMissionId={null}
         onMissionCreated={(id) => navigate(`/m/${id}`)}
       />

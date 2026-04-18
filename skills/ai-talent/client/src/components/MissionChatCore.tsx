@@ -1,25 +1,27 @@
 /**
- * ChatCore.tsx — v7 Chat核心元件
- * 負責：messages 列表 + input 區域
+ * MissionChatCore.tsx — Mission 對話核心元件
+ * 負責：messages 列表 + input 區域（每個 Mission 的執行對話）
  * 樣式遵循 marketing-os-mockup-v7.html
  * Layout: flex column, height 100%
  *   上半：messages scroll area
  *   下半：input wrap（固定底部）
+ *
+ * Renamed from ChatCore.tsx in Phase A (2026-04-18)
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { trpc } from "../lib/trpc";
-import TaskProgressTracker, { type TaskStep } from "./chat/TaskProgressTracker";
-import TypedThreadCard from "./chat/TypedThreadCard";
-import SquadRecommendCards from "./chat/SquadRecommendCards";
-import { MissionHomePage } from "./chat/MissionHomePage";
-import { AgentBubbleHeader } from "./chat/AgentBubbleHeader";
-import { SaveToBrainButton } from "./chat/SaveToBrainButton";
-import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./chat/MentionAutocomplete";
-import { PositioningBar } from "./chat/PositioningBar";
-import { MarkdownRenderer } from "./chat/MarkdownRenderer";
-import { BrandPositioningBook, parsePositioningData } from "./chat/BrandPositioningBook";
+import TaskProgressTracker, { type TaskStep } from "./mission-chat/TaskProgressTracker";
+import TypedThreadCard from "./mission-chat/TypedThreadCard";
+import SquadRecommendCards from "./mission-chat/SquadRecommendCards";
+import { MissionHomePage } from "./mission-chat/MissionHomePage";
+import { AgentBubbleHeader } from "./mission-chat/AgentBubbleHeader";
+import { SaveToBrainButton } from "./mission-chat/SaveToBrainButton";
+import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./mission-chat/MentionAutocomplete";
+import { PositioningBar } from "./mission-chat/PositioningBar";
+import { MarkdownRenderer } from "./mission-chat/MarkdownRenderer";
+import { BrandPositioningBook, parsePositioningData } from "./mission-chat/BrandPositioningBook";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -144,7 +146,7 @@ export interface SquadStepProgress {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-export interface ChatCoreProps {
+export interface MissionChatCoreProps {
   initialBrandId?: number | null;
   activeMissionId?: number | null;
   preselectedAgent?: { id: number; name: string; title?: string; type: "agent" | "squad" } | null;
@@ -455,9 +457,9 @@ const IconSend = () => (
   </svg>
 );
 
-// ─── ChatCore ────────────────────────────────────────────────────────────────
+// ─── MissionChatCore ────────────────────────────────────────────────────────
 
-export default function ChatCore({
+export default function MissionChatCore({
   initialBrandId,
   activeMissionId,
   preselectedAgent,
@@ -466,7 +468,7 @@ export default function ChatCore({
   onSquadSelect,
   onSquadPreview,
   onSquadStepProgress,
-}: ChatCoreProps = {}) {
+}: MissionChatCoreProps = {}) {
 
   // ── Conversations state ──────────────────────────────────────────────────
   const [conversations, setConversations] = useState<Array<{
@@ -723,10 +725,13 @@ export default function ChatCore({
     autoStartedRef.current.add(activeMissionId);
 
     const missionConvId = `conv-mission-${activeMissionId}`;
-    // Small delay so the mission-init useEffect has time to create the conversation in state
+    // Delay to allow MissionHomePage to render and display squad recommendations to user
+    // This ensures visual consistency between new tasks and existing tasks (e.g., task 149)
+    // 700ms: mission-init, 300ms: MissionHomePage render, 500ms: user sees recommendations
     const timer = setTimeout(() => {
+      console.log("[MissionChatCore] Auto-starting mission chat after homepage display delay");
       executeSquadChat("開始任務", missionConvId, squadSlug);
-    }, 700);
+    }, 1500);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMissionId, (missionDataQuery.data as any)?.squadSlug, missionDataQuery.isLoading, savedMessagesQuery.isLoading, savedMessagesQuery.isSuccess]);

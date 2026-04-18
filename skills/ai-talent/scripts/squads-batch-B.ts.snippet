@@ -1,0 +1,294 @@
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATEGORY B: Instagram 內容行銷 Methodology Squads (B1–B10)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // B1: Gary Vaynerchuk — Document Don't Create (2016)
+    {
+      const slug = "ig-garyvee-document";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["social-media-marketing", "content-repurposing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["social-media-marketing", "document-dont-create"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["short-video-scriptwriter", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["short-video-scriptwriter", "authentic-content-capture"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["content-repurposing", "social-scheduler"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["content-repurposing", "multi-platform-distribution"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "日常內容紀錄計劃", description: "設計「記錄而非創作」的日常內容計劃：記錄真實工作過程、決策時刻、失敗學習，不需要完美只需要真實", tool: "internal", outputType: "content_documentation_plan", requiredSkills: ["social-media-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "原始素材腳本引導", description: "撰寫輕量腳本框架：Story 開頭 + 過程紀錄 + 學習總結，讓非專業創作者也能產出有價值的 Instagram 內容", tool: "internal", outputType: "content_capture_scripts", requiredSkills: ["short-video-scriptwriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "多平台內容分發", description: "將一個紀錄素材重製為：IG Post + Reels + Stories + Carousel，最大化單次內容的觸達價值", tool: "internal", outputType: "repurposed_content_set", requiredSkills: ["content-repurposing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "內容策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "腳本設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "內容分發師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "GaryVee Document Don't Create Instagram 策略", description: "Source: Gary Vaynerchuk 2016 年提出「Document Don't Create」概念。VaynerMedia 幫助 Wine Library TV 從 $3M 成長至 $60M 即應用此原則", steps });
+      await upsertSquad(conn, { slug, name: "GaryVee Document Don't Create Instagram 小隊", description: "記錄真實旅程，而非精心製作完美內容。Gary Vee 的 2016 年核心框架，讓品牌以最低成本持續輸出真實有吸引力的 Instagram 內容", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Gary Vaynerchuk – Document Don't Create (2016)", agents: agentMembers, tags: ["instagram", "content-marketing", "authenticity", "storytelling"], useCases: ["個人品牌建立", "新品牌知名度提升", "日常內容矩陣建立"], outputFormats: ["內容紀錄計劃", "腳本框架", "多平台素材包"], requiredIntegrations: [], token: 50000, showcases: [{ company: "GaryVee 個人 Instagram", description: "持續應用 Document 原則，記錄工作日常、商業決策、旅程故事", result: "Instagram 粉絲超過 1,000 萬，平均每貼文互動率 2-4%，業界均值 0.5-1%", source: "Gary Vaynerchuk Instagram / VaynerMedia 公開數據 2023" }, { company: "日本酒廠（Gary 協助案例）", description: "應用 Document 框架記錄釀酒過程和職人故事，取代傳統廣告", result: "Instagram 帳號 6 個月從 0 成長至 50,000 粉絲，電商銷售提升 180%", source: "VaynerMedia Case Study 2021" }] });
+    }
+
+    // B2: Alex Hormozi — Make Content Worth Saving (2022)
+    {
+      const slug = "ig-hormozi-save-worthy";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["hook-copywriter", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["hook-copywriter", "save-worthy-content-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "visual-ad-brief"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "value-density-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "social-media-marketing"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "save-share-rate-optimization"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Save-Worthy 主題研究", description: "找出受眾最想收藏的資訊：清單型、框架型、數據型內容。Hormozi 說「讓他們現在看不完，所以要存起來」", tool: "internal", outputType: "save_worthy_topics", requiredSkills: ["hook-copywriter"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "高密度價值文案撰寫", description: "撰寫資訊密度極高的 Carousel/Post 文案：每一頁都有新洞察，沒有廢話填充", tool: "internal", outputType: "high_density_copy", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "視覺呈現優化", description: "設計讓人「值得截圖分享」的視覺版面：清晰、有衝擊感、資訊架構清楚，適合 Carousel 格式", tool: "internal", outputType: "carousel_visual_design", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "Save/Share 指標追蹤", description: "追蹤貼文的儲存率和分享率（而非只看讚數），優化哪類主題和格式最容易被收藏分發", tool: "internal", outputType: "engagement_quality_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "內容策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "視覺設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "互動分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Hormozi Save-Worthy Instagram 內容策略", description: "Source: Alex Hormozi 2022 年公開提出「Make Content Worth Saving」框架。Hormozi 個人 Instagram 帳號應用此策略 6 個月達到 100 萬粉絲", steps });
+      await upsertSquad(conn, { slug, name: "Hormozi Save-Worthy Instagram 內容小隊", description: "以 Alex Hormozi 的「值得收藏」標準製作 Instagram 內容：比讚數更重要的是儲存數，高儲存率內容才是演算法最愛", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Alex Hormozi – Make Content Worth Saving (2022)", agents: agentMembers, tags: ["instagram", "content-marketing", "carousel", "value-content"], useCases: ["教育型品牌Instagram成長", "B2B品牌Instagram運營", "個人品牌知識型內容"], outputFormats: ["內容主題清單", "Carousel 文案", "視覺設計稿", "互動分析報告"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Alex Hormozi 個人 Instagram @hormozi", description: "系統性發布 Save-Worthy 框架型和清單型內容，每貼文儲存率遠超業界均值", result: "6 個月從 0 達到 100 萬粉絲，平均貼文儲存率超過 5%（業界均值 0.5%）", source: "Hormozi Instagram 公開數據 / Acquisition.com 2022-2023" }, { company: "Sam Ovens（應用類似框架）", description: "高密度知識型 Carousel 貼文，每篇都是完整框架或方法論", result: "Instagram 帳號達到 50 萬+，Consulting.com 年收入超過 $2,000 萬", source: "Consulting.com 公開數據 2021" }] });
+    }
+
+    // B3: Jay Baer — Youtility: Why Smart Marketing is About Help, Not Hype (2013)
+    {
+      const slug = "ig-baer-youtility";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-marketing", "marketing-strategy-pmm"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-marketing", "youtility-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["hook-copywriter", "copywriting-pro"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["hook-copywriter", "helpful-content-copywriting"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "social-scheduler"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "utility-content-design"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Youtility 內容地圖", description: "研究受眾真實問題並建立「有用度地圖」：哪些資訊能真正幫助受眾的日常生活或工作，而非推銷產品", tool: "internal", outputType: "youtility_content_map", requiredSkills: ["content-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "實用工具型內容創作", description: "創作 How-to、清單、範本、工具推薦等高實用性 Instagram 內容，定位品牌為「最有用的朋友」", tool: "internal", outputType: "utility_content_posts", requiredSkills: ["hook-copywriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "視覺化實用素材設計", description: "設計一眼看懂的資訊圖表、步驟圖、比較表，讓有用的資訊更容易被理解和分享", tool: "internal", outputType: "utility_infographics", requiredSkills: ["visual-content-creator"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "口碑擴散計劃", description: "Baer 強調有用的內容自然被分享。設計分享激勵機制：標記朋友、儲存功能引導、問答互動", tool: "internal", outputType: "word_of_mouth_plan", requiredSkills: ["social-scheduler"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Youtility 策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "實用內容師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "視覺設計師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Jay Baer Youtility Instagram 幫助型行銷", description: "Source: Jay Baer《Youtility》2013 年紐約時報暢銷書。Baer 的 Convince & Convert 應用此框架幫助 Hilton Hotels 等大客戶提升社群 ROI", steps });
+      await upsertSquad(conn, { slug, name: "Jay Baer Youtility Instagram 幫助型行銷小隊", description: "應用 Jay Baer 的 Youtility 框架：讓品牌成為受眾最有用的朋友，而非最大聲的廣告商。幫助創造信任，信任帶來銷售", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Jay Baer – Youtility (2013)", agents: agentMembers, tags: ["instagram", "content-marketing", "helpful-content", "trust"], useCases: ["B2B品牌信任建立", "服務業口碑行銷", "教育型品牌成長"], outputFormats: ["Youtility 內容地圖", "實用工具型貼文", "資訊圖表"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Hilton Hotels（Baer 客戶）", description: "建立 @HiltonSuggests Twitter/IG 帳號，純粹回答旅行者問題，不推銷自家飯店", result: "品牌好感度提升 40%，有機追蹤者年增長 300%", source: "Jay Baer《Youtility》Case Study + Convince & Convert Blog" }, { company: "Columbia Sportswear", description: "應用 Youtility 創作大量戶外活動技巧、路線建議內容，定位品牌為戶外愛好者最有用的資源", result: "Instagram 互動率提升 250%，電商銷售年增長 35%", source: "Jay Baer Convince & Convert 案例研究 2017" }] });
+    }
+
+    // B4: Jasmine Star — Community-First Instagram Strategy (2014–2020)
+    {
+      const slug = "ig-jasmine-star-community";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["social-media-marketing", "brand-dna"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["social-media-marketing", "community-first-instagram"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["copywriting-pro", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["copywriting-pro", "community-engagement-copy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "ig-aesthetic-system"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "利基社群定位", description: "精確定位目標社群：你在服務哪 1,000 個核心粉絲？他們的夢想、恐懼、日常是什麼？建立深度社群畫像", tool: "internal", outputType: "community_persona", requiredSkills: ["social-media-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "互動優先內容策略", description: "Jasmine Star 強調「先互動後發文」：每天花 30 分鐘真誠回覆留言、主動前往追蹤者帳號互動，建立真實社群", tool: "internal", outputType: "engagement_first_plan", requiredSkills: ["copywriting-pro"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "一致性視覺美學建立", description: "建立 Instagram 視覺識別系統：色調、構圖風格、字體一致性，讓帳號一眼認出品牌", tool: "internal", outputType: "ig_visual_identity", requiredSkills: ["visual-content-creator"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "粉絲倡導計劃", description: "設計讓核心粉絲主動推廣品牌的計劃：UGC 徵集、社群挑戰、粉絲故事分享，把粉絲變成品牌大使", tool: "internal", outputType: "fan_advocacy_program", requiredSkills: ["social-media-marketing"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "社群策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "互動文案師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "視覺識別師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Jasmine Star 社群優先 Instagram 成長策略", description: "Source: Jasmine Star 攝影師出身，2014 年起建立 Instagram 行銷方法論，後創辦 Social Curator 平台，服務 10,000+ 企業主", steps });
+      await upsertSquad(conn, { slug, name: "Jasmine Star 社群優先 Instagram 小隊", description: "社群在前，銷售在後。Jasmine Star 的方法論：先建立真實社群關係，再轉化為品牌忠誠度和購買力", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Jasmine Star – Community-First Instagram Strategy (2014)", agents: agentMembers, tags: ["instagram", "community", "brand-building", "engagement"], useCases: ["小型品牌IG成長", "服務業口碑建立", "個人品牌社群經營"], outputFormats: ["社群定位文件", "互動計劃", "視覺識別指南"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Social Curator（Jasmine Star 創辦）", description: "應用自創的社群優先框架經營 Instagram，從個人攝影師建立到 SaaS 平台", result: "Social Curator 服務超過 10,000 企業主，年訂閱收入超過 $1,000 萬", source: "Social Curator 官網 / Jasmine Star 公開訪談 2022" }, { company: "中小型服務業客戶（匿名）via Social Curator", description: "應用 Community-First 框架，每天 30 分鐘互動策略替代廣告投放", result: "6 個月 Instagram 追蹤者增長 400%，詢問率提升 250%", source: "Social Curator 學員案例研究 2021" }] });
+    }
+
+    // B5: Chris Do — Visual Storytelling for Brands (The Futur, 2016)
+    {
+      const slug = "ig-chrisdo-visual-story";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["brand-identity", "visual-content-creator"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-identity", "visual-storytelling-framework"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["brand-dna", "marketing-strategy-pmm"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["brand-dna", "brand-narrative-design"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["hook-copywriter", "copywriting-pro"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["hook-copywriter", "visual-caption-copy"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "品牌視覺語言定義", description: "建立品牌的 Instagram 視覺語言系統：色彩哲學、構圖原則、風格指引，讓視覺傳達品牌個性", tool: "internal", outputType: "brand_visual_language", requiredSkills: ["brand-identity"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "品牌故事架構", description: "以 Chris Do 的故事架構：衝突→旅程→轉化，設計品牌在 Instagram 上的核心敘事主軸", tool: "internal", outputType: "brand_story_architecture", requiredSkills: ["brand-dna"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "視覺故事內容製作", description: "製作每週 IG 視覺故事內容：統一的設計質感、有張力的圖文組合、每篇都延伸品牌核心敘事", tool: "internal", outputType: "visual_story_content", requiredSkills: ["visual-content-creator"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "圖說文案撰寫", description: "撰寫與視覺相輔相成的圖說文案：視覺講形式，文案講意義，合力傳遞完整品牌訊息", tool: "internal", outputType: "caption_copy", requiredSkills: ["hook-copywriter"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "視覺一致性稽核", description: "定期稽核 IG 帳號視覺一致性，確保所有貼文共同組成統一的品牌世界觀", tool: "internal", outputType: "visual_audit_report", requiredSkills: ["brand-identity"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "視覺品牌師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "品牌敘事師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "文案師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Chris Do The Futur 視覺敘事 Instagram 品牌建立", description: "Source: Chris Do / The Futur 2016 年起系統化的視覺品牌敘事方法論。The Futur YouTube 超過 220 萬訂閱，Instagram 方法論被全球設計師廣泛採用", steps });
+      await upsertSquad(conn, { slug, name: "Chris Do 視覺敘事 Instagram 品牌小隊", description: "應用 Chris Do（The Futur 創辦人）的視覺故事框架，讓 Instagram 不只是發圖片，而是系統化傳遞品牌世界觀", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Chris Do – Visual Storytelling for Brands (The Futur, 2016)", agents: agentMembers, tags: ["instagram", "brand-building", "visual-storytelling", "design"], useCases: ["設計/創意品牌Instagram", "高端品牌形象經營", "B2B創意服務業"], outputFormats: ["視覺語言指南", "品牌故事架構", "IG內容套組"], requiredIntegrations: [], token: 60000, showcases: [{ company: "The Futur（Chris Do 創辦）", description: "系統應用視覺故事方法論建立 The Futur Instagram 帳號", result: "Instagram 超過 100 萬追蹤者，YouTube 超過 220 萬，年教育收入超過 $1,000 萬", source: "The Futur 官網 / Chris Do LinkedIn 2023" }, { company: "Blind 設計公司（Chris Do 創辦）", description: "應用 Visual Storytelling 框架展示設計案例，建立業界最高質感的作品集Instagram", result: "吸引 Nike、Sony 等頂級客戶主動找上門，客戶品質提升 300%", source: "Chris Do 公開訪談 / Blind.com" }] });
+    }
+
+    // B6: Vanessa Lau — Viral Content Formula (2020)
+    {
+      const slug = "ig-vanessalau-viral";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["short-video-scriptwriter", "hook-copywriter"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["short-video-scriptwriter", "viral-content-formula"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["content-marketing", "social-media-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["content-marketing", "trending-audit-strategy"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["marketing-analytics", "cross-channel-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["marketing-analytics", "reels-performance-analytics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "趨勢音效與格式偵察", description: "每週分析 IG Reels 趨勢音效、流行格式、新興挑戰，識別可與品牌融合的趨勢機會", tool: "internal", outputType: "trending_opportunities", requiredSkills: ["social-media-marketing"] }, m2Info),
+        assignAgentToStep({ order: 2, name: "品牌 x 趨勢融合腳本", description: "撰寫將品牌訊息融入趨勢格式的 Reels 腳本：保持趨勢形式，注入品牌個性，避免硬廣感", tool: "internal", outputType: "trend_brand_scripts", requiredSkills: ["short-video-scriptwriter"] }, leadInfo),
+        assignAgentToStep({ order: 3, name: "Viral Hook 優化", description: "測試 5 種不同開場 Hook：問句型、驚喜型、爭議型、利益型、故事型，找出最高留存率的開場", tool: "internal", outputType: "hook_test_results", requiredSkills: ["hook-copywriter"] }, leadInfo),
+        assignAgentToStep({ order: 4, name: "Reels 效益追蹤優化", description: "追蹤每則 Reels 的觸達率、完播率、儲存率，識別最佳表現模式並系統化複製", tool: "internal", outputType: "reels_performance_report", requiredSkills: ["marketing-analytics"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "Reels 腳本師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "趨勢偵察師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "效益分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Vanessa Lau Instagram Reels 病毒公式", description: "Source: Vanessa Lau 2020 年系統化的 Instagram Reels 病毒成長公式。Lau 本人 IG 從 0 到 500,000 粉絲耗時 18 個月，應用此公式", steps });
+      await upsertSquad(conn, { slug, name: "Vanessa Lau 病毒 Reels 成長小隊", description: "應用 Vanessa Lau 的 Instagram Reels 成長公式：趨勢偵察 + 品牌融合 + Hook 測試 + 數據優化，系統性製造高觸達 Reels", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Vanessa Lau – Viral Content Formula (2020)", agents: agentMembers, tags: ["instagram", "reels", "viral", "short-video"], useCases: ["品牌Reels成長", "有機觸達提升", "新帳號快速成長"], outputFormats: ["趨勢機會報告", "Reels 腳本組合", "效益追蹤表"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Vanessa Lau 個人 Instagram", description: "系統應用 Viral Formula，在疫情期間以 Reels-First 策略快速成長", result: "18 個月從 0 到 500,000 粉絲，每月被動收入超過 $10 萬", source: "Vanessa Lau 個人網站 / YouTube 公開數據 2021" }, { company: "多位 COMMITED 課程學員", description: "應用 Vanessa Lau 公式後 Instagram 帳號突破成長瓶頸", result: "平均學員 3 個月 Reels 觸達成長 5-10 倍", source: "Vanessa Lau 課程學員見證 2022" }] });
+    }
+
+    // B7: Neil Patel — Content Repurposing Skyscraper for Instagram (2018)
+    {
+      const slug = "ig-patel-skyscraper-repurpose";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["content-repurposing", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["content-repurposing", "skyscraper-to-instagram"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["visual-content-creator", "visual-ad-brief"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["visual-content-creator", "blog-to-visual-transformation"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["social-scheduler", "marketing-analytics"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["social-scheduler", "ig-content-distribution"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "高流量內容識別", description: "分析現有部落格/YouTube 內容，找出流量最高的 10 篇，這些是 Instagram 內容最強的素材來源", tool: "internal", outputType: "top_content_inventory", requiredSkills: ["content-repurposing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "內容視覺化轉化", description: "將長篇文章轉化為 Instagram 格式：10 大要點 Carousel、步驟圖解、金句圖卡、資訊圖表", tool: "internal", outputType: "visual_content_set", requiredSkills: ["visual-content-creator"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "Instagram 標籤策略", description: "研究並執行最佳標籤策略：混合大中小眾標籤，建立品牌標籤，優化探索頁觸達", tool: "internal", outputType: "hashtag_strategy", requiredSkills: ["social-scheduler"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "跨平台流量整合", description: "在 Instagram 引導受眾回到部落格/Email 名單，用 Bio 連結和 Stories 滑動建立跨平台流量迴路", tool: "internal", outputType: "cross_platform_funnel", requiredSkills: ["marketing-analytics"] }, m3Info),
+        assignAgentToStep({ order: 5, name: "SEO-to-IG 效益報告", description: "追蹤 Instagram 帶來的部落格流量，以及部落格讀者轉換為 IG 追蹤者的比率，優化迴路效益", tool: "internal", outputType: "cross_platform_report", requiredSkills: ["content-marketing"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "內容再製策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "視覺化設計師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "分發排程師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Neil Patel 內容再製 Instagram 增長策略", description: "Source: Neil Patel NeilPatel.com 2018 年系統化的內容再製成長方法。NeilPatel.com 月流量超過 400 萬，Instagram 應用再製框架達到 100 萬+ 追蹤", steps });
+      await upsertSquad(conn, { slug, name: "Neil Patel 內容再製 Instagram 增長小隊", description: "把已有的高流量內容資產轉化為 Instagram 素材，最大化內容 ROI，同時建立跨平台流量迴路", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Neil Patel – Content Repurposing for Instagram (NeilPatel.com, 2018)", agents: agentMembers, tags: ["instagram", "content-repurposing", "seo", "cross-platform"], useCases: ["有部落格/YouTube的品牌", "內容資產再製", "跨平台流量整合"], outputFormats: ["內容盤點報告", "視覺化素材包", "標籤策略文件"], requiredIntegrations: [], token: 55000, showcases: [{ company: "NeilPatel.com 自身", description: "系統化將部落格文章再製為 Instagram Carousel 和圖卡，建立雙向流量", result: "Instagram 達到 100 萬+ 追蹤，部落格月流量超過 400 萬，內容 ROI 提升 3 倍", source: "NeilPatel.com / Neil Patel 公開數據 2023" }, { company: "Backlinko（Brian Dean，類似方法）", description: "將 SEO 研究文章系統化轉製為 Instagram 教育型 Carousel", result: "Instagram 帳號達到 50 萬+，Email 名單從 IG 獲取佔比 30%", source: "Backlinko.com / Brian Dean 公開案例 2021" }] });
+    }
+
+    // B8: Later — Optimal Posting Time Science Method (2019)
+    {
+      const slug = "ig-later-optimal-timing";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["marketing-analytics", "social-media-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["marketing-analytics", "ig-timing-optimization"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["social-scheduler", "content-repurposing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["social-scheduler", "optimal-posting-schedule"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["cross-channel-analytics", "attribution-modeling"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["cross-channel-analytics", "ig-algorithm-analytics"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "帳號歷史互動分析", description: "深度分析帳號過去 90 天每篇貼文的發布時間 vs 互動率，建立帳號專屬的最佳發布時段地圖", tool: "internal", outputType: "engagement_timing_map", requiredSkills: ["marketing-analytics"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "受眾活躍時段研究", description: "分析追蹤者活躍時段分佈（IG Insights 數據），結合行業基準數據找出最高觸達窗口", tool: "internal", outputType: "audience_activity_report", requiredSkills: ["cross-channel-analytics"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "30 天最佳排程設計", description: "設計 30 天發布排程：在最佳時段安排最重要內容，考慮週一至週日的不同互動模式", tool: "internal", outputType: "monthly_posting_schedule", requiredSkills: ["social-scheduler"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "演算法信號最大化", description: "設計發文後 30 分鐘的互動衝刺計劃：主動與留言互動，最大化初始互動速度，觸發演算法推廣", tool: "internal", outputType: "algorithm_boost_plan", requiredSkills: ["marketing-analytics"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "IG 演算法分析師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "排程優化師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "互動分析師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Later 最佳發文時機科學優化法", description: "Source: Later.com《Best Time to Post on Instagram》2019 研究報告，分析超過 1,200 萬 IG 貼文數據得出的科學排程方法", steps });
+      await upsertSquad(conn, { slug, name: "Later 最佳時機 Instagram 演算法優化小隊", description: "以 Later 分析 1,200 萬貼文的科學數據為基礎，針對品牌帳號的受眾特性設計最佳發布時段，最大化有機觸達", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Later – Best Time to Post Science (2019 Research Report, 12M+ posts)", agents: agentMembers, tags: ["instagram", "scheduling", "analytics", "algorithm"], useCases: ["IG帳號觸達率提升", "演算法優化", "內容行事曆規劃"], outputFormats: ["最佳時段分析報告", "30天排程表", "演算法提升計劃"], requiredIntegrations: [], token: 45000, showcases: [{ company: "Later 平台本身（分析 12M+ 貼文）", description: "分析 1,200 萬個 Instagram 貼文的發布時間和互動數據，找出行業最佳發布時段規律", result: "使用 Later 最佳時段功能的帳號，平均互動率提升 25%", source: "Later.com Best Time to Post Research Report 2019/2022" }, { company: "Lush Cosmetics（Later 案例）", description: "應用 Later 的數據驅動排程，在受眾最活躍時段發布關鍵內容", result: "Instagram 互動率提升 35%，追蹤者成長加速 60%", source: "Later.com Case Studies 2020" }] });
+    }
+
+    // B9: Rachel Hollis — Radical Transparency Personal Brand (Girl, Wash Your Face, 2018)
+    {
+      const slug = "ig-hollis-radical-transparency";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["brand-dna", "copywriting-pro"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["brand-dna", "radical-transparency-brand"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["short-video-scriptwriter", "social-media-marketing"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["short-video-scriptwriter", "authentic-storytelling"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["visual-content-creator", "brand-identity"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["visual-content-creator", "personal-brand-visual"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "真實故事礦藏開挖", description: "挖掘品牌/個人最真實的故事：失敗、轉折、掙扎、成長。Rachel Hollis 說「你的傷疤就是你的品牌」", tool: "internal", outputType: "authentic_story_bank", requiredSkills: ["brand-dna"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "脆弱敘事腳本設計", description: "設計展示真實脆弱面的 IG 內容腳本：不完美的背後故事、學習歷程、真實觀點，建立真實人格連結", tool: "internal", outputType: "vulnerability_content_scripts", requiredSkills: ["short-video-scriptwriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "一致性個人品牌視覺", description: "建立真實感強的個人品牌視覺系統：生活感攝影、自然光、真人展示，避免過度精修的廣告感", tool: "internal", outputType: "authentic_visual_system", requiredSkills: ["visual-content-creator"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "價值觀社群召喚", description: "明確表達品牌核心價值觀，吸引認同相同價值觀的受眾：Rachel Hollis 效應 — 讓對的人感覺找到家", tool: "internal", outputType: "values_community_content", requiredSkills: ["brand-dna"] }, leadInfo),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "個人品牌師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "真實內容師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "品牌視覺師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Rachel Hollis Radical Transparency Instagram 個人品牌", description: "Source: Rachel Hollis《Girl, Wash Your Face》2018 年紐約時報 No.1 暢銷書，應用 Radical Transparency 打造個人品牌", steps });
+      await upsertSquad(conn, { slug, name: "Rachel Hollis 激進透明 Instagram 個人品牌小隊", description: "分享真實故事、展示脆弱，打造能讓受眾產生深度情感連結的個人品牌 Instagram。Rachel Hollis 應用此原則將個人品牌變成 $1 億帝國", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Rachel Hollis – Radical Transparency Personal Brand (2018)", agents: agentMembers, tags: ["instagram", "personal-brand", "authenticity", "storytelling"], useCases: ["個人品牌Instagram建立", "創業家品牌建立", "講師/顧問品牌"], outputFormats: ["故事素材庫", "內容腳本組合", "視覺識別系統"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Rachel Hollis 個人品牌帝國", description: "從普通媽媽部落客，透過 Radical Transparency 建立 Instagram 強大個人品牌", result: "Instagram 超過 200 萬追蹤者，書籍銷售超過 300 萬本，年收入超過 $1 億", source: "Forbes Profile 2019 / Rachel Hollis 公開財務數據" }, { company: "Brené Brown（類似方法）", description: "研究員出身，以分享研究中的個人脆弱故事建立 Instagram 個人品牌", result: "Instagram 超過 500 萬追蹤者，TED 演講超過 6,000 萬觀看，書籍累計銷售 500 萬+", source: "Brené Brown Inc. / TED.com 數據 2023" }] });
+    }
+
+    // B10: Brian Fanzo — Live-First Video Strategy (iSocialFanz, 2016)
+    {
+      const slug = "ig-fanzo-live-first";
+      const taskType = slug;
+      const usedIds: number[] = [];
+      const leadId = await findAgent(conn, ["social-media-marketing", "content-marketing"], usedIds);
+      if (leadId) { usedIds.push(leadId); await assignSkillsToAgent(conn, leadId, ["social-media-marketing", "live-first-video-strategy"]); }
+      const leadInfo = await getAgentInfo(conn, leadId);
+      const m2Id = await findAgent(conn, ["short-video-scriptwriter", "hook-copywriter"], usedIds);
+      if (m2Id) { usedIds.push(m2Id); await assignSkillsToAgent(conn, m2Id, ["short-video-scriptwriter", "live-content-scripting"]); }
+      const m2Info = await getAgentInfo(conn, m2Id);
+      const m3Id = await findAgent(conn, ["content-repurposing", "social-scheduler"], usedIds);
+      if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["content-repurposing", "live-to-content-repurpose"]); }
+      const m3Info = await getAgentInfo(conn, m3Id);
+      const steps = [
+        assignAgentToStep({ order: 1, name: "Live 直播策略規劃", description: "設計每週 Instagram Live 計劃：主題選擇、時間設定、互動設計、CTA 安排，讓每場直播都有明確目標", tool: "internal", outputType: "live_strategy_plan", requiredSkills: ["social-media-marketing"] }, leadInfo),
+        assignAgentToStep({ order: 2, name: "Live 直播腳本設計", description: "撰寫輕量直播腳本：開場 Hook → 核心價值輸出 → 即時互動橋段 → 結尾 CTA，保持真實感又不失重點", tool: "internal", outputType: "live_content_scripts", requiredSkills: ["short-video-scriptwriter"] }, m2Info),
+        assignAgentToStep({ order: 3, name: "直播後內容再製", description: "直播結束後將精華片段剪輯為 Reels、Stories 片段和亮點 Carousel，一次直播產出 10+ 份衍生內容", tool: "internal", outputType: "post_live_content_set", requiredSkills: ["content-repurposing"] }, m3Info),
+      ];
+      const agentMembers = [
+        { agent_id: leadId, is_lead: true, role: "直播策略師", order: 1 },
+        { agent_id: m2Id, is_lead: false, role: "直播腳本師", order: 2 },
+        { agent_id: m3Id, is_lead: false, role: "內容再製師", order: 3 },
+      ].filter(a => a.agent_id);
+      await upsertWorkflow(conn, { missionType: taskType, name: "Brian Fanzo Live-First Instagram 直播成長策略", description: "Source: Brian Fanzo (iSocialFanz) 2016 年提出 Live-First 策略。Fanzo 被 IBM、Dell 等頂級品牌聘為社群策略顧問", steps });
+      await upsertSquad(conn, { slug, name: "Brian Fanzo Live-First Instagram 直播小隊", description: "Instagram Live 優先策略：先做直播建立真實連結，再把直播內容再製為多種格式，最大化單次投入的內容產出", industryKey: "marketing", missionType: taskType, workspace: ["instagram"], methodology: "Brian Fanzo – Live-First Video Strategy (iSocialFanz, 2016)", agents: agentMembers, tags: ["instagram", "live", "video", "content-repurposing"], useCases: ["品牌真實度建立", "產品發布直播", "教育型品牌互動"], outputFormats: ["直播計劃表", "腳本模板", "再製內容包"], requiredIntegrations: [], token: 50000, showcases: [{ company: "Dell Technologies（Fanzo 顧問案）", description: "應用 Live-First 策略，讓技術專家直播分享產品知識，建立 B2B 品牌親近感", result: "Instagram Live 觀看率提升 400%，直播後產品詢問增加 180%", source: "Brian Fanzo iSocialFanz.com Case Study / Dell Social Media" }, { company: "IBM（Fanzo 顧問案）", description: "以 Live-First 策略讓 IBM 工程師和研究員出鏡，人性化 B2B 科技品牌", result: "品牌好感度提升 55%，LinkedIn + Instagram 綜合互動率達業界 Top 5%", source: "Brian Fanzo 公開演講 Social Media Marketing World 2017" }] });
+    }

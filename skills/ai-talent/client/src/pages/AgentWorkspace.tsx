@@ -3,10 +3,10 @@
  * Advanced A2A agent workspace, separate from general /chat.
  */
 import { useState } from "react";
-import AgentNavigation, { type Agent } from "../components/chat/AgentNavigation";
-import MessageBubble, { type Message } from "../components/chat/MessageBubble";
-import ChatInput from "../components/chat/ChatInput";
-import TaskProgressTracker, { type TaskStep } from "../components/chat/TaskProgressTracker";
+import AgentNavigation, { type Agent } from "../components/mission-chat/AgentNavigation";
+import MessageBubble, { type Message } from "../components/mission-chat/MessageBubble";
+import ChatInput from "../components/mission-chat/ChatInput";
+import TaskProgressTracker, { type TaskStep } from "../components/mission-chat/TaskProgressTracker";
 import { trpc } from "../lib/trpc";
 
 const DEMO_STEPS: TaskStep[] = [
