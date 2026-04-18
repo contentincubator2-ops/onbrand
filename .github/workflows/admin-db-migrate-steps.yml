@@ -41,9 +41,12 @@ jobs:
 
             echo ""
             echo "=== Step 2: Migrate steps from squad_template to squads ==="
+            # Handle collation mismatch (utf8mb4_unicode_ci vs utf8mb4_general_ci)
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               UPDATE squads s
-              INNER JOIN squad_template t ON t.taskType = s.missionType AND t.isActive = 1
+              INNER JOIN squad_template t
+                ON t.taskType = s.missionType COLLATE utf8mb4_unicode_ci
+                AND t.isActive = 1
               SET s.steps = t.steps
               WHERE (s.steps IS NULL OR JSON_LENGTH(s.steps) = 0);
             " 2>&1
