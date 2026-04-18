@@ -842,17 +842,18 @@ async function tryExecuteSquadChat(params: {
   const isLeadStep  = currentStep === 0;
   const totalSteps  = workflowSteps.length;
 
-  // 決定本步驟的 agent slot
+  // 決定本步驟的 agent slot — dual-track resolver (Phase D)
+  // Priority: step.assignedAgentId → step.requiredSkills → squad lead
+  const { resolveStepAgent } = await import("../_core/stepAgentResolver");
   let currentSlot: any = null;
   if (isLeadStep) {
     currentSlot = leadSlot ?? squadAgents[0] ?? null;
   } else {
-    // workflow step index (step 1 → workflowSteps[0])
     const wsIdx = Math.min(currentStep - 1, workflowSteps.length - 1);
-    // 找對應 workflow step 的 owner agent
-    const wStep = workflowSteps[wsIdx];
-    const ownerRole = wStep?.owner ?? wStep?.agentRole ?? "";
-    currentSlot = squadAgents.find((a: any) => a.role === ownerRole)
+    const wStep = workflowSteps[wsIdx] ?? {};
+    // Use unified resolver (assignedAgentId → requiredSkills → lead)
+    currentSlot = resolveStepAgent(wStep, squadAgents)
+               ?? squadAgents.find((a: any) => a.role === (wStep?.owner ?? wStep?.agentRole ?? ""))
                ?? squadAgents[wsIdx % squadAgents.length]
                ?? squadAgents[0]
                ?? null;
@@ -952,9 +953,17 @@ async function tryExecuteSquadChat(params: {
     }
   }
 
+  // Phase D2: Each step's agent reads the last 20 chat messages for context continuity.
+  // This ensures the executing agent understands the conversation flow, not just the
+  // handoff from the previous step.
+  const recentHistory = (conversationHistory ?? [])
+    .slice(-20)
+    .map(m => ({ role: m.role as "user" | "assistant" | "system", content: m.content }));
+
   const messages = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: effectiveUserMessage },
+    { role: "system" as const, content: systemPrompt },
+    ...recentHistory,
+    { role: "user" as const, content: effectiveUserMessage },
   ];
 
   let fullOutput = "";

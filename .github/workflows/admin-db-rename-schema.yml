@@ -40,7 +40,7 @@ jobs:
             echo ""
             echo "=== Step 2: Check existing state ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              SELECT 'agent_squads' as tbl, COUNT(*) as rows FROM agent_squads
+              SELECT 'agent_squads' as tbl, COUNT(*) as row_count FROM agent_squads
               UNION ALL
               SELECT 'squad_workflow_templates', COUNT(*) FROM squad_workflow_templates;
             " 2>&1
