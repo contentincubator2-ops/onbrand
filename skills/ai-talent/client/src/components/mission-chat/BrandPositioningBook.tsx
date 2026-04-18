@@ -358,6 +358,16 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
     return undefined;
   };
 
+  // Clean markdown/formatting artifacts from extracted values
+  const cleanValue = (s: string): string =>
+    s
+      .replace(/^[#>\s]+/, "")                    // leading #, >, whitespace
+      .replace(/^\*+|\*+$/g, "")                  // bold markers
+      .replace(/^[🚀🎯💡⚡✨📣🔥💎🌟]+\s*/, "")    // leading emoji
+      .replace(/^「|」$/g, "")                    // Chinese quotes if still present
+      .replace(/^"|"$/g, "")                      // straight quotes
+      .trim();
+
   // Helper: extract text after a specific heading (##/###/****, colon, or bold)
   // Scans from heading position for the pattern within the next 1500 chars
   const extractAfterHeading = (headings: string[], valuePatterns: RegExp[]): string | undefined => {
@@ -369,37 +379,47 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
       const chunk = markdown.slice(start, start + 1500);
       for (const vp of valuePatterns) {
         const vm = chunk.match(vp);
-        if (vm && vm[1]) return vm[1].trim();
+        if (vm && vm[1]) return cleanValue(vm[1]);
       }
     }
     return undefined;
   };
 
+  // Clean markdown formatting (bold/italic/inline code) but preserve structure (> separators)
+  const cleanMarkdown = (s: string): string =>
+    s
+      .replace(/\*\*([^*]+)\*\*/g, "$1")  // **bold** → bold
+      .replace(/\*([^*]+)\*/g, "$1")       // *italic* → italic
+      .replace(/`([^`]+)`/g, "$1")         // `code` → code
+      .replace(/^#{1,6}\s*/gm, "")         // remove markdown headings
+      .replace(/\s*>\s*/g, " · ")          // Moore template "> " separator → " · "
+      .replace(/\n{2,}/g, "\n")            // collapse blank lines
+      .replace(/\s{2,}/g, " ")             // collapse extra whitespace
+      .trim();
+
   // Positioning statement — prefer paragraph under "主定位宣言" / "完整定位宣言" headings
-  const positioningStatement = extractAfterHeading(
+  const positioningStatementRaw = extractAfterHeading(
     ["主定位宣言", "完整定位宣言", "核心定位陳述", "定位陳述", "Positioning Statement", "Core Positioning"],
     [
       // Multi-line paragraph up to next heading or blank-blank
-      /^\s*>?\s*([\s\S]{20,500}?)(?=\n\s*(?:#{1,4}|\*\*[A-Za-z\u4e00-\u9fff])|\n\n)/,
+      /^\s*>?\s*([\s\S]{20,600}?)(?=\n\s*(?:#{1,4}\s|\*\*[A-Z\u4e00-\u9fff][^*]*\*\*\s*\n)|\n\n)/,
       /^\s*>?\s*([^\n]{20,500})/,
     ]
   ) ?? extract([
-    // Colon format inline
     /(?:核心定位陳述|Positioning Statement|定位陳述|主定位宣言)[：:]\s*([^\n]{10,400})/i,
-    // Moore-template paragraph inline
     /(For\s+[^\n]{20,400}(?:Unlike|Our\s+product)[^\n]{5,200})/i,
   ]);
+  const positioningStatement = positioningStatementRaw ? cleanMarkdown(positioningStatementRaw) : undefined;
 
   // Tagline — MUST come after "主訊息" / "Headline" / "品牌標語" heading to avoid noise
   const tagline = extractAfterHeading(
     ["主訊息", "Headline", "中文標語", "品牌標語", "Tagline"],
     [
-      // "🚀「XXX」" style
-      /^\s*>?\s*[🚀🎯💡⚡✨📣]?\s*「([^」\n]{5,80})」/,
-      // "「XXX」" without emoji
-      /^\s*>?\s*「([^」\n]{5,80})」/,
-      // Plain line (no 「」 quotes)
-      /^\s*>?\s*([^\n：:]{5,80})(?=\n|$)/,
+      // Priority 1: find the FIRST 「XXX」 quote within the chunk (after heading)
+      //            — works with any prefix (### 🚀 > ** etc.)
+      /[\s\S]{0,200}?「([^」\n]{5,80})」/,
+      // Priority 2: plain non-quote line (after heading, skip markdown prefixes)
+      /^(?:[#>*\s🚀🎯💡⚡✨📣]*)\s*([^\n：:「」]{5,80})(?=\n|$)/,
     ]
   ) ?? extract([
     // Fallback: colon format inline
