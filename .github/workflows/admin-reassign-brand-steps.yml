@@ -186,7 +186,6 @@ jobs:
                       -- Default: keep as-is
                       ELSE jt.step_val
                     END
-                    ORDER BY CAST(JSON_EXTRACT(jt.step_val, '\$.order') AS UNSIGNED)
                   )
                   FROM JSON_TABLE(sq.steps, '\$[*]' COLUMNS (step_val JSON PATH '\$')) AS jt
                 )
