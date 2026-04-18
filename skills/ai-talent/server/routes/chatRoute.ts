@@ -302,7 +302,7 @@ async function semanticSearch(queryEmbedding: number[], topN = 3): Promise<{
     `SELECT s.slug, s.name, s.description,
             a.slug as agent_slug, a.name as agent_name, a.title, a.specialty,
             ae.embedding
-     FROM agent_squads s
+     FROM squads s
      JOIN squad_members sm ON sm.squad_id = s.id
      JOIN agents a ON a.id = sm.agent_id
      JOIN agent_embeddings ae ON ae.agent_id = a.id
@@ -795,11 +795,10 @@ async function tryExecuteSquadChat(params: {
   let workflowSteps: any[] = [];
 
   try {
+    // Read squad + embedded steps (Phase A.2: steps now live on squads.steps)
     const [sRows] = await localPool.execute(
-      `SELECT s.name, s.methodology, s.agents,
-              wt.steps as workflowSteps
-       FROM agent_squads s
-       LEFT JOIN squad_workflow_templates wt ON wt.missionType = s.slug
+      `SELECT s.id, s.name, s.methodology, s.agents, s.steps as workflowSteps
+       FROM squads s
        WHERE s.slug = ? AND s.is_active = 1 LIMIT 1`,
       [squadSlug]
     ) as any[];
@@ -810,6 +809,18 @@ async function tryExecuteSquadChat(params: {
       squadMethodology = s.methodology ?? "";
       squadAgents      = safeJson(s.agents);
       workflowSteps    = safeJson(s.workflowSteps);
+
+      // Fallback: if squads.steps is empty, read legacy squad_template by slug
+      if (!workflowSteps || workflowSteps.length === 0) {
+        try {
+          const [wtRows] = await localPool.execute(
+            `SELECT steps FROM squad_template WHERE taskType = ? AND isActive = 1 LIMIT 1`,
+            [squadSlug]
+          ) as any[];
+          const wt = (wtRows as any[])?.[0];
+          if (wt?.steps) workflowSteps = safeJson(wt.steps);
+        } catch { /* no legacy steps */ }
+      }
 
       if (!squadAgents || squadAgents.length === 0) {
         console.warn(`[squadChat] WARNING: Squad "${squadSlug}" has NO agents! Will fall back to hardcoded team.`);

@@ -270,7 +270,7 @@ missionChatHandler.post("/squad-chat", async (req: Request, res: Response) => {
     if (isSquadSwitch) {
       const pool = getSquadPool();
       const [allSquads] = await pool.execute(
-        "SELECT slug, name FROM agent_squads WHERE isAvailable=1 ORDER BY sortOrder LIMIT 10"
+        "SELECT slug, name FROM squads WHERE isAvailable=1 ORDER BY sortOrder LIMIT 10"
       ) as [mysql.RowDataPacket[], mysql.FieldPacket[]];
       const squadList = (allSquads as any[]).map((s: any, i: number) => `${i + 1}. **${s.name}** (${s.slug})`).join('\n');
       send("agent", { agentName: "PM Agent", agentTitle: "專案調度", agentRole: "orchestrator", step: currentStep, totalSteps: 10 });
@@ -286,7 +286,7 @@ missionChatHandler.post("/squad-chat", async (req: Request, res: Response) => {
     // 1. Load squad from DB
     const pool = getSquadPool();
     const [squadRows] = await pool.execute(
-      "SELECT slug, name, CONVERT(members USING utf8mb4) as members FROM agent_squads WHERE slug = ? LIMIT 1",
+      "SELECT slug, name, CONVERT(members USING utf8mb4) as members FROM squads WHERE slug = ? LIMIT 1",
       [squadSlug]
     ) as [mysql.RowDataPacket[], mysql.FieldPacket[]];
 

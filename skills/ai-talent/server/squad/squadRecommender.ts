@@ -50,7 +50,7 @@ export async function recommendSquads(params: {
   const query = `
     SELECT s.id, s.name, s.squad_size, s.industry_key,
            COUNT(DISTINCT sm.agent_id) as member_count
-    FROM agent_squads s
+    FROM squads s
     LEFT JOIN squad_members sm ON s.id = sm.squad_id
     ${squadFilter}
     WHERE s.is_active = 1
@@ -64,7 +64,7 @@ export async function recommendSquads(params: {
   const finalQuery = `
     SELECT s.id, s.name, s.squad_size, s.industry_key,
            COUNT(DISTINCT sm.agent_id) as member_count
-    FROM agent_squads s
+    FROM squads s
     LEFT JOIN squad_members sm ON s.id = sm.squad_id
     ${squadFilter ? squadFilter + ' AND s.is_active = 1' : 'WHERE s.is_active = 1'}
     GROUP BY s.id

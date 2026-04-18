@@ -1,0 +1,87 @@
+name: Admin — DB Rename Schema (Phase A.1)
+
+# Phase A.1: Rename tables + add columns
+# - agent_squads → squads (+ steps column)
+# - squad_workflow_templates → squad_template (+ build_flow column)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type CONFIRM to proceed with schema rename'
+        required: true
+        type: string
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'CONFIRM'
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+            BACKUP_DIR="/home/azureuser/db-backups"
+            mkdir -p "$BACKUP_DIR"
+
+            echo "=== Step 1: Backup ==="
+            BACKUP_FILE="$BACKUP_DIR/pre_rename_$(date +%Y%m%d_%H%M%S).sql"
+            mysqldump -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" agent_squads squad_workflow_templates > "$BACKUP_FILE"
+            ls -lh "$BACKUP_FILE"
+            echo "✅ Backup saved: $BACKUP_FILE"
+
+            echo ""
+            echo "=== Step 2: Check existing state ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT 'agent_squads' as tbl, COUNT(*) as rows FROM agent_squads
+              UNION ALL
+              SELECT 'squad_workflow_templates', COUNT(*) FROM squad_workflow_templates;
+            " 2>&1
+
+            echo ""
+            echo "=== Step 3: Rename tables ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              RENAME TABLE agent_squads TO squads;
+              RENAME TABLE squad_workflow_templates TO squad_template;
+            " 2>&1
+            echo "✅ Tables renamed"
+
+            echo ""
+            echo "=== Step 4: Add steps column to squads ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              ALTER TABLE squads ADD COLUMN steps LONGTEXT AFTER methodology;
+            " 2>&1
+            echo "✅ squads.steps column added"
+
+            echo ""
+            echo "=== Step 5: Add build_flow column to squad_template ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              ALTER TABLE squad_template ADD COLUMN build_flow LONGTEXT AFTER steps;
+            " 2>&1
+            echo "✅ squad_template.build_flow column added"
+
+            echo ""
+            echo "=== Step 6: Verify new schema ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SHOW TABLES LIKE 'squad%';
+            " 2>&1
+
+            echo ""
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT 'squads.steps' as col, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='squads' AND COLUMN_NAME='steps'
+              UNION ALL
+              SELECT 'squad_template.build_flow', DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='squad_template' AND COLUMN_NAME='build_flow';
+            " 2>&1
+
+            echo ""
+            echo "✅ Phase A.1 Schema migration complete"
+            echo "   Next: run admin-db-migrate-steps workflow"

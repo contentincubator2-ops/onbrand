@@ -242,7 +242,7 @@ export const squadTemplateRouter = router({
         // Pass A: squads that explicitly declare this workspace
         const [wsRows] = await localPool.execute(
           `SELECT ${selectCols}
-           FROM agent_squads
+           FROM squads
            WHERE is_active = 1 AND workspace LIKE '%${wsLike}%'
            ORDER BY id DESC LIMIT 150`
         ) as any[];
@@ -252,7 +252,7 @@ export const squadTemplateRouter = router({
         // Pass B: tag-based candidates (exclude already found)
         const [tagRows] = await localPool.execute(
           `SELECT ${selectCols}
-           FROM agent_squads
+           FROM squads
            WHERE is_active = 1 AND (${tagLikes}${industryClause})
            ORDER BY id DESC LIMIT 200`
         ) as any[];
@@ -264,7 +264,7 @@ export const squadTemplateRouter = router({
         console.error("[squadRouter] agent_squads query error:", e);
         try {
           const [rows] = await localPool.execute(
-            `SELECT ${selectCols} FROM agent_squads WHERE is_active = 1 ORDER BY RAND() LIMIT 60`
+            `SELECT ${selectCols} FROM squads WHERE is_active = 1 ORDER BY RAND() LIMIT 60`
           ) as any[];
           squadRows = rows as any[];
         } catch (e2) { console.error("[squadRouter] fallback also failed:", e2); }
@@ -405,9 +405,10 @@ export const squadTemplateRouter = router({
   getMembersById: protectedProcedure
     .input(z.object({ squadId: z.number() }))
     .query(async ({ input }) => {
-      // agent_squads and agents live on VM local DB (localPool)
+      // squads and agents live on VM local DB (localPool)
+      // Read `steps` directly from squads table (migrated from squad_template in Phase A.2)
       const [squadRows] = await localPool.execute(
-        `SELECT id, slug, name, agents, missionType, showcases, methodology FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+        `SELECT id, slug, name, agents, missionType, showcases, methodology, steps FROM squads WHERE id = ? AND is_active = 1 LIMIT 1`,
         [input.squadId]
       ) as any[];
       const squad = (squadRows as any[])?.[0];
@@ -461,14 +462,15 @@ export const squadTemplateRouter = router({
       const lead   = mapped.find((m: any) => m.isLead) ?? null;
       const agents = mapped.filter((m: any) => !m.isLead);
 
-      // Fetch workflow steps from squad_workflow_templates (also on local DB)
-      let steps: any[] = [];
-      const effectiveMissionType = squad.missionType;
-      if (effectiveMissionType) {
+      // Steps now live directly on the squad row (migrated from squad_template in Phase A.2)
+      let steps: any[] = safeJsonParse<any[]>(squad.steps, []);
+
+      // Fallback: if squads.steps is empty, try legacy squad_template by missionType (transitional)
+      if (!steps.length && squad.missionType) {
         try {
           const [wfRows] = await localPool.execute(
-            `SELECT steps FROM squad_workflow_templates WHERE taskType = ? AND isActive = 1 LIMIT 1`,
-            [effectiveMissionType]
+            `SELECT steps FROM squad_template WHERE taskType = ? AND isActive = 1 LIMIT 1`,
+            [squad.missionType]
           ) as any[];
           const wf = (wfRows as any[])?.[0];
           if (wf) steps = safeJsonParse<any[]>(wf.steps, []);
@@ -502,7 +504,7 @@ export const squadTemplateRouter = router({
 
       const [rows] = await localPool.execute(
         `SELECT s.id, s.name, s.agents, s.industry_key
-         FROM agent_squads s
+         FROM squads s
          WHERE s.is_active = 1 AND (${tagLikes})
          ${excludeClause}
          LIMIT 30`
@@ -551,7 +553,7 @@ export const squadTemplateRouter = router({
     .query(async ({ input }) => {
       const [rows] = await localPool.execute(
         `SELECT id, slug, name, description, industry_key, missionType, agents
-         FROM agent_squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
+         FROM squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
         [input.slug]
       ) as any[];
       const row = (rows as any[])?.[0];
@@ -615,7 +617,7 @@ export const squadTemplateRouter = router({
         // Pull real members from agent_squads (lives on VM local DB — localPool)
         try {
           const [sqRows] = await localPool.execute(
-            `SELECT name, agents FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+            `SELECT name, agents FROM squads WHERE id = ? AND is_active = 1 LIMIT 1`,
             [input.squadId]
           ) as any[];
           const sq = (sqRows as any[])?.[0];

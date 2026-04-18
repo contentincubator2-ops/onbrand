@@ -88,7 +88,7 @@ function gatewaySlug(slug?: string | null): string {
 //
 // Flow:
 //   1. Load squad definition (from agent_squads.agents JSON — NOT squad_members join table)
-//   2. Load workflow steps (from squad_workflow_templates, ordered by step.order)
+//   2. Load workflow steps (from squads.steps — migrated from squad_template)
 //   3. Squad Lead does a brief context analysis
 //   4. Execute each step SEQUENTIALLY:
 //        - Use step.assignedAgentSlug if available (pre-assigned at seed time)
@@ -108,10 +108,10 @@ export function startSquadLeaderWorker() {
 
       await job.updateProgress(5);
 
-      // ── 1. Load squad from agent_squads.agents JSON ──────────────────────────
+      // ── 1. Load squad from squads.agents JSON + squads.steps ────────────────
       const [squadRows] = await localPool.query(
-        `SELECT id, slug, name, description, missionType, agents
-         FROM agent_squads WHERE id = ? AND is_active = 1 LIMIT 1`,
+        `SELECT id, slug, name, description, missionType, agents, steps
+         FROM squads WHERE id = ? AND is_active = 1 LIMIT 1`,
         [squadId]
       ) as any[];
       const squad = (squadRows as any[])[0];
@@ -144,19 +144,30 @@ export function startSquadLeaderWorker() {
       await job.updateProgress(15);
       console.log(`[Squad Worker] Squad: ${squad.name} | Lead: ${leader.name} | missionType: ${squad.missionType}`);
 
-      // ── 3. Load workflow steps ────────────────────────────────────────────────
+      // ── 3. Load workflow steps (now embedded directly in squads.steps) ──────
       let steps: any[] = [];
       try {
-        const [wfRows] = await localPool.query(
-          `SELECT steps FROM squad_workflow_templates WHERE taskType = ? AND isActive = 1 LIMIT 1`,
-          [squad.missionType]
-        ) as any[];
-        const wf = (wfRows as any[])[0];
-        if (wf?.steps) {
-          const parsed = JSON.parse(wf.steps);
+        // Prefer inline squads.steps (Phase A.2 migrated data lives here)
+        if (squad.steps) {
+          const parsed = JSON.parse(squad.steps);
           steps = Array.isArray(parsed)
             ? parsed.sort((a: any, b: any) => (a.order ?? a.step ?? 0) - (b.order ?? b.step ?? 0))
             : [];
+        }
+
+        // Fallback: legacy squad_template lookup by missionType (transitional)
+        if (!steps.length && squad.missionType) {
+          const [wfRows] = await localPool.query(
+            `SELECT steps FROM squad_template WHERE taskType = ? AND isActive = 1 LIMIT 1`,
+            [squad.missionType]
+          ) as any[];
+          const wf = (wfRows as any[])[0];
+          if (wf?.steps) {
+            const parsed = JSON.parse(wf.steps);
+            steps = Array.isArray(parsed)
+              ? parsed.sort((a: any, b: any) => (a.order ?? a.step ?? 0) - (b.order ?? b.step ?? 0))
+              : [];
+          }
         }
       } catch (e) {
         console.warn(`[Squad Worker] workflow steps load error:`, e);
