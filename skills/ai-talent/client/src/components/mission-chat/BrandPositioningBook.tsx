@@ -333,8 +333,8 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
 export function parsePositioningData(markdown: string): PositioningBookData | null {
   if (!markdown || markdown.length < 100) return null;
 
-  // Must contain positioning-related keywords
-  const isPositioning = /定位陳述|Positioning Statement|品牌定位書|核心定位|Brand Positioning/i.test(markdown);
+  // Broader positioning detection: Dunford, Moore, STP, headline/tagline markers
+  const isPositioning = /定位(?:陳述|宣言|書)|Positioning|核心定位|Brand\s+Positioning|Tagline|主訊息|Headline|Dunford|Obviously\s+Awesome/i.test(markdown);
   if (!isPositioning) return null;
 
   const extract = (patterns: RegExp[]): string | undefined => {
@@ -358,40 +358,72 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
     return undefined;
   };
 
+  // Positioning statement — supports colon format, paragraph under heading, and Moore-template format
   const positioningStatement = extract([
-    /(?:核心定位陳述|Positioning Statement)[：:]\s*([^\n]{10,200})/i,
-    /(?:定位陳述)[：:]\s*([^\n]{10,200})/i,
-    /\*\*(?:定位陳述|核心定位)[：:]\*\*\s*([^\n]{10,200})/i,
+    // "主定位宣言\n為中小企業..."
+    /(?:\*\*)?(?:主定位宣言|完整定位宣言|核心定位陳述|Positioning Statement|定位陳述)(?:\*\*)?[：:\s（(][^\n]*\n+>?\s*([^\n]{10,400})/i,
+    // Colon format: "定位陳述：..."
+    /(?:核心定位陳述|Positioning Statement|定位陳述|主定位宣言)[：:]\s*([^\n]{10,400})/i,
+    // Bold-wrapped colon format
+    /\*\*(?:定位陳述|核心定位|主定位宣言)[：:]\*\*\s*([^\n]{10,400})/i,
+    // Moore-template paragraph "For...Who...is an...That...Unlike...Our product"
+    /(For\s+[^\n]{20,400}(?:Unlike|Our\s+product)[^\n]{5,200})/i,
   ]);
 
+  // Tagline — supports colon, bold headline in quotes (「」 or ""), table row A
   const tagline = extract([
-    /(?:中文標語|品牌標語|標語)[：:]\s*([^\n]{5,100})/i,
+    // Colon format: "中文標語：..."
+    /(?:中文標語|品牌標語|主訊息|Headline)(?:（[^）]*）)?[：:]\s*([^\n]{5,100})/i,
+    // "🚀「一個人的行銷部門，十個 AI 代理人的執行力」"
+    /[🚀🎯💡⚡✨📣]?\s*「([^」\n]{5,80})」/,
+    // Table row: "| A | 「XXX」 | ... |" (first tagline option)
+    /\|\s*(?:A|1)\s*\|\s*[\*｜「"]?([^「」\|\n]{5,80}?)[\*｜」"]?\s*\|/,
+    // Markdown heading "### 主訊息" followed by content
+    /#{2,4}\s*(?:主訊息|Headline|品牌標語)[^\n]*\n+>?\s*[🚀🎯💡⚡✨📣]?「?([^」\n]{5,80})」?/i,
+    // Plain "Tagline" format
     /(?:Tagline)[：:（(（\s]+([^\n）)）]{5,80})/i,
   ]);
 
   const englishTagline = extract([
     /(?:英文標語|English Tagline)[：:]\s*([^\n]{5,100})/i,
+    // Table row D (英文版) in Tagline Options
+    /\|\s*D\s*\|\s*[\*｜「"]?([^「」\|\n]*(?:for|OS|Era|AI)[^「」\|\n]*?)[\*｜」"]?\s*\|/i,
   ]);
 
+  // Target audience — supports Dunford "主力 ICP" blockquote format
   const targetAudience = extract([
-    /(?:目標受眾|Target Audience|ICP)[：:]\s*([^\n]{10,300})/i,
+    // "主力 ICP（Ideal Customer Profile）：\n> 台灣/華語圈中小企業..."
+    /(?:主力\s*ICP|Ideal\s+Customer\s+Profile|理想客戶|目標受眾|Target\s+Audience)(?:（[^）]*）)?[：:\s]*\n+>?\s*([^\n]{10,300})/i,
+    // Colon format
+    /(?:目標受眾|Target Audience|主力\s*ICP|ICP)[：:]\s*([^\n]{10,300})/i,
   ]);
 
   const valueProposition = extract([
-    /(?:價值主張|Value Proposition)[：:]\s*([^\n]{10,300})/i,
+    /(?:價值主張|Value Proposition|對應屬性\s*→\s*價值主張)[：:]?\s*([^\n]{10,300})/i,
+    // "【轉機】SoWork AI：..." short form
+    /【(?:轉機|價值)】\s*([^\n]{10,300})/,
   ]);
 
   const differentiator = extract([
-    /(?:差異化|競爭優勢|Differentiator)[：:]\s*([^\n]{10,300})/i,
+    /(?:差異化|競爭優勢|獨特屬性|Differentiator|Unique\s+Attributes)[：:]?\s*([^\n]{10,300})/i,
+    // From Moore template "Unlike X, Our product..."
+    /Unlike\s+([^\n]{10,200}Our\s+product[^\n]{10,200})/i,
   ]);
 
   const brandVoice = extract([
-    /(?:品牌語調|Brand Voice|語調)[：:]\s*([^\n]{10,200})/i,
+    /(?:品牌語調|Brand Voice|語調|Tone)[：:]\s*([^\n]{10,200})/i,
   ]);
 
   const keyMessages = extractList([
-    /(?:核心訊息|Key Messages)[：:]\s*\n((?:[\d\-\*\•][^\n]+\n?){2,8})/i,
-  ]);
+    /(?:核心訊息|Key Messages|支撐訊息|支撐柱|Supporting Messages)[^\n]*\n((?:(?:[\d\-\*\•]|柱子\s*\d|Pillar)[^\n]+\n?){2,8})/i,
+  ]) ?? (() => {
+    // Try to extract "柱子 1: XXX\n柱子 2: XXX\n柱子 3: XXX"
+    const pillars = markdown.match(/柱子\s*\d[：:\s]+([^\n]{5,150})/g);
+    if (pillars && pillars.length >= 2) {
+      return pillars.map(p => p.replace(/^柱子\s*\d[：:\s]+/, "").trim());
+    }
+    return undefined;
+  })();
 
   const brandPersonality = extractList([
     /(?:品牌個性|Brand Personality)[：:]\s*\n((?:[\d\-\*\•][^\n]+\n?){2,8})/i,
@@ -401,6 +433,8 @@ export function parsePositioningData(markdown: string): PositioningBookData | nu
   })();
 
   const icp = extract([
+    // Same as targetAudience but prioritize "主力 ICP" specifically
+    /(?:主力\s*ICP)[：:\s]*\n+>?\s*([^\n]{10,200})/i,
     /(?:理想客戶|ICP|Ideal Customer)[：:]\s*([^\n]{10,200})/i,
   ]);
 
