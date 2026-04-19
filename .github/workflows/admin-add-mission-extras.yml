@@ -1,17 +1,20 @@
 name: Admin - Add tagline + savedSquadFlow to missions
 
-# Adds 3 columns to `missions` table:
-#   - tagline       VARCHAR(255)  品牌定位標語
-#   - subTagline    VARCHAR(255)  品牌定位副標語
-#   - savedSquadFlow TEXT         User-customized squad steps JSON
+# Adds 3 columns to `missions` table in the LIVE DB (whatever pm2 is using):
+#   - tagline        VARCHAR(255)  品牌定位標語
+#   - subTagline     VARCHAR(255)  品牌定位副標語
+#   - savedSquadFlow TEXT          User-customized squad steps JSON
 #
-# Safe to re-run: uses ADD COLUMN IF NOT EXISTS pattern via INFORMATION_SCHEMA check.
+# DB creds are read from `pm2 jlist` (matches the running marketing-os
+# process) so this hits Azure sowork_db in production, not the local mos_db.
+#
+# Safe to re-run: uses INFORMATION_SCHEMA idempotency check.
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type MIGRATE to add columns (anything else = dry-run DESCRIBE only)'
+        description: 'Type MIGRATE to add columns (anything else = DRY_RUN DESCRIBE only)'
         required: true
         default: 'DRY_RUN'
 
@@ -27,44 +30,64 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 5m
           script: |
-            MOS_USER="mos_user"
-            MOS_PASS="mos_secure_2026"
-            MOS_DB="mos_db"
+            set -e
+            cd /home/azureuser/marketing-os
+
+            # Pull live DB creds from pm2 env (same pattern as diagnose/backfill)
+            eval "$(pm2 jlist 2>/dev/null | node -e "
+              let d=''; process.stdin.on('data',c=>d+=c);
+              process.stdin.on('end',()=>{
+                try{
+                  const procs=JSON.parse(d);
+                  const p=procs.find(x=>x.pm2_env&&x.pm2_env.DB_HOST);
+                  if(!p) process.exit(0);
+                  const e=p.pm2_env;
+                  console.log('export DB_HOST=' + JSON.stringify(e.DB_HOST));
+                  console.log('export DB_USER=' + JSON.stringify(e.DB_USER));
+                  console.log('export DB_PASSWORD=' + JSON.stringify(e.DB_PASSWORD));
+                  console.log('export DB_NAME=' + JSON.stringify(e.DB_NAME));
+                }catch(e){}
+              });
+            ")"
+            [ -z "$DB_HOST" ] && { set -a; source skills/ai-talent/.env; set +a; }
+
             CONFIRM="${{ github.event.inputs.confirm }}"
+            MYSQL="mysql --ssl-mode=REQUIRED -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME"
 
             echo "======================================================"
             echo "Mission Extras Migration (mode=$CONFIRM)"
+            echo "Target DB: $DB_HOST / $DB_NAME"
             echo "======================================================"
             echo ""
             echo "=== Current missions table schema ==="
-            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "DESCRIBE missions;" 2>&1
+            $MYSQL -e "DESCRIBE missions;" 2>&1
 
             if [ "$CONFIRM" = "MIGRATE" ]; then
               echo ""
               echo "=== Applying migration ==="
 
               # tagline
-              HAS_TAGLINE=$(mysql -N -B -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='missions' AND COLUMN_NAME='tagline';" 2>/dev/null)
+              HAS_TAGLINE=$($MYSQL -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='missions' AND COLUMN_NAME='tagline';" 2>/dev/null)
               if [ "$HAS_TAGLINE" = "0" ]; then
-                mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "ALTER TABLE missions ADD COLUMN tagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位標語';" 2>&1
+                $MYSQL -e "ALTER TABLE missions ADD COLUMN tagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位標語';" 2>&1
                 echo "  + tagline column added"
               else
                 echo "  = tagline already exists, skipping"
               fi
 
               # subTagline
-              HAS_SUB=$(mysql -N -B -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='missions' AND COLUMN_NAME='subTagline';" 2>/dev/null)
+              HAS_SUB=$($MYSQL -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='missions' AND COLUMN_NAME='subTagline';" 2>/dev/null)
               if [ "$HAS_SUB" = "0" ]; then
-                mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "ALTER TABLE missions ADD COLUMN subTagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位副標語';" 2>&1
+                $MYSQL -e "ALTER TABLE missions ADD COLUMN subTagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位副標語';" 2>&1
                 echo "  + subTagline column added"
               else
                 echo "  = subTagline already exists, skipping"
               fi
 
               # savedSquadFlow
-              HAS_FLOW=$(mysql -N -B -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='missions' AND COLUMN_NAME='savedSquadFlow';" 2>/dev/null)
+              HAS_FLOW=$($MYSQL -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='missions' AND COLUMN_NAME='savedSquadFlow';" 2>/dev/null)
               if [ "$HAS_FLOW" = "0" ]; then
-                mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "ALTER TABLE missions ADD COLUMN savedSquadFlow TEXT DEFAULT NULL COMMENT 'User-customized squad steps JSON';" 2>&1
+                $MYSQL -e "ALTER TABLE missions ADD COLUMN savedSquadFlow TEXT DEFAULT NULL COMMENT 'User-customized squad steps JSON';" 2>&1
                 echo "  + savedSquadFlow column added"
               else
                 echo "  = savedSquadFlow already exists, skipping"
@@ -72,13 +95,10 @@ jobs:
 
               echo ""
               echo "=== Post-migration schema ==="
-              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "DESCRIBE missions;" 2>&1
+              $MYSQL -e "DESCRIBE missions;" 2>&1
 
               echo ""
               echo "=== Restarting pm2 to pick up new Drizzle schema ==="
-              cd /home/azureuser/marketing-os
-              git fetch origin main && git reset --hard origin/main
-              cd skills/ai-talent
               pm2 restart marketing-os 2>&1 || pm2 restart all 2>&1
               echo "pm2 restart triggered"
 
