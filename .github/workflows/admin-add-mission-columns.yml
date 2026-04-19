@@ -24,54 +24,43 @@ jobs:
           command_timeout: 5m
           script: |
             set -e
-            echo "=== Discover DB with missions table ==="
-            # Find which DB has a missions table with high IDs (main app DB)
-            DB_NAME=$(sudo mysql -sN -e "
-              SELECT TABLE_SCHEMA FROM information_schema.TABLES
-              WHERE TABLE_NAME='missions'
-              ORDER BY TABLE_SCHEMA;
-            " 2>/dev/null | grep -v mos_db | head -1)
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
 
-            if [ -z "$DB_NAME" ]; then
-              # Fallback: load from .env
-              ENV_FILE=$(find /home /opt /var/www /root -maxdepth 4 -name ".env" 2>/dev/null | head -1)
-              if [ -n "$ENV_FILE" ]; then
-                set -o allexport; source "$ENV_FILE"; set +o allexport
+            add_col() {
+              local COL=$1 TYPE=$2 COMMENT=$3
+              EXISTS=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='missions' AND COLUMN_NAME='$COL';
+              " 2>/dev/null)
+              if [ "$EXISTS" = "0" ]; then
+                echo "  Adding $COL..."
+                mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                  ALTER TABLE missions ADD COLUMN \`$COL\` $TYPE DEFAULT NULL COMMENT '$COMMENT';
+                " 2>&1
+              else
+                echo "  $COL already exists — skipped"
               fi
-              DB_NAME="${DB_NAME:-mos_db}"
-            fi
-            echo "Target DB: $DB_NAME"
+            }
 
-            echo "=== 1. Add tagline column ==="
-            sudo mysql "$DB_NAME" -e "
-              ALTER TABLE missions
-                ADD COLUMN IF NOT EXISTS tagline VARCHAR(255) DEFAULT NULL
-                COMMENT '品牌定位標語';
-            " 2>&1
+            echo "=== 1. tagline ==="
+            add_col "tagline" "VARCHAR(255)" "品牌定位標語"
 
-            echo "=== 2. Add subTagline column ==="
-            sudo mysql "$DB_NAME" -e "
-              ALTER TABLE missions
-                ADD COLUMN IF NOT EXISTS subTagline VARCHAR(255) DEFAULT NULL
-                COMMENT '品牌定位副標語';
-            " 2>&1
+            echo "=== 2. subTagline ==="
+            add_col "subTagline" "VARCHAR(255)" "品牌定位副標語"
 
-            echo "=== 3. Add savedSquadFlow column ==="
-            sudo mysql "$DB_NAME" -e "
-              ALTER TABLE missions
-                ADD COLUMN IF NOT EXISTS savedSquadFlow LONGTEXT DEFAULT NULL
-                COMMENT '用戶自訂 squad steps JSON';
-            " 2>&1
+            echo "=== 3. savedSquadFlow ==="
+            add_col "savedSquadFlow" "LONGTEXT" "用戶自訂 squad steps JSON"
 
             echo ""
-            echo "=== 4. Verify ==="
-            sudo mysql "$DB_NAME" -e "
-              SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_COMMENT
+            echo "=== Verify ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT COLUMN_NAME, COLUMN_TYPE
               FROM information_schema.COLUMNS
-              WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = 'missions'
-                AND COLUMN_NAME IN ('tagline','subTagline','savedSquadFlow')
-              ORDER BY ORDINAL_POSITION;
+              WHERE TABLE_SCHEMA='$MOS_DB'
+                AND TABLE_NAME='missions'
+                AND COLUMN_NAME IN ('tagline','subTagline','savedSquadFlow');
             " 2>&1
 
             echo ""
