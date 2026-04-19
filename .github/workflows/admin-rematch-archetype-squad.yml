@@ -1,0 +1,253 @@
+name: Admin — Rematch brand-archetype-positioning Squad Agents
+
+# Step 1: AUDIT — find top candidates for each role from the 17K agent pool
+# Step 2: APPLY — write chosen agents into squads.agents + squads.steps
+#
+# Role requirements:
+#   Lead / Step 2,5  (archetype_strategist)    → brand-archetype, brand-strategy, brand-identity, jungian
+#   Step 1           (brand_perception_analyst) → brand-perception, competitive-analysis, consumer-insights, audience-analysis
+#   Step 3           (brand_voice_specialist)   → brand-voice, tone-of-voice, copywriting, brand-narrative
+#   Step 4           (creative_director)        → visual-identity, creative-direction, brand-design, design-strategy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'AUDIT = show candidates | APPLY = write chosen agents to DB'
+        required: true
+        default: 'AUDIT'
+      lead_id:
+        description: '[APPLY] Agent ID for Lead (archetype_strategist)'
+        required: false
+      step1_id:
+        description: '[APPLY] Agent ID for Step 1 (brand_perception_analyst)'
+        required: false
+      step3_id:
+        description: '[APPLY] Agent ID for Step 3 (brand_voice_specialist)'
+        required: false
+      step4_id:
+        description: '[APPLY] Agent ID for Step 4 (creative_director)'
+        required: false
+
+jobs:
+  rematch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 15m
+          script: |
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+            MODE="${{ github.event.inputs.mode }}"
+
+            SLUG="brand-archetype-positioning"
+
+            echo "======================================================"
+            echo "brand-archetype-positioning — Agent Rematch ($MODE)"
+            echo "======================================================"
+
+            # ── AUDIT: find top candidates for each role ────────────────
+            echo ""
+            echo "=== Role 1: Lead / archetype_strategist ==="
+            echo "    Required: brand-archetype, brand-strategy, brand-identity, jungian, brand-personality"
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, primarySkill, aiModel, LEFT(specialty,80) AS specialty_preview
+              FROM agents
+              WHERE isAvailable = 1
+                AND (
+                  primarySkill LIKE '%brand-archetype%' OR primarySkill LIKE '%brand-strategy%'
+                  OR primarySkill LIKE '%brand-identity%' OR primarySkill LIKE '%jungian%'
+                  OR specialty LIKE '%brand-archetype%' OR specialty LIKE '%brand-strategy%'
+                  OR specialty LIKE '%brand-identity%' OR specialty LIKE '%jungian%'
+                  OR specialty LIKE '%brand-personality%' OR title LIKE '%brand%strat%'
+                )
+              ORDER BY
+                (primarySkill LIKE '%brand-archetype%') DESC,
+                (specialty LIKE '%brand-archetype%') DESC,
+                (primarySkill LIKE '%brand-strategy%') DESC,
+                id ASC
+              LIMIT 8;
+            " 2>&1
+
+            echo ""
+            echo "=== Role 2: Step 1 brand_perception_analyst ==="
+            echo "    Required: brand-perception, competitive-analysis, consumer-insights, audience-analysis"
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, primarySkill, aiModel, LEFT(specialty,80) AS specialty_preview
+              FROM agents
+              WHERE isAvailable = 1
+                AND (
+                  primarySkill LIKE '%brand-perception%' OR primarySkill LIKE '%competitive-anal%'
+                  OR primarySkill LIKE '%consumer-insight%' OR primarySkill LIKE '%audience-anal%'
+                  OR specialty LIKE '%brand-perception%' OR specialty LIKE '%competitive-anal%'
+                  OR specialty LIKE '%consumer-insight%' OR specialty LIKE '%audience-anal%'
+                  OR specialty LIKE '%market-research%' OR title LIKE '%brand%insight%'
+                  OR title LIKE '%competitive%' OR title LIKE '%consumer%insight%'
+                )
+              ORDER BY
+                (primarySkill LIKE '%brand-perception%') DESC,
+                (specialty LIKE '%brand-perception%') DESC,
+                (primarySkill LIKE '%competitive-anal%') DESC,
+                id ASC
+              LIMIT 8;
+            " 2>&1
+
+            echo ""
+            echo "=== Role 3: Step 3 brand_voice_specialist ==="
+            echo "    Required: brand-voice, tone-of-voice, copywriting, brand-narrative"
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, primarySkill, aiModel, LEFT(specialty,80) AS specialty_preview
+              FROM agents
+              WHERE isAvailable = 1
+                AND (
+                  primarySkill LIKE '%brand-voice%' OR primarySkill LIKE '%tone-of-voice%'
+                  OR primarySkill LIKE '%brand-narrative%' OR primarySkill LIKE '%copywriting%'
+                  OR specialty LIKE '%brand-voice%' OR specialty LIKE '%tone-of-voice%'
+                  OR specialty LIKE '%brand-narrative%'
+                  OR title LIKE '%brand voice%' OR title LIKE '%tone%' OR title LIKE '%brand%writ%'
+                )
+              ORDER BY
+                (primarySkill LIKE '%brand-voice%') DESC,
+                (specialty LIKE '%brand-voice%') DESC,
+                (primarySkill LIKE '%tone-of-voice%') DESC,
+                id ASC
+              LIMIT 8;
+            " 2>&1
+
+            echo ""
+            echo "=== Role 4: Step 4 creative_director ==="
+            echo "    Required: visual-identity, creative-direction, brand-design, design-strategy"
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, primarySkill, aiModel, LEFT(specialty,80) AS specialty_preview
+              FROM agents
+              WHERE isAvailable = 1
+                AND (
+                  primarySkill LIKE '%visual-identity%' OR primarySkill LIKE '%creative-direct%'
+                  OR primarySkill LIKE '%brand-design%' OR primarySkill LIKE '%design-strategy%'
+                  OR specialty LIKE '%visual-identity%' OR specialty LIKE '%creative-direct%'
+                  OR specialty LIKE '%brand-design%'
+                  OR title LIKE '%creative direct%' OR title LIKE '%visual%' OR title LIKE '%brand design%'
+                )
+              ORDER BY
+                (primarySkill LIKE '%visual-identity%') DESC,
+                (primarySkill LIKE '%creative-direct%') DESC,
+                (specialty LIKE '%visual-identity%') DESC,
+                id ASC
+              LIMIT 8;
+            " 2>&1
+
+            # ── APPLY: update squads.agents + squads.steps ──────────────
+            if [ "$MODE" = "APPLY" ]; then
+              LEAD_ID="${{ github.event.inputs.lead_id }}"
+              STEP1_ID="${{ github.event.inputs.step1_id }}"
+              STEP3_ID="${{ github.event.inputs.step3_id }}"
+              STEP4_ID="${{ github.event.inputs.step4_id }}"
+
+              echo ""
+              echo "======================================================"
+              echo "APPLY: Writing new agents to DB"
+              echo "  Lead / Step 2,5 → $LEAD_ID"
+              echo "  Step 1          → $STEP1_ID"
+              echo "  Step 3          → $STEP3_ID"
+              echo "  Step 4          → $STEP4_ID"
+              echo "======================================================"
+
+              # Fetch agent info for each chosen ID
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                SELECT id, name, slug, primarySkill, aiModel
+                FROM agents WHERE id IN ($LEAD_ID, $STEP1_ID, $STEP3_ID, $STEP4_ID);
+              " 2>&1
+
+              # Get slugs and names
+              LEAD_SLUG=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT slug FROM agents WHERE id=$LEAD_ID LIMIT 1;" 2>/dev/null)
+              LEAD_NAME=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT name FROM agents WHERE id=$LEAD_ID LIMIT 1;" 2>/dev/null)
+              S1_SLUG=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT slug FROM agents WHERE id=$STEP1_ID LIMIT 1;" 2>/dev/null)
+              S1_NAME=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT name FROM agents WHERE id=$STEP1_ID LIMIT 1;" 2>/dev/null)
+              S3_SLUG=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT slug FROM agents WHERE id=$STEP3_ID LIMIT 1;" 2>/dev/null)
+              S3_NAME=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT name FROM agents WHERE id=$STEP3_ID LIMIT 1;" 2>/dev/null)
+              S4_SLUG=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT slug FROM agents WHERE id=$STEP4_ID LIMIT 1;" 2>/dev/null)
+              S4_NAME=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT name FROM agents WHERE id=$STEP4_ID LIMIT 1;" 2>/dev/null)
+
+              echo ""
+              echo "Resolved: Lead=$LEAD_NAME($LEAD_ID) S1=$S1_NAME($STEP1_ID) S3=$S3_NAME($STEP3_ID) S4=$S4_NAME($STEP4_ID)"
+
+              # 1. Update squads.agents JSON
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE squads SET agents = JSON_ARRAY(
+                  JSON_OBJECT('agent_id', $LEAD_ID,   'is_lead', 1, 'role', 'archetype_strategist',   'order', 1),
+                  JSON_OBJECT('agent_id', $STEP1_ID,  'is_lead', 0, 'role', 'brand_perception_analyst','order', 4),
+                  JSON_OBJECT('agent_id', $STEP3_ID,  'is_lead', 0, 'role', 'brand_voice_specialist',  'order', 2),
+                  JSON_OBJECT('agent_id', $STEP4_ID,  'is_lead', 0, 'role', 'creative_director',       'order', 3)
+                )
+                WHERE slug = '$SLUG' AND is_active = 1;
+              " 2>&1
+              echo "✅ squads.agents updated"
+
+              # 2. Update squads.steps — patch assignedAgentId for each step
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE squads sq
+                SET sq.steps = (
+                  SELECT JSON_ARRAYAGG(
+                    CASE
+                      WHEN CAST(JSON_EXTRACT(jt.sv, '\$.order') AS UNSIGNED) = 1
+                        THEN JSON_SET(jt.sv, '\$.assignedAgentId', $STEP1_ID,
+                                             '\$.assignedAgentSlug', '$S1_SLUG',
+                                             '\$.assignedAgentName', '$S1_NAME')
+                      WHEN CAST(JSON_EXTRACT(jt.sv, '\$.order') AS UNSIGNED) = 2
+                        THEN JSON_SET(jt.sv, '\$.assignedAgentId', $LEAD_ID,
+                                             '\$.assignedAgentSlug', '$LEAD_SLUG',
+                                             '\$.assignedAgentName', '$LEAD_NAME')
+                      WHEN CAST(JSON_EXTRACT(jt.sv, '\$.order') AS UNSIGNED) = 3
+                        THEN JSON_SET(jt.sv, '\$.assignedAgentId', $STEP3_ID,
+                                             '\$.assignedAgentSlug', '$S3_SLUG',
+                                             '\$.assignedAgentName', '$S3_NAME')
+                      WHEN CAST(JSON_EXTRACT(jt.sv, '\$.order') AS UNSIGNED) = 4
+                        THEN JSON_SET(jt.sv, '\$.assignedAgentId', $STEP4_ID,
+                                             '\$.assignedAgentSlug', '$S4_SLUG',
+                                             '\$.assignedAgentName', '$S4_NAME')
+                      WHEN CAST(JSON_EXTRACT(jt.sv, '\$.order') AS UNSIGNED) = 5
+                        THEN JSON_SET(jt.sv, '\$.assignedAgentId', $LEAD_ID,
+                                             '\$.assignedAgentSlug', '$LEAD_SLUG',
+                                             '\$.assignedAgentName', '$LEAD_NAME')
+                      ELSE jt.sv
+                    END
+                  )
+                  FROM JSON_TABLE(sq.steps, '\$[*]' COLUMNS (sv JSON PATH '\$')) AS jt
+                )
+                WHERE sq.slug = '$SLUG' AND sq.is_active = 1;
+              " 2>&1
+              echo "✅ squads.steps updated"
+
+              # 3. Verify result
+              echo ""
+              echo "=== Final verification ==="
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                SELECT
+                  st.step_order,
+                  LEFT(st.step_name, 28)                AS step_name,
+                  st.assigned_agent_id,
+                  COALESCE(a.name, '(UNASSIGNED)')       AS agent_name,
+                  COALESCE(a.primarySkill, '—')          AS primary_skill,
+                  COALESCE(a.aiModel, '—')               AS ai_model
+                FROM squads s,
+                  JSON_TABLE(s.steps, '\$[*]' COLUMNS (
+                    step_order        INT          PATH '\$.order',
+                    step_name         VARCHAR(200) PATH '\$.name',
+                    assigned_agent_id INT          PATH '\$.assignedAgentId'
+                  )) AS st
+                LEFT JOIN agents a ON a.id = st.assigned_agent_id
+                WHERE s.slug = '$SLUG' AND s.is_active = 1
+                ORDER BY st.step_order;
+              " 2>&1
+
+              echo ""
+              echo "✅ Rematch complete for $SLUG"
+              echo "   Clear squad session if needed: DELETE FROM squad_chat_sessions WHERE squadSlug='$SLUG';"
+            fi
+
+            echo "======================================================"
