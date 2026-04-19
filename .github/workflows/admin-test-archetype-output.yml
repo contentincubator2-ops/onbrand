@@ -64,17 +64,18 @@ jobs:
             " 2>/dev/null
             echo "Mission #$MISSION_ID -> squadSlug = brand-archetype-positioning"
 
+            cat > /tmp/sign-jwt.mjs << 'JSEOF'
+import { SignJWT } from '/home/azureuser/marketing-os/skills/ai-talent/node_modules/jose/dist/node/esm/index.js';
+const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+const tok = await new SignJWT({ sub: '199' })
+  .setProtectedHeader({ alg: 'HS256' })
+  .setIssuedAt()
+  .setExpirationTime('4h')
+  .sign(secret);
+process.stdout.write(tok);
+JSEOF
             set +e
-            TOKEN=$(cd /home/azureuser/marketing-os/skills/ai-talent && npx tsx -e "
-              import { SignJWT } from 'jose';
-              const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-              const tok = await new SignJWT({ sub: '199' })
-                .setProtectedHeader({ alg: 'HS256' })
-                .setIssuedAt()
-                .setExpirationTime('4h')
-                .sign(secret);
-              process.stdout.write(tok);
-            " 2>/dev/null)
+            TOKEN=$(node /tmp/sign-jwt.mjs 2>/dev/null)
             set -e
             if [ -z "$TOKEN" ]; then echo "JWT signing failed"; exit 1; fi
             echo "JWT signed (len=${#TOKEN})"
