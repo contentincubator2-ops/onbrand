@@ -1901,13 +1901,8 @@ function RightPanel({
         />
       ),
     },
-    {
-      key: "alternatives",
-      label: "備選專家",
-      content: effectiveSquad
-        ? <DBAlternativesList alternatives={alternatives} isLoading={alternativesQuery.isLoading} />
-        : emptyHint("選擇執行方式\n查看備選專家"),
-    },
+    // "備選專家" section removed by user request (2026-04-20). Query + renderer
+    // are left in place below in case we revive it later.
     {
       key: "brandbrain",
       label: "品牌大腦",

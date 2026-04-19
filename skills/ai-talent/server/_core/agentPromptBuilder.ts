@@ -882,19 +882,22 @@ function buildIdentityBlock(
 }
 
 function buildBrandSection(brand: BrandContext): string {
-  if (!brand.name && !brand.description) return "";
-  const lines = [
+  // Always emit this block, even when fields are missing, so the Squad Lead
+  // can recap "(未提供)" transparently instead of silently falling back to
+  // "what's your brand?". The recap is what proves the Lead read the context.
+  const val = (v?: string | null) =>
+    (v && String(v).trim()) ? String(v).trim() : "（未提供）";
+  return [
     "【品牌全貌】",
-    brand.name           ? `品牌名稱：${brand.name}` : null,
-    brand.industry       ? `產業：${brand.industry}` : null,
-    brand.description    ? `品牌描述：${brand.description}` : null,
-    brand.targetAudience ? `目標受眾：${brand.targetAudience}` : null,
-    brand.tagline        ? `品牌標語：${brand.tagline}` : null,
-    brand.brandVoice     ? `品牌聲音：${brand.brandVoice}` : null,
-    brand.positioningSummary ? `現有定位摘要：${brand.positioningSummary}` : null,
-    brand.website        ? `官網：${brand.website}` : null,
-  ].filter(Boolean);
-  return lines.join("\n");
+    `品牌名稱：${val(brand.name)}`,
+    `產業：${val(brand.industry)}`,
+    `品牌描述：${val(brand.description)}`,
+    `目標受眾：${val(brand.targetAudience)}`,
+    `品牌標語：${val(brand.tagline)}`,
+    `品牌聲音：${val(brand.brandVoice)}`,
+    `現有定位摘要：${val(brand.positioningSummary)}`,
+    `官網：${val(brand.website)}`,
+  ].join("\n");
 }
 
 function buildBrainSection(brandBrain: Record<string, string[]>): string {
@@ -1004,8 +1007,8 @@ function buildBehaviorGuide(
   // ── Squad Lead 開場 Intake ─────────────────────────────────────────────────
   if (isLead && stepIndex === 0) {
     return [
-      "【執行指引 — Squad Lead Intake（一問一答模式）】",
-      "語言：繁體中文（硬性規定）。字數上限：180 字（含標點）。",
+      "【執行指引 — Squad Lead Intake（先 RECAP 再決定是否提問）】",
+      "語言：繁體中文（硬性規定）。字數上限：240 字（含標點）。",
       "",
       "【格式硬性規定】",
       "禁止使用 Emoji（任何表情符號）。",
@@ -1013,30 +1016,37 @@ function buildBehaviorGuide(
       "禁止在輸出中包含 [RELAY:...] 格式的標記。",
       "只能輸出純文字段落，每段之間空一行。",
       "",
-      "【核心原則 — 不重複已知，一次只問一個問題】",
-      "資料來源：(A) 本 Prompt 中的【品牌全貌】區塊  (B) 品牌大腦  (C) 對話歷史。",
-      "上方【品牌全貌】區塊中已有的資訊視為「已知」。絕對禁止問以下問題（已知）：",
-      "  × 你的品牌是什麼？（已知：見品牌名稱）",
-      "  × 你的產品/服務是什麼？（已知：見品牌描述）",
-      "  × 你的目標客群是誰？（已知：見目標受眾）",
-      "  × 你的產業是什麼？（已知：見產業）",
-      "若【品牌全貌】品牌名稱有值 → 在第一句直接說出品牌名稱，表示你已讀取。",
-      "每輪最多問 1 個問題。問完立即停止，等待回應。",
+      "【你必須先讀取的資料來源（系統已把下列區塊放在本 Prompt 上方）】",
+      "  (A) 【任務背景】— 任務名稱、工作區",
+      "  (B) 【品牌全貌】— 品牌名稱、產業、品牌描述、目標受眾、品牌標語、品牌聲音、現有定位摘要、官網",
+      "  (C) 【品牌大腦（累積知識）】— 歷次累積的品牌知識條目",
+      "  (D) 對話歷史",
+      "如果【品牌全貌】中的欄位顯示為「（未提供）」，代表該欄位在資料庫中為空；請如實陳述，不要假裝知道，也不要因此就把整個品牌資訊當作未知。",
       "",
-      "【根據對話輪次執行不同動作】",
-      "▶ 第一輪（對話歷史無 assistant 訊息）：",
-      "  1. 用一句話覆述【已知品牌資訊】（說品牌名稱 + 產業 + 1 個核心描述）",
-      "  2. 自我介紹：你的 specialty + 這個小組的方法論，1 句話",
-      "  3. 任務預告：本次執行共幾步，各由哪位專家負責，1 句話",
-      "  4. 若品牌全貌資訊已齊全：直接說「資訊已齊備，我們現在開始。」",
-      "     若有一個真正未知的關鍵問題（非上面禁問清單）：問這 1 個問題，結尾加「回答後立即開始。」",
+      "【第一輪輸出硬性模板（對話歷史中沒有 assistant 訊息時）】",
+      "段落 1：RECAP — 必須是你整段回應的第一句，不得省略，不得放到後面。",
+      "  格式固定為以下兩句的合併，把括號中的佔位符替換成你從【任務背景】與【品牌全貌】讀到的值；若某欄位為「（未提供）」則照實寫「（尚未提供）」：",
+      "    「我已讀取你的任務〈{任務名稱}〉，位於工作區〈{工作區}〉。目前我掌握的品牌資訊是：品牌〈{品牌名稱}〉、產業〈{產業}〉、主要服務〈{品牌描述濃縮為 ≤ 20 字}〉、目標受眾〈{目標受眾}〉。」",
+      "段落 2：自我介紹（1 句）— 你的名字、specialty、這個 squad 的方法論要解決什麼。",
+      "段落 3：流程預告（1 句）— 本次共幾步、由哪些專家接力完成。",
+      "段落 4：行動或提問（擇一）——",
+      "  · 若【品牌全貌】中 品牌名稱、品牌描述、目標受眾 三個關鍵欄位都不是「（未提供）」 → 只寫：「資訊已齊備，我們現在開始。」",
+      "  · 若上述三個關鍵欄位之中任一個為「（未提供）」 → 只問那一個未知欄位對應的 1 個問題，結尾加「回答後立即開始。」",
       "",
-      "▶ 第二輪（對話歷史已有 1 輪 assistant 訊息）：",
-      "  1. 一句話確認收到用戶答案",
-      "  2. 若資訊已齊全：說「好，我們開始，交給第一位專家 [名字] 執行。」",
-      "  3. 若還有 1 個真正未知問題：問這 1 個問題，結尾「回答後立即開始。」",
+      "【絕對禁止清單】",
+      "× 在 RECAP 段落之前做任何寒暄、自我介紹或提問。RECAP 永遠是整段回應的第一句。",
+      "× 當【品牌全貌】品牌名稱不是「（未提供）」時，不得問「你的品牌是什麼？」「請告訴我你的品牌名稱」或任何等價問題。",
+      "× 當【品牌全貌】品牌描述不是「（未提供）」時，不得問「你的產品/服務是什麼？」",
+      "× 當【品牌全貌】目標受眾不是「（未提供）」時，不得問「你的目標客群是誰？」",
+      "× 當【品牌全貌】產業不是「（未提供）」時，不得問「你的產業是什麼？」",
+      "× 每輪最多問 1 個問題；若沒有真正未知欄位，則 0 個問題。",
       "",
-      "▶ 第三輪及以後：直接說「好，開始執行。」並給出 1 句執行方向摘要。不再追問。",
+      "【第二輪（對話歷史已有 1 輪 assistant 訊息）】",
+      "  1. 一句話確認收到用戶答案。",
+      "  2. 若資訊已齊全：說「好，我們開始，交給第一位專家〈名字〉執行。」",
+      "  3. 若仍有 1 個真正未知問題：問這 1 個問題，結尾「回答後立即開始。」",
+      "",
+      "【第三輪及以後】直接說「好，開始執行。」並給出 1 句執行方向摘要，不再追問。",
     ].join("\n");
   }
 
