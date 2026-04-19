@@ -1,0 +1,71 @@
+name: Admin — Diagnose Missions (read-only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3m
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os
+
+            echo "=== 從 PM2 運行中 process 讀取 DB 連線資訊 ==="
+            eval "$(pm2 jlist 2>/dev/null | node -e "
+              let d=''; process.stdin.on('data',c=>d+=c);
+              process.stdin.on('end',()=>{
+                try{
+                  const procs=JSON.parse(d);
+                  const p=procs.find(x=>x.pm2_env&&x.pm2_env.DB_HOST);
+                  if(!p) process.exit(0);
+                  const e=p.pm2_env;
+                  console.log('export DB_HOST=' + JSON.stringify(e.DB_HOST));
+                  console.log('export DB_USER=' + JSON.stringify(e.DB_USER));
+                  console.log('export DB_PASSWORD=' + JSON.stringify(e.DB_PASSWORD));
+                  console.log('export DB_NAME=' + JSON.stringify(e.DB_NAME));
+                }catch(e){}
+              });
+            ")"
+
+            if [ -z "$DB_HOST" ]; then
+              echo "⚠️  PM2 沒提供 DB_HOST，改從 .env 讀"
+              set -a; source skills/ai-talent/.env; set +a
+            fi
+            echo "✅ DB_HOST=${DB_HOST}  DB_USER=${DB_USER}  DB_NAME=${DB_NAME}  (password length=${#DB_PASSWORD})"
+
+            MYSQL="mysql --ssl-mode=REQUIRED -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME -e"
+
+            echo ""
+            echo "=== 1. missions 表總體狀態 ==="
+            $MYSQL "SELECT COUNT(*) AS total_missions FROM missions;" 2>&1
+            $MYSQL "SELECT MAX(id) AS max_id, MAX(updatedAt) AS last_update FROM missions;" 2>&1
+
+            echo ""
+            echo "=== 2. 按 userId 分群 (前 10 名) ==="
+            $MYSQL "SELECT userId, COUNT(*) AS n_missions, MAX(updatedAt) AS last FROM missions GROUP BY userId ORDER BY n_missions DESC LIMIT 10;" 2>&1
+
+            echo ""
+            echo "=== 3. 按 brandId 分群 (前 10 名) ==="
+            $MYSQL "SELECT brandId, COUNT(*) AS n_missions, MAX(updatedAt) AS last FROM missions GROUP BY brandId ORDER BY n_missions DESC LIMIT 10;" 2>&1
+
+            echo ""
+            echo "=== 4. 最近 15 個 missions ==="
+            $MYSQL "SELECT id, userId, brandId, LEFT(title,40) AS title, LEFT(workspace,15) AS ws, LEFT(squadSlug,30) AS squad, updatedAt FROM missions ORDER BY updatedAt DESC LIMIT 15;" 2>&1
+
+            echo ""
+            echo "=== 5. users 表（前 10 名近期活躍） ==="
+            $MYSQL "SELECT id, email, LEFT(name,30) AS name, isActive, updatedAt FROM users ORDER BY updatedAt DESC LIMIT 10;" 2>&1
+
+            echo ""
+            echo "=== 6. brands 表（前 10 名） ==="
+            $MYSQL "SELECT id, LEFT(name,40) AS name, createdBy, updatedAt FROM brands ORDER BY updatedAt DESC LIMIT 10;" 2>&1
+
+            echo ""
+            echo "=== 診斷完成 ==="
