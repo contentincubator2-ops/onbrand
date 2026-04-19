@@ -71,6 +71,8 @@ export function SaveToBrainButton({
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       setStatus("saved");
       showToast("✓ 已存入品牌大腦", "success");
+      // Notify right panel to float "品牌大腦" section to top
+      window.dispatchEvent(new CustomEvent("section-priority", { detail: { key: "brandbrain" } }));
       onSaved?.();
     } catch (e: any) {
       if (e?.name === "AbortError") return; // unmounted, ignore

@@ -1,0 +1,65 @@
+name: Admin — Add tagline + subTagline + savedSquadFlow to missions
+
+# Adds 3 new columns to the missions table in the main DB.
+# Safe to run multiple times (uses IF NOT EXISTS guard).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type MIGRATE to add columns'
+        required: true
+        type: string
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'MIGRATE'
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            DB_USER="${{ secrets.DB_USER }}"
+            DB_PASS="${{ secrets.DB_PASSWORD }}"
+            DB_NAME="${{ secrets.DB_NAME }}"
+            DB_HOST="${{ secrets.DB_HOST }}"
+
+            echo "=== 1. Add tagline column (IF NOT EXISTS) ==="
+            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+              ALTER TABLE missions
+                ADD COLUMN IF NOT EXISTS tagline VARCHAR(255) DEFAULT NULL
+                  COMMENT '品牌定位標語';
+            " 2>&1
+
+            echo "=== 2. Add subTagline column ==="
+            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+              ALTER TABLE missions
+                ADD COLUMN IF NOT EXISTS subTagline VARCHAR(255) DEFAULT NULL
+                  COMMENT '品牌定位副標語';
+            " 2>&1
+
+            echo "=== 3. Add savedSquadFlow column ==="
+            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+              ALTER TABLE missions
+                ADD COLUMN IF NOT EXISTS savedSquadFlow LONGTEXT DEFAULT NULL
+                  COMMENT '用戶自訂 squad steps JSON';
+            " 2>&1
+
+            echo ""
+            echo "=== 4. Verify ==="
+            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+              SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_COMMENT
+              FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'missions'
+                AND COLUMN_NAME IN ('tagline','subTagline','savedSquadFlow')
+              ORDER BY ORDINAL_POSITION;
+            " 2>&1
+
+            echo ""
+            echo "✅ Mission columns migration complete"

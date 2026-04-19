@@ -1080,131 +1080,247 @@ function WorkflowNode({ label, sub, state }: { label: string; sub: string; state
 }
 
 
-// ─── BrandBrainTab ────────────────────────────────────────────────────────────
+// ─── BrandBrainTab (Knowledge Base + Brain context panel) ────────────────────
+// SoWork orange: #C9823A
+
+const BRAIN_ORANGE = "#C9823A";
+const BRAIN_ORANGE_LIGHT = "#FFF7ED";
+const BRAIN_ORANGE_BORDER = "#F5C9A8";
+const TOKEN_BUDGET = 2000;
+const CHARS_PER_TOKEN = 4;
+
+const BRAIN_CATEGORY_META: Record<string, { label: string; emoji: string; bg: string; text: string; border: string }> = {
+  positioning: { label: "品牌定位", emoji: "📍", bg: "#FFF7ED", text: "#C2410C", border: "#FED7AA" },
+  audience:    { label: "目標受眾", emoji: "👥", bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" },
+  voice:       { label: "品牌語調", emoji: "🗣️", bg: "#F0FDF4", text: "#15803D", border: "#BBF7D0" },
+  competitors: { label: "競品洞察", emoji: "⚔️", bg: "#FEF2F2", text: "#B91C1C", border: "#FECACA" },
+  custom:      { label: "其他知識", emoji: "📝", bg: "#F9FAFB", text: "#374151", border: "#E5E7EB" },
+};
 
 function BrandBrainTab({ brandId }: { brandId?: number | null }) {
-  const [expanded, setExpanded] = React.useState<string | null>(null);
-  const [addingNew, setAddingNew] = React.useState(false);
+  const [expandedKey, setExpandedKey] = React.useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
 
-  // Fetch brand brain data from API
   const brandBrainQuery = (trpc as any).brandBrain?.list?.useQuery
     ? (trpc as any).brandBrain.list.useQuery(
         { brandId: brandId! },
-        { enabled: !!brandId, refetchOnWindowFocus: false }
+        { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 15_000 }
       )
     : { data: null, isLoading: false };
 
-  const brandBrainItems = brandBrainQuery.data ?? [];
+  const allItems: any[] = brandBrainQuery.data ?? [];
+  const items = activeFilter ? allItems.filter((i: any) => (i.category ?? i.key) === activeFilter) : allItems;
 
-  // Default items to show when no real data
-  const defaultItems = [
-    { key: "品牌定位", updatedAt: null, content: null },
-    { key: "目標受眾", updatedAt: null, content: null },
-    { key: "品牌語調", updatedAt: null, content: null },
-    { key: "競品地圖", updatedAt: null, content: null },
-  ];
+  // Token usage
+  const totalChars = allItems.reduce((sum: number, item: any) => sum + (item.content?.length ?? 0) + (item.title?.length ?? 0), 0);
+  const usedTokens = Math.ceil(totalChars / CHARS_PER_TOKEN);
+  const pct = Math.min(100, Math.round((usedTokens / TOKEN_BUDGET) * 100));
+  const meterColor = pct >= 90 ? "#EF4444" : pct > 60 ? "#F59E0B" : BRAIN_ORANGE;
 
-  const items = brandBrainItems.length > 0 ? brandBrainItems : defaultItems;
-
-  const fmtDate = (d: string | null) => {
-    if (!d) return "未建立";
-    try {
-      const dt = new Date(d);
-      return dt.toLocaleDateString("zh-TW", { month: "short", day: "numeric" });
-    } catch { return d; }
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return null;
+    try { return new Date(d).toLocaleDateString("zh-TW", { month: "short", day: "numeric" }); }
+    catch { return d; }
   };
+
+  const isEmpty = allItems.length === 0;
 
   return (
     <div>
+      {/* ── Header with icon + token meter ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 5,
-        fontSize: 10, fontWeight: 600, color: "#9CA3AF",
-        textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 10,
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "8px 10px", marginBottom: 8,
+        background: BRAIN_ORANGE_LIGHT,
+        border: `1px solid ${BRAIN_ORANGE_BORDER}`,
+        borderRadius: 10,
       }}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
-          <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
-        </svg>
-        品牌大腦
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {items.map((item: any) => {
-          const key = item.key ?? item.category ?? "未知";
-          const date = item.updatedAt ?? item.updated_at ?? null;
-          const isExpanded = expanded === key;
-          const hasContent = !!(item.content ?? item.value);
-          return (
-            <div key={key}>
-              <div
-                onClick={() => setExpanded(isExpanded ? null : key)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "7px 8px", borderRadius: 7, cursor: "pointer",
-                  background: isExpanded ? "#F0EEF9" : "white",
-                  border: "1px solid #ECEAE8",
-                  transition: "all 0.12s",
-                }}
-              >
-                <span style={{ fontSize: 11, color: "#1A1A18", flex: 1, fontWeight: 500 }}>{key}</span>
-                <span style={{
-                  fontSize: 9, color: date ? "#3D9A3D" : "#C8C7C3",
-                  background: date ? "#F0FDF4" : "#F2F1EF",
-                  border: '1px solid ' + (date ? '#C8E6C8' : '#E4E3E1'),
-                  borderRadius: 4, padding: "1px 6px", flexShrink: 0,
-                }}>
-                  {fmtDate(date)}
-                </span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9B9990" strokeWidth="2.5" strokeLinecap="round"
-                  style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s", flexShrink: 0 }}>
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </div>
-              {isExpanded && (
-                <div style={{
-                  margin: "2px 0 4px", padding: "8px 10px",
-                  background: "#F8F8FF", border: "1px solid #E0DEF5",
-                  borderRadius: 7, fontSize: 11, color: "#4A4A45", lineHeight: 1.6,
-                }}>
-                  {hasContent
-                    ? (item.content ?? item.value)
-                    : <span style={{ color: "#C8C7C3", fontStyle: "italic" }}>尚未建立此知識項目</span>
-                  }
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <button
-        onClick={() => setAddingNew(true)}
-        style={{
-          marginTop: 10, width: "100%",
-          padding: "7px 0", borderRadius: 7,
-          border: "1px dashed #C8C7C3", background: "transparent",
-          color: "#9B9990", fontSize: 11, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-        }}
-      >
-        <span>+</span> 手動新增知識
-      </button>
-
-      {addingNew && (
+        {/* Orange brain icon */}
         <div style={{
-          marginTop: 6, padding: "10px",
-          background: "#FAFAF9", border: "1px solid #E4E3E1",
-          borderRadius: 8, fontSize: 11,
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: `linear-gradient(135deg, ${BRAIN_ORANGE}, #E8631A)`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: `0 2px 6px rgba(201,130,58,0.35)`,
         }}>
-          <div style={{ color: "#9B9990", textAlign: "center" as const }}>
-            手動新增功能開發中…
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
+            <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
+          </svg>
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: BRAIN_ORANGE }}>品牌大腦</span>
+            <span style={{
+              fontSize: 9, fontWeight: 600,
+              background: "white", border: `1px solid ${BRAIN_ORANGE_BORDER}`,
+              borderRadius: 8, padding: "0 5px", color: "#9B7A55",
+            }}>
+              {allItems.length} 筆知識
+            </span>
           </div>
-          <button
-            onClick={() => setAddingNew(false)}
-            style={{ marginTop: 6, width: "100%", padding: "4px", background: "none", border: "none", color: "#C8C7C3", cursor: "pointer", fontSize: 11 }}
-          >取消</button>
+          {/* Token meter */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{
+              flex: 1, height: 4, borderRadius: 2,
+              background: "#EDE9E4", overflow: "hidden",
+            }}>
+              <div style={{
+                height: "100%", width: `${pct}%`,
+                background: meterColor, borderRadius: 2,
+                transition: "width 0.4s",
+              }} />
+            </div>
+            <span style={{ fontSize: 9, color: pct >= 90 ? "#EF4444" : "#9B7A55", flexShrink: 0 }}>
+              {usedTokens} / {TOKEN_BUDGET} tokens
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Full warning ── */}
+      {pct >= 90 && (
+        <div style={{
+          fontSize: 10, color: "#B91C1C",
+          background: "#FEF2F2", border: "1px solid #FECACA",
+          borderRadius: 6, padding: "5px 8px", marginBottom: 8,
+        }}>
+          ⚠️ 大腦接近上限！AI 可能無法讀取所有知識。建議整合或刪除舊項目。
         </div>
       )}
+
+      {/* ── Category filter chips ── */}
+      {allItems.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
+          <button
+            onClick={() => setActiveFilter(null)}
+            style={{
+              fontSize: 9, padding: "2px 8px", borderRadius: 10,
+              border: `1px solid ${activeFilter === null ? BRAIN_ORANGE : "#E4E3E1"}`,
+              background: activeFilter === null ? BRAIN_ORANGE_LIGHT : "white",
+              color: activeFilter === null ? BRAIN_ORANGE : "#6B6A66",
+              cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
+            }}
+          >
+            全部
+          </button>
+          {Object.entries(BRAIN_CATEGORY_META).map(([cat, meta]) => {
+            const count = allItems.filter((i: any) => (i.category ?? i.key) === cat).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveFilter(activeFilter === cat ? null : cat)}
+                style={{
+                  fontSize: 9, padding: "2px 8px", borderRadius: 10,
+                  border: `1px solid ${activeFilter === cat ? meta.border : "#E4E3E1"}`,
+                  background: activeFilter === cat ? meta.bg : "white",
+                  color: activeFilter === cat ? meta.text : "#6B6A66",
+                  cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
+                }}
+              >
+                {meta.emoji} {meta.label} {count}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Knowledge items ── */}
+      {isEmpty ? (
+        <div style={{
+          textAlign: "center" as const, padding: "20px 8px",
+          color: "#C8C7C3", fontSize: 11, lineHeight: 1.8,
+        }}>
+          <div style={{ fontSize: 24, marginBottom: 6 }}>🧠</div>
+          <div style={{ fontWeight: 600, color: "#9B9990" }}>品牌知識庫是空的</div>
+          <div style={{ fontSize: 10, marginTop: 4 }}>
+            對話時點擊「存入品牌大腦」<br/>來累積品牌知識
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {items.map((item: any, idx: number) => {
+            const cat = item.category ?? item.key ?? "custom";
+            const meta = BRAIN_CATEGORY_META[cat] ?? BRAIN_CATEGORY_META.custom;
+            const title = item.title ?? item.key ?? "知識項目";
+            const content = item.content ?? item.value ?? "";
+            const date = fmtDate(item.updatedAt ?? item.updated_at);
+            const isExp = expandedKey === `${cat}-${idx}`;
+            const hasContent = content.length > 0;
+
+            return (
+              <div key={`${cat}-${idx}`}>
+                <div
+                  onClick={() => setExpandedKey(isExp ? null : `${cat}-${idx}`)}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 7,
+                    padding: "8px 9px", borderRadius: 8, cursor: "pointer",
+                    background: isExp ? meta.bg : "white",
+                    border: `1px solid ${isExp ? meta.border : "#ECEAE8"}`,
+                    transition: "all 0.12s",
+                  }}
+                >
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: "2px 5px",
+                    borderRadius: 4, background: meta.bg,
+                    color: meta.text, border: `1px solid ${meta.border}`,
+                    flexShrink: 0, marginTop: 1,
+                  }}>
+                    {meta.emoji}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", lineHeight: 1.3 }}>
+                      {title}
+                    </div>
+                    {!isExp && hasContent && (
+                      <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.4, marginTop: 1 }}>
+                        {content.slice(0, 50)}{content.length > 50 ? "…" : ""}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                    {date && (
+                      <span style={{
+                        fontSize: 9, color: "#22C55E",
+                        background: "#F0FDF4", border: "1px solid #BBF7D0",
+                        borderRadius: 4, padding: "1px 5px",
+                      }}>
+                        {date}
+                      </span>
+                    )}
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#9B9990" strokeWidth="2.5" strokeLinecap="round"
+                      style={{ transform: isExp ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s" }}>
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </div>
+                </div>
+                {isExp && (
+                  <div style={{
+                    margin: "2px 0 4px", padding: "9px 10px",
+                    background: meta.bg, border: `1px solid ${meta.border}`,
+                    borderRadius: 7, fontSize: 11, color: "#1A1A18", lineHeight: 1.7,
+                  }}>
+                    {hasContent
+                      ? <span style={{ whiteSpace: "pre-wrap" }}>{content}</span>
+                      : <span style={{ color: "#C8C7C3", fontStyle: "italic" }}>尚無內容</span>
+                    }
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Footer hint ── */}
+      <div style={{
+        marginTop: 10, fontSize: 10, color: "#9B9990",
+        textAlign: "center" as const, lineHeight: 1.6,
+      }}>
+        AI 對話時自動讀取大腦內容<br/>
+        <span style={{ color: BRAIN_ORANGE, fontWeight: 600 }}>點擊訊息下方 ＋存入品牌大腦</span> 來新增
+      </div>
     </div>
   );
 }
@@ -1676,6 +1792,22 @@ function RightPanel({
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
     requirements: true, sop: false, agents: false, "live-progress": false, alternatives: false, brandbrain: false,
   });
+  // ── Section priority (floats a section to top when user action triggers it)
+  const [sectionPriority, setSectionPriority] = React.useState<string | null>(null);
+
+  const handleSectionPriority = React.useCallback((key: string) => {
+    setSectionPriority(key);
+    setOpenSections(prev => ({ ...prev, [key]: true }));
+    // Auto-reset after 30s so the panel returns to normal order
+    setTimeout(() => setSectionPriority(null), 30_000);
+  }, []);
+
+  // Listen to global section-priority events (from BrandBrainStrip, SaveToBrainButton, @mention)
+  useEffect(() => {
+    const handler = (e: CustomEvent) => handleSectionPriority(e.detail?.key);
+    window.addEventListener("section-priority" as any, handler);
+    return () => window.removeEventListener("section-priority" as any, handler);
+  }, [handleSectionPriority]);
 
   useEffect(() => {
     if (effectiveSquad) {
@@ -1701,7 +1833,7 @@ function RightPanel({
     </div>
   );
 
-  const sections = [
+  const baseSections = [
     {
       key: "sop",
       label: "執行流程",
@@ -1729,7 +1861,6 @@ function RightPanel({
       label: "協作成員",
       content: (
         <div>
-          {/* Static squad members from DB */}
           {effectiveSquad
             ? <DBAgentMembersList
                 lead={agentsData?.lead ?? null}
@@ -1762,9 +1893,18 @@ function RightPanel({
     {
       key: "brandbrain",
       label: "品牌大腦",
+      // Priority badge shown when this section is the current focus
       content: <BrandBrainTab brandId={brandId} />,
     },
   ];
+
+  // Dynamic section ordering: lift prioritized section to top
+  const sections = sectionPriority
+    ? [
+        ...baseSections.filter(s => s.key === sectionPriority),
+        ...baseSections.filter(s => s.key !== sectionPriority),
+      ]
+    : baseSections;
 
   const panelWidth = width ?? 264;
 
@@ -1807,43 +1947,60 @@ function RightPanel({
         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
       />
       <div style={{ flex: 1, overflowY: "auto" }} className="right-panel-scroll">
-        {sections.map((section, idx) => (
-          <div key={section.key} style={{ borderBottom: "1px solid #E4E3E1" }}>
-            {/* Section header */}
-            <button
-              onClick={() => toggleSection(section.key)}
-              style={{
-                width: "100%",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 12px",
-                background: "transparent", border: "none",
-                cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", letterSpacing: 0.3 }}>
-                {section.label}
-              </span>
-              <svg
-                width="11" height="11" viewBox="0 0 24 24" fill="none"
-                stroke="#9B9990" strokeWidth="2.5" strokeLinecap="round"
+        {sections.map((section, idx) => {
+          const isPriority = section.key === sectionPriority && idx === 0;
+          return (
+            <div key={section.key} style={{
+              borderBottom: "1px solid #E4E3E1",
+              background: isPriority ? "#FFFBF5" : "transparent",
+              transition: "background 0.3s",
+            }}>
+              {/* Section header */}
+              <button
+                onClick={() => toggleSection(section.key)}
                 style={{
-                  transform: openSections[section.key] ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 0.2s",
-                  flexShrink: 0,
+                  width: "100%",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "10px 12px",
+                  background: "transparent", border: "none",
+                  cursor: "pointer", fontFamily: "inherit",
                 }}
               >
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: isPriority ? "#C9823A" : "#1A1A18", letterSpacing: 0.3 }}>
+                    {section.label}
+                  </span>
+                  {isPriority && (
+                    <span style={{
+                      width: 5, height: 5, borderRadius: "50%",
+                      background: "#C9823A",
+                      animation: "pulse 1.5s infinite",
+                      display: "inline-block",
+                    }} />
+                  )}
+                </div>
+                <svg
+                  width="11" height="11" viewBox="0 0 24 24" fill="none"
+                  stroke={isPriority ? "#C9823A" : "#9B9990"} strokeWidth="2.5" strokeLinecap="round"
+                  style={{
+                    transform: openSections[section.key] ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s",
+                    flexShrink: 0,
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
 
-            {/* Section body */}
-            {openSections[section.key] && (
-              <div style={{ padding: "0 12px 14px" }}>
-                {section.content}
-              </div>
-            )}
-          </div>
-        ))}
+              {/* Section body */}
+              {openSections[section.key] && (
+                <div style={{ padding: "0 12px 14px" }}>
+                  {section.content}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

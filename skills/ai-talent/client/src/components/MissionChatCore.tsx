@@ -23,6 +23,8 @@ import { PositioningBar } from "./mission-chat/PositioningBar";
 import { MarkdownRenderer } from "./mission-chat/MarkdownRenderer";
 import { BrandPositioningBook, parsePositioningData } from "./mission-chat/BrandPositioningBook";
 import DeliverableBlock, { type DeliverableItem } from "./mission-chat/DeliverableBlock";
+import { BrandBrainStrip } from "./mission-chat/BrandBrainStrip";
+import { CustomSquadDialog } from "./mission-chat/CustomSquadDialog";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -517,6 +519,8 @@ export default function MissionChatCore({
   const [positioningBarText, setPositioningBarText] = useState<string | null>(null);
   const [positioningBarIcp, setPositioningBarIcp] = useState<string>("");
   const [positioningMsgId, setPositioningMsgId] = useState<string | null>(null);
+  // ── CustomSquadDialog state ───────────────────────────────────────────────
+  const [customSquadDialogOpen, setCustomSquadDialogOpen] = useState(false);
   // ── Email export state ────────────────────────────────────────────────────
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailInput, setEmailInput] = useState("");
@@ -1345,13 +1349,16 @@ export default function MissionChatCore({
 
   // ── Textarea auto-resize ──────────────────────────────────────────────────
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
+    const val = e.target.value;
+    setInput(val);
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
     // Update anchor rect for MentionAutocomplete positioning
-    if (e.target.value.includes("@")) {
+    if (val.includes("@")) {
       setMentionAnchorRect(el.getBoundingClientRect());
+      // Notify right panel to float "協作成員" section to top
+      window.dispatchEvent(new CustomEvent("section-priority", { detail: { key: "agents" } }));
     }
   };
 
@@ -1514,6 +1521,28 @@ export default function MissionChatCore({
       </svg>
       新增對話
     </button>
+
+    {/* 儲存為我的 Squad — shown once squad has run at least 1 step */}
+    {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStepProgress.length > 0 && (
+      <button
+        onClick={() => setCustomSquadDialogOpen(true)}
+        style={{
+          padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+          fontFamily: "inherit",
+          background: "linear-gradient(135deg, #C9823A, #E8631A)",
+          border: "none", color: "white",
+          display: "flex", alignItems: "center", gap: 4,
+          boxShadow: "0 1px 4px rgba(201,130,58,0.3)",
+        }}
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        儲存為我的 Squad
+      </button>
+    )}
       </div>
 
       {/* ── Squad progress bar — Perplexity-style ── */}
@@ -1666,6 +1695,11 @@ export default function MissionChatCore({
             } : undefined}
           />
         </div>
+      )}
+
+      {/* ── Brand Brain Strip — persistent context bar ── */}
+      {activeMissionId && activeBrand?.id && (
+        <BrandBrainStrip brandId={activeBrand.id} missionId={activeMissionId} />
       )}
 
       {/* ── Messages scroll area ── */}
@@ -2483,6 +2517,23 @@ export default function MissionChatCore({
           Enter 送出 · Shift+Enter 換行
         </div>
       </div>
+
+      {/* ── Custom Squad Save Dialog ── */}
+      <CustomSquadDialog
+        isOpen={customSquadDialogOpen}
+        onClose={() => setCustomSquadDialogOpen(false)}
+        currentSteps={(() => {
+          // Build steps from squadStepProgress or from agentsData
+          return squadStepProgress.map((sp, i) => ({
+            order: i + 1,
+            name: sp.label ?? sp.agentName ?? `Step ${i + 1}`,
+            assignedAgentName: sp.agentName,
+          }));
+        })()}
+        baseSquadName={(missionDataQuery.data as any)?.squadSlug?.replace(/-/g, " ") ?? ""}
+        brandId={(missionDataQuery.data as any)?.brandId ?? activeBrand?.id ?? null}
+        missionId={activeMissionId}
+      />
     </div>
   );
 }
