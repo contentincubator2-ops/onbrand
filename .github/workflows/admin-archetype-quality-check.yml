@@ -42,16 +42,7 @@ jobs:
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "UPDATE missions SET squadSlug='brand-archetype-positioning' WHERE id=$MID;" 2>/dev/null
             echo "Mission #$MID ready"
             set +e
-            TOK=$(python3 -c "
-import hmac,hashlib,base64,json,time,os
-s=os.environ.get('JWT_SECRET','')
-n=int(time.time())
-h=base64.urlsafe_b64encode(json.dumps({'alg':'HS256','typ':'JWT'}).encode()).rstrip(b'=')
-p=base64.urlsafe_b64encode(json.dumps({'sub':'199','iat':n,'exp':n+14400}).encode()).rstrip(b'=')
-m=h+b'.'+p
-g=base64.urlsafe_b64encode(hmac.new(s.encode(),m,hashlib.sha256).digest()).rstrip(b'=')
-print((m+b'.'+g).decode(),end='')
-" 2>/dev/null)
+            TOK=$(python3 -c "import hmac,hashlib,base64,json,time,os; s=os.environ.get('JWT_SECRET',''); n=int(time.time()); h=base64.urlsafe_b64encode(json.dumps({'alg':'HS256','typ':'JWT'}).encode()).rstrip(b'='); p=base64.urlsafe_b64encode(json.dumps({'sub':'199','iat':n,'exp':n+14400}).encode()).rstrip(b'='); m=h+b'.'+p; g=base64.urlsafe_b64encode(hmac.new(s.encode(),m,hashlib.sha256).digest()).rstrip(b'='); print((m+b'.'+g).decode(),end='')" 2>/dev/null)
             set -e
             if [ -z "$TOK" ]; then echo "JWT failed"; exit 1; fi
             echo "JWT len=${#TOK}"
