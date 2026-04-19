@@ -75,24 +75,19 @@ jobs:
             " 2>/dev/null
             echo "✅ Mission #$MISSION_ID → squadSlug = brand-archetype-positioning"
 
-            # ── 3. 簽 JWT ─────────────────────────────────────────────
-            TOKEN=$(node -e "
-              const { SignJWT } = require('jose');
-              async function go() {
-                const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-                const tok = await new SignJWT({ sub: '199' })
-                  .setProtectedHeader({ alg: 'HS256' })
-                  .setIssuedAt()
-                  .setExpirationTime('4h')
-                  .sign(secret);
-                process.stdout.write(tok);
-              }
-              go();
-            " 2>/dev/null || node -e "
-              const jwt = require('jsonwebtoken');
-              process.stdout.write(jwt.sign({ sub: '199' }, process.env.JWT_SECRET, { expiresIn: '4h' }));
+            # ── 3. 簽 JWT（用 tsx + jose，與 test-squad-flow.ts 相同方式）──
+            TOKEN=$(cd /home/azureuser/marketing-os/skills/ai-talent && npx tsx -e "
+              import { SignJWT } from 'jose';
+              const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+              const tok = await new SignJWT({ sub: '199' })
+                .setProtectedHeader({ alg: 'HS256' })
+                .setIssuedAt()
+                .setExpirationTime('4h')
+                .sign(secret);
+              process.stdout.write(tok);
             " 2>/dev/null)
-            echo "✅ JWT signed"
+            if [ -z "$TOKEN" ]; then echo "❌ JWT signing failed"; exit 1; fi
+            echo "✅ JWT signed (len=${#TOKEN})"
 
             # ── Helper: 重置 squad session ────────────────────────────
             reset_session() {
@@ -114,15 +109,17 @@ jobs:
               echo "▶ $LABEL"
               echo "══════════════════════════════════════════════════════"
 
-              BODY=$(node -e "
-                const body = {
-                  userMessage: $(echo "$MSG" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>process.stdout.write(JSON.stringify(d.trim())))"),
-                  conversationHistory: $HISTORY,
-                  missionId: $MISSION_ID,
-                  squadSlug: 'brand-archetype-positioning'
-                };
-                process.stdout.write(JSON.stringify(body));
-              " 2>/dev/null)
+              # Build JSON body safely using python3 (always available on ubuntu)
+              BODY=$(python3 -c "
+import json, sys
+body = {
+  'userMessage': '''$MSG''',
+  'conversationHistory': [],
+  'missionId': $MISSION_ID,
+  'squadSlug': 'brand-archetype-positioning'
+}
+print(json.dumps(body), end='')
+")
 
               # Stream SSE → 擷取 agent info + content
               curl -sk -X POST "https://localhost:$PORT/api/chat" \
