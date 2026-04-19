@@ -2,6 +2,11 @@ name: Admin — Diagnose Missions (read-only)
 
 on:
   workflow_dispatch:
+    inputs:
+      user_id:
+        description: "userId to inspect (default 199)"
+        required: false
+        default: "199"
 
 jobs:
   diagnose:
@@ -17,7 +22,6 @@ jobs:
             set -e
             cd /home/azureuser/marketing-os
 
-            echo "=== 從 PM2 運行中 process 讀取 DB 連線資訊 ==="
             eval "$(pm2 jlist 2>/dev/null | node -e "
               let d=''; process.stdin.on('data',c=>d+=c);
               process.stdin.on('end',()=>{
@@ -33,39 +37,43 @@ jobs:
                 }catch(e){}
               });
             ")"
+            [ -z "$DB_HOST" ] && { set -a; source skills/ai-talent/.env; set +a; }
 
-            if [ -z "$DB_HOST" ]; then
-              echo "⚠️  PM2 沒提供 DB_HOST，改從 .env 讀"
-              set -a; source skills/ai-talent/.env; set +a
-            fi
-            echo "✅ DB_HOST=${DB_HOST}  DB_USER=${DB_USER}  DB_NAME=${DB_NAME}  (password length=${#DB_PASSWORD})"
-
+            UID_IN="${{ github.event.inputs.user_id }}"
             MYSQL="mysql --ssl-mode=REQUIRED -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME -e"
 
-            echo ""
-            echo "=== 1. missions 表總體狀態 ==="
-            $MYSQL "SELECT COUNT(*) AS total_missions FROM missions;" 2>&1
-            $MYSQL "SELECT MAX(id) AS max_id, MAX(updatedAt) AS last_update FROM missions;" 2>&1
+            echo "=== 查 userId=$UID_IN 的資訊 ==="
+            $MYSQL "SELECT id, email, name, isActive FROM users WHERE id = $UID_IN;" 2>&1
 
             echo ""
-            echo "=== 2. 按 userId 分群 (前 10 名) ==="
-            $MYSQL "SELECT userId, COUNT(*) AS n_missions, MAX(updatedAt) AS last FROM missions GROUP BY userId ORDER BY n_missions DESC LIMIT 10;" 2>&1
+            echo "=== userId=$UID_IN 在 brand_members 的身份 ==="
+            $MYSQL "
+              SELECT bm.brandId, b.name AS brand_name, bm.role, bm.createdAt
+              FROM brand_members bm
+              LEFT JOIN brands b ON b.id = bm.brandId
+              WHERE bm.userId = $UID_IN
+              ORDER BY bm.createdAt DESC;
+            " 2>&1
 
             echo ""
-            echo "=== 3. 按 brandId 分群 (前 10 名) ==="
-            $MYSQL "SELECT brandId, COUNT(*) AS n_missions, MAX(updatedAt) AS last FROM missions GROUP BY brandId ORDER BY n_missions DESC LIMIT 10;" 2>&1
+            echo "=== userId=$UID_IN 的 missions（依 brandId 分群） ==="
+            $MYSQL "
+              SELECT COALESCE(brandId, 'NULL') AS brandId, workspace, COUNT(*) AS n,
+                     MIN(id) AS first_id, MAX(id) AS last_id, MAX(updatedAt) AS last_update
+              FROM missions
+              WHERE userId = $UID_IN
+              GROUP BY brandId, workspace
+              ORDER BY last_update DESC;
+            " 2>&1
 
             echo ""
-            echo "=== 4. 最近 15 個 missions ==="
-            $MYSQL "SELECT id, userId, brandId, LEFT(title,40) AS title, LEFT(workspace,15) AS ws, LEFT(squadSlug,30) AS squad, updatedAt FROM missions ORDER BY updatedAt DESC LIMIT 15;" 2>&1
-
-            echo ""
-            echo "=== 5. users 表（前 10 名近期活躍） ==="
-            $MYSQL "SELECT id, email, LEFT(name,30) AS name, isActive, updatedAt FROM users ORDER BY updatedAt DESC LIMIT 10;" 2>&1
-
-            echo ""
-            echo "=== 6. brands 表（前 10 名） ==="
-            $MYSQL "SELECT id, LEFT(name,40) AS name, createdBy, updatedAt FROM brands ORDER BY updatedAt DESC LIMIT 10;" 2>&1
+            echo "=== userId=$UID_IN brandId=NULL 的 mission 列表 ==="
+            $MYSQL "
+              SELECT id, LEFT(title,40) AS title, workspace, LEFT(squadSlug,30) AS squad, updatedAt
+              FROM missions
+              WHERE userId = $UID_IN AND brandId IS NULL
+              ORDER BY updatedAt DESC;
+            " 2>&1
 
             echo ""
             echo "=== 診斷完成 ==="
