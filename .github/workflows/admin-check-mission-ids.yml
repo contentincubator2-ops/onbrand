@@ -1,0 +1,38 @@
+name: Admin — Check Mission IDs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3m
+          script: |
+            mysql -u mos_user -p'mos_secure_2026' mos_db -e "
+              SELECT 'BY_SLUG' as src, id, title, LEFT(workspace,20) as ws, squadSlug, userId
+              FROM missions
+              WHERE squadSlug IN (
+                'segmentation-based-positioning',
+                'competitive-perceptual-mapping',
+                'category-design-positioning',
+                'mind-positioning',
+                'purpose-driven-positioning'
+              )
+              UNION ALL
+              SELECT 'BY_ID' as src, id, title, LEFT(workspace,20) as ws, squadSlug, userId
+              FROM missions WHERE id IN (128,129,130,131,132)
+              ORDER BY id;
+            " 2>&1
+            echo "=== MAX id in missions ==="
+            mysql -u mos_user -p'mos_secure_2026' mos_db -sN -e "SELECT MAX(id) FROM missions;" 2>/dev/null
+            echo "=== Last 10 missions ==="
+            mysql -u mos_user -p'mos_secure_2026' mos_db -e "
+              SELECT id, LEFT(title,30) as title, LEFT(workspace,15) as ws, squadSlug
+              FROM missions ORDER BY id DESC LIMIT 10;
+            " 2>&1
