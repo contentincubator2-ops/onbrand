@@ -162,9 +162,10 @@ ${agentList || "無"}
 
 【PM 行動指引】
 你是 SoWork 行銷 AI PM，精通品牌策略、內容行銷、數位廣告。
-以繁體中文回覆。根據用戶的具體需求，自行拆解任務步驟，選擇最合適的 Squad Lead 或 Agent 執行。
-品牌資料已提供，不要讓 Agent 重複詢問用戶已知資訊。
-直接分析並行動，不要問無謂的確認問題。${depthNote ? ("\n" + depthNote) : ""}`;
+以繁體中文回覆。根據用戶的具體需求，直接給出建議或分析。
+品牌資料已在上方提供，不得詢問用戶品牌名稱、產業、目標客群等已知資訊。
+直接分析並行動，不要問無謂的確認問題。
+【格式規定】禁止在回應中輸出 [RELAY:...] 格式的標記。禁止使用 Emoji。${depthNote ? ("\n" + depthNote) : ""}`;
 }
 
 // ── Gateway streaming proxy ───────────────────────────────────────────────────
@@ -400,7 +401,33 @@ async function tryExecuteSquadChat(params: {
 
   // squad agents 依 order 排序
   squadAgents.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
-  const leadSlot = squadAgents.find((a: any) => a.is_lead === 1 || a.is_lead === true);
+  // Support both snake_case (is_lead) and camelCase (isLead) field names
+  const leadSlot = squadAgents.find((a: any) =>
+    a.is_lead === 1 || a.is_lead === true || a.isLead === 1 || a.isLead === true
+  );
+
+  // Fallback: if squadAgents is empty or no lead found, query squad_members table directly
+  let fallbackLeadAgentId: number | null = null;
+  if (!leadSlot && squadSlug) {
+    try {
+      const [smRows] = await localPool.execute(
+        `SELECT sm.agent_id, sm.is_lead, sm.role
+         FROM squad_members sm
+         JOIN squads s ON s.id = sm.squad_id
+         WHERE s.slug = ? AND s.is_active = 1
+         ORDER BY sm.is_lead DESC, sm.id ASC
+         LIMIT 1`,
+        [squadSlug]
+      ) as any[];
+      const smLead = (smRows as any[])?.[0];
+      if (smLead?.agent_id) {
+        fallbackLeadAgentId = smLead.agent_id;
+        console.log(`[squadChat] Lead resolved from squad_members: agent_id=${smLead.agent_id}`);
+      }
+    } catch (e: any) {
+      console.warn("[squadChat] squad_members fallback:", e?.message);
+    }
+  }
 
   // ── 3. 取得 / 建立 squad session（步驟狀態）──────────────────────────────────
   const session = await getOrCreateSquadSession(localPool as any, missionId, squadSlug!);
@@ -444,14 +471,16 @@ async function tryExecuteSquadChat(params: {
 
   // ── 4. 讀取 agent 詳細資料 ──────────────────────────────────────────────────
   let agentDetail: any = null;
-  if (currentSlot?.agent_id) {
+  const agentIdToFetch = currentSlot?.agent_id ?? fallbackLeadAgentId;
+  if (agentIdToFetch) {
     try {
       const [aRows] = await localPool.execute(
         `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill
          FROM agents WHERE id = ? LIMIT 1`,
-        [currentSlot.agent_id]
+        [agentIdToFetch]
       ) as any[];
       agentDetail = (aRows as any[])?.[0] ?? null;
+      console.log(`[squadChat] Agent detail: name=${agentDetail?.name}, model=${agentDetail?.aiModel}`);
     } catch (e: any) {
       console.warn("[squadChat] agent fetch:", e?.message);
     }

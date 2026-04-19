@@ -883,7 +883,8 @@ export default function MissionChatCore({
     );
     // Helper: process RELAY markers in buffered text and route content to correct bubbles
     const processRelayMarkers = (buffer: string): string => {
-      const relayRegex = /\[RELAY:([^:\]]+):([^;\]]+);([^;\]]+);([^\]]+)\]/g;
+      // Format: [RELAY:slug:name:title:layer]  (all `:` separators)
+      const relayRegex = /\[RELAY:([^:\]]+):([^:\]]+):([^:\]]+):([^\]]+)\]/g;
       let match;
       let remainderStart = 0;
       let processed = buffer;
@@ -2095,8 +2096,8 @@ export default function MissionChatCore({
           />
         )}
 
-        {/* TypedThreadCard execution thread */}
-        {relaySteps.length > 0 && (
+        {/* TypedThreadCard execution thread — only shown when NO squad is active */}
+        {relaySteps.length > 0 && !(activeMissionId && (missionDataQuery.data as any)?.squadSlug) && (
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: "#C8C7C3", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
               Execution Thread
