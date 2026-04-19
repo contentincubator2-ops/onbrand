@@ -19,6 +19,8 @@ interface AgentBubbleHeaderProps {
   agentName: string;
   agentTitle?: string;
   agentAvatar?: string | null;
+  agentSkill?: string | null;
+  agentModel?: string | null;
   stepLabel?: string;
   stepIndex?: number;
   totalSteps?: number;
@@ -28,10 +30,29 @@ interface AgentBubbleHeaderProps {
   showHandoff?: boolean;  // true when receiving from previous agent
 }
 
+function formatModelShort(raw: string): string {
+  if (!raw) return "";
+  const r = raw.toLowerCase();
+  if (r.includes("claude") && r.includes("sonnet")) return "Sonnet 4";
+  if (r.includes("claude") && r.includes("opus")) return "Opus 4";
+  if (r.includes("claude") && r.includes("haiku")) return "Haiku 3.5";
+  if (r.includes("claude")) return "Claude";
+  if (r.includes("gpt-4o")) return "GPT-4o";
+  if (r.includes("gpt-4")) return "GPT-4";
+  if (r.includes("gemini-2.0-flash")) return "Gemini Flash";
+  if (r.includes("gemini-1.5-pro")) return "Gemini Pro";
+  if (r.includes("deepseek")) return "DeepSeek";
+  if (r.includes("llama")) return "Llama 3";
+  // Strip "openclaw/" prefix if present
+  return raw.replace(/^openclaw\//i, "");
+}
+
 export function AgentBubbleHeader({
   agentName,
   agentTitle,
   agentAvatar,
+  agentSkill,
+  agentModel,
   stepLabel,
   stepIndex,
   totalSteps,
@@ -131,6 +152,29 @@ export function AgentBubbleHeader({
         </div>
         {agentTitle && (
           <span style={{ fontSize: 11, color: "#6B6A66" }}>{agentTitle}</span>
+        )}
+        {/* Skill + Model badges — shown only on non-lead steps */}
+        {(!isLead && !isSecondOpinion) && (agentSkill || agentModel) && (
+          <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
+            {agentSkill && (
+              <span style={{
+                fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 10,
+                background: "#FEF3C7", color: "#92400E", border: "1px solid #FDE68A",
+                whiteSpace: "nowrap",
+              }}>
+                {agentSkill}
+              </span>
+            )}
+            {agentModel && (
+              <span style={{
+                fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 10,
+                background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE",
+                whiteSpace: "nowrap",
+              }}>
+                ⚡ {formatModelShort(agentModel)}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

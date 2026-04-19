@@ -87,7 +87,51 @@ export async function getOrCreateSquadSession(
   };
 }
 
-// ── 儲存本步驟結果並推進到下一步 ────────────────────────────────────────────
+// ── 儲存本步驟結果，等待用戶確認後再推進 ────────────────────────────────────
+// 不自動跳下一步 — 讓用戶選擇：回覆當前 Agent 或繼續下一步
+export async function saveStepResultOnly(
+  pool: mysql.Pool,
+  missionId: number,
+  step: number,
+  result: string,
+): Promise<void> {
+  await ensureTable(pool);
+
+  const [rows] = await pool.execute(
+    `SELECT stepResults FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
+    [missionId]
+  ) as any[];
+  const row = (rows as any[])?.[0];
+  const existing: Record<number, string> = safeParseJson(row?.stepResults);
+
+  existing[step] = result.slice(0, 2000);
+
+  await pool.execute(
+    `UPDATE squad_chat_sessions
+     SET stepResults = ?, status = 'awaiting_reply', updatedAt = NOW(3)
+     WHERE missionId = ?`,
+    [JSON.stringify(existing), missionId]
+  );
+}
+
+// ── 用戶明確說「繼續」後才推進到下一步 ──────────────────────────────────────
+export async function advanceToNextStep(
+  pool: mysql.Pool,
+  missionId: number,
+  nextStep: number,
+  totalSteps: number
+): Promise<void> {
+  await ensureTable(pool);
+  const newStatus = nextStep > totalSteps ? "complete" : "executing";
+  await pool.execute(
+    `UPDATE squad_chat_sessions
+     SET currentStep = ?, status = ?, updatedAt = NOW(3)
+     WHERE missionId = ?`,
+    [nextStep, newStatus, missionId]
+  );
+}
+
+// ── 儲存本步驟結果並推進到下一步（保留相容性，Squad Lead intake 用）─────────
 export async function saveStepAndAdvance(
   pool: mysql.Pool,
   missionId: number,
@@ -97,7 +141,6 @@ export async function saveStepAndAdvance(
 ): Promise<number> {
   await ensureTable(pool);
 
-  // 讀取現有 stepResults
   const [rows] = await pool.execute(
     `SELECT stepResults, currentStep FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
     [missionId]
@@ -105,7 +148,7 @@ export async function saveStepAndAdvance(
   const row = (rows as any[])?.[0];
   const existing: Record<number, string> = safeParseJson(row?.stepResults);
 
-  existing[step] = result.slice(0, 2000); // 限制每步摘要長度
+  existing[step] = result.slice(0, 2000);
   const nextStep = step + 1;
   const newStatus = nextStep > totalSteps ? "complete" : "executing";
 

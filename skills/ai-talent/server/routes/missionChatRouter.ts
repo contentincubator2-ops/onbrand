@@ -40,7 +40,7 @@ import sgMail from "@sendgrid/mail";
 import { writeBrandBrainEntry } from "./brandBrainRoute";
 import { recordMissionExport } from "./exportsRoute";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
-import { getOrCreateSquadSession, saveStepAndAdvance, resetSquadSession } from "../_core/squadSessionManager";
+import { getOrCreateSquadSession, saveStepAndAdvance, saveStepResultOnly, advanceToNextStep, resetSquadSession } from "../_core/squadSessionManager";
 import { buildSquadAgentPrompt, buildSecondOpinionPrompt } from "../_core/agentPromptBuilder";
 
 export const missionChatRouter = Router();
@@ -404,9 +404,26 @@ async function tryExecuteSquadChat(params: {
 
   // ── 3. 取得 / 建立 squad session（步驟狀態）──────────────────────────────────
   const session = await getOrCreateSquadSession(localPool as any, missionId, squadSlug!);
-  const currentStep = session.currentStep;
-  const isLeadStep  = currentStep === 0;
+  let currentStep = session.currentStep;
   const totalSteps  = workflowSteps.length;
+
+  // ── 3a. 處理「awaiting_reply」狀態 ─────────────────────────────────────────
+  // 用戶可以選擇：回覆當前 Agent（繼續對話）或說「繼續」跳到下一步
+  const isContinueSignal = /^(繼續|继续|continue|next|下一步|go|yes|ok|好的|好|開始|开始)$/i.test(userMessage.trim());
+
+  if (session.status === "awaiting_reply") {
+    if (isContinueSignal) {
+      // 用戶明確要繼續 → 推進到下一步
+      const nextStep = currentStep + 1;
+      await advanceToNextStep(localPool as any, missionId, nextStep, totalSteps);
+      currentStep = nextStep;
+    } else {
+      // 用戶回覆當前 Agent — currentStep 保持不變，重新執行當前步驟的 agent
+      // （讓 agent 看到用戶的跟進問題，並讀取自己之前的輸出作為上下文）
+    }
+  }
+
+  const isLeadStep  = currentStep === 0;
 
   // 決定本步驟的 agent slot — dual-track resolver (Phase D)
   // Priority: step.assignedAgentId → step.requiredSkills → squad lead
@@ -440,9 +457,15 @@ async function tryExecuteSquadChat(params: {
     }
   }
 
-  const agentName  = agentDetail?.name  ?? (squadName + " Agent");
-  const agentTitle = agentDetail?.title ?? currentSlot?.role ?? "";
-  const agentAvatar = agentDetail?.avatarUrl ?? null;
+  const agentName   = agentDetail?.name        ?? (squadName + " Agent");
+  const agentTitle  = agentDetail?.title       ?? currentSlot?.role ?? "";
+  const agentAvatar = agentDetail?.avatarUrl   ?? null;
+  const agentSkill  = agentDetail?.primarySkill ?? "";
+  // Normalize aiModel → gateway format "openclaw/{slug}"
+  const rawModel    = agentDetail?.aiModel ?? "";
+  const agentModel  = rawModel
+    ? (rawModel.includes("/") ? rawModel : `openclaw/${rawModel}`)
+    : "openclaw/pm";
 
   // ── 5. 讀取品牌大腦 ──────────────────────────────────────────────────────────
   const brandBrain: Record<string, string[]> = {};
@@ -479,6 +502,8 @@ async function tryExecuteSquadChat(params: {
     agentName,
     agentTitle,
     agentAvatar,
+    agentSkill,
+    agentModel,
     agentRole:   currentSlot?.role ?? "",
     squadName,
     layer:       isLeadStep ? "strategy" : "execution",
@@ -507,15 +532,24 @@ async function tryExecuteSquadChat(params: {
   // context in the user message. This models true agent-to-agent communication where
   // each agent explicitly receives the prior agent's deliverable and acts on it.
   let effectiveUserMessage = userMessage;
-  if (!isLeadStep && Object.keys(session.stepResults).length > 0) {
-    const prevKey = currentStep - 1;
-    const prevOutput = session.stepResults[prevKey]
-      ?? session.stepResults[Math.max(...Object.keys(session.stepResults).map(Number))]
-      ?? null;
-    if (prevOutput) {
-      const prevWorkflowStep = workflowSteps[Math.min(currentStep - 2, workflowSteps.length - 1)];
-      const prevStepTitle = prevWorkflowStep?.title ?? prevWorkflowStep?.name ?? `Step ${currentStep - 1}`;
-      effectiveUserMessage = `【A2A 交接文件 — 來自「${prevStepTitle}」的成果】\n\n${prevOutput.slice(0, 2500)}\n\n${"─".repeat(40)}\n【你的任務】${workflowStep.description ?? stepLabel}\n\n請基於上方的交接成果，執行你負責的步驟。用戶原始請求：${userMessage}`;
+  const isReplyToSameAgent = session.status === "awaiting_reply" && !isContinueSignal;
+
+  if (!isLeadStep) {
+    if (isReplyToSameAgent && session.stepResults[currentStep]) {
+      // 用戶在跟剛完成的 Agent 繼續對話 — 讓 Agent 看到自己之前的輸出
+      const myPrevOutput = session.stepResults[currentStep];
+      effectiveUserMessage = `【你在上一輪的分析成果】\n\n${myPrevOutput.slice(0, 1500)}\n\n${"─".repeat(40)}\n【用戶的跟進問題】${userMessage}\n\n請根據你的分析成果，直接回答用戶的問題或修改你的輸出。`;
+    } else if (Object.keys(session.stepResults).length > 0) {
+      // 正常 A2A 交接 — 新步驟接收上一步成果
+      const prevKey = currentStep - 1;
+      const prevOutput = session.stepResults[prevKey]
+        ?? session.stepResults[Math.max(...Object.keys(session.stepResults).map(Number))]
+        ?? null;
+      if (prevOutput) {
+        const prevWorkflowStep = workflowSteps[Math.min(currentStep - 2, workflowSteps.length - 1)];
+        const prevStepTitle = prevWorkflowStep?.title ?? prevWorkflowStep?.name ?? `Step ${currentStep - 1}`;
+        effectiveUserMessage = `【A2A 交接文件 — 來自「${prevStepTitle}」的成果】\n\n${prevOutput.slice(0, 2500)}\n\n${"─".repeat(40)}\n【你的任務】${workflowStep.description ?? stepLabel}\n\n請基於上方的交接成果，執行你負責的步驟。用戶原始請求：${userMessage}`;
+      }
     }
   }
 
@@ -534,7 +568,8 @@ async function tryExecuteSquadChat(params: {
 
   let fullOutput = "";
   try {
-    for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
+    // Use agent's actual AI model — each agent runs on their designated model
+    for await (const { event, data } of streamFromGateway(agentModel, messages)) {
       send(event, data);
       if (event === "delta") fullOutput += (data as any).text ?? "";
     }
@@ -547,17 +582,27 @@ async function tryExecuteSquadChat(params: {
     }
   }
 
-  // ── 10. 儲存步驟結果，推進步驟 ────────────────────────────────────────────
-  await saveStepAndAdvance(localPool as any, missionId, currentStep, fullOutput, totalSteps);
+  // ── 10. 儲存步驟結果 ──────────────────────────────────────────────────────
+  if (isLeadStep) {
+    // Squad Lead intake: advance automatically (keeps old behavior for step 0 → 1)
+    await saveStepAndAdvance(localPool as any, missionId, currentStep, fullOutput, totalSteps);
+  } else {
+    // Execution steps: save result but WAIT for user to explicitly continue
+    await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput);
+  }
 
+  const isLastStep = currentStep >= totalSteps;
   send("relay_step", {
     id: currentStep, status: "done",
     agentName, agentTitle,
+    agentSkill, agentModel,
     summary: fullOutput.slice(0, 400),
     totalSteps,
-    // Signal to the client whether more steps remain (enables auto-advance A2A)
-    hasMoreSteps: currentStep + 1 <= totalSteps,
+    hasMoreSteps: !isLeadStep && !isLastStep,
+    isLastStep,
     nextStepIndex: currentStep + 1,
+    // Tell client to show "continue" button — user must explicitly advance
+    waitForUser: !isLeadStep,
   });
 
   // ── 11. 自動存入品牌大腦（關鍵步驟成果）──────────────────────────────────

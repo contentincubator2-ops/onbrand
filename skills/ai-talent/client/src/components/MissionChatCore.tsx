@@ -76,6 +76,7 @@ export interface Msg {
   agentTitle?: string;
   agentAvatar?: string | null;
   agentModel?: string | null;
+  agentSkill?: string | null;
   agentRole?: string;
   isStreaming?: boolean;
   pendingApproval?: boolean;
@@ -515,6 +516,12 @@ export default function MissionChatCore({
 
   // ── Squad step progress (for RELAY-based sidebar) ─────────────────────────
   const [squadStepProgress, setSquadStepProgress] = useState<SquadStepProgress[]>([]);
+  // ── A2A step reply state — user controls when to advance ─────────────────
+  const [awaitingStepReply, setAwaitingStepReply] = useState(false);
+  const [awaitingStepInfo, setAwaitingStepInfo] = useState<{
+    agentName: string; agentTitle: string; agentSkill: string; agentModel: string;
+    nextStep: number; totalSteps: number;
+  } | null>(null);
   // ── PositioningBar state ──────────────────────────────────────────────────
   const [positioningBarText, setPositioningBarText] = useState<string | null>(null);
   const [positioningBarIcp, setPositioningBarIcp] = useState<string>("");
@@ -596,6 +603,19 @@ export default function MissionChatCore({
     setStreamingAgentTitle(null);
     setStreamingModel(null);
     setStreamingThinking("");
+  };
+
+  // ── Continue to next step (user-controlled A2A advance) ──────────────────
+  const handleContinueToNextStep = () => {
+    const convId = activeId;
+    const squadSlug = (missionDataQuery.data as any)?.squadSlug as string | undefined;
+    if (!convId || !squadSlug) return;
+    setAwaitingStepReply(false);
+    setAwaitingStepInfo(null);
+    setLoading(true);
+    setStreamingAgentName(null);
+    setStreamingAgentTitle(null);
+    executeSquadChat("繼續", convId, squadSlug);
   };
 
   // ── Workflow poll ─────────────────────────────────────────────────────────
@@ -850,6 +870,8 @@ export default function MissionChatCore({
     let squadHasMoreSteps = false;
     let streamBuffer = "";
     let lastAgentModel: string | null = null;
+    // Capture the last relay_step "done" data for the continue/reply banner
+    let lastRelayStepDoneData: any = null;
     const streamMsgId = `squad-stream-${Date.now()}`;
     activeStreamMsgIdRef.current = streamMsgId;
     setConversations((prev) =>
@@ -964,9 +986,10 @@ export default function MissionChatCore({
                 const isSecondOpinion = data.isSecondOpinion ?? false;
 
                 if (data.status === "done") {
-                  // Capture A2A auto-advance signal from server
+                  // Capture step completion data for the continue/reply UI
                   if (data.hasMoreSteps === true) {
                     squadHasMoreSteps = true;
+                    lastRelayStepDoneData = data;
                   } else if (data.hasMoreSteps === false && typeof data.totalSteps === "number") {
                     // All steps done — mark squad as complete
                     setSquadStep((prev) => ({ ...prev, currentStep: data.totalSteps + 1, totalSteps: data.totalSteps + 1, isComplete: true }));
@@ -1029,6 +1052,8 @@ export default function MissionChatCore({
                               agentTitle: data.agentTitle ?? m.agentTitle,
                               agentAvatar: data.agentAvatar ?? m.agentAvatar,
                               agentRole: data.agentRole ?? m.agentRole,
+                              agentSkill: data.agentSkill ?? m.agentSkill,
+                              agentModel: data.agentModel ?? m.agentModel,
                               squadStep: data.step,
                               squadTotalSteps: data.totalSteps,
                               squadStepLabel: data.label,
@@ -1161,19 +1186,22 @@ export default function MissionChatCore({
         // Track which message ID contains the positioning book
         setPositioningMsgId(activeStreamMsgIdRef.current ?? streamMsgId);
       }
-      // ── A2A Auto-advance ───────────────────────────────────────────────────
-      // If the server signals more steps remain (hasMoreSteps: true), automatically
-      // trigger the next squad step after a brief pause — no user click needed.
-      // Keep loading=true during the gap so the loading card stays visible.
+      // ── Step done: show Continue / Reply UI (user controls when to advance) ─
       if (squadHasMoreSteps) {
-        // Brief "handoff" pause — show "交接中" state in loading card
-        setStreamingAgentName(null);
-        setStreamingAgentTitle(null);
-        // loading stays true (no setLoading(false)) for seamless transition
-        setTimeout(() => {
-          executeSquadChat("繼續", convId, squadSlug, /* isAutoAdvance */ true);
-        }, 1600);
+        // Show "continue or reply" banner — don't auto-advance
+        setAwaitingStepReply(true);
+        setAwaitingStepInfo({
+          agentName:  lastRelayStepDoneData?.agentName  ?? streamingAgentName  ?? "",
+          agentTitle: lastRelayStepDoneData?.agentTitle ?? streamingAgentTitle ?? "",
+          agentSkill: lastRelayStepDoneData?.agentSkill ?? "",
+          agentModel: lastRelayStepDoneData?.agentModel ?? "",
+          nextStep:   lastRelayStepDoneData?.nextStepIndex ?? 1,
+          totalSteps: lastRelayStepDoneData?.totalSteps ?? 1,
+        });
+        setLoading(false);
       } else {
+        setAwaitingStepReply(false);
+        setAwaitingStepInfo(null);
         setLoading(false);
       }
       return true;
@@ -1331,6 +1359,13 @@ export default function MissionChatCore({
     // Persist to mission_messages if mission is active
     if (activeMissionId) {
       saveMissionMsg.mutate({ missionId: activeMissionId, role: "user", content: text });
+    }
+
+    // If awaiting reply to current agent step, dismiss banner before sending
+    // The server will detect "continue" signal or treat message as reply to same agent
+    if (awaitingStepReply) {
+      setAwaitingStepReply(false);
+      setAwaitingStepInfo(null);
     }
 
     // On first message, updateMission.mutate() (squad slug) hasn't propagated to query cache yet.
@@ -1759,6 +1794,8 @@ export default function MissionChatCore({
                 agentName={msg.agentName ?? "Agent"}
                 agentTitle={msg.agentTitle}
                 agentAvatar={msg.agentAvatar}
+                agentSkill={msg.agentSkill}
+                agentModel={msg.agentModel}
                 stepLabel={msg.squadStepLabel}
                 stepIndex={msg.squadStep}
                 totalSteps={msg.squadTotalSteps}
@@ -1892,6 +1929,84 @@ export default function MissionChatCore({
             )}
           </div>
         ))}
+
+        {/* ── A2A Step: Continue / Reply Banner ─────────────────────────────── */}
+        {awaitingStepReply && awaitingStepInfo && !loading && (
+          <div style={{
+            background: "linear-gradient(135deg, #FFF8F0, #FFF3E6)",
+            border: "1.5px solid #F5C9A8",
+            borderRadius: 14,
+            padding: "14px 18px",
+            maxWidth: 640,
+            boxShadow: "0 2px 12px rgba(201,130,58,0.12)",
+            animation: "slideInUp 0.3s cubic-bezier(0.16,1,0.3,1)",
+          }}>
+            {/* Agent identity row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "linear-gradient(135deg, #C9823A, #E8631A)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 13, fontWeight: 700, color: "white", flexShrink: 0,
+              }}>
+                {awaitingStepInfo.agentName?.charAt(0) ?? "A"}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A18" }}>
+                  {awaitingStepInfo.agentName}
+                  {awaitingStepInfo.agentTitle && (
+                    <span style={{ fontWeight: 400, color: "#6B6A66", marginLeft: 6 }}>— {awaitingStepInfo.agentTitle}</span>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+                  {awaitingStepInfo.agentSkill && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 20,
+                      background: "#FEF3C7", color: "#92400E", border: "1px solid #FDE68A",
+                    }}>
+                      🔧 {awaitingStepInfo.agentSkill}
+                    </span>
+                  )}
+                  {awaitingStepInfo.agentModel && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 20,
+                      background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE",
+                    }}>
+                      ⚡ {formatModelName(awaitingStepInfo.agentModel)}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 10, color: "#9B9990", padding: "1px 4px" }}>
+                    Step {awaitingStepInfo.nextStep - 1} 完成 · 共 {awaitingStepInfo.totalSteps} 步
+                  </span>
+                </div>
+              </div>
+            </div>
+            {/* Prompt text */}
+            <p style={{ fontSize: 12, color: "#6B6A66", margin: "0 0 12px 0", lineHeight: 1.6 }}>
+              💬 可以繼續與 <strong style={{ color: "#1A1A18" }}>{awaitingStepInfo.agentName}</strong> 深入討論此步驟的成果，或點擊下方按鈕繼續執行下一步。
+            </p>
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={handleContinueToNextStep}
+                style={{
+                  padding: "8px 18px", borderRadius: 8, border: "none",
+                  background: "linear-gradient(135deg, #1A1A18, #2D2D28)",
+                  color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "inherit",
+                  display: "flex", alignItems: "center", gap: 6,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                }}
+              >
+                繼續第 {awaitingStepInfo.nextStep} 步
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+              <span style={{ fontSize: 11, color: "#C8C7C3" }}>或直接輸入問題與此 Agent 繼續對話</span>
+            </div>
+          </div>
+        )}
 
         {/* Loading card (streaming) — Perplexity-style thinking indicator */}
         {loading && !teamAssembly && (
