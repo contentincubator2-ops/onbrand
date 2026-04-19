@@ -6,7 +6,7 @@
  * - Expand/collapse to preview items
  * - Fire 'brain-panel-focus' event to lift right panel section to top
  */
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { trpc } from "../../lib/trpc";
 
 const TOKEN_BUDGET = 2000;
@@ -57,7 +57,7 @@ export function BrandBrainStrip({ brandId, missionId }: BrandBrainStripProps) {
     : { data: null, isLoading: false };
 
   const items: any[] = brainQuery.data ?? [];
-  const usedTokens = approxTokens(items);
+  const usedTokens = useMemo(() => approxTokens(items), [items]);
   const pct = Math.min(100, Math.round((usedTokens / TOKEN_BUDGET) * 100));
   const isFull = pct >= 90;
   const meterColor = isFull ? "#EF4444" : pct > 60 ? "#F59E0B" : ORANGE;
@@ -105,7 +105,19 @@ export function BrandBrainStrip({ brandId, missionId }: BrandBrainStripProps) {
         <span style={{ fontSize: 11, fontWeight: 700, color: ORANGE, letterSpacing: 0.2 }}>
           品牌大腦
         </span>
-        {items.length > 0 && (
+        {brainQuery.isLoading ? (
+          <span style={{
+            fontSize: 10, color: "#C5C3BE",
+            background: "#F2F1EF", border: "1px solid #E4E3E1",
+            borderRadius: 10, padding: "0 6px",
+          }}>載入中…</span>
+        ) : items.length === 0 ? (
+          <span style={{
+            fontSize: 10, color: "#C5C3BE",
+            background: "#F2F1EF", border: "1px solid #E4E3E1",
+            borderRadius: 10, padding: "0 6px",
+          }}>尚無知識</span>
+        ) : (
           <span style={{
             fontSize: 10, fontWeight: 600, color: "#9B7A55",
             background: ORANGE_LIGHT, border: `1px solid ${ORANGE_BORDER}`,
@@ -150,9 +162,21 @@ export function BrandBrainStrip({ brandId, missionId }: BrandBrainStripProps) {
           {items.length === 0 ? (
             <div style={{
               fontSize: 11, color: "#9B9990", textAlign: "center",
-              padding: "10px 0", fontStyle: "italic",
+              padding: "12px 0 8px",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
             }}>
-              尚無品牌知識。聊天時點擊「存入品牌大腦」來建立。
+              <div style={{
+                width: 32, height: 32, borderRadius: 9,
+                background: "#F4F3F0",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C5C3BE" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
+                  <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
+                </svg>
+              </div>
+              <span style={{ fontStyle: "italic" }}>品牌大腦尚無知識</span>
+              <span style={{ fontSize: 10, color: "#C5C3BE" }}>聊天後點擊「存入品牌大腦」建立首筆知識</span>
             </div>
           ) : (
             items.slice(0, 5).map((item: any, i: number) => {

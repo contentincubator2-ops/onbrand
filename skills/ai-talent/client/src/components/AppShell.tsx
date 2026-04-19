@@ -1766,6 +1766,22 @@ function RightPanel({
   );
   const agentsData = agentsQuery.data as any;
 
+  // ── Fetch brand brain item count to auto-open section ────────────────────
+  const brandBrainCountQuery = (trpc as any).brandBrain?.list?.useQuery
+    ? (trpc as any).brandBrain.list.useQuery(
+        { brandId: brandId! },
+        { enabled: !!brandId, staleTime: 60_000, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+  const brandBrainCount = ((brandBrainCountQuery.data as any[]) ?? []).length;
+
+  // Auto-open brandbrain when it has data
+  useEffect(() => {
+    if (brandBrainCount > 0) {
+      setOpenSections(prev => prev.brandbrain ? prev : { ...prev, brandbrain: true });
+    }
+  }, [brandBrainCount > 0]);
+
   // ── Fetch alternative squad leads ──────────────────────────────────────────
   const alternativesQuery = trpc.squad.getAlternativeLeads.useQuery(
     { workspace: missionWorkspace ?? "strategy", excludeSquadId: effectiveSquad?.squadId, limit: 6 },
@@ -1810,10 +1826,11 @@ function RightPanel({
   }, [handleSectionPriority]);
 
   useEffect(() => {
+    // Preserve brandbrain open state across squad changes — it's brand-specific, not squad-specific
     if (effectiveSquad) {
-      setOpenSections({ requirements: true, sop: true, agents: true, "live-progress": true, alternatives: true, brandbrain: false });
+      setOpenSections(prev => ({ requirements: true, sop: true, agents: true, "live-progress": true, alternatives: true, brandbrain: prev.brandbrain ?? false }));
     } else {
-      setOpenSections({ requirements: true, sop: false, agents: false, "live-progress": false, alternatives: false, brandbrain: false });
+      setOpenSections(prev => ({ requirements: true, sop: false, agents: false, "live-progress": false, alternatives: false, brandbrain: prev.brandbrain ?? false }));
     }
   }, [effectiveSquad?.squadId]);
 

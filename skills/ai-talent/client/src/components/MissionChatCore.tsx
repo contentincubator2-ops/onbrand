@@ -557,6 +557,18 @@ export default function MissionChatCore({
     { id: activeMissionId! },
     { enabled: !!activeMissionId, refetchOnWindowFocus: false }
   );
+  // ── Squad steps query (for CustomSquadDialog step enrichment) ───────────────
+  const missionSquadSlug = (missionDataQuery.data as any)?.squadSlug as string | undefined;
+  const squadBySlugQuery = trpc.squad.getSquadBySlug.useQuery(
+    { slug: missionSquadSlug ?? "" },
+    { enabled: !!missionSquadSlug, staleTime: 5 * 60_000, refetchOnWindowFocus: false }
+  );
+  const squadMembersQuery = trpc.squad.getMembersById.useQuery(
+    { squadId: (squadBySlugQuery.data as any)?.squadId ?? 0 },
+    { enabled: !!(squadBySlugQuery.data as any)?.squadId, staleTime: 5 * 60_000, refetchOnWindowFocus: false }
+  );
+  const dbSquadSteps: any[] = (squadMembersQuery.data as any)?.steps ?? [];
+
   const matchQuery = trpc.agent.matchForTask.useQuery(
     { taskDescription: pendingTask },
     { enabled: pendingTask.length > 0, refetchOnWindowFocus: false }
@@ -2523,14 +2535,40 @@ export default function MissionChatCore({
         isOpen={customSquadDialogOpen}
         onClose={() => setCustomSquadDialogOpen(false)}
         currentSteps={(() => {
-          // Build steps from squadStepProgress or from agentsData
-          return squadStepProgress.map((sp, i) => ({
-            order: i + 1,
-            name: sp.label ?? sp.agentName ?? `Step ${i + 1}`,
-            assignedAgentName: sp.agentName,
-          }));
+          // Prefer runtime progress (user-observed steps) enriched with DB step metadata
+          if (squadStepProgress.length > 0) {
+            return squadStepProgress.map((sp, i) => {
+              // Try to match DB step by agentName or label to get description + agentSlug
+              const dbStep = dbSquadSteps.find(
+                (s: any) => s.agentName === sp.agentName || s.name === sp.label
+              );
+              return {
+                order: i + 1,
+                name: sp.label ?? sp.agentName ?? `Step ${i + 1}`,
+                description: dbStep?.description ?? sp.agentTitle ?? undefined,
+                assignedAgentName: sp.agentName,
+                assignedAgentSlug: dbStep?.agentSlug ?? undefined,
+              };
+            });
+          }
+          // Fallback: use raw DB steps when squad hasn't started yet
+          if (dbSquadSteps.length > 0) {
+            return dbSquadSteps.map((s: any, i: number) => ({
+              order: s.step ?? i + 1,
+              name: s.name ?? `Step ${i + 1}`,
+              description: s.description,
+              assignedAgentName: s.agentName,
+              assignedAgentSlug: s.agentSlug,
+            }));
+          }
+          return [];
         })()}
-        baseSquadName={(missionDataQuery.data as any)?.squadSlug?.replace(/-/g, " ") ?? ""}
+        baseSquadName={
+          (squadMembersQuery.data as any)?.squadName
+          ?? (missionDataQuery.data as any)?.squadSlug?.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+          ?? ""
+        }
+        baseSquadDescription={(squadBySlugQuery.data as any)?.description ?? ""}
         brandId={(missionDataQuery.data as any)?.brandId ?? activeBrand?.id ?? null}
         missionId={activeMissionId}
       />

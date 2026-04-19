@@ -206,7 +206,7 @@ export function CustomSquadDialog({
           {steps.length > 0 && (
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6A66", display: "block", marginBottom: 6 }}>
-                執行步驟（可拖曳排序）
+                執行步驟（可調整順序）
               </label>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {steps.map((step, i) => (
@@ -225,8 +225,13 @@ export function CustomSquadDialog({
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18" }}>{step.name}</div>
+                      {step.description && (
+                        <div style={{ fontSize: 10, color: "#6B6A66", marginTop: 1, lineHeight: 1.35 }}>
+                          {step.description.slice(0, 60)}{step.description.length > 60 ? "…" : ""}
+                        </div>
+                      )}
                       {step.assignedAgentName && (
-                        <div style={{ fontSize: 10, color: "#9B9990" }}>by {step.assignedAgentName}</div>
+                        <div style={{ fontSize: 10, color: "#9B9990", marginTop: step.description ? 0 : 1 }}>by {step.assignedAgentName}</div>
                       )}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
