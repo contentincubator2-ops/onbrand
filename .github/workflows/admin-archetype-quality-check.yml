@@ -24,50 +24,9 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 25m
           script: |
-            set -e
             cd /home/azureuser/marketing-os
             git fetch origin main && git reset --hard origin/main
-            BRAND="${{ github.event.inputs.brand_name }}"
-            DESC="${{ github.event.inputs.brand_desc }}"
-            PORT=3001
-            MOS_USER="mos_user"
-            MOS_PASS="mos_secure_2026"
-            MOS_DB="mos_db"
-            echo "=== Archetype Quality Check: $BRAND ==="
-            export JWT_SECRET=$(pm2 jlist 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const p=JSON.parse(d).find(x=>x.pm2_env&&x.pm2_env.JWT_SECRET);if(p)process.stdout.write(p.pm2_env.JWT_SECRET);}catch(e){}});" 2>/dev/null)
-            if [ -z "$JWT_SECRET" ]; then export JWT_SECRET=$(grep -E '^JWT_SECRET=' skills/ai-talent/.env | head -1 | cut -d= -f2-); fi
-            echo "JWT_SECRET len=${#JWT_SECRET}"
-            MID=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "SELECT id FROM missions WHERE brandId IS NOT NULL ORDER BY updatedAt DESC LIMIT 1;" 2>/dev/null)
-            if [ -z "$MID" ]; then echo "No mission"; exit 1; fi
-            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "UPDATE missions SET squadSlug='brand-archetype-positioning' WHERE id=$MID;" 2>/dev/null
-            echo "Mission #$MID ready"
-            printf '%s\n' "import{SignJWT}from'/home/azureuser/marketing-os/skills/ai-talent/node_modules/jose/dist/node/esm/index.js';" "const secret=new TextEncoder().encode(process.env.JWT_SECRET);" "const tok=await new SignJWT({sub:'199'}).setProtectedHeader({alg:'HS256'}).setIssuedAt().setExpirationTime('4h').sign(secret);" "process.stdout.write(tok);" > /tmp/jwt.mjs
-            set +e
-            TOK=$(JWT_SECRET="$JWT_SECRET" node /tmp/jwt.mjs 2>/dev/null)
-            set -e
-            if [ -z "$TOK" ]; then echo "JWT failed"; exit 1; fi
-            echo "JWT len=${#TOK}"
-            RESET_RESP=$(curl -sk -o /dev/null -w "%{http_code}" -X POST "https://localhost:$PORT/api/chat/reset-squad-session" -H "Content-Type: application/json" -H "Authorization: Bearer $TOK" -d "{\"missionId\":$MID}" 2>/dev/null || echo "000")
-            echo "Reset session HTTP: $RESET_RESP"
-            sleep 2
-            do_turn() {
-              local L="$1" M="$2"
-              echo ""; echo "=== $L ==="; echo ""
-              B=$(python3 -c "import json,sys;print(json.dumps({'userMessage':sys.argv[1],'conversationHistory':[],'missionId':$MID,'squadSlug':'brand-archetype-positioning'}),end='')" "$M")
-              HTTP_AND_BODY=$(curl -sk -X POST "https://localhost:$PORT/api/chat" -H "Content-Type: application/json" -H "Authorization: Bearer $TOK" -H "Accept: text/event-stream" -d "$B" --max-time 180 -w "\nHTTP_STATUS:%{http_code}" 2>/dev/null)
-              HTTP_CODE=$(echo "$HTTP_AND_BODY" | grep "HTTP_STATUS:" | tail -1 | cut -d: -f2)
-              echo "HTTP: $HTTP_CODE"
-              echo "$HTTP_AND_BODY" | node -e "let buf='',ag='',mo='',co='',ev='';process.stdin.on('data',c=>{buf+=c;const ls=buf.split('\n');buf=ls.pop()||'';for(const l of ls){if(l.startsWith('event: ')){ev=l.slice(7).trim();}else if(l.startsWith('data: ')){try{const d=JSON.parse(l.slice(6));if(ev==='relay_step'&&d.status==='running'){ag=d.agentName||ag;mo=d.agentModel||mo;}else if(ev==='delta'&&d.text){co+=d.text;}}catch{}}}});process.stdin.on('end',()=>{console.log('Agent:',ag,'Model:',mo,'Len:',co.length);console.log('');console.log('---OUTPUT---');console.log(co||'(empty)');console.log('---END---');});"
-            }
-            do_turn "T1 Lead Intake" "${BRAND}，${DESC}請用品牌原型定位法分析。"
-            sleep 3
-            do_turn "T2 Step1 Brand Personality Audit" "繼續"
-            sleep 3
-            do_turn "T3 Step2 Archetype Selection" "繼續"
-            sleep 3
-            do_turn "T4 Step3 Brand Voice Guide" "繼續"
-            sleep 3
-            do_turn "T5 Step4 Visual Experience" "繼續"
-            sleep 3
-            do_turn "T6 Step5 Omnichannel Audit" "繼續"
-            echo ""; echo "=== Test complete ==="
+            echo "=== Archetype Quality Check: ${{ github.event.inputs.brand_name }} ==="
+            cd skills/ai-talent
+            npx tsx scripts/test-squad-flow.ts 2>&1
+            echo "=== Test complete ==="
