@@ -24,43 +24,38 @@ jobs:
           command_timeout: 5m
           script: |
             set -e
-            # Load main DB credentials from VM's .env file
+            # Load main DB name from VM's .env file
             ENV_FILE=$(find /home /opt /var/www /root -maxdepth 4 -name ".env" 2>/dev/null | head -1)
             if [ -n "$ENV_FILE" ]; then
-              set -o allexport
-              source "$ENV_FILE"
-              set +o allexport
+              set -o allexport; source "$ENV_FILE"; set +o allexport
             fi
-            DB_USER="${DB_USER:-root}"
-            DB_PASS="${DB_PASSWORD:-}"
             DB_NAME="${DB_NAME:-marketing_os}"
-            DB_HOST="${DB_HOST:-localhost}"
-            echo "Connecting to $DB_NAME@$DB_HOST as $DB_USER"
+            echo "Target DB: $DB_NAME"
 
-            echo "=== 1. Add tagline column (IF NOT EXISTS) ==="
-            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+            echo "=== 1. Add tagline column ==="
+            sudo mysql "$DB_NAME" -e "
               ALTER TABLE missions
                 ADD COLUMN IF NOT EXISTS tagline VARCHAR(255) DEFAULT NULL
-                  COMMENT '品牌定位標語';
+                COMMENT '品牌定位標語';
             " 2>&1
 
             echo "=== 2. Add subTagline column ==="
-            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+            sudo mysql "$DB_NAME" -e "
               ALTER TABLE missions
                 ADD COLUMN IF NOT EXISTS subTagline VARCHAR(255) DEFAULT NULL
-                  COMMENT '品牌定位副標語';
+                COMMENT '品牌定位副標語';
             " 2>&1
 
             echo "=== 3. Add savedSquadFlow column ==="
-            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+            sudo mysql "$DB_NAME" -e "
               ALTER TABLE missions
                 ADD COLUMN IF NOT EXISTS savedSquadFlow LONGTEXT DEFAULT NULL
-                  COMMENT '用戶自訂 squad steps JSON';
+                COMMENT '用戶自訂 squad steps JSON';
             " 2>&1
 
             echo ""
             echo "=== 4. Verify ==="
-            mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
+            sudo mysql "$DB_NAME" -e "
               SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_COMMENT
               FROM information_schema.COLUMNS
               WHERE TABLE_SCHEMA = DATABASE()
