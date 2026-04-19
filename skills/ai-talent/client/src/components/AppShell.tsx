@@ -1882,6 +1882,7 @@ function RightPanel({
             ? <DBAgentMembersList
                 lead={agentsData?.lead ?? null}
                 agents={agentsData?.agents ?? []}
+                steps={agentsData?.steps ?? []}
                 isLoading={agentsQuery.isLoading}
                 activeStep={activeStep}
               />
@@ -2199,10 +2200,11 @@ function DBSquadMethodologyPanel({
 // Renders real DB agents: lead (teal card) + members
 
 function DBAgentMembersList({
-  lead, agents, isLoading, activeStep,
+  lead, agents, steps, isLoading, activeStep,
 }: {
   lead: any | null;
   agents: any[];
+  steps?: any[];   // enriched steps from getMembersById
   isLoading: boolean;
   activeStep?: number; // 0 = lead active, 1+ = agent at that step index
 }) {
@@ -2228,6 +2230,26 @@ function DBAgentMembersList({
 
   const AGENT_AVATAR_COLORS = ["#0A6EFA", "#E8631A", "#7C3AED", "#059669", "#DC2626", "#0891B2"];
 
+  // Build agentId → steps[] map for step assignment badges
+  const stepsByAgent = React.useMemo(() => {
+    const map: Record<number, { order: number; name: string; primarySkill: string | null; aiModel: string | null }[]> = {};
+    if (steps && steps.length > 0) {
+      for (const step of steps) {
+        const id: number | null = step.assignedAgentId ?? null;
+        if (id != null) {
+          if (!map[id]) map[id] = [];
+          map[id].push({
+            order: step.order ?? step.step ?? 0,
+            name:  step.name ?? step.title ?? "",
+            primarySkill: step.assignedAgentPrimarySkill ?? null,
+            aiModel:      step.assignedAgentAiModel      ?? null,
+          });
+        }
+      }
+    }
+    return map;
+  }, [steps]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {allMembers.map((agent: any, i: number) => {
@@ -2237,6 +2259,7 @@ function DBAgentMembersList({
         );
         const isDone = activeStep !== undefined && !agent.isLead && activeStep > i;
         const avatarColor = isDone ? "#9B9990" : isActive ? "#0A6EFA" : AGENT_AVATAR_COLORS[i % AGENT_AVATAR_COLORS.length];
+        const assignedSteps = stepsByAgent[agent.agentId] ?? [];
 
         return (
           <div
@@ -2311,6 +2334,27 @@ function DBAgentMembersList({
                     {fmtModel(agent.aiModel)}
                   </span>
                 )}
+              </div>
+            )}
+            {/* Step assignment rows — shows which step(s) this agent handles */}
+            {assignedSteps.length > 0 && (
+              <div style={{ marginTop: 6, borderTop: "1px solid #F0EFED", paddingTop: 5, display: "flex", flexDirection: "column", gap: 3 }}>
+                {assignedSteps.map((s) => (
+                  <div key={s.order} style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+                    <span style={{
+                      flexShrink: 0,
+                      fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+                      background: isActive ? "#DBEAFE" : "#F2F1EF",
+                      color: isActive ? "#2563EB" : "#7C7B77",
+                      marginTop: 1,
+                    }}>
+                      Step {s.order}
+                    </span>
+                    <span style={{ fontSize: 9, color: "#5A5955", lineHeight: 1.4, flex: 1, minWidth: 0 }}>
+                      {s.name}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>

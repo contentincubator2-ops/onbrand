@@ -21,7 +21,7 @@ export interface SquadSession {
   squadSlug: string;
   currentStep: number;
   stepResults: Record<number, string>;
-  status: "intake" | "executing" | "complete";
+  status: "intake" | "executing" | "awaiting_reply" | "complete" | "discussing";
 }
 
 // ── 確保 table 存在（首次呼叫時建立）────────────────────────────────────────

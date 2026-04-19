@@ -479,12 +479,24 @@ export const squadTemplateRouter = router({
 
       const showcases = safeJsonParse<any[]>(squad.showcases, []);
 
+      // Enrich steps with real agent details (primarySkill, aiModel, name)
+      const enrichedSteps = steps.map((step: any) => {
+        const assignedId: number | null = step.assignedAgentId ?? null;
+        const agentDetail = assignedId ? agentMap[assignedId] : null;
+        return {
+          ...step,
+          assignedAgentPrimarySkill: agentDetail?.primarySkill ?? null,
+          assignedAgentAiModel:      agentDetail?.aiModel      ?? null,
+          assignedAgentName:         agentDetail?.name         ?? step.assignedAgentName ?? null,
+        };
+      });
+
       return {
         squadName:   (squad.name ?? "") as string,
         methodology: (squad.methodology ?? "") as string,
         lead,
         agents,
-        steps,
+        steps: enrichedSteps,
         showcases,
       };
     }),
@@ -699,9 +711,13 @@ export const squadTemplateRouter = router({
         `);
       }
 
-      // Link squad to mission
+      // Link squad to mission — store the TEMPLATE SLUG (input.squadType), not the instance UID.
+      // missionChatRouter reads missions.squadSlug and queries squads WHERE slug = ?.
+      // Storing the UID here caused squad lookup to fail → "Mission Lead" fallback.
+      // The squad_uid is already linked via squad_sessions.mission_id for instance tracking.
+      const templateSlugToStore = input.squadType; // e.g. "brand-archetype-positioning"
       await db.execute(sql`
-        UPDATE missions SET squadSlug = ${squadUid}, updatedAt = NOW()
+        UPDATE missions SET squadSlug = ${templateSlugToStore}, updatedAt = NOW()
         WHERE id = ${input.missionId} AND userId = ${userId}
       `);
 

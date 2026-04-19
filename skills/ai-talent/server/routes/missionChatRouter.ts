@@ -41,7 +41,7 @@ import { writeBrandBrainEntry } from "./brandBrainRoute";
 import { recordMissionExport } from "./exportsRoute";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
 import { getOrCreateSquadSession, saveStepAndAdvance, saveStepResultOnly, advanceToNextStep, resetSquadSession } from "../_core/squadSessionManager";
-import { buildSquadAgentPrompt, buildSecondOpinionPrompt } from "../_core/agentPromptBuilder";
+import { buildSquadAgentPrompt, buildSecondOpinionPrompt, buildLeadSynthesisPrompt } from "../_core/agentPromptBuilder";
 
 export const missionChatRouter = Router();
 
@@ -446,8 +446,16 @@ async function tryExecuteSquadChat(params: {
       currentStep = nextStep;
     } else {
       // 用戶回覆當前 Agent — currentStep 保持不變，重新執行當前步驟的 agent
-      // （讓 agent 看到用戶的跟進問題，並讀取自己之前的輸出作為上下文）
     }
+  }
+
+  // ── 「討論模式」：synthesis 完成後，所有訊息路由給 Squad Lead 繼續討論 ────────
+  // status='discussing' 代表整合報告已輸出，用戶在與 Squad Lead 確認定案方向。
+  // 強制走 Squad Lead 路徑（currentStep = 0 equivalent），不觸發 synthesis。
+  const isDiscussionMode = session.status === "discussing";
+  if (isDiscussionMode) {
+    currentStep = 0; // Force Squad Lead slot resolution
+    // But DON'T auto-advance after this turn — handled in step completion section below
   }
 
   const isLeadStep  = currentStep === 0;
@@ -566,7 +574,7 @@ async function tryExecuteSquadChat(params: {
   if (!isLeadStep) {
     if (isReplyToSameAgent && session.stepResults[currentStep]) {
       // 用戶在跟剛完成的 Agent 繼續對話 — 讓 Agent 看到自己之前的輸出
-      const myPrevOutput = session.stepResults[currentStep];
+      const myPrevOutput = session.stepResults[currentStep] ?? "";
       effectiveUserMessage = `【你在上一輪的分析成果】\n\n${myPrevOutput.slice(0, 1500)}\n\n${"─".repeat(40)}\n【用戶的跟進問題】${userMessage}\n\n請根據你的分析成果，直接回答用戶的問題或修改你的輸出。`;
     } else if (Object.keys(session.stepResults).length > 0) {
       // 正常 A2A 交接 — 新步驟接收上一步成果
@@ -612,7 +620,11 @@ async function tryExecuteSquadChat(params: {
   }
 
   // ── 10. 儲存步驟結果 ──────────────────────────────────────────────────────
-  if (isLeadStep) {
+  if (isDiscussionMode) {
+    // 討論模式：Squad Lead 繼續對話，不推進步驟，維持 'discussing' 狀態
+    // 只記錄輸出（不改變 currentStep / status）
+    // no DB write needed for discussion turns
+  } else if (isLeadStep) {
     // Squad Lead intake: advance automatically (keeps old behavior for step 0 → 1)
     await saveStepAndAdvance(localPool as any, missionId, currentStep, fullOutput, totalSteps);
   } else {
@@ -634,7 +646,36 @@ async function tryExecuteSquadChat(params: {
     waitForUser: !isLeadStep,
   });
 
-  // ── 11. 自動存入品牌大腦（關鍵步驟成果）──────────────────────────────────
+  // ── 11. Squad Lead 最終整合（最後一步完成後自動觸發，僅執行一次）──────────
+  // 當所有 Specialist 都跑完（isLastStep），且不在討論模式，插入 Squad Lead 整合分析。
+  // 同一個 SSE 連線繼續送出 relay_step / delta / done，用戶無需再次操作。
+  if (isLastStep && !isLeadStep && !isDiscussionMode) {
+    // 重新讀取 stepResults（包含剛存入的最後一步）
+    const [freshRows] = await (localPool as any).execute(
+      `SELECT stepResults FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
+      [missionId]
+    ) as any[];
+    const freshResults: Record<number, string> = (() => {
+      try { return JSON.parse(freshRows?.[0]?.stepResults ?? "{}"); } catch { return {}; }
+    })();
+
+    await runSquadLeadSynthesis({
+      leadSlot,
+      fallbackLeadAgentId,
+      squadName,
+      squadMethodology,
+      workflowSteps,
+      stepResults:    freshResults,
+      totalSteps,
+      brand,
+      brandBrain,
+      missionId,
+      send,
+      agent:     { name: agentName, title: agentTitle, specialty: "" }, // will be overwritten by lead lookup inside
+    });
+  }
+
+  // ── 12. 自動存入品牌大腦（關鍵步驟成果）──────────────────────────────────
   if (brandId && fullOutput.length > 100 && !isLeadStep) {
     type BrainCategory = "custom" | "audience" | "positioning" | "voice" | "competitors";
     const STEP_TO_BRAIN_CATEGORY: Record<number, BrainCategory> = {
@@ -657,7 +698,7 @@ async function tryExecuteSquadChat(params: {
     }
   }
 
-  // ── 12. 偵測 @mention → 第二意見 ─────────────────────────────────────────
+  // ── 13. 偵測 @mention → 第二意見 ─────────────────────────────────────────
   const mentionMatch = userMessage.match(/@([\u4e00-\u9fa5\w\s]{1,20})/);
   if (mentionMatch && mentionMatch[1]) {
     const mentionedName = mentionMatch[1].trim();
@@ -667,23 +708,166 @@ async function tryExecuteSquadChat(params: {
     });
   }
 
-  // ── 13. 送出後續建議 ─────────────────────────────────────────────────────
+  // ── 14. 送出後續建議 ─────────────────────────────────────────────────────
   const nextStep = workflowSteps[currentStep]; // currentStep 已推進，指向下一步
-  const suggestions = nextStep
+  const suggestions = isLastStep
+    ? [
+        `針對定位建議做進一步調整`,
+        `@某位 Agent 深入探討特定環節`,
+        `儲存完整報告到品牌大腦`,
+      ]
+    : nextStep
     ? [
         `繼續執行：${nextStep.title ?? nextStep.name ?? "下一步"}`,
         `深入分析剛才的結果`,
         `調整方向後重新執行這一步`,
       ]
     : [
-        `💾 將完整成果存入品牌大腦`,
-        `📄 匯出完整報告`,
-        `🔁 針對某個環節深入分析`,
+        `針對某個環節深入分析`,
+        `儲存完整成果到品牌大腦`,
       ];
 
   send("suggestions", { items: suggestions });
 
   return true; // 已處理
+}
+
+// ── Squad Lead 最終整合步驟 ───────────────────────────────────────────────────
+/**
+ * 在所有 Specialist 完成後，自動觸發 Squad Lead 整合分析。
+ * 在同一個 SSE 連線繼續送出事件，用戶無需再次輸入。
+ */
+async function runSquadLeadSynthesis(params: {
+  leadSlot:             any;
+  fallbackLeadAgentId:  number | null;
+  squadName:            string;
+  squadMethodology:     string;
+  workflowSteps:        any[];
+  stepResults:          Record<number, string>;
+  totalSteps:           number;
+  brand:                Record<string, string>;
+  brandBrain:           Record<string, string[]>;
+  missionId:            number;
+  send:                 (event: string, data: unknown) => void;
+  agent:                { name: string; title: string; specialty: string };
+}): Promise<void> {
+  const {
+    leadSlot, fallbackLeadAgentId, squadName, squadMethodology,
+    workflowSteps, stepResults, totalSteps, brand, brandBrain, missionId, send,
+  } = params;
+
+  // 取得 Squad Lead 詳細資料
+  let leadDetail: any = null;
+  const leadAgentId = leadSlot?.agent_id ?? fallbackLeadAgentId;
+  if (leadAgentId) {
+    try {
+      const [aRows] = await localPool.execute(
+        `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill
+         FROM agents WHERE id = ? LIMIT 1`,
+        [leadAgentId]
+      ) as any[];
+      leadDetail = (aRows as any[])?.[0] ?? null;
+    } catch (e: any) {
+      console.warn("[squadSynthesis] lead agent fetch:", e?.message);
+    }
+  }
+
+  const leadName   = leadDetail?.name  ?? squadName + " Lead";
+  const leadTitle  = leadDetail?.title ?? "Squad Lead";
+  const leadAvatar = leadDetail?.avatarUrl ?? null;
+  const leadSkill  = leadDetail?.primarySkill ?? "";
+  const rawModel   = leadDetail?.aiModel ?? "";
+  const leadModel  = rawModel
+    ? (rawModel.includes("/") ? rawModel : `openclaw/${rawModel}`)
+    : "openclaw/pm";
+
+  const synthesisStepIndex = totalSteps + 1; // e.g. step 6 for a 5-step squad
+
+  // 送出 relay_step running（讓前端渲染 Squad Lead bubble）
+  send("relay_step", {
+    id:          synthesisStepIndex,
+    step:        synthesisStepIndex,
+    totalSteps:  synthesisStepIndex,
+    label:       `${squadName} — 最終整合建議`,
+    agentId:     leadDetail?.id ?? null,
+    agentName:   leadName,
+    agentTitle:  leadTitle,
+    agentAvatar: leadAvatar,
+    agentSkill:  leadSkill,
+    agentModel:  leadModel,
+    agentRole:   "squad_lead",
+    squadName,
+    layer:       "strategy",
+    status:      "running",
+    isLead:      true,
+    isSynthesis: true,
+  });
+
+  // 建構整合 prompt
+  const synthesisPrompt = buildLeadSynthesisPrompt({
+    agent:            { name: leadName, title: leadTitle, specialty: leadDetail?.specialty ?? "" },
+    brand,
+    squadName,
+    squadMethodology,
+    workflowSteps,
+    stepResults,
+    totalSteps,
+    brandBrain,
+  });
+
+  const messages = [
+    { role: "system" as const, content: synthesisPrompt },
+    {
+      role: "user" as const,
+      content: "請整合所有成員的分析成果，提出最終的品牌定位建議。",
+    },
+  ];
+
+  // 串流
+  let synthesisOutput = "";
+  try {
+    for await (const { event, data } of streamFromGateway(leadModel, messages)) {
+      send(event, data);
+      if (event === "delta") synthesisOutput += (data as any).text ?? "";
+    }
+  } catch (e: any) {
+    console.warn("[squadSynthesis] gateway fallback:", e?.message);
+    for await (const chunk of streamFromLLM(synthesisPrompt, [], "請整合所有成員的分析成果，提出最終的品牌定位建議。")) {
+      synthesisOutput += chunk;
+      send("delta", { text: chunk });
+    }
+  }
+
+  // relay_step done — 完整流程結束
+  send("relay_step", {
+    id:          synthesisStepIndex,
+    status:      "done",
+    agentName:   leadName,
+    agentTitle:  leadTitle,
+    agentSkill:  leadSkill,
+    agentModel:  leadModel,
+    summary:     synthesisOutput.slice(0, 400),
+    totalSteps:  synthesisStepIndex,
+    hasMoreSteps: false,
+    isLastStep:  true,
+    isSynthesis: true,
+    waitForUser: true, // 讓用戶與 Squad Lead 討論定案
+  });
+
+  // 更新 session 為 discussing：synthesis 完成後，後續訊息路由給 Squad Lead 討論
+  // 不設為 'complete'，讓用戶可以繼續與 Squad Lead 交流，直到用戶確認定案
+  try {
+    await (localPool as any).execute(
+      `UPDATE squad_chat_sessions
+       SET status = 'discussing', updatedAt = NOW(3)
+       WHERE missionId = ?`,
+      [missionId]
+    );
+  } catch (e: any) {
+    console.warn("[squadSynthesis] session status update:", e?.message);
+  }
+
+  console.log(`[squadSynthesis] Squad Lead synthesis done, missionId=${missionId}, len=${synthesisOutput.length}`);
 }
 
 // ── @mention 第二意見處理 ─────────────────────────────────────────────────────
