@@ -59,23 +59,30 @@ jobs:
             echo "Existing test missions: $EXISTING"
 
             echo ""
+            echo "=== 3b. Get userId for cjwang@sowork.tw ==="
+            USER_ID=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "
+              SELECT id FROM users WHERE email='cjwang@sowork.tw' LIMIT 1;
+            " 2>/dev/null)
+            echo "User ID: $USER_ID"
+
+            echo ""
             echo "=== 4. Insert test missions ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              INSERT INTO missions (title, description, workspace, brandId, squadSlug)
+              INSERT INTO missions (userId, title, description, workspace, brandId, squadSlug)
               VALUES
-                ('SoWork AI 市場分群定位分析',
+                (${USER_ID}, 'SoWork AI 市場分群定位分析',
                  '市場分群定位分析，建立消費品牌的 ICP Profile，識別最佳客群，制定市場區隔策略',
                  'strategy', ${BRAND_ID}, 'segmentation-based-positioning'),
-                ('SoWork AI 競品知覺地圖',
+                (${USER_ID}, 'SoWork AI 競品知覺地圖',
                  '品牌知覺地圖分析，找出競品定位空間，建立差異化定位',
                  'strategy', ${BRAND_ID}, 'competitive-perceptual-mapping'),
-                ('SoWork AI 新品類設計定位',
+                (${USER_ID}, 'SoWork AI 新品類設計定位',
                  '新品類設計定位，建立 Point-of-View 宣言，Category Design 方法論',
                  'strategy', ${BRAND_ID}, 'category-design-positioning'),
-                ('SoWork AI 心智定位分析',
+                (${USER_ID}, 'SoWork AI 心智定位分析',
                  '心智定位分析（里斯特勞特 One-Word Positioning），建立品牌心智佔有率',
                  'strategy', ${BRAND_ID}, 'mind-positioning'),
-                ('SoWork AI 目的驅動定位',
+                (${USER_ID}, 'SoWork AI 目的驅動定位',
                  '目的驅動品牌定位（Sinek Golden Circle），建立使命宣言與品牌故事',
                  'strategy', ${BRAND_ID}, 'purpose-driven-positioning');
             " 2>&1
