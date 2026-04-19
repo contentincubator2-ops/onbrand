@@ -1780,7 +1780,7 @@ function RightPanel({
     if (brandBrainCount > 0) {
       setOpenSections(prev => prev.brandbrain ? prev : { ...prev, brandbrain: true });
     }
-  }, [brandBrainCount > 0]);
+  }, [brandBrainCount]);
 
   // ── Fetch alternative squad leads ──────────────────────────────────────────
   const alternativesQuery = trpc.squad.getAlternativeLeads.useQuery(

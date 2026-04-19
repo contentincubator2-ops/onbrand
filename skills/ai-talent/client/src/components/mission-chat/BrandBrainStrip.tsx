@@ -57,7 +57,7 @@ export function BrandBrainStrip({ brandId, missionId }: BrandBrainStripProps) {
     : { data: null, isLoading: false };
 
   const items: any[] = brainQuery.data ?? [];
-  const usedTokens = useMemo(() => approxTokens(items), [items]);
+  const usedTokens = useMemo(() => approxTokens(items), [brainQuery.data]);
   const pct = Math.min(100, Math.round((usedTokens / TOKEN_BUDGET) * 100));
   const isFull = pct >= 90;
   const meterColor = isFull ? "#EF4444" : pct > 60 ? "#F59E0B" : ORANGE;
