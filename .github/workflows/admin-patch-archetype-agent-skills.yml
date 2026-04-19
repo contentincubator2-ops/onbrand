@@ -1,0 +1,144 @@
+name: Admin — Patch Archetype Squad Agent Skills
+
+# Updates primarySkill + specialty for each of the 6 confirmed agents
+# to match the requiredSkills of their assigned step.
+#
+# Agent → Step mapping:
+#   180797 Mary Allen  → Lead:  brand-archetype, brand-strategy, brand-identity, jungian, brand-personality
+#   30003  王志豪      → Step1: brand-perception, competitive-analysis, consumer-insights, audience-analysis
+#   180299 陳怡君      → Step2: brand-archetype, brand-strategy, brand-identity, jungian
+#   220839 陳哲宇      → Step3: brand-voice, tone-of-voice, copywriting, brand-narrative
+#   229484 余佳穎      → Step4: visual-identity, creative-direction, brand-design, design-strategy
+#   39     徐俊偉      → Step5: brand-strategy, omnichannel, brand-voice, content-strategy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'AUDIT = show current vs target | APPLY = write skills to DB'
+        required: true
+        default: 'AUDIT'
+
+jobs:
+  patch-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+            MODE="${{ github.event.inputs.mode }}"
+
+            echo "======================================================"
+            echo "Archetype Squad — Agent Skill Patch ($MODE)"
+            echo "======================================================"
+
+            echo ""
+            echo "=== Current skills (before patch) ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, primarySkill, LEFT(specialty, 100) AS specialty_preview
+              FROM agents
+              WHERE id IN (180797, 30003, 180299, 220839, 229484, 39)
+              ORDER BY FIELD(id, 180797, 30003, 180299, 220839, 229484, 39);
+            " 2>&1
+
+            echo ""
+            echo "=== Target skill mapping ==="
+            echo "  180797 Mary Allen  → primarySkill: brand-archetype"
+            echo "                       specialty:    brand-archetype, brand-strategy, brand-identity, jungian, brand-personality"
+            echo "  30003  王志豪      → primarySkill: brand-perception"
+            echo "                       specialty:    brand-perception, competitive-analysis, consumer-insights, audience-analysis, market-research"
+            echo "  180299 陳怡君      → primarySkill: brand-archetype"
+            echo "                       specialty:    brand-archetype, brand-strategy, brand-identity, jungian, emotional-branding"
+            echo "  220839 陳哲宇      → primarySkill: brand-voice"
+            echo "                       specialty:    brand-voice, tone-of-voice, copywriting, brand-narrative, content-strategy"
+            echo "  229484 余佳穎      → primarySkill: visual-identity"
+            echo "                       specialty:    visual-identity, creative-direction, brand-design, design-strategy, visual-identity-director"
+            echo "  39     徐俊偉      → primarySkill: brand-consistency"
+            echo "                       specialty:    brand-strategy, omnichannel, brand-voice, content-strategy, brand-identity"
+
+            if [ "$MODE" = "APPLY" ]; then
+              echo ""
+              echo "======================================================"
+              echo "APPLYING skill updates..."
+              echo "======================================================"
+
+              # 180797 Mary Allen — Lead: brand-archetype strategist
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE agents SET
+                  primarySkill = 'brand-archetype',
+                  specialty    = 'brand-archetype, brand-strategy, brand-identity, jungian, brand-personality, archetype-positioning, brand-strategy'
+                WHERE id = 180797;
+              " 2>&1
+              echo "✅ 180797 Mary Allen updated"
+
+              # 30003 王志豪 — Step 1: brand perception analyst
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE agents SET
+                  primarySkill = 'brand-perception',
+                  specialty    = 'brand-perception, competitive-analysis, consumer-insights, audience-analysis, market-research, brand-audit, segmentation, analytics'
+                WHERE id = 30003;
+              " 2>&1
+              echo "✅ 30003 王志豪 updated"
+
+              # 180299 陳怡君 — Step 2: archetype selector
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE agents SET
+                  primarySkill = 'brand-archetype',
+                  specialty    = 'brand-archetype, brand-strategy, brand-identity, jungian, emotional-branding, brand-dna, archetype-selection, brand-personality'
+                WHERE id = 180299;
+              " 2>&1
+              echo "✅ 180299 陳怡君 updated"
+
+              # 220839 陳哲宇 — Step 3: brand voice specialist
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE agents SET
+                  primarySkill = 'brand-voice',
+                  specialty    = 'brand-voice, tone-of-voice, copywriting, brand-narrative, content-strategy, slogan-creation, brand-naming, messaging'
+                WHERE id = 220839;
+              " 2>&1
+              echo "✅ 220839 陳哲宇 updated"
+
+              # 229484 余佳穎 — Step 4: creative director
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE agents SET
+                  primarySkill = 'visual-identity',
+                  specialty    = 'visual-identity, creative-direction, brand-design, design-strategy, visual-identity-director, moodboard, brand-experience, typography'
+                WHERE id = 229484;
+              " 2>&1
+              echo "✅ 229484 余佳穎 updated"
+
+              # 39 徐俊偉 — Step 5: consistency auditor
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                UPDATE agents SET
+                  primarySkill = 'brand-consistency',
+                  specialty    = 'brand-strategy, omnichannel, brand-voice, content-strategy, brand-identity, brand-audit, cross-channel, consistency-audit'
+                WHERE id = 39;
+              " 2>&1
+              echo "✅ 39 徐俊偉 updated"
+
+              echo ""
+              echo "=== Verification: skills after patch ==="
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                SELECT id, name, primarySkill, specialty
+                FROM agents
+                WHERE id IN (180797, 30003, 180299, 220839, 229484, 39)
+                ORDER BY FIELD(id, 180797, 30003, 180299, 220839, 229484, 39);
+              " 2>&1
+
+              echo ""
+              echo "======================================================"
+              echo "✅ All 6 agent skills patched."
+              echo "   stepAgentResolver skill-matching will now hit correctly."
+              echo "======================================================"
+            else
+              echo ""
+              echo "AUDIT complete. Run APPLY to write skill updates."
+              echo "======================================================"
+            fi
