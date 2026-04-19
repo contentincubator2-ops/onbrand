@@ -66,6 +66,14 @@ function IndexPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // If auth fails (expired/invalid JWT), clear token and bounce to login.
+    // Without this, the page sits on "載入中…" forever because `isSuccess`
+    // never flips when the server returns 401.
+    if (brandsQuery.isError) {
+      try { localStorage.removeItem("authToken"); } catch {}
+      navigate("/login", { replace: true });
+      return;
+    }
     if (!brandsQuery.isSuccess) return;
     const brandList = (brandsQuery.data as any[]) ?? [];
     if (brandList.length === 0) {
@@ -80,7 +88,7 @@ function IndexPage() {
       return;
     }
     setReady(true);
-  }, [brandsQuery.isSuccess, brandsQuery.data, navigate]);
+  }, [brandsQuery.isSuccess, brandsQuery.isError, brandsQuery.data, navigate]);
 
   if (!ready) {
     return (
