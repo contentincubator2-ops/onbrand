@@ -72,25 +72,6 @@ async function main() {
       console.log("[migrate] missions.status: 'inactive' already present, skipped");
     }
 
-    // 4. Add tagline, subTagline, savedSquadFlow to missions (idempotent)
-    const newCols: { col: string; ddl: string }[] = [
-      { col: "tagline",       ddl: "VARCHAR(255) NULL COMMENT '品牌定位標語'" },
-      { col: "subTagline",    ddl: "VARCHAR(255) NULL COMMENT '品牌定位副標語'" },
-      { col: "savedSquadFlow", ddl: "LONGTEXT NULL COMMENT '用戶自訂 squad steps JSON'" },
-    ];
-    for (const { col, ddl } of newCols) {
-      const [rows] = await conn.execute(`
-        SELECT COLUMN_NAME FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'missions' AND COLUMN_NAME = ?
-      `, [col]) as any;
-      if ((rows as any[]).length === 0) {
-        await conn.execute(`ALTER TABLE missions ADD COLUMN \`${col}\` ${ddl}`);
-        console.log(`[migrate] missions.${col}: added`);
-      } else {
-        console.log(`[migrate] missions.${col}: already exists, skipped`);
-      }
-    }
-
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

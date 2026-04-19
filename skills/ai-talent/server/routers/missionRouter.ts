@@ -126,9 +126,6 @@ export const missionRouter = router({
       methodology: z.string().optional(),
       status: z.enum(["inactive", "active", "completed", "archived"]).optional(),
       squadSlug: z.string().max(64).optional().nullable(),
-      tagline: z.string().max(255).optional().nullable(),
-      subTagline: z.string().max(255).optional().nullable(),
-      savedSquadFlow: z.string().optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
