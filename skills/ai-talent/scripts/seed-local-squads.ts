@@ -1722,36 +1722,41 @@ async function main() {
 
     // ── 10. Brand Archetype Positioning（品牌原型定位）────────────────────────
     // Use Jung's 12 archetypes to unify brand voice, visuals, and experience
+    // ⚠️  HARDCODED confirmed agent IDs — DO NOT replace with findAgent()
+    //   Lead  180797 Mary Allen  — Intake + Synthesis only (no step execution)
+    //   S1    30003  王志豪      — brand_perception_analyst  (Step 1)
+    //   S2    180299 陳怡君      — archetype_selector         (Step 2)
+    //   S3    220839 陳哲宇      — brand_voice_specialist     (Step 3)
+    //   S4    229484 余佳穎      — creative_director          (Step 4)
+    //   S5    39     徐俊偉      — consistency_auditor        (Step 5)
     {
       const slug     = "brand-archetype-positioning";
       const taskType = "brand-archetype-positioning";
-      const used: number[] = [];
 
-      const leadSkills = ["brand-archetype", "brand-identity", "brand-personality", "jungian", "brand-strategy"];
-      const leadId = await findAgent(conn, leadSkills, used);
-      if (leadId) { used.push(leadId); await assignSkillsToAgent(conn, leadId, leadSkills); }
-      const m2Skills = ["brand-voice", "tone-of-voice", "brand-narrative", "copywriting", "content-strategy"];
-      const m2 = await findAgent(conn, m2Skills, used);
-      if (m2) { used.push(m2); await assignSkillsToAgent(conn, m2, m2Skills); }
-      const m3Skills = ["visual-identity", "creative-direction", "design-strategy", "brand-design"];
-      const m3 = await findAgent(conn, m3Skills, used);
-      if (m3) { used.push(m3); await assignSkillsToAgent(conn, m3, m3Skills); }
-      const m4Skills = ["consumer-insights", "audience-analysis", "brand-perception", "market-research"];
-      const m4 = await findAgent(conn, m4Skills, used);
-      if (m4) { used.push(m4); await assignSkillsToAgent(conn, m4, m4Skills); }
+      // Hardcoded agent IDs — confirmed and patched in DB
+      const LEAD_ID = 180797;  // Mary Allen
+      const S1_ID   = 30003;   // 王志豪
+      const S2_ID   = 180299;  // 陳怡君
+      const S3_ID   = 220839;  // 陳哲宇
+      const S4_ID   = 229484;  // 余佳穎
+      const S5_ID   = 39;      // 徐俊偉
 
       const members = [
-        leadId && { agent_id: leadId, is_lead: true,  role: "archetype_strategist",   order: 1 },
-        m2     && { agent_id: m2,     is_lead: false, role: "brand_voice_specialist",  order: 2 },
-        m3     && { agent_id: m3,     is_lead: false, role: "creative_director",       order: 3 },
-        m4     && { agent_id: m4,     is_lead: false, role: "brand_perception_analyst",order: 4 },
-      ].filter(Boolean);
+        { agent_id: LEAD_ID, is_lead: true,  role: "archetype_strategist",    order: 1 },
+        { agent_id: S1_ID,   is_lead: false, role: "brand_perception_analyst", order: 2 },
+        { agent_id: S2_ID,   is_lead: false, role: "archetype_selector",       order: 3 },
+        { agent_id: S3_ID,   is_lead: false, role: "brand_voice_specialist",   order: 4 },
+        { agent_id: S4_ID,   is_lead: false, role: "creative_director",        order: 5 },
+        { agent_id: S5_ID,   is_lead: false, role: "consistency_auditor",      order: 6 },
+      ];
 
-      const [leadInfo, m2Info, m3Info, m4Info] = await Promise.all([
-        getAgentInfo(conn, leadId),
-        getAgentInfo(conn, m2 ?? null),
-        getAgentInfo(conn, m3 ?? null),
-        getAgentInfo(conn, m4 ?? null),
+      const [leadInfo, s1Info, s2Info, s3Info, s4Info, s5Info] = await Promise.all([
+        getAgentInfo(conn, LEAD_ID),
+        getAgentInfo(conn, S1_ID),
+        getAgentInfo(conn, S2_ID),
+        getAgentInfo(conn, S3_ID),
+        getAgentInfo(conn, S4_ID),
+        getAgentInfo(conn, S5_ID),
       ]);
 
       const bapSteps = [
@@ -1760,36 +1765,36 @@ async function main() {
           description: "用 octolens 爬取品牌既有溝通素材（官網文案、社群貼文、廣告），Madison MarketMind 掃描消費者對品牌的感知描述詞，診斷品牌目前隱性展現的原型是什麼，以及與期望原型的落差。",
           tool: "octolens",
           outputType: "brand_personality_audit",
-          requiredSkills: ["brand-archetype", "brand-identity", "brand-perception", "competitive-analysis"],
-        }, m4Info),
+          requiredSkills: ["brand-perception", "competitive-analysis", "consumer-insights", "audience-analysis"],
+        }, s1Info),
         assignAgentToStep({
           order: 2, name: "原型選擇與組合",
           description: "基於品牌使命、目標受眾心理需求、競品原型地圖，從 Jung 12 原型中選擇主原型（Primary）和輔助原型（Secondary）。避免選擇競品已強勢佔據的原型。建立原型選擇理由書。",
           tool: "marketing-strategy-pmm",
           outputType: "archetype_selection_rationale",
           requiredSkills: ["brand-archetype", "brand-strategy", "brand-identity", "jungian"],
-        }, leadInfo),
+        }, s2Info),
         assignAgentToStep({
           order: 3, name: "品牌聲音指南",
           description: "用 osp_marketing_tools Brand Voice Generator 建立以原型為核心的品牌聲音指南：用詞庫（宜用 / 禁用）、句子結構偏好、情緒基調、各通路語調微調（官網 vs 社群 vs 廣告 vs 客服）。",
           tool: "osp_marketing_tools",
           outputType: "brand_voice_guide",
           requiredSkills: ["brand-voice", "tone-of-voice", "copywriting", "brand-narrative"],
-        }, m2Info),
+        }, s3Info),
         assignAgentToStep({
           order: 4, name: "視覺與體驗方向",
           description: "根據原型特質制定視覺方向：配色系統、字型個性、攝影風格、版面偏好。建立體驗設計原則：產品包裝、官網 UX、門市空間（如適用）應傳遞的感受。提供 Moodboard 方向。",
           tool: "internal",
           outputType: "visual_experience_direction",
           requiredSkills: ["visual-identity", "creative-direction", "brand-design", "design-strategy"],
-        }, m3Info),
+        }, s4Info),
         assignAgentToStep({
           order: 5, name: "全通路原型一致性稽核",
           description: "用 marketing-strategy-pmm 訊息一致性工具，稽核所有現有觸點的原型一致性。建立品牌原型評分標準，讓後續所有溝通都能自我稽核是否符合原型人格。",
           tool: "marketing-strategy-pmm",
           outputType: "archetype_consistency_audit",
           requiredSkills: ["brand-strategy", "omnichannel", "brand-voice", "content-strategy"],
-        }, leadInfo),
+        }, s5Info),
       ];
 
       await upsertWorkflow(conn, {
