@@ -1,14 +1,4 @@
-name: Admin — Test brand-archetype-positioning Full Output
-
-# 直接從後端對 brand-archetype-positioning squad 送出真實對話，
-# 逐步顯示每個 step 的完整 AI 產出內容（不評分，純看產出品質）
-#
-# Turn 1: Squad Lead Intake → 看 Lead 如何收集資訊 + 啟動 Squad
-# Turn 2: 繼續 → Step 1 王志豪 (brand-personality-audit / DeepSeek-R1)
-# Turn 3: 繼續 → Step 2 陳怡君 (archetype-selection / DeepSeek-R1)
-# Turn 4: 繼續 → Step 3 陳哲宇 (brand-voice-guide / claude-sonnet-4-6)
-# Turn 5: 繼續 → Step 4 余佳穎 (visual-experience-direction / qwen-vl-max)
-# Turn 6: 繼續 → Step 5 徐俊偉 (omnichannel-consistency-audit / claude-sonnet-4-6)
+name: Admin - Test Archetype Full Output
 
 on:
   workflow_dispatch:
@@ -20,13 +10,14 @@ on:
       brand_desc:
         description: 'Brand description'
         required: true
-        default: '企業 AI 行銷作業系統，幫助行銷團隊自動化決策與創作。目標客戶是中大型企業行銷主管。'
+        default: 'AI marketing OS for enterprise teams'
 
 jobs:
   test-archetype-output:
     runs-on: ubuntu-latest
     steps:
-      - uses: appleboy/ssh-action@v1.0.3
+      - name: Run 6-turn archetype test via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
@@ -45,11 +36,10 @@ jobs:
             MOS_DB="mos_db"
 
             echo "======================================================"
-            echo "brand-archetype-positioning — Full Output Test"
+            echo "brand-archetype-positioning Full Output Test"
             echo "Brand: $BRAND"
             echo "======================================================"
 
-            # ── 1. 取得 JWT_SECRET ─────────────────────────────────────
             export JWT_SECRET=$(pm2 jlist 2>/dev/null | node -e "
               let d=''; process.stdin.on('data',c=>d+=c);
               process.stdin.on('end',()=>{
@@ -60,22 +50,20 @@ jobs:
             if [ -z "$JWT_SECRET" ]; then
               export JWT_SECRET=$(grep -E '^JWT_SECRET=' skills/ai-talent/.env | head -1 | cut -d= -f2-)
             fi
-            echo "✅ JWT_SECRET ready (len=${#JWT_SECRET})"
+            echo "JWT_SECRET ready (len=${#JWT_SECRET})"
 
-            # ── 2. 找 mission + 強制設為 brand-archetype-positioning ──
             MISSION_ID=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "
               SELECT m.id FROM missions m
               WHERE m.brandId IS NOT NULL AND m.brandId > 0
               ORDER BY m.updatedAt DESC LIMIT 1;
             " 2>/dev/null)
-            if [ -z "$MISSION_ID" ]; then echo "❌ No mission found"; exit 1; fi
+            if [ -z "$MISSION_ID" ]; then echo "No mission found"; exit 1; fi
 
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               UPDATE missions SET squadSlug = 'brand-archetype-positioning' WHERE id = $MISSION_ID;
             " 2>/dev/null
-            echo "✅ Mission #$MISSION_ID → squadSlug = brand-archetype-positioning"
+            echo "Mission #$MISSION_ID -> squadSlug = brand-archetype-positioning"
 
-            # ── 3. 簽 JWT（用 tsx + jose，與 test-squad-flow.ts 相同方式）──
             TOKEN=$(cd /home/azureuser/marketing-os/skills/ai-talent && npx tsx -e "
               import { SignJWT } from 'jose';
               const secret = new TextEncoder().encode(process.env.JWT_SECRET);
@@ -86,49 +74,42 @@ jobs:
                 .sign(secret);
               process.stdout.write(tok);
             " 2>/dev/null)
-            if [ -z "$TOKEN" ]; then echo "❌ JWT signing failed"; exit 1; fi
-            echo "✅ JWT signed (len=${#TOKEN})"
+            if [ -z "$TOKEN" ]; then echo "JWT signing failed"; exit 1; fi
+            echo "JWT signed (len=${#TOKEN})"
 
-            # ── Helper: 重置 squad session ────────────────────────────
-            reset_session() {
-              curl -sk -X POST "https://localhost:$PORT/api/chat/reset-squad-session" \
-                -H "Content-Type: application/json" \
-                -H "Authorization: Bearer $TOKEN" \
-                -d "{\"missionId\": $MISSION_ID}" > /dev/null 2>&1 || true
-              sleep 1
-            }
+            curl -sk -X POST "https://localhost:$PORT/api/chat/reset-squad-session" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $TOKEN" \
+              -d "{\"missionId\": $MISSION_ID}" > /dev/null 2>&1 || true
+            sleep 2
 
-            # ── Helper: 送出一輪並擷取純文字產出 ─────────────────────
-            send_turn() {
-              local MSG="$1"
-              local HISTORY="$2"
-              local LABEL="$3"
+            run_turn() {
+              local LABEL="$1"
+              local MSG="$2"
 
               echo ""
-              echo "══════════════════════════════════════════════════════"
-              echo "▶ $LABEL"
-              echo "══════════════════════════════════════════════════════"
+              echo "======================================================"
+              echo "$LABEL"
+              echo "======================================================"
 
-              # Build JSON body safely using python3 (always available on ubuntu)
               BODY=$(python3 -c "
-import json, sys
-body = {
-  'userMessage': '''$MSG''',
-  'conversationHistory': [],
-  'missionId': $MISSION_ID,
-  'squadSlug': 'brand-archetype-positioning'
-}
-print(json.dumps(body), end='')
-")
+            import json
+            body = {
+              'userMessage': '$MSG',
+              'conversationHistory': [],
+              'missionId': $MISSION_ID,
+              'squadSlug': 'brand-archetype-positioning'
+            }
+            print(json.dumps(body), end='')
+            ")
 
-              # Stream SSE → 擷取 agent info + content
               curl -sk -X POST "https://localhost:$PORT/api/chat" \
                 -H "Content-Type: application/json" \
                 -H "Authorization: Bearer $TOKEN" \
                 -H "Accept: text/event-stream" \
                 -d "$BODY" \
-                --max-time 120 2>/dev/null | node -e "
-                  let buf='', agent='', model='', step=-1, content='';
+                --max-time 180 2>/dev/null | node -e "
+                  let buf='', agent='', model='', content='';
                   let curEvent='';
                   process.stdin.on('data', chunk => {
                     buf += chunk.toString();
@@ -142,7 +123,6 @@ print(json.dumps(body), end='')
                           if (curEvent === 'relay_step' && d.status === 'running') {
                             agent = d.agentName || agent;
                             model = d.agentModel || model;
-                            if (typeof d.step === 'number') step = d.step;
                           } else if (curEvent === 'delta' && d.text) {
                             content += d.text;
                           }
@@ -153,59 +133,30 @@ print(json.dumps(body), end='')
                   process.stdin.on('end', () => {
                     console.log('Agent  :', agent || '(unknown)');
                     console.log('Model  :', model || '(unknown)');
-                    console.log('Step   :', step);
                     console.log('Length :', content.length, 'chars');
                     console.log('');
-                    console.log('─── OUTPUT ─────────────────────────────────────');
+                    console.log('--- OUTPUT ---');
                     console.log(content || '(empty)');
-                    console.log('─── END ─────────────────────────────────────────');
+                    console.log('--- END ---');
                   });
                 "
             }
 
-            # ── 4. 重置 session ────────────────────────────────────────
-            echo ""
-            echo "=== Resetting squad session ==="
-            reset_session
+            INTAKE_MSG="${BRAND}，${DESC}請用品牌原型定位法開始分析。"
 
-            # ── 5. 執行 5 輪對話 ──────────────────────────────────────
-            HISTORY='[]'
-            TURN1_MSG="我想用品牌原型定位法分析品牌：${BRAND}，${DESC}請開始分析。"
-
-            send_turn "$TURN1_MSG" "$HISTORY" "Turn 1 — Squad Lead Intake (Mary Allen / MAI-DS-R1)"
-
-            echo ""
-            echo "=== [等待 3 秒再送 Turn 2] ==="
+            run_turn "Turn 1 - Squad Lead Intake" "$INTAKE_MSG"
             sleep 3
-
-            HISTORY='[]'
-            send_turn "繼續" "$HISTORY" "Turn 2 — Step 1: 現有品牌人格診斷 (王志豪 / DeepSeek-R1-0528)"
-
-            echo ""
-            echo "=== [等待 3 秒再送 Turn 3] ==="
+            run_turn "Turn 2 - Step 1: Brand Personality Audit" "繼續"
             sleep 3
-
-            send_turn "繼續" "$HISTORY" "Turn 3 — Step 2: 原型選擇與組合 (陳怡君 / DeepSeek-R1-0528)"
-
-            echo ""
-            echo "=== [等待 3 秒再送 Turn 4] ==="
+            run_turn "Turn 3 - Step 2: Archetype Selection" "繼續"
             sleep 3
-
-            send_turn "繼續" "$HISTORY" "Turn 4 — Step 3: 品牌聲音指南 (陳哲宇 / claude-sonnet-4-6)"
-
-            echo ""
-            echo "=== [等待 3 秒再送 Turn 5] ==="
+            run_turn "Turn 4 - Step 3: Brand Voice Guide" "繼續"
             sleep 3
-
-            send_turn "繼續" "$HISTORY" "Turn 5 — Step 4: 視覺與體驗方向 (余佳穎 / qwen-vl-max)"
-
-            echo ""
-            echo "=== [等待 3 秒再送 Turn 6] ==="
+            run_turn "Turn 5 - Step 4: Visual Experience Direction" "繼續"
             sleep 3
-
-            send_turn "繼續" "$HISTORY" "Turn 6 — Step 5: 全通路原型一致性稽核 (徐俊偉 / claude-sonnet-4-6)"
+            run_turn "Turn 6 - Step 5: Omnichannel Consistency Audit" "繼續"
 
             echo ""
             echo "======================================================"
-            echo "✅ brand-archetype-positioning 完整輸出測試完成"
+            echo "brand-archetype-positioning full output test complete"
             echo "======================================================"
