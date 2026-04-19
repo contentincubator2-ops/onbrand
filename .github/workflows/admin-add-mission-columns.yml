@@ -24,10 +24,18 @@ jobs:
           command_timeout: 5m
           script: |
             set -e
-            DB_USER="${{ secrets.DB_USER }}"
-            DB_PASS="${{ secrets.DB_PASSWORD }}"
-            DB_NAME="${{ secrets.DB_NAME }}"
-            DB_HOST="${{ secrets.DB_HOST }}"
+            # Load main DB credentials from VM's .env file
+            ENV_FILE=$(find /home /opt /var/www /root -maxdepth 4 -name ".env" 2>/dev/null | head -1)
+            if [ -n "$ENV_FILE" ]; then
+              set -o allexport
+              source "$ENV_FILE"
+              set +o allexport
+            fi
+            DB_USER="${DB_USER:-root}"
+            DB_PASS="${DB_PASSWORD:-}"
+            DB_NAME="${DB_NAME:-marketing_os}"
+            DB_HOST="${DB_HOST:-localhost}"
+            echo "Connecting to $DB_NAME@$DB_HOST as $DB_USER"
 
             echo "=== 1. Add tagline column (IF NOT EXISTS) ==="
             mysql -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" -e "
