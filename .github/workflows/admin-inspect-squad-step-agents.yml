@@ -1,7 +1,7 @@
 name: Admin — Inspect & Fix Squad Step Agent Assignments
 
 # Lists each step's assigned agent (ID, name, primarySkill, aiModel) for any squad.
-# If a step has no assignedAgentId, optionally runs the skill-based matcher to assign one.
+# Runs the Node.js inspect-squad-agents.ts script on the VM.
 
 on:
   workflow_dispatch:
@@ -10,10 +10,6 @@ on:
         description: 'Squad slug to inspect (e.g. brand-archetype-positioning)'
         required: true
         default: 'brand-archetype-positioning'
-      fix_missing:
-        description: 'Set to YES to auto-assign missing step agents via skill matching'
-        required: false
-        default: 'NO'
 
 jobs:
   inspect:
@@ -27,138 +23,22 @@ jobs:
           command_timeout: 10m
           script: |
             set -e
-            MOS_USER="mos_user"
-            MOS_PASS="mos_secure_2026"
-            MOS_DB="mos_db"
             SLUG="${{ github.event.inputs.squad_slug }}"
-            FIX="${{ github.event.inputs.fix_missing }}"
+            APP_DIR="/home/azureuser/A2A-Marketing-Claw"
 
             echo "======================================================"
-            echo "Squad Step Agent Inspection: $SLUG"
+            echo "Inspecting squad: $SLUG"
             echo "======================================================"
 
-            # ── Step 1: Verify squad exists ─────────────────────────────
-            echo ""
-            echo "=== 1. Squad overview ==="
-            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              SELECT id, slug, name, missionType,
-                     JSON_LENGTH(agents) as agent_count,
-                     JSON_LENGTH(steps)  as step_count
-              FROM squads
-              WHERE slug = '$SLUG' AND is_active = 1
-              LIMIT 1;
-            " 2>&1
+            cd "$APP_DIR"
 
-            # ── Step 2: Show Squad Lead ──────────────────────────────────
-            echo ""
-            echo "=== 2. Squad Lead ==="
-            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              SELECT
-                a.id                        AS agent_id,
-                a.name                      AS agent_name,
-                a.title                     AS agent_title,
-                a.primarySkill              AS primary_skill,
-                a.aiModel                   AS ai_model,
-                JSON_UNQUOTE(JSON_EXTRACT(m.value, '$.role')) AS squad_role
-              FROM squads s,
-                   JSON_TABLE(s.agents, '$[*]' COLUMNS (
-                     agent_id INT PATH '$.agent_id',
-                     is_lead  TINYINT PATH '$.is_lead',
-                     role     VARCHAR(100) PATH '$.role',
-                     value    JSON PATH '$'
-                   )) AS m
-              JOIN agents a ON a.id = m.agent_id
-              WHERE s.slug = '$SLUG' AND s.is_active = 1 AND m.is_lead = 1
-              LIMIT 1;
-            " 2>&1
+            # Pull latest scripts
+            git pull --ff-only origin main 2>&1 || echo "[warn] git pull failed, using current files"
 
-            # ── Step 3: Show per-step agent assignments ──────────────────
-            echo ""
-            echo "=== 3. Per-step agent assignments ==="
-            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              SELECT
-                step_order,
-                step_name,
-                assigned_agent_id,
-                COALESCE(a.name,      '(not assigned)') AS agent_name,
-                COALESCE(a.primarySkill, '—')            AS primary_skill,
-                COALESCE(a.aiModel,      '—')            AS ai_model,
-                required_skills
-              FROM squads s,
-                   JSON_TABLE(s.steps, '$[*]' COLUMNS (
-                     step_order        INT          PATH '$.order',
-                     step_name         VARCHAR(200) PATH '$.name',
-                     assigned_agent_id INT          PATH '$.assignedAgentId',
-                     required_skills   VARCHAR(500) PATH '$.requiredSkills'
-                   )) AS st
-              LEFT JOIN agents a ON a.id = st.assigned_agent_id
-              WHERE s.slug = '$SLUG' AND s.is_active = 1
-              ORDER BY step_order;
-            " 2>&1
-
-            # ── Step 4: Count unassigned steps ──────────────────────────
-            UNASSIGNED=$(mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -sN -e "
-              SELECT COUNT(*) FROM squads s,
-                JSON_TABLE(s.steps, '$[*]' COLUMNS (
-                  assigned_agent_id INT PATH '$.assignedAgentId'
-                )) AS st
-              WHERE s.slug = '$SLUG' AND s.is_active = 1
-                AND st.assigned_agent_id IS NULL;
-            " 2>&1)
-            echo ""
-            echo ">>> Unassigned steps: $UNASSIGNED"
-
-            # ── Step 5 (optional): Auto-fix missing assignments ──────────
-            if [ "$FIX" = "YES" ] && [ "$UNASSIGNED" -gt "0" ]; then
-              echo ""
-              echo "=== 5. Auto-fix: assigning agents by requiredSkills ==="
-
-              # For each unassigned step, find best matching agent from the squad
-              # Strategy: match requiredSkills against agents.specialty or primarySkill
-              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-                -- Get squad agents list
-                SELECT sa.agent_id, a.name, a.primarySkill, a.specialty
-                FROM squads s,
-                  JSON_TABLE(s.agents, '$[*]' COLUMNS (
-                    agent_id INT  PATH '$.agent_id',
-                    is_lead  TINYINT PATH '$.is_lead'
-                  )) AS sa
-                JOIN agents a ON a.id = sa.agent_id
-                WHERE s.slug = '$SLUG' AND s.is_active = 1
-                ORDER BY sa.is_lead DESC;
-              " 2>&1
-
-              echo ""
-              echo "--- Per-step skill matching ---"
-              # Show which steps are unassigned and their requiredSkills for manual review
-              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-                SELECT st.step_order, st.step_name, st.required_skills,
-                  (SELECT a2.id FROM squads s2,
-                    JSON_TABLE(s2.agents, '$[*]' COLUMNS (agent_id INT PATH '$.agent_id')) AS sq2
-                  JOIN agents a2 ON a2.id = sq2.agent_id
-                  WHERE s2.slug = '$SLUG'
-                    AND (a2.primarySkill LIKE CONCAT('%', JSON_UNQUOTE(JSON_EXTRACT(st.required_skills, '$[0]')), '%')
-                      OR a2.specialty    LIKE CONCAT('%', JSON_UNQUOTE(JSON_EXTRACT(st.required_skills, '$[0]')), '%'))
-                  LIMIT 1) AS best_match_agent_id
-                FROM squads s,
-                  JSON_TABLE(s.steps, '$[*]' COLUMNS (
-                    step_order        INT          PATH '$.order',
-                    step_name         VARCHAR(200) PATH '$.name',
-                    assigned_agent_id INT          PATH '$.assignedAgentId',
-                    required_skills   JSON         PATH '$.requiredSkills'
-                  )) AS st
-                WHERE s.slug = '$SLUG' AND s.is_active = 1
-                  AND st.assigned_agent_id IS NULL
-                ORDER BY st.step_order;
-              " 2>&1
-
-              echo ""
-              echo "NOTE: Auto-patch requires Node.js script. Run on VM:"
-              echo "  cd /home/azureuser/A2A-Marketing-Claw && npx tsx scripts/inspect-squad-agents.ts $SLUG"
-              echo "Or use the fix-step-assignments script to patch specific steps manually."
-            fi
+            # Run the Node.js inspect script
+            npx tsx scripts/inspect-squad-agents.ts "$SLUG" 2>&1
 
             echo ""
             echo "======================================================"
-            echo "Inspection complete for squad: $SLUG"
+            echo "Done."
             echo "======================================================"
