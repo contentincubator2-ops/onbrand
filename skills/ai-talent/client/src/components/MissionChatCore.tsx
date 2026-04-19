@@ -13,7 +13,6 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { trpc } from "../lib/trpc";
 import TaskProgressTracker, { type TaskStep } from "./mission-chat/TaskProgressTracker";
-import TypedThreadCard from "./mission-chat/TypedThreadCard";
 import SquadRecommendCards from "./mission-chat/SquadRecommendCards";
 import { MissionHomePage } from "./mission-chat/MissionHomePage";
 import { AgentBubbleHeader } from "./mission-chat/AgentBubbleHeader";
@@ -2155,38 +2154,9 @@ export default function MissionChatCore({
           />
         )}
 
-        {/* TypedThreadCard execution thread — only shown when NO squad is active */}
-        {relaySteps.length > 0 && !(activeMissionId && (missionDataQuery.data as any)?.squadSlug) && (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: "#C8C7C3", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
-              Execution Thread
-            </div>
-            {relaySteps.filter((s) => s.status === "done").map((step, i, arr) => {
-              type CardType = "human_request" | "pm_agent" | "team_assembly" | "specialist" | "review_request" | "approval_result";
-              let cardType: CardType = "specialist";
-              if (i === 0) cardType = "pm_agent";
-              else if (step.layer === "strategy" || step.agentTitle?.includes("PM") || step.agentTitle?.includes("策略")) cardType = "pm_agent";
-              else if (step.label?.includes("組隊") || step.label?.includes("分工") || step.label?.includes("team")) cardType = "team_assembly";
-              else if (step.label?.includes("審核") || step.label?.includes("review") || step.label?.includes("確認")) cardType = "review_request";
-              else if (i === arr.length - 1 && step.label?.includes("核准")) cardType = "approval_result";
-              else cardType = "specialist";
-              return (
-                <TypedThreadCard
-                  key={step.id}
-                  cardType={cardType}
-                  agentName={step.agentName}
-                  label={step.label}
-                  status={step.status}
-                  content={step.summary || ""}
-                  stepIndex={i + 1}
-                  totalSteps={relaySteps.length}
-                  nextAction={i < arr.length - 1 ? `下一步：${arr[i + 1]?.agentName ?? "下位成員"}執行` : undefined}
-                  collapsible={true}
-                />
-              );
-            })}
-          </div>
-        )}
+        {/* Execution Thread removed — same content is already rendered upstream
+            (TeamAssemblyPanel + chat-message relay steps), so the duplicate
+            TypedThreadCard list below was redundant. */}
 
         {/* TaskProgressTracker */}
         {(a2aSteps.length > 0 || (loading && a2aSteps.length > 0)) && (
