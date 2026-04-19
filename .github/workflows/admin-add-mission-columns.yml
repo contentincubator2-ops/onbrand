@@ -24,12 +24,22 @@ jobs:
           command_timeout: 5m
           script: |
             set -e
-            # Load main DB name from VM's .env file
-            ENV_FILE=$(find /home /opt /var/www /root -maxdepth 4 -name ".env" 2>/dev/null | head -1)
-            if [ -n "$ENV_FILE" ]; then
-              set -o allexport; source "$ENV_FILE"; set +o allexport
+            echo "=== Discover DB with missions table ==="
+            # Find which DB has a missions table with high IDs (main app DB)
+            DB_NAME=$(sudo mysql -sN -e "
+              SELECT TABLE_SCHEMA FROM information_schema.TABLES
+              WHERE TABLE_NAME='missions'
+              ORDER BY TABLE_SCHEMA;
+            " 2>/dev/null | grep -v mos_db | head -1)
+
+            if [ -z "$DB_NAME" ]; then
+              # Fallback: load from .env
+              ENV_FILE=$(find /home /opt /var/www /root -maxdepth 4 -name ".env" 2>/dev/null | head -1)
+              if [ -n "$ENV_FILE" ]; then
+                set -o allexport; source "$ENV_FILE"; set +o allexport
+              fi
+              DB_NAME="${DB_NAME:-mos_db}"
             fi
-            DB_NAME="${DB_NAME:-marketing_os}"
             echo "Target DB: $DB_NAME"
 
             echo "=== 1. Add tagline column ==="
