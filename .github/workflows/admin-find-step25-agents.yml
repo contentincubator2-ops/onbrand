@@ -1,0 +1,89 @@
+name: Admin — Find Step 2 & 5 Agents (archetype-positioning)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+
+            # Already chosen — exclude these
+            # 180797 Mary Allen (Lead), 30003 王志豪 (S1), 220839 陳哲宇 (S3), 229484 余佳穎 (S4)
+            EXCLUDE="(180797, 30003, 220839, 229484)"
+
+            echo "======================================================"
+            echo "Finding Step 2 + Step 5 agents (excluding $EXCLUDE)"
+            echo "======================================================"
+
+            echo ""
+            echo "=== Step 2: 原型選擇與組合 ==="
+            echo "    Required: brand-archetype, brand-strategy, brand-identity, jungian"
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, primarySkill, aiModel, LEFT(specialty,90) AS specialty_preview
+              FROM agents
+              WHERE isAvailable = 1
+                AND id NOT IN $EXCLUDE
+                AND (
+                  primarySkill LIKE '%brand-archetype%'
+                  OR primarySkill LIKE '%brand-strategy%'
+                  OR primarySkill LIKE '%brand-identity%'
+                  OR primarySkill LIKE '%jungian%'
+                  OR specialty LIKE '%brand-archetype%'
+                  OR specialty LIKE '%brand-strategy%'
+                  OR specialty LIKE '%brand-identity%'
+                  OR specialty LIKE '%jungian%'
+                  OR specialty LIKE '%brand-personality%'
+                  OR title LIKE '%brand strat%'
+                  OR title LIKE '%brand identity%'
+                )
+              ORDER BY
+                (primarySkill LIKE '%brand-archetype%') DESC,
+                (specialty LIKE '%brand-archetype%') DESC,
+                (primarySkill LIKE '%brand-strategy%') DESC,
+                (specialty LIKE '%brand-strategy%') DESC,
+                id ASC
+              LIMIT 10;
+            " 2>&1
+
+            echo ""
+            echo "=== Step 5: 全通路原型一致性稽核 ==="
+            echo "    Required: brand-strategy, omnichannel, brand-voice, content-strategy"
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, primarySkill, aiModel, LEFT(specialty,90) AS specialty_preview
+              FROM agents
+              WHERE isAvailable = 1
+                AND id NOT IN $EXCLUDE
+                AND (
+                  primarySkill LIKE '%omnichannel%'
+                  OR primarySkill LIKE '%brand-strategy%'
+                  OR primarySkill LIKE '%content-strategy%'
+                  OR specialty LIKE '%omnichannel%'
+                  OR specialty LIKE '%brand-strategy%'
+                  OR specialty LIKE '%content-strategy%'
+                  OR specialty LIKE '%channel-strategy%'
+                  OR specialty LIKE '%integrated-marketing%'
+                  OR title LIKE '%omnichannel%'
+                  OR title LIKE '%integrated%'
+                  OR title LIKE '%brand consist%'
+                )
+              ORDER BY
+                (primarySkill LIKE '%omnichannel%') DESC,
+                (specialty LIKE '%omnichannel%') DESC,
+                (primarySkill LIKE '%brand-strategy%') DESC,
+                id ASC
+              LIMIT 10;
+            " 2>&1
+
+            echo ""
+            echo "======================================================"
