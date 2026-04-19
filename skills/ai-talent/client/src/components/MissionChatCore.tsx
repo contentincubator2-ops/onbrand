@@ -1364,7 +1364,9 @@ export default function MissionChatCore({
   })();
   const currentAgentTurns = agentTurnCounts[currentAgentKey] ?? 0;
   const turnsLeft = MAX_TURNS_PER_AGENT - currentAgentTurns;
-  const isAtTurnLimit = turnsLeft <= 0;
+  // Per-agent 2-turn cap removed — users can discuss with any member as long as they want.
+  const isAtTurnLimit = false;
+  void turnsLeft; // keep symbol referenced for any downstream analytics
 
   const handleSend = async () => {
     const rawText = input.trim();
@@ -2636,23 +2638,6 @@ export default function MissionChatCore({
               missionDataQuery.refetch();
             }}
           />
-        )}
-
-        {/* Per-agent turn-limit notice */}
-        {isAtTurnLimit && (
-          <div style={{
-            fontSize: 11,
-            color: "#92400E",
-            background: "#FFFBEB",
-            border: "1px solid #FDE68A",
-            borderRadius: 8,
-            padding: "6px 10px",
-            marginBottom: 6,
-            lineHeight: 1.5,
-          }}>
-            已達與 <strong>{currentAgentKey}</strong> 的互動上限（{MAX_TURNS_PER_AGENT} 次）。
-            請儲存目前流程，或繼續下一步驟。
-          </div>
         )}
 
         {/* Input box */}
