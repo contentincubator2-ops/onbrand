@@ -27,6 +27,8 @@ jobs:
             cd /home/azureuser/marketing-os
             git fetch origin main && git reset --hard origin/main
             echo "=== Archetype Quality Check: ${{ github.event.inputs.brand_name }} ==="
+            PM2_JWT=$(pm2 jlist 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const p=JSON.parse(d).find(x=>x.pm2_env&&x.pm2_env.JWT_SECRET);if(p)process.stdout.write(p.pm2_env.JWT_SECRET);}catch(e){}});" 2>/dev/null)
+            if [ -z "$PM2_JWT" ]; then echo "Cannot read JWT_SECRET from pm2"; else echo "Got JWT_SECRET from pm2 (len=${#PM2_JWT})"; fi
             cd skills/ai-talent
-            npx tsx scripts/test-squad-flow.ts 2>&1
+            JWT_SECRET="${PM2_JWT:-}" npx tsx scripts/test-squad-flow.ts 2>&1
             echo "=== Test complete ==="
