@@ -64,18 +64,17 @@ jobs:
             " 2>/dev/null
             echo "Mission #$MISSION_ID -> squadSlug = brand-archetype-positioning"
 
-            cat > /tmp/sign-jwt.mjs << 'JSEOF'
-import { SignJWT } from '/home/azureuser/marketing-os/skills/ai-talent/node_modules/jose/dist/node/esm/index.js';
-const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-const tok = await new SignJWT({ sub: '199' })
-  .setProtectedHeader({ alg: 'HS256' })
-  .setIssuedAt()
-  .setExpirationTime('4h')
-  .sign(secret);
-process.stdout.write(tok);
-JSEOF
             set +e
-            TOKEN=$(node /tmp/sign-jwt.mjs 2>/dev/null)
+            TOKEN=$(python3 -c "
+import hmac, hashlib, base64, json, time, os
+secret = os.environ.get('JWT_SECRET','')
+now = int(time.time())
+hdr = base64.urlsafe_b64encode(json.dumps({'alg':'HS256','typ':'JWT'}).encode()).rstrip(b'=')
+pld = base64.urlsafe_b64encode(json.dumps({'sub':'199','iat':now,'exp':now+14400}).encode()).rstrip(b'=')
+msg = hdr + b'.' + pld
+sig = base64.urlsafe_b64encode(hmac.new(secret.encode(), msg, hashlib.sha256).digest()).rstrip(b'=')
+print((msg + b'.' + sig).decode(), end='')
+" 2>/dev/null)
             set -e
             if [ -z "$TOKEN" ]; then echo "JWT signing failed"; exit 1; fi
             echo "JWT signed (len=${#TOKEN})"
