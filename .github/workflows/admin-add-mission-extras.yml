@@ -1,0 +1,93 @@
+name: Admin - Add tagline + savedSquadFlow to missions
+
+# Adds 3 columns to `missions` table:
+#   - tagline       VARCHAR(255)  品牌定位標語
+#   - subTagline    VARCHAR(255)  品牌定位副標語
+#   - savedSquadFlow TEXT         User-customized squad steps JSON
+#
+# Safe to re-run: uses ADD COLUMN IF NOT EXISTS pattern via INFORMATION_SCHEMA check.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type MIGRATE to add columns (anything else = dry-run DESCRIBE only)'
+        required: true
+        default: 'DRY_RUN'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and apply migration
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+            CONFIRM="${{ github.event.inputs.confirm }}"
+
+            echo "======================================================"
+            echo "Mission Extras Migration (mode=$CONFIRM)"
+            echo "======================================================"
+            echo ""
+            echo "=== Current missions table schema ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "DESCRIBE missions;" 2>&1
+
+            if [ "$CONFIRM" = "MIGRATE" ]; then
+              echo ""
+              echo "=== Applying migration ==="
+
+              # tagline
+              HAS_TAGLINE=$(mysql -N -B -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='missions' AND COLUMN_NAME='tagline';" 2>/dev/null)
+              if [ "$HAS_TAGLINE" = "0" ]; then
+                mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "ALTER TABLE missions ADD COLUMN tagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位標語';" 2>&1
+                echo "  + tagline column added"
+              else
+                echo "  = tagline already exists, skipping"
+              fi
+
+              # subTagline
+              HAS_SUB=$(mysql -N -B -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='missions' AND COLUMN_NAME='subTagline';" 2>/dev/null)
+              if [ "$HAS_SUB" = "0" ]; then
+                mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "ALTER TABLE missions ADD COLUMN subTagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位副標語';" 2>&1
+                echo "  + subTagline column added"
+              else
+                echo "  = subTagline already exists, skipping"
+              fi
+
+              # savedSquadFlow
+              HAS_FLOW=$(mysql -N -B -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$MOS_DB' AND TABLE_NAME='missions' AND COLUMN_NAME='savedSquadFlow';" 2>/dev/null)
+              if [ "$HAS_FLOW" = "0" ]; then
+                mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "ALTER TABLE missions ADD COLUMN savedSquadFlow TEXT DEFAULT NULL COMMENT 'User-customized squad steps JSON';" 2>&1
+                echo "  + savedSquadFlow column added"
+              else
+                echo "  = savedSquadFlow already exists, skipping"
+              fi
+
+              echo ""
+              echo "=== Post-migration schema ==="
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "DESCRIBE missions;" 2>&1
+
+              echo ""
+              echo "=== Restarting pm2 to pick up new Drizzle schema ==="
+              cd /home/azureuser/marketing-os
+              git fetch origin main && git reset --hard origin/main
+              cd skills/ai-talent
+              pm2 restart marketing-os 2>&1 || pm2 restart all 2>&1
+              echo "pm2 restart triggered"
+
+              echo ""
+              echo "======================================================"
+              echo "Migration complete."
+              echo "======================================================"
+            else
+              echo ""
+              echo "DRY_RUN only. Run with confirm=MIGRATE to apply."
+              echo "======================================================"
+            fi

@@ -25,6 +25,7 @@ import { BrandPositioningBook, parsePositioningData } from "./mission-chat/Brand
 import DeliverableBlock, { type DeliverableItem } from "./mission-chat/DeliverableBlock";
 import { BrandBrainStrip } from "./mission-chat/BrandBrainStrip";
 import { CustomSquadDialog } from "./mission-chat/CustomSquadDialog";
+import TaglineBar from "./mission-chat/TaglineBar";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -533,6 +534,11 @@ export default function MissionChatCore({
   const [emailInput, setEmailInput] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  // ── Agent turn counters — cap user-agent back-and-forth at 2 turns per agent ─
+  const MAX_TURNS_PER_AGENT = 2;
+  const [agentTurnCounts, setAgentTurnCounts] = useState<Record<string, number>>({});
+  // Reset turn counters whenever the active mission changes
+  useEffect(() => { setAgentTurnCounts({}); }, [activeMissionId]);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
@@ -988,12 +994,17 @@ export default function MissionChatCore({
 
                 if (data.status === "done") {
                   // Capture step completion data for the continue/reply UI
-                  if (data.hasMoreSteps === true) {
+                  if (data.isSynthesis) {
+                    // Squad Lead 最終整合完成 → 標記流程完成，讓用戶直接與 Squad Lead 討論定案
+                    setSquadStep((prev) => ({ ...prev, isComplete: true }));
+                    // 不顯示 "繼續" banner，讓用戶自由輸入與 Squad Lead 討論
+                    squadHasMoreSteps = false;
+                  } else if (data.hasMoreSteps === true) {
                     squadHasMoreSteps = true;
                     lastRelayStepDoneData = data;
                   } else if (data.hasMoreSteps === false && typeof data.totalSteps === "number") {
-                    // All steps done — mark squad as complete
-                    setSquadStep((prev) => ({ ...prev, currentStep: data.totalSteps + 1, totalSteps: data.totalSteps + 1, isComplete: true }));
+                    // All specialist steps done (synthesis will follow automatically in same SSE)
+                    setSquadStep((prev) => ({ ...prev, currentStep: data.totalSteps, totalSteps: data.totalSteps, isComplete: false }));
                   }
                   // Only update relaySteps for non-squad relay (squad uses message bubbles)
                   if (typeof data.step !== "number") {
@@ -1043,7 +1054,33 @@ export default function MissionChatCore({
                     ]);
                   }
 
-                  if (!isSecondOpinion) {
+                  if (data.isSynthesis) {
+                    // Squad Lead 最終整合 → 新開一個 bubble，不覆蓋 Specialist 的輸出
+                    const synthMsgId = `synthesis-${Date.now()}`;
+                    activeStreamMsgIdRef.current = synthMsgId;
+                    const synthMsg: Msg = {
+                      id: synthMsgId, role: "assistant", content: "", ts: Date.now(),
+                      isStreaming: true,
+                      agentName:   data.agentName  ?? "",
+                      agentTitle:  data.agentTitle  ?? "",
+                      agentAvatar: data.agentAvatar ?? null,
+                      agentRole:   "squad_lead",
+                      agentSkill:  data.agentSkill  ?? "",
+                      agentModel:  data.agentModel  ?? "",
+                      isSquadLead: true,
+                      squadStep:        data.step,
+                      squadTotalSteps:  data.totalSteps,
+                      squadStepLabel:   data.label ?? "最終整合建議",
+                    };
+                    setConversations((prev) => prev.map((c) => c.id === convId
+                      ? { ...c, messages: [...c.messages, synthMsg] }
+                      : c
+                    ));
+                    // 更新 Squad Lead 身份顯示
+                    if (data.agentName) { lastAgentName = data.agentName; setStreamingAgentName(data.agentName); }
+                    if (data.agentTitle) { lastAgentTitle = data.agentTitle; setStreamingAgentTitle(data.agentTitle); }
+                    if (data.label) { setCurrentStepLabel(data.label); }
+                  } else if (!isSecondOpinion) {
                     const curId = activeStreamMsgIdRef.current;
                     setConversations((prev) => prev.map((c) => c.id === convId
                       ? { ...c, messages: c.messages.map((m) => m.id === curId
@@ -1316,9 +1353,29 @@ export default function MissionChatCore({
     setPendingTask("");
   };
 
+  // Derive the current "active agent key" — the agent the next user message will reply to.
+  // Falls back to "squad-lead" before any specialist step has begun.
+  const currentAgentKey = (() => {
+    const running = squadStepProgress.find((s) => s.status === "running");
+    if (running?.agentName) return running.agentName;
+    const lastDone = [...squadStepProgress].reverse().find((s) => s.status === "done");
+    if (lastDone?.agentName) return lastDone.agentName;
+    return "squad-lead";
+  })();
+  const currentAgentTurns = agentTurnCounts[currentAgentKey] ?? 0;
+  const turnsLeft = MAX_TURNS_PER_AGENT - currentAgentTurns;
+  const isAtTurnLimit = turnsLeft <= 0;
+
   const handleSend = async () => {
     const rawText = input.trim();
     if (!rawText || loading) return;
+    // Enforce per-agent 2-turn discussion cap
+    if (isAtTurnLimit) return;
+    // Increment turn counter for the agent this message targets
+    setAgentTurnCounts((prev) => ({
+      ...prev,
+      [currentAgentKey]: (prev[currentAgentKey] ?? 0) + 1,
+    }));
 
     // First-message: persist selected squad
     const active = conversations.find((c) => c.id === activeId);
@@ -2563,6 +2620,41 @@ export default function MissionChatCore({
           onClose={() => setMentionAnchorRect(null)}
         />
 
+        {/* Tagline / sub-tagline strip — brand positioning surface */}
+        {activeMissionId && (
+          <TaglineBar
+            missionId={activeMissionId}
+            tagline={(missionDataQuery.data as any)?.tagline ?? null}
+            subTagline={(missionDataQuery.data as any)?.subTagline ?? null}
+            onUpdate={async (tagline, subTagline) => {
+              if (!activeMissionId) return;
+              await updateMission.mutateAsync({
+                id: activeMissionId,
+                tagline,
+                subTagline,
+              });
+              missionDataQuery.refetch();
+            }}
+          />
+        )}
+
+        {/* Per-agent turn-limit notice */}
+        {isAtTurnLimit && (
+          <div style={{
+            fontSize: 11,
+            color: "#92400E",
+            background: "#FFFBEB",
+            border: "1px solid #FDE68A",
+            borderRadius: 8,
+            padding: "6px 10px",
+            marginBottom: 6,
+            lineHeight: 1.5,
+          }}>
+            已達與 <strong>{currentAgentKey}</strong> 的互動上限（{MAX_TURNS_PER_AGENT} 次）。
+            請儲存目前流程，或繼續下一步驟。
+          </div>
+        )}
+
         {/* Input box */}
         <div
           style={{
@@ -2600,7 +2692,7 @@ export default function MissionChatCore({
                 : "選擇品牌後開始輸入任務…"
             }
             rows={1}
-            disabled={loading}
+            disabled={loading || isAtTurnLimit}
             style={{
               flex: 1,
               resize: "none",
@@ -2625,16 +2717,16 @@ export default function MissionChatCore({
           )}
           <button
             onClick={handleSend}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || isAtTurnLimit}
             style={{
               flexShrink: 0,
               width: 32, height: 32,
               borderRadius: 8,
-              background: input.trim() && !loading ? "#1A1A18" : "#E4E3E1",
+              background: input.trim() && !loading && !isAtTurnLimit ? "#1A1A18" : "#E4E3E1",
               border: "none",
-              color: input.trim() && !loading ? "white" : "#9B9990",
+              color: input.trim() && !loading && !isAtTurnLimit ? "white" : "#9B9990",
               display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: input.trim() && !loading ? "pointer" : "default",
+              cursor: input.trim() && !loading && !isAtTurnLimit ? "pointer" : "default",
               transition: "all 0.15s",
             }}
           >

@@ -4,28 +4,45 @@
  * Auto-expands textarea up to 5 rows.
  * Claude-style warm design with amber send button.
  */
-import { useState, useRef, type KeyboardEvent } from "react";
+import React, { useState, useRef, type KeyboardEvent } from "react";
 
 interface Props {
   onSend: (text: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** Fired once per typing session when the user types an '@' character.
+   *  Used by AppShell to bump the "協作成員" section to the top of the right panel. */
+  onAtMention?: () => void;
 }
 
-export default function ChatInput({ onSend, placeholder = "告訴我你想為「SoWork.ai」完成什麼任務...", disabled }: Props) {
+export default function ChatInput({ onSend, placeholder = "告訴我你想為「SoWork.ai」完成什麼任務...", disabled, onAtMention }: Props) {
   const [value, setValue] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const atFiredRef = useRef(false);
 
   const submit = () => {
     const text = value.trim();
     if (!text || disabled) return;
     onSend(text);
     setValue("");
+    atFiredRef.current = false;
     if (ref.current) ref.current.style.height = "auto";
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const next = e.target.value;
+    setValue(next);
+    // Fire onAtMention once per session when '@' first appears
+    if (!atFiredRef.current && next.includes("@") && onAtMention) {
+      atFiredRef.current = true;
+      onAtMention();
+    } else if (!next.includes("@")) {
+      atFiredRef.current = false;
+    }
   };
 
   const onInput = () => {
@@ -40,7 +57,7 @@ export default function ChatInput({ onSend, placeholder = "告訴我你想為「
         ref={ref}
         rows={1}
         value={value}
-        onChange={e => setValue(e.target.value)}
+        onChange={handleChange}
         onKeyDown={onKey}
         onInput={onInput}
         placeholder={placeholder}
