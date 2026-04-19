@@ -46,13 +46,16 @@ jobs:
             $MYSQL "SELECT id, email, name, isActive FROM users WHERE id = $UID_IN;" 2>&1
 
             echo ""
+            echo "=== brand_members 表結構 ==="
+            $MYSQL "DESCRIBE brand_members;" 2>&1
+
+            echo ""
             echo "=== userId=$UID_IN 在 brand_members 的身份 ==="
             $MYSQL "
-              SELECT bm.brandId, b.name AS brand_name, bm.role, bm.createdAt
+              SELECT bm.brandId, b.name AS brand_name, bm.role
               FROM brand_members bm
               LEFT JOIN brands b ON b.id = bm.brandId
-              WHERE bm.userId = $UID_IN
-              ORDER BY bm.createdAt DESC;
+              WHERE bm.userId = $UID_IN;
             " 2>&1
 
             echo ""
