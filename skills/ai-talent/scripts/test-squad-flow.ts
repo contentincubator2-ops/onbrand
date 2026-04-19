@@ -545,9 +545,13 @@ function printReport(results: RunResult[]) {
       t.scores.isActualA2A           ? "🔀A2A" : "⚠️SameAgent",
       t.scores.replyToSameAgent      ? "" : t.label.includes("reply") ? "❌ WrongAgent" : "",
     ].filter(Boolean).join(" ");
-    const preview = t.content.slice(0, 110).replace(/\n/g, " ");
-    console.log(`  ${t.label.padEnd(52)} ${t.agentName.padEnd(18)} ${flags}`);
-    console.log(`    "${preview}…"`);
+    console.log(`\n${"═".repeat(80)}`);
+    console.log(`  ${t.label}`);
+    console.log(`  Agent: ${t.agentName}  |  Model: ${t.agentModel}  |  Step: ${t.step}  |  ${flags}`);
+    console.log(`  字數: ${t.content.length}  |  耗時: ${(t.scores.timeMs/1000).toFixed(1)}s  |  Score: ${t.totalScore}`);
+    console.log("─".repeat(80));
+    console.log(t.content);
+    console.log("─".repeat(80));
   }
 
   // ── 優化建議 ──
