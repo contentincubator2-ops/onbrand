@@ -3232,8 +3232,6 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
           </div>
         </div>
 
-        <BrandPositioningBar brandId={selectedBrandId} />
-
         {/* Children slot (chat/content area) or Exports panel */}
         <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           {railTab === "outputs"

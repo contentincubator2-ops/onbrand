@@ -22,9 +22,8 @@ import { PositioningBar } from "./mission-chat/PositioningBar";
 import { MarkdownRenderer } from "./mission-chat/MarkdownRenderer";
 import { BrandPositioningBook, parsePositioningData } from "./mission-chat/BrandPositioningBook";
 import DeliverableBlock, { type DeliverableItem } from "./mission-chat/DeliverableBlock";
-import { BrandBrainStrip } from "./mission-chat/BrandBrainStrip";
 import { CustomSquadDialog } from "./mission-chat/CustomSquadDialog";
-import TaglineBar from "./mission-chat/TaglineBar";
+import BrandIntelligenceBar from "./mission-chat/BrandIntelligenceBar";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -1803,9 +1802,19 @@ export default function MissionChatCore({
         </div>
       )}
 
-      {/* ── Brand Brain Strip — persistent context bar ── */}
+      {/* ── Brand Intelligence Bar — unified positioning + brain + tagline strip ── */}
       {activeMissionId && activeBrand?.id && (
-        <BrandBrainStrip brandId={activeBrand.id} missionId={activeMissionId} />
+        <BrandIntelligenceBar
+          brandId={activeBrand.id}
+          missionId={activeMissionId}
+          tagline={(missionDataQuery.data as any)?.tagline ?? null}
+          subTagline={(missionDataQuery.data as any)?.subTagline ?? null}
+          onUpdate={async (tagline, subTagline) => {
+            if (!activeMissionId) return;
+            await updateMission.mutateAsync({ id: activeMissionId, tagline, subTagline });
+            missionDataQuery.refetch();
+          }}
+        />
       )}
 
       {/* ── Messages scroll area ── */}
@@ -2591,24 +2600,6 @@ export default function MissionChatCore({
           onSelect={handleMentionSelect}
           onClose={() => setMentionAnchorRect(null)}
         />
-
-        {/* Tagline / sub-tagline strip — brand positioning surface */}
-        {activeMissionId && (
-          <TaglineBar
-            missionId={activeMissionId}
-            tagline={(missionDataQuery.data as any)?.tagline ?? null}
-            subTagline={(missionDataQuery.data as any)?.subTagline ?? null}
-            onUpdate={async (tagline, subTagline) => {
-              if (!activeMissionId) return;
-              await updateMission.mutateAsync({
-                id: activeMissionId,
-                tagline,
-                subTagline,
-              });
-              missionDataQuery.refetch();
-            }}
-          />
-        )}
 
         {/* Input box */}
         <div
