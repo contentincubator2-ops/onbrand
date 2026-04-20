@@ -45,7 +45,7 @@ import sgMail from "@sendgrid/mail";
 import { writeBrandBrainEntry } from "./brandBrainRoute";
 import { recordMissionExport } from "./exportsRoute";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
-import { getOrCreateSquadSession, saveStepAndAdvance, saveStepResultOnly, advanceToNextStep, resetSquadSession } from "../_core/squadSessionManager";
+import { getOrCreateSquadSession, saveStepResultOnly, advanceToNextStep, resetSquadSession } from "../_core/squadSessionManager";
 import { buildSquadAgentPrompt, buildSecondOpinionPrompt, buildLeadSynthesisPrompt } from "../_core/agentPromptBuilder";
 
 export const missionChatRouter = Router();
@@ -452,7 +452,7 @@ async function tryExecuteSquadChat(params: {
 
   // ── 3a. 處理「awaiting_reply」狀態 ─────────────────────────────────────────
   // 用戶可以選擇：回覆當前 Agent（繼續對話）或說「繼續」跳到下一步
-  const isContinueSignal = /^(繼續|继续|continue|next|下一步|go|yes|ok|好的|好|開始|开始)$/i.test(userMessage.trim());
+  const isContinueSignal = /^(繼續|继续|continue|next|下一步|go|yes|ok|好的|好|開始|开始|確認|确认|confirm|派遣|開始執行|执行)$/i.test(userMessage.trim());
 
   if (session.status === "awaiting_reply") {
     if (isContinueSignal) {
@@ -500,12 +500,13 @@ async function tryExecuteSquadChat(params: {
   // internally but presents a unified face to the client.
 
   // 4a. 永遠拿 Squad Lead 的資料（對話主體）
+  // Fetch methodology so Lead agents with custom Mode B system prompts override buildSquadAgentPrompt
   let leadAgentDetail: any = null;
   const leadId = leadSlot?.agent_id ?? fallbackLeadAgentId;
   if (leadId) {
     try {
       const [lRows] = await localPool.execute(
-        `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill
+        `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill, methodology
          FROM agents WHERE id = ? LIMIT 1`,
         [leadId]
       ) as any[];
@@ -603,36 +604,56 @@ async function tryExecuteSquadChat(params: {
   });
 
   // ── 8. 建構 system prompt（品牌 + workspace + mission + 步驟任務）───────────
-  const systemPrompt = buildSquadAgentPrompt({
-    agent: {
-      name:      agentName,   // always Lead
-      title:     agentTitle,  // always Lead
-      specialty: leadAgentDetail?.specialty,
-      aiModel:   leadAgentDetail?.aiModel,
-    },
-    // Specialist skill framework injected into Lead's context (non-lead steps only)
-    // Includes full skill documentation: methodology + tool_instructions
-    specialistContext: specialistDetail ? {
-      name:             specialistDetail.name,
-      title:            specialistDetail.title,
-      specialty:        specialistDetail.specialty ?? "",
-      skill:            specialistDetail.primarySkill ?? "",
-      methodology:      specialistDetail.methodology ?? "",
-      toolInstructions: specialistDetail.tool_instructions ?? "",
-    } : undefined,
-    brand,
-    workspace:       workspace ?? "strategy",
-    missionTitle,
-    squadName,
-    squadMethodology,
-    agentRole:       currentSlot?.role ?? agentTitle,
-    workflowStep,
-    stepIndex:       currentStep,
-    totalSteps,
-    previousResults: session.stepResults,
-    brandBrain,
-    isLead:          isLeadStep,
-  });
+  //
+  // Mode B architecture: when a Squad Lead has a custom methodology field (e.g. Mary Allen),
+  // use it as the complete system prompt for intake steps. Brand context is prepended so the
+  // Lead has full situational awareness. This replaces buildSquadAgentPrompt for lead steps only.
+  // Discussion mode always uses buildSquadAgentPrompt (the Lead is synthesizing, not doing intake).
+  const hasLeadMethodology = isLeadStep && !isDiscussionMode && (leadAgentDetail?.methodology ?? "").trim().length > 0;
+
+  const systemPrompt = hasLeadMethodology
+    ? [
+        "【任務背景】",
+        `任務名稱：${missionTitle}`,
+        `工作區：${workspace ?? "strategy"}`,
+        `小組：${squadName}`,
+        "",
+        formatBrandCtx(brand),
+        "",
+        "─".repeat(40),
+        "",
+        leadAgentDetail.methodology,
+      ].join("\n")
+    : buildSquadAgentPrompt({
+        agent: {
+          name:      agentName,   // always Lead
+          title:     agentTitle,  // always Lead
+          specialty: leadAgentDetail?.specialty,
+          aiModel:   leadAgentDetail?.aiModel,
+        },
+        // Specialist skill framework injected into Lead's context (non-lead steps only)
+        // Includes full skill documentation: methodology + tool_instructions
+        specialistContext: specialistDetail ? {
+          name:             specialistDetail.name,
+          title:            specialistDetail.title,
+          specialty:        specialistDetail.specialty ?? "",
+          skill:            specialistDetail.primarySkill ?? "",
+          methodology:      specialistDetail.methodology ?? "",
+          toolInstructions: specialistDetail.tool_instructions ?? "",
+        } : undefined,
+        brand,
+        workspace:       workspace ?? "strategy",
+        missionTitle,
+        squadName,
+        squadMethodology,
+        agentRole:       currentSlot?.role ?? agentTitle,
+        workflowStep,
+        stepIndex:       currentStep,
+        totalSteps,
+        previousResults: session.stepResults,
+        brandBrain,
+        isLead:          isLeadStep,
+      });
 
   // ── 9. 串流 LLM 回應 ────────────────────────────────────────────────────────
   // A2A Handoff: non-lead steps receive previous agent's output as explicit handoff
@@ -692,17 +713,29 @@ async function tryExecuteSquadChat(params: {
       } catch (e2: any) {
         console.warn("[squadChat] openclaw/pm also failed:", e2?.message);
         // Final fallback: direct invokeLLMStream
-        for await (const chunk of streamFromLLM(systemPrompt, [], userMessage)) {
+        for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
           fullOutput += chunk;
           send("delta", { text: chunk });
         }
       }
     } else {
       // Already used pm, go direct
-      for await (const chunk of streamFromLLM(systemPrompt, [], userMessage)) {
+      for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
         fullOutput += chunk;
         send("delta", { text: chunk });
       }
+    }
+  }
+
+  // ── Empty output guard ──────────────────────────────────────────────────────
+  // Gateway sometimes returns HTTP 200 with a valid SSE stream but zero content tokens
+  // (silent empty response). This is NOT an error so the catch block above doesn't fire.
+  // Detect it here and fall back to invokeLLMStream to guarantee a response.
+  if (!fullOutput.trim()) {
+    console.warn(`[squadChat] Gateway returned empty content (model=${agentModel}, step=${currentStep}). Falling back to invokeLLMStream...`);
+    for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
+      fullOutput += chunk;
+      send("delta", { text: chunk });
     }
   }
 
@@ -712,8 +745,10 @@ async function tryExecuteSquadChat(params: {
     // 只記錄輸出（不改變 currentStep / status）
     // no DB write needed for discussion turns
   } else if (isLeadStep) {
-    // Squad Lead intake: advance automatically (keeps old behavior for step 0 → 1)
-    await saveStepAndAdvance(localPool as any, missionId, currentStep, fullOutput, totalSteps);
+    // Mode B: Squad Lead intake — save result but DON'T auto-advance.
+    // The Lead (e.g. Mary Allen) confirms with user before dispatching specialists.
+    // User must send a continue signal (「繼續」「好的」「確認」「開始」etc.) to advance to step 1.
+    await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput);
   } else {
     // Execution steps: save result but WAIT for user to explicitly continue
     await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput);
@@ -722,15 +757,20 @@ async function tryExecuteSquadChat(params: {
   const isLastStep = currentStep >= totalSteps;
   send("relay_step", {
     id: currentStep, status: "done",
+    label: stepLabel,           // completed step label (e.g. "任務確認" for step 0)
     agentName, agentTitle,
     agentSkill, agentModel,
     summary: fullOutput.slice(0, 400),
     totalSteps,
-    hasMoreSteps: !isLeadStep && !isLastStep,
+    // Lead step (step 0): always has more steps (the specialist execution steps follow).
+    // Execution steps: check if this is the final specialist step.
+    hasMoreSteps: isLeadStep ? (totalSteps > 0) : !isLastStep,
     isLastStep,
     nextStepIndex: currentStep + 1,
-    // Tell client to show "continue" button — user must explicitly advance
-    waitForUser: !isLeadStep,
+    // Always show "continue" button — user must explicitly advance every step.
+    // Lead step: user confirms dispatch before specialist 1 executes.
+    // Execution steps: user confirms before next specialist executes.
+    waitForUser: true,
   });
 
   // ── 11. Squad Lead 最終整合（最後一步完成後自動觸發，僅執行一次）──────────

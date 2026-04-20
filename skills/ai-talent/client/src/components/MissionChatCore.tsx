@@ -520,6 +520,7 @@ export default function MissionChatCore({
   const [awaitingStepInfo, setAwaitingStepInfo] = useState<{
     agentName: string; agentTitle: string; agentSkill: string; agentModel: string;
     nextStep: number; totalSteps: number;
+    completedLabel?: string | null; // label of the completed step (e.g. "任務確認")
   } | null>(null);
   // ── PositioningBar state ──────────────────────────────────────────────────
   const [positioningBarText, setPositioningBarText] = useState<string | null>(null);
@@ -1227,12 +1228,13 @@ export default function MissionChatCore({
         // Show "continue or reply" banner — don't auto-advance
         setAwaitingStepReply(true);
         setAwaitingStepInfo({
-          agentName:  lastRelayStepDoneData?.agentName  ?? streamingAgentName  ?? "",
-          agentTitle: lastRelayStepDoneData?.agentTitle ?? streamingAgentTitle ?? "",
-          agentSkill: lastRelayStepDoneData?.agentSkill ?? "",
-          agentModel: lastRelayStepDoneData?.agentModel ?? "",
-          nextStep:   lastRelayStepDoneData?.nextStepIndex ?? 1,
-          totalSteps: lastRelayStepDoneData?.totalSteps ?? 1,
+          agentName:      lastRelayStepDoneData?.agentName  ?? streamingAgentName  ?? "",
+          agentTitle:     lastRelayStepDoneData?.agentTitle ?? streamingAgentTitle ?? "",
+          agentSkill:     lastRelayStepDoneData?.agentSkill ?? "",
+          agentModel:     lastRelayStepDoneData?.agentModel ?? "",
+          nextStep:       lastRelayStepDoneData?.nextStepIndex ?? 1,
+          totalSteps:     lastRelayStepDoneData?.totalSteps ?? 1,
+          completedLabel: lastRelayStepDoneData?.label ?? null, // e.g. "任務確認" for lead step
         });
         setLoading(false);
       } else {
@@ -2037,7 +2039,9 @@ export default function MissionChatCore({
                     </span>
                   )}
                   <span style={{ fontSize: 10, color: "#9B9990", padding: "1px 4px" }}>
-                    Step {awaitingStepInfo.nextStep - 1} 完成 · 共 {awaitingStepInfo.totalSteps} 步
+                    {awaitingStepInfo.completedLabel
+                      ? `${awaitingStepInfo.completedLabel} 完成 · 共 ${awaitingStepInfo.totalSteps} 步`
+                      : `Step ${awaitingStepInfo.nextStep - 1} 完成 · 共 ${awaitingStepInfo.totalSteps} 步`}
                   </span>
                 </div>
               </div>

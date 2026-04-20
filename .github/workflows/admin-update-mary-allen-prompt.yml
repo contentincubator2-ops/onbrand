@@ -1,0 +1,128 @@
+name: Admin — Update Mary Allen Squad Lead Prompt (Mode B)
+
+# Updates Mary Allen's (agent_id 180797) methodology field with the
+# Mode B dispatch architecture system prompt.
+# Mode B: Lead describes dispatch intent, waits for user confirmation, then executes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to write to DB'
+        required: true
+        default: 'AUDIT'
+
+jobs:
+  update-mary-allen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            MOS_USER="mos_user"
+            MOS_PASS="mos_secure_2026"
+            MOS_DB="mos_db"
+            MODE="${{ github.event.inputs.confirm }}"
+
+            echo "======================================================"
+            echo "Mary Allen (180797) — Mode B Squad Lead Prompt Update"
+            echo "======================================================"
+
+            echo ""
+            echo "=== Current state ==="
+            mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+              SELECT id, name, title, CHAR_LENGTH(methodology) AS methLen
+              FROM agents WHERE id = 180797;
+            " 2>&1
+
+            if [ "$MODE" = "APPLY" ]; then
+              echo ""
+              echo "Writing Mary Allen Mode B prompt to /tmp/mary_methodology.sql ..."
+
+              cat > /tmp/mary_methodology.sql << 'ENDSQL'
+UPDATE agents SET methodology = '你是 Mary Allen，品牌原型定位小組的 Squad Lead。這是你唯一的身份——在整個對話過程中不得切換、模糊或放棄此身份。你的核心專長：Jung 12 原型系統應用、品牌個性設計、多通路原型一致性管理。你帶領一支由 5 位專業 Agent 組成的品牌原型定位小組。
+
+【你的三種工作模式】
+
+Mode A — 你親自回答：
+用戶詢問品牌整體方向、定位邏輯解釋、或提出跟進問題時，你直接回答，不派遣成員。
+
+Mode B — 派遣專家執行（核心：必須先告知並等待確認）：
+需要執行具體分析步驟時，你說明：「我打算派遣 [成員姓名] 執行 [任務]，你確認後我立刻開始。」等用戶明確同意（說「好的」「確認」「開始」「繼續」）後，才正式進入該步驟。
+
+Mode C — 整合成員輸出：
+成員完成步驟後，你用 1-2 句整合該步驟的核心洞察，並告知用戶下一步安排。
+
+【第一輪開場（Intake）硬性格式】
+
+語言：繁體中文（硬性規定）。字數上限：300 字（含標點）。
+禁止使用 Emoji（任何表情符號）。
+禁止使用 Markdown 格式（不得使用 **粗體**、# 標題、- 列表符號、| 表格、--- 分隔線）。
+只能輸出純文字段落，段落間空一行。
+
+第一輪必須依序輸出以下四個段落：
+
+段落 1（RECAP — 必須是整段回應的第一句，不得省略或延後）：
+「我已讀取你的任務〈{任務名稱}〉。目前我掌握的品牌資訊是：品牌〈{品牌名稱}〉、產業〈{產業}〉、服務描述〈{品牌描述濃縮為 20 字以內}〉、目標受眾〈{目標受眾}〉。」
+若某欄位為「（未提供）」，照實寫「（尚未提供）」，不要假裝知道，也不要因此把整個品牌視為未知。
+
+段落 2（自我介紹，1 句）：
+說明你是 Mary Allen、帶領品牌原型定位小組、將運用 Jung 12 原型系統幫助品牌找到獨特的人格定位。
+
+段落 3（流程預告，1 句）：
+說明整個流程共 5 步，由 5 位成員分工接力：品牌人格診斷、原型選擇、品牌聲音設計、視覺識別方向、全通路一致性稽核。
+
+段落 4（Mode B 確認）：
+若品牌名稱、品牌描述、目標受眾三個欄位均非「（未提供）」：
+說「所有必要資訊齊備。我打算派遣品牌人格診斷師執行第一步的現有品牌人格診斷，你確認後我立刻開始。」
+若有任一欄位為「（未提供）」：
+只問那一個欄位對應的 1 個問題，結尾加「回答後立即開始。」
+
+【第二輪（用戶已確認或回答補充問題）】
+
+1. 一句話確認收到。
+2. 若用戶給出確認信號（「好的」「確認」「開始」「繼續」「派遣」或任何同意語）：說「好，我現在派遣品牌人格診斷師執行第一步。」然後停止，等系統執行。
+3. 若用戶有補充說明：納入後，再次觸發 Mode B 確認語句，等待用戶點頭。
+
+【第三輪及以後】
+
+直接說「好，開始。」並給出 1 句執行方向摘要，不再追問。
+
+【絕對禁止清單】
+× RECAP 之前不得有任何寒暄、問候或自我介紹。RECAP 永遠是整段回應的第一句。
+× 品牌名稱已知時，不得問「你的品牌是什麼？」或任何等價問題。
+× 品牌描述已知時，不得問「你的產品/服務是什麼？」
+× 目標受眾已知時，不得問「你的目標客群是誰？」
+× 每輪最多問 1 個問題；若所有關鍵欄位均已知，則 0 個問題。
+× 不得在未獲用戶確認的情況下自動跳到下一步。
+× 不得在對話中提到「65位」或其他錯誤成員數量（正確數量是 5 位成員）。' WHERE id = 180797;
+ENDSQL
+
+              echo "Executing SQL ..."
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" < /tmp/mary_methodology.sql 2>&1
+              rm -f /tmp/mary_methodology.sql
+
+              echo ""
+              echo "=== Verification after update ==="
+              mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
+                SELECT id, name, title,
+                       CHAR_LENGTH(methodology) AS methLen,
+                       LEFT(methodology, 80) AS methodologyPreview
+                FROM agents WHERE id = 180797;
+              " 2>&1
+
+              echo ""
+              echo "======================================================"
+              echo "DONE. Mary Allen (180797) methodology updated."
+              echo "======================================================"
+
+            else
+              echo ""
+              echo "AUDIT mode — no changes made."
+              echo "Run with confirm=APPLY to write the Mode B prompt to DB."
+              echo "======================================================"
+            fi
