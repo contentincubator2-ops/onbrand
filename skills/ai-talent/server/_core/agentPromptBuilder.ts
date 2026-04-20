@@ -785,8 +785,16 @@ export interface WorkflowStepDef {
   requiredSkills?: string[];
 }
 
+export interface SpecialistContext {
+  name: string;
+  title: string;
+  specialty: string;
+  skill: string;
+}
+
 export interface SquadPromptInput {
   agent: AgentIdentity;
+  specialistContext?: SpecialistContext; // Skill framework injected into Lead's context
   brand: BrandContext;
   workspace: string;
   missionTitle: string;
@@ -805,15 +813,15 @@ export interface SquadPromptInput {
 // ── 主函數 ────────────────────────────────────────────────────────────────────
 export function buildSquadAgentPrompt(input: SquadPromptInput): string {
   const {
-    agent, brand, workspace, missionTitle, squadName, squadMethodology,
+    agent, specialistContext, brand, workspace, missionTitle, squadName, squadMethodology,
     agentRole, workflowStep, stepIndex, totalSteps,
     previousResults, brandBrain, isLead,
   } = input;
 
   const wsDesc = WORKSPACE_DESCRIPTIONS[workspace] ?? `${workspace} 工作區`;
 
-  // 1. 身份宣告（必須在 prompt 最頂部，含身份鎖定語）
-  const identity = buildIdentityBlock(agent, squadName, agentRole, squadMethodology);
+  // 1. 身份宣告（Squad Lead 永遠是對話主體；Specialist 只是技能框架）
+  const identity = buildIdentityBlock(agent, squadName, agentRole, squadMethodology, specialistContext);
 
   // 2. 工作區域
   const workspaceSection = `【工作區域】\n${wsDesc}`;
@@ -838,6 +846,7 @@ export function buildSquadAgentPrompt(input: SquadPromptInput): string {
     isLead, stepIndex, totalSteps,
     squadMethodology,
     workflowStep.outputType ?? workflowStep.output,
+    specialistContext,
   );
 
   const sections = [
@@ -868,14 +877,26 @@ function buildIdentityBlock(
   squadName: string,
   agentRole: string,
   squadMethodology: string,
+  specialistContext?: SpecialistContext,
 ): string {
   const lines = [
-    `你是 ${agent.name}，${agent.title}。這是你唯一的身份——在整個回應過程中不得切換、模糊或放棄此身份。`,
+    `你是 ${agent.name}，${agent.title}。這是你唯一的身份——在整個對話過程中不得切換、模糊或放棄此身份。`,
     agent.specialty
-      ? `核心專長（你的每一句分析都必須從這個專業角度出發，不得說成通用行銷建議）：${agent.specialty}`
+      ? `你的核心專長：${agent.specialty}`
       : null,
     `你在「${squadName}」小組的角色：${agentRole}。`,
     squadMethodology ? `小組方法論：${squadMethodology}` : null,
+    // When a specialist skill framework is being applied, tell the Lead it's their internal tool
+    specialistContext
+      ? [
+          ``,
+          `【本步驟啟用的技能框架】`,
+          `你正在運用你內建的「${specialistContext.skill || specialistContext.name}」技能框架（${specialistContext.title}）執行本步驟分析。`,
+          specialistContext.specialty ? `此框架的分析角度：${specialistContext.specialty}` : null,
+          `重要：你始終以 ${agent.name} 的身份發言，以第一人稱直接呈現分析結果。`,
+          `不得說「讓我交給...」「由...來負責」「根據...Agent」等切換身份的語句。`,
+        ].filter(Boolean).join("\n")
+      : null,
     `嚴格禁止：不得以旁白者、協調者或「群組總結者」身份發言；不得在輸出中致謝、引用、或回應其他 Agent 的名字或輸出內容。`,
   ].filter(Boolean);
   return lines.join("\n");
@@ -892,10 +913,13 @@ function buildBrandSection(brand: BrandContext): string {
     `品牌名稱：${val(brand.name)}`,
     `產業：${val(brand.industry)}`,
     `品牌描述：${val(brand.description)}`,
-    `目標受眾：${val(brand.targetAudience)}`,
     `品牌標語：${val(brand.tagline)}`,
-    `品牌聲音：${val(brand.brandVoice)}`,
-    `現有定位摘要：${val(brand.positioningSummary)}`,
+    `品牌定位：${val((brand as any).valueProposition ?? brand.positioningSummary)}`,
+    `目標市場：${val((brand as any).targetMarket ?? brand.targetAudience)}`,
+    `受眾A：${val((brand as any).audienceA)}`,
+    `受眾B：${val((brand as any).audienceB)}`,
+    `情感差異化：${val((brand as any).emotionalDiff)}`,
+    `功能差異化：${val((brand as any).functionalDiff)}`,
     `官網：${val(brand.website)}`,
   ].join("\n");
 }
@@ -1003,6 +1027,7 @@ function buildBehaviorGuide(
   totalSteps: number,
   squadMethodology?: string,
   outputType?: string,
+  specialistContext?: SpecialistContext,
 ): string {
   // ── Squad Lead 開場 Intake ─────────────────────────────────────────────────
   if (isLead && stepIndex === 0) {
@@ -1094,10 +1119,17 @@ function buildBehaviorGuide(
     ? METHODOLOGY_STEP_FORMATS[methodologyStepKey]
     : null;
 
+  const skillLabel = specialistContext
+    ? `「${specialistContext.skill || specialistContext.name}」技能框架`
+    : "本步驟分析框架";
+
   const baseGuide = [
     "【執行指引 — 執行步驟】",
     "語言：繁體中文（硬性規定）。",
     `字數上限：${methodologyStepFormat ? "800" : "600"} 字。超過即截止。不得加「補充說明」「注意事項」或「附錄」區塊。`,
+    "【聲音一致性規定】你始終以 Squad Lead 身份說話，使用第一人稱「我」直接呈現分析結果。",
+    `禁止說：「讓我交給...」「由...負責」「下一位同事」「根據其他 Agent」等切換身份的語句。`,
+    `本步驟你正在運用 ${skillLabel} 進行深度分析，直接以你的聲音呈現結論。`,
     "禁止開頭語：不得以「好的」「根據 Group Chat Context」「根據以上分析」「根據 Squad Lead」「首先，讓我」「作為 [任何角色名稱]」「我來幫您」開頭。",
     "輸出規則：",
     "  1. 你的回應第一個字符必須是 Markdown 二級標題（## 開頭）。直接輸出分析，零過渡詞。",
@@ -1117,7 +1149,7 @@ function buildBehaviorGuide(
     baseGuide.push(
       `  5. 結尾固定格式（兩行，不得省略）：`,
       `     ---`,
-      `     **下一步**：Step ${stepIndex + 1} 將由 [下一步執行者角色] 負責 [一句話說明任務]。`,
+      `     **下一步**：我接下來將進行 [一句話說明下一步分析方向]。`,
       `     **確認問題**：[針對你剛才輸出內容的 1 個具體確認問題，不得是開放泛問]`,
     );
   }

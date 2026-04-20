@@ -493,32 +493,61 @@ async function tryExecuteSquadChat(params: {
                ?? null;
   }
 
-  // ── 4. 讀取 agent 詳細資料 ──────────────────────────────────────────────────
-  let agentDetail: any = null;
-  const agentIdToFetch = currentSlot?.agent_id ?? fallbackLeadAgentId;
-  if (agentIdToFetch) {
+  // ── 4. 讀取 agent 詳細資料 ─────────────────────────────────────────────────
+  // Design: Squad Lead is ALWAYS the speaking voice throughout the conversation.
+  // Specialist agents are "skill frameworks" injected into the Lead's context —
+  // they are NOT separate personas. This mirrors how a real lead delegates
+  // internally but presents a unified face to the client.
+
+  // 4a. 永遠拿 Squad Lead 的資料（對話主體）
+  let leadAgentDetail: any = null;
+  const leadId = leadSlot?.agent_id ?? fallbackLeadAgentId;
+  if (leadId) {
     try {
-      const [aRows] = await localPool.execute(
+      const [lRows] = await localPool.execute(
         `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill
          FROM agents WHERE id = ? LIMIT 1`,
-        [agentIdToFetch]
+        [leadId]
       ) as any[];
-      agentDetail = (aRows as any[])?.[0] ?? null;
-      console.log(`[squadChat] Agent detail: name=${agentDetail?.name}, model=${agentDetail?.aiModel}`);
+      leadAgentDetail = (lRows as any[])?.[0] ?? null;
     } catch (e: any) {
-      console.warn("[squadChat] agent fetch:", e?.message);
+      console.warn("[squadChat] lead agent fetch:", e?.message);
     }
   }
 
-  const agentName   = agentDetail?.name        ?? (squadName + " Agent");
-  const agentTitle  = agentDetail?.title       ?? currentSlot?.role ?? "";
-  const agentAvatar = agentDetail?.avatarUrl   ?? null;
-  const agentSkill  = agentDetail?.primarySkill ?? "";
-  // Normalize aiModel → gateway format "openclaw/{slug}"
-  const rawModel    = agentDetail?.aiModel ?? "";
-  const agentModel  = rawModel
+  // 4b. 本步驟 Specialist（技能框架注入，非對話主體）
+  let specialistDetail: any = null;
+  if (!isLeadStep) {
+    const specId = currentSlot?.agent_id;
+    if (specId && specId !== leadId) {
+      try {
+        const [sRows] = await localPool.execute(
+          `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill
+           FROM agents WHERE id = ? LIMIT 1`,
+          [specId]
+        ) as any[];
+        specialistDetail = (sRows as any[])?.[0] ?? null;
+      } catch (e: any) {
+        console.warn("[squadChat] specialist agent fetch:", e?.message);
+      }
+    }
+  }
+
+  // Squad Lead is always the speaking voice
+  const agentName   = leadAgentDetail?.name   ?? (squadName + " Lead");
+  const agentTitle  = leadAgentDetail?.title  ?? "Squad Lead";
+  const agentAvatar = leadAgentDetail?.avatarUrl ?? null;
+
+  // Skill badge = specialist's skill (what capability Lead is applying this step)
+  const agentSkill  = specialistDetail?.primarySkill ?? leadAgentDetail?.primarySkill ?? "";
+
+  // Model: use specialist's model for step quality; Lead's model for lead/discussion steps
+  const rawModel = (specialistDetail?.aiModel || leadAgentDetail?.aiModel) ?? "";
+  const agentModel = rawModel
     ? (rawModel.includes("/") ? rawModel : `openclaw/${rawModel}`)
     : "openclaw/pm";
+
+  console.log(`[squadChat] Lead="${agentName}", step=${currentStep}, skill="${agentSkill}", model="${agentModel}"`);
 
   // ── 5. 讀取品牌大腦 ──────────────────────────────────────────────────────────
   const brandBrain: Record<string, string[]> = {};
@@ -565,7 +594,19 @@ async function tryExecuteSquadChat(params: {
 
   // ── 8. 建構 system prompt（品牌 + workspace + mission + 步驟任務）───────────
   const systemPrompt = buildSquadAgentPrompt({
-    agent:           { name: agentName, title: agentTitle, specialty: agentDetail?.specialty, aiModel: agentDetail?.aiModel },
+    agent: {
+      name:      agentName,   // always Lead
+      title:     agentTitle,  // always Lead
+      specialty: leadAgentDetail?.specialty,
+      aiModel:   leadAgentDetail?.aiModel,
+    },
+    // Specialist skill framework injected into Lead's context (non-lead steps only)
+    specialistContext: specialistDetail ? {
+      name:      specialistDetail.name,
+      title:     specialistDetail.title,
+      specialty: specialistDetail.specialty ?? "",
+      skill:     specialistDetail.primarySkill ?? "",
+    } : undefined,
     brand,
     workspace:       workspace ?? "strategy",
     missionTitle,
