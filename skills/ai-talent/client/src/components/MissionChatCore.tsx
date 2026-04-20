@@ -23,7 +23,7 @@ import { MarkdownRenderer } from "./mission-chat/MarkdownRenderer";
 import { BrandPositioningBook, parsePositioningData } from "./mission-chat/BrandPositioningBook";
 import DeliverableBlock, { type DeliverableItem } from "./mission-chat/DeliverableBlock";
 import { CustomSquadDialog } from "./mission-chat/CustomSquadDialog";
-import BrandIntelligenceBar from "./mission-chat/BrandIntelligenceBar";
+import { BrandBrainBar } from "./mission-chat/BrandBrainBar";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -1802,18 +1802,11 @@ export default function MissionChatCore({
         </div>
       )}
 
-      {/* ── Brand Intelligence Bar — unified positioning + brain + tagline strip ── */}
+      {/* ── BrandBrainBar — positioning + knowledge context strip ── */}
       {activeMissionId && activeBrand?.id && (
-        <BrandIntelligenceBar
+        <BrandBrainBar
           brandId={activeBrand.id}
           missionId={activeMissionId}
-          tagline={(missionDataQuery.data as any)?.tagline ?? null}
-          subTagline={(missionDataQuery.data as any)?.subTagline ?? null}
-          onUpdate={async (tagline, subTagline) => {
-            if (!activeMissionId) return;
-            await updateMission.mutateAsync({ id: activeMissionId, tagline, subTagline });
-            missionDataQuery.refetch();
-          }}
         />
       )}
 
