@@ -379,7 +379,7 @@ function WorkspaceMissions({
   wsKey: string;
   brandId: number | null;
   activeMissionId?: number | null;
-  onMissionSelect?: (missionId: number) => void;
+  onMissionSelect?: (missionId: number, brandId?: number, workspace?: string) => void;
   onNewTask?: (wsKey: string) => void;
 }) {
   const { t } = useLang();
@@ -414,7 +414,7 @@ function WorkspaceMissions({
             flexShrink: 0,
           }} />
           <span
-            onClick={() => onMissionSelect?.(mission.id)}
+            onClick={() => onMissionSelect?.(mission.id, brandId ?? undefined, wsKey)}
             style={{
               fontSize: 11,
               color: activeMissionId === mission.id ? "#1A1A18" : "#9B9990",
@@ -459,7 +459,7 @@ function RecentMissions({
 }: {
   brandId: number | null;
   activeMissionId?: number | null;
-  onMissionSelect?: (missionId: number) => void;
+  onMissionSelect?: (missionId: number, brandId?: number, workspace?: string) => void;
   onNewImpromptu?: () => void;
   workspaces: any[];
 }) {
@@ -553,7 +553,7 @@ function RecentMissions({
             >
               <div style={{ width: 4, height: 4, borderRadius: '50%', background: activeMissionId === m.id ? '#E8631A' : '#DEDDDA', flexShrink: 0 }} />
               <span
-                onClick={() => onMissionSelect?.(m.id)}
+                onClick={() => onMissionSelect?.(m.id, brandId ?? undefined, undefined)}
                 style={{
                   fontSize: 11, flex: 1,
                   color: activeMissionId === m.id ? '#1A1A18' : '#4A4A45',
@@ -610,7 +610,7 @@ function Drawer({
   onNewMission,
   onNewWorkspace,
 }: {
-  onMissionSelect?: (missionId: number) => void;
+  onMissionSelect?: (missionId: number, brandId?: number, workspace?: string) => void;
   onNewTask?: (wsKey: string) => void;
   activeMissionId?: number | null;
   onNewMission?: () => void;
@@ -1831,12 +1831,28 @@ function RightPanel({
   // ── Section priority (floats a section to top when user action triggers it)
   const [sectionPriority, setSectionPriority] = React.useState<string | null>(null);
 
+  // ── Section picker dropdown state
+  const [showSectionPicker, setShowSectionPicker] = React.useState(false);
+  const pickerRef = React.useRef<HTMLDivElement>(null);
+
   const handleSectionPriority = React.useCallback((key: string) => {
     setSectionPriority(key);
     setOpenSections(prev => ({ ...prev, [key]: true }));
     // Auto-reset after 30s so the panel returns to normal order
     setTimeout(() => setSectionPriority(null), 30_000);
   }, []);
+
+  // Click-outside handler: close picker dropdown
+  useEffect(() => {
+    if (!showSectionPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowSectionPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSectionPicker]);
 
   // Listen to global section-priority events (from BrandBrainBar, SaveToBrainButton, @mention)
   useEffect(() => {
@@ -2026,52 +2042,99 @@ function RightPanel({
         onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "rgba(26,26,24,0.08)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
       />
-      {/* ── Section selector bar (top) — Claude Code style ── */}
+      {/* ── Compact panel header ── */}
       <div style={{
         flexShrink: 0,
         display: "flex",
         alignItems: "center",
-        gap: 2,
-        padding: "6px 8px 5px",
+        justifyContent: "space-between",
+        padding: "6px 8px 5px 12px",
         borderBottom: "1px solid #E4E3E1",
-        overflowX: "auto",
         background: "rgba(250,250,249,0.95)",
       }}>
-        {sections.map((section) => {
-          const isOpen = !!openSections[section.key];
-          const isPri  = section.key === sectionPriority;
-          return (
-            <button
-              key={section.key}
-              onClick={() => {
-                setOpenSections(prev => ({ ...prev, [section.key]: !prev[section.key] }));
-                // scroll section into view after opening
-                setTimeout(() => {
-                  const el = document.getElementById(`rp-section-${section.key}`);
-                  el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                }, 50);
-              }}
-              style={{
-                flexShrink: 0,
-                padding: "2px 8px",
-                borderRadius: 5,
-                border: "none",
-                fontSize: 10.5, fontWeight: isOpen ? 600 : 400,
-                cursor: "pointer", fontFamily: "inherit",
-                background: isOpen
-                  ? (isPri ? "rgba(201,130,58,0.12)" : "rgba(26,26,24,0.08)")
-                  : "transparent",
-                color: isPri ? "#C9823A" : (isOpen ? "#1A1A18" : "#9B9990"),
-                transition: "all 0.15s",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.05)"; }}
-              onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-            >
-              {section.label}
-            </button>
-          );
-        })}
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: "#9B9990", letterSpacing: "0.03em" }}>
+          工具面板
+        </span>
+        <div style={{ position: "relative" }} ref={pickerRef}>
+          <button
+            onClick={() => setShowSectionPicker(p => !p)}
+            title="選擇顯示的面板"
+            style={{
+              padding: "2px 8px",
+              borderRadius: 5,
+              border: "1px solid #E4E3E1",
+              fontSize: 10.5, fontWeight: 500,
+              cursor: "pointer", fontFamily: "inherit",
+              background: showSectionPicker ? "rgba(26,26,24,0.08)" : "transparent",
+              color: "#6B6A66",
+              display: "flex", alignItems: "center", gap: 4,
+            }}
+            onMouseEnter={e => { if (!showSectionPicker) (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.05)"; }}
+            onMouseLeave={e => { if (!showSectionPicker) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            面板
+          </button>
+          {showSectionPicker && (
+            <div style={{
+              position: "absolute", right: 0, top: "calc(100% + 4px)",
+              background: "#FFFFFF",
+              border: "1px solid #E4E3E1",
+              borderRadius: 8,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)",
+              zIndex: 50,
+              minWidth: 150,
+              padding: "4px 0",
+            }}>
+              {sections.map((section) => {
+                const isOpen = !!openSections[section.key];
+                return (
+                  <button
+                    key={section.key}
+                    onClick={() => {
+                      const willOpen = !isOpen;
+                      setOpenSections(prev => ({ ...prev, [section.key]: willOpen }));
+                      if (willOpen) {
+                        setTimeout(() => {
+                          const el = document.getElementById(`rp-section-${section.key}`);
+                          el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        }, 50);
+                      }
+                      setShowSectionPicker(false);
+                    }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      width: "100%",
+                      padding: "6px 12px",
+                      background: "transparent", border: "none",
+                      cursor: "pointer", fontFamily: "inherit",
+                      fontSize: 11,
+                      color: isOpen ? "#1A1A18" : "#9B9990",
+                      fontWeight: isOpen ? 500 : 400,
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.05)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+                  >
+                    {/* Checkbox */}
+                    <span style={{
+                      width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                      border: `1.5px solid ${isOpen ? "#1A1A18" : "#C8C7C3"}`,
+                      background: isOpen ? "#1A1A18" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {isOpen && <span style={{ color: "#FFFFFF", fontSize: 9, lineHeight: 1 }}>✓</span>}
+                    </span>
+                    {section.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Section cards ── */}
@@ -2946,7 +3009,7 @@ export interface SquadStepProgress {
 
 interface AppShellProps {
   children: React.ReactNode;
-  onMissionSelect?: (missionId: number) => void;
+  onMissionSelect?: (missionId: number, brandId?: number, workspace?: string) => void;
   onNewTask?: (wsKey: string) => void;
   activeMissionId?: number | null;
   activeSquad?: DBSquad | null;

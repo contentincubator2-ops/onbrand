@@ -1,5 +1,5 @@
 /**
- * App.tsx — v7 routing with /m/:missionId support
+ * App.tsx — v8 routing with /b/:brandId/:workspace/m/:missionId support
  */
 import React, { useEffect, useState } from "react";
 import Login from "./pages/Login";
@@ -18,9 +18,13 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// ── MissionPage: dedicated route for /m/:missionId ──────────────────────────
+// ── MissionPage: /b/:brandId/:workspace/m/:missionId ────────────────────────
 function MissionPage() {
-  const { missionId } = useParams<{ missionId: string }>();
+  const { missionId, brandId: brandIdParam, workspace } = useParams<{
+    missionId: string;
+    brandId?: string;
+    workspace?: string;
+  }>();
   const navigate = useNavigate();
   const numericMissionId = missionId ? Number(missionId) : null;
 
@@ -32,8 +36,14 @@ function MissionPage() {
     setSquadStepProgress([]);
   }, [numericMissionId]);
 
-  const handleMissionSelect = (id: number) => {
-    navigate(`/m/${id}`);
+  const handleMissionSelect = (id: number, bId?: number, ws?: string) => {
+    if (bId && ws) {
+      navigate(`/b/${bId}/${ws}/m/${id}`);
+    } else if (bId) {
+      navigate(`/b/${bId}/_/m/${id}`);
+    } else {
+      navigate(`/m/${id}`);
+    }
   };
 
   return (
@@ -49,7 +59,14 @@ function MissionPage() {
       <MissionChatCore
         key={`mission-${numericMissionId}`}
         activeMissionId={numericMissionId}
-        onMissionCreated={(id) => navigate(`/m/${id}`)}
+        onMissionCreated={(id) => {
+          // When a new mission is created, stay on the same brand/workspace if available
+          if (brandIdParam && workspace) {
+            navigate(`/b/${brandIdParam}/${workspace}/m/${id}`);
+          } else {
+            navigate(`/m/${id}`);
+          }
+        }}
         onSquadPreview={(squad) => {
           setActiveSquad(squad);
         }}
@@ -101,7 +118,16 @@ function IndexPage() {
     );
   }
 
-  const handleMissionSelect = (id: number) => navigate(`/m/${id}`);
+  const handleMissionSelect = (id: number, bId?: number, ws?: string) => {
+    if (bId && ws) {
+      navigate(`/b/${bId}/${ws}/m/${id}`);
+    } else if (bId) {
+      navigate(`/b/${bId}/_/m/${id}`);
+    } else {
+      navigate(`/m/${id}`);
+    }
+  };
+
   return (
     <AppShell
       activeMissionId={null}
@@ -122,6 +148,16 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<RequireAuth><OnboardingWizard onComplete={() => window.location.href = "/"} /></RequireAuth>} />
+        {/* Primary URL format: /b/:brandId/:workspace/m/:missionId */}
+        <Route
+          path="/b/:brandId/:workspace/m/:missionId"
+          element={
+            <RequireAuth>
+              <MissionPage />
+            </RequireAuth>
+          }
+        />
+        {/* Legacy / fallback: /m/:missionId */}
         <Route
           path="/m/:missionId"
           element={
