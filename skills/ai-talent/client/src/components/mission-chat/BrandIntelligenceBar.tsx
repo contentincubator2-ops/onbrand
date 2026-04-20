@@ -45,6 +45,21 @@ function approxTokens(items: any[]): number {
   );
 }
 
+// ── 定位欄位 row helper ────────────────────────────────────────────────────────
+function PosRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+      <span style={{ fontSize: 10, color: "#9a8f82", width: 52, flexShrink: 0, paddingTop: 2 }}>{label}</span>
+      <span style={{
+        fontSize: highlight ? 13 : 11,
+        fontWeight: highlight ? 600 : 400,
+        color: highlight ? "#1A1A18" : "#4A4A45",
+        lineHeight: 1.45,
+      }}>{value}</span>
+    </div>
+  );
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   brandId:    number | null | undefined;
@@ -77,11 +92,12 @@ export default function BrandIntelligenceBar({ brandId, missionId, tagline, subT
     : { mutate: () => {}, isLoading: false };
 
   const pos = posQuery.data as any;
-  const isEstimating = !pos || (!pos.tagline && genEstimate.isLoading);
+  // isEstimating: only show spinner when mutation is running (not just because tagline is empty)
+  const isEstimating = genEstimate.isLoading || (posQuery.isLoading && !pos);
   const posTagline   = pos?.tagline ?? "";
   const posSub       = pos?.valueProposition ?? "";
   const isEstimate   = pos?.isEstimate === 1;
-  const posTags      = [pos?.targetMarket, pos?.audienceA, pos?.audienceB, pos?.emotionalDiff, pos?.functionalDiff].filter(Boolean) as string[];
+  const posTags      = [pos?.targetMarket, pos?.audienceA, pos?.audienceB].filter(Boolean) as string[];
 
   // Auto-trigger estimate if no tagline yet
   useEffect(() => {
@@ -239,40 +255,86 @@ export default function BrandIntelligenceBar({ brandId, missionId, tagline, subT
       {expanded && (
         <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
 
-          {/* Section 1: 品牌定位 */}
+          {/* Section 1: 品牌定位 — 完整欄位 */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: ORANGE, letterSpacing: 0.5, marginBottom: 6, textTransform: "uppercase" as const }}>
-              品牌定位
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: ORANGE, letterSpacing: 0.5, textTransform: "uppercase" as const }}>
+                品牌定位
+              </span>
+              {isEstimate && (
+                <span style={{
+                  fontSize: 9, color: "#E8631A", border: "1px solid #F5C4A8",
+                  borderRadius: 4, padding: "1px 6px", fontWeight: 500,
+                }}>✦ AI 推估中</span>
+              )}
             </div>
+
             {isEstimating ? (
-              <div style={{ fontSize: 11, color: "#B0AFA9", fontStyle: "italic" }}>AI 正在分析品牌定位，請稍候…</div>
+              <div style={{ fontSize: 11, color: "#B0AFA9", fontStyle: "italic", padding: "8px 0" }}>
+                AI 正在分析品牌定位，請稍候…
+              </div>
             ) : !posTagline ? (
-              <div style={{ fontSize: 11, color: "#B0AFA9" }}>品牌定位尚未設定</div>
+              <div style={{ fontSize: 11, color: "#B0AFA9", padding: "8px 0" }}>品牌定位尚未設定</div>
             ) : (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", marginBottom: 3 }}>
-                  {posTagline}
-                  {isEstimate && (
-                    <span style={{
-                      fontSize: 9, color: "#E8631A", border: "1px solid #F5C4A8",
-                      borderRadius: 4, padding: "1px 5px", fontWeight: 500, marginLeft: 6,
-                    }}>✦ 推估中</span>
-                  )}
-                </div>
-                {posSub && <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5, marginBottom: 4 }}>{posSub}</div>}
-                {posTags.length > 0 && (
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
-                    {posTags.map((tag, i) => (
-                      <span key={i} style={{
-                        fontSize: 10, padding: "2px 7px", borderRadius: 10,
-                        background: i === 0 ? "#FFF0E8" : "#F2F1EF",
-                        color: i === 0 ? "#E8631A" : "#6B6A66",
-                        border: i === 0 ? "1px solid #F5C4A8" : "1px solid #E4E3E1",
-                      }}>{tag}</span>
-                    ))}
+              <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
+
+                {/* 標語 */}
+                <PosRow label="標語" value={posTagline} highlight />
+
+                {/* 副標語 / Value Proposition */}
+                {posSub && <PosRow label="價值主張" value={typeof posSub === "string" ? posSub : JSON.stringify(posSub)} />}
+
+                {/* 目標市場 */}
+                {pos?.targetMarket && <PosRow label="目標市場" value={pos.targetMarket} />}
+
+                {/* 目標受眾 */}
+                {(pos?.audienceA || pos?.audienceB) && (
+                  <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                    <span style={{ fontSize: 10, color: "#9a8f82", width: 52, flexShrink: 0, paddingTop: 2 }}>目標受眾</span>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
+                      {pos?.audienceA && (
+                        <span style={{
+                          fontSize: 10, padding: "2px 8px", borderRadius: 10,
+                          background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE",
+                        }}>{pos.audienceA}</span>
+                      )}
+                      {pos?.audienceB && (
+                        <span style={{
+                          fontSize: 10, padding: "2px 8px", borderRadius: 10,
+                          background: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0",
+                        }}>{pos.audienceB}</span>
+                      )}
+                    </div>
                   </div>
                 )}
-              </>
+
+                {/* USP — 情感 + 功能差異化 */}
+                {(pos?.emotionalDiff || pos?.functionalDiff) && (
+                  <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                    <span style={{ fontSize: 10, color: "#9a8f82", width: 52, flexShrink: 0, paddingTop: 2 }}>USP</span>
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: 3 }}>
+                      {pos?.emotionalDiff && (
+                        <div style={{ display: "flex", gap: 5, alignItems: "flex-start" }}>
+                          <span style={{
+                            fontSize: 9, padding: "1px 5px", borderRadius: 3, flexShrink: 0,
+                            background: "#FFF7ED", color: "#C2410C", border: "1px solid #FED7AA",
+                          }}>情感</span>
+                          <span style={{ fontSize: 11, color: "#4A4A45", lineHeight: 1.4 }}>{pos.emotionalDiff}</span>
+                        </div>
+                      )}
+                      {pos?.functionalDiff && (
+                        <div style={{ display: "flex", gap: 5, alignItems: "flex-start" }}>
+                          <span style={{
+                            fontSize: 9, padding: "1px 5px", borderRadius: 3, flexShrink: 0,
+                            background: "#F5F3FF", color: "#7C3AED", border: "1px solid #DDD6FE",
+                          }}>功能</span>
+                          <span style={{ fontSize: 11, color: "#4A4A45", lineHeight: 1.4 }}>{pos.functionalDiff}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

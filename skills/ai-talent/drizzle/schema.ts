@@ -1,6 +1,7 @@
 import {
   boolean,
   int,
+  tinyint,
   mysqlEnum,
   mysqlTable,
   text,
@@ -99,6 +100,14 @@ export const brands = mysqlTable("brands", {
   brandVoice: text("brandVoice"),
   soworkAnalysis: json("soworkAnalysis").$type<Record<string, unknown>>(),
   isDefault: boolean("isDefault").default(false),
+  // ── AI 推估定位欄位 ──
+  valueProposition: text("valueProposition"),
+  targetMarket: varchar("targetMarket", { length: 100 }),
+  audienceA: varchar("audienceA", { length: 100 }),
+  audienceB: varchar("audienceB", { length: 100 }),
+  emotionalDiff: varchar("emotionalDiff", { length: 200 }),
+  functionalDiff: varchar("functionalDiff", { length: 200 }),
+  isEstimate: tinyint("isEstimate").default(0),
 });
 
 export type Brand = typeof brands.$inferSelect;
