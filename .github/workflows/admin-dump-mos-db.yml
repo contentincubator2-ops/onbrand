@@ -18,68 +18,60 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.confirm == 'DUMP' }}
     steps:
-      - name: SSH & mysqldump to /tmp
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 300s
-          script: |
-            set -e
-            TS=$(date -u +%Y%m%dT%H%M%SZ)
-            OUT=/tmp/mos_db_${TS}.sql.gz
-            echo "[dump] writing to ${OUT}"
-            # Read creds from the app's .env
-            cd /home/azureuser/marketing-os
-            DB_USER=$(grep -E '^LOCAL_DB_USER=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
-            DB_PASS=$(grep -E '^LOCAL_DB_PASSWORD=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
-            DB_NAME=$(grep -E '^LOCAL_DB_NAME=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
-            DB_USER=${DB_USER:-mos_user}
-            DB_NAME=${DB_NAME:-mos_db}
-            # Dump: schema + data, no routines/triggers, single-tx, quick (streams large tables)
-            mysqldump \
-              --host=127.0.0.1 \
-              --user="${DB_USER}" \
-              --password="${DB_PASS}" \
-              --single-transaction \
-              --quick \
-              --skip-lock-tables \
-              --default-character-set=utf8mb4 \
-              --set-gtid-purged=OFF \
-              --no-tablespaces \
-              --column-statistics=0 \
-              "${DB_NAME}" 2>/tmp/mysqldump.err | gzip -9 > "${OUT}"
-            ls -lh "${OUT}"
-            # Copy to a predictable path for scp-download
-            cp "${OUT}" /tmp/mos_db_latest.sql.gz
-            echo "[dump] done: /tmp/mos_db_latest.sql.gz"
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "[ssh] key ready"
 
-      - name: SCP dump file back to runner
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          source: "/tmp/mos_db_latest.sql.gz"
-          target: "."
-          strip_components: 1
+      - name: Dump mos_db on VM
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" bash <<'ENDSSH'
+          set -e
+          cd /home/azureuser/marketing-os
+          DB_USER=$(grep -E '^LOCAL_DB_USER=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
+          DB_PASS=$(grep -E '^LOCAL_DB_PASSWORD=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
+          DB_NAME=$(grep -E '^LOCAL_DB_NAME=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
+          DB_USER=${DB_USER:-mos_user}
+          DB_NAME=${DB_NAME:-mos_db}
+          echo "[vm] dumping ${DB_NAME} as ${DB_USER}"
+          mysqldump \
+            --host=127.0.0.1 \
+            --user="${DB_USER}" \
+            --password="${DB_PASS}" \
+            --single-transaction \
+            --quick \
+            --skip-lock-tables \
+            --default-character-set=utf8mb4 \
+            --set-gtid-purged=OFF \
+            --no-tablespaces \
+            --column-statistics=0 \
+            "${DB_NAME}" 2>/tmp/mysqldump.err | gzip -9 > /tmp/mos_db_latest.sql.gz
+          ls -lh /tmp/mos_db_latest.sql.gz
+          echo "[vm] dump done"
+          ENDSSH
+
+      - name: SCP dump from VM to runner
+        run: |
+          mkdir -p dump
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/mos_db_latest.sql.gz" \
+            dump/mos_db_latest.sql.gz
+          ls -lh dump/
 
       - name: Upload as artifact
         uses: actions/upload-artifact@v4
         with:
           name: mos_db_dump
-          path: tmp/mos_db_latest.sql.gz
+          path: dump/mos_db_latest.sql.gz
           retention-days: 7
 
       - name: Cleanup dump from VM
         if: always()
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 60s
-          script: |
-            rm -f /tmp/mos_db_*.sql.gz
-            echo "[cleanup] removed dumps from VM"
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            "rm -f /tmp/mos_db_*.sql.gz && echo '[vm] cleaned'"
