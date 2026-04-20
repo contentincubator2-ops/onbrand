@@ -1,80 +1,74 @@
 /**
  * BrandBrainBar.tsx
  *
- * Brand context strip with:
- *  - Neural-node tiling pattern as background texture
- *  - Prominent "品牌大腦" section header
- *  - Inline positioning data (tagline, value prop, audience, USP)
- *  - Knowledge meter row
+ * Compact brand-context strip.
+ * - Neural-node pattern tiles the ENTIRE background (visible texture)
+ * - "品牌大腦" label sits inline with the tagline row — no separate header
+ * - Capacity bar at bottom uses pattern-fill to show 字數 usage (no tokens)
  */
 import React, { useEffect, useMemo } from "react";
 import { trpc } from "../../lib/trpc";
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// ─── Tokens ───────────────────────────────────────────────────────────────────
 const INK    = "#1A1A18";
 const MUTED  = "#8C8B87";
 const SUBTLE = "#B8B7B3";
-const BORDER = "#E8E7E5";
+const BORDER = "#E4E3E1";
 
-const TOKEN_BUDGET    = 2000;
-const CHARS_PER_TOKEN = 4;
+// Characters budget (displayed as 字數, not tokens)
+const CHAR_BUDGET = 8000;
 
-// ─── Neural-network tiling pattern (SVG data URL) ─────────────────────────────
-// 48×48 tile: centre node → 4 cardinal nodes → 4 corner nodes + spokes.
-// Tiled, these form a continuous network across the panel background.
-const PATTERN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">
-  <circle cx="24" cy="24" r="1.8" fill="${INK}" opacity="0.09"/>
-  <circle cx="24" cy="0"  r="1.1" fill="${INK}" opacity="0.055"/>
-  <circle cx="24" cy="48" r="1.1" fill="${INK}" opacity="0.055"/>
-  <circle cx="0"  cy="24" r="1.1" fill="${INK}" opacity="0.055"/>
-  <circle cx="48" cy="24" r="1.1" fill="${INK}" opacity="0.055"/>
-  <circle cx="0"  cy="0"  r="0.9" fill="${INK}" opacity="0.03"/>
-  <circle cx="48" cy="0"  r="0.9" fill="${INK}" opacity="0.03"/>
-  <circle cx="0"  cy="48" r="0.9" fill="${INK}" opacity="0.03"/>
-  <circle cx="48" cy="48" r="0.9" fill="${INK}" opacity="0.03"/>
-  <line x1="24" y1="22.2" x2="24" y2="1.1"  stroke="${INK}" stroke-width="0.6" opacity="0.045"/>
-  <line x1="24" y1="25.8" x2="24" y2="46.9" stroke="${INK}" stroke-width="0.6" opacity="0.045"/>
-  <line x1="22.2" y1="24" x2="1.1"  y2="24" stroke="${INK}" stroke-width="0.6" opacity="0.045"/>
-  <line x1="25.8" y1="24" x2="46.9" y2="24" stroke="${INK}" stroke-width="0.6" opacity="0.045"/>
-  <line x1="22.7" y1="22.7" x2="1"   y2="1"   stroke="${INK}" stroke-width="0.5" opacity="0.025"/>
-  <line x1="25.3" y1="22.7" x2="47"  y2="1"   stroke="${INK}" stroke-width="0.5" opacity="0.025"/>
-  <line x1="22.7" y1="25.3" x2="1"   y2="47"  stroke="${INK}" stroke-width="0.5" opacity="0.025"/>
-  <line x1="25.3" y1="25.3" x2="47"  y2="47"  stroke="${INK}" stroke-width="0.5" opacity="0.025"/>
-</svg>`;
-
-const PATTERN_URL = `url("data:image/svg+xml,${encodeURIComponent(PATTERN_SVG)}")`;
-
-// ─── Neural-node icon (inline, matches pattern motif) ────────────────────────
-function NeuralIcon({ size = 15, opacity = 1 }: { size?: number; opacity?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      xmlns="http://www.w3.org/2000/svg" style={{ opacity, flexShrink: 0 }}>
-      <circle cx="12" cy="12" r="2.4" fill={INK} />
-      <circle cx="12" cy="4"  r="1.4" fill={INK} opacity="0.7" />
-      <circle cx="12" cy="20" r="1.4" fill={INK} opacity="0.7" />
-      <circle cx="4"  cy="12" r="1.4" fill={INK} opacity="0.7" />
-      <circle cx="20" cy="12" r="1.4" fill={INK} opacity="0.7" />
-      <circle cx="5.8"  cy="5.8"  r="1.0" fill={INK} opacity="0.38" />
-      <circle cx="18.2" cy="5.8"  r="1.0" fill={INK} opacity="0.38" />
-      <circle cx="5.8"  cy="18.2" r="1.0" fill={INK} opacity="0.38" />
-      <circle cx="18.2" cy="18.2" r="1.0" fill={INK} opacity="0.38" />
-      <line x1="12" y1="9.6"  x2="12" y2="5.4"  stroke={INK} strokeWidth="0.9" opacity="0.45"/>
-      <line x1="12" y1="14.4" x2="12" y2="18.6" stroke={INK} strokeWidth="0.9" opacity="0.45"/>
-      <line x1="9.6"  y1="12" x2="5.4"  y2="12" stroke={INK} strokeWidth="0.9" opacity="0.45"/>
-      <line x1="14.4" y1="12" x2="18.6" y2="12" stroke={INK} strokeWidth="0.9" opacity="0.45"/>
-      <line x1="10.5" y1="10.5" x2="6.7"  y2="6.7"  stroke={INK} strokeWidth="0.7" opacity="0.22"/>
-      <line x1="13.5" y1="10.5" x2="17.3" y2="6.7"  stroke={INK} strokeWidth="0.7" opacity="0.22"/>
-      <line x1="10.5" y1="13.5" x2="6.7"  y2="17.3" stroke={INK} strokeWidth="0.7" opacity="0.22"/>
-      <line x1="13.5" y1="13.5" x2="17.3" y2="17.3" stroke={INK} strokeWidth="0.7" opacity="0.22"/>
-    </svg>
-  );
+function totalChars(items: any[]): number {
+  return items.reduce((s: number, i: any) =>
+    s + (i.content?.length ?? 0) + (i.title?.length ?? 0), 0);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function approxTokens(items: any[]): number {
-  return Math.ceil(
-    items.reduce((s: number, i: any) => s + (i.content?.length ?? 0) + (i.title?.length ?? 0), 0)
-    / CHARS_PER_TOKEN
+// ─── Pattern ──────────────────────────────────────────────────────────────────
+// 48×48 tile — nodes + spokes at higher opacity so texture is actually visible.
+const TILE = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+  <circle cx="24" cy="24" r="2"   fill="#1A1A18" opacity="0.13"/>
+  <circle cx="24" cy="0"  r="1.3" fill="#1A1A18" opacity="0.08"/>
+  <circle cx="24" cy="48" r="1.3" fill="#1A1A18" opacity="0.08"/>
+  <circle cx="0"  cy="24" r="1.3" fill="#1A1A18" opacity="0.08"/>
+  <circle cx="48" cy="24" r="1.3" fill="#1A1A18" opacity="0.08"/>
+  <circle cx="0"  cy="0"  r="1"   fill="#1A1A18" opacity="0.05"/>
+  <circle cx="48" cy="0"  r="1"   fill="#1A1A18" opacity="0.05"/>
+  <circle cx="0"  cy="48" r="1"   fill="#1A1A18" opacity="0.05"/>
+  <circle cx="48" cy="48" r="1"   fill="#1A1A18" opacity="0.05"/>
+  <line x1="24" y1="22"  x2="24" y2="1.3"  stroke="#1A1A18" stroke-width="0.7" opacity="0.07"/>
+  <line x1="24" y1="26"  x2="24" y2="46.7" stroke="#1A1A18" stroke-width="0.7" opacity="0.07"/>
+  <line x1="22"  y1="24" x2="1.3"  y2="24" stroke="#1A1A18" stroke-width="0.7" opacity="0.07"/>
+  <line x1="26"  y1="24" x2="46.7" y2="24" stroke="#1A1A18" stroke-width="0.7" opacity="0.07"/>
+  <line x1="22.7" y1="22.7" x2="1"  y2="1"  stroke="#1A1A18" stroke-width="0.55" opacity="0.04"/>
+  <line x1="25.3" y1="22.7" x2="47" y2="1"  stroke="#1A1A18" stroke-width="0.55" opacity="0.04"/>
+  <line x1="22.7" y1="25.3" x2="1"  y2="47" stroke="#1A1A18" stroke-width="0.55" opacity="0.04"/>
+  <line x1="25.3" y1="25.3" x2="47" y2="47" stroke="#1A1A18" stroke-width="0.55" opacity="0.04"/>
+</svg>`;
+
+const PATTERN = `url("data:image/svg+xml,${encodeURIComponent(TILE)}")`;
+
+// ─── Neural icon ──────────────────────────────────────────────────────────────
+function NeuralIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="2.4" fill={INK} />
+      <circle cx="12" cy="4"  r="1.4" fill={INK} opacity="0.65"/>
+      <circle cx="12" cy="20" r="1.4" fill={INK} opacity="0.65"/>
+      <circle cx="4"  cy="12" r="1.4" fill={INK} opacity="0.65"/>
+      <circle cx="20" cy="12" r="1.4" fill={INK} opacity="0.65"/>
+      <circle cx="5.8"  cy="5.8"  r="1" fill={INK} opacity="0.35"/>
+      <circle cx="18.2" cy="5.8"  r="1" fill={INK} opacity="0.35"/>
+      <circle cx="5.8"  cy="18.2" r="1" fill={INK} opacity="0.35"/>
+      <circle cx="18.2" cy="18.2" r="1" fill={INK} opacity="0.35"/>
+      <line x1="12" y1="9.6"  x2="12" y2="5.4"  stroke={INK} strokeWidth="0.9" opacity="0.4"/>
+      <line x1="12" y1="14.4" x2="12" y2="18.6" stroke={INK} strokeWidth="0.9" opacity="0.4"/>
+      <line x1="9.6"  y1="12" x2="5.4"  y2="12" stroke={INK} strokeWidth="0.9" opacity="0.4"/>
+      <line x1="14.4" y1="12" x2="18.6" y2="12" stroke={INK} strokeWidth="0.9" opacity="0.4"/>
+      <line x1="10.5" y1="10.5" x2="6.8"  y2="6.8"  stroke={INK} strokeWidth="0.65" opacity="0.2"/>
+      <line x1="13.5" y1="10.5" x2="17.2" y2="6.8"  stroke={INK} strokeWidth="0.65" opacity="0.2"/>
+      <line x1="10.5" y1="13.5" x2="6.8"  y2="17.2" stroke={INK} strokeWidth="0.65" opacity="0.2"/>
+      <line x1="13.5" y1="13.5" x2="17.2" y2="17.2" stroke={INK} strokeWidth="0.65" opacity="0.2"/>
+    </svg>
   );
 }
 
@@ -84,10 +78,10 @@ interface Props {
   missionId: number | null | undefined;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── BrandBrainBar ────────────────────────────────────────────────────────────
 export function BrandBrainBar({ brandId, missionId }: Props) {
 
-  // ── Brand positioning ──────────────────────────────────────────────────────
+  // Brand positioning
   const posQuery = (trpc as any).brand?.getPositioning?.useQuery
     ? (trpc as any).brand.getPositioning.useQuery(
         { brandId: brandId! },
@@ -117,7 +111,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
     }
   }, [brandId, pos]);
 
-  // ── Brand knowledge ────────────────────────────────────────────────────────
+  // Brand knowledge
   const brainQuery = (trpc as any).brandBrain?.list?.useQuery
     ? (trpc as any).brandBrain.list.useQuery(
         { brandId: brandId! },
@@ -125,11 +119,10 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
       )
     : { data: null, isLoading: false };
 
-  const brainItems: any[] = brainQuery.data ?? [];
-  const usedTokens = useMemo(() => approxTokens(brainItems), [brainQuery.data]);
-  const pct        = Math.min(100, Math.round((usedTokens / TOKEN_BUDGET) * 100));
-  const isFull     = pct >= 90;
-  const meterFill  = isFull ? "#EF4444" : pct > 60 ? "#F59E0B" : INK;
+  const brainItems: any[]  = brainQuery.data ?? [];
+  const usedChars = useMemo(() => totalChars(brainItems), [brainQuery.data]);
+  const pct       = Math.min(100, Math.round((usedChars / CHAR_BUDGET) * 100));
+  const isFull    = pct >= 90;
 
   const handleFocusBrain = () =>
     window.dispatchEvent(new CustomEvent("section-priority", { detail: { key: "brandbrain" } }));
@@ -144,154 +137,76 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
   return (
     <div style={{
       flexShrink: 0,
-      borderBottom: `1px solid ${BORDER}`,
       position: "relative",
+      borderBottom: `1px solid ${BORDER}`,
       overflow: "hidden",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
-      background: "#FFFFFF",
     }}>
 
-      {/* ══════════════════════════════════════════════════════════
-          SECTION HEADER — "品牌大腦" with neural-pattern background
-          ══════════════════════════════════════════════════════════ */}
+      {/* ── Full-area neural pattern background ── */}
       <div style={{
-        position: "relative",
-        backgroundImage: PATTERN_URL,
+        position: "absolute", inset: 0,
+        backgroundImage: PATTERN,
         backgroundSize: "48px 48px",
         backgroundRepeat: "repeat",
-        borderBottom: `1px solid ${BORDER}`,
-        padding: "8px 20px 7px",
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-      }}>
-        {/* Frosted overlay so text stays legible */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "rgba(255,255,255,0.82)",
-          backdropFilter: "blur(0px)",
-          pointerEvents: "none",
-        }} />
+        pointerEvents: "none",
+      }} />
+      {/* Frosted overlay — white at 88% keeps content readable */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "rgba(255,255,255,0.88)",
+        pointerEvents: "none",
+      }} />
 
-        {/* Icon + label (above overlay via z-index) */}
-        <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 7 }}>
-          <NeuralIcon size={14} />
-          <span style={{
-            fontSize: 11.5,
-            fontWeight: 700,
-            color: INK,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-          }}>
-            品牌大腦
-          </span>
-        </div>
+      {/* ── Content (sits above pattern) ── */}
+      <div style={{ position: "relative", padding: "10px 18px 0" }}>
 
-        {/* Knowledge count badge */}
-        <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
-          {brainItems.length > 0 ? (
-            <span style={{
-              fontSize: 10, color: MUTED,
-              background: "rgba(255,255,255,0.9)",
-              border: `1px solid ${BORDER}`,
-              borderRadius: 20, padding: "1px 7px",
-              letterSpacing: "0.02em",
-            }}>
-              {brainItems.length} 筆知識
-            </span>
-          ) : (
-            <span style={{
-              fontSize: 10, color: SUBTLE,
-              background: "rgba(255,255,255,0.9)",
-              border: `1px solid ${BORDER}`,
-              borderRadius: 20, padding: "1px 7px",
-            }}>
-              尚無知識
-            </span>
-          )}
-        </div>
-
-        {/* Token meter in header */}
-        <div style={{
-          position: "relative", zIndex: 1,
-          display: "flex", alignItems: "center", gap: 5, width: 120,
-        }}>
-          <div style={{
-            flex: 1, height: 2, borderRadius: 1,
-            background: "rgba(0,0,0,0.08)", overflow: "hidden",
-          }}>
-            <div style={{
-              height: "100%", width: `${pct}%`,
-              background: meterFill, borderRadius: 1, transition: "width 0.4s",
-            }} />
-          </div>
-          <span style={{
-            fontSize: 9.5, color: isFull ? "#EF4444" : SUBTLE,
-            fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
-          }}>
-            {usedTokens} / {TOKEN_BUDGET}
-          </span>
-        </div>
-
-        <button
-          onClick={handleFocusBrain}
-          style={{
-            position: "relative", zIndex: 1,
-            fontSize: 10.5, color: MUTED, background: "none", border: "none",
-            cursor: "pointer", fontFamily: "inherit", padding: 0, flexShrink: 0,
-            letterSpacing: "0.01em", transition: "color 0.15s",
-          }}
-          onMouseEnter={e => (e.currentTarget.style.color = INK)}
-          onMouseLeave={e => (e.currentTarget.style.color = MUTED)}
-        >
-          查看 →
-        </button>
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════
-          POSITIONING DATA
-          ══════════════════════════════════════════════════════════ */}
-      <div style={{ padding: "10px 20px 11px" }}>
-
+        {/* ── Row 1: tagline + inline "品牌大腦" label ── */}
         {genEstimate.isLoading && !hasPos ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <NeuralIcon size={13} opacity={0.4} />
-            <span style={{ fontSize: 11.5, color: MUTED, letterSpacing: "0.01em" }}>
-              正在推估品牌定位…
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
+            <NeuralIcon size={13} />
+            <span style={{ fontSize: 11.5, color: MUTED }}>正在推估品牌定位…</span>
           </div>
-
         ) : hasPos ? (
-          <>
-            {/* Tagline */}
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 5 }}>
-              <div style={{ paddingTop: 1, flexShrink: 0 }}>
-                <NeuralIcon size={13} opacity={0.55} />
+          <div style={{ marginBottom: 7 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+              {/* Icon */}
+              <div style={{ paddingTop: 2, flexShrink: 0, opacity: 0.7 }}>
+                <NeuralIcon size={12} />
               </div>
+              {/* Tagline */}
               <span style={{
-                fontSize: 13.5, fontWeight: 650, color: INK,
+                fontSize: 13, fontWeight: 650, color: INK,
                 letterSpacing: "-0.01em", lineHeight: 1.35, flex: 1,
               }}>
                 {tagline}
               </span>
+              {/* 品牌大腦 label — inline */}
+              <span style={{
+                fontSize: 10, fontWeight: 700, color: MUTED,
+                textTransform: "uppercase", letterSpacing: "0.07em",
+                flexShrink: 0, paddingTop: 3,
+              }}>
+                品牌大腦
+              </span>
+              {/* AI推估 badge */}
               {isEst && (
                 <span style={{
-                  fontSize: 9.5, fontWeight: 500, color: MUTED,
+                  fontSize: 9.5, color: MUTED,
                   border: `1px solid ${BORDER}`,
                   borderRadius: 20, padding: "1px 7px", flexShrink: 0,
-                  letterSpacing: "0.03em", marginTop: 2,
+                  marginTop: 2, letterSpacing: "0.03em",
                 }}>
                   AI 推估
                 </span>
               )}
             </div>
 
-            {/* Value proposition */}
+            {/* Value prop */}
             {valueProp && (
               <p style={{
-                margin: "0 0 6px 22px",
-                fontSize: 12, color: "#5A5955", lineHeight: 1.55,
-                letterSpacing: "0.005em",
+                margin: "0 0 5px 20px",
+                fontSize: 11.5, color: "#5A5955", lineHeight: 1.55,
               }}>
                 {valueProp}
               </p>
@@ -301,19 +216,17 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
             {hasAudience && (
               <div style={{
                 display: "flex", alignItems: "center",
-                flexWrap: "wrap", gap: "3px 5px",
-                marginLeft: 22, marginBottom: 5,
+                flexWrap: "wrap", gap: "2px 5px",
+                marginLeft: 20, marginBottom: 4,
               }}>
                 <span style={{
-                  fontSize: 9.5, fontWeight: 600, color: SUBTLE,
-                  textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 2,
-                }}>
-                  受眾
-                </span>
+                  fontSize: 9, fontWeight: 600, color: SUBTLE,
+                  textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 1,
+                }}>受眾</span>
                 {audience.map((a, i) => (
                   <React.Fragment key={i}>
-                    {i > 0 && <span style={{ color: BORDER, fontSize: 13 }}>·</span>}
-                    <span style={{ fontSize: 11.5, color: "#3D3C39" }}>{a}</span>
+                    {i > 0 && <span style={{ color: BORDER, fontSize: 12 }}>·</span>}
+                    <span style={{ fontSize: 11, color: "#3D3C39" }}>{a}</span>
                   </React.Fragment>
                 ))}
               </div>
@@ -322,42 +235,105 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
             {/* USP */}
             {hasUSP && (
               <div style={{
-                display: "flex", flexWrap: "wrap", gap: "3px 16px", marginLeft: 22,
+                display: "flex", flexWrap: "wrap",
+                gap: "2px 14px", marginLeft: 20,
               }}>
                 {emoUSP && (
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                     <span style={{
-                      fontSize: 9.5, fontWeight: 600, color: SUBTLE,
+                      fontSize: 9, fontWeight: 600, color: SUBTLE,
                       textTransform: "uppercase", letterSpacing: "0.06em",
                     }}>情感</span>
-                    <span style={{ fontSize: 11.5, color: "#3D3C39" }}>{emoUSP}</span>
+                    <span style={{ fontSize: 11, color: "#3D3C39" }}>{emoUSP}</span>
                   </div>
                 )}
                 {funcUSP && (
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                     <span style={{
-                      fontSize: 9.5, fontWeight: 600, color: SUBTLE,
+                      fontSize: 9, fontWeight: 600, color: SUBTLE,
                       textTransform: "uppercase", letterSpacing: "0.06em",
                     }}>功能</span>
-                    <span style={{ fontSize: 11.5, color: "#3D3C39" }}>{funcUSP}</span>
+                    <span style={{ fontSize: 11, color: "#3D3C39" }}>{funcUSP}</span>
                   </div>
                 )}
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <span style={{ fontSize: 11.5, color: SUBTLE }}>尚未設定品牌定位</span>
-        )}
-
-        {isFull && (
-          <p style={{
-            margin: "8px 0 0", fontSize: 10.5,
-            color: "#B91C1C", letterSpacing: "0.01em",
-          }}>
-            ⚠ 知識庫接近上限，建議整合或移除舊項目。
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+            <NeuralIcon size={12} />
+            <span style={{ fontSize: 11, color: SUBTLE }}>尚未設定品牌定位</span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, color: MUTED,
+              textTransform: "uppercase", letterSpacing: "0.07em", marginLeft: "auto",
+            }}>品牌大腦</span>
+          </div>
         )}
       </div>
+
+      {/* ── Capacity bar — pattern fill shows 字數 usage ── */}
+      <div
+        title={`品牌知識庫：已使用 ${usedChars.toLocaleString()} / ${CHAR_BUDGET.toLocaleString()} 字`}
+        style={{
+          position: "relative", height: 18,
+          cursor: "pointer", overflow: "hidden",
+          borderTop: `1px solid ${BORDER}`,
+        }}
+        onClick={handleFocusBrain}
+      >
+        {/* Track background — subtle pattern at low opacity */}
+        <div style={{
+          position: "absolute", inset: 0,
+          backgroundImage: PATTERN,
+          backgroundSize: "48px 48px",
+          backgroundRepeat: "repeat",
+          opacity: 0.25,
+        }} />
+
+        {/* Filled portion — same pattern but denser/darker, clipped by pct */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, bottom: 0,
+          width: `${pct}%`,
+          backgroundImage: PATTERN,
+          backgroundSize: "48px 48px",
+          backgroundRepeat: "repeat",
+          opacity: isFull ? 1 : 0.75,
+          filter: isFull ? "hue-rotate(0deg) saturate(2)" : "none",
+          transition: "width 0.5s ease",
+          // darken filled region
+          boxShadow: "inset 0 0 0 999px rgba(26,26,24,0.08)",
+        }} />
+
+        {/* Labels */}
+        <div style={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center",
+          padding: "0 10px", gap: 5,
+          pointerEvents: "none",
+        }}>
+          <span style={{
+            fontSize: 9.5, fontWeight: 600, color: INK, opacity: 0.55,
+            textTransform: "uppercase", letterSpacing: "0.07em",
+          }}>
+            {brainItems.length > 0 ? `${brainItems.length} 筆知識` : "尚無知識"}
+          </span>
+          <span style={{ flex: 1 }} />
+          <span style={{
+            fontSize: 9.5, color: isFull ? "#B91C1C" : INK,
+            opacity: isFull ? 1 : 0.45,
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {isFull ? "⚠ 接近上限 " : ""}{usedChars.toLocaleString()} / {CHAR_BUDGET.toLocaleString()} 字
+          </span>
+          <span style={{
+            fontSize: 9.5, color: INK, opacity: 0.4, marginLeft: 6,
+            textDecoration: "underline",
+          }}>
+            查看 →
+          </span>
+        </div>
+      </div>
+
     </div>
   );
 }
