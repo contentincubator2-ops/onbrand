@@ -7,10 +7,12 @@ import {
   text,
   longtext,
   timestamp,
+  datetime,
   varchar,
   decimal,
   json,
 } from "drizzle-orm/mysql-core";
+import { sql } from "drizzle-orm";
 
 //  Users 
 // NOTE: This table already exists in sowork_db with extended columns.
@@ -590,6 +592,19 @@ export const missionTaskUnits = mysqlTable("mission_task_units", {
 });
 export type MissionTaskUnit = typeof missionTaskUnits.$inferSelect;
 export type InsertMissionTaskUnit = typeof missionTaskUnits.$inferInsert;
+
+// ─── Mission Messages (對話訊息持久化) ───────────────────────────────────────────
+export const missionMessages = mysqlTable("mission_messages", {
+  id:        int("id").autoincrement().primaryKey(),
+  missionId: int("missionId").notNull(),
+  userId:    int("userId").notNull(),
+  role:      mysqlEnum("role", ["user", "assistant", "system"]).notNull(),
+  content:   longtext("content").notNull(),
+  metadata:  text("metadata"),
+  createdAt: datetime("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+export type MissionMessage = typeof missionMessages.$inferSelect;
+export type InsertMissionMessage = typeof missionMessages.$inferInsert;
 
 // ─── Mission Resources (語意配對結果快取) ────────────────────────────────────────
 // Computed async after mission creation via text-embedding-3-large cosine similarity
