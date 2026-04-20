@@ -72,6 +72,55 @@ async function main() {
       console.log("[migrate] missions.status: 'inactive' already present, skipped");
     }
 
+    // 4. Add tier + strategy_layer columns to agent_squads (idempotent)
+    //    tier: core/defer/kill — determines what clients see in UI
+    //    strategy_layer: L1–L6 — the 6-layer strategy decision hierarchy
+    const [squadTierCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'agent_squads'
+        AND COLUMN_NAME = 'tier'
+    `) as any;
+    if ((squadTierCol as any[]).length === 0) {
+      await conn.execute(`
+        ALTER TABLE agent_squads
+          ADD COLUMN tier ENUM('core','defer','kill')
+            CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            NOT NULL DEFAULT 'defer'
+      `);
+      await conn.execute(`CREATE INDEX idx_agent_squads_tier ON agent_squads(tier)`);
+      console.log("[migrate] agent_squads.tier: added (default 'defer')");
+    } else {
+      console.log("[migrate] agent_squads.tier: already exists, skipped");
+    }
+
+    const [squadLayerCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'agent_squads'
+        AND COLUMN_NAME = 'strategy_layer'
+    `) as any;
+    if ((squadLayerCol as any[]).length === 0) {
+      await conn.execute(`
+        ALTER TABLE agent_squads
+          ADD COLUMN strategy_layer ENUM(
+            'L1_brand',
+            'L2_product',
+            'L3_audience',
+            'L4_channel',
+            'L5_campaign',
+            'L6_validation',
+            'unassigned'
+          )
+            CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            NOT NULL DEFAULT 'unassigned'
+      `);
+      await conn.execute(`CREATE INDEX idx_agent_squads_layer ON agent_squads(strategy_layer)`);
+      console.log("[migrate] agent_squads.strategy_layer: added (default 'unassigned')");
+    } else {
+      console.log("[migrate] agent_squads.strategy_layer: already exists, skipped");
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
