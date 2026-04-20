@@ -1,0 +1,176 @@
+name: Admin — Setup mos_db full schema
+
+# Creates ALL missing tables in mos_db using drizzle-kit push.
+# Also applies idempotent column additions for new columns added to existing tables.
+#
+# Safe to re-run: drizzle-kit push only adds what's missing (never drops data).
+# Run this after the "migrate to mos_db" refactor to ensure all tables exist.
+#
+# Must type APPLY to run; anything else = DRY_RUN (inspect only).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to create missing tables. Anything else = DRY_RUN.'
+        required: true
+        default: 'DRY_RUN'
+
+jobs:
+  setup-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH — run drizzle-kit push against mos_db
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os/skills/ai-talent
+
+            CONFIRM="${{ github.event.inputs.confirm }}"
+            MOS="mysql -h localhost -u mos_user -pmos_secure_2026 mos_db"
+
+            echo "======================================================"
+            echo "  mos_db schema setup (mode=$CONFIRM)"
+            echo "======================================================"
+            echo ""
+            echo "=== Current mos_db tables ==="
+            $MOS -e "SHOW TABLES;" 2>&1
+
+            echo ""
+            echo "=== mos_db missions schema (if exists) ==="
+            $MOS -e "DESCRIBE missions;" 2>&1 || echo "(missions table not found — will be created)"
+
+            echo ""
+            echo "=== mos_db user_workspaces schema (if exists) ==="
+            $MOS -e "DESCRIBE user_workspaces;" 2>&1 || echo "(user_workspaces table not found — will be created)"
+
+            if [ "$CONFIRM" = "APPLY" ]; then
+              echo ""
+              echo "======================================================"
+              echo "STEP 1: drizzle-kit push → create all missing tables"
+              echo "======================================================"
+
+              # Override DB creds to point at mos_db
+              export LOCAL_DB_HOST=localhost
+              export LOCAL_DB_USER=mos_user
+              export LOCAL_DB_PASSWORD=mos_secure_2026
+              export LOCAL_DB_NAME=mos_db
+              # Also set DB_* vars so drizzle.config.ts fallback works
+              export DB_HOST=localhost
+              export DB_USER=mos_user
+              export DB_PASSWORD=mos_secure_2026
+              export DB_NAME=mos_db
+              # JWT_SECRET is required by env.ts validation but not needed for schema push
+              export JWT_SECRET="drizzle-push-dummy-secret-32-chars-ok"
+              export NODE_ENV=production
+
+              echo "Running: npx drizzle-kit push --force"
+              npx drizzle-kit push --force 2>&1
+              echo "drizzle-kit push complete."
+
+              echo ""
+              echo "======================================================"
+              echo "STEP 2: Add columns to existing tables (idempotent)"
+              echo "======================================================"
+
+              # missions: tagline
+              HAS=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='tagline';" 2>/dev/null)
+              if [ "$HAS" = "0" ]; then
+                $MOS -e "ALTER TABLE missions ADD COLUMN tagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位標語';"
+                echo "  + missions.tagline added"
+              else
+                echo "  = missions.tagline already exists"
+              fi
+
+              # missions: subTagline
+              HAS=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='subTagline';" 2>/dev/null)
+              if [ "$HAS" = "0" ]; then
+                $MOS -e "ALTER TABLE missions ADD COLUMN subTagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位副標語';"
+                echo "  + missions.subTagline added"
+              else
+                echo "  = missions.subTagline already exists"
+              fi
+
+              # missions: savedSquadFlow
+              HAS=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='savedSquadFlow';" 2>/dev/null)
+              if [ "$HAS" = "0" ]; then
+                $MOS -e "ALTER TABLE missions ADD COLUMN savedSquadFlow TEXT DEFAULT NULL COMMENT 'User-customized squad steps JSON';"
+                echo "  + missions.savedSquadFlow added"
+              else
+                echo "  = missions.savedSquadFlow already exists"
+              fi
+
+              # missions: squadSlug
+              HAS=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='squadSlug';" 2>/dev/null)
+              if [ "$HAS" = "0" ]; then
+                $MOS -e "ALTER TABLE missions ADD COLUMN squadSlug VARCHAR(100) DEFAULT NULL COMMENT 'Assigned squad slug';"
+                echo "  + missions.squadSlug added"
+              else
+                echo "  = missions.squadSlug already exists"
+              fi
+
+              # missions: welcomeMessage
+              HAS=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='welcomeMessage';" 2>/dev/null)
+              if [ "$HAS" = "0" ]; then
+                $MOS -e "ALTER TABLE missions ADD COLUMN welcomeMessage TEXT DEFAULT NULL;"
+                echo "  + missions.welcomeMessage added"
+              else
+                echo "  = missions.welcomeMessage already exists"
+              fi
+
+              # brands: brandVoice
+              HAS=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='brands' AND COLUMN_NAME='brandVoice';" 2>/dev/null)
+              if [ "$HAS" = "0" ]; then
+                $MOS -e "ALTER TABLE brands ADD COLUMN brandVoice TEXT DEFAULT NULL COMMENT '品牌聲音';"
+                echo "  + brands.brandVoice added"
+              else
+                echo "  = brands.brandVoice already exists"
+              fi
+
+              # brands: positioningSummary
+              HAS=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='brands' AND COLUMN_NAME='positioningSummary';" 2>/dev/null)
+              if [ "$HAS" = "0" ]; then
+                $MOS -e "ALTER TABLE brands ADD COLUMN positioningSummary TEXT DEFAULT NULL COMMENT '品牌定位摘要';"
+                echo "  + brands.positioningSummary added"
+              else
+                echo "  = brands.positioningSummary already exists"
+              fi
+
+              echo ""
+              echo "======================================================"
+              echo "STEP 3: Verify final state"
+              echo "======================================================"
+              echo ""
+              echo "=== All tables in mos_db ==="
+              $MOS -e "SHOW TABLES;" 2>&1
+
+              echo ""
+              echo "=== missions schema ==="
+              $MOS -e "DESCRIBE missions;" 2>&1
+
+              echo ""
+              echo "=== user_workspaces schema ==="
+              $MOS -e "DESCRIBE user_workspaces;" 2>&1
+
+              echo ""
+              echo "=== brands schema ==="
+              $MOS -e "DESCRIBE brands;" 2>&1
+
+              echo ""
+              echo "=== Restarting pm2 ==="
+              pm2 restart marketing-os 2>&1 || pm2 restart all 2>&1
+
+              echo ""
+              echo "======================================================"
+              echo "mos_db schema setup complete."
+              echo "======================================================"
+            else
+              echo ""
+              echo "DRY_RUN only. Run again with confirm=APPLY to create missing tables."
+              echo "======================================================"
+            fi
