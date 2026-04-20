@@ -2457,14 +2457,9 @@ function DBAgentMembersList({
                 </div>
               </div>
             </div>
-            {/* Skill chips - compact row */}
-            {(agent.primarySkill || agent.aiModel) && (
+            {/* AI model chip only — skill slug removed (internal detail) */}
+            {agent.aiModel && (
               <div style={{ display: "flex", gap: 3, marginTop: 5, flexWrap: "wrap" as const }}>
-                {agent.primarySkill && (
-                  <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: "#F0F4FF", color: "#4A6FA5", border: "1px solid #D0DCEF" }}>
-                    {agent.primarySkill}
-                  </span>
-                )}
                 {agent.aiModel && (
                   <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: "#F5F0FF", color: "#6B4FA5", border: "1px solid #DDD0EF" }}>
                     {fmtModel(agent.aiModel)}
@@ -2542,14 +2537,6 @@ function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; 
             )}
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
-            {alt.primarySkill && (
-              <span style={{
-                fontSize: 10, padding: "2px 7px", borderRadius: 20,
-                background: "#F5F5F4", color: "#6B6A66", border: "1px solid #E4E3E1",
-              }}>
-                {alt.primarySkill}
-              </span>
-            )}
             {alt.aiModel && (
               <span style={{
                 fontSize: 10, padding: "2px 7px", borderRadius: 20,
