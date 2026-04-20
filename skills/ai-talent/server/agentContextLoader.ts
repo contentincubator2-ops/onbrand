@@ -56,8 +56,9 @@ export async function loadAgentContext(input: AgentContextInput): Promise<AgentC
 
   // ── 1. 品牌基本資料 ────────────────────────────────────────────────────────
   const [brandRows] = await pool.execute(
-    `SELECT name, industry, description, targetAudience, tagline,
-            positioningStatus, positioningSummary, brandVoice
+    `SELECT name, industry, description, tagline,
+            valueProposition, targetMarket, audienceA, audienceB,
+            emotionalDiff, functionalDiff
      FROM brands
      WHERE id = ? AND (userId = ? OR createdBy = ?)
      LIMIT 1`,
@@ -122,9 +123,13 @@ export async function loadAgentContext(input: AgentContextInput): Promise<AgentC
 品牌名稱：${brandName}
 產業：${brand.industry ?? "未填寫"}
 描述：${brand.description ?? "未填寫"}
-目標受眾：${brand.targetAudience ?? "未填寫"}
+目標市場：${brand.targetMarket ?? "未填寫"}
+受眾A：${brand.audienceA ?? "未填寫"}
+受眾B：${brand.audienceB ?? "未填寫"}
 Tagline：${brand.tagline ?? "尚無"}
-品牌聲音：${brand.brandVoice ?? "未定義"}`);
+品牌定位：${brand.valueProposition ?? "未定義"}
+情感差異化：${brand.emotionalDiff ?? "未定義"}
+功能差異化：${brand.functionalDiff ?? "未定義"}`);
 
   // 品牌大腦 section（有資料才顯示）
   if (Object.keys(brandBrain).length > 0) {

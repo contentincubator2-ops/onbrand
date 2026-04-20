@@ -63,7 +63,13 @@ function formatBrandCtx(brand: Record<string, string>): string {
     brand.name ? `品牌名稱：${brand.name}` : "",
     brand.industry ? `產業：${brand.industry}` : "",
     brand.description ? `品牌描述：${brand.description}` : "",
-    brand.targetAudience ? `目標受眾：${brand.targetAudience}` : "",
+    brand.tagline ? `品牌標語：${brand.tagline}` : "",
+    brand.valueProposition ? `品牌定位：${brand.valueProposition}` : "",
+    brand.targetMarket ? `目標市場：${brand.targetMarket}` : "",
+    brand.audienceA ? `受眾A：${brand.audienceA}` : "",
+    brand.audienceB ? `受眾B：${brand.audienceB}` : "",
+    brand.emotionalDiff ? `情感差異化：${brand.emotionalDiff}` : "",
+    brand.functionalDiff ? `功能差異化：${brand.functionalDiff}` : "",
     brand.website ? `官網：${brand.website}` : "",
   ].filter(Boolean).join("\n");
 }
@@ -322,8 +328,9 @@ async function tryExecuteSquadChat(params: {
     // All data lives in mos_db — use localPool
     const [mRows] = await localPool.execute(
       `SELECT m.squadSlug, m.title, m.brandId,
-              b.name, b.industry, b.description, b.targetAudience,
-              b.brandVoice, b.tagline, b.positioningSummary, b.website
+              b.name, b.industry, b.description, b.tagline, b.website,
+              b.valueProposition, b.targetMarket, b.audienceA, b.audienceB,
+              b.emotionalDiff, b.functionalDiff
        FROM missions m
        LEFT JOIN brands b ON b.id = m.brandId
        WHERE m.id = ? LIMIT 1`,
@@ -347,14 +354,17 @@ async function tryExecuteSquadChat(params: {
     missionTitle = m.title ?? "";
     brandId      = m.brandId ?? 0;
     brand = {
-      name:               m.name ?? "",
-      industry:           m.industry ?? "",
-      description:        m.description ?? "",
-      targetAudience:     m.targetAudience ?? "",
-      brandVoice:         m.brandVoice ?? "",
-      tagline:            m.tagline ?? "",
-      positioningSummary: m.positioningSummary ?? "",
-      website:            m.website ?? "",
+      name:             m.name ?? "",
+      industry:         m.industry ?? "",
+      description:      m.description ?? "",
+      tagline:          m.tagline ?? "",
+      website:          m.website ?? "",
+      valueProposition: m.valueProposition ?? "",
+      targetMarket:     m.targetMarket ?? "",
+      audienceA:        m.audienceA ?? "",
+      audienceB:        m.audienceB ?? "",
+      emotionalDiff:    m.emotionalDiff ?? "",
+      functionalDiff:   m.functionalDiff ?? "",
     };
   } catch (e: any) {
     console.warn("[squadChat] mission/brand fetch:", e?.message);

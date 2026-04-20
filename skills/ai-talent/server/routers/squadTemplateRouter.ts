@@ -137,21 +137,25 @@ export const squadTemplateRouter = router({
       if (input.brandId && db) {
         try {
           const [bRows] = await db.execute(
-            sql`SELECT name, industry, description, positioningSummary, targetAudience,
-                       brandVoice, tagline
+            sql`SELECT name, industry, description, tagline,
+                       valueProposition, targetMarket, audienceA, audienceB,
+                       emotionalDiff, functionalDiff
                 FROM brands WHERE id = ${input.brandId} LIMIT 1`
           ) as any[];
           const b = (bRows as any[])?.[0];
           if (b) {
             brandIndustry = b.industry ? String(b.industry).replace(/['"\\;]/g, "") : null;
             const parts: string[] = [];
-            if (b.name)               parts.push(`品牌：${b.name}`);
-            if (b.industry)           parts.push(`產業：${b.industry}`);
-            if (b.description)        parts.push(`品牌描述：${b.description}`);
-            if (b.positioningSummary) parts.push(`品牌定位：${b.positioningSummary}`);
-            if (b.targetAudience)     parts.push(`目標受眾：${b.targetAudience}`);
-            if (b.brandVoice)         parts.push(`品牌語氣：${b.brandVoice}`);
-            if (b.tagline)            parts.push(`品牌標語：${b.tagline}`);
+            if (b.name)             parts.push(`品牌：${b.name}`);
+            if (b.industry)         parts.push(`產業：${b.industry}`);
+            if (b.description)      parts.push(`品牌描述：${b.description}`);
+            if (b.tagline)          parts.push(`品牌標語：${b.tagline}`);
+            if (b.valueProposition) parts.push(`品牌定位：${b.valueProposition}`);
+            if (b.targetMarket)     parts.push(`目標市場：${b.targetMarket}`);
+            if (b.audienceA)        parts.push(`受眾A：${b.audienceA}`);
+            if (b.audienceB)        parts.push(`受眾B：${b.audienceB}`);
+            if (b.emotionalDiff)    parts.push(`情感差異化：${b.emotionalDiff}`);
+            if (b.functionalDiff)   parts.push(`功能差異化：${b.functionalDiff}`);
             brandContext = parts.join(" | ");
           }
         } catch (e) {
