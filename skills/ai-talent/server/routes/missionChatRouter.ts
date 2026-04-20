@@ -580,7 +580,7 @@ async function tryExecuteSquadChat(params: {
     step:        currentStep,
     totalSteps,
     label:       stepLabel,
-    agentId:     agentDetail?.id ?? null,
+    agentId:     leadAgentDetail?.id ?? null,
     agentName,
     agentTitle,
     agentAvatar,
