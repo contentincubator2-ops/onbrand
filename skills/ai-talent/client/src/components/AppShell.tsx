@@ -1996,20 +1996,21 @@ function RightPanel({
         onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "rgba(26,26,24,0.08)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
       />
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }} className="right-panel-scroll">
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px 12px" }} className="right-panel-scroll">
         {sections.map((section, idx) => {
           const isPriority = section.key === sectionPriority && idx === 0;
+          const isOpen = !!openSections[section.key];
           return (
             <div key={section.key} style={{
-              margin: "8px 8px 0",
+              marginBottom: 8,
               borderRadius: 8,
-              border: `1px solid ${isPriority ? "#E8C99A" : "#E4E3E1"}`,
+              border: `1px solid ${isPriority ? "#E8C99A" : "#E0DFDb"}`,
               overflow: "hidden",
               boxShadow: isPriority
-                ? "0 2px 10px rgba(201,130,58,0.12), 0 1px 3px rgba(0,0,0,0.05)"
-                : "0 1px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+                ? "0 2px 10px rgba(201,130,58,0.12), 0 1px 3px rgba(0,0,0,0.06)"
+                : "0 1px 6px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
               position: "relative",
-              transition: "box-shadow 0.3s, border-color 0.3s",
+              transition: "box-shadow 0.25s, border-color 0.25s",
             }}>
               {/* Neural pattern background */}
               <div style={{
@@ -2022,41 +2023,53 @@ function RightPanel({
               {/* Frosted overlay */}
               <div style={{
                 position: "absolute", inset: 0,
-                background: isPriority ? "rgba(255,251,245,0.93)" : "rgba(255,255,255,0.93)",
+                background: isPriority ? "rgba(255,251,245,0.94)" : "rgba(250,250,249,0.94)",
                 pointerEvents: "none",
-                transition: "background 0.3s",
+                transition: "background 0.25s",
               }} />
-              {/* Section header (must be position:relative to sit above pattern) */}
+
+              {/* ── Panel header — Claude Code style ── */}
               <button
                 onClick={() => toggleSection(section.key)}
                 style={{
+                  position: "relative",
                   width: "100%",
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 12px",
+                  padding: "8px 10px",
                   background: "transparent", border: "none",
+                  borderBottom: isOpen ? `1px solid ${isPriority ? "#F0DFC0" : "#ECEAE8"}` : "none",
                   cursor: "pointer", fontFamily: "inherit",
-                  position: "relative",
+                  userSelect: "none",
                 }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.04)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: isPriority ? "#C9823A" : "#1A1A18", letterSpacing: 0.3 }}>
+                {/* Left: dot indicator + label */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {/* Active dot */}
+                  <span style={{
+                    width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                    background: isPriority ? "#C9823A" : (isOpen ? "#1A1A18" : "#C8C7C3"),
+                    opacity: isPriority ? 1 : (isOpen ? 0.5 : 0.35),
+                    transition: "background 0.2s, opacity 0.2s",
+                  }} />
+                  <span style={{
+                    fontSize: 11, fontWeight: 600,
+                    color: isPriority ? "#C9823A" : (isOpen ? "#1A1A18" : "#6B6A66"),
+                    letterSpacing: "0.02em",
+                    transition: "color 0.2s",
+                  }}>
                     {section.label}
                   </span>
-                  {isPriority && (
-                    <span style={{
-                      width: 5, height: 5, borderRadius: "50%",
-                      background: "#C9823A",
-                      animation: "pulse 1.5s infinite",
-                      display: "inline-block",
-                    }} />
-                  )}
                 </div>
+
+                {/* Right: chevron */}
                 <svg
-                  width="11" height="11" viewBox="0 0 24 24" fill="none"
+                  width="12" height="12" viewBox="0 0 24 24" fill="none"
                   stroke={isPriority ? "#C9823A" : "#9B9990"} strokeWidth="2.5" strokeLinecap="round"
                   style={{
-                    transform: openSections[section.key] ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s",
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
                     flexShrink: 0,
                   }}
                 >
@@ -2064,9 +2077,15 @@ function RightPanel({
                 </svg>
               </button>
 
-              {/* Section body */}
-              {openSections[section.key] && (
-                <div style={{ padding: "0 12px 14px", position: "relative" }}>
+              {/* ── Section body — independent scroll ── */}
+              {isOpen && (
+                <div style={{
+                  position: "relative",
+                  maxHeight: 300,
+                  overflowY: "auto",
+                  overscrollBehavior: "contain",
+                  padding: "10px 12px 12px",
+                }}>
                   {section.content}
                 </div>
               )}
