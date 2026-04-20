@@ -26,20 +26,39 @@ jobs:
           ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
           echo "[ssh] key ready"
 
+      - name: Probe VM mysqldump options
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" bash <<'ENDSSH'
+          set -e
+          which mysqldump
+          mysqldump --version
+          cd /home/azureuser/marketing-os
+          echo "--- .env db lines ---"
+          grep -E '^(LOCAL_DB_|DB_)' skills/ai-talent/.env | sed 's/=.*/=<redacted>/'
+          ENDSSH
+
       - name: Dump mos_db on VM
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
             "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" bash <<'ENDSSH'
           set -e
           cd /home/azureuser/marketing-os
+          DB_HOST=$(grep -E '^LOCAL_DB_HOST=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
+          DB_PORT=$(grep -E '^LOCAL_DB_PORT=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
           DB_USER=$(grep -E '^LOCAL_DB_USER=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
           DB_PASS=$(grep -E '^LOCAL_DB_PASSWORD=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
           DB_NAME=$(grep -E '^LOCAL_DB_NAME=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
+          DB_HOST=${DB_HOST:-127.0.0.1}
+          DB_PORT=${DB_PORT:-3306}
           DB_USER=${DB_USER:-mos_user}
           DB_NAME=${DB_NAME:-mos_db}
-          echo "[vm] dumping ${DB_NAME} as ${DB_USER}"
+          echo "[vm] dumping ${DB_NAME} as ${DB_USER} from ${DB_HOST}:${DB_PORT}"
+
+          # Write dump WITHOUT piping to gzip first, so we can see exit status
           mysqldump \
-            --host=127.0.0.1 \
+            --host="${DB_HOST}" \
+            --port="${DB_PORT}" \
             --user="${DB_USER}" \
             --password="${DB_PASS}" \
             --single-transaction \
@@ -48,8 +67,16 @@ jobs:
             --default-character-set=utf8mb4 \
             --set-gtid-purged=OFF \
             --no-tablespaces \
-            --column-statistics=0 \
-            "${DB_NAME}" 2>/tmp/mysqldump.err | gzip -9 > /tmp/mos_db_latest.sql.gz
+            "${DB_NAME}" > /tmp/mos_db_latest.sql 2>/tmp/mysqldump.err
+          DUMP_STATUS=$?
+          echo "[vm] mysqldump exit=${DUMP_STATUS}"
+          if [ -s /tmp/mysqldump.err ]; then
+            echo "[vm] stderr from mysqldump:"
+            cat /tmp/mysqldump.err
+          fi
+          ls -lh /tmp/mos_db_latest.sql
+          head -20 /tmp/mos_db_latest.sql || true
+          gzip -9f /tmp/mos_db_latest.sql
           ls -lh /tmp/mos_db_latest.sql.gz
           echo "[vm] dump done"
           ENDSSH
@@ -74,4 +101,4 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
             "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
-            "rm -f /tmp/mos_db_*.sql.gz && echo '[vm] cleaned'"
+            "rm -f /tmp/mos_db_*.sql /tmp/mos_db_*.sql.gz /tmp/mysqldump.err && echo '[vm] cleaned'"
