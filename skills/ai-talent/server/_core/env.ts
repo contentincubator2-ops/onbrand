@@ -72,6 +72,9 @@ const envSchema = z.object({
 
   // App
   PORT: z.coerce.number().default(3001),
+
+  // Authentication
+  APP_URL: z.string().url().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

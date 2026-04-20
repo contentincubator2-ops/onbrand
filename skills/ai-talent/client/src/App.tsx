@@ -1,8 +1,12 @@
 /**
- * App.tsx — v8 routing with /b/:brandId/:workspace/m/:missionId support
+ * App.tsx — v7 routing with /m/:missionId support and authentication
  */
 import React, { useEffect, useState } from "react";
-import Login from "./pages/Login";
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
+import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import AppShell from "./components/AppShell";
 import MissionChatCore from "./components/MissionChatCore";
@@ -13,8 +17,57 @@ import type { DBSquad } from "./types/squad";
 import { LanguageProvider } from "./lib/i18n";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem("authToken");
-  if (!token) return <Navigate to="/login" replace />;
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/me", {
+          method: "POST",
+          credentials: "include",
+        });
+
+        if (!res.ok) {
+          setIsAuthenticated(false);
+          setChecking(false);
+          return;
+        }
+
+        const data = await res.json();
+        setIsAuthenticated(!!data.user);
+      } catch (err) {
+        setIsAuthenticated(false);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!checking && !isAuthenticated) {
+      navigate("/auth/login", { replace: true });
+    }
+  }, [checking, isAuthenticated, navigate]);
+
+  if (checking) {
+    return (
+      <div style={{
+        height: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+        background: "#F9F9F8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif",
+      }}>
+        <div style={{ fontSize: 13, color: "#9B9990" }}>載入中…</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return <>{children}</>;
 }
 
@@ -146,7 +199,17 @@ export default function App() {
   return (
     <LanguageProvider>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        {/* Auth routes */}
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+
+        {/* Legacy redirect */}
+        <Route path="/login" element={<Navigate to="/auth/login" replace />} />
+
+        {/* Protected routes */}
         <Route path="/onboarding" element={<RequireAuth><OnboardingWizard onComplete={() => window.location.href = "/"} /></RequireAuth>} />
         {/* Primary URL format: /b/:brandId/:workspace/m/:missionId */}
         <Route

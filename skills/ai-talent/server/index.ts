@@ -7,8 +7,15 @@
 
 // Load .env before any other imports (dotenv must come first)
 import { config as dotenvConfig } from "dotenv";
-import { resolve } from "path";
-dotenvConfig({ path: resolve(process.cwd(), ".env") });
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const envPath = `${__dirname}/../.env`;
+console.log('[server] Loading .env from:', envPath);
+const result = dotenvConfig({ path: envPath });
+console.log('[server] dotenv result:', { error: result.error, parsed: result.parsed ? 'YES' : 'NO' });
+console.log('[server] DB_HOST from process.env:', process.env.DB_HOST ? 'LOADED' : 'MISSING');
 
 import express from "express";
 import cors from "cors";

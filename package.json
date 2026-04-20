@@ -4,10 +4,23 @@
   "description": "SoWork Marketing Enterprise — AI 行銷團隊平台，基於 OpenClaw",
   "private": true,
   "scripts": {
+    "install:all": "./scripts/install-all.sh",
     "dev": "tsx watch server/index.ts",
     "build": "tsc",
     "test": "vitest"
   },
-  "keywords": ["openclaw", "ai", "marketing", "enterprise"],
-  "author": "SoWork AI Team <cjwang@sowork.tw>"
+  "keywords": [
+    "openclaw",
+    "ai",
+    "marketing",
+    "enterprise"
+  ],
+  "author": "SoWork AI Team <cjwang@sowork.tw>",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "nanoid": "^5.1.9"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0"
+  }
 }

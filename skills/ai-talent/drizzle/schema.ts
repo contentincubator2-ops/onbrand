@@ -28,6 +28,19 @@ export const users = mysqlTable("users", {
   isActive: int("isActive").default(0).notNull(),
   credits: int("credits").default(1000).notNull(),
   hasUnlimitedCredits: int("hasUnlimitedCredits").default(0).notNull(),
+  // Authentication fields
+  passwordHash: varchar("passwordHash", { length: 255 }),
+  authMethod: mysqlEnum("authMethod", ["password", "oauth", "google", "slack"]).default("password"),
+  // Email verification fields
+  emailVerificationToken: varchar("emailVerificationToken", { length: 255 }),
+  emailVerificationExpires: timestamp("emailVerificationExpires"),
+  // Password reset fields
+  passwordResetToken: varchar("passwordResetToken", { length: 255 }),
+  passwordResetExpires: timestamp("passwordResetExpires"),
+  // Security fields
+  registrationIp: varchar("registrationIp", { length: 45 }),
+  lastLoginIp: varchar("lastLoginIp", { length: 45 }),
+  activatedAt: timestamp("activatedAt"),
   // Enterprise fields (added in MOS migration)
   companyId: int("companyId"),
   departmentId: int("departmentId"),
