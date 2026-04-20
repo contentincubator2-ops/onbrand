@@ -1826,7 +1826,7 @@ function RightPanel({
 
   // ── Accordion ──────────────────────────────────────────────────────────────
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
-    requirements: true, sop: false, agents: false, "live-progress": false, alternatives: false, brandbrain: false,
+    requirements: true, sop: false, agents: false, alternatives: false, brandbrain: false,
   });
   // ── Section priority (floats a section to top when user action triggers it)
   const [sectionPriority, setSectionPriority] = React.useState<string | null>(null);
@@ -1848,16 +1848,16 @@ function RightPanel({
   useEffect(() => {
     // Preserve brandbrain open state across squad changes — it's brand-specific, not squad-specific
     if (effectiveSquad) {
-      setOpenSections(prev => ({ requirements: true, sop: true, agents: true, "live-progress": true, alternatives: true, brandbrain: prev.brandbrain ?? false }));
+      setOpenSections(prev => ({ requirements: true, sop: true, agents: true, alternatives: true, brandbrain: prev.brandbrain ?? false }));
     } else {
-      setOpenSections(prev => ({ requirements: true, sop: false, agents: false, "live-progress": false, alternatives: false, brandbrain: prev.brandbrain ?? false }));
+      setOpenSections(prev => ({ requirements: true, sop: false, agents: false, alternatives: false, brandbrain: prev.brandbrain ?? false }));
     }
   }, [effectiveSquad?.squadId]);
 
-  // Auto-open live-progress when squad execution starts
+  // Auto-open agents when squad execution starts
   useEffect(() => {
     if (squadStepProgress.length > 0) {
-      setOpenSections((prev) => ({ ...prev, "live-progress": true, agents: true }));
+      setOpenSections((prev) => ({ ...prev, agents: true }));
     }
   }, [squadStepProgress.length > 0]);
 
@@ -1887,12 +1887,6 @@ function RightPanel({
           />
         : emptyHint("選擇執行方式\n查看對應流程"),
     },
-    // Live execution timeline — shown when squadStepProgress has data
-    ...(squadStepProgress.length > 0 ? [{
-      key: "live-progress",
-      label: `執行進度 · ${squadStepProgress.filter(s => s.status === 'done').length}/${squadStepProgress.length}`,
-      content: <AgentExecutionTimeline steps={squadStepProgress} />,
-    }] : []),
     {
       key: "agents",
       label: "協作成員",

@@ -1517,8 +1517,8 @@ export default function MissionChatCore({
       background: "#FFFFFF",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
     }}>
-      {/* ── Squad progress bar — Perplexity-style ── */}
-      {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
+      {/* ── Squad progress bar removed — progress is shown in right panel SOP section ── */}
+      {false && activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
         <div style={{
           padding: "10px 20px",
           borderBottom: "1px solid #ECEAE8",
