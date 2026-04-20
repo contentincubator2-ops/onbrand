@@ -1,29 +1,18 @@
 /**
- * BrandBrainBar.tsx
+ * BrandBrainBar.tsx — Perplexity-style brand context strip
  *
- * Persistent brand context bar — always-visible, no expand required.
- * Shows brand positioning data + brain knowledge meter in one compact strip.
- *
- * Layout (all visible by default):
- *   Row 1: 🧠 icon | Tagline (bold) | [✦推估中 badge]
- *   Row 2: Value Proposition
- *   Row 3: Audience chips + Target market
- *   Row 4: USP — 情感 / 功能
- *   ──────────────────────────────────────
- *   Row 5: 品牌大腦 N筆 | token meter | [查看全部→]
- *
- * Replaces: BrandPositioningBar (AppShell) + BrandBrainStrip (MissionChatCore)
- * Renamed from: BrandIntelligenceBar → BrandBrainBar
+ * Always-visible. Shows brand positioning + knowledge meter inline.
+ * Clean, typography-first design — no colored backgrounds, minimal chrome.
  */
 import React, { useEffect, useMemo } from "react";
 import { trpc } from "../../lib/trpc";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const TOKEN_BUDGET  = 2000;
+const TOKEN_BUDGET    = 2000;
 const CHARS_PER_TOKEN = 4;
-const ORANGE        = "#C9823A";
-const ORANGE_LIGHT  = "#FFF7ED";
-const ORANGE_BORDER = "#F5C9A8";
+const ACCENT          = "#1A1A18";   // near-black
+const MUTED           = "#8C8B87";   // mid-gray
+const BORDER          = "#EBEBEA";   // very light border
 
 function approxTokens(items: any[]): number {
   return Math.ceil(
@@ -38,6 +27,35 @@ interface Props {
   missionId: number | null | undefined;
 }
 
+// ─── Neural-node icon (custom — replaces generic brain path) ──────────────────
+function BrandIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      {/* Central node */}
+      <circle cx="12" cy="12" r="2.2" fill={ACCENT} />
+      {/* Outer nodes */}
+      <circle cx="12" cy="4"  r="1.4" fill={ACCENT} opacity="0.75" />
+      <circle cx="12" cy="20" r="1.4" fill={ACCENT} opacity="0.75" />
+      <circle cx="4"  cy="12" r="1.4" fill={ACCENT} opacity="0.75" />
+      <circle cx="20" cy="12" r="1.4" fill={ACCENT} opacity="0.75" />
+      <circle cx="6.3"  cy="6.3"  r="1.1" fill={ACCENT} opacity="0.45" />
+      <circle cx="17.7" cy="6.3"  r="1.1" fill={ACCENT} opacity="0.45" />
+      <circle cx="6.3"  cy="17.7" r="1.1" fill={ACCENT} opacity="0.45" />
+      <circle cx="17.7" cy="17.7" r="1.1" fill={ACCENT} opacity="0.45" />
+      {/* Spokes from center */}
+      <line x1="12" y1="9.8"  x2="12" y2="5.4"  stroke={ACCENT} strokeWidth="0.9" opacity="0.5" />
+      <line x1="12" y1="14.2" x2="12" y2="18.6" stroke={ACCENT} strokeWidth="0.9" opacity="0.5" />
+      <line x1="9.8"  y1="12" x2="5.4"  y2="12" stroke={ACCENT} strokeWidth="0.9" opacity="0.5" />
+      <line x1="14.2" y1="12" x2="18.6" y2="12" stroke={ACCENT} strokeWidth="0.9" opacity="0.5" />
+      <line x1="10.4" y1="10.4" x2="7.2"  y2="7.2"  stroke={ACCENT} strokeWidth="0.9" opacity="0.3" />
+      <line x1="13.6" y1="10.4" x2="16.8" y2="7.2"  stroke={ACCENT} strokeWidth="0.9" opacity="0.3" />
+      <line x1="10.4" y1="13.6" x2="7.2"  y2="16.8" stroke={ACCENT} strokeWidth="0.9" opacity="0.3" />
+      <line x1="13.6" y1="13.6" x2="16.8" y2="16.8" stroke={ACCENT} strokeWidth="0.9" opacity="0.3" />
+    </svg>
+  );
+}
+
 // ─── BrandBrainBar ────────────────────────────────────────────────────────────
 export function BrandBrainBar({ brandId, missionId }: Props) {
 
@@ -50,23 +68,21 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
     : { data: null, isLoading: false, refetch: () => {} };
 
   const genEstimate = (trpc as any).brand?.generateEstimate?.useMutation
-    ? (trpc as any).brand.generateEstimate.useMutation({
-        onSuccess: () => posQuery.refetch?.(),
-      })
+    ? (trpc as any).brand.generateEstimate.useMutation({ onSuccess: () => posQuery.refetch?.() })
     : { mutate: () => {}, isLoading: false };
 
-  const pos         = posQuery.data as any;
-  const tagline     = pos?.tagline ?? "";
-  const valueProp   = pos?.valueProposition ?? "";
-  const targetMkt   = pos?.targetMarket ?? "";
-  const audA        = pos?.audienceA ?? "";
-  const audB        = pos?.audienceB ?? "";
-  const emoUSP      = pos?.emotionalDiff ?? "";
-  const funcUSP     = pos?.functionalDiff ?? "";
-  const isEstimate  = pos?.isEstimate === 1;
-  const isLoading   = posQuery.isLoading || genEstimate.isLoading;
+  const pos        = posQuery.data as any;
+  const tagline    = pos?.tagline ?? "";
+  const valueProp  = typeof pos?.valueProposition === "string"
+    ? pos.valueProposition
+    : pos?.valueProposition ? JSON.stringify(pos.valueProposition) : "";
+  const targetMkt  = pos?.targetMarket  ?? "";
+  const audA       = pos?.audienceA     ?? "";
+  const audB       = pos?.audienceB     ?? "";
+  const emoUSP     = pos?.emotionalDiff ?? "";
+  const funcUSP    = pos?.functionalDiff ?? "";
+  const isEstimate = pos?.isEstimate === 1;
 
-  // Auto-trigger estimate if brand has no tagline yet
   useEffect(() => {
     if (brandId && pos && !pos.tagline && !genEstimate.isLoading) {
       genEstimate.mutate({ brandId });
@@ -85,95 +101,116 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
   const usedTokens = useMemo(() => approxTokens(brainItems), [brainQuery.data]);
   const pct        = Math.min(100, Math.round((usedTokens / TOKEN_BUDGET) * 100));
   const isFull     = pct >= 90;
-  const meterColor = isFull ? "#EF4444" : pct > 60 ? "#F59E0B" : ORANGE;
+  const meterColor = isFull ? "#EF4444" : pct > 60 ? "#F59E0B" : "#6B6A66";
 
-  const handleFocusBrain = () => {
+  const handleFocusBrain = () =>
     window.dispatchEvent(new CustomEvent("section-priority", { detail: { key: "brandbrain" } }));
-  };
 
   if (!brandId) return null;
 
-  const hasPositioning = !!tagline;
-  const hasAudience    = !!(audA || audB || targetMkt);
-  const hasUSP         = !!(emoUSP || funcUSP);
+  const hasPos      = !!tagline;
+  const hasAudience = !!(audA || audB || targetMkt);
+  const hasUSP      = !!(emoUSP || funcUSP);
+
+  const audienceItems = [targetMkt, audA, audB].filter(Boolean);
 
   return (
     <div style={{
       flexShrink: 0,
-      borderBottom: "1px solid #ECEAE8",
-      background: "#FAFAF9",
-      padding: "10px 18px 8px",
+      borderBottom: `1px solid ${BORDER}`,
+      background: "#FFFFFF",
+      padding: "12px 20px 10px",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
     }}>
 
-      {/* ── Positioning section ── */}
-      {isLoading && !hasPositioning ? (
-        <div style={{ fontSize: 11, color: "#B0AFA9", fontStyle: "italic", marginBottom: 6 }}>
-          AI 正在推估品牌定位…
-        </div>
-      ) : hasPositioning ? (
-        <div style={{ marginBottom: 8 }}>
+      {/* ── Positioning ── */}
+      {genEstimate.isLoading && !hasPos ? (
 
-          {/* Row 1: Tagline */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-            {/* 🧠 icon */}
-            <div style={{
-              width: 20, height: 20, borderRadius: 5, flexShrink: 0,
-              background: `linear-gradient(135deg, ${ORANGE}, #E8631A)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: `0 1px 4px rgba(201,130,58,0.30)`,
-            }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
-                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
-              </svg>
+        /* Loading state */
+        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 8 }}>
+          <BrandIcon />
+          <span style={{ fontSize: 12, color: MUTED, letterSpacing: "0.01em" }}>
+            正在推估品牌定位…
+          </span>
+          <span style={{
+            display: "inline-block", width: 5, height: 5, borderRadius: "50%",
+            background: MUTED, animation: "pulse 1.5s ease-in-out infinite",
+          }} />
+        </div>
+
+      ) : hasPos ? (
+        <div style={{ marginBottom: 9 }}>
+
+          {/* ── Row 1: Icon + Tagline + badge ── */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 5 }}>
+            <div style={{ paddingTop: 1, flexShrink: 0, opacity: 0.85 }}>
+              <BrandIcon />
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1A18", flex: 1, lineHeight: 1.3 }}>
-              {tagline}
-            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                fontSize: 13.5, fontWeight: 650, color: ACCENT,
+                letterSpacing: "-0.01em", lineHeight: 1.35,
+              }}>
+                {tagline}
+              </span>
+            </div>
             {isEstimate && (
               <span style={{
-                fontSize: 9, color: "#E8631A", border: "1px solid #F5C4A8",
-                borderRadius: 4, padding: "1px 5px", fontWeight: 600, flexShrink: 0,
-              }}>✦ 推估中</span>
+                fontSize: 9.5, fontWeight: 500, color: MUTED,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 20, padding: "1px 7px", flexShrink: 0,
+                letterSpacing: "0.03em", marginTop: 2,
+              }}>
+                AI 推估
+              </span>
             )}
           </div>
 
-          {/* Row 2: Value Proposition */}
+          {/* ── Row 2: Value proposition ── */}
           {valueProp && (
-            <div style={{ fontSize: 11, color: "#4A4A45", lineHeight: 1.5, marginBottom: 5, paddingLeft: 26 }}>
-              {typeof valueProp === "string" ? valueProp : JSON.stringify(valueProp)}
-            </div>
+            <p style={{
+              margin: "0 0 7px 25px",
+              fontSize: 12, color: "#5A5955", lineHeight: 1.55,
+              letterSpacing: "0.005em",
+            }}>
+              {valueProp}
+            </p>
           )}
 
-          {/* Row 3: Audience chips */}
+          {/* ── Row 3: Audience ── */}
           {hasAudience && (
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 5, paddingLeft: 26 }}>
-              {targetMkt && (
-                <Chip label={targetMkt} bg="#F2F1EF" text="#6B6A66" border="#E4E3E1" />
-              )}
-              {audA && (
-                <Chip label={audA} bg="#EFF6FF" text="#1D4ED8" border="#BFDBFE" />
-              )}
-              {audB && (
-                <Chip label={audB} bg="#F0FDF4" text="#15803D" border="#BBF7D0" />
-              )}
+            <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginLeft: 25, marginBottom: 5 }}>
+              <span style={{ fontSize: 10.5, color: MUTED, marginRight: 1, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 500 }}>
+                受眾
+              </span>
+              {audienceItems.map((a, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <span style={{ color: BORDER, fontSize: 12, userSelect: "none" }}>·</span>}
+                  <span style={{ fontSize: 11.5, color: "#3D3C39" }}>{a}</span>
+                </React.Fragment>
+              ))}
             </div>
           )}
 
-          {/* Row 4: USP */}
+          {/* ── Row 4: USP ── */}
           {hasUSP && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 26 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginLeft: 25 }}>
               {emoUSP && (
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                  <Chip label="情感" bg="#FFF7ED" text="#C2410C" border="#FED7AA" />
-                  <span style={{ fontSize: 11, color: "#4A4A45", lineHeight: 1.45 }}>{emoUSP}</span>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <span style={{
+                    fontSize: 9.5, fontWeight: 600, color: MUTED,
+                    textTransform: "uppercase", letterSpacing: "0.06em",
+                  }}>情感</span>
+                  <span style={{ fontSize: 11.5, color: "#3D3C39" }}>{emoUSP}</span>
                 </div>
               )}
               {funcUSP && (
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                  <Chip label="功能" bg="#F5F3FF" text="#7C3AED" border="#DDD6FE" />
-                  <span style={{ fontSize: 11, color: "#4A4A45", lineHeight: 1.45 }}>{funcUSP}</span>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <span style={{
+                    fontSize: 9.5, fontWeight: 600, color: MUTED,
+                    textTransform: "uppercase", letterSpacing: "0.06em",
+                  }}>功能</span>
+                  <span style={{ fontSize: 11.5, color: "#3D3C39" }}>{funcUSP}</span>
                 </div>
               )}
             </div>
@@ -181,85 +218,63 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
         </div>
       ) : null}
 
-      {/* ── Divider (only when positioning is shown) ── */}
-      {hasPositioning && (
-        <div style={{ height: 1, background: "#ECEAE8", margin: "6px 0" }} />
-      )}
+      {/* ── Divider ── */}
+      {hasPos && <div style={{ height: 1, background: BORDER, margin: "8px 0 7px" }} />}
 
       {/* ── Brain meter row ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: ORANGE, letterSpacing: 0.2 }}>
-          品牌大腦
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: ACCENT, letterSpacing: "0.01em" }}>
+          品牌知識庫
         </span>
 
-        {brainItems.length === 0 ? (
-          <span style={{
-            fontSize: 10, color: "#C5C3BE",
-            background: "#F2F1EF", border: "1px solid #E4E3E1",
-            borderRadius: 10, padding: "0 6px",
-          }}>尚無知識</span>
-        ) : (
-          <span style={{
-            fontSize: 10, fontWeight: 600, color: "#9B7A55",
-            background: ORANGE_LIGHT, border: `1px solid ${ORANGE_BORDER}`,
-            borderRadius: 10, padding: "0 6px",
-          }}>{brainItems.length} 筆知識</span>
-        )}
+        <span style={{ fontSize: 11, color: brainItems.length > 0 ? "#3D3C39" : MUTED }}>
+          {brainItems.length > 0 ? `${brainItems.length} 筆` : "尚無內容"}
+        </span>
 
-        {/* Token meter */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 5 }}>
+        {/* Meter */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{
-            flex: 1, height: 3, borderRadius: 2,
-            background: "#EDE9E4", overflow: "hidden",
+            flex: 1, height: 2, borderRadius: 1,
+            background: "#EBEBEA", overflow: "hidden",
           }}>
             <div style={{
               height: "100%", width: `${pct}%`,
-              background: meterColor, borderRadius: 2, transition: "width 0.4s",
+              background: meterColor, borderRadius: 1,
+              transition: "width 0.4s ease",
             }} />
           </div>
           <span style={{
-            fontSize: 9, color: isFull ? "#EF4444" : "#9B9990",
-            fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", flexShrink: 0,
+            fontSize: 10, color: isFull ? "#EF4444" : MUTED,
+            fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
           }}>
-            {usedTokens.toLocaleString()} / {TOKEN_BUDGET.toLocaleString()} tokens
+            {usedTokens} / {TOKEN_BUDGET}
           </span>
         </div>
 
-        {/* Focus right panel */}
         <button
           onClick={handleFocusBrain}
           style={{
-            fontSize: 10, color: ORANGE, background: "none", border: "none",
+            fontSize: 11, color: MUTED, background: "none", border: "none",
             cursor: "pointer", fontFamily: "inherit", padding: 0,
-            flexShrink: 0, textDecoration: "underline",
+            flexShrink: 0, letterSpacing: "0.01em",
+            transition: "color 0.15s",
           }}
+          onMouseEnter={e => (e.currentTarget.style.color = ACCENT)}
+          onMouseLeave={e => (e.currentTarget.style.color = MUTED)}
         >
-          查看全部 →
+          查看 →
         </button>
       </div>
 
       {isFull && (
-        <div style={{
-          fontSize: 10, color: "#B91C1C",
-          background: "#FEF2F2", border: "1px solid #FECACA",
-          borderRadius: 6, padding: "4px 8px", marginTop: 5,
+        <p style={{
+          margin: "6px 0 0",
+          fontSize: 10.5, color: "#B91C1C",
+          letterSpacing: "0.01em", lineHeight: 1.4,
         }}>
-          ⚠️ 品牌大腦接近上限，建議刪除舊項目或整合重複內容。
-        </div>
+          ⚠ 知識庫接近上限，建議整合或移除舊項目。
+        </p>
       )}
     </div>
-  );
-}
-
-// ─── Chip helper ──────────────────────────────────────────────────────────────
-function Chip({ label, bg, text, border }: { label: string; bg: string; text: string; border: string }) {
-  return (
-    <span style={{
-      fontSize: 10, padding: "1px 7px", borderRadius: 10,
-      background: bg, color: text, border: `1px solid ${border}`,
-      whiteSpace: "nowrap", flexShrink: 0,
-    }}>
-      {label}
-    </span>
   );
 }
