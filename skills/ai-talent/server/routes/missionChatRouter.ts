@@ -301,6 +301,241 @@ async function generateAndSendPPT(
 }
 // (removed 2026-04-19) executePositioningStep + POSITIONING_STEPS_6 hardcoded 6-step legacy
 
+// ── Squad Full Auto Flow ──────────────────────────────────────────────────────
+/**
+ * Runs all specialist steps (startFromStep..totalSteps) automatically in sequence,
+ * within the same SSE connection. Called after user confirms at step 0 (lead intake).
+ * After all steps complete, triggers Squad Lead synthesis automatically.
+ */
+async function runAutoSquadFlow(params: {
+  leadAgentDetail:      any;
+  workflowSteps:        any[];
+  squadAgents:          any[];
+  squadName:            string;
+  squadMethodology:     string;
+  brand:                Record<string, string>;
+  brandBrain:           Record<string, string[]>;
+  missionTitle:         string;
+  workspace:            string;
+  missionId:            number;
+  initialStepResults:   Record<number, string>;
+  totalSteps:           number;
+  leadSlot:             any;
+  fallbackLeadAgentId:  number | null;
+  send:                 (event: string, data: unknown) => void;
+  userMessage:          string;
+  startFromStep:        number;
+}): Promise<void> {
+  const {
+    leadAgentDetail, workflowSteps, squadAgents, squadName, squadMethodology,
+    brand, brandBrain, missionTitle, workspace, missionId, initialStepResults,
+    totalSteps, leadSlot, fallbackLeadAgentId, send, userMessage, startFromStep,
+  } = params;
+
+  const { resolveStepAgent } = await import("../_core/stepAgentResolver");
+  const normalizeModel = (m?: string | null) =>
+    m ? (m.includes("/") ? m : `openclaw/${m}`) : null;
+
+  // Accumulate step results as we go (seed from DB-fresh results)
+  const autoStepResults: Record<number, string> = { ...initialStepResults };
+
+  const leadName   = leadAgentDetail?.name   ?? (squadName + " Lead");
+  const leadTitle  = leadAgentDetail?.title  ?? "Squad Lead";
+  const leadAvatar = leadAgentDetail?.avatarUrl ?? null;
+
+  for (let stepIdx = startFromStep; stepIdx <= totalSteps; stepIdx++) {
+    const wsIdx = Math.min(stepIdx - 1, workflowSteps.length - 1);
+    const wStep = workflowSteps[wsIdx] ?? {};
+
+    // Resolve specialist slot for this step
+    const currentSlot =
+      resolveStepAgent(wStep, squadAgents)
+      ?? squadAgents.find((a: any) => a.role === (wStep?.owner ?? wStep?.agentRole ?? ""))
+      ?? squadAgents[wsIdx % squadAgents.length]
+      ?? squadAgents[0]
+      ?? null;
+
+    // Load specialist agent details
+    let specialistDetail: any = null;
+    const specId = currentSlot?.agent_id;
+    const leadId = leadSlot?.agent_id ?? fallbackLeadAgentId;
+    if (specId && specId !== leadId) {
+      try {
+        const [sRows] = await localPool.execute(
+          `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill,
+                  methodology, tool_instructions, workingPrinciples
+           FROM agents WHERE id = ? LIMIT 1`,
+          [specId]
+        ) as any[];
+        specialistDetail = (sRows as any[])?.[0] ?? null;
+      } catch (e: any) {
+        console.warn(`[autoFlow] specialist fetch step=${stepIdx}:`, e?.message);
+      }
+    }
+
+    const agentSkill  = specialistDetail?.primarySkill ?? leadAgentDetail?.primarySkill ?? "";
+    const agentModel  = normalizeModel(specialistDetail?.aiModel)
+                     ?? normalizeModel(leadAgentDetail?.aiModel)
+                     ?? "openclaw/pm"; // fallback to pm (valid gateway slug)
+    const stepLabel   = wStep.title ?? wStep.name ?? `Step ${stepIdx}`;
+    const nextStepIdx = stepIdx + 1;
+
+    // Send relay_step running event (Squad Lead as speaking voice, specialist skill context)
+    send("relay_step", {
+      id:          stepIdx,
+      step:        stepIdx,
+      totalSteps,
+      label:       stepLabel,
+      agentId:     leadAgentDetail?.id ?? null,
+      agentName:   leadName,
+      agentTitle:  leadTitle,
+      agentAvatar: leadAvatar,
+      agentSkill,
+      agentModel,
+      agentRole:   currentSlot?.role ?? "",
+      squadName,
+      layer:       "execution",
+      status:      "running",
+    });
+
+    // Build system prompt (specialist context injected into Lead's framework)
+    const systemPrompt = buildSquadAgentPrompt({
+      agent: {
+        name:      leadName,
+        title:     leadTitle,
+        specialty: leadAgentDetail?.specialty,
+        aiModel:   leadAgentDetail?.aiModel,
+      },
+      specialistContext: specialistDetail ? {
+        name:             specialistDetail.name,
+        title:            specialistDetail.title,
+        specialty:        specialistDetail.specialty ?? "",
+        skill:            specialistDetail.primarySkill ?? "",
+        methodology:      specialistDetail.methodology ?? "",
+        toolInstructions: specialistDetail.tool_instructions ?? "",
+      } : undefined,
+      brand,
+      workspace,
+      missionTitle,
+      squadName,
+      squadMethodology,
+      agentRole:       currentSlot?.role ?? leadTitle,
+      workflowStep:    wStep,
+      stepIndex:       stepIdx,
+      totalSteps,
+      previousResults: autoStepResults,
+      brandBrain,
+      isLead:          false,
+    });
+
+    // Build A2A handoff message for this step
+    let effectiveMsg = userMessage;
+    const prevOutput = autoStepResults[stepIdx - 1] ?? null;
+    if (prevOutput) {
+      const prevStepDef  = workflowSteps[Math.min(stepIdx - 2, workflowSteps.length - 1)];
+      const prevTitle    = prevStepDef?.title ?? prevStepDef?.name ?? `Step ${stepIdx - 1}`;
+      effectiveMsg = `【A2A 交接文件 — 來自「${prevTitle}」的成果】\n\n${prevOutput.slice(0, 2500)}\n\n${"─".repeat(40)}\n【你的任務】${wStep.description ?? wStep.title ?? `Step ${stepIdx}`}\n\n請基於上方的交接成果，執行你負責的步驟。`;
+    }
+
+    const messages = [
+      { role: "system" as const, content: systemPrompt },
+      { role: "user" as const, content: effectiveMsg },
+    ];
+
+    // Stream via gateway with fallback
+    let fullOutput = "";
+    try {
+      for await (const { event, data } of streamFromGateway(agentModel, messages)) {
+        send(event, data);
+        if (event === "delta") fullOutput += (data as any).text ?? "";
+      }
+    } catch (e: any) {
+      console.warn(`[autoFlow] gateway failed step=${stepIdx} model=${agentModel}:`, e?.message);
+      // Fallback: gateway pm → then direct LLM
+      if (agentModel !== "openclaw/pm") {
+        try {
+          for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
+            send(event, data);
+            if (event === "delta") fullOutput += (data as any).text ?? "";
+          }
+        } catch (e2: any) {
+          console.warn(`[autoFlow] openclaw/pm also failed step=${stepIdx}:`, e2?.message);
+          for await (const chunk of streamFromLLM(systemPrompt, [], effectiveMsg)) {
+            fullOutput += chunk;
+            send("delta", { text: chunk });
+          }
+        }
+      } else {
+        for await (const chunk of streamFromLLM(systemPrompt, [], effectiveMsg)) {
+          fullOutput += chunk;
+          send("delta", { text: chunk });
+        }
+      }
+    }
+
+    // Empty output guard
+    if (!fullOutput.trim()) {
+      console.warn(`[autoFlow] Gateway empty response step=${stepIdx}, falling back to invokeLLMStream...`);
+      for await (const chunk of streamFromLLM(systemPrompt, [], effectiveMsg)) {
+        fullOutput += chunk;
+        send("delta", { text: chunk });
+      }
+    }
+
+    // Save step result
+    await saveStepResultOnly(localPool as any, missionId, stepIdx, fullOutput);
+
+    // Update local dict for next step's A2A handoff
+    autoStepResults[stepIdx] = fullOutput;
+
+    const hasMore = nextStepIdx <= totalSteps;
+
+    // Send relay_step done — waitForUser: false (auto mode)
+    send("relay_step", {
+      id:            stepIdx,
+      status:        "done",
+      label:         stepLabel,
+      agentName:     leadName,
+      agentTitle:    leadTitle,
+      agentSkill,
+      agentModel,
+      summary:       fullOutput.slice(0, 400),
+      totalSteps,
+      hasMoreSteps:  hasMore,
+      isLastStep:    !hasMore,
+      nextStepIndex: nextStepIdx,
+      waitForUser:   false, // Auto mode: no button needed
+    });
+
+    console.log(`[autoFlow] Step ${stepIdx} done, len=${fullOutput.length}, hasMore=${hasMore}`);
+  }
+
+  // All specialist steps done — re-read fresh results from DB for synthesis
+  const [freshRows] = await (localPool as any).execute(
+    `SELECT stepResults FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
+    [missionId]
+  ) as any[];
+  const freshResults: Record<number, string> = (() => {
+    try { return JSON.parse(freshRows?.[0]?.stepResults ?? "{}"); } catch { return {}; }
+  })();
+
+  // Auto-trigger Squad Lead synthesis
+  await runSquadLeadSynthesis({
+    leadSlot,
+    fallbackLeadAgentId,
+    squadName,
+    squadMethodology,
+    workflowSteps,
+    stepResults: freshResults,
+    totalSteps,
+    brand,
+    brandBrain,
+    missionId,
+    send,
+    agent: { name: leadName, title: leadTitle, specialty: "" },
+  });
+}
+
 // ── Squad Chat 執行器 ─────────────────────────────────────────────────────────
 /**
  * 當 mission 有 squadSlug 時，走 squad agent 分工流程
@@ -313,10 +548,11 @@ async function tryExecuteSquadChat(params: {
   conversationHistory: { role: string; content: string }[];
   workspace?: string;
   squadSlugHint?: string; // client-supplied hint for first-message race condition
+  autoMode?: boolean;     // true = full auto chain all steps; false/undefined = step-by-step
   send: (event: string, data: unknown) => void;
   sessionId: string;
 }): Promise<boolean> {
-  const { userId, missionId, userMessage, conversationHistory, workspace, squadSlugHint, send } = params;
+  const { userId, missionId, userMessage, conversationHistory, workspace, squadSlugHint, autoMode, send } = params;
 
   // ── 1. 從 mission 讀取 squadSlug 與品牌資料 ─────────────────────────────────
   let squadSlug: string | null = null;
@@ -454,6 +690,12 @@ async function tryExecuteSquadChat(params: {
   // 用戶可以選擇：回覆當前 Agent（繼續對話）或說「繼續」跳到下一步
   const isContinueSignal = /^(繼續|继续|continue|next|下一步|go|yes|ok|好的|好|開始|开始|確認|确认|confirm|派遣|開始執行|执行)$/i.test(userMessage.trim());
 
+  // Capture BEFORE advancing — used for full auto mode detection.
+  // Only fire when user is explicitly confirming the lead step output (status=awaiting_reply).
+  const wasAtLeadStep = currentStep === 0;
+  // autoMode must be explicitly true (user clicked "全自動執行" button) — never default
+  const isFullAutoTrigger = wasAtLeadStep && isContinueSignal && session.status === "awaiting_reply" && autoMode === true;
+
   if (session.status === "awaiting_reply") {
     if (isContinueSignal) {
       // 用戶明確要繼續 → 推進到下一步
@@ -546,17 +788,20 @@ async function tryExecuteSquadChat(params: {
   const agentSkill  = specialistDetail?.primarySkill ?? leadAgentDetail?.primarySkill ?? "";
 
   // Model: use specialist's model for step quality; Lead's model for lead/discussion steps
-  // For lead intake (step 0): always use the reliable default model.
-  // For execution steps: prefer the specialist's designated model.
+  // For lead intake (step 0): BYPASS gateway — use invokeLLMStream directly (openrouter/forge).
+  //   Reason: gateway requires "openclaw/{agent_slug}" format. Model names like
+  //   "claude-sonnet-4-6" are NOT valid gateway slugs and silently produce empty streams.
+  //   Squad Lead steps are better served by the direct LLM path which is model-agnostic.
+  // For execution steps: gateway with specialist's DB model (valid agent slug).
   // Normalize DB model slugs → "openclaw/{slug}" gateway format.
   const normalizeModel = (m?: string | null) =>
     m ? (m.includes("/") ? m : `openclaw/${m}`) : null;
 
   const agentModel = isLeadStep
-    ? "openclaw/pm"                                           // Lead intake: always reliable default
+    ? "direct-llm"                                           // Lead intake: bypass gateway (see streaming below)
     : (normalizeModel(specialistDetail?.aiModel)             // Specialist step: use specialist's model
         ?? normalizeModel(leadAgentDetail?.aiModel)          // Fallback: Lead's model
-        ?? "openclaw/pm");                                    // Final fallback
+        ?? "openclaw/pm");                                   // Final fallback (valid gateway slug)
 
   console.log(`[squadChat] Lead="${agentName}", step=${currentStep}, skill="${agentSkill}", model="${agentModel}"`);
 
@@ -695,47 +940,81 @@ async function tryExecuteSquadChat(params: {
   ];
 
   let fullOutput = "";
-  try {
-    for await (const { event, data } of streamFromGateway(agentModel, messages)) {
-      send(event, data);
-      if (event === "delta") fullOutput += (data as any).text ?? "";
-    }
-  } catch (e: any) {
-    console.warn(`[squadChat] gateway failed (model=${agentModel}):`, e?.message);
-    // Try openclaw/pm as reliable secondary gateway model before falling back to direct LLM
-    if (agentModel !== "openclaw/pm") {
-      try {
-        console.log("[squadChat] retrying with openclaw/pm...");
-        for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
-          send(event, data);
-          if (event === "delta") fullOutput += (data as any).text ?? "";
-        }
-      } catch (e2: any) {
-        console.warn("[squadChat] openclaw/pm also failed:", e2?.message);
-        // Final fallback: direct invokeLLMStream
-        for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
-          fullOutput += chunk;
-          send("delta", { text: chunk });
-        }
-      }
-    } else {
-      // Already used pm, go direct
+
+  // ── Squad Lead step: bypass gateway entirely, call LLM directly ────────────
+  // Gateway requires "openclaw/{agent_slug}" format. Model names are NOT valid slugs
+  // and silently produce empty streams. Direct LLM call (openrouter → forge) is reliable.
+  if (isLeadStep) {
+    console.log(`[squadChat] Lead step — using invokeLLMStream directly (skip gateway), step=${currentStep}`);
+    try {
       for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
         fullOutput += chunk;
         send("delta", { text: chunk });
       }
+    } catch (e: any) {
+      console.warn(`[squadChat] invokeLLMStream (openrouter) failed for lead step: ${e?.message}. Trying forge...`);
+      try {
+        // Forge fallback — uses BUILT_IN_FORGE_API_KEY / BUILT_IN_FORGE_API_URL
+        const forgeMessages = [
+          { role: "system" as const, content: systemPrompt },
+          ...recentHistory.slice(-10).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+          { role: "user" as const, content: effectiveUserMessage },
+        ];
+        for await (const chunk of invokeLLMStream({ messages: forgeMessages, maxTokens: 4096, provider: "forge" })) {
+          fullOutput += chunk;
+          send("delta", { text: chunk });
+        }
+      } catch (e2: any) {
+        console.warn(`[squadChat] forge also failed for lead step: ${e2?.message}. Trying gateway pm...`);
+        // Final fallback: gateway with pm (known valid slug)
+        try {
+          for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
+            send(event, data);
+            if (event === "delta") fullOutput += (data as any).text ?? "";
+          }
+        } catch (e3: any) {
+          console.error(`[squadChat] All LLM providers failed for lead step: ${e3?.message}`);
+        }
+      }
+    }
+  } else {
+    // ── Specialist steps: use gateway with agent slug ──────────────────────────
+    const gatewayModel = agentModel === "direct-llm" ? "openclaw/pm" : agentModel;
+    try {
+      for await (const { event, data } of streamFromGateway(gatewayModel, messages)) {
+        send(event, data);
+        if (event === "delta") fullOutput += (data as any).text ?? "";
+      }
+    } catch (e: any) {
+      console.warn(`[squadChat] gateway failed (model=${gatewayModel}):`, e?.message);
+      // Fallback: direct invokeLLMStream
+      try {
+        for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
+          fullOutput += chunk;
+          send("delta", { text: chunk });
+        }
+      } catch (e2: any) {
+        console.warn("[squadChat] invokeLLMStream fallback also failed:", e2?.message);
+      }
     }
   }
 
-  // ── Empty output guard ──────────────────────────────────────────────────────
-  // Gateway sometimes returns HTTP 200 with a valid SSE stream but zero content tokens
-  // (silent empty response). This is NOT an error so the catch block above doesn't fire.
-  // Detect it here and fall back to invokeLLMStream to guarantee a response.
+  // ── Empty output guard (specialist steps / gateway returned empty stream) ───
+  // Gateway sometimes returns HTTP 200 with zero content tokens (silent empty response).
+  // This is NOT caught by the catch block above. Detect it and call invokeLLMStream.
   if (!fullOutput.trim()) {
-    console.warn(`[squadChat] Gateway returned empty content (model=${agentModel}, step=${currentStep}). Falling back to invokeLLMStream...`);
-    for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
-      fullOutput += chunk;
-      send("delta", { text: chunk });
+    console.warn(`[squadChat] Empty output after streaming (step=${currentStep}). Calling invokeLLMStream as final guard...`);
+    try {
+      for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
+        fullOutput += chunk;
+        send("delta", { text: chunk });
+      }
+    } catch (finalErr: any) {
+      console.error(`[squadChat] Final guard also failed: ${finalErr?.message}`);
+      // Send a helpful error message so the user isn't left with empty UI
+      const errMsg = "抱歉，LLM 服務暫時無回應，請稍後再試或聯絡管理員。";
+      fullOutput = errMsg;
+      send("delta", { text: errMsg });
     }
   }
 
@@ -856,6 +1135,46 @@ async function tryExecuteSquadChat(params: {
 
   send("suggestions", { items: suggestions });
 
+  // ── Full Auto Mode ──────────────────────────────────────────────────────────
+  // When user confirmed from lead step (step 0 → "確認/好的/繼續" etc.),
+  // auto-chain ALL remaining specialist steps + synthesis in this same SSE connection.
+  // The "繼續" button still works step-by-step for manual navigation (isFullAutoTrigger=false).
+  if (isFullAutoTrigger && currentStep < totalSteps) {
+    // currentStep is now 1 (step 1 just executed above).
+    // runAutoSquadFlow handles steps (currentStep+1)..totalSteps then synthesis.
+    const [freshRows2] = await (localPool as any).execute(
+      `SELECT stepResults FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
+      [missionId]
+    ) as any[];
+    const freshResults2: Record<number, string> = (() => {
+      try { return JSON.parse(freshRows2?.[0]?.stepResults ?? "{}"); } catch { return {}; }
+    })();
+
+    await runAutoSquadFlow({
+      leadAgentDetail,
+      workflowSteps,
+      squadAgents,
+      squadName,
+      squadMethodology,
+      brand,
+      brandBrain,
+      missionTitle,
+      workspace: workspace ?? "strategy",
+      missionId,
+      initialStepResults: freshResults2,
+      totalSteps,
+      leadSlot,
+      fallbackLeadAgentId,
+      send,
+      userMessage,
+      startFromStep: currentStep + 1, // steps 2..totalSteps
+    });
+    return true;
+  }
+
+  // Edge case: isFullAutoTrigger but only 1 specialist step (currentStep === totalSteps after step 1 ran).
+  // Synthesis was already triggered above by the isLastStep block — nothing more to do.
+
   return true; // 已處理
 }
 
@@ -950,18 +1269,24 @@ async function runSquadLeadSynthesis(params: {
     },
   ];
 
-  // 串流
+  // 串流 — Squad Lead synthesis: bypass gateway, use invokeLLMStream directly
+  // (Same reason as lead intake: gateway requires valid agent slug, not model names)
+  const synthesisUserMsg = "請整合所有成員的分析成果，提出最終的品牌定位建議。";
   let synthesisOutput = "";
   try {
-    for await (const { event, data } of streamFromGateway(leadModel, messages)) {
-      send(event, data);
-      if (event === "delta") synthesisOutput += (data as any).text ?? "";
-    }
-  } catch (e: any) {
-    console.warn("[squadSynthesis] gateway fallback:", e?.message);
-    for await (const chunk of streamFromLLM(synthesisPrompt, [], "請整合所有成員的分析成果，提出最終的品牌定位建議。")) {
+    for await (const chunk of streamFromLLM(synthesisPrompt, [], synthesisUserMsg)) {
       synthesisOutput += chunk;
       send("delta", { text: chunk });
+    }
+  } catch (e: any) {
+    console.warn("[squadSynthesis] invokeLLMStream failed:", e?.message, "— trying gateway pm...");
+    try {
+      for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
+        send(event, data);
+        if (event === "delta") synthesisOutput += (data as any).text ?? "";
+      }
+    } catch (e2: any) {
+      console.error("[squadSynthesis] all providers failed:", e2?.message);
     }
   }
 
@@ -1106,14 +1431,15 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {}, squadSlug: bodySquadSlug } = req.body as {
+  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {}, squadSlug: bodySquadSlug, autoMode } = req.body as {
     userMessage: string;
     conversationHistory: { role: string; content: string }[];
     sessionId?: string;
     missionId?: number;
     workspace?: string;
     brandContext?: Record<string, string>;
-    squadSlug?: string; // client hint for first-message race condition
+    squadSlug?: string;    // client hint for first-message race condition
+    autoMode?: boolean;    // true = full auto; false/undefined = step-by-step
   };
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
@@ -1156,6 +1482,7 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
         conversationHistory,
         workspace,
         squadSlugHint: bodySquadSlug,
+        autoMode,
         send,
         sessionId,
       });
