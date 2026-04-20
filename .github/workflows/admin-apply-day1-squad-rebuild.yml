@@ -1,0 +1,82 @@
+name: Admin — Apply Day 1 (migration + L1 squad rebuild)
+
+# Applies the Day 1 schema migration and L1 brand squad rebuild to
+# the VM's mos_db. Idempotent:
+#   - migration checks information_schema before ALTER
+#   - squad-builder upsert uses slug as UPSERT key
+#   - new lead agents are only created if primarySkill doesn't exist yet
+#
+# Requires confirm=APPLY to run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to run migration + L1 squad rebuild on VM mos_db'
+        required: true
+        type: string
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.confirm == 'APPLY' }}
+    steps:
+      - name: SSH & apply
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os
+            echo "[vm] pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "[vm] installing deps (if needed)..."
+            cd skills/ai-talent
+            if [ ! -d node_modules ]; then
+              npm install
+            fi
+
+            echo ""
+            echo "===== Step 1: DB migration (adds tier + strategy_layer cols) ====="
+            npm run db:migrate
+
+            echo ""
+            echo "===== Step 2: Squad-builder — L1 brand 9 new squads + 9 new lead agents ====="
+            npm run db:build-L1
+
+            echo ""
+            echo "===== Step 3: Verify results ====="
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_USER=${DB_USER:-mos_user}
+            DB_NAME=${DB_NAME:-mos_db}
+
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<'SQL'
+            SELECT 'L1 brand squads after apply:' AS info;
+            SELECT s.id, s.slug, s.name,
+                   JSON_LENGTH(s.agents) AS members,
+                   JSON_LENGTH(t.steps) AS steps,
+                   s.strategy_layer, s.tier
+            FROM agent_squads s
+            LEFT JOIN squad_workflow_templates t ON t.taskType = s.slug
+            WHERE s.strategy_layer='L1_brand' AND s.tier='core'
+            ORDER BY s.id;
+
+            SELECT 'Lead distribution (should be 10 unique skills):' AS info;
+            SELECT COUNT(DISTINCT a.primarySkill) AS unique_lead_skills
+            FROM agent_squads s,
+              JSON_TABLE(s.agents, '$[*]' COLUMNS (
+                agent_id INT PATH '$.agent_id',
+                is_lead BOOLEAN PATH '$.is_lead'
+              )) AS m
+            LEFT JOIN agents a ON a.id = m.agent_id
+            WHERE s.strategy_layer='L1_brand' AND s.tier='core' AND m.is_lead = 1;
+            SQL
+            echo ""
+            echo "[vm] Day 1 applied successfully."
