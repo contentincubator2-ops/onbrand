@@ -226,15 +226,15 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
           ) : hasPos ? (
             <>
               <span style={{
-                fontSize: 13, fontWeight: 650, color: INK,
-                letterSpacing: "-0.01em", lineHeight: 1.35,
+                fontSize: 15.5, fontWeight: 700, color: INK,
+                letterSpacing: "-0.02em", lineHeight: 1.3,
               }}>
                 {tagline}
               </span>
               {valueProp && (
                 <p style={{
                   margin: 0,
-                  fontSize: 11, color: "#5A5955", lineHeight: 1.5,
+                  fontSize: 12.5, color: "#5A5955", lineHeight: 1.55,
                 }}>
                   {valueProp}
                 </p>
@@ -265,21 +265,34 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
               justifyContent: "center",
               gap: 5,
             }}>
-              {/* 受眾 */}
+              {/* 受眾: targetMkt inline with label; audA/audB as sub-items below */}
               {hasAudience && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{
-                    fontSize: 8.5, fontWeight: 700, color: SUBTLE,
-                    textTransform: "uppercase", letterSpacing: "0.08em",
-                  }}>受眾</span>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "1px 5px" }}>
-                    {audience.map((a, i) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && <span style={{ color: BORDER, fontSize: 11 }}>·</span>}
-                        <span style={{ fontSize: 10.5, color: "#3D3C39" }}>{a}</span>
-                      </React.Fragment>
-                    ))}
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {/* Row 1: label + primary market */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{
+                      fontSize: 8.5, fontWeight: 700, color: SUBTLE,
+                      textTransform: "uppercase", letterSpacing: "0.08em",
+                      flexShrink: 0,
+                    }}>受眾</span>
+                    {targetMkt && (
+                      <span style={{ fontSize: 11, color: INK, fontWeight: 600 }}>{targetMkt}</span>
+                    )}
                   </div>
+                  {/* Row 2: sub-audience (audA / audB) */}
+                  {(audA || audB) && (
+                    <div style={{
+                      display: "flex", flexWrap: "wrap", gap: "1px 5px",
+                      paddingLeft: 2,
+                    }}>
+                      {[audA, audB].filter(Boolean).map((a, i) => (
+                        <React.Fragment key={i}>
+                          {i > 0 && <span style={{ color: BORDER, fontSize: 10 }}>·</span>}
+                          <span style={{ fontSize: 10, color: MUTED }}>{a}</span>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
