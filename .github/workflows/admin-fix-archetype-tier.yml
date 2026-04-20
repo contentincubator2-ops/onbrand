@@ -1,0 +1,22 @@
+name: Admin — Fix id=11 tier/layer
+on:
+  workflow_dispatch:
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" "${DB_NAME}" <<SQL
+            UPDATE agent_squads SET tier='core', strategy_layer='L1_brand' WHERE id=11 AND slug='brand-archetype-positioning';
+            SELECT id, slug, tier, strategy_layer FROM agent_squads WHERE strategy_layer='L1_brand' AND tier='core' ORDER BY id;
+            SQL
