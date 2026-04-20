@@ -10,11 +10,18 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
 
-  // DB — all required; no defaults
-  DB_HOST:     z.string().min(1),
-  DB_USER:     z.string().min(1),
-  DB_PASSWORD: z.string().min(1),
-  DB_NAME:     z.string().min(1),
+  // DB — primary DB is mos_db on localhost; these env vars are legacy/optional.
+  // Actual connection uses LOCAL_DB_* (see db.ts + localDb.ts).
+  DB_HOST:     z.string().optional(),
+  DB_USER:     z.string().optional(),
+  DB_PASSWORD: z.string().optional(),
+  DB_NAME:     z.string().optional(),
+
+  // mos_db local connection (preferred)
+  LOCAL_DB_HOST:     z.string().optional(),
+  LOCAL_DB_USER:     z.string().optional(),
+  LOCAL_DB_PASSWORD: z.string().optional(),
+  LOCAL_DB_NAME:     z.string().optional(),
 
   // JWT — required and minimum length enforced
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),

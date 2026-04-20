@@ -1,13 +1,11 @@
-name: Admin - Add tagline + savedSquadFlow to missions
+name: Admin - Add tagline + savedSquadFlow to missions (mos_db)
 
-# Adds 3 columns to `missions` table in the LIVE DB (whatever pm2 is using):
+# Adds columns to `missions` table in mos_db (localhost):
 #   - tagline        VARCHAR(255)  品牌定位標語
 #   - subTagline     VARCHAR(255)  品牌定位副標語
 #   - savedSquadFlow TEXT          User-customized squad steps JSON
 #
-# DB creds are read from `pm2 jlist` (matches the running marketing-os
-# process) so this hits Azure sowork_db in production, not the local mos_db.
-#
+# mos_db is now the single source of truth (sowork_db dependency removed).
 # Safe to re-run: uses INFORMATION_SCHEMA idempotency check.
 
 on:
@@ -33,61 +31,43 @@ jobs:
             set -e
             cd /home/azureuser/marketing-os
 
-            # Pull live DB creds from pm2 env (same pattern as diagnose/backfill)
-            eval "$(pm2 jlist 2>/dev/null | node -e "
-              let d=''; process.stdin.on('data',c=>d+=c);
-              process.stdin.on('end',()=>{
-                try{
-                  const procs=JSON.parse(d);
-                  const p=procs.find(x=>x.pm2_env&&x.pm2_env.DB_HOST);
-                  if(!p) process.exit(0);
-                  const e=p.pm2_env;
-                  console.log('export DB_HOST=' + JSON.stringify(e.DB_HOST));
-                  console.log('export DB_USER=' + JSON.stringify(e.DB_USER));
-                  console.log('export DB_PASSWORD=' + JSON.stringify(e.DB_PASSWORD));
-                  console.log('export DB_NAME=' + JSON.stringify(e.DB_NAME));
-                }catch(e){}
-              });
-            ")"
-            [ -z "$DB_HOST" ] && { set -a; source skills/ai-talent/.env; set +a; }
-
+            # mos_db — always localhost
+            MOS="mysql -h localhost -u mos_user -pmos_secure_2026 mos_db"
             CONFIRM="${{ github.event.inputs.confirm }}"
-            MYSQL="mysql --ssl-mode=REQUIRED -h $DB_HOST -u $DB_USER -p$DB_PASSWORD $DB_NAME"
 
             echo "======================================================"
-            echo "Mission Extras Migration (mode=$CONFIRM)"
-            echo "Target DB: $DB_HOST / $DB_NAME"
+            echo "Mission Extras Migration → mos_db (mode=$CONFIRM)"
             echo "======================================================"
             echo ""
             echo "=== Current missions table schema ==="
-            $MYSQL -e "DESCRIBE missions;" 2>&1
+            $MOS -e "DESCRIBE missions;" 2>&1
 
             if [ "$CONFIRM" = "MIGRATE" ]; then
               echo ""
               echo "=== Applying migration ==="
 
               # tagline
-              HAS_TAGLINE=$($MYSQL -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='missions' AND COLUMN_NAME='tagline';" 2>/dev/null)
+              HAS_TAGLINE=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='tagline';" 2>/dev/null)
               if [ "$HAS_TAGLINE" = "0" ]; then
-                $MYSQL -e "ALTER TABLE missions ADD COLUMN tagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位標語';" 2>&1
+                $MOS -e "ALTER TABLE missions ADD COLUMN tagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位標語';" 2>&1
                 echo "  + tagline column added"
               else
                 echo "  = tagline already exists, skipping"
               fi
 
               # subTagline
-              HAS_SUB=$($MYSQL -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='missions' AND COLUMN_NAME='subTagline';" 2>/dev/null)
+              HAS_SUB=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='subTagline';" 2>/dev/null)
               if [ "$HAS_SUB" = "0" ]; then
-                $MYSQL -e "ALTER TABLE missions ADD COLUMN subTagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位副標語';" 2>&1
+                $MOS -e "ALTER TABLE missions ADD COLUMN subTagline VARCHAR(255) DEFAULT NULL COMMENT '品牌定位副標語';" 2>&1
                 echo "  + subTagline column added"
               else
                 echo "  = subTagline already exists, skipping"
               fi
 
               # savedSquadFlow
-              HAS_FLOW=$($MYSQL -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='missions' AND COLUMN_NAME='savedSquadFlow';" 2>/dev/null)
+              HAS_FLOW=$($MOS -N -B -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='missions' AND COLUMN_NAME='savedSquadFlow';" 2>/dev/null)
               if [ "$HAS_FLOW" = "0" ]; then
-                $MYSQL -e "ALTER TABLE missions ADD COLUMN savedSquadFlow TEXT DEFAULT NULL COMMENT 'User-customized squad steps JSON';" 2>&1
+                $MOS -e "ALTER TABLE missions ADD COLUMN savedSquadFlow TEXT DEFAULT NULL COMMENT 'User-customized squad steps JSON';" 2>&1
                 echo "  + savedSquadFlow column added"
               else
                 echo "  = savedSquadFlow already exists, skipping"
@@ -95,10 +75,10 @@ jobs:
 
               echo ""
               echo "=== Post-migration schema ==="
-              $MYSQL -e "DESCRIBE missions;" 2>&1
+              $MOS -e "DESCRIBE missions;" 2>&1
 
               echo ""
-              echo "=== Restarting pm2 to pick up new Drizzle schema ==="
+              echo "=== Restarting pm2 ==="
               pm2 restart marketing-os 2>&1 || pm2 restart all 2>&1
               echo "pm2 restart triggered"
 

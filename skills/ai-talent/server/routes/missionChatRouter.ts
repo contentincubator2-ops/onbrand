@@ -30,35 +30,12 @@ import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
-import { createPool as createMysqlPool } from "mysql2/promise";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 
-// ── Azure mainPool — for missions + brands (written by tRPC via getDb()) ──────
-// localPool → mos_db (squads, agents, sessions, embeddings, brand_brain)
-// mainPool  → DB_HOST env (Azure sowork_db: missions, brands, users)
-let _mainPool: ReturnType<typeof createMysqlPool> | null = null;
-function getMainPool() {
-  if (_mainPool) return _mainPool;
-  const host = process.env.DB_HOST;
-  const user = process.env.DB_USER;
-  const pass = process.env.DB_PASSWORD;
-  const db   = process.env.DB_NAME;
-  if (!host || !user || !pass || !db) {
-    // Fallback to localPool if env not set (dev/test environment)
-    return localPool as any;
-  }
-  _mainPool = createMysqlPool({
-    host,
-    user,
-    password: pass,
-    database: db,
-    ssl: host !== "localhost" && host !== "127.0.0.1" ? { rejectUnauthorized: false } : undefined,
-    connectionLimit: 10,
-    waitForConnections: true,
-    queueLimit: 0,
-  });
-  return _mainPool;
-}
+// ── All data lives in mos_db — use localPool throughout ──────────────────────
+// localPool → mos_db on localhost (missions, brands, squads, agents, sessions, …)
+// No more Azure sowork_db dependency.
+
 import { invokeLLMStream } from "../_core/llm";
 import { loadAgentContext } from "../agentContextLoader";
 import { createRequire } from "module";
@@ -342,11 +319,11 @@ async function tryExecuteSquadChat(params: {
   let missionTitle = "";
 
   try {
-    // missions + brands live in Azure sowork_db → use mainPool (not localPool/mos_db)
-    const [mRows] = await getMainPool().execute(
+    // All data lives in mos_db — use localPool
+    const [mRows] = await localPool.execute(
       `SELECT m.squadSlug, m.title, m.brandId,
               b.name, b.industry, b.description, b.targetAudience,
-              b.tagline, b.website
+              b.brandVoice, b.tagline, b.positioningSummary, b.website
        FROM missions m
        LEFT JOIN brands b ON b.id = m.brandId
        WHERE m.id = ? LIMIT 1`,
@@ -358,9 +335,9 @@ async function tryExecuteSquadChat(params: {
     const resolvedSlug = m?.squadSlug ?? squadSlugHint ?? null;
     if (!resolvedSlug) return false; // 沒有 squad，讓 caller 走一般路徑
 
-    // If slug came from hint, persist it now so future calls see it in DB (Azure)
+    // If slug came from hint, persist it now so future calls see it in DB
     if (!m?.squadSlug && squadSlugHint) {
-      await getMainPool().execute(
+      await localPool.execute(
         `UPDATE missions SET squadSlug = ? WHERE id = ?`,
         [squadSlugHint, missionId]
       ).catch(() => {}); // non-fatal
@@ -374,9 +351,9 @@ async function tryExecuteSquadChat(params: {
       industry:           m.industry ?? "",
       description:        m.description ?? "",
       targetAudience:     m.targetAudience ?? "",
-      brandVoice:         "",   // not in Azure brands table — omitted from SELECT
+      brandVoice:         m.brandVoice ?? "",
       tagline:            m.tagline ?? "",
-      positioningSummary: "",   // not in Azure brands table — omitted from SELECT
+      positioningSummary: m.positioningSummary ?? "",
       website:            m.website ?? "",
     };
   } catch (e: any) {
@@ -1081,7 +1058,7 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
     const enrichedBrandCtx: Record<string, string> = {};
     if (missionId) {
       try {
-        const [mBrandRows] = await getMainPool().execute(
+        const [mBrandRows] = await localPool.execute(
           `SELECT m.brandId, b.name, b.industry, b.description, b.website
            FROM missions m LEFT JOIN brands b ON b.id = m.brandId
            WHERE m.id = ? LIMIT 1`,
@@ -1112,7 +1089,7 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
     let missionTitle = "";
     if (missionId) {
       try {
-              const [mRows] = await getMainPool().execute(
+        const [mRows] = await localPool.execute(
           `SELECT title FROM missions WHERE id=? LIMIT 1`,
           [missionId]
         ) as any;

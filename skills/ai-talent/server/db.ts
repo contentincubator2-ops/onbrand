@@ -1,7 +1,12 @@
 /**
  * Database connection — Drizzle ORM over MySQL2
- * Uses connection pool for concurrency + graceful shutdown support.
- * Env vars are required; missing vars throw at startup.
+ *
+ * ✅ All data lives in mos_db (localhost VM).
+ *    getDb()       → mos_db (primary, via LOCAL_DB_* env or hardcoded mos defaults)
+ *    getSoworkDb() → alias of getDb() (sowork_db dependency fully removed)
+ *
+ * LOCAL_DB_HOST / LOCAL_DB_USER / LOCAL_DB_PASSWORD / LOCAL_DB_NAME
+ *   → default to localhost / mos_user / mos_secure_2026 / mos_db
  */
 
 import { drizzle } from "drizzle-orm/mysql2";
@@ -17,32 +22,17 @@ let pool: Pool | null = null;
 export async function getDb(): Promise<DB> {
   if (db) return db;
 
-  // SEC-1: Require all env vars — no hardcoded fallbacks allowed
-  const host = process.env.DB_HOST;
-  const user = process.env.DB_USER;
-  const password = process.env.DB_PASSWORD;
-  const database = process.env.DB_NAME;
-
-  if (!host || !user || !password || !database) {
-    throw new Error(
-      "[db] Missing required env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME"
-    );
-  }
-
-  // SEC-2: Use connection pool instead of single connection
-  // STAB-2: keepAlive prevents silent connection drops on idle pools
   pool = createPool({
-    host,
-    user,
-    password,
-    database,
-    ssl: { rejectUnauthorized: false }, // enforce SSL cert verification in production
-    connectionLimit: 10,
-    waitForConnections: true,
-    queueLimit: 0,
-    connectTimeout: 10_000,
-    idleTimeout: 60_000,
-    enableKeepAlive: true,
+    host:     process.env.LOCAL_DB_HOST     || "localhost",
+    user:     process.env.LOCAL_DB_USER     || "mos_user",
+    password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+    database: process.env.LOCAL_DB_NAME     || "mos_db",
+    connectionLimit:      10,
+    waitForConnections:   true,
+    queueLimit:           0,
+    connectTimeout:       10_000,
+    idleTimeout:          60_000,
+    enableKeepAlive:      true,
     keepAliveInitialDelay: 10_000,
   });
 
@@ -61,56 +51,21 @@ export async function pingDb(): Promise<boolean> {
   }
 }
 
-// sowork_db read-only connection (for agents, market_data, agent_knowledge_base)
-let soworkDb: ReturnType<typeof drizzle> | null = null;
-let soworkPool: Pool | null = null;
-
-export async function getSoworkDb(): Promise<ReturnType<typeof drizzle>> {
-  if (soworkDb) return soworkDb;
-
-  const host = process.env.SOWORK_DB_HOST ?? process.env.DB_HOST;
-  const user = process.env.SOWORK_DB_USER ?? process.env.DB_USER;
-  const password = process.env.SOWORK_DB_PASSWORD ?? process.env.DB_PASSWORD;
-
-  if (!host || !user || !password) {
-    throw new Error("[db] Missing sowork DB connection vars");
-  }
-
-  soworkPool = createPool({
-    host,
-    user,
-    password,
-    database: process.env.SOWORK_DB_NAME ?? process.env.DB_NAME ?? "mos_db",
-    ssl: { rejectUnauthorized: false },
-    connectionLimit: 5,
-    waitForConnections: true,
-  });
-
-  soworkDb = drizzle(soworkPool, { mode: "default" });
-  return soworkDb;
+// getSoworkDb — now an alias for getDb() (mos_db).
+// sowork_db Azure dependency is fully removed.
+export async function getSoworkDb(): Promise<DB> {
+  return getDb();
 }
 
-// STAB-7: Health check for sowork_db — mirrors pingDb() for main DB
 export async function pingSoworkDb(): Promise<boolean> {
-  try {
-    const database = await getSoworkDb();
-    await database.execute(sql`SELECT 1`);
-    return true;
-  } catch {
-    return false;
-  }
+  return pingDb();
 }
 
 export function getPool(): Pool | null { return pool; }
 
 // DEBT-2: Graceful shutdown — drain pool before process exits
 export async function closeDb(): Promise<void> {
-  const closing: Promise<void>[] = [];
-  if (pool) closing.push(pool.end());
-  if (soworkPool) closing.push(soworkPool.end());
-  await Promise.all(closing);
+  if (pool) await pool.end();
   db = null;
   pool = null;
-  soworkDb = null;
-  soworkPool = null;
 }

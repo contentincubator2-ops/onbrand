@@ -10,16 +10,15 @@ import mysql from "mysql2/promise";
 
 export const exportsRouter = Router();
 
-// ── Azure MySQL Pool ──────────────────────────────────────────────────────────
+// ── mos_db Pool ───────────────────────────────────────────────────────────────
 let _pool: mysql.Pool | null = null;
 function getPool(): mysql.Pool {
   if (!_pool) {
     _pool = mysql.createPool({
-      host: process.env.DB_HOST!,
-      user: process.env.DB_USER!,
-      password: process.env.DB_PASSWORD!,
-      database: process.env.DB_NAME!,
-      ssl: { rejectUnauthorized: false },
+      host:     process.env.LOCAL_DB_HOST     || "localhost",
+      user:     process.env.LOCAL_DB_USER     || "mos_user",
+      password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+      database: process.env.LOCAL_DB_NAME     || "mos_db",
       connectionLimit: 5,
     });
   }

@@ -16,11 +16,10 @@ import mysql from "mysql2/promise";
 
 function getDbPool() {
   return mysql.createPool({
-    host: process.env.DB_HOST!,
-    user: process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.DB_NAME!,
-    ssl: { rejectUnauthorized: false },
+    host:     process.env.LOCAL_DB_HOST     || "localhost",
+    user:     process.env.LOCAL_DB_USER     || "mos_user",
+    password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+    database: process.env.LOCAL_DB_NAME     || "mos_db",
     connectionLimit: 5,
   });
 }
