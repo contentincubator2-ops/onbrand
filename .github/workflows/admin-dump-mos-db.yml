@@ -42,20 +42,23 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
             "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" bash <<'ENDSSH'
-          set -e
           cd /home/azureuser/marketing-os
-          DB_HOST=$(grep -E '^LOCAL_DB_HOST=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
-          DB_PORT=$(grep -E '^LOCAL_DB_PORT=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
-          DB_USER=$(grep -E '^LOCAL_DB_USER=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
-          DB_PASS=$(grep -E '^LOCAL_DB_PASSWORD=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
-          DB_NAME=$(grep -E '^LOCAL_DB_NAME=' skills/ai-talent/.env | cut -d= -f2- | tr -d '"')
+          ENV_FILE=skills/ai-talent/.env
+          # Extract using DB_* prefix (what the VM actually uses)
+          DB_HOST=$(grep -E '^DB_HOST=' $ENV_FILE | cut -d= -f2- | tr -d '"' | tr -d "'")
+          DB_PORT=$(grep -E '^DB_PORT=' $ENV_FILE | cut -d= -f2- | tr -d '"' | tr -d "'")
+          DB_USER=$(grep -E '^DB_USER=' $ENV_FILE | cut -d= -f2- | tr -d '"' | tr -d "'")
+          DB_PASS=$(grep -E '^DB_PASSWORD=' $ENV_FILE | cut -d= -f2- | tr -d '"' | tr -d "'")
+          DB_NAME=$(grep -E '^DB_NAME=' $ENV_FILE | cut -d= -f2- | tr -d '"' | tr -d "'")
           DB_HOST=${DB_HOST:-127.0.0.1}
           DB_PORT=${DB_PORT:-3306}
           DB_USER=${DB_USER:-mos_user}
           DB_NAME=${DB_NAME:-mos_db}
           echo "[vm] dumping ${DB_NAME} as ${DB_USER} from ${DB_HOST}:${DB_PORT}"
+          echo "[vm] password length: ${#DB_PASS}"
 
-          # Write dump WITHOUT piping to gzip first, so we can see exit status
+          # Write dump; capture exit code without aborting via set -e
+          set +e
           mysqldump \
             --host="${DB_HOST}" \
             --port="${DB_PORT}" \
@@ -69,13 +72,19 @@ jobs:
             --no-tablespaces \
             "${DB_NAME}" > /tmp/mos_db_latest.sql 2>/tmp/mysqldump.err
           DUMP_STATUS=$?
+          set -e
+
           echo "[vm] mysqldump exit=${DUMP_STATUS}"
           if [ -s /tmp/mysqldump.err ]; then
             echo "[vm] stderr from mysqldump:"
             cat /tmp/mysqldump.err
           fi
           ls -lh /tmp/mos_db_latest.sql
-          head -20 /tmp/mos_db_latest.sql || true
+          head -5 /tmp/mos_db_latest.sql || true
+          if [ "${DUMP_STATUS}" -ne 0 ]; then
+            echo "[vm] DUMP FAILED"
+            exit 1
+          fi
           gzip -9f /tmp/mos_db_latest.sql
           ls -lh /tmp/mos_db_latest.sql.gz
           echo "[vm] dump done"
