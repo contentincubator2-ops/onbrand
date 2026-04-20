@@ -1,10 +1,9 @@
-name: Admin — Apply Day 1 (migration + L1 squad rebuild)
+name: Admin — Apply L1 + L2 squads to VM
 
-# Applies the Day 1 schema migration and L1 brand squad rebuild to
-# the VM's mos_db. Idempotent:
+# Applies migration + L1 + L2 squad rebuild to VM mos_db. Idempotent:
 #   - migration checks information_schema before ALTER
 #   - squad-builder upsert uses slug as UPSERT key
-#   - new lead agents are only created if primarySkill doesn't exist yet
+#   - new lead agents only created if primarySkill doesn't exist yet
 #
 # Requires confirm=APPLY to run.
 
@@ -50,7 +49,11 @@ jobs:
             npm run db:build-L1
 
             echo ""
-            echo "===== Step 3: Verify results ====="
+            echo "===== Step 3: Squad-builder — L2 product 10 new squads + 10 new lead agents ====="
+            npm run db:build-L2
+
+            echo ""
+            echo "===== Step 4: Verify results ====="
             DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
             DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
             DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
@@ -58,17 +61,22 @@ jobs:
             DB_NAME=${DB_NAME:-mos_db}
 
             mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<'SQL'
-            SELECT 'L1 brand squads after apply:' AS info;
-            SELECT s.id, s.slug, s.name,
+            SELECT 'L1 + L2 squads after apply:' AS info;
+            SELECT s.id, s.strategy_layer, s.slug, s.name,
                    JSON_LENGTH(s.agents) AS members,
-                   JSON_LENGTH(t.steps) AS steps,
-                   s.strategy_layer, s.tier
+                   JSON_LENGTH(t.steps) AS steps
             FROM agent_squads s
             LEFT JOIN squad_workflow_templates t ON t.taskType = s.slug
-            WHERE s.strategy_layer='L1_brand' AND s.tier='core'
-            ORDER BY s.id;
+            WHERE s.strategy_layer IN ('L1_brand','L2_product') AND s.tier='core'
+            ORDER BY s.strategy_layer, s.id;
 
-            SELECT 'Lead distribution (should be 10 unique skills):' AS info;
+            SELECT 'Layer count:' AS info;
+            SELECT strategy_layer, COUNT(*) AS squad_count
+            FROM agent_squads
+            WHERE strategy_layer IN ('L1_brand','L2_product') AND tier='core'
+            GROUP BY strategy_layer;
+
+            SELECT 'Unique lead primarySkills (should = 20 total for L1+L2):' AS info;
             SELECT COUNT(DISTINCT a.primarySkill) AS unique_lead_skills
             FROM agent_squads s,
               JSON_TABLE(s.agents, '$[*]' COLUMNS (
@@ -76,7 +84,7 @@ jobs:
                 is_lead BOOLEAN PATH '$.is_lead'
               )) AS m
             LEFT JOIN agents a ON a.id = m.agent_id
-            WHERE s.strategy_layer='L1_brand' AND s.tier='core' AND m.is_lead = 1;
+            WHERE s.strategy_layer IN ('L1_brand','L2_product') AND s.tier='core' AND m.is_lead = 1;
             SQL
             echo ""
-            echo "[vm] Day 1 applied successfully."
+            echo "[vm] L1 + L2 applied successfully."

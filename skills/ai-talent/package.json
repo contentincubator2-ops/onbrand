@@ -24,6 +24,8 @@
     "db:classify-squads": "tsx scripts/classify-squads-tier.ts",
     "db:build-L1": "tsx scripts/squad-builder/index.ts L1-brand",
     "db:build-L1-dry": "tsx scripts/squad-builder/index.ts L1-brand --dry-run",
+    "db:build-L2": "tsx scripts/squad-builder/index.ts L2-product",
+    "db:build-L2-dry": "tsx scripts/squad-builder/index.ts L2-product --dry-run",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
     "lint": "tsc --noEmit"
