@@ -1926,9 +1926,45 @@ function RightPanel({
     {
       key: "brandbrain",
       label: "品牌大腦",
-      // Priority badge shown when this section is the current focus
       content: <BrandBrainTab brandId={brandId} />,
     },
+    // Commercial Validation — only shown when squad has showcases
+    ...((agentsData?.showcases ?? []).length > 0 ? [{
+      key: "validation",
+      label: "Commercial Validation",
+      content: (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {(agentsData?.showcases ?? []).map((sc: any, i: number) => (
+            <div key={i} style={{
+              background: "#FAFAF9",
+              border: "1px solid #E7E5E4",
+              borderLeft: "3px solid #D6B96B",
+              borderRadius: 6,
+              padding: "9px 10px",
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 3 }}>
+                {sc.company ?? sc.brand ?? "案例"}
+              </div>
+              {sc.result && (
+                <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5, marginBottom: 3 }}>
+                  {sc.result}
+                </div>
+              )}
+              {sc.description && (
+                <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.4 }}>
+                  {sc.description}
+                </div>
+              )}
+              {sc.source && (
+                <div style={{ fontSize: 9, color: "#B5B4B0", marginTop: 4, fontStyle: "italic" }}>
+                  {sc.source}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ),
+    }] : []),
   ];
 
   // Dynamic section ordering: lift prioritized section to top
@@ -1996,22 +2032,74 @@ function RightPanel({
         onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "rgba(26,26,24,0.08)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
       />
+      {/* ── Section selector bar (top) — Claude Code style ── */}
+      <div style={{
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        padding: "6px 8px 5px",
+        borderBottom: "1px solid #E4E3E1",
+        overflowX: "auto",
+        background: "rgba(250,250,249,0.95)",
+      }}>
+        {sections.map((section) => {
+          const isOpen = !!openSections[section.key];
+          const isPri  = section.key === sectionPriority;
+          return (
+            <button
+              key={section.key}
+              onClick={() => {
+                setOpenSections(prev => ({ ...prev, [section.key]: !prev[section.key] }));
+                // scroll section into view after opening
+                setTimeout(() => {
+                  const el = document.getElementById(`rp-section-${section.key}`);
+                  el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }, 50);
+              }}
+              style={{
+                flexShrink: 0,
+                padding: "2px 8px",
+                borderRadius: 5,
+                border: "none",
+                fontSize: 10.5, fontWeight: isOpen ? 600 : 400,
+                cursor: "pointer", fontFamily: "inherit",
+                background: isOpen
+                  ? (isPri ? "rgba(201,130,58,0.12)" : "rgba(26,26,24,0.08)")
+                  : "transparent",
+                color: isPri ? "#C9823A" : (isOpen ? "#1A1A18" : "#9B9990"),
+                transition: "all 0.15s",
+                whiteSpace: "nowrap",
+              }}
+              onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.05)"; }}
+              onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+            >
+              {section.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Section cards ── */}
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px 12px" }} className="right-panel-scroll">
         {sections.map((section, idx) => {
           const isPriority = section.key === sectionPriority && idx === 0;
           const isOpen = !!openSections[section.key];
           return (
-            <div key={section.key} style={{
-              marginBottom: 8,
-              borderRadius: 8,
-              border: `1px solid ${isPriority ? "#E8C99A" : "#E0DFDb"}`,
-              overflow: "hidden",
-              boxShadow: isPriority
-                ? "0 2px 10px rgba(201,130,58,0.12), 0 1px 3px rgba(0,0,0,0.06)"
-                : "0 1px 6px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
-              position: "relative",
-              transition: "box-shadow 0.25s, border-color 0.25s",
-            }}>
+            <div
+              id={`rp-section-${section.key}`}
+              key={section.key}
+              style={{
+                marginBottom: 8,
+                borderRadius: 8,
+                border: `1px solid ${isPriority ? "#E8C99A" : "#E0DFDb"}`,
+                overflow: "hidden",
+                boxShadow: isPriority
+                  ? "0 2px 10px rgba(201,130,58,0.12), 0 1px 3px rgba(0,0,0,0.06)"
+                  : "0 1px 6px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
+                position: "relative",
+                transition: "box-shadow 0.25s, border-color 0.25s",
+              }}>
               {/* Neural pattern background */}
               <div style={{
                 position: "absolute", inset: 0,
@@ -2028,54 +2116,76 @@ function RightPanel({
                 transition: "background 0.25s",
               }} />
 
-              {/* ── Panel header — Claude Code style ── */}
-              <button
-                onClick={() => toggleSection(section.key)}
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "8px 10px",
-                  background: "transparent", border: "none",
-                  borderBottom: isOpen ? `1px solid ${isPriority ? "#F0DFC0" : "#ECEAE8"}` : "none",
-                  cursor: "pointer", fontFamily: "inherit",
-                  userSelect: "none",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.04)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-              >
-                {/* Left: dot indicator + label */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {/* Active dot */}
+              {/* ── Panel header ── */}
+              <div style={{
+                position: "relative",
+                display: "flex", alignItems: "center",
+                borderBottom: isOpen ? `1px solid ${isPriority ? "#F0DFC0" : "#ECEAE8"}` : "none",
+              }}>
+                {/* Toggle button (takes most of the width) */}
+                <button
+                  onClick={() => toggleSection(section.key)}
+                  style={{
+                    flex: 1,
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 8px 8px 10px",
+                    background: "transparent", border: "none",
+                    cursor: "pointer", fontFamily: "inherit",
+                    userSelect: "none", textAlign: "left",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.04)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+                >
+                  {/* Dot */}
                   <span style={{
                     width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
                     background: isPriority ? "#C9823A" : (isOpen ? "#1A1A18" : "#C8C7C3"),
                     opacity: isPriority ? 1 : (isOpen ? 0.5 : 0.35),
                     transition: "background 0.2s, opacity 0.2s",
                   }} />
+                  {/* Label */}
                   <span style={{
                     fontSize: 11, fontWeight: 600,
                     color: isPriority ? "#C9823A" : (isOpen ? "#1A1A18" : "#6B6A66"),
-                    letterSpacing: "0.02em",
+                    letterSpacing: "0.02em", flex: 1,
                     transition: "color 0.2s",
                   }}>
                     {section.label}
                   </span>
-                </div>
+                  {/* Chevron */}
+                  <svg
+                    width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    stroke={isPriority ? "#C9823A" : "#9B9990"} strokeWidth="2.5" strokeLinecap="round"
+                    style={{
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s ease", flexShrink: 0,
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
 
-                {/* Right: chevron */}
-                <svg
-                  width="12" height="12" viewBox="0 0 24 24" fill="none"
-                  stroke={isPriority ? "#C9823A" : "#9B9990"} strokeWidth="2.5" strokeLinecap="round"
+                {/* X close button */}
+                <button
+                  onClick={() => setOpenSections(prev => ({ ...prev, [section.key]: false }))}
+                  title="關閉此面板"
                   style={{
-                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease",
                     flexShrink: 0,
+                    width: 24, height: 32,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "transparent", border: "none",
+                    cursor: "pointer", color: "#C8C7C3",
+                    fontSize: 14, lineHeight: 1,
+                    paddingRight: 6,
+                    opacity: isOpen ? 1 : 0.4,
+                    transition: "color 0.15s, opacity 0.15s",
                   }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#9B9990"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#C8C7C3"; }}
                 >
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </button>
+                  ×
+                </button>
+              </div>
 
               {/* ── Section body — independent scroll ── */}
               {isOpen && (
@@ -2223,48 +2333,7 @@ function DBSquadMethodologyPanel({
         </div>
       )}
 
-      {/* 商業驗證 showcases */}
-      {showcases.length > 0 && (
-        <>
-          <div style={{ height: 1, background: "#E7E5E4", margin: "14px 0 12px" }} />
-          <div style={{
-            fontSize: 10, fontWeight: 600, color: "#9B9990", marginBottom: 8,
-            letterSpacing: 0.8, textTransform: "uppercase" as const,
-          }}>
-            Commercial Validation
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {showcases.map((sc: any, i: number) => (
-              <div key={i} style={{
-                background: "#FAFAF9",
-                border: "1px solid #E7E5E4",
-                borderLeft: "3px solid #D6B96B",
-                borderRadius: 6,
-                padding: "9px 10px",
-              }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 3 }}>
-                  {sc.company ?? sc.brand ?? "案例"}
-                </div>
-                {sc.result && (
-                  <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5, marginBottom: 3 }}>
-                    {sc.result}
-                  </div>
-                )}
-                {sc.description && (
-                  <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.4 }}>
-                    {sc.description}
-                  </div>
-                )}
-                {sc.source && (
-                  <div style={{ fontSize: 9, color: "#B5B4B0", marginTop: 4, fontStyle: "italic" }}>
-                    {sc.source}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      {/* showcases moved to dedicated "validation" section in RightPanel */}
     </div>
   );
 }
