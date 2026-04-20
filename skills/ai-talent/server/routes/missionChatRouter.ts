@@ -516,17 +516,20 @@ async function tryExecuteSquadChat(params: {
   }
 
   // 4b. 本步驟 Specialist（技能框架注入，非對話主體）
+  // Load full skill documentation: methodology + tool_instructions + workingPrinciples
   let specialistDetail: any = null;
   if (!isLeadStep) {
     const specId = currentSlot?.agent_id;
     if (specId && specId !== leadId) {
       try {
         const [sRows] = await localPool.execute(
-          `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill
+          `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill,
+                  methodology, tool_instructions, workingPrinciples
            FROM agents WHERE id = ? LIMIT 1`,
           [specId]
         ) as any[];
         specialistDetail = (sRows as any[])?.[0] ?? null;
+        console.log(`[squadChat] Specialist skill docs: ${specialistDetail?.name}, methodology=${!!specialistDetail?.methodology}, tools=${!!specialistDetail?.tool_instructions}`);
       } catch (e: any) {
         console.warn("[squadChat] specialist agent fetch:", e?.message);
       }
@@ -608,11 +611,14 @@ async function tryExecuteSquadChat(params: {
       aiModel:   leadAgentDetail?.aiModel,
     },
     // Specialist skill framework injected into Lead's context (non-lead steps only)
+    // Includes full skill documentation: methodology + tool_instructions
     specialistContext: specialistDetail ? {
-      name:      specialistDetail.name,
-      title:     specialistDetail.title,
-      specialty: specialistDetail.specialty ?? "",
-      skill:     specialistDetail.primarySkill ?? "",
+      name:             specialistDetail.name,
+      title:            specialistDetail.title,
+      specialty:        specialistDetail.specialty ?? "",
+      skill:            specialistDetail.primarySkill ?? "",
+      methodology:      specialistDetail.methodology ?? "",
+      toolInstructions: specialistDetail.tool_instructions ?? "",
     } : undefined,
     brand,
     workspace:       workspace ?? "strategy",

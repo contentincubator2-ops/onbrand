@@ -790,6 +790,8 @@ export interface SpecialistContext {
   title: string;
   specialty: string;
   skill: string;
+  methodology?: string;      // 完整技能方法論文件
+  toolInstructions?: string; // 工具使用說明
 }
 
 export interface SquadPromptInput {
@@ -886,14 +888,20 @@ function buildIdentityBlock(
       : null,
     `你在「${squadName}」小組的角色：${agentRole}。`,
     squadMethodology ? `小組方法論：${squadMethodology}` : null,
-    // When a specialist skill framework is being applied, tell the Lead it's their internal tool
+    // When a specialist skill framework is being applied, inject full skill documentation
     specialistContext
       ? [
           ``,
-          `【本步驟啟用的技能框架】`,
-          `你正在運用你內建的「${specialistContext.skill || specialistContext.name}」技能框架（${specialistContext.title}）執行本步驟分析。`,
-          specialistContext.specialty ? `此框架的分析角度：${specialistContext.specialty}` : null,
-          `重要：你始終以 ${agent.name} 的身份發言，以第一人稱直接呈現分析結果。`,
+          `【本步驟啟用技能：${specialistContext.skill || specialistContext.name}】`,
+          `你正在運用「${specialistContext.skill}」技能執行本步驟。以下是此技能的完整執行文件：`,
+          specialistContext.specialty ? `技能專長：${specialistContext.specialty.slice(0, 300)}` : null,
+          specialistContext.methodology
+            ? `\n【技能方法論】\n${specialistContext.methodology.slice(0, 1200)}`
+            : null,
+          specialistContext.toolInstructions
+            ? `\n【工具與輸出格式】\n${specialistContext.toolInstructions.slice(0, 600)}`
+            : null,
+          `\n執行規則：你始終以 ${agent.name}（Squad Lead）身份，第一人稱直接呈現分析結果。`,
           `不得說「讓我交給...」「由...來負責」「根據...Agent」等切換身份的語句。`,
         ].filter(Boolean).join("\n")
       : null,
