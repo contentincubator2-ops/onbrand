@@ -542,10 +542,17 @@ async function tryExecuteSquadChat(params: {
   const agentSkill  = specialistDetail?.primarySkill ?? leadAgentDetail?.primarySkill ?? "";
 
   // Model: use specialist's model for step quality; Lead's model for lead/discussion steps
-  const rawModel = (specialistDetail?.aiModel || leadAgentDetail?.aiModel) ?? "";
-  const agentModel = rawModel
-    ? (rawModel.includes("/") ? rawModel : `openclaw/${rawModel}`)
-    : "openclaw/pm";
+  // For lead intake (step 0): always use the reliable default model.
+  // For execution steps: prefer the specialist's designated model.
+  // Normalize DB model slugs → "openclaw/{slug}" gateway format.
+  const normalizeModel = (m?: string | null) =>
+    m ? (m.includes("/") ? m : `openclaw/${m}`) : null;
+
+  const agentModel = isLeadStep
+    ? "openclaw/pm"                                           // Lead intake: always reliable default
+    : (normalizeModel(specialistDetail?.aiModel)             // Specialist step: use specialist's model
+        ?? normalizeModel(leadAgentDetail?.aiModel)          // Fallback: Lead's model
+        ?? "openclaw/pm");                                    // Final fallback
 
   console.log(`[squadChat] Lead="${agentName}", step=${currentStep}, skill="${agentSkill}", model="${agentModel}"`);
 
@@ -662,17 +669,34 @@ async function tryExecuteSquadChat(params: {
 
   let fullOutput = "";
   try {
-    // Use agent's actual AI model — each agent runs on their designated model
     for await (const { event, data } of streamFromGateway(agentModel, messages)) {
       send(event, data);
       if (event === "delta") fullOutput += (data as any).text ?? "";
     }
   } catch (e: any) {
-    // gateway 失敗，fallback 到直接 LLM
-    console.warn("[squadChat] gateway fallback:", e?.message);
-    for await (const chunk of streamFromLLM(systemPrompt, [], userMessage)) {
-      fullOutput += chunk;
-      send("delta", { text: chunk });
+    console.warn(`[squadChat] gateway failed (model=${agentModel}):`, e?.message);
+    // Try openclaw/pm as reliable secondary gateway model before falling back to direct LLM
+    if (agentModel !== "openclaw/pm") {
+      try {
+        console.log("[squadChat] retrying with openclaw/pm...");
+        for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
+          send(event, data);
+          if (event === "delta") fullOutput += (data as any).text ?? "";
+        }
+      } catch (e2: any) {
+        console.warn("[squadChat] openclaw/pm also failed:", e2?.message);
+        // Final fallback: direct invokeLLMStream
+        for await (const chunk of streamFromLLM(systemPrompt, [], userMessage)) {
+          fullOutput += chunk;
+          send("delta", { text: chunk });
+        }
+      }
+    } else {
+      // Already used pm, go direct
+      for await (const chunk of streamFromLLM(systemPrompt, [], userMessage)) {
+        fullOutput += chunk;
+        send("delta", { text: chunk });
+      }
     }
   }
 
