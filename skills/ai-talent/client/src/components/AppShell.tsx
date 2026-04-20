@@ -1838,7 +1838,7 @@ function RightPanel({
     setTimeout(() => setSectionPriority(null), 30_000);
   }, []);
 
-  // Listen to global section-priority events (from BrandBrainStrip, SaveToBrainButton, @mention)
+  // Listen to global section-priority events (from BrandBrainBar, SaveToBrainButton, @mention)
   useEffect(() => {
     const handler = (e: CustomEvent) => handleSectionPriority(e.detail?.key);
     window.addEventListener("section-priority" as any, handler);
