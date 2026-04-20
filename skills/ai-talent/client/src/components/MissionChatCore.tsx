@@ -1517,139 +1517,6 @@ export default function MissionChatCore({
       background: "#FFFFFF",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
     }}>
-      {/* ── Chat toolbar ── */}
-      <div style={{
-        flexShrink: 0,
-        padding: "6px 20px",
-        borderBottom: "1px solid #ECEAE8",
-        background: "#FAFAF9",
-        display: "flex", alignItems: "center", gap: 8,
-      }}>
-        <button
-          onClick={() => {
-            const summaryText = "請總結以上對話的重點，包含：主要決策、行動項目、待確認事項。";
-            setInput(summaryText);
-            setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
-          }}
-          disabled={loading || !active || (active.messages.length === 0)}
-          style={{
-            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-            fontFamily: "inherit", background: "transparent",
-            border: "1px solid #E4E3E1", color: "#6B6A66",
-            display: "flex", alignItems: "center", gap: 4,
-            opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
-          }}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-          </svg>
-          總結對話
-        </button>
-
-        {/* 清空對話按鈕 */}
-        <button
-          onClick={async () => {
-            if (!window.confirm("確定要清空目前對話？定位進度也會重置。")) return;
-            // 清空前端狀態
-            if (active) {
-              setConversations((prev) =>
-                prev.map((c) => c.id === active.id ? { ...c, messages: [] } : c)
-              );
-            }
-            setRelaySteps([]);
-            setConversationHistory([]);
-            setTeamAssembly(null);
-            setStreamingAgentName(null);
-            setStreamingAgentTitle(null);
-            // 清空後端 positioning_sessions（strategy workspace）
-            if (activeMissionId) {
-              try {
-                const token = localStorage.getItem("authToken");
-                await fetch(`/api/chat/reset-positioning`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({ missionId: activeMissionId }),
-                });
-          } catch { /* non-fatal */ }
-        }
-      }}
-      disabled={loading || !active || (active?.messages.length === 0)}
-      style={{
-        padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-        fontFamily: "inherit", background: "transparent",
-        border: "1px solid #E4E3E1", color: "#9B4040",
-        display: "flex", alignItems: "center", gap: 4,
-        opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
-      }}
-    >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14H6L5 6"/>
-        <path d="M10 11v6M14 11v6"/>
-        <path d="M9 6V4h6v2"/>
-      </svg>
-      清空對話
-    </button>
-
-    {/* 新增對話按鈕 */}
-    <button
-      onClick={() => {
-        // 建立新對話，重置所有 relay/team 狀態
-        const newId = `conv-new-${Date.now()}`;
-        const newConv = { id: newId, title: "新對話", messages: [], createdAt: Date.now() };
-        setConversations((prev) => [newConv, ...prev]);
-        setActiveId(newId);
-        setRelaySteps([]);
-        setConversationHistory([]);
-        setTeamAssembly(null);
-        setStreamingAgentName(null);
-        setStreamingAgentTitle(null);
-        setInput("");
-        setTimeout(() => chatInputRef.current?.focus(), 100);
-      }}
-      disabled={loading}
-      style={{
-        padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-        fontFamily: "inherit", background: "transparent",
-        border: "1px solid #E4E3E1", color: "#4A6B4A",
-        display: "flex", alignItems: "center", gap: 4,
-        opacity: loading ? 0.4 : 1,
-        marginLeft: "auto",
-      }}
-    >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19"/>
-        <line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      新增對話
-    </button>
-
-    {/* 儲存為我的 Squad — shown once squad has run at least 1 step */}
-    {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStepProgress.length > 0 && (
-      <button
-        onClick={() => setCustomSquadDialogOpen(true)}
-        style={{
-          padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-          fontFamily: "inherit",
-          background: "linear-gradient(135deg, #C9823A, #E8631A)",
-          border: "none", color: "white",
-          display: "flex", alignItems: "center", gap: 4,
-          boxShadow: "0 1px 4px rgba(201,130,58,0.3)",
-        }}
-      >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
-        </svg>
-        儲存為我的 Squad
-      </button>
-    )}
-      </div>
-
       {/* ── Squad progress bar — Perplexity-style ── */}
       {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStep.currentStep > 0 && (
         <div style={{
@@ -1809,6 +1676,139 @@ export default function MissionChatCore({
           missionId={activeMissionId}
         />
       )}
+
+      {/* ── Chat toolbar ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: "6px 20px",
+        borderTop: "1px solid #ECEAE8",
+        background: "#FAFAF9",
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <button
+          onClick={() => {
+            const summaryText = "請總結以上對話的重點，包含：主要決策、行動項目、待確認事項。";
+            setInput(summaryText);
+            setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
+          }}
+          disabled={loading || !active || (active.messages.length === 0)}
+          style={{
+            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+            fontFamily: "inherit", background: "transparent",
+            border: "1px solid #E4E3E1", color: "#6B6A66",
+            display: "flex", alignItems: "center", gap: 4,
+            opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          總結對話
+        </button>
+
+        {/* 清空對話按鈕 */}
+        <button
+          onClick={async () => {
+            if (!window.confirm("確定要清空目前對話？定位進度也會重置。")) return;
+            // 清空前端狀態
+            if (active) {
+              setConversations((prev) =>
+                prev.map((c) => c.id === active.id ? { ...c, messages: [] } : c)
+              );
+            }
+            setRelaySteps([]);
+            setConversationHistory([]);
+            setTeamAssembly(null);
+            setStreamingAgentName(null);
+            setStreamingAgentTitle(null);
+            // 清空後端 positioning_sessions（strategy workspace）
+            if (activeMissionId) {
+              try {
+                const token = localStorage.getItem("authToken");
+                await fetch(`/api/chat/reset-positioning`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ missionId: activeMissionId }),
+                });
+              } catch { /* non-fatal */ }
+            }
+          }}
+          disabled={loading || !active || (active?.messages.length === 0)}
+          style={{
+            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+            fontFamily: "inherit", background: "transparent",
+            border: "1px solid #E4E3E1", color: "#9B4040",
+            display: "flex", alignItems: "center", gap: 4,
+            opacity: (loading || !active || (active?.messages.length === 0)) ? 0.4 : 1,
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+          清空對話
+        </button>
+
+        {/* 新增對話按鈕 */}
+        <button
+          onClick={() => {
+            // 建立新對話，重置所有 relay/team 狀態
+            const newId = `conv-new-${Date.now()}`;
+            const newConv = { id: newId, title: "新對話", messages: [], createdAt: Date.now() };
+            setConversations((prev) => [newConv, ...prev]);
+            setActiveId(newId);
+            setRelaySteps([]);
+            setConversationHistory([]);
+            setTeamAssembly(null);
+            setStreamingAgentName(null);
+            setStreamingAgentTitle(null);
+            setInput("");
+            setTimeout(() => chatInputRef.current?.focus(), 100);
+          }}
+          disabled={loading}
+          style={{
+            padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+            fontFamily: "inherit", background: "transparent",
+            border: "1px solid #E4E3E1", color: "#4A6B4A",
+            display: "flex", alignItems: "center", gap: 4,
+            opacity: loading ? 0.4 : 1,
+            marginLeft: "auto",
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          新增對話
+        </button>
+
+        {/* 儲存為我的 Squad — shown once squad has run at least 1 step */}
+        {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStepProgress.length > 0 && (
+          <button
+            onClick={() => setCustomSquadDialogOpen(true)}
+            style={{
+              padding: "3px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+              fontFamily: "inherit",
+              background: "linear-gradient(135deg, #C9823A, #E8631A)",
+              border: "none", color: "white",
+              display: "flex", alignItems: "center", gap: 4,
+              boxShadow: "0 1px 4px rgba(201,130,58,0.3)",
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+            儲存為我的 Squad
+          </button>
+        )}
+      </div>
 
       {/* ── Messages scroll area ── */}
       <div

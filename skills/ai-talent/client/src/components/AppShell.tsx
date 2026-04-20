@@ -1941,6 +1941,23 @@ function RightPanel({
 
   const panelWidth = width ?? 264;
 
+  const RP_TILE = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+  <circle cx="24" cy="24" r="2" fill="#1A1A18" opacity="0.10"/>
+  <circle cx="24" cy="0" r="1.3" fill="#1A1A18" opacity="0.06"/>
+  <circle cx="24" cy="48" r="1.3" fill="#1A1A18" opacity="0.06"/>
+  <circle cx="0" cy="24" r="1.3" fill="#1A1A18" opacity="0.06"/>
+  <circle cx="48" cy="24" r="1.3" fill="#1A1A18" opacity="0.06"/>
+  <circle cx="0" cy="0" r="1" fill="#1A1A18" opacity="0.04"/>
+  <circle cx="48" cy="0" r="1" fill="#1A1A18" opacity="0.04"/>
+  <circle cx="0" cy="48" r="1" fill="#1A1A18" opacity="0.04"/>
+  <circle cx="48" cy="48" r="1" fill="#1A1A18" opacity="0.04"/>
+  <line x1="24" y1="22" x2="24" y2="1.3" stroke="#1A1A18" stroke-width="0.6" opacity="0.05"/>
+  <line x1="24" y1="26" x2="24" y2="46.7" stroke="#1A1A18" stroke-width="0.6" opacity="0.05"/>
+  <line x1="22" y1="24" x2="1.3" y2="24" stroke="#1A1A18" stroke-width="0.6" opacity="0.05"/>
+  <line x1="26" y1="24" x2="46.7" y2="24" stroke="#1A1A18" stroke-width="0.6" opacity="0.05"/>
+</svg>`;
+  const RP_PATTERN = `url("data:image/svg+xml,${encodeURIComponent(RP_TILE)}")`;
+
   const handleDragStart = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -1979,16 +1996,37 @@ function RightPanel({
         onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "rgba(26,26,24,0.08)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
       />
-      <div style={{ flex: 1, overflowY: "auto" }} className="right-panel-scroll">
+      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }} className="right-panel-scroll">
         {sections.map((section, idx) => {
           const isPriority = section.key === sectionPriority && idx === 0;
           return (
             <div key={section.key} style={{
-              borderBottom: "1px solid #E4E3E1",
-              background: isPriority ? "#FFFBF5" : "transparent",
-              transition: "background 0.3s",
+              margin: "8px 8px 0",
+              borderRadius: 8,
+              border: `1px solid ${isPriority ? "#E8C99A" : "#E4E3E1"}`,
+              overflow: "hidden",
+              boxShadow: isPriority
+                ? "0 2px 10px rgba(201,130,58,0.12), 0 1px 3px rgba(0,0,0,0.05)"
+                : "0 1px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+              position: "relative",
+              transition: "box-shadow 0.3s, border-color 0.3s",
             }}>
-              {/* Section header */}
+              {/* Neural pattern background */}
+              <div style={{
+                position: "absolute", inset: 0,
+                backgroundImage: RP_PATTERN,
+                backgroundSize: "48px 48px",
+                backgroundRepeat: "repeat",
+                pointerEvents: "none",
+              }} />
+              {/* Frosted overlay */}
+              <div style={{
+                position: "absolute", inset: 0,
+                background: isPriority ? "rgba(255,251,245,0.93)" : "rgba(255,255,255,0.93)",
+                pointerEvents: "none",
+                transition: "background 0.3s",
+              }} />
+              {/* Section header (must be position:relative to sit above pattern) */}
               <button
                 onClick={() => toggleSection(section.key)}
                 style={{
@@ -1997,6 +2035,7 @@ function RightPanel({
                   padding: "10px 12px",
                   background: "transparent", border: "none",
                   cursor: "pointer", fontFamily: "inherit",
+                  position: "relative",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -2027,7 +2066,7 @@ function RightPanel({
 
               {/* Section body */}
               {openSections[section.key] && (
-                <div style={{ padding: "0 12px 14px" }}>
+                <div style={{ padding: "0 12px 14px", position: "relative" }}>
                   {section.content}
                 </div>
               )}
