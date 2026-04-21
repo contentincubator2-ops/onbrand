@@ -23,7 +23,7 @@ jobs:
 
             echo "===== Step 1: Generate a fresh JWT for userId=1 using server's own code ====="
             # Use Node + jose to mint a token with same secret as server
-            cat > /tmp/mint.mjs <<'EOF'
+            cat > "$BE/mint-token.mjs" <<'EOF'
             import { SignJWT } from 'jose';
             import { readFileSync } from 'fs';
             const env = readFileSync('/opt/marketing-os/marketing-os-backend/.env', 'utf8');
@@ -33,10 +33,15 @@ jobs:
               .setIssuedAt()
               .setExpirationTime('365d')
               .sign(new TextEncoder().encode(secret));
-            console.log(token);
+            process.stdout.write(token);
             EOF
-            TOKEN=$(cd "$BE" && node --experimental-vm-modules /tmp/mint.mjs 2>&1 | tail -1)
-            echo "[token first 20 chars]: ${TOKEN:0:20}..."
+            cd "$BE"
+            TOKEN=$(node mint-token.mjs 2>/tmp/mint.err)
+            echo "[stderr if any]:"
+            cat /tmp/mint.err
+            echo "[token length]: ${#TOKEN}"
+            echo "[token first 30 chars]: ${TOKEN:0:30}..."
+            rm -f "$BE/mint-token.mjs"
 
             echo ""
             echo "===== Step 2: Hit /api/chat with fresh token ====="
