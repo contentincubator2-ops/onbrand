@@ -1,0 +1,56 @@
+name: Admin — Inspect ai-recruitment agents titles
+
+# id=90050 has primarySkill=ai-recruitment but title='Data Engineering Manager'.
+# Need to audit whether other 334 ai-recruitment agents are also mis-tagged.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            echo "===== ai-recruitment agents by title (are they actually HR?) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT title, COUNT(*) AS cnt
+                  FROM agents WHERE primarySkill = 'ai-recruitment'
+                  GROUP BY title ORDER BY cnt DESC LIMIT 30;"
+
+            echo ""
+            echo "===== ai-recruitment: how many have title with HR/Recruit/Talent keywords? ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT
+                    SUM(CASE WHEN title REGEXP 'HR|Recruit|Talent|人資|招募|人力' THEN 1 ELSE 0 END) AS hr_title,
+                    SUM(CASE WHEN title NOT REGEXP 'HR|Recruit|Talent|人資|招募|人力' THEN 1 ELSE 0 END) AS non_hr_title
+                  FROM agents WHERE primarySkill = 'ai-recruitment';"
+
+            echo ""
+            echo "===== SAME check for other 8 HR skills — are they true-HR by title? ====="
+            for skill in chro hr-tech-github employee-onboarding-automation hris-integration talent-acquisition-tools linkedin-recruiter-tools hr-automation-tools training-automation; do
+              echo "--- primarySkill = ${skill} ---"
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "SELECT
+                      SUM(CASE WHEN title REGEXP 'HR|Recruit|Talent|人資|招募|人力|人才|Chief People|Training' THEN 1 ELSE 0 END) AS hr_titled,
+                      SUM(CASE WHEN title NOT REGEXP 'HR|Recruit|Talent|人資|招募|人力|人才|Chief People|Training' THEN 1 ELSE 0 END) AS non_hr_titled
+                    FROM agents WHERE primarySkill = '${skill}';"
+            done
+
+            echo ""
+            echo "===== Samples of non-HR-titled ai-recruitment agents ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT id, name, title, primarySkill
+                  FROM agents WHERE primarySkill = 'ai-recruitment'
+                    AND title NOT REGEXP 'HR|Recruit|Talent|人資|招募|人力'
+                  LIMIT 10;"
