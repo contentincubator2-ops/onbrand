@@ -46,6 +46,7 @@ import { writeBrandBrainEntry } from "./brandBrainRoute";
 import { recordMissionExport } from "./exportsRoute";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
 import { getOrCreateSquadSession, saveStepResultOnly, advanceToNextStep, resetSquadSession } from "../_core/squadSessionManager";
+import { persistReportSection } from "../_core/reportPersistence";
 import { buildSquadAgentPrompt, buildSecondOpinionPrompt, buildLeadSynthesisPrompt } from "../_core/agentPromptBuilder";
 
 export const missionChatRouter = Router();
@@ -311,6 +312,7 @@ async function runAutoSquadFlow(params: {
   leadAgentDetail:      any;
   workflowSteps:        any[];
   squadAgents:          any[];
+  squadId:              number | null;
   squadName:            string;
   squadMethodology:     string;
   brand:                Record<string, string>;
@@ -327,7 +329,7 @@ async function runAutoSquadFlow(params: {
   startFromStep:        number;
 }): Promise<void> {
   const {
-    leadAgentDetail, workflowSteps, squadAgents, squadName, squadMethodology,
+    leadAgentDetail, workflowSteps, squadAgents, squadId, squadName, squadMethodology,
     brand, brandBrain, missionTitle, workspace, missionId, initialStepResults,
     totalSteps, leadSlot, fallbackLeadAgentId, send, userMessage, startFromStep,
   } = params;
@@ -484,6 +486,11 @@ async function runAutoSquadFlow(params: {
 
     // Save step result
     await saveStepResultOnly(localPool as any, missionId, stepIdx, fullOutput);
+    if (squadId) {
+      await persistReportSection(localPool as any, {
+        missionId, squadId, stepOrder: stepIdx, content: fullOutput,
+      });
+    }
 
     // Update local dict for next step's A2A handoff
     autoStepResults[stepIdx] = fullOutput;
@@ -608,6 +615,7 @@ async function tryExecuteSquadChat(params: {
   }
 
   // ── 2. 讀取 squad 定義與 workflow ──────────────────────────────────────────
+  let squadId: number | null = null;
   let squadName = squadSlug!;
   let squadMethodology = "";
   let squadAgents: any[] = [];
@@ -624,6 +632,7 @@ async function tryExecuteSquadChat(params: {
     const s = (sRows as any[])?.[0];
     if (s) {
       console.log(`[squadChat] Loaded squad by slug=${squadSlug}, id=${s.id}, name=${s.name}`);
+      squadId          = s.id;
       squadName        = s.name ?? squadSlug;
       squadMethodology = s.methodology ?? "";
       squadAgents      = safeJson(s.agents);
@@ -1028,9 +1037,19 @@ async function tryExecuteSquadChat(params: {
     // The Lead (e.g. Mary Allen) confirms with user before dispatching specialists.
     // User must send a continue signal (「繼續」「好的」「確認」「開始」etc.) to advance to step 1.
     await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput);
+    if (squadId) {
+      await persistReportSection(localPool as any, {
+        missionId, squadId, stepOrder: currentStep, content: fullOutput,
+      });
+    }
   } else {
     // Execution steps: save result but WAIT for user to explicitly continue
     await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput);
+    if (squadId) {
+      await persistReportSection(localPool as any, {
+        missionId, squadId, stepOrder: currentStep, content: fullOutput,
+      });
+    }
   }
 
   const isLastStep = currentStep >= totalSteps;
@@ -1154,6 +1173,7 @@ async function tryExecuteSquadChat(params: {
       leadAgentDetail,
       workflowSteps,
       squadAgents,
+      squadId,
       squadName,
       squadMethodology,
       brand,

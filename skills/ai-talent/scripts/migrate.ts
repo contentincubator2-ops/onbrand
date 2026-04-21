@@ -121,6 +121,51 @@ async function main() {
       console.log("[migrate] squads.strategy_layer: already exists, skipped");
     }
 
+    // 5. brand_reports + brand_report_sections
+    //    Structured, editable squad-run outputs. Each workflow step becomes
+    //    a brand_report_sections row so users can edit in-platform and
+    //    regenerate from source messages without context switching.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_reports (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        missionId    INT NOT NULL UNIQUE,
+        squadId      INT NOT NULL,
+        squadSlug    VARCHAR(100),
+        brandId      INT NULL,
+        title        VARCHAR(255),
+        status       ENUM('draft','finalized') NOT NULL DEFAULT 'draft',
+        createdAt    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_mission (missionId),
+        INDEX idx_brand   (brandId),
+        INDEX idx_squad   (squadId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_reports: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_report_sections (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        reportId         INT NOT NULL,
+        stepOrder        INT NOT NULL,
+        stepName         VARCHAR(255),
+        agentId          INT,
+        agentRole        VARCHAR(128),
+        agentName        VARCHAR(128),
+        content          LONGTEXT,
+        userEdited       TINYINT(1) NOT NULL DEFAULT 0,
+        version          INT NOT NULL DEFAULT 1,
+        sourceMessageId  INT NULL,
+        isCurrent        TINYINT(1) NOT NULL DEFAULT 1,
+        createdAt        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_report_step (reportId, stepOrder, isCurrent),
+        INDEX idx_current     (reportId, isCurrent),
+        INDEX idx_source_msg  (sourceMessageId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_report_sections: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
