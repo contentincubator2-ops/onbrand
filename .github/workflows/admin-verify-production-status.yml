@@ -1,0 +1,56 @@
+name: Admin — Verify production status post-deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            echo "===== pm2 processes ====="
+            pm2 list
+
+            echo ""
+            echo "===== listening ports ====="
+            sudo ss -tlnp 2>/dev/null | grep -E ":(80|443|3101|5173|8080)" | head -10
+
+            echo ""
+            echo "===== nginx upstream routing ====="
+            sudo nginx -T 2>/dev/null | grep -E "proxy_pass|root " | grep -v "^#" | sort -u | head -10
+
+            echo ""
+            echo "===== Backend static public/ contents (if served) ====="
+            PUB=/opt/marketing-os/marketing-os-backend/public
+            if [ -d "$PUB" ]; then
+              echo "public/ timestamp:"
+              stat -c '%y  %n' "$PUB/index.html" 2>/dev/null
+              echo ""
+              ls -lh "$PUB/assets/" 2>/dev/null | head -5
+            fi
+
+            echo ""
+            echo "===== External HTTP tests ====="
+            echo "Backend health direct:"
+            curl -s -o /dev/null -w "  HTTP %{http_code}  %{time_total}s\n" http://127.0.0.1:3101/health
+            echo ""
+            echo "Public-facing nginx (port 80 with Host header):"
+            curl -s -o /dev/null -w "  HTTP %{http_code}\n" -H "Host: marketing-os.sowork.ai" http://127.0.0.1/
+            echo ""
+            echo "Frontend /b/ new route:"
+            curl -s -o /dev/null -w "  HTTP %{http_code}\n" -H "Host: marketing-os.sowork.ai" "http://127.0.0.1/b/1/brand-positioning/m/1"
+
+            echo ""
+            echo "===== HTML served by public/ (excerpt) ====="
+            if [ -f "$PUB/index.html" ]; then
+              head -c 300 "$PUB/index.html"
+              echo ""
+              echo "---"
+              grep -oE 'assets/[a-zA-Z0-9.-]+\.(js|css)' "$PUB/index.html" | head -5
+            fi
