@@ -13,6 +13,7 @@
 
 import React from "react";
 import type { SquadStepProgress } from "../MissionChatCore";
+import { useLang } from "../../lib/i18n";
 
 interface Props {
   steps: SquadStepProgress[];           // phase 1..N (from squadStepProgress)
@@ -54,6 +55,7 @@ export function PhaseTabs({
   leadAgentTitle,
   stalePhases,
 }: Props) {
+  const { t } = useLang();
 
   if (!steps || steps.length === 0) return null;
 
@@ -65,7 +67,7 @@ export function PhaseTabs({
     agentTitle?: string;
     status?: "waiting" | "running" | "done";
   }> = [
-    { phase: 0, label: "初談", agentName: leadAgentName, agentTitle: leadAgentTitle, status: undefined },
+    { phase: 0, label: t("phase_intake"), agentName: leadAgentName, agentTitle: leadAgentTitle, status: undefined },
     ...steps.map((s) => ({
       phase: s.step,
       label: s.label || `Step ${s.step}`,
@@ -87,19 +89,19 @@ export function PhaseTabs({
       overflowX: "auto",
       scrollbarWidth: "thin",
     }}>
-      {tabs.map((t, i) => {
-        const active = t.phase === activePhase;
-        const stale = stalePhases?.has(t.phase);
+      {tabs.map((tab, i) => {
+        const active = tab.phase === activePhase;
+        const stale = stalePhases?.has(tab.phase);
         const statusDot =
-          t.status === "done"    ? { bg: "#C5F0D5", color: "#1A7F3C" } :
-          t.status === "running" ? { bg: "#FFE8D4", color: ACCENT } :
+          tab.status === "done"    ? { bg: "#C5F0D5", color: "#1A7F3C" } :
+          tab.status === "running" ? { bg: "#FFE8D4", color: ACCENT } :
           null;
 
         return (
           <button
-            key={t.phase}
-            onClick={() => onPhaseChange(t.phase)}
-            title={t.agentTitle ? `${t.agentName} · ${t.agentTitle}` : t.agentName}
+            key={tab.phase}
+            onClick={() => onPhaseChange(tab.phase)}
+            title={tab.agentTitle ? `${tab.agentName} · ${tab.agentTitle}` : tab.agentName}
             style={{
               border: "none",
               borderBottom: active ? `2px solid ${INK}` : "2px solid transparent",
@@ -120,12 +122,12 @@ export function PhaseTabs({
             onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = "#F2F1EF"; }}
             onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
           >
-            <Avatar name={t.agentName} active={active} />
+            <Avatar name={tab.agentName} active={active} />
 
             {/* Stale warning red dot */}
             {stale && (
               <span
-                title="此階段後有上游變動 — 可能需要重跑"
+                title={t("stale_phase_warning")}
                 style={{
                   position: "absolute", top: 6, left: 22,
                   width: 7, height: 7, borderRadius: "50%",
@@ -141,7 +143,7 @@ export function PhaseTabs({
               fontSize: 9, fontWeight: 700, color: SUBTLE,
               fontVariantNumeric: "tabular-nums",
             }}>
-              {t.phase === 0 ? "0" : t.phase.toString().padStart(2, "0")}
+              {tab.phase === 0 ? "0" : tab.phase.toString().padStart(2, "0")}
             </span>
 
             {/* Phase label + optional agent name when active */}
@@ -154,7 +156,7 @@ export function PhaseTabs({
                 whiteSpace: "nowrap",
                 maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis",
               }}>
-                {t.label}
+                {tab.label}
               </span>
               {active && (
                 <span style={{
@@ -162,7 +164,7 @@ export function PhaseTabs({
                   whiteSpace: "nowrap",
                   maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis",
                 }}>
-                  {t.agentName}
+                  {tab.agentName}
                 </span>
               )}
             </span>
@@ -176,7 +178,7 @@ export function PhaseTabs({
                 letterSpacing: "0.02em",
                 flexShrink: 0,
               }}>
-                {t.status === "done" ? "完成" : t.status === "running" ? "執行中" : ""}
+                {tab.status === "done" ? t("status_done") : tab.status === "running" ? t("status_running") : ""}
               </span>
             )}
           </button>

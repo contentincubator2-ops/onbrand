@@ -34,7 +34,11 @@ function detectLocale(): Lang {
 interface LangContextValue {
   lang: Lang;
   setLang: (l: Lang) => void;
-  t: (key: TranslationKey) => string;
+  /**
+   * Translate a key. Optionally pass `params` to interpolate `{placeholder}`
+   * tokens — e.g. t("confirm_delete_brand", { name: brand.name }).
+   */
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
 }
 
 const LangContext = createContext<LangContextValue | null>(null);
@@ -50,9 +54,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: TranslationKey): string => {
+    (key: TranslationKey, params?: Record<string, string | number>): string => {
       const dict = lang === "en" ? en : zh;
-      return (dict as Record<string, string>)[key] ?? (zh as Record<string, string>)[key] ?? key;
+      const raw =
+        (dict as Record<string, string>)[key] ??
+        (zh as Record<string, string>)[key] ??
+        key;
+      if (!params) return raw;
+      // Interpolate {placeholder} tokens
+      return raw.replace(/\{(\w+)\}/g, (_m, name) =>
+        params[name] != null ? String(params[name]) : `{${name}}`
+      );
     },
     [lang]
   );

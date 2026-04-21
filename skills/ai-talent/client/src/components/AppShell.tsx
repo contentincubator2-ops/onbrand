@@ -247,7 +247,7 @@ function Rail({ activeTab, onTabChange, notifCount }: {
       <div style={{ flex: 1 }} />
       {/* Logout button */}
       <button
-        title="登出"
+        title={t("logout")}
         onClick={() => {
           localStorage.clear();
           window.location.href = "/login";
@@ -263,7 +263,7 @@ function Rail({ activeTab, onTabChange, notifCount }: {
           <polyline points="16 17 21 12 16 7"/>
           <line x1="21" y1="12" x2="9" y2="12"/>
         </svg>
-        <span style={{ fontSize: 8, color: "inherit", lineHeight: 1 }}>登出</span>
+        <span style={{ fontSize: 8, color: "inherit", lineHeight: 1 }}>{t("logout")}</span>
       </button>
       <div style={avatarStyle}>C</div>
     </div>
@@ -608,6 +608,7 @@ function Drawer({
   onNewWorkspace?: () => void;
   onCollapse?: () => void;
 }) {
+  const { t } = useLang();
   const drawerStyle: React.CSSProperties = {
     width: 210, minWidth: 210,
     background: "#F2F1EF",
@@ -696,12 +697,11 @@ function Drawer({
     createImpromptu.mutate({
       workspace: "",
       brandId: selectedBrandId ?? undefined,
-      title: "新對話",
+      title: t("new_impromptu_title"),
     });
   };
 
   // 拖曳移動：即興任務 → 工作區
-  const { t } = useLang();
   const [dragOverWs, setDragOverWs] = useState<string | null>(null);
   const moveMission = (trpc as any).mission?.move?.useMutation
     ? (trpc as any).mission.move.useMutation({
@@ -718,7 +718,7 @@ function Drawer({
       {onCollapse && (
         <button
           onClick={onCollapse}
-          title="收合側欄"
+          title={t("collapse_sidebar")}
           style={{
             position: "absolute",
             top: 6, right: 4,
@@ -815,7 +815,7 @@ function Drawer({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm(`確定刪除品牌「${brand.name}」？`)) {
+                        if (window.confirm(t("confirm_delete_brand", { name: brand.name }))) {
                           deleteBrand.mutate({ id: brand.id });
                         }
                       }}
@@ -825,7 +825,7 @@ function Drawer({
                         fontSize: 14, padding: "0 2px",
                         flexShrink: 0, lineHeight: 1,
                       }}
-                      title="刪除品牌"
+                      title={t("delete_brand")}
                     >×</button>
                   </div>
                 ))}
@@ -974,15 +974,16 @@ const BRAIN_ORANGE_BORDER = "#F5C9A8";
 const TOKEN_BUDGET = 2000;
 const CHARS_PER_TOKEN = 4;
 
-const BRAIN_CATEGORY_META: Record<string, { label: string; emoji: string; bg: string; text: string; border: string }> = {
-  positioning: { label: "品牌定位", emoji: "📍", bg: "#FFF7ED", text: "#C2410C", border: "#FED7AA" },
-  audience:    { label: "目標受眾", emoji: "👥", bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" },
-  voice:       { label: "品牌語調", emoji: "🗣️", bg: "#F0FDF4", text: "#15803D", border: "#BBF7D0" },
-  competitors: { label: "競品洞察", emoji: "⚔️", bg: "#FEF2F2", text: "#B91C1C", border: "#FECACA" },
-  custom:      { label: "其他知識", emoji: "📝", bg: "#F9FAFB", text: "#374151", border: "#E5E7EB" },
+const BRAIN_CATEGORY_META: Record<string, { labelKey: string; emoji: string; bg: string; text: string; border: string }> = {
+  positioning: { labelKey: "bb_category_positioning", emoji: "📍", bg: "#FFF7ED", text: "#C2410C", border: "#FED7AA" },
+  audience:    { labelKey: "bb_category_audience",    emoji: "👥", bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" },
+  voice:       { labelKey: "bb_category_voice",       emoji: "🗣️", bg: "#F0FDF4", text: "#15803D", border: "#BBF7D0" },
+  competitors: { labelKey: "bb_category_competitor",  emoji: "⚔️", bg: "#FEF2F2", text: "#B91C1C", border: "#FECACA" },
+  custom:      { labelKey: "bb_category_other",       emoji: "📝", bg: "#F9FAFB", text: "#374151", border: "#E5E7EB" },
 };
 
 function BrandBrainTab({ brandId }: { brandId?: number | null }) {
+  const { t } = useLang();
   const [expandedKey, setExpandedKey] = React.useState<string | null>(null);
   const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
 
@@ -1035,13 +1036,13 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: BRAIN_ORANGE }}>品牌大腦</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: BRAIN_ORANGE }}>{t("section_brand_brain")}</span>
             <span style={{
               fontSize: 9, fontWeight: 600,
               background: "white", border: `1px solid ${BRAIN_ORANGE_BORDER}`,
               borderRadius: 8, padding: "0 5px", color: "#9B7A55",
             }}>
-              {allItems.length} 筆知識
+              {t("brain_n_knowledge", { n: allItems.length })}
             </span>
           </div>
           {/* Token meter */}
@@ -1057,7 +1058,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
               }} />
             </div>
             <span style={{ fontSize: 9, color: pct >= 90 ? "#EF4444" : "#9B7A55", flexShrink: 0 }}>
-              {usedTokens} / {TOKEN_BUDGET} tokens
+              {t("brain_tokens_used", { used: usedTokens, total: TOKEN_BUDGET })}
             </span>
           </div>
         </div>
@@ -1070,7 +1071,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
           background: "#FEF2F2", border: "1px solid #FECACA",
           borderRadius: 6, padding: "5px 8px", marginBottom: 8,
         }}>
-          ⚠️ 大腦接近上限！AI 可能無法讀取所有知識。建議整合或刪除舊項目。
+          {t("brain_full_warning")}
         </div>
       )}
 
@@ -1087,7 +1088,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
               cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
             }}
           >
-            全部
+            {t("filter_all")}
           </button>
           {Object.entries(BRAIN_CATEGORY_META).map(([cat, meta]) => {
             const count = allItems.filter((i: any) => (i.category ?? i.key) === cat).length;
@@ -1104,7 +1105,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
                   cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
                 }}
               >
-                {meta.emoji} {meta.label} {count}
+                {meta.emoji} {t(meta.labelKey as any)} {count}
               </button>
             );
           })}
@@ -1118,9 +1119,9 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
           color: "#C8C7C3", fontSize: 11, lineHeight: 1.8,
         }}>
           <div style={{ fontSize: 24, marginBottom: 6 }}>🧠</div>
-          <div style={{ fontWeight: 600, color: "#9B9990" }}>品牌知識庫是空的</div>
+          <div style={{ fontWeight: 600, color: "#9B9990" }}>{t("brain_empty_title")}</div>
           <div style={{ fontSize: 10, marginTop: 4 }}>
-            對話時點擊「存入品牌大腦」<br/>來累積品牌知識
+            {t("brain_empty_hint")}
           </div>
         </div>
       ) : (
@@ -1128,7 +1129,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
           {items.map((item: any, idx: number) => {
             const cat = item.category ?? item.key ?? "custom";
             const meta = BRAIN_CATEGORY_META[cat] ?? BRAIN_CATEGORY_META.custom;
-            const title = item.title ?? item.key ?? "知識項目";
+            const title = item.title ?? item.key ?? t("knowledge_item_fallback");
             const content = item.content ?? item.value ?? "";
             const date = fmtDate(item.updatedAt ?? item.updated_at);
             const isExp = expandedKey === `${cat}-${idx}`;
@@ -1188,7 +1189,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
                   }}>
                     {hasContent
                       ? <span style={{ whiteSpace: "pre-wrap" }}>{content}</span>
-                      : <span style={{ color: "#C8C7C3", fontStyle: "italic" }}>尚無內容</span>
+                      : <span style={{ color: "#C8C7C3", fontStyle: "italic" }}>{t("no_content_yet")}</span>
                     }
                   </div>
                 )}
@@ -1203,8 +1204,8 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
         marginTop: 10, fontSize: 10, color: "#9B9990",
         textAlign: "center" as const, lineHeight: 1.6,
       }}>
-        AI 對話時自動讀取大腦內容<br/>
-        <span style={{ color: BRAIN_ORANGE, fontWeight: 600 }}>點擊訊息下方 ＋存入品牌大腦</span> 來新增
+        {t("brain_auto_read_hint")}<br/>
+        <span style={{ color: BRAIN_ORANGE, fontWeight: 600 }}>{t("brain_add_hint")}</span>
       </div>
     </div>
   );
@@ -1481,6 +1482,7 @@ const AGENT_COLORS = [
 ];
 
 function AgentExecutionTimeline({ steps }: { steps: SquadStepProgress[] }) {
+  const { t } = useLang();
   const doneCount = steps.filter(s => s.status === 'done').length;
 
   return (
@@ -1598,7 +1600,7 @@ function AgentExecutionTimeline({ steps }: { steps: SquadStepProgress[] }) {
                   background: bgColor, color: accentColor, border: `1px solid ${borderColor}`,
                   fontWeight: 600, letterSpacing: 0.2, flexShrink: 0,
                 }}>
-                  {isDone ? '完成' : isRunning ? '執行中' : '等待'}
+                  {isDone ? t("status_completed") : isRunning ? t("status_running") : t("status_pending")}
                 </span>
               </div>
               {step.agentTitle && (
@@ -1637,6 +1639,7 @@ function RightPanel({
   onWidthChange?: (w: number) => void;
   squadStepProgress?: SquadStepProgress[];
 }) {
+  const { t } = useLang();
   // ── Resolve squad: prefer chip selection, fall back to stored slug ──────────
   const slugQuery = trpc.squad.getSquadBySlug.useQuery(
     { slug: missionSquadSlug ?? "" },
@@ -1779,7 +1782,7 @@ function RightPanel({
   const baseSections = [
     {
       key: "sop",
-      label: "執行流程",
+      label: t("section_workflow"),
       content: effectiveSquad
         ? <DBSquadMethodologyPanel
             squadName={agentsData?.squadName ?? effectiveSquad.name}
@@ -1796,7 +1799,7 @@ function RightPanel({
     // Commercial Validation — only shown when squad has showcases
     ...((agentsData?.showcases ?? []).length > 0 ? [{
       key: "validation",
-      label: "商業驗證",
+      label: t("section_commercial_validation"),
       content: (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {(agentsData?.showcases ?? []).map((sc: any, i: number) => (
@@ -1832,7 +1835,7 @@ function RightPanel({
     }] : []),
     {
       key: "agents",
-      label: "協作成員",
+      label: t("section_agents"),
       content: (
         <div>
           {effectiveSquad
@@ -1849,7 +1852,7 @@ function RightPanel({
     },
     {
       key: "requirements",
-      label: "任務需求",
+      label: t("section_task_requirements"),
       content: (
         <SquadRequirementsPanel
           missionId={missionId}
@@ -1862,7 +1865,7 @@ function RightPanel({
     // are left in place below in case we revive it later.
     {
       key: "brandbrain",
-      label: "品牌大腦",
+      label: t("section_brand_brain"),
       content: <BrandBrainTab brandId={brandId} />,
     },
   ];
@@ -1945,7 +1948,7 @@ function RightPanel({
         background: "rgba(250,250,249,0.95)",
       }}>
         <span style={{ fontSize: 10.5, fontWeight: 600, color: "#9B9990", letterSpacing: "0.03em" }}>
-          工具面板
+          {t("section_tools_panel")}
         </span>
         <div style={{ position: "relative" }} ref={pickerRef}>
           <button
@@ -1968,7 +1971,7 @@ function RightPanel({
               <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
               <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
-            面板
+            {t("tools_panel_pill")}
           </button>
           {showSectionPicker && (
             <div style={{
@@ -2175,6 +2178,7 @@ function DBSquadMethodologyPanel({
   isLoading: boolean;
   activeStep?: number; // 0 = lead intake, 1+ = workflow steps
 }) {
+  const { t } = useLang();
   return (
     <div>
       {/* Squad header */}
@@ -2300,9 +2304,9 @@ function DBSquadMethodologyPanel({
                             width: 5, height: 5, borderRadius: "50%", background: "#0A6EFA",
                             animation: "pulse 1.2s infinite",
                           }} />
-                          執行中
+                          {t("status_running")}
                         </span>
-                        <span style={{ fontSize: 10, color: "#6B6A66" }}>第 {stepNum} 步</span>
+                        <span style={{ fontSize: 10, color: "#6B6A66" }}>{t("step_prefix")} {stepNum}</span>
                       </div>
                       <div style={{
                         fontSize: 14, fontWeight: 700, color: "#0A4FAA",
@@ -2352,7 +2356,7 @@ function DBSquadMethodologyPanel({
         </div>
       ) : (
         <div style={{ fontSize: 11, color: "#C8C7C3", textAlign: "center", padding: "12px 0" }}>
-          此小隊尚未設定執行流程
+          {t("squad_no_workflow")}
         </div>
       )}
 
@@ -2373,6 +2377,7 @@ function DBAgentMembersList({
   isLoading: boolean;
   activeStep?: number; // 0 = lead active, 1+ = agent at that step index
 }) {
+  const { t } = useLang();
   if (isLoading) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2388,7 +2393,7 @@ function DBAgentMembersList({
   if (!allMembers.length) {
     return (
       <div style={{ padding: "12px 0", textAlign: "center", fontSize: 11, color: "#C8C7C3" }}>
-        無成員資料
+        {t("squad_no_agents")}
       </div>
     );
   }
@@ -2477,7 +2482,7 @@ function DBAgentMembersList({
                       display: "inline-flex", alignItems: "center", gap: 2,
                     }}>
                       <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#3B82F6", display: "inline-block", animation: "pulse 1.2s infinite" }} />
-                      執行中
+                      {t("status_running")}
                     </span>
                   )}
                 </div>
@@ -2600,10 +2605,10 @@ function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; 
 // Market research, competitor analysis, audience data = agents' job.
 
 const SECTION_ORDER = ["identity", "access", "output"] as const;
-const SECTION_META: Record<string, { icon: string; title: string; sub: string }> = {
-  identity: { icon: "🔍", title: "基本資訊",  sub: "讓 agents 開始研究" },
-  access:   { icon: "🔑", title: "平台授權",  sub: "授權後可代你操作" },
-  output:   { icon: "📤", title: "成果交付",  sub: "選擇輸出方式" },
+const SECTION_META: Record<string, { icon: string; titleKey: string; subKey: string }> = {
+  identity: { icon: "🔍", titleKey: "section_basic_info",    subKey: "section_basic_info_sub" },
+  access:   { icon: "🔑", titleKey: "section_platform_auth", subKey: "section_platform_auth_sub" },
+  output:   { icon: "📤", titleKey: "section_deliverables",  subKey: "section_deliverables_sub" },
 };
 
 /** For oauth/output items: display a "連結" action button */
@@ -2638,6 +2643,7 @@ function SquadRequirementsPanel({
   squadSlug?: string | null;
   workspace?: string | null;
 }) {
+  const { t } = useLang();
   const requirementsQuery = (trpc as any).squad?.getRequirements?.useQuery
     ? (trpc as any).squad.getRequirements.useQuery(
         { squadSlug: squadSlug ?? "", workspace: workspace ?? undefined },
@@ -2734,8 +2740,8 @@ function SquadRequirementsPanel({
               borderBottom: "1px solid #EEEDE9",
             }}>
               <span style={{ fontSize: 11 }}>{meta.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "#6B6A66" }}>{meta.title}</span>
-              <span style={{ fontSize: 9, color: "#C5C4C0" }}>{meta.sub}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "#6B6A66" }}>{t(meta.titleKey as any)}</span>
+              <span style={{ fontSize: 9, color: "#C5C4C0" }}>{t(meta.subKey as any)}</span>
             </div>
 
             {/* Items */}
@@ -3270,6 +3276,7 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
 }
 
 export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId, activeSquad, squadStepProgress = [] }: AppShellProps) {
+  const { t } = useLang();
   const [railTab, setRailTab] = useState("chat");
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("rightPanelWidth") : null;
@@ -3547,24 +3554,24 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
             style={{ background:"#FFFFFF", borderRadius:16, padding:"28px 32px", width:"100%", maxWidth:400, boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ fontSize:17, fontWeight:700, color:"#1A1A18", margin:"0 0 18px" }}>新增工作區</h2>
+            <h2 style={{ fontSize:17, fontWeight:700, color:"#1A1A18", margin:"0 0 18px" }}>{t("add_workspace")}</h2>
             <form onSubmit={(e) => { e.preventDefault(); if (newWsLabel.trim()) createWorkspace.mutate({ label: newWsLabel.trim() }); }}>
               <input
                 autoFocus
                 type="text"
                 value={newWsLabel}
                 onChange={(e) => setNewWsLabel(e.target.value)}
-                placeholder="例：Instagram、電商、公關"
+                placeholder={t("workspace_placeholder")}
                 style={{ width:"100%", border:"1.5px solid #E2E8F0", borderRadius:8, padding:"9px 12px", fontSize:13, color:"#1A1A18", outline:"none", fontFamily:"inherit", boxSizing:"border-box" as const, marginBottom:16 }}
               />
               <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
                 <button type="button" onClick={() => { setNewWsOpen(false); setNewWsLabel(""); }}
                   style={{ background:"transparent", border:"1px solid #E8EAF0", borderRadius:8, padding:"7px 16px", fontSize:12, cursor:"pointer", color:"#5A5A5A" }}>
-                  取消
+                  {t("cancel")}
                 </button>
                 <button type="submit" disabled={!newWsLabel.trim() || createWorkspace.isPending}
                   style={{ background: newWsLabel.trim() ? "#1A1A18" : "#E8EAF0", color: newWsLabel.trim() ? "#FFFFFF" : "#9B9990", border:"none", borderRadius:8, padding:"7px 18px", fontSize:12, fontWeight:600, cursor: newWsLabel.trim() ? "pointer" : "not-allowed" }}>
-                  {createWorkspace.isPending ? "建立中…" : "建立"}
+                  {createWorkspace.isPending ? t("creating") : t("create")}
                 </button>
               </div>
             </form>

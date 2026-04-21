@@ -26,6 +26,7 @@ import { CustomSquadDialog } from "./mission-chat/CustomSquadDialog";
 import { BrandBrainBar } from "./mission-chat/BrandBrainBar";
 import { PhaseTabs } from "./mission-chat/PhaseTabs";
 import type { DBSquad } from '../types/squad';
+import { useLang } from "../lib/i18n";
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
 
@@ -268,6 +269,7 @@ function TeamAssemblyPanel({
   onApprove: () => void;
   onToggleSummary: (id: number) => void;
 }) {
+  const { t } = useLang();
   const activeStep = relaySteps.find((s) => s.status === "running");
   const completedCount = relaySteps.filter((s) => s.status === "done").length;
   const progress = relaySteps.length ? Math.round((completedCount / relaySteps.length) * 100) : 0;
@@ -422,7 +424,7 @@ function TeamAssemblyPanel({
                           onClick={() => onToggleSummary(step.id)}
                           style={{ fontSize: 11, color: "#6B6A66", background: "none", border: "none", cursor: "pointer", padding: 0 }}
                         >
-                          {step.expanded ? "收合摘要" : "查看摘要"}
+                          {step.expanded ? t("collapse_summary") : t("view_summary")}
                         </button>
                         {step.expanded && (
                           <div style={{
@@ -473,6 +475,7 @@ export default function MissionChatCore({
   onSquadPreview,
   onSquadStepProgress,
 }: MissionChatCoreProps = {}) {
+  const { t } = useLang();
 
   // ── Conversations state ──────────────────────────────────────────────────
   const [conversations, setConversations] = useState<Array<{
@@ -1737,7 +1740,7 @@ export default function MissionChatCore({
             <line x1="16" y1="13" x2="8" y2="13"/>
             <line x1="16" y1="17" x2="8" y2="17"/>
           </svg>
-          總結對話
+          {t("summarize_chat")}
         </button>
 
         {/* 清空對話按鈕 */}
@@ -1782,7 +1785,7 @@ export default function MissionChatCore({
             <path d="M10 11v6M14 11v6"/>
             <path d="M9 6V4h6v2"/>
           </svg>
-          清空對話
+          {t("clear_chat")}
         </button>
 
         {/* 新增對話按鈕 */}
@@ -1815,7 +1818,7 @@ export default function MissionChatCore({
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          新增對話
+          {t("new_chat")}
         </button>
 
         {/* 儲存為我的 Squad — shown once squad has run at least 1 step */}
@@ -2069,15 +2072,22 @@ export default function MissionChatCore({
                   )}
                   <span style={{ fontSize: 10, color: "#9B9990", padding: "1px 4px" }}>
                     {awaitingStepInfo.completedLabel
-                      ? `${awaitingStepInfo.completedLabel} 完成 · 共 ${awaitingStepInfo.totalSteps} 步`
-                      : `Step ${awaitingStepInfo.nextStep - 1} 完成 · 共 ${awaitingStepInfo.totalSteps} 步`}
+                      ? t("label_done_of_total", { label: awaitingStepInfo.completedLabel, total: awaitingStepInfo.totalSteps })
+                      : t("step_done_of_total", { n: awaitingStepInfo.nextStep - 1, total: awaitingStepInfo.totalSteps })}
                   </span>
                 </div>
               </div>
             </div>
             {/* Prompt text */}
             <p style={{ fontSize: 12, color: "#6B6A66", margin: "0 0 12px 0", lineHeight: 1.6 }}>
-              💬 可以繼續與 <strong style={{ color: "#1A1A18" }}>{awaitingStepInfo.agentName}</strong> 深入討論此步驟的成果，或選擇執行方式繼續。
+              💬 {(() => {
+                const parts = t("continue_discuss_hint").split("{agent}");
+                return <>
+                  {parts[0]}
+                  <strong style={{ color: "#1A1A18" }}>{awaitingStepInfo.agentName}</strong>
+                  {parts[1] ?? ""}
+                </>;
+              })()}
             </p>
             {/* Step-by-step only — auto-execution has been permanently removed */}
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -2092,12 +2102,12 @@ export default function MissionChatCore({
                   boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
                 }}
               >
-                繼續第 {awaitingStepInfo.nextStep} 步
+                {t("continue_step_n", { n: awaitingStepInfo.nextStep })}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6"/>
                 </svg>
               </button>
-              <span style={{ fontSize: 11, color: "#C8C7C3" }}>或直接輸入問題與此 Agent 繼續對話</span>
+              <span style={{ fontSize: 11, color: "#C8C7C3" }}>{t("continue_discuss_placeholder")}</span>
             </div>
           </div>
         )}
@@ -2331,7 +2341,7 @@ export default function MissionChatCore({
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
-                複製全部成果
+                {t("copy_all_results")}
               </button>
 
               {/* Email */}
@@ -2404,7 +2414,7 @@ export default function MissionChatCore({
                     <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
                     <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
                   </svg>
-                  存入品牌大腦
+                  {t("save_to_brain")}
                 </button>
               )}
 
@@ -2658,10 +2668,10 @@ export default function MissionChatCore({
             onKeyDown={handleKeyDown}
             placeholder={
               preselectedAgent
-                ? `告訴 ${preselectedAgent.name} 你要完成的任務…`
+                ? t("chat_placeholder_agent", { agent: preselectedAgent.name })
                 : activeBrandName
-                ? `告訴我你想為「${activeBrandName}」完成什麼任務…`
-                : "選擇品牌後開始輸入任務…"
+                ? t("chat_placeholder", { brand: activeBrandName })
+                : t("chat_placeholder_pick_brand")
             }
             rows={1}
             disabled={loading || isAtTurnLimit}
@@ -2706,7 +2716,7 @@ export default function MissionChatCore({
           </button>
         </div>
         <div style={{ fontSize: 10, color: "#C8C7C3", textAlign: "center", marginTop: 6 }}>
-          Enter 送出 · Shift+Enter 換行
+          {t("enter_hint")}
         </div>
       </div>
 

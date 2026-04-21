@@ -12,6 +12,7 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 
 // ─── Collapse preference (persisted) ───────────────────────────────────────
 const LS_KEY = "brandBrainBar.collapsed";
@@ -93,6 +94,7 @@ interface Props {
 
 // ─── BrandBrainBar ────────────────────────────────────────────────────────
 export function BrandBrainBar({ brandId, missionId }: Props) {
+  const { t } = useLang();
 
   const posQuery = (trpc as any).brand?.getPositioning?.useQuery
     ? (trpc as any).brand.getPositioning.useQuery(
@@ -154,7 +156,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
     return (
       <div
         onClick={() => setCollapsed(false)}
-        title="展開品牌大腦"
+        title={t("expand_brain")}
         style={{
           flexShrink: 0,
           margin: "0 12px 0",
@@ -191,7 +193,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
           textTransform: "uppercase", letterSpacing: "0.1em",
           flexShrink: 0,
         }}>
-          品牌大腦
+          {t("section_brand_brain")}
         </span>
         <span style={{
           position: "relative",
@@ -203,7 +205,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
           overflow: "hidden",
           textOverflow: "ellipsis",
         }}>
-          {isLoading ? "正在推估品牌定位…" : (tagline || "尚未設定品牌定位")}
+          {isLoading ? t("estimating_positioning") : (tagline || t("positioning_not_set"))}
         </span>
         {isEst && !isLoading && (
           <span style={{
@@ -213,7 +215,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
             borderRadius: 20, padding: "0px 5px",
             letterSpacing: "0.02em",
             flexShrink: 0,
-          }}>AI推估</span>
+          }}>{t("ai_estimate")}</span>
         )}
         <span style={{
           position: "relative",
@@ -221,7 +223,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
           fontVariantNumeric: "tabular-nums",
           flexShrink: 0,
         }}>
-          {brainItems.length} 筆 · {pct}%
+          {t("brain_items_pct", { n: brainItems.length, pct })}
         </span>
         <span style={{
           position: "relative",
@@ -250,7 +252,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
       {/* Collapse toggle — big, obvious, top-right */}
       <button
         onClick={() => setCollapsed(true)}
-        title="收合品牌大腦"
+        title={t("collapse_brain")}
         style={{
           position: "absolute",
           top: -10, right: 14,
@@ -275,7 +277,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = INK; }}
       >
         <span style={{ fontSize: 11 }}>▴</span>
-        <span>收合品牌大腦</span>
+        <span>{t("collapse_brain")}</span>
       </button>
 
       {/* Neural pattern — full background */}
@@ -319,7 +321,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
             textTransform: "uppercase", letterSpacing: "0.1em",
             textAlign: "center", lineHeight: 1,
           }}>
-            品牌大腦
+            {t("section_brand_brain")}
           </span>
           <NeuralIcon size={38} />
           {isEst && (
@@ -329,7 +331,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
               borderRadius: 20, padding: "0px 5px",
               letterSpacing: "0.02em", textAlign: "center",
             }}>
-              AI推估
+              {t("ai_estimate")}
             </span>
           )}
         </div>
@@ -353,7 +355,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
           gap: 4,
         }}>
           {isLoading ? (
-            <span style={{ fontSize: 11.5, color: MUTED }}>正在推估品牌定位…</span>
+            <span style={{ fontSize: 11.5, color: MUTED }}>{t("estimating_positioning")}</span>
           ) : hasPos ? (
             <>
               <span style={{
@@ -372,7 +374,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
               )}
             </>
           ) : (
-            <span style={{ fontSize: 11.5, color: SUBTLE }}>尚未設定品牌定位</span>
+            <span style={{ fontSize: 11.5, color: SUBTLE }}>{t("positioning_not_set")}</span>
           )}
         </div>
 
@@ -405,7 +407,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
                       fontSize: 8.5, fontWeight: 700, color: SUBTLE,
                       textTransform: "uppercase", letterSpacing: "0.08em",
                       flexShrink: 0,
-                    }}>受眾</span>
+                    }}>{t("audience_label")}</span>
                     {targetMkt && (
                       <span style={{ fontSize: 11, color: INK, fontWeight: 600 }}>{targetMkt}</span>
                     )}
@@ -436,7 +438,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
                         fontSize: 8.5, fontWeight: 700, color: SUBTLE,
                         textTransform: "uppercase", letterSpacing: "0.08em",
                         marginRight: 5,
-                      }}>情感</span>
+                      }}>{t("emotional_label")}</span>
                       <span style={{ fontSize: 10.5, color: "#3D3C39" }}>{emoUSP}</span>
                     </div>
                   )}
@@ -446,7 +448,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
                         fontSize: 8.5, fontWeight: 700, color: SUBTLE,
                         textTransform: "uppercase", letterSpacing: "0.08em",
                         marginRight: 5,
-                      }}>功能</span>
+                      }}>{t("functional_label")}</span>
                       <span style={{ fontSize: 10.5, color: "#3D3C39" }}>{funcUSP}</span>
                     </div>
                   )}
@@ -459,7 +461,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
 
       {/* ── Capacity bar ── */}
       <div
-        title={`品牌知識庫：已使用 ${usedChars.toLocaleString()} / ${CHAR_BUDGET.toLocaleString()} 字`}
+        title={`${usedChars.toLocaleString()} / ${CHAR_BUDGET.toLocaleString()}`}
         style={{
           position: "relative", height: 18,
           cursor: "pointer", overflow: "hidden",
@@ -501,7 +503,7 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
             fontSize: 9.5, fontWeight: 600, color: INK, opacity: 0.5,
             textTransform: "uppercase", letterSpacing: "0.07em",
           }}>
-            {brainItems.length > 0 ? `${brainItems.length} 筆知識` : "尚無知識"}
+            {brainItems.length > 0 ? t("brain_n_knowledge", { n: brainItems.length }) : t("brain_no_knowledge")}
           </span>
           <span style={{ flex: 1 }} />
           <span style={{
@@ -509,13 +511,13 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
             opacity: isFull ? 1 : 0.4,
             fontVariantNumeric: "tabular-nums",
           }}>
-            {isFull ? "⚠ 接近上限 " : ""}{usedChars.toLocaleString()} / {CHAR_BUDGET.toLocaleString()} 字
+            {isFull ? `⚠ ${t("brain_near_limit")} ` : ""}{usedChars.toLocaleString()} / {CHAR_BUDGET.toLocaleString()}
           </span>
           <span style={{
             fontSize: 9.5, color: INK, opacity: 0.38, marginLeft: 6,
             textDecoration: "underline",
           }}>
-            查看 →
+            {t("view_arrow")}
           </span>
         </div>
       </div>

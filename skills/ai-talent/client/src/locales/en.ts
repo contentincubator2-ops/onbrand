@@ -8,6 +8,7 @@ export const en = {
   tab_brain:    "Brain",
   tab_outputs:  "Outputs",
   tab_settings: "Settings",
+  logout:       "Log out",
 
   // ── Drawer — brand ─────────────────────────────────────────────────────────
   loading_brands:   "Loading brands…",
@@ -29,10 +30,18 @@ export const en = {
   section_workspace:  "Workspace",
   no_workspaces:      "No workspaces",
   add_workspace:      "Add Workspace",
+  workspace_placeholder: "e.g. Instagram, E-commerce, PR",
+  create:             "Create",
+  creating:           "Creating…",
+  cancel:             "Cancel",
 
   // ── Drawer — resources ────────────────────────────────────────────────────
   section_resources:  "Available Resources",
   matching:           "Matching…",
+  footer_agents:      "Agents",
+  footer_skills:      "Skills",
+  footer_models:      "AI Models",
+  footer_credits:     "credits",
 
   // ── MissionHomePage ────────────────────────────────────────────────────────
   mission_start:           "Launch Mission",
@@ -58,13 +67,108 @@ export const en = {
   save_settings:           "Save Settings",
   saved:                   "✓ Saved",
 
-  // ── Right panel ───────────────────────────────────────────────────────────
+  // ── Right panel — section headers ─────────────────────────────────────────
+  section_tools_panel:     "Tools Panel",
+  tools_panel_pill:        "Panel",
   section_workflow:        "Workflow",
   section_agents:          "Team Members",
   section_brand_brain:     "Brand Brain",
+  section_commercial_validation: "Business Validation",
+  section_task_requirements: "Task Requirements",
+  section_inbox:           "Inbox",
+  section_basic_info:      "Basic Info",
+  section_platform_auth:   "Platform Auth",
+  section_deliverables:    "Deliverables",
   squad_no_workflow:       "No workflow configured for this squad",
   squad_no_agents:         "No member data",
   methodology_label:       "Methodology",
   commercial_validation:   "Commercial Validation",
   label_agent_count:       "members",
+
+  // ── Brand brain categories ────────────────────────────────────────────────
+  bb_category_positioning: "Brand Positioning",
+  bb_category_audience:    "Target Audience",
+  bb_category_voice:       "Brand Voice",
+  bb_category_competitor:  "Competitor Insights",
+  bb_category_other:       "Other Knowledge",
+  bb_item_label:           "Knowledge Item",
+
+  // ── Chat top bar ──────────────────────────────────────────────────────────
+  summarize_chat:          "Summarize",
+  clear_chat:              "Clear",
+  new_chat:                "New Chat",
+  fullscreen:              "Fullscreen",
+  exit_fullscreen:         "Exit Fullscreen",
+  view_summary:            "View Summary",
+  collapse_summary:        "Collapse Summary",
+
+  // ── Chat input / hint ─────────────────────────────────────────────────────
+  chat_placeholder:        'Tell me what task you want to complete for "{brand}"…',
+  chat_placeholder_no_brand: "Tell me what task you want to complete…",
+  chat_placeholder_agent:  "Tell {agent} what task to do…",
+  chat_placeholder_pick_brand: "Select a brand to start typing your task…",
+  enter_hint:              "Enter to send · Shift+Enter for newline",
+
+  // ── Output / bubble / buttons ─────────────────────────────────────────────
+  copy:                    "Copy",
+  copy_all_results:        "Copy All Results",
+  expand_full:             "Expand",
+  save_to_brain:           "Save to Brain",
+  saved_to_brain:          "Saved to Brain",
+  saving:                  "Saving…",
+  save_to_brain_choose:    "Choose a category:",
+  deliverable:             "Deliverable",
+  level_direct:            "Level 1 · Ready to use",
+  task_confirm:            "Task Confirmation",
+  step_total:              "{n} steps total",
+  step_prefix:             "Step",
+  status_done:             "Done",
+  status_running:          "Running",
+  continue_step_n:         "Continue to Step {n}",
+  continue_discuss_hint:   "You can continue discussing this step's results with {agent}, or choose an execution path to proceed.",
+  continue_discuss_placeholder: "Or type a question to continue with this agent",
+  step_done_of_total:      "Step {n} done · {total} steps total",
+  label_done_of_total:     "{label} done · {total} steps total",
+  status_completed:        "Done",
+  status_running_ellipsis: "Running…",
+  status_pending:          "Pending",
+
+  // ── PhaseTabs ─────────────────────────────────────────────────────────────
+  phase_intake:            "Intake",
+  stale_phase_warning:     "Upstream changes detected — may need to re-run",
+
+  // ── BrandBrainBar ─────────────────────────────────────────────────────────
+  expand_brain:            "Expand Brand Brain",
+  collapse_brain:          "Collapse Brand Brain",
+  estimating_positioning:  "Estimating brand positioning…",
+  positioning_not_set:     "Brand positioning not set",
+  brain_no_knowledge:      "No knowledge yet",
+  brain_n_knowledge:       "{n} items",
+  brain_items_pct:         "{n} items · {pct}%",
+  brain_near_limit:        "Near capacity",
+  view_arrow:              "View →",
+  ai_estimate:             "AI estimate",
+  audience_label:          "Audience",
+  emotional_label:         "Emotional",
+  functional_label:        "Functional",
+  filter_all:              "All",
+  brain_empty_title:       "Brand brain is empty",
+  brain_empty_hint:        "Click 'Save to Brain' in chat to build up brand knowledge",
+  brain_full_warning:      "⚠️ Brain near capacity — AI may not read all knowledge. Consider consolidating or deleting old items.",
+  brain_tokens_used:       "{used} / {total} tokens",
+  brain_auto_read_hint:    "AI auto-reads brand brain during chat",
+  brain_add_hint:          "Click + Save to Brain below messages to add",
+  no_content_yet:          "No content yet",
+  knowledge_item_fallback: "Knowledge Item",
+  section_basic_info_sub:     "Let agents start researching",
+  section_platform_auth_sub:  "Authorize so we can act for you",
+  section_deliverables_sub:   "Choose output channels",
+  collapse_sidebar:           "Collapse sidebar",
+  new_impromptu_title:        "New chat",
+
+  // ── AgentBubbleHeader ─────────────────────────────────────────────────────
+  a2a_handoff:             "Received previous step · A2A Handoff",
+  second_opinion:          "Second Opinion",
+  squad_lead:              "Squad Lead",
+  agent_lead_tag:          "Lead",
 } as const;

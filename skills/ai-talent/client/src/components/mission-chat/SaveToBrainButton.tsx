@@ -12,16 +12,25 @@
 import { useState, useEffect, useRef } from "react";
 import { Brain, Check, ChevronDown } from "lucide-react";
 import { useToast } from "../ui/Toast";
+import { useLang } from "../../lib/i18n";
 
-const CATEGORIES = [
-  { value: "positioning", label: "📍 品牌定位" },
-  { value: "audience",    label: "👥 目標受眾" },
-  { value: "voice",       label: "🗣️  品牌聲音" },
-  { value: "competitors", label: "⚔️  競品洞察" },
-  { value: "custom",      label: "📝 其他" },
-] as const;
+const CATEGORY_VALUES = ["positioning", "audience", "voice", "competitors", "custom"] as const;
+const CATEGORY_ICONS: Record<(typeof CATEGORY_VALUES)[number], string> = {
+  positioning: "📍",
+  audience:    "👥",
+  voice:       "🗣️",
+  competitors: "⚔️",
+  custom:      "📝",
+};
+const CATEGORY_KEYS: Record<(typeof CATEGORY_VALUES)[number], string> = {
+  positioning: "bb_category_positioning",
+  audience:    "bb_category_audience",
+  voice:       "bb_category_voice",
+  competitors: "bb_category_competitor",
+  custom:      "bb_category_other",
+};
 
-type Category = typeof CATEGORIES[number]["value"];
+type Category = typeof CATEGORY_VALUES[number];
 
 interface SaveToBrainButtonProps {
   brandId: number;
@@ -44,6 +53,8 @@ export function SaveToBrainButton({
   const [selectedCat, setSelectedCat] = useState<Category>(defaultCategory);
   const abortRef = useRef<AbortController | null>(null);
   const { showToast } = useToast();
+  const { t } = useLang();
+  const categoryLabel = (v: Category) => `${CATEGORY_ICONS[v]} ${t(CATEGORY_KEYS[v] as any)}`;
 
   // Cleanup in-flight request on unmount
   useEffect(() => () => { abortRef.current?.abort(); }, []);
@@ -70,7 +81,7 @@ export function SaveToBrainButton({
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       setStatus("saved");
-      showToast("✓ 已存入品牌大腦", "success");
+      showToast(`✓ ${t("saved_to_brain")}`, "success");
       // Notify right panel to float "品牌大腦" section to top
       window.dispatchEvent(new CustomEvent("section-priority", { detail: { key: "brandbrain" } }));
       onSaved?.();
@@ -90,7 +101,7 @@ export function SaveToBrainButton({
         background: "#F0FDF4", border: "1px solid #BBF7D0",
       }}>
         <Check size={12} />
-        已存入品牌大腦 · {CATEGORIES.find(c => c.value === selectedCat)?.label}
+        {t("saved_to_brain")} · {categoryLabel(selectedCat)}
       </div>
     );
   }
@@ -104,13 +115,13 @@ export function SaveToBrainButton({
         borderRadius: 8,
       }}>
         <span style={{ fontSize: 11, color: "#6B6A66", marginBottom: 2 }}>
-          選擇存入哪個類別：
+          {t("save_to_brain_choose")}
         </span>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {CATEGORIES.map(cat => (
+          {CATEGORY_VALUES.map(cat => (
             <button
-              key={cat.value}
-              onClick={() => handleSave(cat.value)}
+              key={cat}
+              onClick={() => handleSave(cat)}
               style={{
                 fontSize: 11, padding: "3px 9px", borderRadius: 6,
                 border: "1px solid #E4E3E1", background: "#fff",
@@ -118,7 +129,7 @@ export function SaveToBrainButton({
                 fontFamily: "inherit",
               }}
             >
-              {cat.label}
+              {categoryLabel(cat)}
             </button>
           ))}
           <button
@@ -129,7 +140,7 @@ export function SaveToBrainButton({
               cursor: "pointer", color: "#9CA3AF", fontFamily: "inherit",
             }}
           >
-            取消
+            {t("cancel")}
           </button>
         </div>
       </div>
@@ -162,7 +173,7 @@ export function SaveToBrainButton({
       }}
     >
       <Brain size={12} />
-      {status === "saving" ? "存入中..." : "存入品牌大腦"}
+      {status === "saving" ? t("saving") : t("save_to_brain")}
       <ChevronDown size={11} />
     </button>
   );

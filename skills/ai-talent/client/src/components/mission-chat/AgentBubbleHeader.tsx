@@ -14,6 +14,7 @@
  */
 
 import { Loader2, CheckCircle2, MessageSquareQuote } from "lucide-react";
+import { useLang } from "../../lib/i18n";
 
 interface AgentBubbleHeaderProps {
   agentName: string;
@@ -61,6 +62,7 @@ export function AgentBubbleHeader({
   isLead = false,
   showHandoff = false,
 }: AgentBubbleHeaderProps) {
+  const { t } = useLang();
   const accentColor = isSecondOpinion
     ? "#7C5FF0"
     : isLead
@@ -85,7 +87,7 @@ export function AgentBubbleHeader({
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9B9990" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
-          <span>接收上一步成果 · A2A 交接</span>
+          <span>{t("a2a_handoff")}</span>
         </div>
       )}
     <div
@@ -137,7 +139,7 @@ export function AgentBubbleHeader({
               padding: "1px 5px", fontWeight: 500,
               display: "flex", alignItems: "center", gap: 3,
             }}>
-              <MessageSquareQuote size={9} /> 第二意見
+              <MessageSquareQuote size={9} /> {t("second_opinion")}
             </span>
           )}
           {isLead && (
@@ -146,7 +148,7 @@ export function AgentBubbleHeader({
               background: "#DBEAFE", borderRadius: 4,
               padding: "1px 5px", fontWeight: 500,
             }}>
-              Squad Lead
+              {t("squad_lead")}
             </span>
           )}
         </div>
