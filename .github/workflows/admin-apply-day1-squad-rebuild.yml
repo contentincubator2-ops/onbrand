@@ -61,30 +61,49 @@ jobs:
             DB_NAME=${DB_NAME:-mos_db}
 
             mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<'SQL'
-            SELECT 'L1 + L2 squads after apply:' AS info;
-            SELECT s.id, s.strategy_layer, s.slug, s.name,
-                   JSON_LENGTH(s.agents) AS members,
-                   JSON_LENGTH(t.steps) AS steps
-            FROM agent_squads s
-            LEFT JOIN squad_workflow_templates t ON t.taskType = s.slug
-            WHERE s.strategy_layer IN ('L1_brand','L2_product') AND s.tier='core'
-            ORDER BY s.strategy_layer, s.id;
+            SELECT '========== L1 + L2 squads after apply ==========' AS info;
+            SELECT id, strategy_layer, tier, slug, name,
+                   JSON_LENGTH(agents) AS members,
+                   JSON_LENGTH(steps) AS steps,
+                   JSON_LENGTH(use_cases) AS use_cases_count,
+                   JSON_LENGTH(output_formats) AS outputs_count,
+                   JSON_LENGTH(showcases) AS showcases_count,
+                   industry_key
+            FROM squads
+            WHERE strategy_layer IN ('L1_brand','L2_product') AND tier='core'
+            ORDER BY strategy_layer, id;
 
-            SELECT 'Layer count:' AS info;
+            SELECT '========== Layer count ==========' AS info;
             SELECT strategy_layer, COUNT(*) AS squad_count
-            FROM agent_squads
+            FROM squads
             WHERE strategy_layer IN ('L1_brand','L2_product') AND tier='core'
             GROUP BY strategy_layer;
 
-            SELECT 'Unique lead primarySkills (should = 20 total for L1+L2):' AS info;
+            SELECT '========== Unique lead primarySkills (should = 20) ==========' AS info;
             SELECT COUNT(DISTINCT a.primarySkill) AS unique_lead_skills
-            FROM agent_squads s,
+            FROM squads s,
               JSON_TABLE(s.agents, '$[*]' COLUMNS (
                 agent_id INT PATH '$.agent_id',
                 is_lead BOOLEAN PATH '$.is_lead'
               )) AS m
             LEFT JOIN agents a ON a.id = m.agent_id
             WHERE s.strategy_layer IN ('L1_brand','L2_product') AND s.tier='core' AND m.is_lead = 1;
+
+            SELECT '========== Field completeness audit (should all be 0) ==========' AS info;
+            SELECT
+              SUM(CASE WHEN description IS NULL OR description='' THEN 1 ELSE 0 END) AS null_description,
+              SUM(CASE WHEN methodology IS NULL OR methodology='' THEN 1 ELSE 0 END) AS null_methodology,
+              SUM(CASE WHEN workspace IS NULL OR workspace='' OR workspace='[]' THEN 1 ELSE 0 END) AS null_workspace,
+              SUM(CASE WHEN tags IS NULL OR tags='' OR tags='[]' THEN 1 ELSE 0 END) AS null_tags,
+              SUM(CASE WHEN agents IS NULL OR agents='' OR agents='[]' THEN 1 ELSE 0 END) AS null_agents,
+              SUM(CASE WHEN steps IS NULL OR steps='' OR steps='[]' THEN 1 ELSE 0 END) AS null_steps,
+              SUM(CASE WHEN use_cases IS NULL OR use_cases='' OR use_cases='[]' THEN 1 ELSE 0 END) AS null_use_cases,
+              SUM(CASE WHEN output_formats IS NULL OR output_formats='' OR output_formats='[]' THEN 1 ELSE 0 END) AS null_output_formats,
+              SUM(CASE WHEN showcases IS NULL OR showcases='' OR showcases='[]' THEN 1 ELSE 0 END) AS null_showcases,
+              SUM(CASE WHEN industry_key IS NULL OR industry_key='' THEN 1 ELSE 0 END) AS null_industry_key,
+              SUM(CASE WHEN token < 1000 THEN 1 ELSE 0 END) AS low_token
+            FROM squads
+            WHERE strategy_layer IN ('L1_brand','L2_product') AND tier='core';
             SQL
             echo ""
             echo "[vm] L1 + L2 applied successfully."

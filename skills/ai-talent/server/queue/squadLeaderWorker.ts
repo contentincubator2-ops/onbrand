@@ -87,7 +87,7 @@ function gatewaySlug(slug?: string | null): string {
 // Step-driven Squad Execution
 //
 // Flow:
-//   1. Load squad definition (from agent_squads.agents JSON — NOT squad_members join table)
+//   1. Load squad definition (from squads.agents JSON — NOT squad_members join table)
 //   2. Load workflow steps (from squads.steps — migrated from squad_template)
 //   3. Squad Lead does a brief context analysis
 //   4. Execute each step SEQUENTIALLY:

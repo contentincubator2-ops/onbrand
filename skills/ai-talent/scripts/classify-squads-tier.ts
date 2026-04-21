@@ -2,7 +2,7 @@
  * classify-squads-tier.ts
  *
  * Purpose
- *   Read all active squads from agent_squads and auto-classify each one into:
+ *   Read all active squads from squads and auto-classify each one into:
  *     - tier:           core | defer | kill
  *     - strategy_layer: L1_brand | L2_product | L3_audience
  *                     | L4_channel | L5_campaign | L6_validation
@@ -362,7 +362,7 @@ async function main() {
       SELECT id, slug, name, missionType, methodology,
              workspace, tags,
              JSON_LENGTH(agents) AS agent_count
-      FROM agent_squads
+      FROM squads
       WHERE is_active = 1
       ORDER BY id ASC
     `)) as any[];
@@ -453,7 +453,7 @@ async function main() {
       let updated = 0;
       for (const r of final) {
         await conn.execute(
-          `UPDATE agent_squads SET tier = ?, strategy_layer = ? WHERE id = ?`,
+          `UPDATE squads SET tier = ?, strategy_layer = ? WHERE id = ?`,
           [r.tier, r.layer, r.id],
         );
         updated++;

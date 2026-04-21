@@ -55,27 +55,27 @@ async function checkDatabase(
     stats.connected = true;
     console.log(`✅ Connected to ${name} (${host})`);
 
-    // Check agent_squads count
+    // Check squads count
     const [squads] = await connection.execute(
-      'SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active=1'
+      'SELECT COUNT(*) as cnt FROM squads WHERE is_active=1'
     );
     stats.squads = (squads as any)[0].cnt;
 
     // Check empty agents
     const [empty] = await connection.execute(
-      "SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active=1 AND (agents='[]' OR agents IS NULL)"
+      "SELECT COUNT(*) as cnt FROM squads WHERE is_active=1 AND (agents='[]' OR agents IS NULL)"
     );
     stats.emptyAgents = (empty as any)[0].cnt;
 
     // Check unique slugs
     const [unique] = await connection.execute(
-      'SELECT COUNT(DISTINCT slug) as cnt FROM agent_squads WHERE is_active=1'
+      'SELECT COUNT(DISTINCT slug) as cnt FROM squads WHERE is_active=1'
     );
     stats.uniqueSlugs = (unique as any)[0].cnt;
 
     // Check duplicate slugs
     const [dups] = await connection.execute(
-      'SELECT COUNT(*) as cnt FROM (SELECT slug FROM agent_squads WHERE is_active=1 GROUP BY slug HAVING COUNT(*) > 1) as dupes'
+      'SELECT COUNT(*) as cnt FROM (SELECT slug FROM squads WHERE is_active=1 GROUP BY slug HAVING COUNT(*) > 1) as dupes'
     );
     stats.duplicateSlugs = (dups as any)[0].cnt;
 
@@ -93,7 +93,7 @@ async function checkDatabase(
 
     // Check last update
     const [lastUpdate] = await connection.execute(
-      'SELECT MAX(updated_at) as last_update FROM agent_squads'
+      'SELECT MAX(updated_at) as last_update FROM squads'
     );
     const updateDate = (lastUpdate as any)[0].last_update;
     stats.lastUpdate = updateDate ? new Date(updateDate).toISOString() : null;

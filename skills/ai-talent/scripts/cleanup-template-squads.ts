@@ -29,7 +29,7 @@ async function main() {
   try {
     // Preview: list squads that will be deactivated
     const [rows] = await conn.execute(
-      `SELECT id, slug, name FROM agent_squads
+      `SELECT id, slug, name FROM squads
        WHERE is_active = 1 AND workspace IS NULL
        ORDER BY id ASC
        LIMIT 500`
@@ -43,14 +43,14 @@ async function main() {
 
     // Count total
     const [countRows] = await conn.execute(
-      `SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active = 1 AND workspace IS NULL`
+      `SELECT COUNT(*) as cnt FROM squads WHERE is_active = 1 AND workspace IS NULL`
     ) as any[];
     const total = (countRows as any[])[0]?.cnt ?? 0;
     console.log(`\n合計：${total} 個\n`);
 
     // Soft-delete
     const [result] = await conn.execute(
-      `UPDATE agent_squads
+      `UPDATE squads
        SET is_active = 0, updated_at = NOW()
        WHERE is_active = 1 AND workspace IS NULL`
     ) as any[];
@@ -59,7 +59,7 @@ async function main() {
     // Summary of remaining
     const [remaining] = await conn.execute(
       `SELECT workspace, COUNT(*) as cnt
-       FROM agent_squads
+       FROM squads
        WHERE is_active = 1
        GROUP BY workspace
        ORDER BY cnt DESC`
@@ -73,7 +73,7 @@ async function main() {
     }
 
     const [totalActive] = await conn.execute(
-      `SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active = 1`
+      `SELECT COUNT(*) as cnt FROM squads WHERE is_active = 1`
     ) as any[];
     console.log(`\n✅ 剩餘 active squads 總計：${(totalActive as any[])[0]?.cnt}`);
 

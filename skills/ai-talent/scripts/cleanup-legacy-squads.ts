@@ -28,7 +28,7 @@ async function main() {
   try {
     // 先列出將被停用的 squads
     const [rows] = await conn.execute(
-      `SELECT id, slug, name, is_active FROM agent_squads WHERE id IN (${LEGACY_IDS.join(",")}) ORDER BY id ASC`
+      `SELECT id, slug, name, is_active FROM squads WHERE id IN (${LEGACY_IDS.join(",")}) ORDER BY id ASC`
     ) as any[];
 
     const squads = rows as any[];
@@ -39,14 +39,14 @@ async function main() {
 
     // 執行軟刪除
     const [result] = await conn.execute(
-      `UPDATE agent_squads SET is_active = 0, updated_at = NOW() WHERE id IN (${LEGACY_IDS.join(",")})`
+      `UPDATE squads SET is_active = 0, updated_at = NOW() WHERE id IN (${LEGACY_IDS.join(",")})`
     ) as any[];
 
     console.log(`\n✅ 已停用 ${(result as any).affectedRows} 個 squads (is_active → 0)`);
 
     // 確認結果
     const [remaining] = await conn.execute(
-      `SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active = 1`
+      `SELECT COUNT(*) as cnt FROM squads WHERE is_active = 1`
     ) as any[];
     console.log(`✅ 剩餘 active squads: ${(remaining as any[])[0].cnt}`);
 

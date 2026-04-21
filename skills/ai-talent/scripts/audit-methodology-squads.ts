@@ -69,7 +69,7 @@ async function main() {
     const [rows] = await conn.execute(
       `SELECT id, slug, name, methodology, workspace, agents, tags,
               use_cases, output_formats, showcases, token, is_active
-       FROM agent_squads
+       FROM squads
        WHERE is_active = 1
        ORDER BY slug ASC`
     ) as any[];

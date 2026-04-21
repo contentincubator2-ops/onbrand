@@ -87,10 +87,10 @@ async function executePhasePreA() {
 
   try {
     const [soworkSquads] = await soworkConn.query(
-      'SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active=1'
+      'SELECT COUNT(*) as cnt FROM squads WHERE is_active=1'
     );
     const [mosSquads] = await mosConn.query(
-      'SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active=1'
+      'SELECT COUNT(*) as cnt FROM squads WHERE is_active=1'
     );
 
     const soworkCount = (soworkSquads as any)[0].cnt;
@@ -126,7 +126,7 @@ async function executePhasePreA() {
   console.log('\n📌 Step 4: Migrating data from sowork_db to mos_db...\n');
 
   const tablesToMigrate = [
-    'agent_squads',
+    'squads',
     'agents',
     'missions',
     'agent_chats',
@@ -209,7 +209,7 @@ async function executePhasePreA() {
 
   try {
     const [dupSlugs] = await mosConn.query(
-      'SELECT COUNT(*) as cnt FROM (SELECT slug FROM agent_squads WHERE is_active=1 GROUP BY slug HAVING COUNT(*) > 1) as x'
+      'SELECT COUNT(*) as cnt FROM (SELECT slug FROM squads WHERE is_active=1 GROUP BY slug HAVING COUNT(*) > 1) as x'
     );
     const dupCount = (dupSlugs as any)[0].cnt;
 
@@ -221,7 +221,7 @@ async function executePhasePreA() {
     }
 
     const [emptyAgents] = await mosConn.query(
-      "SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active=1 AND (agents='[]' OR agents IS NULL)"
+      "SELECT COUNT(*) as cnt FROM squads WHERE is_active=1 AND (agents='[]' OR agents IS NULL)"
     );
     const emptyCount = (emptyAgents as any)[0].cnt;
 

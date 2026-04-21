@@ -1,6 +1,6 @@
 /**
  * audit-squads.ts
- * 全面審計 agent_squads 欄位完整性
+ * 全面審計 squads 欄位完整性
  * 輸出：每個 squad 哪些欄位缺失 / 空陣列 / 為 null
  *
  * Usage: npm run db:audit-squads
@@ -87,7 +87,7 @@ async function main() {
         workspace, agents, tags,
         use_cases, output_formats, required_integrations,
         showcases, token
-      FROM agent_squads
+      FROM squads
       WHERE is_active = 1
       ORDER BY id ASC
     `) as any[];

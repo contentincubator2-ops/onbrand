@@ -8,8 +8,8 @@
  * squadRouter.ts — Squad 生命週期管理 + DB-driven 推薦
  *
  * 查詢流程：
- *   getRecommendedSquads() — 從 517 個 agent_squads 中，按 workspace + brand + mission 評分推薦 6 個
- *   getMembersById()       — 解析 agent_squads.members JSON → 查 agents → 回傳真實成員 + workflow steps
+ *   getRecommendedSquads() — 從 517 個 squads 中，按 workspace + brand + mission 評分推薦 6 個
+ *   getMembersById()       — 解析 squads.members JSON → 查 agents → 回傳真實成員 + workflow steps
  *   getAlternativeLeads()  — 其他 squad 的 lead agents（備選專家）
  *   getSquadBySlug()       — 透過 slug 查單一 squad（用於頁面重載後還原選中狀態）
  *
@@ -120,7 +120,7 @@ function genAgentKey(squadUid: string, agentName: string): string {
 export const squadTemplateRouter = router({
 
   // ── getRecommendedSquads ─────────────────────────────────────────────────────
-  // 從 agent_squads 按 workspace + brand + mission 評分，回傳前 N 個 squad chips
+  // 從 squads 按 workspace + brand + mission 評分，回傳前 N 個 squad chips
   getRecommendedSquads: protectedProcedure
     .input(z.object({
       workspace: z.string().default("strategy"),
@@ -265,7 +265,7 @@ export const squadTemplateRouter = router({
         }
         console.log(`[squadRouter] pass-B total candidates: ${squadRows.length}`);
       } catch (e) {
-        console.error("[squadRouter] agent_squads query error:", e);
+        console.error("[squadRouter] squads query error:", e);
         try {
           const [rows] = await localPool.execute(
             `SELECT ${selectCols} FROM squads WHERE is_active = 1 ORDER BY RAND() LIMIT 60`
@@ -332,7 +332,7 @@ export const squadTemplateRouter = router({
 
       // ── 6. Semantic re-ranking (text-embedding-3-large) ─────────────────────
       // Build a rich query vector from brand profile + mission context.
-      // Compare against each squad's pre-computed embedding (stored in agent_squads.embedding).
+      // Compare against each squad's pre-computed embedding (stored in squads.embedding).
       // Squads with embeddings get a cosine-similarity bonus on top of the keyword score.
       // Squads without embeddings fall back to keyword score only.
       let semanticEnabled = false;
@@ -608,7 +608,7 @@ export const squadTemplateRouter = router({
       missionId: z.number(),
       brandId:   z.number(),
       workspace: z.string().default("strategy"),
-      squadId:   z.number().optional(),   // DB agent_squads.id — preferred
+      squadId:   z.number().optional(),   // DB squads.id — preferred
       squadType: z.string().default("brand_positioning"), // fallback label
     }))
     .mutation(async ({ ctx, input }) => {
@@ -630,7 +630,7 @@ export const squadTemplateRouter = router({
       let agentDefs: AgentDef[] = [];
 
       if (input.squadId) {
-        // Pull real members from agent_squads (lives on VM local DB — localPool)
+        // Pull real members from squads (lives on VM local DB — localPool)
         try {
           const [sqRows] = await localPool.execute(
             `SELECT name, agents FROM squads WHERE id = ? AND is_active = 1 LIMIT 1`,
@@ -668,7 +668,7 @@ export const squadTemplateRouter = router({
             }
           }
         } catch (e) {
-          console.error("[squadRouter] assemble: agent_squads lookup error (localPool):", e);
+          console.error("[squadRouter] assemble: squads lookup error (localPool):", e);
         }
       }
 

@@ -7,7 +7,7 @@ async function main() {
   });
 
   // Get all squads with their members JSON
-  const [squads] = await conn.execute('SELECT id, name, members FROM agent_squads WHERE is_active=1');
+  const [squads] = await conn.execute('SELECT id, name, members FROM squads WHERE is_active=1');
   console.log(`Processing ${squads.length} squads...`);
 
   let assigned = 0;

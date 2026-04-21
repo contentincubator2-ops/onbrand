@@ -635,7 +635,7 @@ async function main() {
 
       // Preview count first
       const [countRows] = await conn.execute(
-        `SELECT COUNT(*) as cnt FROM agent_squads WHERE ${whereClause}`,
+        `SELECT COUNT(*) as cnt FROM squads WHERE ${whereClause}`,
         params
       ) as any[];
       const cnt = (countRows as any[])[0]?.cnt ?? 0;
@@ -646,7 +646,7 @@ async function main() {
       const showcasesJson  = JSON.stringify(rule.showcases);
 
       await conn.execute(
-        `UPDATE agent_squads
+        `UPDATE squads
          SET workspace = ?,
              methodology = ?,
              output_formats = ?,
@@ -665,7 +665,7 @@ async function main() {
 
     // Final audit
     const [remaining] = await conn.execute(
-      `SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active = 1 AND workspace IS NULL`
+      `SELECT COUNT(*) as cnt FROM squads WHERE is_active = 1 AND workspace IS NULL`
     ) as any[];
     const leftover = (remaining as any[])[0]?.cnt ?? 0;
     if (leftover > 0) {

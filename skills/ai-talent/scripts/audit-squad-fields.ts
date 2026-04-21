@@ -91,7 +91,7 @@ async function main() {
       `SELECT id, slug, missionType, methodology, workspace, agents, tags,
               use_cases, output_formats, required_integrations, showcases,
               description, token
-       FROM agent_squads
+       FROM squads
        WHERE is_active = 1
        ORDER BY slug ASC`
     ) as any[];

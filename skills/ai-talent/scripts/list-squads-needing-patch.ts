@@ -19,7 +19,7 @@ async function main() {
       `SELECT id, slug, name, methodology, workspace,
               JSON_LENGTH(agents) as agent_count,
               JSON_LENGTH(tags)   as tag_count
-       FROM agent_squads
+       FROM squads
        WHERE is_active = 1 AND workspace IS NULL
        ORDER BY id ASC`
     ) as any[];

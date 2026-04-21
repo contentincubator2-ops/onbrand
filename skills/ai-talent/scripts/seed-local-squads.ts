@@ -133,11 +133,11 @@ async function upsertSquad(conn: any, s: {
   showcases: { company: string; description: string; result: string; source?: string }[];
 }) {
   const [existing] = await conn.execute(
-    `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
+    `SELECT id FROM squads WHERE slug = ? LIMIT 1`, [s.slug]
   ) as any[];
   if ((existing as any[]).length > 0) {
     await conn.execute(
-      `UPDATE agent_squads SET name=?, description=?, missionType=?, agents=?, tags=?, use_cases=?,
+      `UPDATE squads SET name=?, description=?, missionType=?, agents=?, tags=?, use_cases=?,
        workspace=?, methodology=?, output_formats=?, required_integrations=?, token=?, showcases=?,
        is_active=1, updated_at=NOW() WHERE slug=?`,
       [s.name, s.description, s.missionType, JSON.stringify(s.agents), JSON.stringify(s.tags),
@@ -148,7 +148,7 @@ async function upsertSquad(conn: any, s: {
     console.log(`[seed-local] Squad '${s.slug}': updated`);
   } else {
     await conn.execute(
-      `INSERT INTO agent_squads (slug,name,description,industry_key,missionType,agents,tags,use_cases,
+      `INSERT INTO squads (slug,name,description,industry_key,missionType,agents,tags,use_cases,
        workspace,methodology,output_formats,required_integrations,token,showcases,is_active,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW())`,
       [s.slug, s.name, s.description, s.industryKey, s.missionType,
@@ -157,7 +157,7 @@ async function upsertSquad(conn: any, s: {
        JSON.stringify(s.requiredIntegrations), s.token, JSON.stringify(s.showcases)]
     );
     const [newRow] = await conn.execute(
-      `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
+      `SELECT id FROM squads WHERE slug = ? LIMIT 1`, [s.slug]
     ) as any[];
     console.log(`[seed-local] Squad '${s.slug}' inserted with id=${(newRow as any[])[0]?.id}`);
   }
@@ -218,7 +218,7 @@ async function main() {
     console.log("[seed-local] squad_workflow_templates: ready");
 
     await conn.execute(`
-      CREATE TABLE IF NOT EXISTS agent_squads (
+      CREATE TABLE IF NOT EXISTS squads (
         id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         slug         VARCHAR(120) NOT NULL UNIQUE,
         name         VARCHAR(255) NOT NULL,
@@ -233,26 +233,26 @@ async function main() {
         updated_at   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
-    console.log("[seed-local] agent_squads: ready");
+    console.log("[seed-local] squads: ready");
 
     // ── Schema migrations (idempotent, wrapped in try/catch) ─────────────────────
     console.log("[seed-local] Running schema migrations…");
     const migrations = [
       // Rename members → agents
-      `ALTER TABLE agent_squads CHANGE COLUMN members agents LONGTEXT NULL`,
-      // Rename taskType → missionType in agent_squads
-      `ALTER TABLE agent_squads CHANGE COLUMN taskType missionType VARCHAR(100) NULL`,
-      // Add new columns to agent_squads
-      `ALTER TABLE agent_squads ADD COLUMN workspace             LONGTEXT NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN methodology           VARCHAR(100) NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN output_formats        LONGTEXT NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN required_integrations LONGTEXT NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN token                 INT NOT NULL DEFAULT 0`,
-      `ALTER TABLE agent_squads ADD COLUMN showcases             LONGTEXT NULL`,
+      `ALTER TABLE squads CHANGE COLUMN members agents LONGTEXT NULL`,
+      // Rename taskType → missionType in squads
+      `ALTER TABLE squads CHANGE COLUMN taskType missionType VARCHAR(100) NULL`,
+      // Add new columns to squads
+      `ALTER TABLE squads ADD COLUMN workspace             LONGTEXT NULL`,
+      `ALTER TABLE squads ADD COLUMN methodology           VARCHAR(100) NULL`,
+      `ALTER TABLE squads ADD COLUMN output_formats        LONGTEXT NULL`,
+      `ALTER TABLE squads ADD COLUMN required_integrations LONGTEXT NULL`,
+      `ALTER TABLE squads ADD COLUMN token                 INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE squads ADD COLUMN showcases             LONGTEXT NULL`,
       // Squad semantic embedding (text-embedding-3-large, computed by embed:squads script)
-      `ALTER TABLE agent_squads ADD COLUMN embedding             LONGTEXT NULL`,
+      `ALTER TABLE squads ADD COLUMN embedding             LONGTEXT NULL`,
       // Expand methodology from VARCHAR(100) to TEXT (methodology strings can exceed 100 chars)
-      `ALTER TABLE agent_squads MODIFY COLUMN methodology TEXT NULL`,
+      `ALTER TABLE squads MODIFY COLUMN methodology TEXT NULL`,
       // Add missionType to workflow templates (mirror of taskType)
       `ALTER TABLE squad_workflow_templates ADD COLUMN missionType VARCHAR(100) NULL`,
       `UPDATE squad_workflow_templates SET missionType = taskType WHERE missionType IS NULL`,
@@ -460,14 +460,14 @@ async function main() {
     ]);
 
     const [existingSquad] = await conn.execute(
-      `SELECT id FROM agent_squads WHERE slug = 'sowork-brand-positioning' LIMIT 1`
+      `SELECT id FROM squads WHERE slug = 'sowork-brand-positioning' LIMIT 1`
     ) as any[];
 
     if ((existingSquad as any[]).length > 0) {
       const existingId = (existingSquad as any[])[0].id;
       console.log(`[seed-local] Squad 'sowork-brand-positioning' (id=${existingId}) already exists — updating.`);
       await conn.execute(
-        `UPDATE agent_squads
+        `UPDATE squads
          SET name = ?, description = ?, missionType = ?, agents = ?, tags = ?, use_cases = ?,
          workspace = ?, methodology = ?, output_formats = ?, required_integrations = ?, token = ?, showcases = ?,
          is_active = 1, updated_at = NOW()
@@ -489,7 +489,7 @@ async function main() {
       );
     } else {
       await conn.execute(
-        `INSERT INTO agent_squads
+        `INSERT INTO squads
            (slug, name, description, industry_key, missionType, agents, tags, use_cases,
             workspace, methodology, output_formats, required_integrations, token, showcases,
             is_active, created_at, updated_at)
@@ -513,7 +513,7 @@ async function main() {
       );
 
       const [newSquad] = await conn.execute(
-        `SELECT id FROM agent_squads WHERE slug = 'sowork-brand-positioning' LIMIT 1`
+        `SELECT id FROM squads WHERE slug = 'sowork-brand-positioning' LIMIT 1`
       ) as any[];
       console.log(`[seed-local] Squad 'sowork-brand-positioning' inserted with id=${(newSquad as any[])[0]?.id}`);
     }

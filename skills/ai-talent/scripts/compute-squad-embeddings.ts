@@ -1,8 +1,8 @@
 /**
  * compute-squad-embeddings.ts
  *
- * One-time (and incremental) script: embed every squad in agent_squads
- * using text-embedding-3-large and store the vector in agent_squads.embedding.
+ * One-time (and incremental) script: embed every squad in squads
+ * using text-embedding-3-large and store the vector in squads.embedding.
  *
  * Embed text = name | description | methodology | workspace | tags | use_cases
  *
@@ -77,7 +77,7 @@ async function main() {
 
   // Ensure embedding column exists
   try {
-    await conn.execute(`ALTER TABLE agent_squads ADD COLUMN embedding LONGTEXT NULL`);
+    await conn.execute(`ALTER TABLE squads ADD COLUMN embedding LONGTEXT NULL`);
     console.log("[embed-squads] Created embedding column");
   } catch { /* already exists */ }
 
@@ -87,7 +87,7 @@ async function main() {
 
   const [rows] = await conn.execute(
     `SELECT id, name, description, methodology, tags, use_cases, workspace
-     FROM agent_squads WHERE ${whereClause}
+     FROM squads WHERE ${whereClause}
      ORDER BY id ASC`
   ) as any[];
 
@@ -118,7 +118,7 @@ async function main() {
 
     if (embedding) {
       await conn.execute(
-        `UPDATE agent_squads SET embedding = ? WHERE id = ?`,
+        `UPDATE squads SET embedding = ? WHERE id = ?`,
         [JSON.stringify(embedding), squad.id]
       );
       success++;

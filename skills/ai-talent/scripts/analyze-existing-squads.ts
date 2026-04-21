@@ -26,7 +26,7 @@ async function main() {
   try {
     // ── 1. 總覽 ─────────────────────────────────────────────────────────────
     const [totalSquads] = await conn.execute(
-      `SELECT COUNT(*) as cnt FROM agent_squads WHERE is_active=1`
+      `SELECT COUNT(*) as cnt FROM squads WHERE is_active=1`
     ) as any[];
     const [totalAgents] = await conn.execute(
       `SELECT COUNT(*) as cnt FROM agents WHERE isAvailable=1`
@@ -42,7 +42,7 @@ async function main() {
              missionType, methodology,
              workspace, tags, token,
              JSON_LENGTH(agents) as agent_count
-      FROM agent_squads
+      FROM squads
       WHERE is_active=1
       ORDER BY id ASC
     `) as any[];
@@ -77,7 +77,7 @@ async function main() {
     // ── 4. Workspace 分佈（squads）──────────────────────────────────────────
     const [wsDist] = await conn.execute(`
       SELECT workspace, COUNT(*) as cnt
-      FROM agent_squads
+      FROM squads
       WHERE is_active=1 AND workspace IS NOT NULL AND workspace != ''
       GROUP BY workspace
       ORDER BY cnt DESC
@@ -92,7 +92,7 @@ async function main() {
     // ── 5. MissionType 分佈 ──────────────────────────────────────────────────
     const [mtDist] = await conn.execute(`
       SELECT missionType, COUNT(*) as cnt
-      FROM agent_squads
+      FROM squads
       WHERE is_active=1
       GROUP BY missionType
       ORDER BY cnt DESC

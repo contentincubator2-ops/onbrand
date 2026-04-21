@@ -103,11 +103,11 @@ async function upsertSquad(conn: any, s: {
   showcases: { company: string; description: string; result: string; source?: string }[];
 }) {
   const [existing] = await conn.execute(
-    `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
+    `SELECT id FROM squads WHERE slug = ? LIMIT 1`, [s.slug]
   ) as any[];
   if ((existing as any[]).length > 0) {
     await conn.execute(
-      `UPDATE agent_squads SET name=?, description=?, missionType=?, agents=?, tags=?, use_cases=?,
+      `UPDATE squads SET name=?, description=?, missionType=?, agents=?, tags=?, use_cases=?,
        workspace=?, methodology=?, output_formats=?, required_integrations=?, token=?, showcases=?,
        is_active=1, updated_at=NOW() WHERE slug=?`,
       [s.name, s.description, s.missionType, JSON.stringify(s.agents), JSON.stringify(s.tags),
@@ -118,7 +118,7 @@ async function upsertSquad(conn: any, s: {
     console.log(`[seed-missing] Squad '${s.slug}': updated`);
   } else {
     await conn.execute(
-      `INSERT INTO agent_squads (slug,name,description,industry_key,missionType,agents,tags,use_cases,
+      `INSERT INTO squads (slug,name,description,industry_key,missionType,agents,tags,use_cases,
        workspace,methodology,output_formats,required_integrations,token,showcases,is_active,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW())`,
       [s.slug, s.name, s.description, s.industryKey, s.missionType,
@@ -127,7 +127,7 @@ async function upsertSquad(conn: any, s: {
        JSON.stringify(s.requiredIntegrations), s.token, JSON.stringify(s.showcases)]
     );
     const [newRow] = await conn.execute(
-      `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
+      `SELECT id FROM squads WHERE slug = ? LIMIT 1`, [s.slug]
     ) as any[];
     console.log(`[seed-missing] Squad '${s.slug}' inserted id=${(newRow as any[])[0]?.id}`);
   }

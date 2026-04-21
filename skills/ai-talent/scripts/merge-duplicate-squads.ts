@@ -24,7 +24,7 @@ async function mergeDuplicateSquads() {
   try {
     // Find duplicate slugs
     const [dupRows] = await localPool.execute(
-      `SELECT slug FROM agent_squads WHERE is_active = 1 GROUP BY slug HAVING COUNT(*) > 1`
+      `SELECT slug FROM squads WHERE is_active = 1 GROUP BY slug HAVING COUNT(*) > 1`
     ) as any[];
 
     if ((dupRows as any[]).length === 0) {
@@ -39,7 +39,7 @@ async function mergeDuplicateSquads() {
 
       // Get all squads with this slug, sorted by agent count (descending)
       const [squadRows] = await localPool.execute(
-        `SELECT id, name, agents FROM agent_squads WHERE slug = ? AND is_active = 1 ORDER BY agents DESC`,
+        `SELECT id, name, agents FROM squads WHERE slug = ? AND is_active = 1 ORDER BY agents DESC`,
         [slug]
       ) as any[];
 
@@ -55,7 +55,7 @@ async function mergeDuplicateSquads() {
       // Deactivate duplicate squads
       for (const mergeSquad of mergeSquads) {
         await localPool.execute(
-          `UPDATE agent_squads SET is_active = 0 WHERE id = ?`,
+          `UPDATE squads SET is_active = 0 WHERE id = ?`,
           [mergeSquad.id]
         );
         console.log(`    ✓ Deactivated id=${mergeSquad.id}`);

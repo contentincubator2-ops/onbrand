@@ -1,5 +1,5 @@
 /**
- * validate-squads.ts — Validate agent_squads data integrity
+ * validate-squads.ts — Validate squads data integrity
  *
  * Checks for:
  * 1. Duplicate slugs
@@ -28,7 +28,7 @@ async function validateSquads() {
     // 1. Check for duplicate slugs
     console.log("1️⃣  Checking for duplicate slugs...");
     const [dupRows] = await localPool.execute(
-      `SELECT slug, COUNT(*) as cnt FROM agent_squads WHERE is_active = 1 GROUP BY slug HAVING cnt > 1`
+      `SELECT slug, COUNT(*) as cnt FROM squads WHERE is_active = 1 GROUP BY slug HAVING cnt > 1`
     ) as any[];
 
     if ((dupRows as any[]).length > 0) {
@@ -49,7 +49,7 @@ async function validateSquads() {
     // 2. Check for empty agents JSON
     console.log("\n2️⃣  Checking for empty agents JSON...");
     const [emptyRows] = await localPool.execute(
-      `SELECT id, slug, name FROM agent_squads WHERE is_active = 1 AND (agents IS NULL OR agents = '' OR agents = '[]')`
+      `SELECT id, slug, name FROM squads WHERE is_active = 1 AND (agents IS NULL OR agents = '' OR agents = '[]')`
     ) as any[];
 
     if ((emptyRows as any[]).length > 0) {
@@ -70,7 +70,7 @@ async function validateSquads() {
     // 3. Check for invalid agent references
     console.log("\n3️⃣  Checking for invalid agent references...");
     const [allSquads] = await localPool.execute(
-      `SELECT id, slug, agents FROM agent_squads WHERE is_active = 1 LIMIT 1000`
+      `SELECT id, slug, agents FROM squads WHERE is_active = 1 LIMIT 1000`
     ) as any[];
 
     let invalidAgentCount = 0;
