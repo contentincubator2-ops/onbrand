@@ -18,6 +18,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db";
+import { users } from "../../drizzle/schema";
 import {
   getUserByEmail,
   createUser,
@@ -230,17 +231,17 @@ authRouter.post("/me", async (req: Request, res: Response) => {
     const db = await getDb();
     const user = await db
       .select({
-        id: db.schema.users.id,
-        openId: db.schema.users.openId,
-        name: db.schema.users.name,
-        email: db.schema.users.email,
-        role: db.schema.users.role,
-        isActive: db.schema.users.isActive,
-        credits: db.schema.users.credits,
-        hasUnlimitedCredits: db.schema.users.hasUnlimitedCredits,
+        id: users.id,
+        openId: users.openId,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        isActive: users.isActive,
+        credits: users.credits,
+        hasUnlimitedCredits: users.hasUnlimitedCredits,
       })
-      .from(db.schema.users)
-      .where(eq(db.schema.users.id, session.userId))
+      .from(users)
+      .where(eq(users.id, session.userId))
       .limit(1);
 
     if (!user || user.length === 0) {

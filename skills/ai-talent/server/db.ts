@@ -14,7 +14,7 @@ import { createPool, type Pool } from "mysql2/promise";
 import { sql } from "drizzle-orm";
 import * as schema from "../drizzle/schema";
 
-type DB = ReturnType<typeof drizzle<typeof schema>>;
+export type DB = ReturnType<typeof drizzle<typeof schema>>;
 
 let db: DB | null = null;
 let pool: Pool | null = null;

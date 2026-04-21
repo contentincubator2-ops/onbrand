@@ -2,7 +2,7 @@
  * passwordUtils.ts — Password hashing and verification using bcrypt
  */
 
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 // BCrypt rounds (higher = more secure but slower)
 const BCRYPT_ROUNDS = 12;
