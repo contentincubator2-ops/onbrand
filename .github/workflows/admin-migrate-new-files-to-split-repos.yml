@@ -1,0 +1,159 @@
+name: Admin — Migrate today's new files to /opt split repos
+
+# Copies files that only exist in /home/azureuser/marketing-os (my work today)
+# to the corresponding location in the new split repos:
+#
+# BACKEND migrations:
+#   /home/azureuser/marketing-os/skills/ai-talent/scripts/squad-builder/*
+#     → /opt/marketing-os/marketing-os-backend/ai-talent-scripts/squad-builder/
+#
+#   /home/azureuser/marketing-os/skills/ai-talent/scripts/migrate.ts
+#     → /opt/marketing-os/marketing-os-backend/ai-talent-scripts/migrate.ts
+#       (overwrite — my version has tier+strategy_layer migration)
+#
+#   /home/azureuser/marketing-os/skills/ai-talent/scripts/classify-squads-tier.ts
+#   /home/azureuser/marketing-os/skills/ai-talent/scripts/upgrade-lead-agent-fields.ts
+#     → /opt/marketing-os/marketing-os-backend/ai-talent-scripts/
+#
+#   package.json scripts additions: db:classify-squads, db:build-L1, db:build-L1-v2,
+#     db:build-L2, db:upgrade-lead-fields
+#
+# FRONTEND migrations:
+#   /home/azureuser/marketing-os/skills/ai-talent/client/src/App.tsx
+#     → /opt/marketing-os/marketing-os-frontend/ai-talent-client/src/App.tsx
+#
+#   /home/azureuser/marketing-os/skills/ai-talent/client/src/components/AppShell.tsx
+#     → /opt/marketing-os/marketing-os-frontend/ai-talent-client/src/components/AppShell.tsx
+#
+#   /home/azureuser/marketing-os/skills/ai-talent/client/src/components/MissionChatCore.tsx
+#     → /opt/marketing-os/marketing-os-frontend/ai-talent-client/src/components/MissionChatCore.tsx
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to cp + git push to both new repos. DRY for preview.'
+        required: true
+        type: string
+        default: 'DRY'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set -e
+            OLD=/home/azureuser/marketing-os
+            BE=/opt/marketing-os/marketing-os-backend
+            FE=/opt/marketing-os/marketing-os-frontend
+            CONFIRM="${{ inputs.confirm }}"
+
+            echo "===== Step 0: ensure OLD repo is latest ====="
+            cd "$OLD"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "OLD HEAD: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 1: BACKEND — prepare file list ====="
+            # Ensure squad-builder subdir exists in target
+            BE_TARGET_SB="$BE/ai-talent-scripts/squad-builder"
+            echo "Target squad-builder dir: $BE_TARGET_SB"
+            echo "Source files to migrate:"
+            ls -1 "$OLD/skills/ai-talent/scripts/squad-builder/" | sed 's/^/  /'
+            echo ""
+            echo "Additional scripts:"
+            for f in migrate.ts classify-squads-tier.ts upgrade-lead-agent-fields.ts; do
+              [ -f "$OLD/skills/ai-talent/scripts/$f" ] && echo "  $f (will overwrite if exists)"
+            done
+
+            echo ""
+            echo "===== Step 2: FRONTEND — prepare file list ====="
+            echo "Frontend files to migrate:"
+            for f in src/App.tsx src/components/AppShell.tsx src/components/MissionChatCore.tsx; do
+              [ -f "$OLD/skills/ai-talent/client/$f" ] && echo "  $f (will overwrite)"
+            done
+
+            if [ "$CONFIRM" != "APPLY" ]; then
+              echo ""
+              echo "[DRY-RUN] nothing copied or pushed. Run with confirm=APPLY."
+              exit 0
+            fi
+
+            echo ""
+            echo "===== Step 3: BACKEND cp + commit + push ====="
+            mkdir -p "$BE_TARGET_SB"
+            cp -v "$OLD/skills/ai-talent/scripts/squad-builder/"*.ts "$BE_TARGET_SB/"
+            cp -v "$OLD/skills/ai-talent/scripts/migrate.ts"                  "$BE/ai-talent-scripts/"
+            cp -v "$OLD/skills/ai-talent/scripts/classify-squads-tier.ts"     "$BE/ai-talent-scripts/"
+            cp -v "$OLD/skills/ai-talent/scripts/upgrade-lead-agent-fields.ts" "$BE/ai-talent-scripts/"
+
+            # Update package.json scripts: add my new npm scripts
+            # Use node to patch JSON safely
+            node - <<'JSEOF'
+            const fs = require('fs');
+            const path = '/opt/marketing-os/marketing-os-backend/package.json';
+            const pkg = JSON.parse(fs.readFileSync(path, 'utf-8'));
+            const add = {
+              "db:classify-squads":    "tsx ai-talent-scripts/classify-squads-tier.ts",
+              "db:build-L1":           "tsx ai-talent-scripts/squad-builder/index.ts L1-brand",
+              "db:build-L1-dry":       "tsx ai-talent-scripts/squad-builder/index.ts L1-brand --dry-run",
+              "db:build-L1-v2":        "tsx ai-talent-scripts/squad-builder/index.ts L1-brand-v2",
+              "db:build-L1-v2-dry":    "tsx ai-talent-scripts/squad-builder/index.ts L1-brand-v2 --dry-run",
+              "db:build-L2":           "tsx ai-talent-scripts/squad-builder/index.ts L2-product",
+              "db:build-L2-dry":       "tsx ai-talent-scripts/squad-builder/index.ts L2-product --dry-run",
+              "db:upgrade-lead-fields":"tsx ai-talent-scripts/upgrade-lead-agent-fields.ts"
+            };
+            let added = 0;
+            for (const [k,v] of Object.entries(add)) {
+              if (!pkg.scripts[k]) { pkg.scripts[k] = v; added++; }
+            }
+            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
+            console.log(`[pkg.json] added ${added} scripts`);
+            JSEOF
+
+            cd "$BE"
+            git add ai-talent-scripts/squad-builder/ ai-talent-scripts/migrate.ts ai-talent-scripts/classify-squads-tier.ts ai-talent-scripts/upgrade-lead-agent-fields.ts package.json
+            git status --short
+            git -c user.name="CJ Migration Bot" -c user.email="cjwang@sowork.tw" \
+              commit -m "feat: migrate squad-builder + classify + upgrade-lead-fields scripts (from CJ's workspace)
+
+Adds:
+- ai-talent-scripts/squad-builder/ (9 files: types, db, upsertSquad, findOrCreateAgent, validateSquad, index, L1-brand, L1-brand-v2, L2-product)
+- ai-talent-scripts/classify-squads-tier.ts
+- ai-talent-scripts/upgrade-lead-agent-fields.ts
+- ai-talent-scripts/migrate.ts (tier + strategy_layer migration)
+- package.json: db:build-L1, db:build-L1-v2, db:build-L2, db:classify-squads, db:upgrade-lead-fields"
+            git push origin main
+            echo "[BE] pushed"
+
+            echo ""
+            echo "===== Step 4: FRONTEND cp + commit + push ====="
+            cp -v "$OLD/skills/ai-talent/client/src/App.tsx"                    "$FE/ai-talent-client/src/App.tsx"
+            cp -v "$OLD/skills/ai-talent/client/src/components/AppShell.tsx"    "$FE/ai-talent-client/src/components/AppShell.tsx"
+            cp -v "$OLD/skills/ai-talent/client/src/components/MissionChatCore.tsx" "$FE/ai-talent-client/src/components/MissionChatCore.tsx"
+
+            cd "$FE"
+            git add ai-talent-client/src/App.tsx ai-talent-client/src/components/AppShell.tsx ai-talent-client/src/components/MissionChatCore.tsx
+            git status --short
+            git -c user.name="CJ Migration Bot" -c user.email="cjwang@sowork.tw" \
+              commit -m "feat: migrate AppShell picker dropdown + brand/workspace URL routing
+
+- App.tsx: add /b/:brandId/:workspace/m/:missionId primary route (/m/:missionId legacy redirect)
+- AppShell.tsx: replace right-panel tab bar with compact header + ⊞ picker dropdown
+- MissionChatCore.tsx: Step 0 two-button mode selector (auto vs step-by-step)"
+            git push origin main
+            echo "[FE] pushed"
+
+            echo ""
+            echo "===== Step 5: FINAL verify ====="
+            cd "$BE" && echo "BE HEAD: $(git log --oneline -1)"
+            cd "$FE" && echo "FE HEAD: $(git log --oneline -1)"
+            echo ""
+            echo "[done] migration complete"
