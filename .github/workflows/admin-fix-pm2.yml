@@ -1,0 +1,55 @@
+name: Admin — Fix PM2 startup (JWT_SECRET + CWD)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set -e
+            AI=/opt/marketing-os/app/skills/ai-talent
+            TSX=$AI/node_modules/.bin/tsx
+
+            echo "===== Check .env key names (no values) ====="
+            grep -o '^[^=]*' "$AI/.env" | head -30
+
+            echo ""
+            echo "===== Check JWT_SECRET in .env ====="
+            grep -q "JWT_SECRET" "$AI/.env" && echo "JWT_SECRET: PRESENT" || echo "JWT_SECRET: MISSING"
+
+            echo ""
+            echo "===== Fix: copy JWT_SECRET from old backend .env if missing ====="
+            if ! grep -q "JWT_SECRET" "$AI/.env"; then
+              OLD_SECRET=$(grep "JWT_SECRET" /opt/marketing-os/marketing-os-backend/.env 2>/dev/null || true)
+              if [ -n "$OLD_SECRET" ]; then
+                echo "$OLD_SECRET" >> "$AI/.env"
+                echo "JWT_SECRET copied from old backend"
+              else
+                echo "WARNING: JWT_SECRET not found in old backend either — check manually"
+              fi
+            fi
+
+            echo ""
+            echo "===== Restart PM2 with absolute paths ====="
+            pm2 delete marketing-os 2>/dev/null || true
+
+            pm2 start "$TSX" \
+              --name marketing-os \
+              --cwd "$AI" \
+              -- server/index.ts
+
+            pm2 save --force
+
+            echo ""
+            echo "===== Wait 5s then health check ====="
+            sleep 5
+            pm2 list | head -6
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/health
