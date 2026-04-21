@@ -28,6 +28,10 @@ jobs:
               cat ~/.pm2/logs/marketing-os-out.log 2>/dev/null | tail -20
 
             echo ""
+            echo "===== Full error log tail (last 30 lines, fresh) ====="
+            tail -30 ~/.pm2/logs/marketing-os-error.log 2>/dev/null
+
+            echo ""
             echo "===== tsx available? ====="
             ls /opt/marketing-os/app/skills/ai-talent/node_modules/.bin/tsx 2>/dev/null && echo "tsx OK" || echo "tsx NOT FOUND"
 
