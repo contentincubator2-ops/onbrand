@@ -100,25 +100,13 @@ jobs:
             if [ "${CONFIRM}" = "APPLY" ]; then
               echo ""
               echo "========== PATCH: set aiModel='claude-opus-4-6' on L1/L2 leads + Mary Allen =========="
-              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<'SQL'
-              UPDATE agents SET aiModel = 'claude-opus-4-6'
-              WHERE id IN (
-                180797,                                            -- Mary Allen (brand-archetype lead)
-                238844, 238845, 238846, 238847, 238848,            -- L1 leads (5)
-                238849, 238850, 238851, 238852,                    -- L1 leads (4)
-                238853, 238854, 238855, 238856, 238857,            -- L2 leads (5)
-                238858, 238859, 238860, 238861, 238862             -- L2 leads (5)
-              );
-              SELECT ROW_COUNT() AS leads_upgraded_to_opus;
+              IDS="180797,238844,238845,238846,238847,238848,238849,238850,238851,238852,238853,238854,238855,238856,238857,238858,238859,238860,238861,238862"
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "UPDATE agents SET aiModel = 'claude-opus-4-6' WHERE id IN (${IDS}); SELECT ROW_COUNT() AS leads_upgraded_to_opus;"
 
-              SELECT '========== AFTER patch: verify ==========' AS info;
-              SELECT id, slug, name, primarySkill, aiModel, JSON_LENGTH(skills) AS skill_count
-              FROM agents
-              WHERE id IN (180797, 238844, 238845, 238846, 238847, 238848, 238849, 238850,
-                           238851, 238852, 238853, 238854, 238855, 238856, 238857, 238858,
-                           238859, 238860, 238861, 238862)
-              ORDER BY id;
-SQL
+              echo "========== AFTER patch: verify =========="
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "SELECT id, slug, name, primarySkill, aiModel, JSON_LENGTH(skills) AS skill_count FROM agents WHERE id IN (${IDS}) ORDER BY id;"
               echo ""
               echo "[vm] L1/L2 lead aiModel upgraded to claude-opus-4-6."
             else
