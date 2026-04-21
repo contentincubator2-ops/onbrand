@@ -1,21 +1,16 @@
-name: Admin — Deploy to VM (standard)
+name: Deploy to VM
 
-# Standard deploy after consolidation.
-# Pulls latest Marketing-OS from GitHub, rebuilds frontend, restarts backend.
-# Run this for every future code change.
+# Auto-deploys on every push to main.
+# Also available as manual trigger (workflow_dispatch).
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type DEPLOY'
-        required: true
-        type: string
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ inputs.confirm == 'DEPLOY' }}
     steps:
       - uses: appleboy/ssh-action@v1.0.3
         with:
