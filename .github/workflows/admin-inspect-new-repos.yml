@@ -1,0 +1,65 @@
+name: Admin — Inspect new Backend/Frontend repo structure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            BE=/opt/marketing-os/marketing-os-backend
+            FE=/opt/marketing-os/marketing-os-frontend
+
+            echo "========== Backend root structure =========="
+            ls "$BE"
+
+            echo ""
+            echo "========== Backend package.json scripts =========="
+            grep -A 30 '"scripts"' "$BE/package.json" | head -40
+
+            echo ""
+            echo "========== Backend ai-talent-scripts/ structure =========="
+            if [ -d "$BE/ai-talent-scripts" ]; then
+              ls "$BE/ai-talent-scripts/"
+              echo ""
+              echo "(squad-builder subdir? -->)"
+              [ -d "$BE/ai-talent-scripts/squad-builder" ] && ls "$BE/ai-talent-scripts/squad-builder/" || echo "(NO squad-builder subdir)"
+            fi
+
+            echo ""
+            echo "========== Backend .env presence + DB config =========="
+            [ -f "$BE/.env" ] && echo ".env exists" || echo "NO .env"
+            [ -f "$BE/.env" ] && grep -E '^(DB_|LOCAL_DB_)' "$BE/.env" | sed 's/=.*/=<redacted>/' | head -10
+
+            echo ""
+            echo "========== Frontend root structure =========="
+            ls "$FE"
+
+            echo ""
+            echo "========== Frontend package.json scripts =========="
+            grep -A 10 '"scripts"' "$FE/package.json" | head -15
+
+            echo ""
+            echo "========== Frontend ai-talent-client structure =========="
+            if [ -d "$FE/ai-talent-client" ]; then
+              ls "$FE/ai-talent-client/"
+              echo ""
+              echo "(src/components/?)"
+              [ -d "$FE/ai-talent-client/src" ] && ls "$FE/ai-talent-client/src/" | head -15
+            else
+              echo "(NO ai-talent-client subdir, checking src/ directly)"
+              [ -d "$FE/src" ] && ls "$FE/src/" | head -10
+            fi
+
+            echo ""
+            echo "========== Git config of both repos (push perms) =========="
+            cd "$BE" && git remote -v && echo "--- origin test: ---" && git ls-remote --heads origin main 2>&1 | head -3
+            echo ""
+            cd "$FE" && git remote -v && echo "--- origin test: ---" && git ls-remote --heads origin main 2>&1 | head -3
