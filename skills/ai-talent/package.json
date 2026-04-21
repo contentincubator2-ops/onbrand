@@ -26,6 +26,8 @@
     "db:build-L1-dry": "tsx scripts/squad-builder/index.ts L1-brand --dry-run",
     "db:build-L2": "tsx scripts/squad-builder/index.ts L2-product",
     "db:build-L2-dry": "tsx scripts/squad-builder/index.ts L2-product --dry-run",
+    "db:build-L1-v2": "tsx scripts/squad-builder/index.ts L1-brand-v2",
+    "db:build-L1-v2-dry": "tsx scripts/squad-builder/index.ts L1-brand-v2 --dry-run",
     "db:upgrade-lead-fields": "tsx scripts/upgrade-lead-agent-fields.ts",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
