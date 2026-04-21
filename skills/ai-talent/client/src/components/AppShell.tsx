@@ -8,6 +8,7 @@ import { trpc } from "../lib/trpc";
 import { MissionModal } from "./MissionModal";
 import type { DBSquad } from '../types/squad';
 import { useLang } from "../lib/i18n";
+import Settings from "../pages/Settings";
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -106,6 +107,21 @@ const IconPackage = () => (
   </svg>
 );
 
+// Brain: neural-node glyph, matches BrandBrainBar's NeuralIcon aesthetic
+const IconBrain = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="4"  r="1.2" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="20" r="1.2" fill="currentColor" stroke="none"/>
+    <circle cx="4"  cy="12" r="1.2" fill="currentColor" stroke="none"/>
+    <circle cx="20" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+    <line x1="12" y1="9.8" x2="12" y2="5.2"/>
+    <line x1="12" y1="14.2" x2="12" y2="18.8"/>
+    <line x1="9.8" y1="12" x2="5.2" y2="12"/>
+    <line x1="14.2" y1="12" x2="18.8" y2="12"/>
+  </svg>
+);
+
 const IconSettings = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3"/>
@@ -196,6 +212,7 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   const tabs = [
     { id: "tasks",        icon: <IconTasks />,        badge: false, label: t("tab_tasks") },
     { id: "chat",         icon: <IconChat />,         badge: false, label: t("tab_chat") },
+    { id: "brain",        icon: <IconBrain />,        badge: false, label: t("tab_brain") },
     { id: "outputs",      icon: <IconPackage />,      badge: false, label: t("tab_outputs") },
     { id: "settings",     icon: <IconSettings />,     badge: false, label: t("tab_settings") },
   ];
@@ -2966,6 +2983,151 @@ interface AppShellProps {
 }
 
 
+// ─── BrainPanel ───────────────────────────────────────────────────────────────
+// Shows the Brand Brain knowledge base scoped to the currently-selected
+// workspace / brand / mission. Drawer stays unchanged — this panel simply
+// replaces the main content area when the 大腦 rail tab is active.
+
+function BrainPanel({
+  brandId,
+  missionId,
+}: {
+  brandId?: number | null;
+  missionId?: number | null;
+}) {
+  const brainQ = (trpc as any).brandBrain?.list?.useQuery
+    ? (trpc as any).brandBrain.list.useQuery(
+        { brandId: brandId ?? 0 },
+        { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: null, isLoading: false };
+
+  const items: any[] = brainQ.data ?? [];
+  const BUDGET = 8000;
+  const used = items.reduce(
+    (s, i) => s + (i.content?.length ?? 0) + (i.title?.length ?? 0),
+    0
+  );
+  const pct = Math.min(100, Math.round((used / BUDGET) * 100));
+
+  if (!brandId) {
+    return (
+      <div style={{
+        flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#9B9990", fontSize: 13,
+      }}>
+        請先選擇品牌 / Select a brand to view its brain
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      flex: 1, display: "flex", flexDirection: "column",
+      background: "#FAFAF9", overflow: "hidden",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "16px 24px",
+        borderBottom: "1px solid #E4E3E1",
+        background: "#FFFFFF",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1A18", letterSpacing: "-0.01em" }}>
+            品牌大腦
+          </div>
+          <div style={{ fontSize: 11, color: "#8C8B87", marginTop: 2 }}>
+            此工作區 / 任務的記憶與知識庫 · {items.length} 項
+            {missionId ? ` · Mission #${missionId}` : ""}
+          </div>
+        </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          fontSize: 10, color: "#6B6A66",
+        }}>
+          <div style={{ width: 120, height: 6, background: "#E4E3E1", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{
+              width: `${pct}%`, height: "100%",
+              background: pct >= 90 ? "#D14343" : "#1A1A18",
+              transition: "width 0.3s",
+            }} />
+          </div>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{used}/{BUDGET}</span>
+        </div>
+      </div>
+
+      {/* Item list */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+        {brainQ.isLoading ? (
+          <div style={{ color: "#9B9990", fontSize: 12 }}>載入中…</div>
+        ) : items.length === 0 ? (
+          <div style={{
+            padding: "48px 0", textAlign: "center",
+            color: "#9B9990", fontSize: 12,
+          }}>
+            尚未累積任何知識。從對話中把重點「釘」到大腦即可在這裡看到。
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {items.map((it: any, i: number) => (
+              <div
+                key={it.id ?? i}
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E4E3E1",
+                  borderRadius: 8,
+                  padding: "12px 14px",
+                }}
+              >
+                {it.title && (
+                  <div style={{
+                    fontSize: 12, fontWeight: 600, color: "#1A1A18",
+                    marginBottom: 4,
+                  }}>
+                    {it.title}
+                  </div>
+                )}
+                <div style={{
+                  fontSize: 12, color: "#4A4945", lineHeight: 1.55,
+                  whiteSpace: "pre-wrap", wordBreak: "break-word",
+                }}>
+                  {it.content}
+                </div>
+                {(it.kind || it.createdAt) && (
+                  <div style={{
+                    fontSize: 10, color: "#9B9990", marginTop: 6,
+                    display: "flex", gap: 8,
+                  }}>
+                    {it.kind && <span>· {it.kind}</span>}
+                    {it.createdAt && <span>· {new Date(it.createdAt).toLocaleDateString("zh-TW")}</span>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── SettingsPanel ────────────────────────────────────────────────────────────
+// Wraps the Settings page so the main area background and padding match
+// the rest of the shell.
+
+function SettingsPanel() {
+  return (
+    <div style={{
+      flex: 1, overflowY: "auto",
+      background: "#FAFAF9",
+      padding: "24px 32px",
+    }}>
+      <Settings />
+    </div>
+  );
+}
+
 // ─── ExportsPanel ─────────────────────────────────────────────────────────────
 
 function ExportsPanel({ brandId }: { brandId?: number | null }) {
@@ -3353,12 +3515,12 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
           </div>
         </div>
 
-        {/* Children slot (chat/content area) or Exports panel */}
+        {/* Children slot (chat/content area) or Rail-switched panels */}
         <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          {railTab === "outputs"
-            ? <ExportsPanel brandId={selectedBrandId} />
-            : children
-          }
+          {railTab === "outputs"  ? <ExportsPanel brandId={selectedBrandId} />
+           : railTab === "brain"    ? <BrainPanel brandId={selectedBrandId} missionId={activeMissionId} />
+           : railTab === "settings" ? <SettingsPanel />
+           : children}
         </div>
       </main>
 

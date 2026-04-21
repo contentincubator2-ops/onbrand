@@ -5,6 +5,7 @@ export const en = {
   // ── Rail tabs ──────────────────────────────────────────────────────────────
   tab_tasks:    "Tasks",
   tab_chat:     "Chat",
+  tab_brain:    "Brain",
   tab_outputs:  "Outputs",
   tab_settings: "Settings",
 

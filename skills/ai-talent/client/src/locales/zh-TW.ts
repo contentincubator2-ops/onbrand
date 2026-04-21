@@ -5,6 +5,7 @@ export const zh = {
   // ── Rail tabs ──────────────────────────────────────────────────────────────
   tab_tasks:    "任務",
   tab_chat:     "對話",
+  tab_brain:    "大腦",
   tab_outputs:  "產出",
   tab_settings: "設定",
 
