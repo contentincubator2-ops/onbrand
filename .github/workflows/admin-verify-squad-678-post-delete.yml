@@ -1,0 +1,61 @@
+name: Admin — Verify squad 678 + agent count post-HR-delete
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            echo "===== 1. Raw agents JSON of squad 678 ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT id, slug, agents FROM squads WHERE id=678\G"
+
+            echo ""
+            echo "===== 2. Does agent_id=90050 still exist in any squad? (should be 0) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT id, slug FROM squads WHERE is_active=1 AND agents LIKE '%90050%';"
+
+            echo ""
+            echo "===== 3. Any squad still has a now-deleted agent_id? (should be 0) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT COUNT(*) AS squads_with_orphan_member
+                  FROM squads s,
+                    JSON_TABLE(s.agents, '\$[*]' COLUMNS (agent_id INT PATH '\$.agent_id')) AS m
+                  LEFT JOIN agents a ON a.id = m.agent_id
+                  WHERE s.is_active=1 AND a.id IS NULL;"
+
+            echo ""
+            echo "===== 4. Squad 678 member rendering (same query as last workflow) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT m.role, m.is_lead, m.agent_id, a.name, a.title, a.primarySkill
+                  FROM squads s,
+                    JSON_TABLE(s.agents, '\$[*]' COLUMNS (
+                      role VARCHAR(64) PATH '\$.role',
+                      is_lead BOOLEAN PATH '\$.is_lead',
+                      agent_id INT PATH '\$.agent_id',
+                      ord INT PATH '\$.order'
+                    )) AS m
+                  LEFT JOIN agents a ON a.id = m.agent_id
+                  WHERE s.id = 678 ORDER BY m.ord;"
+
+            echo ""
+            echo "===== 5. Current total agents + 15 L1 + 10 L2 squads still intact? ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT COUNT(*) AS total_agents FROM agents;"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT strategy_layer, tier, COUNT(*) AS cnt FROM squads
+                  WHERE is_active=1 AND tier='core'
+                  GROUP BY strategy_layer, tier;"
