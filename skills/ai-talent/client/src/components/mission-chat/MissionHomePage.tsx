@@ -91,10 +91,12 @@ export const MissionHomePage: React.FC<MissionHomePageProps> = ({
   const titleText  = shortTitle || t("mission_start");
 
   // ── DB-driven squad chips ──────────────────────────────────────────────────
+  // Fetch as long as we have a workspace — missionId is optional so that the
+  // IndexPage ("/") can render chips even before a mission has been created.
   const squadQuery = trpc.squad.getRecommendedSquads.useQuery(
     { workspace, brandId: brandId ?? undefined, missionId: missionId ?? undefined, limit: 6 },
     {
-      enabled:              !!missionId,
+      enabled:              !!workspace,
       staleTime:            60_000,
       refetchOnWindowFocus: false,
     }

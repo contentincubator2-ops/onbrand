@@ -744,39 +744,15 @@ export default function MissionChatCore({
     });
   }, [savedMessagesQuery.data, activeMissionId]);
 
-  // ── Squad Lead Auto-start ─────────────────────────────────────────────────
-  // When a mission has a squadSlug and no saved messages, the Squad Lead
-  // auto-initiates the conversation (brand recap + intake questions).
-  // Uses autoStartedRef to prevent double-triggering across re-renders.
-  useEffect(() => {
-    if (!activeMissionId) return;
-    const squadSlug = (missionDataQuery.data as any)?.squadSlug as string | undefined;
-    if (!squadSlug) return;
-    // Wait until both queries have finished fetching
-    if (missionDataQuery.isLoading || savedMessagesQuery.isLoading) return;
-    if (!savedMessagesQuery.isSuccess) return;
-    // Only auto-start if there are no saved messages (fresh mission)
-    const savedCount = (savedMessagesQuery.data as any[])?.length ?? 0;
-    if (savedCount > 0) {
-      // History exists — mark as already started so we never retrigger
-      autoStartedRef.current.add(activeMissionId);
-      return;
-    }
-    // Guard against double-trigger
-    if (autoStartedRef.current.has(activeMissionId)) return;
-    autoStartedRef.current.add(activeMissionId);
-
-    const missionConvId = `conv-mission-${activeMissionId}`;
-    // Delay to allow MissionHomePage to render and display squad recommendations to user
-    // This ensures visual consistency between new tasks and existing tasks (e.g., task 149)
-    // 700ms: mission-init, 300ms: MissionHomePage render, 500ms: user sees recommendations
-    const timer = setTimeout(() => {
-      console.log("[MissionChatCore] Auto-starting mission chat after homepage display delay");
-      executeSquadChat("開始任務", missionConvId, squadSlug);
-    }, 1500);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMissionId, (missionDataQuery.data as any)?.squadSlug, missionDataQuery.isLoading, savedMessagesQuery.isLoading, savedMessagesQuery.isSuccess]);
+  // ── Squad Lead Auto-start — REMOVED 2026-04-21 ─────────────────────────────
+  // Previously: when a mission has a squadSlug and no saved messages, auto-
+  // triggered executeSquadChat("開始任務") after 1500ms. This caused confusion
+  // because users would see analysis running before they had a chance to
+  // review squad details, type their intent, or confirm.
+  //
+  // New behavior: Mission starts only when user explicitly sends a message
+  // via ChatInput. MissionHomePage is shown until the first user message.
+  // `autoStartedRef` is retained elsewhere for other purposes (if any).
 
   // Propagate squad step progress to parent
   useEffect(() => {

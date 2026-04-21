@@ -135,6 +135,12 @@ function IndexPage() {
   const brandsQuery = trpc.brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false });
   const [ready, setReady] = useState(false);
 
+  // Squad preview state — shared with AppShell so the right panel updates
+  // when user hovers/clicks a squad chip on the homepage (before mission
+  // creation). Without this wiring the right panel renders blank.
+  const [activeSquad, setActiveSquad] = useState<DBSquad | null>(null);
+  const [squadStepProgress, setSquadStepProgress] = useState<SquadStepProgress[]>([]);
+
   useEffect(() => {
     // If auth fails (expired/invalid JWT), clear token and bounce to login.
     // Without this, the page sits on "載入中…" forever because `isSuccess`
@@ -186,10 +192,14 @@ function IndexPage() {
       activeMissionId={null}
       onMissionSelect={handleMissionSelect}
       onNewTask={(_wsKey) => {}}
+      activeSquad={activeSquad}
+      squadStepProgress={squadStepProgress}
     >
       <MissionChatCore
         activeMissionId={null}
         onMissionCreated={(id) => navigate(`/m/${id}`)}
+        onSquadPreview={(squad) => setActiveSquad(squad)}
+        onSquadStepProgress={setSquadStepProgress}
       />
     </AppShell>
   );
