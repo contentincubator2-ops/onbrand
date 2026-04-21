@@ -241,13 +241,27 @@ async function main() {
       );
 
       if (applyFlag) {
+        // COALESCE: only fill NULL/empty fields. Don't overwrite real data
+        // (e.g. Mary Allen has a real avatarUrl on manuscdn + bio_en already).
+        // For workspace_tags which is JSON, we treat empty array [] as fillable.
         await conn.execute(
           `UPDATE agents SET
-             avatarUrl = ?, coverUrl = ?,
-             bio_en = ?, specialty_en = ?,
-             workspace = ?, workspace_tags = ?,
-             methodology = ?, workingPrinciples = ?,
-             aiModelSource = ?, aiModelFallback = ?, aiModelFallbackSource = ?,
+             avatarUrl         = COALESCE(NULLIF(avatarUrl, ''), ?),
+             coverUrl          = COALESCE(NULLIF(coverUrl,  ''), ?),
+             bio_en            = COALESCE(NULLIF(bio_en,    ''), ?),
+             specialty_en      = COALESCE(NULLIF(specialty_en, ''), ?),
+             workspace         = COALESCE(NULLIF(workspace, ''), ?),
+             workspace_tags    = CASE
+                                   WHEN workspace_tags IS NULL
+                                     OR JSON_LENGTH(workspace_tags) < 3
+                                   THEN ?
+                                   ELSE workspace_tags
+                                 END,
+             methodology       = COALESCE(NULLIF(methodology, ''), ?),
+             workingPrinciples = COALESCE(NULLIF(workingPrinciples, ''), ?),
+             aiModelSource         = COALESCE(NULLIF(aiModelSource, ''), ?),
+             aiModelFallback       = COALESCE(NULLIF(aiModelFallback, ''), ?),
+             aiModelFallbackSource = COALESCE(NULLIF(aiModelFallbackSource, ''), ?),
              updatedAt = CURRENT_TIMESTAMP
            WHERE id = ?`,
           [
