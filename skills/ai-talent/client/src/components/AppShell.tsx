@@ -2080,11 +2080,13 @@ function RightPanel({
               </div>
 
               {/* ── Section body — independent scroll ── */}
+              {/* sop expands to full content height — the outer right panel scrolls. */}
+              {/* Other sections keep a cap so any single one can't dominate. */}
               {isOpen && (
                 <div style={{
                   position: "relative",
-                  maxHeight: 300,
-                  overflowY: "auto",
+                  maxHeight: section.key === "sop" ? undefined : 300,
+                  overflowY: section.key === "sop" ? "visible" : "auto",
                   overscrollBehavior: "contain",
                   padding: "10px 12px 12px",
                 }}>
@@ -2147,71 +2149,130 @@ function DBSquadMethodologyPanel({
           ))}
         </div>
       ) : steps.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {steps.map((step: any, i: number) => {
             const stepNum = step.step ?? i + 1;
             const isActive = activeStep !== undefined && activeStep > 0 && activeStep === stepNum;
             const isDone   = activeStep !== undefined && activeStep > stepNum;
             const isLast   = i === steps.length - 1;
-            const nodeColor = isActive ? "#0A6EFA" : isDone ? "#059669" : "#D4D3D0";
-            const textColor = isActive ? "#0A6EFA" : isDone ? "#059669" : "#1A1A18";
+            const title    = step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`;
+            // "conclusion" = output/result if present, else description as fallback
+            const conclusion = step.output ?? step.result ?? step.conclusion ?? step.description ?? null;
+
+            // ── Node (left track) — sized by state
+            const nodeSize = isActive ? 28 : isDone ? 22 : 18;
+            const nodeColor = isActive ? "#0A6EFA" : isDone ? "#059669" : "#C8C7C3";
+            const nodeBg    = isActive ? "#EFF6FF" : isDone ? "#ECFDF5" : "#FAFAF9";
+            const trackWidth = 30;
 
             return (
-              <div key={i} style={{ display: "flex" }}>
+              <div key={i} style={{ display: "flex", alignItems: "stretch" }}>
                 {/* Left track */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 32, flexShrink: 0 }}>
-                  {/* Node */}
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  width: trackWidth, flexShrink: 0, paddingTop: isActive ? 2 : 1,
+                }}>
                   <div style={{
-                    width: 22, height: 22, borderRadius: "50%",
-                    background: isActive ? "#EFF6FF" : isDone ? "#ECFDF5" : "#F2F1EF",
-                    border: `2px solid ${nodeColor}`,
+                    width: nodeSize, height: nodeSize, borderRadius: "50%",
+                    background: nodeBg,
+                    border: `${isActive ? 2.5 : 2}px solid ${nodeColor}`,
                     color: nodeColor,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: isDone ? 12 : 10, fontWeight: 700, flexShrink: 0,
-                    boxShadow: isActive ? "0 0 0 4px rgba(10,110,250,0.1)" : "none",
+                    fontSize: isActive ? 12 : 10, fontWeight: 700, flexShrink: 0,
+                    boxShadow: isActive ? "0 0 0 5px rgba(10,110,250,0.12)" : "none",
                     transition: "all 0.3s",
                     zIndex: 1,
                   }}>
                     {isDone ? (
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={nodeColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={nodeColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
                     ) : isActive ? (
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3B82F6", display: "inline-block", animation: "pulse 1.2s infinite" }} />
+                      <span style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: "#0A6EFA", display: "inline-block",
+                        animation: "pulse 1.2s infinite",
+                      }} />
                     ) : (
-                      <span style={{ fontSize: 10, fontWeight: 700 }}>{stepNum}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: "#9B9990" }}>{stepNum}</span>
                     )}
                   </div>
-                  {/* Connector */}
                   {!isLast && (
                     <div style={{
-                      width: 2, flex: 1, minHeight: 10,
-                      background: isDone ? "#BBF7D0" : "#E4E3E1",
-                      margin: "2px 0",
+                      width: 2, flex: 1, minHeight: isActive ? 14 : 8,
+                      background: isDone ? "#A7F3D0" : "#E4E3E1",
+                      margin: "3px 0",
                       transition: "background 0.4s",
                     }} />
                   )}
                 </div>
-                {/* Content */}
-                <div style={{
-                  flex: 1, paddingLeft: 8,
-                  paddingBottom: isLast ? 4 : 12, paddingTop: 2,
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: textColor, marginBottom: 2, transition: "color 0.3s" }}>
-                    {step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`}
-                  </div>
-                  {step.description && (
-                    <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.5 }}>
-                      {step.description}
+
+                {/* Content — differs by state */}
+                <div style={{ flex: 1, paddingLeft: 10, paddingBottom: isLast ? 2 : (isActive ? 14 : 6), minWidth: 0 }}>
+                  {isActive ? (
+                    // ── ACTIVE ── large highlighted card
+                    <div style={{
+                      background: "linear-gradient(180deg, #EFF6FF 0%, #F8FBFF 100%)",
+                      border: "1px solid #BFDBFE",
+                      borderLeft: "3px solid #0A6EFA",
+                      borderRadius: 8,
+                      padding: "10px 12px 12px",
+                      boxShadow: "0 1px 4px rgba(10,110,250,0.08)",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                        <span style={{
+                          fontSize: 9.5, fontWeight: 700, color: "#0A6EFA",
+                          letterSpacing: 0.5, textTransform: "uppercase",
+                          background: "#DBEAFE", padding: "1.5px 6px", borderRadius: 3,
+                          display: "inline-flex", alignItems: "center", gap: 3,
+                        }}>
+                          <span style={{
+                            width: 5, height: 5, borderRadius: "50%", background: "#0A6EFA",
+                            animation: "pulse 1.2s infinite",
+                          }} />
+                          執行中
+                        </span>
+                        <span style={{ fontSize: 10, color: "#6B6A66" }}>第 {stepNum} 步</span>
+                      </div>
+                      <div style={{
+                        fontSize: 14, fontWeight: 700, color: "#0A4FAA",
+                        marginBottom: 6, lineHeight: 1.35, letterSpacing: 0.2,
+                      }}>
+                        {title}
+                      </div>
+                      {step.description && (
+                        <div style={{ fontSize: 11.5, color: "#1F2937", lineHeight: 1.6 }}>
+                          {step.description}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {isActive && (
-                    <div style={{ fontSize: 10, color: "#2563EB", marginTop: 3, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-                        <path d="M21 3v5h-5"/>
-                      </svg>
-                      執行中
+                  ) : isDone ? (
+                    // ── DONE ── title + conclusion (dim)
+                    <div style={{ paddingTop: 1 }}>
+                      <div style={{
+                        fontSize: 11.5, fontWeight: 600, color: "#059669",
+                        marginBottom: conclusion ? 2 : 0, letterSpacing: 0.1,
+                      }}>
+                        {title}
+                      </div>
+                      {conclusion && (
+                        <div style={{
+                          fontSize: 10.5, color: "#6B7280",
+                          lineHeight: 1.5,
+                          display: "-webkit-box", WebkitLineClamp: 2 as any, WebkitBoxOrient: "vertical" as any,
+                          overflow: "hidden",
+                        }}>
+                          {conclusion}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // ── UPCOMING ── title only, compact
+                    <div style={{
+                      fontSize: 11.5, fontWeight: 500, color: "#6B6A66",
+                      paddingTop: 2, letterSpacing: 0.1,
+                    }}>
+                      {title}
                     </div>
                   )}
                 </div>
