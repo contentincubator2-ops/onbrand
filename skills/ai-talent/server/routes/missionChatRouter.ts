@@ -76,12 +76,23 @@ function formatBrandCtx(brand: Record<string, string>): string {
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
+// Accepts BOTH:
+//   1. Authorization: Bearer <jwt>       (legacy flow, Login.tsx → localStorage)
+//   2. Cookie: session=<jwt>             (new flow, LoginPage.tsx → HTTP-only cookie)
+// This lets /api/chat work regardless of which login page the user went through.
 async function verifyToken(req: Request): Promise<number | null> {
+  // Try Authorization header first
   const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
+  let raw: string | null = null;
+  if (auth?.startsWith("Bearer ")) {
+    raw = auth.slice(7);
+  } else if ((req as any).cookies?.session) {
+    raw = (req as any).cookies.session;
+  }
+  if (!raw) return null;
   try {
     const secret = new TextEncoder().encode(getJwtSecret());
-    const { payload } = await jwtVerify(auth.slice(7), secret);
+    const { payload } = await jwtVerify(raw, secret);
     return payload.sub ? parseInt(String(payload.sub), 10) : null;
   } catch { return null; }
 }

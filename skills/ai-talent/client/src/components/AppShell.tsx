@@ -3384,9 +3384,11 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         brandName={(selectedBrand as any)?.name}
         workspaces={shellWsList}
         onClose={() => setNewMissionOpen(false)}
-        onCreated={(missionId) => {
+        onCreated={(missionId, workspace) => {
           setNewMissionOpen(false);
-          onMissionSelect?.(missionId);
+          // Pass brandId + workspace so the router can build the canonical
+          // URL /b/:brandId/:workspace/m/:missionId (not the legacy /m/:id)
+          onMissionSelect?.(missionId, selectedBrandId ?? undefined, workspace);
         }}
       />
     </div>

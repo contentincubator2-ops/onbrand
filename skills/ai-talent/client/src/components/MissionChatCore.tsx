@@ -817,8 +817,10 @@ export default function MissionChatCore({
     // Accept an explicit override so the first message still reaches the squad path.
     const squadSlug: string = squadSlugOverride ?? missionData?.squadSlug ?? "";
     if (!squadSlug) return false;
+    // Token is OPTIONAL: users who signed in via the new LoginPage have only a
+    // session cookie (no localStorage token). The fetch below sends cookies via
+    // credentials:"include", and the server's verifyToken accepts either source.
     const token = localStorage.getItem("authToken");
-    if (!token) return false;
     const isNegativeFeedback = /不對|不好|不滿意|不喜歡|不要這個|不是這樣|重做|重新|撤销|差太遠|跟我想的不一樣|no|wrong|redo|again/i.test(text);
     if (isNegativeFeedback) {
       const clarifyMsgId = `clarify-${Date.now()}`;
@@ -936,7 +938,10 @@ export default function MissionChatCore({
     try {
       const resp = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include", // also send session cookie (new LoginPage flow)
+        headers: token
+          ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+          : { "Content-Type": "application/json" },
         body: JSON.stringify({
           userMessage: text,
           conversationHistory: conversationHistory.slice(-12),
