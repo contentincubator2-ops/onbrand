@@ -1643,6 +1643,20 @@ function RightPanel({
     }
   );
   const activeStep = (sessionStepQuery.data as any)?.currentStep as number | undefined;
+  // Per-step conclusions saved by saveStepResultOnly (keyed by stepOrder as string)
+  const stepResults = ((sessionStepQuery.data as any)?.stepResults ?? {}) as Record<string, string>;
+
+  // Merge stepResults into steps[] as `conclusion` so done steps can render a summary.
+  // We keep the original agentsData.steps untouched and produce an enriched copy here.
+  const enrichedSteps = React.useMemo(() => {
+    const raw = (agentsData?.steps ?? []) as any[];
+    if (!raw.length) return raw;
+    return raw.map((s, i) => {
+      const order = s.order ?? s.step ?? i + 1;
+      const conclusion = stepResults[String(order)] ?? stepResults[order as any] ?? null;
+      return conclusion ? { ...s, conclusion } : s;
+    });
+  }, [agentsData?.steps, stepResults]);
 
   // ── Accordion ──────────────────────────────────────────────────────────────
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
@@ -1727,7 +1741,7 @@ function RightPanel({
             description={effectiveSquad.description ?? ""}
             methodology={agentsData?.methodology ?? (effectiveSquad as any).methodology ?? ""}
             leadTitle={agentsData?.lead?.title ?? effectiveSquad.lead?.title ?? ""}
-            steps={agentsData?.steps ?? []}
+            steps={enrichedSteps}
             showcases={agentsData?.showcases ?? []}
             isLoading={agentsQuery.isLoading}
             activeStep={activeStep}
@@ -2156,8 +2170,19 @@ function DBSquadMethodologyPanel({
             const isDone   = activeStep !== undefined && activeStep > stepNum;
             const isLast   = i === steps.length - 1;
             const title    = step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`;
-            // "conclusion" = output/result if present, else description as fallback
-            const conclusion = step.output ?? step.result ?? step.conclusion ?? step.description ?? null;
+            // "conclusion" = real execution output if present, else description as fallback.
+            // Raw LLM output may contain markdown — strip common markers so the 2-line clamp reads cleanly.
+            const rawConclusion: string | null = step.conclusion ?? step.output ?? step.result ?? step.description ?? null;
+            const conclusion = rawConclusion
+              ? rawConclusion
+                  .replace(/^#{1,6}\s+/gm, "")      // drop heading markers
+                  .replace(/^\s*[-*•]\s+/gm, "")    // drop bullet markers
+                  .replace(/\*\*|__/g, "")           // drop bold markers
+                  .replace(/`+/g, "")                // drop code ticks
+                  .replace(/\s+/g, " ")              // collapse whitespace/newlines
+                  .trim()
+                  .slice(0, 240)
+              : null;
 
             // ── Node (left track) — sized by state
             const nodeSize = isActive ? 28 : isDone ? 22 : 18;

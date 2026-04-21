@@ -856,25 +856,48 @@ ${agentCtx.systemPromptPrefix}`;
 
   // ── getSessionStep ────────────────────────────────────────────────────────────
   // Returns the current step index for a mission's squad session.
-  // Used by the right-panel sidebar to highlight the active agent / step.
+  // Used by the right-panel sidebar to highlight the active agent / step
+  // and to surface per-step conclusions on done steps.
   getSessionStep: protectedProcedure
     .input(z.object({ missionId: z.number() }))
     .query(async ({ input }) => {
       try {
         const [rows] = await localPool.execute(
-          `SELECT currentStep, squadSlug, status
+          `SELECT currentStep, squadSlug, status, stepResults
            FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
           [input.missionId]
         ) as any[];
         const row = (rows as any[])?.[0];
-        if (!row) return { currentStep: 0, status: "intake" as const, found: false };
+        if (!row) {
+          return {
+            currentStep: 0,
+            status: "intake" as const,
+            found: false,
+            stepResults: {} as Record<string, string>,
+          };
+        }
+        // Parse stepResults JSON; stored as { [stepOrder: string]: "raw LLM output ≤2000 chars" }
+        let stepResults: Record<string, string> = {};
+        try {
+          const raw = row.stepResults;
+          if (raw) {
+            const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+            if (parsed && typeof parsed === "object") stepResults = parsed;
+          }
+        } catch { /* leave empty */ }
         return {
           currentStep: Number(row.currentStep ?? 0),
           status: (row.status ?? "intake") as string,
           found: true,
+          stepResults,
         };
       } catch {
-        return { currentStep: 0, status: "intake" as const, found: false };
+        return {
+          currentStep: 0,
+          status: "intake" as const,
+          found: false,
+          stepResults: {} as Record<string, string>,
+        };
       }
     }),
 
