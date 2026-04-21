@@ -40,7 +40,7 @@ jobs:
             MOS_PASS="mos_secure_2026"
             MOS_DB="mos_db"
 
-            TABLES="agent_squads agents missions"
+            TABLES="squads agents missions"
 
             echo "=== Step 1: Count rows in both databases ==="
             for table in $TABLES; do
@@ -65,10 +65,10 @@ jobs:
             echo "=== Step 2: Check data integrity (mos_db) ==="
             mysql -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT 'Duplicate slugs' as Check_Type, COUNT(*) as Count
-              FROM (SELECT slug FROM agent_squads WHERE is_active=1 GROUP BY slug HAVING COUNT(*)>1) as x
+              FROM (SELECT slug FROM squads WHERE is_active=1 GROUP BY slug HAVING COUNT(*)>1) as x
               UNION ALL
               SELECT 'Empty agents',
-                COUNT(*) FROM agent_squads WHERE is_active=1 AND (agents='[]' OR agents IS NULL);
+                COUNT(*) FROM squads WHERE is_active=1 AND (agents='[]' OR agents IS NULL);
             " 2>&1 || echo "⚠️ Integrity check failed"
 
             echo ""
@@ -81,7 +81,7 @@ jobs:
 
               # Backup current mos_db (safety)
               echo "📦 Backing up mos_db..."
-              mysqldump -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" agent_squads agents missions > mos_backup_$(date +%Y%m%d_%H%M%S).sql
+              mysqldump -h "$MOS_HOST" -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" squads agents missions > mos_backup_$(date +%Y%m%d_%H%M%S).sql
               echo "✅ Backup saved"
 
               # Export each table individually for better control

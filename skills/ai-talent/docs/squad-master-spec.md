@@ -394,7 +394,7 @@ L6 驗證校準     Validation Brain       持續
 
 ## Seed Framework 約定
 
-### 必填欄位（agent_squads table）
+### 必填欄位（squads table）
 ```
 slug              : kebab-case，全域唯一
 name              : 中文名稱（含「小組」後綴）
@@ -431,7 +431,7 @@ steps             : JSON 陣列，每 step:
 ```
 
 ### 驗收規則（validateSquad.ts 本週實作）
-1. `agent_squads.agents[].is_lead` 必須恰好一個為 true
+1. `squads.agents[].is_lead` 必須恰好一個為 true
 2. Lead agent 的 `primarySkill` 必須跟 squad methodology 字面對齊（容許 fallback 清單）
 3. 每個 step 必須有 `assignedAgentId`（不接受空字串或 owner 字串）
 4. 每個 step 的 `assignedAgentId` 必須存在於該 squad 的 `agents[]` 內

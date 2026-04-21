@@ -27,5 +27,5 @@ jobs:
             echo ""
             echo "=== Agents assigned to Dunford squad ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              SELECT agents FROM agent_squads WHERE slug='brand-dunford-positioning'
+              SELECT agents FROM squads WHERE slug='brand-dunford-positioning'
             " 2>&1 | python3 -m json.tool 2>&1 | head -30 || true

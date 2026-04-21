@@ -1,4 +1,4 @@
-name: Admin — Schema Inspect (squad_workflow_templates + agent_squads)
+name: Admin — Schema Inspect (squad_workflow_templates + squads)
 
 on:
   workflow_dispatch:
@@ -24,15 +24,15 @@ jobs:
             " 2>&1
 
             echo ""
-            echo "=== 2. agent_squads 欄位 ==="
+            echo "=== 2. squads 欄位 ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              DESCRIBE agent_squads;
+              DESCRIBE squads;
             " 2>&1
 
             echo ""
-            echo "=== 3. Dunford agent_squads 所有欄位內容 ==="
+            echo "=== 3. Dunford squads 所有欄位內容 ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
-              SELECT * FROM agent_squads WHERE slug='brand-dunford-positioning' LIMIT 1\G
+              SELECT * FROM squads WHERE slug='brand-dunford-positioning' LIMIT 1\G
             " 2>&1 | head -80
 
             echo ""

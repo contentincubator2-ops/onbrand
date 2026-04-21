@@ -1,0 +1,108 @@
+name: Admin — DROP agent_squads table
+
+# Destructive: physically removes the agent_squads table from VM mos_db.
+# Safety guards:
+#   1. Requires confirm=DROP to run
+#   2. Pre-flight verification: confirms no DB objects (view/trigger/proc/FK/event) reference it
+#   3. Makes a schema+data mysqldump backup before DROP
+#   4. Uploads the backup as a workflow artifact (7-day retention)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DROP to permanently remove agent_squads table'
+        required: true
+        type: string
+
+jobs:
+  drop:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.confirm == 'DROP' }}
+    steps:
+      - name: SSH & pre-flight + backup + DROP
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            echo "===== Pre-flight 1: any DB object still references agent_squads? ====="
+            HITS=$(mysql -N -B --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" "${DB_NAME}" <<'SQL'
+            SELECT COUNT(*) FROM information_schema.VIEWS
+              WHERE TABLE_SCHEMA = DATABASE() AND VIEW_DEFINITION LIKE '%agent_squads%';
+            SELECT COUNT(*) FROM information_schema.TRIGGERS
+              WHERE TRIGGER_SCHEMA = DATABASE()
+                AND (EVENT_OBJECT_TABLE = 'agent_squads' OR ACTION_STATEMENT LIKE '%agent_squads%');
+            SELECT COUNT(*) FROM information_schema.ROUTINES
+              WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_DEFINITION LIKE '%agent_squads%';
+            SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
+              WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'agent_squads';
+            SELECT COUNT(*) FROM information_schema.EVENTS
+              WHERE EVENT_SCHEMA = DATABASE() AND EVENT_DEFINITION LIKE '%agent_squads%';
+            SQL
+            )
+            TOTAL=$(echo "$HITS" | awk '{s+=$1} END {print s+0}')
+            echo "Total DB-object references to agent_squads: ${TOTAL}"
+            if [ "${TOTAL}" -ne 0 ]; then
+              echo "ABORT — DB still has references."
+              exit 1
+            fi
+
+            echo ""
+            echo "===== Pre-flight 2: rowcount snapshot ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" -e "
+              SELECT 'agent_squads' AS tbl, COUNT(*) AS rows_total,
+                     SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END) AS rows_active FROM agent_squads;
+            "
+
+            echo ""
+            echo "===== Backup agent_squads (schema + data) to /tmp ====="
+            BACKUP=/tmp/agent_squads_backup_$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+            mysqldump \
+              --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" \
+              --single-transaction --skip-lock-tables --no-tablespaces \
+              --default-character-set=utf8mb4 --set-gtid-purged=OFF \
+              "${DB_NAME}" agent_squads | gzip -9 > "${BACKUP}"
+            ls -lh "${BACKUP}"
+            cp "${BACKUP}" /tmp/agent_squads_backup_latest.sql.gz
+
+            echo ""
+            echo "===== DROP TABLE agent_squads ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" "${DB_NAME}" -e "DROP TABLE IF EXISTS agent_squads;"
+
+            echo ""
+            echo "===== Verify: agent_squads gone ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" "${DB_NAME}" -e "
+              SELECT TABLE_NAME FROM information_schema.TABLES
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agent_squads';
+            "
+            echo "(empty result = table dropped successfully)"
+            echo ""
+            echo "[vm] backup kept at /tmp/agent_squads_backup_latest.sql.gz"
+
+      - name: SCP backup from VM
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          mkdir -p dump
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/agent_squads_backup_latest.sql.gz" \
+            dump/agent_squads_backup.sql.gz
+          ls -lh dump/
+
+      - name: Upload backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent_squads_backup_before_drop
+          path: dump/agent_squads_backup.sql.gz
+          retention-days: 90

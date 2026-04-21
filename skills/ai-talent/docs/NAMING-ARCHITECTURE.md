@@ -23,7 +23,7 @@ Mission (tasks)  ──1:1──►  Squad Template (predefined)
 
 | 層 | 檔案/表 | 職責 |
 |---|---|---|
-| **DB 表** | `agent_squads` | **Squad 模板庫**（671 個預定義團隊，含成員 JSON）|
+| **DB 表** | `squads` | **Squad 模板庫**（671 個預定義團隊，含成員 JSON）|
 | **DB 表** | `squads` | Squad 執行實例（每次 mission 開始時產生） |
 | **DB 表** | `squad_agents` | 執行實例下的成員記錄 |
 | **TRPC Router** | `squadTemplateRouter.ts` | Squad 模板 CRUD、推薦（`trpc.squad.*`）|
@@ -79,7 +79,7 @@ Mission (tasks)  ──1:1──►  Squad Template (predefined)
 ## 命名規則總結
 
 ### 保留 `squad` 的場景（模板概念）
-- DB 表名：`agent_squads`, `squads`, `squad_agents`, `squad_templates`（未來）
+- DB 表名：`squads`, `squads`, `squad_agents`, `squad_templates`（未來）
 - TRPC router key：`trpc.squad.*`（前端兼容）
 - 業務邏輯：`squadTemplateRouter` (管理 squad 模板)
 - Squad 內部概念：`SquadChip`, `SquadRecommendCards`, `squadSlug`, `squadId`

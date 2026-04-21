@@ -23,7 +23,7 @@ jobs:
             echo "=== 1. Dunford squad row ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT id, slug, missionType, LEFT(methodology, 50) as method
-              FROM agent_squads
+              FROM squads
               WHERE slug LIKE '%dunford%' OR name LIKE '%Dunford%'
               LIMIT 5;
             " 2>&1

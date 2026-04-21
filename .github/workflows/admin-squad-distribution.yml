@@ -23,7 +23,7 @@ jobs:
             echo "=== 1. Total squads by workspace ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT workspace, COUNT(*) as count
-              FROM agent_squads
+              FROM squads
               WHERE is_active=1
               GROUP BY workspace
               ORDER BY count DESC;
@@ -33,7 +33,7 @@ jobs:
             echo "=== 2. Squads by methodology (top 20) ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT methodology, COUNT(*) as count
-              FROM agent_squads
+              FROM squads
               WHERE is_active=1 AND methodology IS NOT NULL AND methodology != ''
               GROUP BY methodology
               ORDER BY count DESC
@@ -44,7 +44,7 @@ jobs:
             echo "=== 3. Squads without methodology ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT COUNT(*) as no_methodology
-              FROM agent_squads
+              FROM squads
               WHERE is_active=1 AND (methodology IS NULL OR methodology = '');
             " 2>&1
 
@@ -52,7 +52,7 @@ jobs:
             echo "=== 4. Squads with agents but short methodology (possible template squads) ==="
             mysql -u "$MOS_USER" -p"$MOS_PASS" "$MOS_DB" -e "
               SELECT slug, name, LEFT(methodology, 40) as method, JSON_LENGTH(agents) as agent_count
-              FROM agent_squads
+              FROM squads
               WHERE is_active=1 AND agents IS NOT NULL AND agents != '[]'
               ORDER BY JSON_LENGTH(agents) DESC, name
               LIMIT 10;

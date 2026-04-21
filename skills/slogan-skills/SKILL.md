@@ -54,7 +54,7 @@ Step 7: Squad Lead QA + Final Delivery — Top 5 + 最終推薦 + 部署指南
 
 ## Database Schema
 
-Squads are stored in `agent_squads` table. Workflow templates in `squad_workflow_templates`.
+Squads are stored in `squads` table. Workflow templates in `squad_workflow_templates`.
 
 See `scripts/seed-slogan-squads.ts` for the complete seed data.
 

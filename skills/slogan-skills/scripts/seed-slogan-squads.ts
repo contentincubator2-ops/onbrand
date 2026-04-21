@@ -56,11 +56,11 @@ async function upsertSquad(conn: any, s: {
   showcases: { company: string; description: string; result: string; source?: string }[];
 }) {
   const [existing] = await conn.execute(
-    `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
+    `SELECT id FROM squads WHERE slug = ? LIMIT 1`, [s.slug]
   ) as any[];
   if ((existing as any[]).length > 0) {
     await conn.execute(
-      `UPDATE agent_squads SET name=?, description=?, missionType=?, agents=?, tags=?, use_cases=?,
+      `UPDATE squads SET name=?, description=?, missionType=?, agents=?, tags=?, use_cases=?,
        workspace=?, methodology=?, output_formats=?, required_integrations=?, token=?, showcases=?,
        is_active=1, updated_at=NOW() WHERE slug=?`,
       [s.name, s.description, s.missionType, JSON.stringify(s.agents), JSON.stringify(s.tags),
@@ -71,7 +71,7 @@ async function upsertSquad(conn: any, s: {
     console.log(`[seed-slogan] Squad '${s.slug}': updated`);
   } else {
     await conn.execute(
-      `INSERT INTO agent_squads (slug,name,description,industry_key,missionType,agents,tags,use_cases,
+      `INSERT INTO squads (slug,name,description,industry_key,missionType,agents,tags,use_cases,
        workspace,methodology,output_formats,required_integrations,token,showcases,is_active,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW())`,
       [s.slug, s.name, s.description, s.industryKey, s.missionType,
@@ -80,7 +80,7 @@ async function upsertSquad(conn: any, s: {
        JSON.stringify(s.requiredIntegrations), s.token, JSON.stringify(s.showcases)]
     );
     const [newRow] = await conn.execute(
-      `SELECT id FROM agent_squads WHERE slug = ? LIMIT 1`, [s.slug]
+      `SELECT id FROM squads WHERE slug = ? LIMIT 1`, [s.slug]
     ) as any[];
     console.log(`[seed-slogan] Squad '${s.slug}' inserted with id=${(newRow as any[])[0]?.id}`);
   }
@@ -146,7 +146,7 @@ async function main() {
     console.log("[seed-slogan] squad_workflow_templates: ready");
 
     await conn.execute(`
-      CREATE TABLE IF NOT EXISTS agent_squads (
+      CREATE TABLE IF NOT EXISTS squads (
         id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         slug         VARCHAR(120) NOT NULL UNIQUE,
         name         VARCHAR(255) NOT NULL,
@@ -161,19 +161,19 @@ async function main() {
         updated_at   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
-    console.log("[seed-slogan] agent_squads: ready");
+    console.log("[seed-slogan] squads: ready");
 
     // ── Schema migrations (idempotent, wrapped in try/catch) ─────────────────────
     console.log("[seed-slogan] Running schema migrations…");
     const migrations = [
-      `ALTER TABLE agent_squads CHANGE COLUMN members agents LONGTEXT NULL`,
-      `ALTER TABLE agent_squads CHANGE COLUMN taskType missionType VARCHAR(100) NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN workspace             LONGTEXT NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN methodology           VARCHAR(100) NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN output_formats        LONGTEXT NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN required_integrations LONGTEXT NULL`,
-      `ALTER TABLE agent_squads ADD COLUMN token                 INT NOT NULL DEFAULT 0`,
-      `ALTER TABLE agent_squads ADD COLUMN showcases             LONGTEXT NULL`,
+      `ALTER TABLE squads CHANGE COLUMN members agents LONGTEXT NULL`,
+      `ALTER TABLE squads CHANGE COLUMN taskType missionType VARCHAR(100) NULL`,
+      `ALTER TABLE squads ADD COLUMN workspace             LONGTEXT NULL`,
+      `ALTER TABLE squads ADD COLUMN methodology           VARCHAR(100) NULL`,
+      `ALTER TABLE squads ADD COLUMN output_formats        LONGTEXT NULL`,
+      `ALTER TABLE squads ADD COLUMN required_integrations LONGTEXT NULL`,
+      `ALTER TABLE squads ADD COLUMN token                 INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE squads ADD COLUMN showcases             LONGTEXT NULL`,
       `ALTER TABLE squad_workflow_templates ADD COLUMN missionType VARCHAR(100) NULL`,
       `UPDATE squad_workflow_templates SET missionType = taskType WHERE missionType IS NULL`,
     ];

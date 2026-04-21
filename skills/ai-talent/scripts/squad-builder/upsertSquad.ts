@@ -4,8 +4,8 @@
  * Writes a fully-resolved squad (spec + member agents) to the SINGLE
  * canonical table: squads. Workflow steps live inline in squads.steps.
  *
- * No writes to squad_workflow_templates or agent_squads — those are
- * legacy / historical and not written by the builder.
+ * squads is the ONLY table written by the builder.
+ * Legacy tables (squad_workflow_templates, squad_template) are NOT touched.
  *
  * Idempotent: uses slug as upsert key. Re-running overwrites fields.
  *
