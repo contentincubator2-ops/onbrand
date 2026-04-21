@@ -1686,16 +1686,24 @@ function RightPanel({
   useEffect(() => {
     // Preserve brandbrain open state across squad changes — it's brand-specific, not squad-specific
     if (effectiveSquad) {
-      setOpenSections(prev => ({ requirements: true, sop: true, agents: true, alternatives: true, brandbrain: prev.brandbrain ?? false }));
+      // Squad chosen but not yet executing: open sop/validation/agents/requirements
+      setOpenSections(prev => ({ sop: true, validation: true, agents: true, requirements: true, alternatives: true, brandbrain: prev.brandbrain ?? false }));
     } else {
       setOpenSections(prev => ({ requirements: true, sop: false, agents: false, alternatives: false, brandbrain: prev.brandbrain ?? false }));
     }
   }, [effectiveSquad?.squadId]);
 
-  // Auto-open agents when squad execution starts
+  // When squad execution starts: focus on SOP + agents; collapse the rest
   useEffect(() => {
     if (squadStepProgress.length > 0) {
-      setOpenSections((prev) => ({ ...prev, agents: true }));
+      setOpenSections((prev) => ({
+        ...prev,
+        sop: true,
+        agents: true,
+        validation: false,
+        requirements: false,
+        brandbrain: false,
+      }));
     }
   }, [squadStepProgress.length > 0]);
 
@@ -1708,6 +1716,7 @@ function RightPanel({
     </div>
   );
 
+  // Order when a squad is selected: 執行流程 → 商業驗證 → 協作成員 → 任務需求 → 品牌大腦
   const baseSections = [
     {
       key: "sop",
@@ -1725,6 +1734,43 @@ function RightPanel({
           />
         : emptyHint("選擇執行方式\n查看對應流程"),
     },
+    // Commercial Validation — only shown when squad has showcases
+    ...((agentsData?.showcases ?? []).length > 0 ? [{
+      key: "validation",
+      label: "商業驗證",
+      content: (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {(agentsData?.showcases ?? []).map((sc: any, i: number) => (
+            <div key={i} style={{
+              background: "#FAFAF9",
+              border: "1px solid #E7E5E4",
+              borderLeft: "3px solid #D6B96B",
+              borderRadius: 6,
+              padding: "9px 10px",
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 3 }}>
+                {sc.company ?? sc.brand ?? "案例"}
+              </div>
+              {sc.result && (
+                <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5, marginBottom: 3 }}>
+                  {sc.result}
+                </div>
+              )}
+              {sc.description && (
+                <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.4 }}>
+                  {sc.description}
+                </div>
+              )}
+              {sc.source && (
+                <div style={{ fontSize: 9, color: "#B5B4B0", marginTop: 4, fontStyle: "italic" }}>
+                  {sc.source}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ),
+    }] : []),
     {
       key: "agents",
       label: "協作成員",
@@ -1760,43 +1806,6 @@ function RightPanel({
       label: "品牌大腦",
       content: <BrandBrainTab brandId={brandId} />,
     },
-    // Commercial Validation — only shown when squad has showcases
-    ...((agentsData?.showcases ?? []).length > 0 ? [{
-      key: "validation",
-      label: "Commercial Validation",
-      content: (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {(agentsData?.showcases ?? []).map((sc: any, i: number) => (
-            <div key={i} style={{
-              background: "#FAFAF9",
-              border: "1px solid #E7E5E4",
-              borderLeft: "3px solid #D6B96B",
-              borderRadius: 6,
-              padding: "9px 10px",
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 3 }}>
-                {sc.company ?? sc.brand ?? "案例"}
-              </div>
-              {sc.result && (
-                <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5, marginBottom: 3 }}>
-                  {sc.result}
-                </div>
-              )}
-              {sc.description && (
-                <div style={{ fontSize: 10, color: "#9B9990", lineHeight: 1.4 }}>
-                  {sc.description}
-                </div>
-              )}
-              {sc.source && (
-                <div style={{ fontSize: 9, color: "#B5B4B0", marginTop: 4, fontStyle: "italic" }}>
-                  {sc.source}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ),
-    }] : []),
   ];
 
   // Dynamic section ordering: lift prioritized section to top
