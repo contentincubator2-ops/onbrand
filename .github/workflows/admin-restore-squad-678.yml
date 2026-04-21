@@ -1,0 +1,54 @@
+name: Admin — Restore squad 678 agents JSON
+
+# Rebuild squad 678 agents JSON manually (was NULL'd by bad JSON_REPLACE).
+# Members per inspection:
+#   role="Data Stack Architect"        is_lead=1  order=0  agent_id=180611 (was 90050, replaced with Timothy Garcia)
+#   role="Analytics Engineering (dbt)" is_lead=0  order=1  agent_id=90059
+#   role="BI & Dashboard"              is_lead=0  order=2  agent_id=90058
+#   role="Integration & CDP"           is_lead=0  order=3  agent_id=180036
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to rebuild squad 678 agents JSON'
+        required: true
+        type: string
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.confirm == 'APPLY' }}
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            # Rebuild agents JSON from known role/order/agent_id mapping
+            NEW_AGENTS='[{"role":"Data Stack Architect","order":0,"is_lead":true,"agent_id":180611},{"role":"Analytics Engineering (dbt)","order":1,"is_lead":false,"agent_id":90059},{"role":"BI & Dashboard","order":2,"is_lead":false,"agent_id":90058},{"role":"Integration & CDP","order":3,"is_lead":false,"agent_id":180036}]'
+
+            echo "===== Restoring squad 678 agents JSON ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "UPDATE squads SET agents = '${NEW_AGENTS}' WHERE id=678; SELECT ROW_COUNT() AS restored;"
+
+            echo ""
+            echo "===== Verify squad 678 members ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT m.role, m.is_lead, m.agent_id, a.name, a.title, a.primarySkill
+                  FROM squads s,
+                    JSON_TABLE(s.agents, '\$[*]' COLUMNS (
+                      role VARCHAR(64) PATH '\$.role',
+                      is_lead BOOLEAN PATH '\$.is_lead',
+                      agent_id INT PATH '\$.agent_id',
+                      ord INT PATH '\$.order'
+                    )) AS m
+                  LEFT JOIN agents a ON a.id = m.agent_id
+                  WHERE s.id = 678 ORDER BY m.ord;"
