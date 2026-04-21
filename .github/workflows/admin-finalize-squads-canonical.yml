@@ -1,0 +1,73 @@
+name: Admin — Finalize squads canonical (verify + tag Mary Allen)
+
+# Final confirmation:
+#   1. squads table is the canonical single source
+#   2. Mary Allen (brand-archetype-positioning) tagged L1_brand/core
+#   3. agent_squads table (if still exists) has no code referencing it
+#   4. squads count for L1 = 10, L2 = 10
+
+on:
+  workflow_dispatch:
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<'SQL'
+            SELECT '========== (1) Does agent_squads table still exist? ==========' AS info;
+            SELECT TABLE_NAME, TABLE_ROWS, CREATE_TIME
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('squads', 'agent_squads')
+            ORDER BY TABLE_NAME;
+
+            SELECT '========== (2) Mary Allen: tag her as L1_brand/core ==========' AS info;
+            UPDATE squads SET tier='core', strategy_layer='L1_brand'
+            WHERE slug='brand-archetype-positioning';
+            SELECT ROW_COUNT() AS mary_allen_tagged;
+
+            SELECT '========== (3) Final L1+L2 count in squads (should = 20) ==========' AS info;
+            SELECT strategy_layer, COUNT(*) AS cnt
+            FROM squads
+            WHERE strategy_layer IN ('L1_brand','L2_product') AND tier='core'
+            GROUP BY strategy_layer WITH ROLLUP;
+
+            SELECT '========== (4) All 20 squads with full field inventory ==========' AS info;
+            SELECT id, strategy_layer, tier, slug, name,
+                   JSON_LENGTH(agents) AS m,
+                   JSON_LENGTH(steps) AS s,
+                   JSON_LENGTH(use_cases) AS u,
+                   JSON_LENGTH(output_formats) AS o,
+                   JSON_LENGTH(showcases) AS h,
+                   industry_key,
+                   token
+            FROM squads
+            WHERE strategy_layer IN ('L1_brand','L2_product') AND tier='core'
+            ORDER BY strategy_layer, id;
+
+            SELECT '========== (5) Confirm no null fields across 20 squads ==========' AS info;
+            SELECT
+              SUM(CASE WHEN description IS NULL OR description='' THEN 1 ELSE 0 END) AS desc_null,
+              SUM(CASE WHEN methodology IS NULL OR methodology='' THEN 1 ELSE 0 END) AS meth_null,
+              SUM(CASE WHEN JSON_LENGTH(workspace)=0 THEN 1 ELSE 0 END) AS ws_empty,
+              SUM(CASE WHEN JSON_LENGTH(tags)=0 THEN 1 ELSE 0 END) AS tag_empty,
+              SUM(CASE WHEN JSON_LENGTH(agents)<2 THEN 1 ELSE 0 END) AS agents_short,
+              SUM(CASE WHEN JSON_LENGTH(steps)<4 THEN 1 ELSE 0 END) AS steps_short,
+              SUM(CASE WHEN JSON_LENGTH(use_cases)=0 THEN 1 ELSE 0 END) AS uc_empty,
+              SUM(CASE WHEN JSON_LENGTH(output_formats)=0 THEN 1 ELSE 0 END) AS of_empty,
+              SUM(CASE WHEN JSON_LENGTH(showcases)=0 THEN 1 ELSE 0 END) AS sc_empty,
+              SUM(CASE WHEN industry_key IS NULL OR industry_key='' THEN 1 ELSE 0 END) AS ik_null,
+              SUM(CASE WHEN token < 1000 THEN 1 ELSE 0 END) AS tok_low
+            FROM squads WHERE strategy_layer IN ('L1_brand','L2_product') AND tier='core';
+            SQL
