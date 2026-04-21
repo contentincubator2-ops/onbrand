@@ -1,0 +1,82 @@
+name: Admin — Rescan brand-positioning squads
+
+# Read-only scan. Finds every squad in `squads` table that appears to
+# be about brand positioning (by slug, name, tags, or methodology),
+# shows its current tier/strategy_layer/is_active so we can decide
+# which ones belong in L1_brand core.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<'SQL'
+            SELECT '========== All squads matching brand/positioning criteria ==========' AS info;
+            SELECT id,
+                   slug,
+                   name,
+                   COALESCE(strategy_layer, '(null)') AS layer,
+                   COALESCE(tier, '(null)') AS tier,
+                   is_active,
+                   COALESCE(methodology, '') AS methodology,
+                   JSON_LENGTH(agents) AS members,
+                   JSON_LENGTH(steps) AS steps
+            FROM squads
+            WHERE (
+              slug LIKE '%position%' OR slug LIKE '%brand%' OR slug LIKE '%archetype%'
+              OR name LIKE '%品牌%' OR name LIKE '%定位%' OR name LIKE '%原型%'
+              OR methodology LIKE '%positioning%' OR methodology LIKE '%brand%'
+              OR methodology LIKE '%archetype%'
+            )
+            ORDER BY
+              CASE WHEN strategy_layer = 'L1_brand' AND tier = 'core' THEN 0
+                   WHEN strategy_layer = 'L1_brand' THEN 1
+                   WHEN is_active = 1 THEN 2
+                   ELSE 3 END,
+              id;
+
+            SELECT '========== Summary counts by layer+tier ==========' AS info;
+            SELECT COALESCE(strategy_layer, '(null)') AS layer,
+                   COALESCE(tier, '(null)') AS tier,
+                   COUNT(*) AS cnt
+            FROM squads
+            WHERE (
+              slug LIKE '%position%' OR slug LIKE '%brand%' OR slug LIKE '%archetype%'
+              OR name LIKE '%品牌%' OR name LIKE '%定位%' OR name LIKE '%原型%'
+              OR methodology LIKE '%positioning%' OR methodology LIKE '%brand%'
+            ) AND is_active = 1
+            GROUP BY strategy_layer, tier
+            ORDER BY layer, tier;
+
+            SELECT '========== Squads that LOOK like L1 but tagged otherwise ==========' AS info;
+            -- SoWork brand positioning, benefit-based, value-proposition, segmentation,
+            -- jtbd, etc. — ones with 品牌/定位 in name but tier/layer weird
+            SELECT id, slug, name,
+                   COALESCE(strategy_layer, '(null)') AS layer,
+                   COALESCE(tier, '(null)') AS tier,
+                   is_active
+            FROM squads
+            WHERE (
+              name LIKE '%品牌%' OR name LIKE '%定位%' OR name LIKE '%原型%'
+              OR name LIKE '%角色%'
+            )
+              AND is_active = 1
+              AND (strategy_layer IS NULL OR strategy_layer = 'unassigned'
+                   OR (strategy_layer = 'L1_brand' AND tier != 'core')
+                   OR tier IS NULL OR tier = 'defer')
+            ORDER BY id;
+            SQL
