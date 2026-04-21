@@ -1,0 +1,50 @@
+name: Admin — Inspect squad 678 HR member
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            echo "===== Squad 678 full info ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT id, slug, name, description, methodology, tier, strategy_layer, is_active FROM squads WHERE id=678\G"
+
+            echo ""
+            echo "===== Squad 678 members (with agent details) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT m.role AS squad_role, m.is_lead, m.agent_id,
+                         a.name, a.title, a.primarySkill, a.jobLevel
+                  FROM squads s,
+                    JSON_TABLE(s.agents, '\$[*]' COLUMNS (
+                      role VARCHAR(64) PATH '\$.role',
+                      is_lead BOOLEAN PATH '\$.is_lead',
+                      agent_id INT PATH '\$.agent_id',
+                      ord INT PATH '\$.order'
+                    )) AS m
+                  LEFT JOIN agents a ON a.id = m.agent_id
+                  WHERE s.id = 678
+                  ORDER BY m.ord;"
+
+            echo ""
+            echo "===== Candidate replacements: marketing-analytics / data-analysis agents ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT id, name, title, primarySkill, jobLevel, rating
+                  FROM agents
+                  WHERE primarySkill IN ('marketing-analytics','data-analysis','data-engineering','marketing-ops','revops')
+                    AND isAvailable = 1
+                  ORDER BY rating DESC, createdAt DESC
+                  LIMIT 10;"
