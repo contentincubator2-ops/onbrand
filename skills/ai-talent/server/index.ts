@@ -7,15 +7,15 @@
 
 // Load .env before any other imports (dotenv must come first)
 import { config as dotenvConfig } from "dotenv";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const envPath = `${__dirname}/../.env`;
+// Use process.cwd() so PM2 --cwd flag controls where we look for .env.
+// CWD is set to skills/ai-talent/ so .env lives right there.
+const envPath = join(process.cwd(), ".env");
 console.log('[server] Loading .env from:', envPath);
 const result = dotenvConfig({ path: envPath });
 console.log('[server] dotenv result:', { error: result.error, parsed: result.parsed ? 'YES' : 'NO' });
-console.log('[server] DB_HOST from process.env:', process.env.DB_HOST ? 'LOADED' : 'MISSING');
+console.log('[server] JWT_SECRET loaded:', process.env.JWT_SECRET ? 'YES' : 'NO');
 
 import express from "express";
 import cors from "cors";
@@ -23,7 +23,6 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { join } from "path";
 import { existsSync } from "fs";
 import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./llmWithBilling";
