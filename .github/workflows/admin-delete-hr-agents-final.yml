@@ -1,0 +1,118 @@
+name: Admin — Delete all HR agents (final, with squad 678 patch)
+
+# Full-pipeline destructive operation:
+#   1. Backup all HR agents to /tmp + scp to artifact
+#   2. Patch squad 678 — replace HR member id=90050 with id=180611 (Timothy Garcia, data-analysis VP)
+#   3. DELETE FROM agent_embeddings WHERE agent_id IN (HR agents)  [~1336 rows]
+#   4. DELETE FROM agents WHERE primarySkill IN (HR skills)        [~1336 rows]
+#   5. Verify final state
+#
+# Requires confirm=DELETE.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DELETE to permanently remove 1336 HR agents'
+        required: true
+        type: string
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.confirm == 'DELETE' }}
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            HR_SKILLS="'ai-recruitment','chro','hr-tech-github','employee-onboarding-automation','hris-integration','talent-acquisition-tools','linkedin-recruiter-tools','hr-automation-tools','training-automation'"
+
+            echo "===== Step 1: BACKUP HR agents ====="
+            BACKUP=/tmp/hr_agents_backup_$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+            mysqldump \
+              --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" \
+              --single-transaction --skip-lock-tables --no-tablespaces \
+              --default-character-set=utf8mb4 --set-gtid-purged=OFF \
+              --where="primarySkill IN (${HR_SKILLS})" \
+              "${DB_NAME}" agents | gzip -9 > "${BACKUP}"
+            ls -lh "${BACKUP}"
+            cp "${BACKUP}" /tmp/hr_agents_backup_latest.sql.gz
+
+            echo ""
+            echo "===== Step 2: PATCH squad 678 — replace HR member 90050 with 180611 ====="
+            # squad 678 agents JSON: replace agent_id=90050 with agent_id=180611
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "UPDATE squads
+                  SET agents = JSON_REPLACE(agents,
+                    JSON_UNQUOTE(JSON_SEARCH(agents, 'one', 90050, NULL, '\$[*].agent_id')),
+                    180611)
+                  WHERE id = 678;
+                  SELECT ROW_COUNT() AS patched;"
+
+            # Verify the swap
+            echo "===== Verify squad 678 after patch ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT m.role, m.agent_id, a.name, a.title, a.primarySkill
+                  FROM squads s,
+                    JSON_TABLE(s.agents, '\$[*]' COLUMNS (
+                      role VARCHAR(64) PATH '\$.role',
+                      agent_id INT PATH '\$.agent_id',
+                      ord INT PATH '\$.order'
+                    )) AS m
+                  LEFT JOIN agents a ON a.id = m.agent_id
+                  WHERE s.id = 678 ORDER BY m.ord;"
+
+            echo ""
+            echo "===== Step 3: DELETE agent_embeddings for HR agents ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "DELETE FROM agent_embeddings WHERE agent_id IN (SELECT id FROM agents WHERE primarySkill IN (${HR_SKILLS}));
+                  SELECT ROW_COUNT() AS embeddings_deleted;"
+
+            echo ""
+            echo "===== Step 4: DELETE HR agents ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "DELETE FROM agents WHERE primarySkill IN (${HR_SKILLS});
+                  SELECT ROW_COUNT() AS agents_deleted;"
+
+            echo ""
+            echo "===== Step 5: FINAL state ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT COUNT(*) AS total_agents_remaining FROM agents;"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT COUNT(*) AS total_embeddings_remaining FROM agent_embeddings;"
+
+            echo "===== Sanity check: any HR skills remain? (should be 0) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT primarySkill, COUNT(*) AS cnt FROM agents WHERE primarySkill IN (${HR_SKILLS}) GROUP BY primarySkill;"
+
+            echo ""
+            echo "[vm] backup preserved at /tmp/hr_agents_backup_latest.sql.gz"
+
+      - name: SCP backup from VM
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          mkdir -p dump
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/hr_agents_backup_latest.sql.gz" \
+            dump/hr_agents_backup.sql.gz
+          ls -lh dump/
+
+      - name: Upload backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hr_agents_backup_before_delete_final
+          path: dump/hr_agents_backup.sql.gz
+          retention-days: 90
