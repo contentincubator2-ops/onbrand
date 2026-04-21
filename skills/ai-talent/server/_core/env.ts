@@ -71,7 +71,7 @@ const envSchema = z.object({
   CREATOMATE_API_KEY:   z.string().optional(), // Creatomate video composition
 
   // App
-  PORT: z.coerce.number().default(3001),
+  PORT: z.coerce.number().default(3101),
 
   // Authentication
   APP_URL: z.string().url().optional(),

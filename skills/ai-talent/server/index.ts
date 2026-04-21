@@ -19,6 +19,7 @@ console.log('[server] DB_HOST from process.env:', process.env.DB_HOST ? 'LOADED'
 
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -73,6 +74,7 @@ app.use(cors({
     : ["http://localhost:5173", "http://localhost:3000"],
   credentials: true,
 }));
+app.use(cookieParser());
 app.use(express.json());
 
 // DEBT-3: Request logging — minimal, no PII logged
