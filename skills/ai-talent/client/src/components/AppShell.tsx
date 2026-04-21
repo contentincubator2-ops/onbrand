@@ -1648,6 +1648,8 @@ function RightPanel({
   const [openSections, setOpenSections] = React.useState<Record<string, boolean>>({
     requirements: true, sop: false, agents: false, alternatives: false, brandbrain: false,
   });
+  // ── Hidden sections (X-button closed — re-add via panel picker) ────────────
+  const [hiddenSections, setHiddenSections] = React.useState<Record<string, boolean>>({});
   // ── Section priority (floats a section to top when user action triggers it)
   const [sectionPriority, setSectionPriority] = React.useState<string | null>(null);
 
@@ -1798,12 +1800,14 @@ function RightPanel({
   ];
 
   // Dynamic section ordering: lift prioritized section to top
-  const sections = sectionPriority
+  const orderedSections = sectionPriority
     ? [
         ...baseSections.filter(s => s.key === sectionPriority),
         ...baseSections.filter(s => s.key !== sectionPriority),
       ]
     : baseSections;
+  // Filter out hidden (X-button closed) sections — re-add via panel picker
+  const sections = orderedSections.filter(s => !hiddenSections[s.key]);
 
   const panelWidth = width ?? 264;
 
@@ -1909,15 +1913,17 @@ function RightPanel({
               minWidth: 150,
               padding: "4px 0",
             }}>
-              {sections.map((section) => {
-                const isOpen = !!openSections[section.key];
+              {baseSections.map((section) => {
+                const isVisible = !hiddenSections[section.key];
                 return (
                   <button
                     key={section.key}
                     onClick={() => {
-                      const willOpen = !isOpen;
-                      setOpenSections(prev => ({ ...prev, [section.key]: willOpen }));
-                      if (willOpen) {
+                      const willBeVisible = !isVisible;
+                      setHiddenSections(prev => ({ ...prev, [section.key]: !willBeVisible }));
+                      if (willBeVisible) {
+                        // Re-showing a closed section: expand it and scroll into view
+                        setOpenSections(prev => ({ ...prev, [section.key]: true }));
                         setTimeout(() => {
                           const el = document.getElementById(`rp-section-${section.key}`);
                           el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1932,21 +1938,21 @@ function RightPanel({
                       background: "transparent", border: "none",
                       cursor: "pointer", fontFamily: "inherit",
                       fontSize: 11,
-                      color: isOpen ? "#1A1A18" : "#9B9990",
-                      fontWeight: isOpen ? 500 : 400,
+                      color: isVisible ? "#1A1A18" : "#9B9990",
+                      fontWeight: isVisible ? 500 : 400,
                       textAlign: "left",
                     }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(26,26,24,0.05)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
                   >
-                    {/* Checkbox */}
+                    {/* Checkbox — checked = visible in panel */}
                     <span style={{
                       width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                      border: `1.5px solid ${isOpen ? "#1A1A18" : "#C8C7C3"}`,
-                      background: isOpen ? "#1A1A18" : "transparent",
+                      border: `1.5px solid ${isVisible ? "#1A1A18" : "#C8C7C3"}`,
+                      background: isVisible ? "#1A1A18" : "transparent",
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
-                      {isOpen && <span style={{ color: "#FFFFFF", fontSize: 9, lineHeight: 1 }}>✓</span>}
+                      {isVisible && <span style={{ color: "#FFFFFF", fontSize: 9, lineHeight: 1 }}>✓</span>}
                     </span>
                     {section.label}
                   </button>
@@ -2042,10 +2048,10 @@ function RightPanel({
                   </svg>
                 </button>
 
-                {/* X close button */}
+                {/* X close button — hide section entirely (re-add via 面板 picker) */}
                 <button
-                  onClick={() => setOpenSections(prev => ({ ...prev, [section.key]: false }))}
-                  title="關閉此面板"
+                  onClick={() => setHiddenSections(prev => ({ ...prev, [section.key]: true }))}
+                  title="關閉此面板（可從上方「面板」重新開啟）"
                   style={{
                     flexShrink: 0,
                     width: 24, height: 32,
