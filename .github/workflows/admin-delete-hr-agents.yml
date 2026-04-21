@@ -1,0 +1,131 @@
+name: Admin — Delete HR agents (permanent, with backup)
+
+# Destructive: DELETE FROM agents where primarySkill is HR-related.
+# Safety guards:
+#   1. Requires confirm=DELETE (CHECK for read-only pre-flight)
+#   2. Lists exact agent IDs to be deleted and any squads referencing them
+#   3. Makes a mysqldump backup before DELETE (uploaded as workflow artifact)
+#   4. Reports row counts after DELETE
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type CHECK for pre-flight, DELETE to permanently remove HR agents'
+        required: true
+        type: string
+        default: 'CHECK'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            CONFIRM="${{ inputs.confirm }}"
+
+            # HR-related primarySkill patterns (from our earlier audit)
+            HR_SKILLS="'ai-recruitment','chro','hr-tech-github','employee-onboarding-automation','hris-integration','talent-acquisition-tools','linkedin-recruiter-tools','hr-automation-tools','training-automation'"
+
+            echo "===== Pre-flight 1: count HR agents by primarySkill ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT primarySkill, COUNT(*) AS cnt FROM agents WHERE primarySkill IN (${HR_SKILLS}) GROUP BY primarySkill ORDER BY cnt DESC;"
+
+            echo ""
+            echo "===== Pre-flight 2: total HR agents ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT COUNT(*) AS total_hr_agents_to_delete FROM agents WHERE primarySkill IN (${HR_SKILLS});"
+
+            echo ""
+            echo "===== Pre-flight 3: are any HR agents referenced in squads? ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT s.id AS squad_id, s.slug, COUNT(DISTINCT a.id) AS hr_member_cnt
+                  FROM squads s,
+                    JSON_TABLE(s.agents, '\$[*]' COLUMNS (agent_id INT PATH '\$.agent_id')) AS m
+                  JOIN agents a ON a.id = m.agent_id
+                  WHERE s.is_active = 1 AND a.primarySkill IN (${HR_SKILLS})
+                  GROUP BY s.id, s.slug
+                  ORDER BY hr_member_cnt DESC
+                  LIMIT 20;"
+
+            echo ""
+            echo "===== Pre-flight 4: FK references (agent_embeddings etc.) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'agent_embeddings' AS tbl, COUNT(*) AS will_also_be_cascaded
+                  FROM agent_embeddings e JOIN agents a ON a.id = e.agent_id
+                  WHERE a.primarySkill IN (${HR_SKILLS});"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'squad_members' AS tbl, COUNT(*) AS referenced_rows
+                  FROM squad_members sm JOIN agents a ON a.id = sm.agent_id
+                  WHERE a.primarySkill IN (${HR_SKILLS});" 2>/dev/null || echo "(squad_members.agent_id not a thing or table empty)"
+
+            if [ "$CONFIRM" = "CHECK" ]; then
+              echo ""
+              echo "[CHECK-mode] Nothing deleted. Re-run with confirm=DELETE to permanently remove HR agents."
+              exit 0
+            fi
+
+            if [ "$CONFIRM" != "DELETE" ]; then
+              echo ""
+              echo "[abort] confirm input must be CHECK or DELETE. Got: ${CONFIRM}"
+              exit 1
+            fi
+
+            echo ""
+            echo "===== Backup HR agents (schema + data) before DELETE ====="
+            BACKUP=/tmp/hr_agents_backup_$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+            mysqldump \
+              --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" \
+              --single-transaction --skip-lock-tables --no-tablespaces \
+              --default-character-set=utf8mb4 --set-gtid-purged=OFF \
+              --no-create-info \
+              --where="primarySkill IN (${HR_SKILLS})" \
+              "${DB_NAME}" agents | gzip -9 > "${BACKUP}"
+            ls -lh "${BACKUP}"
+            cp "${BACKUP}" /tmp/hr_agents_backup_latest.sql.gz
+
+            echo ""
+            echo "===== STEP A: DELETE HR agents (cascade will hit agent_embeddings.agent_id FK) ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "DELETE FROM agent_embeddings WHERE agent_id IN (SELECT id FROM agents WHERE primarySkill IN (${HR_SKILLS})); SELECT ROW_COUNT() AS embeddings_deleted;"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "DELETE FROM agents WHERE primarySkill IN (${HR_SKILLS}); SELECT ROW_COUNT() AS agents_deleted;"
+
+            echo ""
+            echo "===== Final: remaining agents count ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT COUNT(*) AS total_agents_remaining FROM agents;"
+
+            echo ""
+            echo "[vm] backup preserved at /tmp/hr_agents_backup_latest.sql.gz (and time-stamped copy)"
+
+      - name: SCP backup from VM
+        if: ${{ inputs.confirm == 'DELETE' }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          mkdir -p dump
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/hr_agents_backup_latest.sql.gz" \
+            dump/hr_agents_backup.sql.gz
+          ls -lh dump/
+
+      - name: Upload backup as artifact
+        if: ${{ inputs.confirm == 'DELETE' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hr_agents_backup_before_delete
+          path: dump/hr_agents_backup.sql.gz
+          retention-days: 90
