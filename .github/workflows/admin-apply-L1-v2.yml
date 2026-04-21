@@ -44,10 +44,16 @@ jobs:
             DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
 
             echo ""
-            echo "===== STEP B: apply aiModel=claude-opus-4-6 + metadata to 5 new leads ====="
-            # New lead agents: sowork, dunford, neumeier, sharp, godin
-            # They were just created — run the upgrade script to fill fields
+            echo "===== STEP B: apply aiModel=claude-opus-4-6 + metadata to all 25 leads ====="
             npm run db:upgrade-lead-fields -- --apply
+
+            echo ""
+            echo "===== STEP B2: set aiModel=claude-opus-4-6 on 5 new L1-v2 leads ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "UPDATE agents
+                  SET aiModel = 'claude-opus-4-6'
+                  WHERE id IN (238863, 238864, 238865, 238866, 238867);
+                  SELECT ROW_COUNT() AS updated;"
 
             echo ""
             echo "===== STEP C: Verify all 15 L1/core are golden standard ====="
