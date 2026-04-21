@@ -121,15 +121,17 @@ jobs:
             cd "$BE"
             git add ai-talent-scripts/squad-builder/ ai-talent-scripts/migrate.ts ai-talent-scripts/classify-squads-tier.ts ai-talent-scripts/upgrade-lead-agent-fields.ts package.json
             git status --short
-            git -c user.name="CJ Migration Bot" -c user.email="cjwang@sowork.tw" \
-              commit -m "feat: migrate squad-builder + classify + upgrade-lead-fields scripts (from CJ's workspace)
+            cat > /tmp/be_commit_msg.txt <<'MSGEOF'
+            feat: migrate squad-builder + scripts from CJ workspace
 
-Adds:
-- ai-talent-scripts/squad-builder/ (9 files: types, db, upsertSquad, findOrCreateAgent, validateSquad, index, L1-brand, L1-brand-v2, L2-product)
-- ai-talent-scripts/classify-squads-tier.ts
-- ai-talent-scripts/upgrade-lead-agent-fields.ts
-- ai-talent-scripts/migrate.ts (tier + strategy_layer migration)
-- package.json: db:build-L1, db:build-L1-v2, db:build-L2, db:classify-squads, db:upgrade-lead-fields"
+            - ai-talent-scripts/squad-builder/ (types, db, upsertSquad, findOrCreateAgent, validateSquad, index, L1-brand, L1-brand-v2, L2-product)
+            - ai-talent-scripts/classify-squads-tier.ts
+            - ai-talent-scripts/upgrade-lead-agent-fields.ts
+            - ai-talent-scripts/migrate.ts (adds tier + strategy_layer)
+            - package.json new db: scripts
+            MSGEOF
+            git -c user.name="CJ Migration Bot" -c user.email="cjwang@sowork.tw" \
+              commit -F /tmp/be_commit_msg.txt
             git push origin main
             echo "[BE] pushed"
 
@@ -142,12 +144,15 @@ Adds:
             cd "$FE"
             git add ai-talent-client/src/App.tsx ai-talent-client/src/components/AppShell.tsx ai-talent-client/src/components/MissionChatCore.tsx
             git status --short
-            git -c user.name="CJ Migration Bot" -c user.email="cjwang@sowork.tw" \
-              commit -m "feat: migrate AppShell picker dropdown + brand/workspace URL routing
+            cat > /tmp/fe_commit_msg.txt <<'MSGEOF'
+            feat: migrate AppShell picker + brand/workspace URL routing
 
-- App.tsx: add /b/:brandId/:workspace/m/:missionId primary route (/m/:missionId legacy redirect)
-- AppShell.tsx: replace right-panel tab bar with compact header + ⊞ picker dropdown
-- MissionChatCore.tsx: Step 0 two-button mode selector (auto vs step-by-step)"
+            - App.tsx: add /b/:brandId/:workspace/m/:missionId primary route
+            - AppShell.tsx: replace right-panel tab bar with compact picker dropdown
+            - MissionChatCore.tsx: Step 0 two-button mode selector
+            MSGEOF
+            git -c user.name="CJ Migration Bot" -c user.email="cjwang@sowork.tw" \
+              commit -F /tmp/fe_commit_msg.txt
             git push origin main
             echo "[FE] pushed"
 
