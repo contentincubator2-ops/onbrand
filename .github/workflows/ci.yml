@@ -66,8 +66,17 @@ jobs:
             echo "===== Restart (delete + start fresh) ====="
             AI=/opt/marketing-os/app/skills/ai-talent
             TSX=$AI/node_modules/.bin/tsx
+
+            # Source .env into shell so PM2's forked process inherits real env
+            # vars. This avoids ESM import-hoisting race where env.ts runs
+            # before the top-level dotenvConfig() call in server/index.ts.
+            set -a
+            source "$AI/.env"
+            set +a
+            echo "JWT_SECRET in shell: $([ -n "$JWT_SECRET" ] && echo YES || echo NO)"
+
             pm2 delete marketing-os 2>/dev/null || true
-            pm2 start "$TSX" --name marketing-os --cwd "$AI" -- server/index.ts
+            pm2 start "$TSX" --name marketing-os --cwd "$AI" --update-env -- server/index.ts
             pm2 save --force
 
             echo "===== Health check ====="
