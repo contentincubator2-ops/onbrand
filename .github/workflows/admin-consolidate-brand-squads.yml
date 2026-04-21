@@ -1,0 +1,116 @@
+name: Admin — Consolidate brand-positioning squads
+
+# DELETE 7 duplicate/low-quality brand squads
+# UPGRADE 5 to L1_brand/core, 2 to L1_brand/defer, 1 to L3_audience/defer
+# Pre-flight FK / reference safety check before any DELETE.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to run. CHECK for read-only pre-flight.'
+        required: true
+        type: string
+        default: 'CHECK'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set -e
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            CONFIRM="${{ inputs.confirm }}"
+            DELETE_IDS="547,549,554,638,641,642,643"
+
+            echo "===== Pre-flight: FK / reference safety check for the 7 DELETE ids ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT TABLE_NAME, COLUMN_NAME, CONSTRAINT_NAME
+                  FROM information_schema.KEY_COLUMN_USAGE
+                  WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'squads';"
+
+            echo ""
+            echo "===== Pre-flight: rows in other tables that reference these squad ids ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<SQL
+            SELECT 'missions (squad_id)' AS tbl,
+                   COUNT(*) AS row_count
+            FROM missions WHERE squad_id IN (${DELETE_IDS});
+
+            SELECT 'squad_chat_sessions (squad_id)' AS tbl, COUNT(*) AS row_count
+            FROM squad_chat_sessions WHERE squad_id IN (${DELETE_IDS});
+
+            SELECT 'squad_members (squad_id)' AS tbl, COUNT(*) AS row_count
+            FROM squad_members WHERE squad_id IN (${DELETE_IDS});
+
+            SELECT 'squad_usage_log (squad_id)' AS tbl, COUNT(*) AS row_count
+            FROM squad_usage_log WHERE squad_id IN (${DELETE_IDS});
+
+            SELECT 'squad_sessions (squad_id)' AS tbl, COUNT(*) AS row_count
+            FROM squad_sessions WHERE squad_id IN (${DELETE_IDS});
+
+            SELECT 'squad_agents (squad_id)' AS tbl, COUNT(*) AS row_count
+            FROM squad_agents WHERE squad_id IN (${DELETE_IDS});
+SQL
+
+            echo ""
+            echo "===== Snapshot: 7 squads to DELETE ====="
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT id, slug, name, strategy_layer, tier, is_active
+                  FROM squads WHERE id IN (${DELETE_IDS}) ORDER BY id;"
+
+            if [ "${CONFIRM}" = "APPLY" ]; then
+              echo ""
+              echo "===== Backup the 7 squads before DELETE ====="
+              BACKUP=/tmp/squads_deleted_backup_$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+              mysqldump --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" \
+                --no-create-info --default-character-set=utf8mb4 --set-gtid-purged=OFF --no-tablespaces \
+                --where="id IN (${DELETE_IDS})" \
+                "${DB_NAME}" squads | gzip -9 > "${BACKUP}"
+              ls -lh "${BACKUP}"
+
+              echo ""
+              echo "===== STEP A: DELETE 7 duplicate/low-quality squads ====="
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "DELETE FROM squads WHERE id IN (${DELETE_IDS}); SELECT ROW_COUNT() AS deleted;"
+
+              echo ""
+              echo "===== STEP B: UPGRADE 5 to L1_brand/core ====="
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "UPDATE squads SET tier='core', strategy_layer='L1_brand', is_active=1 WHERE id IN (546, 637, 639, 640, 644); SELECT ROW_COUNT() AS upgraded_to_L1_core;"
+
+              echo ""
+              echo "===== STEP C: UPGRADE 2 to L1_brand/defer (keep but not in primary list) ====="
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "UPDATE squads SET tier='defer', strategy_layer='L1_brand', is_active=1 WHERE id IN (645, 646); SELECT ROW_COUNT() AS moved_to_L1_defer;"
+
+              echo ""
+              echo "===== STEP D: UPDATE 550 to L3_audience/defer (pending Phase 2 L3 rebuild) ====="
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "UPDATE squads SET tier='defer', strategy_layer='L3_audience', is_active=1 WHERE id = 550; SELECT ROW_COUNT() AS moved_to_L3_defer;"
+
+              echo ""
+              echo "===== FINAL VERIFY: L1_brand/core should be 15 ====="
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "SELECT id, slug, name FROM squads WHERE strategy_layer='L1_brand' AND tier='core' AND is_active=1 ORDER BY id;"
+              echo ""
+              mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+                -e "SELECT strategy_layer, tier, COUNT(*) AS cnt
+                    FROM squads WHERE is_active = 1
+                      AND strategy_layer IN ('L1_brand', 'L2_product', 'L3_audience')
+                    GROUP BY strategy_layer, tier
+                    ORDER BY strategy_layer, tier;"
+
+              echo "[vm] backup preserved at ${BACKUP}"
+            else
+              echo ""
+              echo "[vm] CHECK mode — nothing modified. Re-run with confirm=APPLY."
+            fi
