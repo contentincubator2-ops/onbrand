@@ -37,14 +37,14 @@ jobs:
     steps:
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 300s
           envs: GH_TOKEN
-          env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           script: |
             set -e
             APP=/opt/marketing-os/app
