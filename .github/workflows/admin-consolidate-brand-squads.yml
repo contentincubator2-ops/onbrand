@@ -40,26 +40,19 @@ jobs:
 
             echo ""
             echo "===== Pre-flight: rows in other tables that reference these squad ids ====="
-            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<SQL
-            SELECT 'missions (squad_id)' AS tbl,
-                   COUNT(*) AS row_count
-            FROM missions WHERE squad_id IN (${DELETE_IDS});
-
-            SELECT 'squad_chat_sessions (squad_id)' AS tbl, COUNT(*) AS row_count
-            FROM squad_chat_sessions WHERE squad_id IN (${DELETE_IDS});
-
-            SELECT 'squad_members (squad_id)' AS tbl, COUNT(*) AS row_count
-            FROM squad_members WHERE squad_id IN (${DELETE_IDS});
-
-            SELECT 'squad_usage_log (squad_id)' AS tbl, COUNT(*) AS row_count
-            FROM squad_usage_log WHERE squad_id IN (${DELETE_IDS});
-
-            SELECT 'squad_sessions (squad_id)' AS tbl, COUNT(*) AS row_count
-            FROM squad_sessions WHERE squad_id IN (${DELETE_IDS});
-
-            SELECT 'squad_agents (squad_id)' AS tbl, COUNT(*) AS row_count
-            FROM squad_agents WHERE squad_id IN (${DELETE_IDS});
-SQL
+            MY="mysql --host=127.0.0.1 --user=${DB_USER} --password=${DB_PASS} --default-character-set=utf8mb4 ${DB_NAME} -e"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'missions.squad_id' AS tbl, COUNT(*) AS row_count FROM missions WHERE squad_id IN (${DELETE_IDS});"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'squad_chat_sessions.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_chat_sessions WHERE squad_id IN (${DELETE_IDS});"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'squad_members.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_members WHERE squad_id IN (${DELETE_IDS});"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'squad_usage_log.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_usage_log WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_usage_log not present or no squad_id col)"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'squad_sessions.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_sessions WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_sessions not present)"
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
+              -e "SELECT 'squad_agents.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_agents WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_agents empty or no col)"
 
             echo ""
             echo "===== Snapshot: 7 squads to DELETE ====="
