@@ -39,20 +39,29 @@ jobs:
                   WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'squads';"
 
             echo ""
-            echo "===== Pre-flight: rows in other tables that reference these squad ids ====="
-            MY="mysql --host=127.0.0.1 --user=${DB_USER} --password=${DB_PASS} --default-character-set=utf8mb4 ${DB_NAME} -e"
+            echo "===== Pre-flight: discover squad-reference columns across all tables ====="
             mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
-              -e "SELECT 'missions.squad_id' AS tbl, COUNT(*) AS row_count FROM missions WHERE squad_id IN (${DELETE_IDS});"
+              -e "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND (COLUMN_NAME LIKE '%squad%Id%' OR COLUMN_NAME LIKE '%squad%_id%'
+                         OR COLUMN_NAME LIKE '%squad%Slug%' OR COLUMN_NAME LIKE '%squad%_slug%')
+                    AND TABLE_NAME != 'squads'
+                  ORDER BY TABLE_NAME;"
+
+            echo ""
+            echo "===== Pre-flight: get slugs of the 7 DELETE ids (used for slug-based refs) ====="
+            DELETE_SLUGS=$(mysql -N -B --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" "${DB_NAME}" \
+              -e "SELECT GROUP_CONCAT(QUOTE(slug)) FROM squads WHERE id IN (${DELETE_IDS});")
+            echo "DELETE_SLUGS = ${DELETE_SLUGS}"
+
+            echo ""
+            echo "===== Pre-flight: row counts that would be orphaned ====="
             mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
-              -e "SELECT 'squad_chat_sessions.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_chat_sessions WHERE squad_id IN (${DELETE_IDS});"
+              -e "SELECT 'missions.squadSlug' AS tbl, COUNT(*) AS row_count FROM missions WHERE squadSlug IN (${DELETE_SLUGS});" 2>/dev/null || echo "(missions.squadSlug check skipped)"
             mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
-              -e "SELECT 'squad_members.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_members WHERE squad_id IN (${DELETE_IDS});"
+              -e "SELECT 'squad_chat_sessions.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_chat_sessions WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_chat_sessions check skipped)"
             mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
-              -e "SELECT 'squad_usage_log.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_usage_log WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_usage_log not present or no squad_id col)"
-            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
-              -e "SELECT 'squad_sessions.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_sessions WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_sessions not present)"
-            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" \
-              -e "SELECT 'squad_agents.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_agents WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_agents empty or no col)"
+              -e "SELECT 'squad_members.squad_id' AS tbl, COUNT(*) AS row_count FROM squad_members WHERE squad_id IN (${DELETE_IDS});" 2>/dev/null || echo "(squad_members check skipped)"
 
             echo ""
             echo "===== Snapshot: 7 squads to DELETE ====="
