@@ -97,14 +97,6 @@ const IconCredits = () => (
   </svg>
 );
 
-const IconArrowDown = () => (
-  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="12" y1="5" x2="12" y2="19"/>
-    <polyline points="19 12 12 19 5 12"/>
-  </svg>
-);
-
-
 const IconPackage = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>
@@ -118,25 +110,6 @@ const IconSettings = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3"/>
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-  </svg>
-);
-
-const IconCheckDone = () => (
-  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-    <polyline points="20 6 9 17 4 12"/>
-  </svg>
-);
-
-const IconSpinner = () => (
-  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <polyline points="23 4 23 10 17 10"/>
-    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-  </svg>
-);
-
-const IconCircle = () => (
-  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <circle cx="12" cy="12" r="10"/>
   </svg>
 );
 
@@ -946,159 +919,6 @@ function Drawer({
 }
 
 // ─── RightPanel ───────────────────────────────────────────────────────────────
-
-// WORKFLOW_NODES 硬編碼已移除
-
-function PositioningProgress({ missionId, brandId }: { missionId: number | null | undefined; brandId: number | null | undefined }) {
-  const { data: steps } = (trpc as any).positioning?.getSteps?.useQuery
-    ? (trpc as any).positioning.getSteps.useQuery(
-        { missionId: missionId! },
-        { enabled: !!missionId, refetchInterval: 3000, refetchOnWindowFocus: false }
-      )
-    : { data: null };
-
-  // 沒有 DB 資料時顯示空白等待狀態，不顯示假資料
-  const stepList = (steps ?? []) as any[];
-
-  // 找出當前進行中的步驟（running 或 confirm 狀態）
-  const activeStep = stepList.find((s: any) => s.state === 'running' || s.state === 'confirm');
-
-  // 空狀態：尚未開始任何步驟
-  if (stepList.length === 0) {
-    return (
-      <div style={{ padding: '12px 0' }}>
-        <div style={{
-          padding: '10px 12px', borderRadius: 8,
-          background: '#FAFAF9', border: '1px solid #E7E5E4',
-          fontSize: 11, color: '#A8A29E', textAlign: 'center' as const,
-        }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8C7C3" strokeWidth="1.8" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </div>
-          <div>開始對話後</div>
-          <div>步驟進度會顯示在這裡</div>
-        </div>
-        <div style={{
-          marginTop: 10, padding: '7px 10px',
-          background: '#FFF8F5', border: '1px solid #FDDCCC',
-          borderRadius: 7,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{
-              width: 18, height: 18, borderRadius: '50%',
-              background: '#E8631A', color: 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 8, fontWeight: 700, flexShrink: 0,
-            }}>品</div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#44403C' }}>劉品妤 · Squad Lead</div>
-              <div style={{ fontSize: 9, color: '#A8A29E' }}>每步自動 QA 品質控管</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {stepList.map((s: any, i: number) => (
-        <React.Fragment key={i}>
-          <WorkflowNode
-            label={s.title ?? s.label ?? ''}
-            sub={s.agent ? `${s.agent} · ${s.description ?? s.sub ?? ''}` : s.description ?? s.sub ?? ''}
-            state={s.state === 'confirm' ? 'running' : (s.state as any ?? 'wait')}
-          />
-          {i < stepList.length - 1 && (
-            <div style={{ textAlign: 'center' as const, margin: '2px 0', color: '#E4E3E1', display: 'flex', justifyContent: 'center' }}>
-              <IconArrowDown />
-            </div>
-          )}
-        </React.Fragment>
-      ))}
-
-      {/* ── 當前步驟狀態說明 ── */}
-      {activeStep && (
-        <div style={{
-          marginTop: 12, padding: '8px 10px',
-          background: activeStep.state === 'confirm' ? '#F0FDF8' : '#FAFAF9',
-          border: `1px solid ${activeStep.state === 'confirm' ? '#1DBEAA' : '#E7E5E4'}`,
-          borderRadius: 8,
-        }}>
-          {activeStep.state === 'confirm' ? (
-            <div style={{ fontSize: 10, color: '#1DBEAA', fontWeight: 600 }}>
-              ✦ 劉品妤已完成 QA 審核
-              <div style={{ fontSize: 10, color: '#78716C', fontWeight: 400, marginTop: 3 }}>
-                請在對話視窗確認成果，說「繼續」推進下一步
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: 10, color: '#78716C' }}>
-              <span style={{ color: '#F97316' }}>⟳</span> {activeStep.agent || '分析中'}...
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Squad Lead 說明 */}
-      <div style={{
-        marginTop: 10, padding: '7px 10px',
-        background: '#FFF8F5', border: '1px solid #FDDCCC',
-        borderRadius: 7,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <div style={{
-            width: 18, height: 18, borderRadius: '50%',
-            background: '#E8631A', color: 'white',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 8, fontWeight: 700, flexShrink: 0,
-          }}>品</div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#44403C' }}>劉品妤 · Squad Lead</div>
-            <div style={{ fontSize: 9, color: '#A8A29E' }}>每步自動 QA 品質控管</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WorkflowNode({ label, sub, state }: { label: string; sub: string; state: "done" | "running" | "wait" }) {
-  const colors = {
-    done:    { border: "#C8E6C8", bg: "#F4FCF4", iconBg: "#DCEFDC", iconColor: "#3D9A3D", nameColor: "#3D9A3D" },
-    running: { border: "#E4E3E1", bg: "#FAFAF9", iconBg: "#F2F1EF", iconColor: "#E8631A", nameColor: "#1A1A18" },
-    wait:    { border: "#ECEAE8", bg: "#FFFFFF", iconBg: "#F2F1EF", iconColor: "#C8C7C3", nameColor: "#C8C7C3" },
-  }[state];
-
-  return (
-    <div style={{
-      background: colors.bg,
-      border: `1px solid ${colors.border}`,
-      borderRadius: 8, padding: "7px 10px", marginBottom: 3,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{
-          width: 17, height: 17, borderRadius: 4,
-          background: colors.iconBg, color: colors.iconColor,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 9, flexShrink: 0,
-        }}>
-          {state === "done"    && <IconCheckDone />}
-          {state === "running" && <IconSpinner />}
-          {state === "wait"    && <IconCircle />}
-        </div>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 500, color: colors.nameColor }}>{label}</div>
-          <div style={{ fontSize: 10, color: "#B0AFA9", marginTop: 1 }}>{sub}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 // ─── BrandBrainTab (Knowledge Base + Brain context panel) ────────────────────
 // SoWork orange: #C9823A

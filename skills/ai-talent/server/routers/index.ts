@@ -19,7 +19,6 @@ import { knowledgeRouter } from "./knowledgeRouter";
 import { resourceRouter } from "./resourceRouter";
 import { reviewRouter } from "./reviewRouter";
 import { messageRouter } from "./messageRouter";
-import { positioningRouter } from "./positioningRouter";
 import { squadTemplateRouter } from "./squadTemplateRouter";
 import { reportRouter } from "./reportRouter";
 
@@ -43,7 +42,6 @@ export const appRouter = router({
   knowledge:     knowledgeRouter,
   review:        reviewRouter,
   message:       messageRouter,
-  positioning:   positioningRouter,
   resource:      resourceRouter,
   squad:         squadTemplateRouter,  // TRPC key kept as "squad" for backward compatibility (frontend uses trpc.squad.*)
   report:        reportRouter,

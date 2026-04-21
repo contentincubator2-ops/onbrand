@@ -2,7 +2,9 @@
  * missionSquadRoute.ts — Mission's Squad Resource REST API
  * GET /api/missions/:missionId/squad — 回傳該任務的 squad 成員資訊
  *
- * Renamed from squadRoute.ts in Phase A (2026-04-18)
+ * Always reads from the `squads` table (squadSlug column on missions).
+ * Renamed from squadRoute.ts in Phase A (2026-04-18).
+ * POSITIONING_SQUAD hardcoded block removed 2026-04-21 (squad consolidation).
  */
 
 import { Router, type Request, type Response } from "express";
@@ -12,68 +14,22 @@ import localPool from "../localDb";
 
 export const missionSquadRouter = Router();
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+// ── Auth (accepts both Bearer token and session cookie) ───────────────────────
 async function verifyToken(req: Request): Promise<number | null> {
   const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
+  let raw: string | null = null;
+  if (auth?.startsWith("Bearer ")) {
+    raw = auth.slice(7);
+  } else if ((req as any).cookies?.session) {
+    raw = (req as any).cookies.session;
+  }
+  if (!raw) return null;
   try {
     const secret = new TextEncoder().encode(getJwtSecret());
-    const { payload } = await jwtVerify(auth.slice(7), secret);
+    const { payload } = await jwtVerify(raw, secret);
     return payload.sub ? parseInt(String(payload.sub), 10) : null;
   } catch { return null; }
 }
-
-// ── Static squad definition for positioning flow ──────────────────────────────
-const POSITIONING_SQUAD: Record<number, {
-  agentName: string;
-  agentTitle: string;
-  model: string;
-  skills: string[];
-  stepLabel: string;
-}> = {
-  1: {
-    agentName: "PM Agent",
-    agentTitle: "行銷任務指揮官",
-    model: "Claude Sonnet",
-    skills: ["任務規劃", "流程管理", "品牌 recap"],
-    stepLabel: "Step 1: 任務確認",
-  },
-  2: {
-    agentName: "Sarah Chen",
-    agentTitle: "品牌策略師",
-    model: "Claude Sonnet",
-    skills: ["品牌定位", "競品分析", "市場洞察"],
-    stepLabel: "Step 2: 競品分析",
-  },
-  3: {
-    agentName: "Mark Liu",
-    agentTitle: "市場研究師",
-    model: "Claude Sonnet",
-    skills: ["消費者洞察", "Persona 設計", "市場調研"],
-    stepLabel: "Step 3: 目標受眾定義",
-  },
-  4: {
-    agentName: "Sarah Chen",
-    agentTitle: "品牌策略師",
-    model: "Claude Sonnet",
-    skills: ["品牌定位宣言", "Tagline 設計", "定位框架"],
-    stepLabel: "Step 4: 品牌定位宣言",
-  },
-  5: {
-    agentName: "Jessica Wu",
-    agentTitle: "創意文案師",
-    model: "Claude Sonnet",
-    skills: ["品牌語調", "文案策略", "DO/DON'T 框架"],
-    stepLabel: "Step 5: 品牌聲音定義",
-  },
-  6: {
-    agentName: "PM Agent",
-    agentTitle: "報告整理師",
-    model: "Claude Sonnet",
-    skills: ["報告整合", "PPT 生成", "成果交付"],
-    stepLabel: "Step 6: 完整報告 + PPT 輸出",
-  },
-};
 
 // ── GET /api/missions/:missionId/squad ────────────────────────────────────────
 missionSquadRouter.get("/:missionId/squad", async (req: Request, res: Response) => {
@@ -84,12 +40,10 @@ missionSquadRouter.get("/:missionId/squad", async (req: Request, res: Response) 
   if (!missionId) { res.status(400).json({ error: "Invalid missionId" }); return; }
 
   try {
-    // 查詢任務資訊
+    // 查詢任務資訊（包含 squadSlug）
     const [missionRows] = await localPool.execute(
-      `SELECT m.id, m.workspace, m.title, m.status,
-              ps.currentStep, ps.status as posStatus, ps.stepResults
+      `SELECT m.id, m.workspace, m.title, m.status, m.squadSlug
        FROM missions m
-       LEFT JOIN positioning_sessions ps ON ps.missionId = m.id
        WHERE m.id = ? LIMIT 1`,
       [missionId]
     ) as any[];
@@ -100,104 +54,71 @@ missionSquadRouter.get("/:missionId/squad", async (req: Request, res: Response) 
       return;
     }
 
-    // 對於品牌定位任務（workspace=strategy），從 positioning_sessions 抽取 squad
-    if (mission.workspace === "strategy") {
-      const currentStep = mission.currentStep ?? 0;
-      const posStatus = mission.posStatus ?? "pending";
+    // 若任務有 squadSlug，從 squads 表讀取成員資訊
+    if (mission.squadSlug) {
+      const [squadRows] = await localPool.execute(
+        `SELECT id, name, slug, description, agents, steps
+         FROM squads
+         WHERE slug = ? LIMIT 1`,
+        [mission.squadSlug]
+      ) as any[];
 
-      let stepResults: Record<string, string> = {};
-      try {
-        stepResults = typeof mission.stepResults === "string"
-          ? JSON.parse(mission.stepResults || "{}")
-          : (mission.stepResults ?? {});
-      } catch { stepResults = {}; }
+      const squad = (squadRows as any[])?.[0];
+      if (squad) {
+        let agents: any[] = [];
+        let steps: any[] = [];
+        try { agents = typeof squad.agents === "string" ? JSON.parse(squad.agents) : (squad.agents ?? []); } catch { agents = []; }
+        try { steps = typeof squad.steps === "string" ? JSON.parse(squad.steps) : (squad.steps ?? []); } catch { steps = []; }
 
-      const squad = [];
-      for (let step = 1; step <= 6; step++) {
-        const def = POSITIONING_SQUAD[step];
-        if (!def) continue;
+        // 從 squad_chat_sessions 取得目前執行進度
+        const [sessionRows] = await localPool.execute(
+          `SELECT currentStepIndex, status FROM squad_chat_sessions WHERE missionId = ? ORDER BY updatedAt DESC LIMIT 1`,
+          [missionId]
+        ) as any[];
+        const session = (sessionRows as any[])?.[0];
+        const currentStepIndex = session?.currentStepIndex ?? 0;
+        const sessionStatus = session?.status ?? "pending";
 
-        let status: "pending" | "running" | "done";
-        if (step < currentStep) {
-          status = "done";
-        } else if (step === currentStep) {
-          status = posStatus === "completed" ? "done" : posStatus === "in_progress" ? "running" : "done";
-        } else {
-          status = "pending";
-        }
-
-        // 只有已執行的步驟才加入（或全部顯示，取決於需求）
-        squad.push({
-          agentName: def.agentName,
-          agentTitle: def.agentTitle,
-          model: def.model,
-          skills: def.skills,
-          status,
-          completedStep: def.stepLabel,
-          hasOutput: !!stepResults[String(step)],
+        const membersWithStatus = agents.map((a: any, idx: number) => {
+          let status: "pending" | "running" | "done";
+          if (idx < currentStepIndex) {
+            status = "done";
+          } else if (idx === currentStepIndex) {
+            status = sessionStatus === "completed" ? "done" : sessionStatus === "in_progress" ? "running" : "pending";
+          } else {
+            status = "pending";
+          }
+          const step = steps[idx] as any;
+          return {
+            agentName: a.name ?? a.agentName ?? "Agent",
+            agentTitle: a.title ?? a.agentTitle ?? "",
+            model: a.aiModel ?? "claude-opus-4-6",
+            skills: a.primarySkill ? [a.primarySkill] : [],
+            status,
+            completedStep: step?.name ?? `Step ${idx + 1}`,
+            hasOutput: idx < currentStepIndex,
+          };
         });
-      }
 
-      // 去除重複的 agentName（PM Agent 出現兩次時合併）
-      const uniqueAgents = new Map<string, typeof squad[0]>();
-      for (const member of squad) {
-        const key = `${member.agentName}-${member.completedStep}`;
-        uniqueAgents.set(key, member);
+        res.json({
+          missionId,
+          workspace: mission.workspace,
+          title: mission.title,
+          squadSlug: mission.squadSlug,
+          squadName: squad.name,
+          squad: membersWithStatus,
+        });
+        return;
       }
-
-      res.json({
-        missionId,
-        workspace: mission.workspace,
-        title: mission.title,
-        squad: [...uniqueAgents.values()],
-      });
-      return;
     }
 
-    // 對於一般任務，從 chat_messages / task_executions 抽取 agent 資訊
-    const [msgRows] = await localPool.execute(
-      `SELECT DISTINCT role, content
-       FROM chat_messages
-       WHERE missionId = ? AND role = 'assistant'
-       ORDER BY createdAt DESC
-       LIMIT 20`,
-      [missionId]
-    ) as any[];
-
-    // 嘗試從 task_executions 取得 agent 資訊
-    const [taskRows] = await localPool.execute(
-      `SELECT te.agentSlug, te.status, te.createdAt,
-              a.name as agentName, a.title as agentTitle, a.specialty
-       FROM task_executions te
-       LEFT JOIN agents a ON a.slug = te.agentSlug
-       WHERE te.missionId = ?
-       ORDER BY te.createdAt DESC
-       LIMIT 20`,
-      [missionId]
-    ) as any[];
-
-    if ((taskRows as any[]).length > 0) {
-      const squad = (taskRows as any[]).map(row => ({
-        agentName: row.agentName || row.agentSlug || "Agent",
-        agentTitle: row.agentTitle || "執行專員",
-        model: "Claude Sonnet",
-        skills: row.specialty ? [row.specialty] : [],
-        status: row.status === "completed" ? "done" : row.status === "running" ? "running" : "pending",
-        completedStep: row.agentSlug,
-        hasOutput: row.status === "completed",
-      }));
-
-      res.json({ missionId, workspace: mission.workspace, title: mission.title, squad });
-      return;
-    }
-
-    // Fallback: 回傳空 squad
+    // Fallback: 回傳空 squad（任務尚未選擇 squad）
     res.json({
       missionId,
       workspace: mission.workspace,
       title: mission.title,
       squad: [],
-      message: "尚無執行紀錄",
+      message: "尚未選擇 Squad",
     });
   } catch (err: any) {
     console.error("[missionSquadRoute] GET error:", err?.message);

@@ -1231,7 +1231,7 @@ export default function MissionChatCore({
       setConversations((prev) =>
         prev.map((c) =>
           c.id === convId
-            ? { ...c, messages: c.messages.map((m) => m.id === errMsgId ? { ...m, content: `Squad chat 錯誤：${err?.message ?? "未知"}，切換一般模式...` } : m) }
+            ? { ...c, messages: c.messages.map((m) => m.id === errMsgId ? { ...m, content: `Squad chat 錯誤：${err?.message ?? "未知"}` } : m) }
             : c
         )
       );
@@ -1416,8 +1416,9 @@ export default function MissionChatCore({
     const missionSlug = (missionDataQuery.data as any)?.squadSlug
       ?? (isFirstUserMsg && selectedSquadForMission ? selectedSquadForMission.slug : null);
     if (activeMissionId && missionSlug) {
-      const handled = await executeSquadChat(text, convId, missionSlug);
-      if (handled) return;
+      // Mission with squad: always use squad chat. Never fall through to task flow.
+      await executeSquadChat(text, convId, missionSlug);
+      return;
     }
     if (isTaskLike(text)) {
       setTeamAssembly({ phase: "analyzing", agents: [], plan: [], taskText: text });
