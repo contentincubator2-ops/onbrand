@@ -56,7 +56,7 @@ jobs:
                          JSON_LENGTH(agents) AS members,
                          JSON_LENGTH(steps) AS steps,
                          JSON_LENGTH(use_cases) AS uc,
-                         JSON_LENGTH(output_formats) AS of,
+                         JSON_LENGTH(output_formats) AS ofmt,
                          JSON_LENGTH(showcases) AS sc,
                          industry_key,
                          token
@@ -71,7 +71,7 @@ jobs:
                     SUM(CASE WHEN JSON_LENGTH(agents) < 6 THEN 1 ELSE 0 END) AS members_too_few,
                     SUM(CASE WHEN JSON_LENGTH(steps) < 5 THEN 1 ELSE 0 END) AS steps_too_few,
                     SUM(CASE WHEN JSON_LENGTH(use_cases) < 2 THEN 1 ELSE 0 END) AS uc_too_few,
-                    SUM(CASE WHEN JSON_LENGTH(output_formats) < 4 THEN 1 ELSE 0 END) AS of_too_few,
+                    SUM(CASE WHEN JSON_LENGTH(output_formats) < 4 THEN 1 ELSE 0 END) AS ofmt_too_few,
                     SUM(CASE WHEN JSON_LENGTH(showcases) < 1 THEN 1 ELSE 0 END) AS sc_too_few,
                     SUM(CASE WHEN industry_key IS NULL OR industry_key='' THEN 1 ELSE 0 END) AS ik_null,
                     SUM(CASE WHEN token < 55000 THEN 1 ELSE 0 END) AS token_low

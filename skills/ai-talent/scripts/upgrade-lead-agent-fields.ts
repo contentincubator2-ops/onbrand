@@ -29,6 +29,7 @@
 import { createPool } from "mysql2/promise";
 import * as dotenv from "dotenv";
 import { specs as L1_specs } from "./squad-builder/L1-brand.js";
+import { specs as L1v2_specs } from "./squad-builder/L1-brand-v2.js";
 import { specs as L2_specs } from "./squad-builder/L2-product.js";
 import type { SquadSpec, SquadMemberSpec } from "./squad-builder/types.js";
 
@@ -201,8 +202,8 @@ async function main() {
   try {
     const patches: PatchRow[] = [];
 
-    // L1 + L2 specs
-    for (const spec of [...L1_specs, ...L2_specs]) {
+    // L1 + L1-v2 + L2 specs (all layers that have been built so far)
+    for (const spec of [...L1_specs, ...L1v2_specs, ...L2_specs]) {
       const p = buildPatchFromSpec(spec);
       if (p) patches.push(p);
     }
