@@ -302,246 +302,10 @@ async function generateAndSendPPT(
 }
 // (removed 2026-04-19) executePositioningStep + POSITIONING_STEPS_6 hardcoded 6-step legacy
 
-// ── Squad Full Auto Flow ──────────────────────────────────────────────────────
-/**
- * Runs all specialist steps (startFromStep..totalSteps) automatically in sequence,
- * within the same SSE connection. Called after user confirms at step 0 (lead intake).
- * After all steps complete, triggers Squad Lead synthesis automatically.
- */
-async function runAutoSquadFlow(params: {
-  leadAgentDetail:      any;
-  workflowSteps:        any[];
-  squadAgents:          any[];
-  squadId:              number | null;
-  squadName:            string;
-  squadMethodology:     string;
-  brand:                Record<string, string>;
-  brandBrain:           Record<string, string[]>;
-  missionTitle:         string;
-  workspace:            string;
-  missionId:            number;
-  initialStepResults:   Record<number, string>;
-  totalSteps:           number;
-  leadSlot:             any;
-  fallbackLeadAgentId:  number | null;
-  send:                 (event: string, data: unknown) => void;
-  userMessage:          string;
-  startFromStep:        number;
-}): Promise<void> {
-  const {
-    leadAgentDetail, workflowSteps, squadAgents, squadId, squadName, squadMethodology,
-    brand, brandBrain, missionTitle, workspace, missionId, initialStepResults,
-    totalSteps, leadSlot, fallbackLeadAgentId, send, userMessage, startFromStep,
-  } = params;
+// ── Squad auto-exec removed ─────────────────────────────────────────────────
+// runAutoSquadFlow was removed on 2026-04-21. All squad steps now require
+// explicit user confirmation via the "繼續第 N 步" button in MissionChatCore.
 
-  const { resolveStepAgent } = await import("../_core/stepAgentResolver");
-  const normalizeModel = (m?: string | null) =>
-    m ? (m.includes("/") ? m : `openclaw/${m}`) : null;
-
-  // Accumulate step results as we go (seed from DB-fresh results)
-  const autoStepResults: Record<number, string> = { ...initialStepResults };
-
-  const leadName   = leadAgentDetail?.name   ?? (squadName + " Lead");
-  const leadTitle  = leadAgentDetail?.title  ?? "Squad Lead";
-  const leadAvatar = leadAgentDetail?.avatarUrl ?? null;
-
-  for (let stepIdx = startFromStep; stepIdx <= totalSteps; stepIdx++) {
-    const wsIdx = Math.min(stepIdx - 1, workflowSteps.length - 1);
-    const wStep = workflowSteps[wsIdx] ?? {};
-
-    // Resolve specialist slot for this step
-    const currentSlot =
-      resolveStepAgent(wStep, squadAgents)
-      ?? squadAgents.find((a: any) => a.role === (wStep?.owner ?? wStep?.agentRole ?? ""))
-      ?? squadAgents[wsIdx % squadAgents.length]
-      ?? squadAgents[0]
-      ?? null;
-
-    // Load specialist agent details
-    let specialistDetail: any = null;
-    const specId = currentSlot?.agent_id;
-    const leadId = leadSlot?.agent_id ?? fallbackLeadAgentId;
-    if (specId && specId !== leadId) {
-      try {
-        const [sRows] = await localPool.execute(
-          `SELECT id, name, title, specialty, avatarUrl, aiModel, primarySkill,
-                  methodology, tool_instructions, workingPrinciples
-           FROM agents WHERE id = ? LIMIT 1`,
-          [specId]
-        ) as any[];
-        specialistDetail = (sRows as any[])?.[0] ?? null;
-      } catch (e: any) {
-        console.warn(`[autoFlow] specialist fetch step=${stepIdx}:`, e?.message);
-      }
-    }
-
-    const agentSkill  = specialistDetail?.primarySkill ?? leadAgentDetail?.primarySkill ?? "";
-    const agentModel  = normalizeModel(specialistDetail?.aiModel)
-                     ?? normalizeModel(leadAgentDetail?.aiModel)
-                     ?? "openclaw/pm"; // fallback to pm (valid gateway slug)
-    const stepLabel   = wStep.title ?? wStep.name ?? `Step ${stepIdx}`;
-    const nextStepIdx = stepIdx + 1;
-
-    // Send relay_step running event (Squad Lead as speaking voice, specialist skill context)
-    send("relay_step", {
-      id:          stepIdx,
-      step:        stepIdx,
-      totalSteps,
-      label:       stepLabel,
-      agentId:     leadAgentDetail?.id ?? null,
-      agentName:   leadName,
-      agentTitle:  leadTitle,
-      agentAvatar: leadAvatar,
-      agentSkill,
-      agentModel,
-      agentRole:   currentSlot?.role ?? "",
-      squadName,
-      layer:       "execution",
-      status:      "running",
-    });
-
-    // Build system prompt (specialist context injected into Lead's framework)
-    const systemPrompt = buildSquadAgentPrompt({
-      agent: {
-        name:      leadName,
-        title:     leadTitle,
-        specialty: leadAgentDetail?.specialty,
-        aiModel:   leadAgentDetail?.aiModel,
-      },
-      specialistContext: specialistDetail ? {
-        name:             specialistDetail.name,
-        title:            specialistDetail.title,
-        specialty:        specialistDetail.specialty ?? "",
-        skill:            specialistDetail.primarySkill ?? "",
-        methodology:      specialistDetail.methodology ?? "",
-        toolInstructions: specialistDetail.tool_instructions ?? "",
-      } : undefined,
-      brand,
-      workspace,
-      missionTitle,
-      squadName,
-      squadMethodology,
-      agentRole:       currentSlot?.role ?? leadTitle,
-      workflowStep:    wStep,
-      stepIndex:       stepIdx,
-      totalSteps,
-      previousResults: autoStepResults,
-      brandBrain,
-      isLead:          false,
-    });
-
-    // Build A2A handoff message for this step
-    let effectiveMsg = userMessage;
-    const prevOutput = autoStepResults[stepIdx - 1] ?? null;
-    if (prevOutput) {
-      const prevStepDef  = workflowSteps[Math.min(stepIdx - 2, workflowSteps.length - 1)];
-      const prevTitle    = prevStepDef?.title ?? prevStepDef?.name ?? `Step ${stepIdx - 1}`;
-      effectiveMsg = `【A2A 交接文件 — 來自「${prevTitle}」的成果】\n\n${prevOutput.slice(0, 2500)}\n\n${"─".repeat(40)}\n【你的任務】${wStep.description ?? wStep.title ?? `Step ${stepIdx}`}\n\n請基於上方的交接成果，執行你負責的步驟。`;
-    }
-
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
-      { role: "user" as const, content: effectiveMsg },
-    ];
-
-    // Stream via gateway with fallback
-    let fullOutput = "";
-    try {
-      for await (const { event, data } of streamFromGateway(agentModel, messages)) {
-        send(event, data);
-        if (event === "delta") fullOutput += (data as any).text ?? "";
-      }
-    } catch (e: any) {
-      console.warn(`[autoFlow] gateway failed step=${stepIdx} model=${agentModel}:`, e?.message);
-      // Fallback: gateway pm → then direct LLM
-      if (agentModel !== "openclaw/pm") {
-        try {
-          for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
-            send(event, data);
-            if (event === "delta") fullOutput += (data as any).text ?? "";
-          }
-        } catch (e2: any) {
-          console.warn(`[autoFlow] openclaw/pm also failed step=${stepIdx}:`, e2?.message);
-          for await (const chunk of streamFromLLM(systemPrompt, [], effectiveMsg)) {
-            fullOutput += chunk;
-            send("delta", { text: chunk });
-          }
-        }
-      } else {
-        for await (const chunk of streamFromLLM(systemPrompt, [], effectiveMsg)) {
-          fullOutput += chunk;
-          send("delta", { text: chunk });
-        }
-      }
-    }
-
-    // Empty output guard
-    if (!fullOutput.trim()) {
-      console.warn(`[autoFlow] Gateway empty response step=${stepIdx}, falling back to invokeLLMStream...`);
-      for await (const chunk of streamFromLLM(systemPrompt, [], effectiveMsg)) {
-        fullOutput += chunk;
-        send("delta", { text: chunk });
-      }
-    }
-
-    // Save step result
-    await saveStepResultOnly(localPool as any, missionId, stepIdx, fullOutput);
-    if (squadId) {
-      await persistReportSection(localPool as any, {
-        missionId, squadId, stepOrder: stepIdx, content: fullOutput,
-      });
-    }
-
-    // Update local dict for next step's A2A handoff
-    autoStepResults[stepIdx] = fullOutput;
-
-    const hasMore = nextStepIdx <= totalSteps;
-
-    // Send relay_step done — waitForUser: false (auto mode)
-    send("relay_step", {
-      id:            stepIdx,
-      status:        "done",
-      label:         stepLabel,
-      agentName:     leadName,
-      agentTitle:    leadTitle,
-      agentSkill,
-      agentModel,
-      summary:       fullOutput.slice(0, 400),
-      totalSteps,
-      hasMoreSteps:  hasMore,
-      isLastStep:    !hasMore,
-      nextStepIndex: nextStepIdx,
-      waitForUser:   false, // Auto mode: no button needed
-    });
-
-    console.log(`[autoFlow] Step ${stepIdx} done, len=${fullOutput.length}, hasMore=${hasMore}`);
-  }
-
-  // All specialist steps done — re-read fresh results from DB for synthesis
-  const [freshRows] = await (localPool as any).execute(
-    `SELECT stepResults FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
-    [missionId]
-  ) as any[];
-  const freshResults: Record<number, string> = (() => {
-    try { return JSON.parse(freshRows?.[0]?.stepResults ?? "{}"); } catch { return {}; }
-  })();
-
-  // Auto-trigger Squad Lead synthesis
-  await runSquadLeadSynthesis({
-    leadSlot,
-    fallbackLeadAgentId,
-    squadName,
-    squadMethodology,
-    workflowSteps,
-    stepResults: freshResults,
-    totalSteps,
-    brand,
-    brandBrain,
-    missionId,
-    send,
-    agent: { name: leadName, title: leadTitle, specialty: "" },
-  });
-}
 
 // ── Squad Chat 執行器 ─────────────────────────────────────────────────────────
 /**
@@ -555,11 +319,10 @@ async function tryExecuteSquadChat(params: {
   conversationHistory: { role: string; content: string }[];
   workspace?: string;
   squadSlugHint?: string; // client-supplied hint for first-message race condition
-  autoMode?: boolean;     // true = full auto chain all steps; false/undefined = step-by-step
   send: (event: string, data: unknown) => void;
   sessionId: string;
 }): Promise<boolean> {
-  const { userId, missionId, userMessage, conversationHistory, workspace, squadSlugHint, autoMode, send } = params;
+  const { userId, missionId, userMessage, conversationHistory, workspace, squadSlugHint, send } = params;
 
   // ── 1. 從 mission 讀取 squadSlug 與品牌資料 ─────────────────────────────────
   let squadSlug: string | null = null;
@@ -699,11 +462,9 @@ async function tryExecuteSquadChat(params: {
   // 用戶可以選擇：回覆當前 Agent（繼續對話）或說「繼續」跳到下一步
   const isContinueSignal = /^(繼續|继续|continue|next|下一步|go|yes|ok|好的|好|開始|开始|確認|确认|confirm|派遣|開始執行|执行)$/i.test(userMessage.trim());
 
-  // Capture BEFORE advancing — used for full auto mode detection.
-  // Only fire when user is explicitly confirming the lead step output (status=awaiting_reply).
-  const wasAtLeadStep = currentStep === 0;
-  // autoMode must be explicitly true (user clicked "全自動執行" button) — never default
-  const isFullAutoTrigger = wasAtLeadStep && isContinueSignal && session.status === "awaiting_reply" && autoMode === true;
+  // Auto-execution has been permanently removed. Every step is step-by-step:
+  // user clicks "繼續第 N 步" each time. `isContinueSignal` is still detected so
+  // we advance currentStep, but we never chain beyond a single step ahead.
 
   if (session.status === "awaiting_reply") {
     if (isContinueSignal) {
@@ -1154,46 +915,8 @@ async function tryExecuteSquadChat(params: {
 
   send("suggestions", { items: suggestions });
 
-  // ── Full Auto Mode ──────────────────────────────────────────────────────────
-  // When user confirmed from lead step (step 0 → "確認/好的/繼續" etc.),
-  // auto-chain ALL remaining specialist steps + synthesis in this same SSE connection.
-  // The "繼續" button still works step-by-step for manual navigation (isFullAutoTrigger=false).
-  if (isFullAutoTrigger && currentStep < totalSteps) {
-    // currentStep is now 1 (step 1 just executed above).
-    // runAutoSquadFlow handles steps (currentStep+1)..totalSteps then synthesis.
-    const [freshRows2] = await (localPool as any).execute(
-      `SELECT stepResults FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
-      [missionId]
-    ) as any[];
-    const freshResults2: Record<number, string> = (() => {
-      try { return JSON.parse(freshRows2?.[0]?.stepResults ?? "{}"); } catch { return {}; }
-    })();
-
-    await runAutoSquadFlow({
-      leadAgentDetail,
-      workflowSteps,
-      squadAgents,
-      squadId,
-      squadName,
-      squadMethodology,
-      brand,
-      brandBrain,
-      missionTitle,
-      workspace: workspace ?? "strategy",
-      missionId,
-      initialStepResults: freshResults2,
-      totalSteps,
-      leadSlot,
-      fallbackLeadAgentId,
-      send,
-      userMessage,
-      startFromStep: currentStep + 1, // steps 2..totalSteps
-    });
-    return true;
-  }
-
-  // Edge case: isFullAutoTrigger but only 1 specialist step (currentStep === totalSteps after step 1 ran).
-  // Synthesis was already triggered above by the isLastStep block — nothing more to do.
+  // Auto-execution has been permanently removed — every step waits for the
+  // user to click "繼續第 N 步". There is no more chained multi-step flow.
 
   return true; // 已處理
 }
@@ -1451,7 +1174,7 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {}, squadSlug: bodySquadSlug, autoMode } = req.body as {
+  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {}, squadSlug: bodySquadSlug } = req.body as {
     userMessage: string;
     conversationHistory: { role: string; content: string }[];
     sessionId?: string;
@@ -1459,7 +1182,6 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
     workspace?: string;
     brandContext?: Record<string, string>;
     squadSlug?: string;    // client hint for first-message race condition
-    autoMode?: boolean;    // true = full auto; false/undefined = step-by-step
   };
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
@@ -1502,7 +1224,6 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
         conversationHistory,
         workspace,
         squadSlugHint: bodySquadSlug,
-        autoMode,
         send,
         sessionId,
       });

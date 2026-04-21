@@ -611,7 +611,9 @@ export default function MissionChatCore({
   };
 
   // ── Continue to next step (user-controlled A2A advance) ──────────────────
-  const handleContinueToNextStep = (chosenAutoMode?: boolean) => {
+  // Auto-mode has been permanently removed — every step requires explicit user
+  // confirmation. See Day 3 note in missionChatRouter about runAutoSquadFlow removal.
+  const handleContinueToNextStep = () => {
     const convId = activeId;
     const squadSlug = (missionDataQuery.data as any)?.squadSlug as string | undefined;
     if (!convId || !squadSlug) return;
@@ -620,7 +622,7 @@ export default function MissionChatCore({
     setLoading(true);
     setStreamingAgentName(null);
     setStreamingAgentTitle(null);
-    executeSquadChat("繼續", convId, squadSlug, false, chosenAutoMode ?? false);
+    executeSquadChat("繼續", convId, squadSlug, false);
   };
 
   // ── Workflow poll ─────────────────────────────────────────────────────────
@@ -809,7 +811,7 @@ export default function MissionChatCore({
     });
   };
 
-  const executeSquadChat = async (text: string, convId: string, squadSlugOverride?: string, isAutoAdvance?: boolean, autoMode?: boolean): Promise<boolean> => {
+  const executeSquadChat = async (text: string, convId: string, squadSlugOverride?: string, isAutoAdvance?: boolean): Promise<boolean> => {
     const missionData = missionDataQuery.data as any;
     // On first message, missionData.squadSlug may not yet be in cache (updateMission.mutate is async).
     // Accept an explicit override so the first message still reaches the squad path.
@@ -941,7 +943,6 @@ export default function MissionChatCore({
           missionId: activeMissionId ?? undefined,
           workspace: (missionDataQuery.data as any)?.workspace ?? undefined,
           squadSlug: squadSlug || undefined, // pass to server as hint (first-message race condition fix)
-          autoMode: autoMode ?? false,       // explicit user choice: true=全自動, false=逐步
         }),
       });
       if (!resp.ok || !resp.body) throw new Error(`chat HTTP ${resp.status}`);
@@ -2027,63 +2028,26 @@ export default function MissionChatCore({
             <p style={{ fontSize: 12, color: "#6B6A66", margin: "0 0 12px 0", lineHeight: 1.6 }}>
               💬 可以繼續與 <strong style={{ color: "#1A1A18" }}>{awaitingStepInfo.agentName}</strong> 深入討論此步驟的成果，或選擇執行方式繼續。
             </p>
-            {/* Action buttons — after Step 0: show mode selection; subsequent steps: single continue */}
-            {awaitingStepInfo.nextStep === 1 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#9B9990", marginBottom: 2 }}>選擇執行方式：</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => handleContinueToNextStep(true)}
-                    style={{
-                      padding: "9px 16px", borderRadius: 8, border: "none",
-                      background: "linear-gradient(135deg, #1A1A18, #2D2D28)",
-                      color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                      fontFamily: "inherit",
-                      display: "flex", alignItems: "center", gap: 6,
-                      boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-                    }}
-                  >
-                    ⚡ 全自動執行
-                    <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.8 }}>一鍵完成所有步驟</span>
-                  </button>
-                  <button
-                    onClick={() => handleContinueToNextStep(false)}
-                    style={{
-                      padding: "9px 16px", borderRadius: 8,
-                      border: "1.5px solid #D4D3CF",
-                      background: "white",
-                      color: "#1A1A18", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                      fontFamily: "inherit",
-                      display: "flex", alignItems: "center", gap: 6,
-                    }}
-                  >
-                    👆 逐步確認
-                    <span style={{ fontSize: 10, fontWeight: 400, color: "#6B6A66" }}>每步完成後暫停</span>
-                  </button>
-                </div>
-                <span style={{ fontSize: 11, color: "#C8C7C3" }}>或直接輸入問題繼續對話</span>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <button
-                  onClick={() => handleContinueToNextStep(false)}
-                  style={{
-                    padding: "8px 18px", borderRadius: 8, border: "none",
-                    background: "linear-gradient(135deg, #1A1A18, #2D2D28)",
-                    color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    fontFamily: "inherit",
-                    display: "flex", alignItems: "center", gap: 6,
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  繼續第 {awaitingStepInfo.nextStep} 步
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
-                <span style={{ fontSize: 11, color: "#C8C7C3" }}>或直接輸入問題與此 Agent 繼續對話</span>
-              </div>
-            )}
+            {/* Step-by-step only — auto-execution has been permanently removed */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={() => handleContinueToNextStep()}
+                style={{
+                  padding: "8px 18px", borderRadius: 8, border: "none",
+                  background: "linear-gradient(135deg, #1A1A18, #2D2D28)",
+                  color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "inherit",
+                  display: "flex", alignItems: "center", gap: 6,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                }}
+              >
+                繼續第 {awaitingStepInfo.nextStep} 步
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+              <span style={{ fontSize: 11, color: "#C8C7C3" }}>或直接輸入問題與此 Agent 繼續對話</span>
+            </div>
           </div>
         )}
 
