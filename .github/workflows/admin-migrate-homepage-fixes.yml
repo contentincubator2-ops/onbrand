@@ -1,0 +1,78 @@
+name: Admin — Migrate homepage bug fixes to Frontend repo + deploy
+
+# Copies 3 frontend files from /home/azureuser/marketing-os (CJ's workspace)
+# to /opt/marketing-os/marketing-os-frontend (production) and triggers
+# deploy-dev.sh. Covers the 3 homepage bug fixes:
+#   1. MissionChatCore.tsx — remove auto-start
+#   2. App.tsx — IndexPage squad preview wiring
+#   3. MissionHomePage.tsx — fetch chips without missionId
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY to migrate + build + restart'
+        required: true
+        type: string
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.confirm == 'DEPLOY' }}
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            OLD=/home/azureuser/marketing-os
+            FE=/opt/marketing-os/marketing-os-frontend
+
+            echo "===== Step 1: sync CJ's workspace to latest main ====="
+            cd "$OLD"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "OLD HEAD: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 2: copy 3 files to Frontend repo ====="
+            cp -v "$OLD/skills/ai-talent/client/src/App.tsx" \
+                  "$FE/ai-talent-client/src/App.tsx"
+            cp -v "$OLD/skills/ai-talent/client/src/components/MissionChatCore.tsx" \
+                  "$FE/ai-talent-client/src/components/MissionChatCore.tsx"
+            cp -v "$OLD/skills/ai-talent/client/src/components/mission-chat/MissionHomePage.tsx" \
+                  "$FE/ai-talent-client/src/components/mission-chat/MissionHomePage.tsx"
+
+            echo ""
+            echo "===== Step 3: commit + push Frontend repo ====="
+            cd "$FE"
+            git add ai-talent-client/src/App.tsx \
+                    ai-talent-client/src/components/MissionChatCore.tsx \
+                    ai-talent-client/src/components/mission-chat/MissionHomePage.tsx
+            git status --short
+
+            cat > /tmp/fe_homepage_msg.txt <<'MSGEOF'
+            fix: Mission Homepage bugs — no auto-start + squad preview + chips without mission
+
+            - MissionChatCore: remove 1500ms auto-start useEffect
+            - App.tsx IndexPage: wire activeSquad + onSquadPreview
+            - MissionHomePage: fetch chips enabled on workspace (not missionId)
+            MSGEOF
+
+            git -c user.name="CJ Migration Bot" -c user.email="cjwang@sowork.tw" \
+              commit -F /tmp/fe_homepage_msg.txt
+            git push origin main
+
+            echo ""
+            echo "===== Step 4: deploy-dev.sh ====="
+            bash ./deploy-dev.sh 2>&1 | tail -20
+
+            echo ""
+            echo "===== Step 5: verify ====="
+            pm2 list | head -8
+            stat -c '%y  %n' /opt/marketing-os/marketing-os-backend/public/index.html
+            ls -lh /opt/marketing-os/marketing-os-backend/public/assets/ | head -5
+            curl -s -o /dev/null -w "Backend /health: HTTP %{http_code}\n" http://127.0.0.1:3101/health
