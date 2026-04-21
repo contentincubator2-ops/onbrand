@@ -1,0 +1,176 @@
+name: Admin — Scan VM for agent_squads residue
+
+# Read-only scan. Reports every place on the VM that still references
+# the legacy table name 'agent_squads':
+#   1. /home/azureuser/marketing-os (my repo)
+#   2. /opt/A2A-Marketing-Claw-Backend (production backend by guo.chen)
+#   3. /opt/A2A-Marketing-Claw-Frontend (production frontend)
+#   4. DB objects: tables, views, triggers, stored procs, events
+#   5. nginx / systemd / cron / PM2 config
+# No writes.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            echo "===== (1) /home/azureuser/marketing-os (my repo) ====="
+            if [ -d /home/azureuser/marketing-os ]; then
+              cd /home/azureuser/marketing-os
+              MY_HITS=$(grep -rln "agent_squads" \
+                --include="*.ts" --include="*.js" --include="*.cjs" \
+                --include="*.sql" --include="*.md" --include="*.yml" --include="*.json" \
+                --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=public \
+                . 2>/dev/null | head -50)
+              if [ -z "$MY_HITS" ]; then
+                echo "  ✓ clean"
+              else
+                echo "$MY_HITS" | while read f; do
+                  echo "  ✗ $f"
+                  grep -n "agent_squads" "$f" | head -5 | sed 's/^/      /'
+                done
+              fi
+            else
+              echo "  (not present)"
+            fi
+
+            echo ""
+            echo "===== (2) /opt/A2A-Marketing-Claw-Backend (production) ====="
+            if [ -d /opt/A2A-Marketing-Claw-Backend ]; then
+              cd /opt/A2A-Marketing-Claw-Backend
+              BE_HITS=$(grep -rln "agent_squads" \
+                --include="*.ts" --include="*.js" --include="*.cjs" \
+                --include="*.sql" --include="*.md" --include="*.yml" --include="*.json" \
+                --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist \
+                . 2>/dev/null | head -50)
+              if [ -z "$BE_HITS" ]; then
+                echo "  ✓ clean"
+              else
+                echo "  ⚠ production Backend repo still references agent_squads:"
+                echo "$BE_HITS" | while read f; do
+                  echo "    ✗ $f"
+                  grep -nH "agent_squads" "$f" 2>/dev/null | head -3 | sed 's/^/        /'
+                done
+              fi
+            else
+              echo "  (not present)"
+            fi
+
+            echo ""
+            echo "===== (3) /opt/A2A-Marketing-Claw-Frontend (production) ====="
+            if [ -d /opt/A2A-Marketing-Claw-Frontend ]; then
+              cd /opt/A2A-Marketing-Claw-Frontend
+              FE_HITS=$(grep -rln "agent_squads" \
+                --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" \
+                --include="*.md" --include="*.yml" --include="*.json" \
+                --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist \
+                . 2>/dev/null | head -50)
+              if [ -z "$FE_HITS" ]; then
+                echo "  ✓ clean"
+              else
+                echo "  ⚠ production Frontend repo still references agent_squads:"
+                echo "$FE_HITS" | while read f; do
+                  echo "    ✗ $f"
+                done
+              fi
+            else
+              echo "  (not present)"
+            fi
+
+            echo ""
+            echo "===== (4) DB objects referencing agent_squads ====="
+            cd /home/azureuser/marketing-os/skills/ai-talent
+            DB_USER=$(grep -E '^DB_USER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_PASS=$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+            DB_NAME=$(grep -E '^DB_NAME=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+            mysql --host=127.0.0.1 --user="${DB_USER}" --password="${DB_PASS}" --default-character-set=utf8mb4 "${DB_NAME}" <<'SQL'
+            -- 4a. Tables named agent_squads or referencing it
+            SELECT '--- 4a. Tables present in DB with squad-related names ---' AS probe;
+            SELECT TABLE_NAME, TABLE_TYPE, TABLE_ROWS, CREATE_TIME
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND (TABLE_NAME LIKE '%squad%' OR TABLE_NAME LIKE '%agent%')
+            ORDER BY TABLE_NAME;
+
+            -- 4b. Views that reference agent_squads
+            SELECT '--- 4b. Views referencing agent_squads ---' AS probe;
+            SELECT TABLE_NAME AS view_name, VIEW_DEFINITION
+            FROM information_schema.VIEWS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND VIEW_DEFINITION LIKE '%agent_squads%';
+
+            -- 4c. Triggers that reference agent_squads
+            SELECT '--- 4c. Triggers referencing agent_squads ---' AS probe;
+            SELECT TRIGGER_NAME, EVENT_OBJECT_TABLE, ACTION_STATEMENT
+            FROM information_schema.TRIGGERS
+            WHERE TRIGGER_SCHEMA = DATABASE()
+              AND (EVENT_OBJECT_TABLE = 'agent_squads' OR ACTION_STATEMENT LIKE '%agent_squads%');
+
+            -- 4d. Stored procedures/functions that reference agent_squads
+            SELECT '--- 4d. Stored routines referencing agent_squads ---' AS probe;
+            SELECT ROUTINE_NAME, ROUTINE_TYPE
+            FROM information_schema.ROUTINES
+            WHERE ROUTINE_SCHEMA = DATABASE()
+              AND ROUTINE_DEFINITION LIKE '%agent_squads%';
+
+            -- 4e. Events (scheduled jobs) that reference agent_squads
+            SELECT '--- 4e. Events referencing agent_squads ---' AS probe;
+            SELECT EVENT_NAME, EVENT_DEFINITION
+            FROM information_schema.EVENTS
+            WHERE EVENT_SCHEMA = DATABASE()
+              AND EVENT_DEFINITION LIKE '%agent_squads%';
+
+            -- 4f. Foreign keys referencing agent_squads
+            SELECT '--- 4f. FKs pointing at agent_squads ---' AS probe;
+            SELECT TABLE_NAME, COLUMN_NAME, CONSTRAINT_NAME, REFERENCED_TABLE_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND REFERENCED_TABLE_NAME = 'agent_squads';
+
+            -- 4g. Row count comparison for the two tables
+            SELECT '--- 4g. Row count: squads vs agent_squads ---' AS probe;
+            SELECT 'squads' AS tbl, COUNT(*) AS rows_total,
+                   SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END) AS rows_active
+            FROM squads
+            UNION ALL
+            SELECT 'agent_squads', COUNT(*),
+                   SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END)
+            FROM agent_squads;
+            SQL
+
+            echo ""
+            echo "===== (5) nginx / systemd / cron / PM2 config ====="
+            echo "--- 5a. nginx -T | grep agent_squads ---"
+            sudo nginx -T 2>/dev/null | grep -i "agent_squads" | head -5 || echo "  ✓ nginx clean"
+            echo "--- 5b. systemd unit files ---"
+            grep -rln "agent_squads" /etc/systemd/system/ 2>/dev/null | head -5 || echo "  ✓ systemd clean"
+            echo "--- 5c. cron / crontab ---"
+            crontab -l 2>/dev/null | grep -i "agent_squads" | head -5 || echo "  (no cron or no hit)"
+            echo "--- 5d. PM2 ecosystem / dump ---"
+            pm2 dump 2>/dev/null > /tmp/pm2dump.json
+            grep -o ".\{0,60\}agent_squads.\{0,60\}" /tmp/pm2dump.json 2>/dev/null | head -5 || echo "  ✓ PM2 config clean"
+            rm -f /tmp/pm2dump.json
+
+            echo ""
+            echo "===== (6) Running process envs that mention agent_squads ====="
+            for pid in $(pgrep -f "node|pm2"); do
+              if [ -r /proc/$pid/environ ]; then
+                if tr '\0' '\n' < /proc/$pid/environ | grep -q "agent_squads"; then
+                  echo "  ⚠ pid=$pid has agent_squads in env"
+                fi
+              fi
+            done
+            echo "  (no process envs hit — or insufficient permission)"
+
+            echo ""
+            echo "===== DONE ====="
