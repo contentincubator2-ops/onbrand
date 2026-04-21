@@ -10,15 +10,37 @@
  * Duplicate-lead guard: for lead agents, we avoid re-using an agent that is
  * already lead on another squad. (This addresses the 9-squads-sharing-id=25 bug
  * documented in the master spec.)
+ *
+ * When creating a NEW agent, all these fields are populated from SquadSpec
+ * so L3/L4/L5/L6 builders don't need a separate upgrade-fields step:
+ *   - aiModel              = 'claude-opus-4-6'   (agency policy)
+ *   - aiModelSource        = 'policy'
+ *   - aiModelFallback      = 'claude-sonnet-4-6'
+ *   - aiModelFallbackSource = 'policy'
+ *   - avatarUrl            = DiceBear notionists (deterministic by slug)
+ *   - coverUrl             = DiceBear shapes
+ *   - bio_en               = built from englishName/Title/methodology
+ *   - specialty_en         = from primarySkill + tags
+ *   - workspace            = derived from squad layer
+ *   - workspace_tags       = from squad tags
+ *   - methodology          = from squad methodology
+ *   - workingPrinciples    = 3 structured lines
  */
 
 import type { PoolConnection } from "mysql2/promise";
 import type {
   AgentRow,
+  Layer,
   ResolvedMember,
   SquadMemberSpec,
+  SquadSpec,
 } from "./types.js";
 import { getPool } from "./db.js";
+
+const DICEBEAR_AVATAR = "https://api.dicebear.com/7.x/notionists/svg?seed=";
+const DICEBEAR_COVER = "https://api.dicebear.com/7.x/shapes/svg?seed=";
+const POLICY_AI_MODEL = "claude-opus-4-6";
+const POLICY_AI_MODEL_FALLBACK = "claude-sonnet-4-6";
 
 /** Slug-safe kebab-case converter. */
 function kebab(str: string): string {
@@ -27,6 +49,50 @@ function kebab(str: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
+}
+
+function layerToWorkspace(layer: Layer): string {
+  if (layer === "L1_brand") return "brand-positioning";
+  if (layer === "L2_product") return "product-positioning";
+  if (layer === "L3_audience") return "audience-strategy";
+  if (layer === "L4_channel") return "channel-strategy";
+  if (layer === "L5_campaign") return "campaign-strategy";
+  if (layer === "L6_validation") return "validation";
+  return "strategy";
+}
+
+function buildBioEn(
+  englishName: string,
+  englishTitle: string,
+  methodologyAuthor: string | undefined,
+  methodologyYear: number | undefined,
+  methodology: string,
+): string {
+  const era = methodologyYear ? ` (${methodologyYear})` : "";
+  const author = methodologyAuthor ? `${methodologyAuthor}'s ` : "";
+  return (
+    `${englishName} is ${englishTitle} at SoWork's AI Strategic Consultancy. ` +
+    `Trained on ${author}${methodology} methodology${era}, ` +
+    `with practical engagement across ${methodologyYear && methodologyYear < 2000 ? "classic" : "modern"} brand strategy cases. ` +
+    `Leads squad-based deliverables that turn methodology into boardroom-ready outputs.`
+  );
+}
+
+function buildSpecialtyEn(primarySkill: string, tags: string[]): string {
+  const head = primarySkill.replace(/-/g, " ");
+  const rest = tags
+    .slice(0, 4)
+    .map((t) => t.replace(/-/g, " "))
+    .join(", ");
+  return `${head} — specializing in: ${rest}.`;
+}
+
+function buildWorkingPrinciples(squad: SquadSpec): string {
+  return [
+    `1. Methodology-first: every deliverable traces back to ${squad.methodologyAuthor ?? "authored"} ${squad.methodology}.`,
+    `2. Squad accountability: leads ${squad.members.length - 1} specialists across a ${squad.workflow.length}-step workflow.`,
+    `3. Evidence discipline: every strategic claim anchored to audit trail, not opinion.`,
+  ].join("\n");
 }
 
 /** Fetch agents matching a primarySkill exactly, optionally excluding ids. */
@@ -51,17 +117,20 @@ async function findBySkill(
   return rows as AgentRow[];
 }
 
-/** Build a slug for a newly-created agent: "{primarySkill-kebab}-lead" or similar. */
+/** Build a slug for a newly-created agent: "{squadSlug}-{kebabRole}". */
 function generateAgentSlug(spec: SquadMemberSpec, squadSlug: string): string {
   const role = kebab(spec.role);
   return `${squadSlug}-${role}`;
 }
 
-/** Insert a brand-new agent row, return the numeric id. */
+/**
+ * Insert a brand-new agent row with ALL default fields populated.
+ * Returns the AgentRow.
+ */
 async function createAgent(
   conn: PoolConnection,
   spec: SquadMemberSpec,
-  squadSlug: string,
+  squad: SquadSpec,
 ): Promise<AgentRow> {
   if (!spec.createAgent) {
     throw new Error(
@@ -69,32 +138,54 @@ async function createAgent(
     );
   }
   const c = spec.createAgent;
-  const slug = generateAgentSlug(spec, squadSlug);
-  const layer = spec.isLead ? "strategy" : "strategy"; // L1 all strategy
+  const slug = generateAgentSlug(spec, squad.slug);
+  const layer = "strategy"; // L1–L6 all strategy (job layer, not squad layer)
   const jobLevel = c.jobLevel ?? (spec.isLead ? "vp" : "ad");
   const industry = c.industry ?? "tech";
   const specialty = [spec.primarySkill, ...c.specialtyTags].join(", ");
   const skills = JSON.stringify([
     c.title,
-    ...(c.specialtyTags.slice(0, 4).map((s) =>
+    ...c.specialtyTags.slice(0, 4).map((s) =>
       s
         .split("-")
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" "),
-    )),
+    ),
   ]);
+
+  // Populated-by-default fields (previously null, now policy-driven)
+  const avatarUrl = `${DICEBEAR_AVATAR}${encodeURIComponent(slug)}`;
+  const coverUrl = `${DICEBEAR_COVER}${encodeURIComponent(squad.slug)}`;
+  const bio_en = buildBioEn(
+    c.englishName,
+    c.englishTitle,
+    squad.methodologyAuthor,
+    squad.methodologyYear,
+    squad.methodology,
+  );
+  const specialty_en = buildSpecialtyEn(spec.primarySkill, squad.tags);
+  const workspace = layerToWorkspace(squad.layer);
+  const workspace_tags = JSON.stringify(squad.tags.slice(0, 8));
+  const methodology = squad.methodology;
+  const workingPrinciples = buildWorkingPrinciples(squad);
 
   const sql = `
     INSERT INTO agents (
       slug, name, englishName, title, englishTitle,
       layer, bio, specialty, skills, primarySkill,
-      industry, jobLevel, isAvailable, reviewStatus,
-      rating, createdAt, updatedAt
+      industry, jobLevel, isAvailable, reviewStatus, rating,
+      avatarUrl, coverUrl, bio_en, specialty_en,
+      workspace, workspace_tags, methodology, workingPrinciples,
+      aiModel, aiModelSource, aiModelFallback, aiModelFallbackSource,
+      createdAt, updatedAt
     ) VALUES (
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
-      ?, ?, 1, 'approved',
-      5.00, NOW(), NOW()
+      ?, ?, 1, 'approved', 5.00,
+      ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, 'policy', ?, 'policy',
+      NOW(), NOW()
     )
   `;
   const [result] = await conn.execute(sql, [
@@ -110,6 +201,16 @@ async function createAgent(
     spec.primarySkill,
     industry,
     jobLevel,
+    avatarUrl,
+    coverUrl,
+    bio_en,
+    specialty_en,
+    workspace,
+    workspace_tags,
+    methodology,
+    workingPrinciples,
+    POLICY_AI_MODEL,
+    POLICY_AI_MODEL_FALLBACK,
   ]);
   const insertId = (result as any).insertId as number;
   return {
@@ -127,14 +228,16 @@ async function createAgent(
 /**
  * Main entry point.
  *
- * usedAgentIds: ids already picked by THIS squad — prevent duplicates within
- *               a single squad (one agent cannot cover 2 roles).
- * leadsUsed:    ids already used as LEAD across squads this run. Pass empty
- *               array if you don't care.
+ * @param spec         The member spec to resolve.
+ * @param squad        Full squad spec — needed for default-field derivation.
+ * @param usedAgentIds Ids already picked by THIS squad — prevent duplicates within
+ *                     a single squad (one agent cannot cover 2 roles).
+ * @param leadsUsed    Ids already used as LEAD across squads this run. Pass empty
+ *                     array if you don't care.
  */
 export async function findOrCreateAgent(
   spec: SquadMemberSpec,
-  squadSlug: string,
+  squad: SquadSpec,
   usedAgentIds: number[],
   leadsUsed: number[] = [],
 ): Promise<ResolvedMember> {
@@ -176,7 +279,7 @@ export async function findOrCreateAgent(
 
     // ── 3. Create new agent if spec allows ─────────────────────────────
     if (spec.createAgent) {
-      const created = await createAgent(conn, spec, squadSlug);
+      const created = await createAgent(conn, spec, squad);
       return {
         spec,
         agent: created,

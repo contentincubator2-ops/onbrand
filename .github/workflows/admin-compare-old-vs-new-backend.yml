@@ -1,0 +1,96 @@
+name: Admin — Compare old /home vs new /opt backend
+
+# Read-only diff audit:
+#   OLD: /home/azureuser/marketing-os/skills/ai-talent/server
+#   NEW: /opt/marketing-os/marketing-os-backend
+# List all server-side files that exist in OLD but NOT in NEW.
+# Same for frontend:
+#   OLD: /home/azureuser/marketing-os/skills/ai-talent/client
+#   NEW: /opt/marketing-os/marketing-os-frontend
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            OLD_BE=/home/azureuser/marketing-os/skills/ai-talent/server
+            NEW_BE=/opt/marketing-os/marketing-os-backend
+            OLD_FE=/home/azureuser/marketing-os/skills/ai-talent/client
+            NEW_FE=/opt/marketing-os/marketing-os-frontend
+            OLD_SCRIPTS=/home/azureuser/marketing-os/skills/ai-talent/scripts
+            NEW_SCRIPTS=/opt/marketing-os/marketing-os-backend/scripts
+
+            echo "========== Both paths exist? =========="
+            for p in "$OLD_BE" "$NEW_BE" "$OLD_FE" "$NEW_FE" "$OLD_SCRIPTS" "$NEW_SCRIPTS"; do
+              if [ -d "$p" ]; then
+                COUNT=$(find "$p" -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.cjs" \) ! -path "*/node_modules/*" ! -path "*/dist/*" | wc -l)
+                echo "  OK  ${p}  (${COUNT} .ts/.js files)"
+              else
+                echo "  MISSING  ${p}"
+              fi
+            done
+
+            echo ""
+            echo "========== Backend: files in OLD but NOT in NEW =========="
+            cd "${OLD_BE}"
+            find . -type f \( -name "*.ts" -o -name "*.js" -o -name "*.cjs" \) ! -path "*/node_modules/*" | sort > /tmp/old_be.txt
+            cd "${NEW_BE}/server" 2>/dev/null || cd "${NEW_BE}"
+            find . -type f \( -name "*.ts" -o -name "*.js" -o -name "*.cjs" \) ! -path "*/node_modules/*" | sort > /tmp/new_be.txt
+            comm -23 /tmp/old_be.txt /tmp/new_be.txt | head -80
+
+            echo ""
+            echo "========== Backend: files in NEW but NOT in OLD (new additions by guo.chen) =========="
+            comm -13 /tmp/old_be.txt /tmp/new_be.txt | head -40
+
+            echo ""
+            echo "========== Scripts: files in OLD but NOT in NEW =========="
+            if [ -d "${OLD_SCRIPTS}" ] && [ -d "${NEW_SCRIPTS}" ]; then
+              cd "${OLD_SCRIPTS}"
+              find . -type f \( -name "*.ts" -o -name "*.js" -o -name "*.cjs" -o -name "*.sh" \) ! -path "*/node_modules/*" | sort > /tmp/old_scripts.txt
+              cd "${NEW_SCRIPTS}"
+              find . -type f \( -name "*.ts" -o -name "*.js" -o -name "*.cjs" -o -name "*.sh" \) ! -path "*/node_modules/*" | sort > /tmp/new_scripts.txt
+              comm -23 /tmp/old_scripts.txt /tmp/new_scripts.txt | head -80
+            else
+              echo "(new scripts dir not at ${NEW_SCRIPTS})"
+              echo "Searching for scripts/ inside new backend..."
+              find "${NEW_BE}" -type d -name "scripts" ! -path "*/node_modules/*" 2>/dev/null | head -5
+            fi
+
+            echo ""
+            echo "========== Frontend: files in OLD but NOT in NEW =========="
+            cd "${OLD_FE}"
+            find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) ! -path "*/node_modules/*" ! -path "*/dist/*" ! -path "*/public/*" | sort > /tmp/old_fe.txt
+            cd "${NEW_FE}/src" 2>/dev/null || cd "${NEW_FE}"
+            find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) ! -path "*/node_modules/*" ! -path "*/dist/*" | sort > /tmp/new_fe.txt
+            comm -23 /tmp/old_fe.txt /tmp/new_fe.txt | head -60
+
+            echo ""
+            echo "========== Frontend: files in NEW but NOT in OLD =========="
+            comm -13 /tmp/old_fe.txt /tmp/new_fe.txt | head -30
+
+            echo ""
+            echo "========== Git status of each path =========="
+            for p in /home/azureuser/marketing-os /opt/marketing-os/marketing-os-backend /opt/marketing-os/marketing-os-frontend; do
+              if [ -d "$p/.git" ]; then
+                echo ""
+                echo "--- ${p} ---"
+                cd "$p"
+                echo "Remote:   $(git remote get-url origin 2>/dev/null)"
+                echo "Branch:   $(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+                echo "HEAD:     $(git log --oneline -1 2>/dev/null)"
+                echo "Last pull: $(git log -1 --format=%cr 2>/dev/null)"
+              fi
+            done
+
+            echo ""
+            echo "========== pm2: which code is running in production now? =========="
+            pm2 list | grep -E "cwd|pid|status|name" || pm2 list
