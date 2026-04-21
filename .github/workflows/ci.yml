@@ -1,16 +1,15 @@
-name: CI
+name: CI / Deploy
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   pull_request:
-    branches: [main, dev]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      # Provide dummy env vars so zod validation passes in CI
       DB_HOST: localhost
       DB_USER: test
       DB_PASSWORD: test
@@ -36,21 +35,37 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - name: Deploy to VM via SSH
+      - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          envs: GH_TOKEN
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           script: |
             set -e
-            cd /home/azureuser/marketing-os
-            git fetch origin main
-            git reset --hard origin/main
-            npm install --prefix skills/ai-talent
-            npm install --prefix skills/ai-talent/client
-            npm run db:migrate --prefix skills/ai-talent
-            npm run db:seed-local --prefix skills/ai-talent
-            npm run embed:squads --prefix skills/ai-talent
-            npm run build --prefix skills/ai-talent/client
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Pull latest code ====="
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main && git reset --hard origin/main
+            echo "Latest commit: $(git log --oneline -1)"
+
+            echo "===== Install & build ====="
+            cd "$AI"
+            npm install --legacy-peer-deps 2>&1 | tail -3
+            cd "$AI/client"
+            npm install --legacy-peer-deps 2>&1 | tail -3
+            npm run build 2>&1 | tail -5
+
+            echo "===== Restart ====="
             pm2 restart marketing-os
+
+            echo "===== Health check ====="
+            sleep 3
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/health

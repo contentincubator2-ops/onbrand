@@ -27,6 +27,9 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 600s
+          envs: GH_TOKEN
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           script: |
             set -e
             APP=/opt/marketing-os/app
@@ -35,14 +38,16 @@ jobs:
             OLD_ENV=$OLD_BE/.env
 
             echo "===== Step 1: Clone or update Marketing-OS monorepo ====="
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
             if [ -d "$APP/.git" ]; then
               echo "Repo exists — pulling latest..."
               cd "$APP"
+              git remote set-url origin "$REPO"
               git fetch origin main && git reset --hard origin/main
             else
               echo "Fresh clone..."
               mkdir -p /opt/marketing-os
-              git clone https://github.com/contentincubator2-ops/Marketing-OS.git "$APP"
+              git clone "$REPO" "$APP"
             fi
             echo "Latest commit: $(cd $APP && git log --oneline -1)"
 
