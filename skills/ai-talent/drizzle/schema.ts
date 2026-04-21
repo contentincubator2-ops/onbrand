@@ -495,6 +495,7 @@ export const chatMessages = mysqlTable("chat_messages", {
   taskId: int("taskId"),
   companyId: int("companyId"),
   departmentId: int("departmentId"),
+  phaseOrder: int("phaseOrder").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ChatMessage = typeof chatMessages.$inferSelect;

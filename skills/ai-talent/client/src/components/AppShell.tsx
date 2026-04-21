@@ -582,12 +582,14 @@ function Drawer({
   activeMissionId,
   onNewMission,
   onNewWorkspace,
+  onCollapse,
 }: {
   onMissionSelect?: (missionId: number, brandId?: number, workspace?: string) => void;
   onNewTask?: (wsKey: string) => void;
   activeMissionId?: number | null;
   onNewMission?: () => void;
   onNewWorkspace?: () => void;
+  onCollapse?: () => void;
 }) {
   const drawerStyle: React.CSSProperties = {
     width: 210, minWidth: 210,
@@ -694,7 +696,33 @@ function Drawer({
     : { mutate: () => {} };
 
   return (
-    <div style={drawerStyle}>
+    <div style={{ ...drawerStyle, position: "relative" }}>
+      {/* Collapse button — top-right edge */}
+      {onCollapse && (
+        <button
+          onClick={onCollapse}
+          title="收合側欄"
+          style={{
+            position: "absolute",
+            top: 6, right: 4,
+            zIndex: 5,
+            width: 20, height: 20,
+            border: "none",
+            background: "transparent",
+            color: "#8C8B87",
+            cursor: "pointer",
+            fontSize: 12,
+            lineHeight: 1,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 4,
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#E4E3E1"; (e.currentTarget as HTMLButtonElement).style.color = "#1A1A18"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#8C8B87"; }}
+        >◀</button>
+      )}
       {/* Brand Switcher Header */}
       <div style={{ padding: "13px 10px 8px", position: "relative" }}>
         {brandsLoading ? (
@@ -3094,6 +3122,46 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
   const [newWsOpen, setNewWsOpen] = useState(false);
   const [newWsLabel, setNewWsLabel] = useState("");
 
+  // Drawer collapse — persisted
+  const [drawerCollapsed, setDrawerCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem("drawerCollapsed") === "1"; } catch { return false; }
+  });
+  const toggleDrawer = React.useCallback(() => {
+    setDrawerCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem("drawerCollapsed", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }, []);
+
+  // Chat fullscreen — persisted, toggled via button or Cmd/Ctrl+\
+  const [chatFullscreen, setChatFullscreen] = useState<boolean>(() => {
+    try { return localStorage.getItem("chatFullscreen") === "1"; } catch { return false; }
+  });
+  const toggleFullscreen = React.useCallback(() => {
+    setChatFullscreen(prev => {
+      const next = !prev;
+      try { localStorage.setItem("chatFullscreen", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }, []);
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + \ toggles fullscreen
+      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+      // Esc exits fullscreen
+      if (e.key === "Escape" && chatFullscreen) {
+        setChatFullscreen(false);
+        try { localStorage.setItem("chatFullscreen", "0"); } catch {}
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chatFullscreen, toggleFullscreen]);
+
   const shellUtils = trpc.useUtils();
   const createWorkspace = trpc.workspace.create.useMutation({
     onSuccess: () => {
@@ -3190,14 +3258,39 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
 
   return (
     <div style={shellStyle}>
-      <Rail activeTab={railTab} onTabChange={setRailTab} notifCount={notifCount} />
-      <Drawer
-        onMissionSelect={onMissionSelect}
-        onNewTask={(wsKey) => { setNewMissionWsKey(wsKey); setNewMissionOpen(true); }}
-        activeMissionId={activeMissionId}
-        onNewMission={() => { setNewMissionWsKey(activeMissionWorkspace ?? "strategy"); setNewMissionOpen(true); }}
-        onNewWorkspace={() => setNewWsOpen(true)}
-      />
+      {!chatFullscreen && <Rail activeTab={railTab} onTabChange={setRailTab} notifCount={notifCount} />}
+      {chatFullscreen ? null : drawerCollapsed ? (
+        /* Collapsed drawer — thin 16px strip with expand button */
+        <div
+          onClick={toggleDrawer}
+          title="展開側欄"
+          style={{
+            width: 16, minWidth: 16,
+            background: "#F2F1EF",
+            borderRight: "1px solid #E4E3E1",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 11,
+            color: "#8C8B87",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#EAE9E6"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#F2F1EF"; }}
+        >
+          ▶
+        </div>
+      ) : (
+        <Drawer
+          onMissionSelect={onMissionSelect}
+          onNewTask={(wsKey) => { setNewMissionWsKey(wsKey); setNewMissionOpen(true); }}
+          activeMissionId={activeMissionId}
+          onNewMission={() => { setNewMissionWsKey(activeMissionWorkspace ?? "strategy"); setNewMissionOpen(true); }}
+          onNewWorkspace={() => setNewWsOpen(true)}
+          onCollapse={toggleDrawer}
+        />
+      )}
 
       {/* Main */}
       <main style={mainStyle}>
@@ -3224,6 +3317,23 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
             )}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 5, alignItems: "center" }}>
+            {/* Fullscreen toggle */}
+            <button
+              onClick={toggleFullscreen}
+              title={chatFullscreen ? "退出全螢幕 (Esc)" : "全螢幕對話 (Ctrl+\\)"}
+              style={{
+                ...btnGhost,
+                padding: "4px 9px",
+                display: "flex", alignItems: "center", gap: 4,
+                fontSize: 12,
+                color: chatFullscreen ? "#E8631A" : "#6B6A66",
+                border: chatFullscreen ? "1px solid #F5C9A8" : "1px solid transparent",
+                background: chatFullscreen ? "#FFF5EE" : "transparent",
+              }}
+            >
+              <span style={{ fontSize: 14, lineHeight: 1 }}>{chatFullscreen ? "⛶" : "⛶"}</span>
+              <span style={{ fontSize: 11 }}>{chatFullscreen ? "退出" : "全螢幕"}</span>
+            </button>
             {/* Notification Bell */}
             <div style={{ position: "relative", marginRight: 4 }}>
               <button
@@ -3252,16 +3362,18 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         </div>
       </main>
 
-      <RightPanel
-        missionId={activeMissionId}
-        brandId={selectedBrandId}
-        activeSquad={activeSquad ?? null}
-        missionSquadSlug={activeMissionSquadSlug}
-        missionWorkspace={activeMissionWorkspace}
-        width={rightPanelWidth}
-        onWidthChange={handleRightWidthChange}
-        squadStepProgress={squadStepProgress}
-      />
+      {!chatFullscreen && (
+        <RightPanel
+          missionId={activeMissionId}
+          brandId={selectedBrandId}
+          activeSquad={activeSquad ?? null}
+          missionSquadSlug={activeMissionSquadSlug}
+          missionWorkspace={activeMissionWorkspace}
+          width={rightPanelWidth}
+          onWidthChange={handleRightWidthChange}
+          squadStepProgress={squadStepProgress}
+        />
+      )}
 
       {/* New Workspace inline modal */}
       {newWsOpen && (

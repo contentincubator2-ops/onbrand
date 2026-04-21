@@ -330,10 +330,12 @@ async function tryExecuteSquadChat(params: {
   conversationHistory: { role: string; content: string }[];
   workspace?: string;
   squadSlugHint?: string; // client-supplied hint for first-message race condition
+  phaseOrder?: number;    // Scheme B: which phase conversation to read/write; defaults 0
   send: (event: string, data: unknown) => void;
   sessionId: string;
 }): Promise<boolean> {
   const { userId, missionId, userMessage, conversationHistory, workspace, squadSlugHint, send } = params;
+  const phaseOrder = params.phaseOrder ?? 0;
 
   // ── 1. 從 mission 讀取 squadSlug 與品牌資料 ─────────────────────────────────
   let squadSlug: string | null = null;
@@ -465,7 +467,7 @@ async function tryExecuteSquadChat(params: {
   }
 
   // ── 3. 取得 / 建立 squad session（步驟狀態）──────────────────────────────────
-  const session = await getOrCreateSquadSession(localPool as any, missionId, squadSlug!);
+  const session = await getOrCreateSquadSession(localPool as any, missionId, squadSlug!, phaseOrder);
   let currentStep = session.currentStep;
   const totalSteps  = workflowSteps.length;
 
@@ -481,7 +483,7 @@ async function tryExecuteSquadChat(params: {
     if (isContinueSignal) {
       // 用戶明確要繼續 → 推進到下一步
       const nextStep = currentStep + 1;
-      await advanceToNextStep(localPool as any, missionId, nextStep, totalSteps);
+      await advanceToNextStep(localPool as any, missionId, nextStep, totalSteps, phaseOrder);
       currentStep = nextStep;
     } else {
       // 用戶回覆當前 Agent — currentStep 保持不變，重新執行當前步驟的 agent
@@ -808,7 +810,7 @@ async function tryExecuteSquadChat(params: {
     // Mode B: Squad Lead intake — save result but DON'T auto-advance.
     // The Lead (e.g. Mary Allen) confirms with user before dispatching specialists.
     // User must send a continue signal (「繼續」「好的」「確認」「開始」etc.) to advance to step 1.
-    await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput);
+    await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput, phaseOrder);
     if (squadId) {
       await persistReportSection(localPool as any, {
         missionId, squadId, stepOrder: currentStep, content: fullOutput,
@@ -816,7 +818,7 @@ async function tryExecuteSquadChat(params: {
     }
   } else {
     // Execution steps: save result but WAIT for user to explicitly continue
-    await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput);
+    await saveStepResultOnly(localPool as any, missionId, currentStep, fullOutput, phaseOrder);
     if (squadId) {
       await persistReportSection(localPool as any, {
         missionId, squadId, stepOrder: currentStep, content: fullOutput,
@@ -1185,7 +1187,7 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {}, squadSlug: bodySquadSlug } = req.body as {
+  const { userMessage, conversationHistory = [], sessionId: clientSessionId, missionId, workspace, brandContext = {}, squadSlug: bodySquadSlug, phaseOrder: bodyPhaseOrder } = req.body as {
     userMessage: string;
     conversationHistory: { role: string; content: string }[];
     sessionId?: string;
@@ -1193,7 +1195,9 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
     workspace?: string;
     brandContext?: Record<string, string>;
     squadSlug?: string;    // client hint for first-message race condition
+    phaseOrder?: number;   // Scheme B: which phase's conversation this belongs to (defaults 0)
   };
+  const phaseOrder = bodyPhaseOrder ?? 0;
 
   if (!userMessage) { res.status(400).json({ error: "userMessage required" }); return; }
 
@@ -1235,6 +1239,7 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
         conversationHistory,
         workspace,
         squadSlugHint: bodySquadSlug,
+        phaseOrder,
         send,
         sessionId,
       });
@@ -1390,10 +1395,10 @@ missionChatRouter.post("/reset-positioning", async (req: Request, res: Response)
 missionChatRouter.post("/reset-squad-session", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { missionId } = req.body as { missionId?: number };
+  const { missionId, phaseOrder } = req.body as { missionId?: number; phaseOrder?: number };
   if (!missionId) { res.status(400).json({ error: "missionId required" }); return; }
   try {
-    await resetSquadSession(localPool as any, missionId);
+    await resetSquadSession(localPool as any, missionId, phaseOrder ?? 0);
     res.json({ ok: true });
   } catch (err: any) {
     console.error("[missionChatRouter] reset-squad-session:", err?.message);

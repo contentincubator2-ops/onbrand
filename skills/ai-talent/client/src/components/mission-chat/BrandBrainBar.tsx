@@ -10,8 +10,21 @@
  * Neural-node pattern tiles the full background.
  * Capacity bar at bottom shows 字數 usage.
  */
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
+
+// ─── Collapse preference (persisted) ───────────────────────────────────────
+const LS_KEY = "brandBrainBar.collapsed";
+function readCollapsed(): boolean {
+  try {
+    const v = localStorage.getItem(LS_KEY);
+    // Default collapsed — give chat area more vertical room
+    return v === null ? true : v === "1";
+  } catch { return true; }
+}
+function writeCollapsed(v: boolean) {
+  try { localStorage.setItem(LS_KEY, v ? "1" : "0"); } catch {}
+}
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 const INK    = "#1A1A18";
@@ -125,6 +138,9 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
   const handleFocusBrain = () =>
     window.dispatchEvent(new CustomEvent("section-priority", { detail: { key: "brandbrain" } }));
 
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
+  useEffect(() => { writeCollapsed(collapsed); }, [collapsed]);
+
   if (!brandId) return null;
 
   const hasPos      = !!tagline;
@@ -133,19 +149,134 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
   const audience    = [targetMkt, audA, audB].filter(Boolean);
   const isLoading   = genEstimate.isLoading || (posQuery.isLoading && !pos);
 
+  // ─── Collapsed chip mode ────────────────────────────────────────────────
+  if (collapsed) {
+    return (
+      <div
+        onClick={() => setCollapsed(false)}
+        title="展開品牌大腦"
+        style={{
+          flexShrink: 0,
+          margin: "0 12px 0",
+          borderRadius: "8px 8px 0 0",
+          border: `1px solid ${BORDER}`,
+          borderBottom: "none",
+          background: "rgba(255,255,255,0.92)",
+          backgroundImage: PATTERN,
+          backgroundSize: "48px 48px",
+          boxShadow: "0 -1px 6px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.04)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "4px 10px 4px 8px",
+          height: 28,
+          cursor: "pointer",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* White veil so pattern doesn't dominate */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "rgba(255,255,255,0.82)",
+          pointerEvents: "none",
+        }} />
+        <div style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
+          <NeuralIcon size={18} />
+        </div>
+        <span style={{
+          position: "relative",
+          fontSize: 9, fontWeight: 700, color: MUTED,
+          textTransform: "uppercase", letterSpacing: "0.1em",
+          flexShrink: 0,
+        }}>
+          品牌大腦
+        </span>
+        <span style={{
+          position: "relative",
+          fontSize: 11.5, color: hasPos ? INK : SUBTLE,
+          fontWeight: hasPos ? 600 : 400,
+          flex: "1 1 0",
+          minWidth: 0,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}>
+          {isLoading ? "正在推估品牌定位…" : (tagline || "尚未設定品牌定位")}
+        </span>
+        {isEst && !isLoading && (
+          <span style={{
+            position: "relative",
+            fontSize: 8.5, color: SUBTLE,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 20, padding: "0px 5px",
+            letterSpacing: "0.02em",
+            flexShrink: 0,
+          }}>AI推估</span>
+        )}
+        <span style={{
+          position: "relative",
+          fontSize: 9.5, color: isFull ? "#B91C1C" : MUTED,
+          fontVariantNumeric: "tabular-nums",
+          flexShrink: 0,
+        }}>
+          {brainItems.length} 筆 · {pct}%
+        </span>
+        <span style={{
+          position: "relative",
+          fontSize: 11, color: INK, opacity: 0.45,
+          flexShrink: 0,
+          lineHeight: 1,
+        }}>▾</span>
+      </div>
+    );
+  }
+
   return (
     /* Outer wrapper: floating card with shadow */
     <div style={{
       flexShrink: 0,
-      margin: "0 12px 0",           /* small side margins so shadow is visible */
+      margin: "10px 12px 0",        /* extra top margin for protruding collapse button */
       borderRadius: "10px 10px 0 0",
-      overflow: "hidden",
+      overflow: "visible",
       boxShadow: "0 -2px 12px rgba(0,0,0,0.07), 0 -1px 4px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.06)",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
       position: "relative",
       border: `1px solid ${BORDER}`,
       borderBottom: "none",
     }}>
+
+      {/* Collapse toggle — big, obvious, top-right */}
+      <button
+        onClick={() => setCollapsed(true)}
+        title="收合品牌大腦"
+        style={{
+          position: "absolute",
+          top: -10, right: 14,
+          zIndex: 10,
+          height: 28,
+          padding: "0 14px",
+          border: `1.5px solid ${INK}`,
+          background: INK,
+          color: "#FFFFFF",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 700,
+          lineHeight: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          borderRadius: 14,
+          boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+          letterSpacing: "0.02em",
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#3D3C39"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = INK; }}
+      >
+        <span style={{ fontSize: 11 }}>▴</span>
+        <span>收合品牌大腦</span>
+      </button>
 
       {/* Neural pattern — full background */}
       <div style={{

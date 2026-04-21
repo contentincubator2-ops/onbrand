@@ -24,6 +24,7 @@ import { BrandPositioningBook, parsePositioningData } from "./mission-chat/Brand
 import DeliverableBlock, { type DeliverableItem } from "./mission-chat/DeliverableBlock";
 import { CustomSquadDialog } from "./mission-chat/CustomSquadDialog";
 import { BrandBrainBar } from "./mission-chat/BrandBrainBar";
+import { PhaseTabs } from "./mission-chat/PhaseTabs";
 import type { DBSquad } from '../types/squad';
 
 // ─── A2A Patterns ────────────────────────────────────────────────────────────
@@ -515,6 +516,15 @@ export default function MissionChatCore({
 
   // ── Squad step progress (for RELAY-based sidebar) ─────────────────────────
   const [squadStepProgress, setSquadStepProgress] = useState<SquadStepProgress[]>([]);
+  // ── Scheme B: which phase conversation is active (0 = intake, 1..N = workflow) ──
+  const [activePhase, setActivePhase] = useState<number>(0);
+  // Phases flagged as potentially stale (user rewrote an upstream phase after downstream completed)
+  const [stalePhases, setStalePhases] = useState<Set<number>>(new Set());
+  // Reset when mission changes
+  useEffect(() => {
+    setActivePhase(0);
+    setStalePhases(new Set());
+  }, [activeMissionId]);
   // ── A2A step reply state — user controls when to advance ─────────────────
   const [awaitingStepReply, setAwaitingStepReply] = useState(false);
   const [awaitingStepInfo, setAwaitingStepInfo] = useState<{
@@ -817,6 +827,29 @@ export default function MissionChatCore({
     // Accept an explicit override so the first message still reaches the squad path.
     const squadSlug: string = squadSlugOverride ?? missionData?.squadSlug ?? "";
     if (!squadSlug) return false;
+
+    // Scheme B: if user is messaging an upstream phase while downstream phases are
+    // already done, flag the downstream as stale so they show a warning dot.
+    if (!isAutoAdvance) {
+      const downstreamDone = squadStepProgress
+        .filter(sp => sp.step > activePhase && sp.status === "done")
+        .map(sp => sp.step);
+      if (downstreamDone.length > 0) {
+        setStalePhases(prev => {
+          const next = new Set(prev);
+          downstreamDone.forEach(p => next.add(p));
+          return next;
+        });
+      }
+      // Entering a phase and messaging it clears its OWN stale flag
+      if (stalePhases.has(activePhase)) {
+        setStalePhases(prev => {
+          const next = new Set(prev);
+          next.delete(activePhase);
+          return next;
+        });
+      }
+    }
     // Token is OPTIONAL: users who signed in via the new LoginPage have only a
     // session cookie (no localStorage token). The fetch below sends cookies via
     // credentials:"include", and the server's verifyToken accepts either source.
@@ -948,6 +981,7 @@ export default function MissionChatCore({
           missionId: activeMissionId ?? undefined,
           workspace: (missionDataQuery.data as any)?.workspace ?? undefined,
           squadSlug: squadSlug || undefined, // pass to server as hint (first-message race condition fix)
+          phaseOrder: activePhase,            // Scheme B: which phase's conversation
         }),
       });
       if (!resp.ok || !resp.body) throw new Error(`chat HTTP ${resp.status}`);
@@ -1653,6 +1687,17 @@ export default function MissionChatCore({
             } : undefined}
           />
         </div>
+      )}
+
+      {/* ── PhaseTabs — Scheme B per-phase conversation switcher ── */}
+      {activeMissionId && (missionDataQuery.data as any)?.squadSlug && squadStepProgress.length > 0 && (
+        <PhaseTabs
+          steps={squadStepProgress}
+          activePhase={activePhase}
+          onPhaseChange={setActivePhase}
+          leadAgentName={(missionDataQuery.data as any)?.squadSlug?.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") ?? "Squad Lead"}
+          stalePhases={stalePhases}
+        />
       )}
 
       {/* ── BrandBrainBar — positioning + knowledge context strip ── */}

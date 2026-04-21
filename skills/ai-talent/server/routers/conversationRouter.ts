@@ -15,6 +15,7 @@ export const conversationRouter = router({
         role: z.string(),
         content: z.string(),
         taskId: z.number().optional(),
+        phaseOrder: z.number().optional(), // Scheme B: defaults to 0 (intake)
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -29,6 +30,7 @@ export const conversationRouter = router({
         role: input.role,
         content: input.content,
         taskId: input.taskId ?? null,
+        phaseOrder: input.phaseOrder ?? 0,
         createdAt: new Date(),
       });
       return { success: true };
@@ -40,6 +42,7 @@ export const conversationRouter = router({
       z.object({
         brandId: z.number().optional(),
         missionId: z.number().optional(),
+        phaseOrder: z.number().optional(), // Scheme B: filter by phase; omit = all phases
       })
     )
     .query(async ({ ctx, input }) => {
@@ -52,6 +55,9 @@ export const conversationRouter = router({
       }
       if (input.missionId !== undefined) {
         conditions.push(eq(chatMessages.missionId, input.missionId));
+      }
+      if (input.phaseOrder !== undefined) {
+        conditions.push(eq((chatMessages as any).phaseOrder, input.phaseOrder));
       }
       const rows = await db
         .select()

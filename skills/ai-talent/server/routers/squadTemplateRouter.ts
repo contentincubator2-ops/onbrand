@@ -859,13 +859,18 @@ ${agentCtx.systemPromptPrefix}`;
   // Used by the right-panel sidebar to highlight the active agent / step
   // and to surface per-step conclusions on done steps.
   getSessionStep: protectedProcedure
-    .input(z.object({ missionId: z.number() }))
+    .input(z.object({
+      missionId: z.number(),
+      phaseOrder: z.number().optional(), // Scheme B: defaults to 0 (intake / overall)
+    }))
     .query(async ({ input }) => {
       try {
+        const phaseOrder = input.phaseOrder ?? 0;
         const [rows] = await localPool.execute(
           `SELECT currentStep, squadSlug, status, stepResults
-           FROM squad_chat_sessions WHERE missionId = ? LIMIT 1`,
-          [input.missionId]
+           FROM squad_chat_sessions
+           WHERE missionId = ? AND phaseOrder = ? LIMIT 1`,
+          [input.missionId, phaseOrder]
         ) as any[];
         const row = (rows as any[])?.[0];
         if (!row) {
