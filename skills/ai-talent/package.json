@@ -5,6 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch server/index.ts",
+    "dev:pm2": "./deploy-dev.sh start",
+    "pm2:stop": "./deploy-dev.sh stop",
+    "pm2:restart": "./deploy-dev.sh restart",
+    "pm2:logs": "./deploy-dev.sh logs",
+    "pm2:status": "./deploy-dev.sh status",
     "build": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

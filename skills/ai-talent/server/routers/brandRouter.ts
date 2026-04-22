@@ -359,16 +359,33 @@ export const brandRouter = router({
    */
   listByMember: protectedProcedure
     .query(async ({ ctx }) => {
-      const db = await getDb();
-      if (!db) return [];
-      const [rows] = await db.execute(
-        sql`SELECT b.*, bm.role
+      try {
+        const db = await getDb();
+        if (!db) {
+          console.error('[brand.listByMember] Database connection failed');
+          return [];
+        }
+
+        console.log('[brand.listByMember] Fetching brands for userId:', ctx.user.id);
+
+        const [rows] = await db.execute(
+          sql`SELECT b.*, bm.role
             FROM brands b
             INNER JOIN brand_members bm ON bm.brandId = b.id
             WHERE bm.userId = ${ctx.user.id}
             ORDER BY b.createdAt DESC`
-      ) as any;
-      return rows ?? [];
+        ) as any;
+
+        console.log('[brand.listByMember] Found', rows?.length ?? 0, 'brands for user', ctx.user.id);
+
+        return rows ?? [];
+      } catch (error) {
+        console.error('[brand.listByMember] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to fetch brands',
+        });
+      }
     }),
 
   /**
@@ -377,21 +394,48 @@ export const brandRouter = router({
   getByMember: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return null;
-      const [membership] = await db.execute(
-        sql`SELECT role FROM brand_members WHERE brandId = ${input.brandId} AND userId = ${ctx.user.id} LIMIT 1`
-      ) as any;
-      if (!membership?.[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this brand" });
-      const [brandRows] = await db.execute(
-        sql`SELECT * FROM brands WHERE id = ${input.brandId} LIMIT 1`
-      ) as any;
-      const brand = brandRows?.[0];
-      if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
-      const [stepRows] = await db.execute(
-        sql`SELECT * FROM brand_positioning_steps WHERE brandId = ${input.brandId} ORDER BY step ASC`
-      ) as any;
-      return { ...brand, role: membership[0].role, positioningSteps: stepRows ?? [] };
+      try {
+        const db = await getDb();
+        if (!db) {
+          console.error('[brand.getByMember] Database connection failed for brandId:', input.brandId);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+        }
+
+        console.log('[brand.getByMember] Fetching brand', input.brandId, 'for userId:', ctx.user.id);
+
+        const [membership] = await db.execute(
+          sql`SELECT role FROM brand_members WHERE brandId = ${input.brandId} AND userId = ${ctx.user.id} LIMIT 1`
+        ) as any;
+
+        if (!membership?.[0]) {
+          console.warn('[brand.getByMember] User', ctx.user.id, 'is not a member of brand', input.brandId);
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this brand" });
+        }
+
+        const [brandRows] = await db.execute(
+          sql`SELECT * FROM brands WHERE id = ${input.brandId} LIMIT 1`
+        ) as any;
+
+        const brand = brandRows?.[0];
+        if (!brand) {
+          console.warn('[brand.getByMember] Brand', input.brandId, 'not found');
+          throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+        }
+
+        const [stepRows] = await db.execute(
+          sql`SELECT * FROM brand_positioning_steps WHERE brandId = ${input.brandId} ORDER BY step ASC`
+        ) as any;
+
+        console.log('[brand.getByMember] Successfully fetched brand', input.brandId);
+        return { ...brand, role: membership[0].role, positioningSteps: stepRows ?? [] };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('[brand.getByMember] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to fetch brand',
+        });
+      }
     }),
 
   /**

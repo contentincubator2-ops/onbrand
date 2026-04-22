@@ -14,69 +14,80 @@ import { computeMissionResources } from "../missionResourceComputer";
 //  global:   agents=17095, skills=539, models=265
 
 export const resourceRouter = router({
-    summary: protectedProcedure
-      .input(
-              z.object({
-                        workspace: z.string().optional(),
-              }).optional()
-            )
-      .query(async ({ input }) => {
-              const db = await getDb();
-              if (!db) return { agents: 0, skills: 0, providers: 0, providerList: [] };
+  summary: protectedProcedure
+    .input(
+      z.object({
+        workspace: z.string().optional(),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { agents: 0, skills: 0, providers: 0, providerList: [], skillList: [] };
 
-                   const wsKey = input?.workspace ?? "global";
+      const wsKey = input?.workspace ?? "global";
 
-                   // Map wsKey to SQL WHERE fragment (matches AppShell.tsx wsKey values)
-                   const wsFilterMap: Record<string, string> = {
-                             strategy: `layer='strategy' OR primarySkill LIKE '%brand%' OR primarySkill LIKE '%strategy%' OR primarySkill LIKE '%positioning%'`,
-                             website:  `primarySkill LIKE '%seo%' OR primarySkill LIKE '%website%' OR primarySkill LIKE '%content%' OR primarySkill LIKE '%copywriting%'`,
-                             facebook: `primarySkill LIKE '%facebook%' OR primarySkill LIKE '%social%' OR primarySkill LIKE '%ads%' OR primarySkill LIKE '%paid-ads%'`,
-                   };
+      // Map wsKey to SQL WHERE fragment (matches AppShell.tsx wsKey values)
+      // Note: agents table uses 'specialty' and 'skills' (JSON array), not 'primarySkill'
+      const wsFilterMap: Record<string, string> = {
+        strategy: `layer='strategy' OR specialty LIKE '%brand%' OR specialty LIKE '%strategy%' OR specialty LIKE '%positioning%'`,
+        website:  `specialty LIKE '%seo%' OR specialty LIKE '%website%' OR specialty LIKE '%content%' OR specialty LIKE '%copywriting%'`,
+        facebook: `specialty LIKE '%facebook%' OR specialty LIKE '%social%' OR specialty LIKE '%ads%' OR specialty LIKE '%paid-ads%'`,
+      };
 
-                   const filter = wsFilterMap[wsKey];
-              const whereClause = filter
-                ? `isAvailable=1 AND (${filter})`
-                        : `isAvailable=1`;
+      const filter = wsFilterMap[wsKey];
+      const whereClause = filter
+        ? `isAvailable=1 AND (${filter})`
+        : `isAvailable=1`;
 
-                   // Count agents matching this workspace
-                   const [agentCountRows] = await db.execute(
-                             sql.raw(`SELECT COUNT(*) as cnt FROM agents WHERE ${whereClause}`)
-                           ) as any;
-              const agentCount = Number((agentCountRows as any)?.[0]?.cnt ?? 0);
+      // Count agents matching this workspace
+      const [agentCountRows] = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM agents WHERE ${whereClause}`)
+      ) as any;
+      const agentCount = Number((agentCountRows as any)?.[0]?.cnt ?? 0);
 
-                   // Count distinct skills (fix: was using readdir() before = wrong count)
-                   const [skillCountRows] = await db.execute(
-                             sql.raw(`SELECT COUNT(DISTINCT primarySkill) as cnt FROM agents WHERE ${whereClause} AND primarySkill IS NOT NULL AND primarySkill != ''`)
-                           ) as any;
-              const skillCount = Number((skillCountRows as any)?.[0]?.cnt ?? 0);
+      // For skills, we use the JSON 'skills' array field
+      // Count agents with non-empty skills
+      const [skillCountRows] = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM agents WHERE ${whereClause} AND skills IS NOT NULL AND JSON_LENGTH(skills) > 0`)
+      ) as any;
+      const skillCount = Number((skillCountRows as any)?.[0]?.cnt ?? 0);
 
-                   // Get sample skill list (top 20 for display)
-                   const [skillRows] = await db.execute(
-                             sql.raw(`SELECT DISTINCT primarySkill FROM agents WHERE ${whereClause} AND primarySkill IS NOT NULL AND primarySkill != '' LIMIT 20`)
-                           ) as any;
-              const skillSet = new Set<string>((skillRows ?? []).map((r: any) => r.primarySkill).filter(Boolean));
+      // Get sample skills from agents (skills is a JSON array)
+      const [skillRows] = await db.execute(
+        sql.raw(`SELECT skills FROM agents WHERE ${whereClause} AND skills IS NOT NULL AND JSON_LENGTH(skills) > 0 LIMIT 50`)
+      ) as any;
 
-                   // Count distinct AI models (fix: was returning 2 before)
-                   const [modelCountRows] = await db.execute(
-                             sql.raw(`SELECT COUNT(DISTINCT aiModel) as cnt FROM agents WHERE ${whereClause} AND aiModel IS NOT NULL AND aiModel != ''`)
-                           ) as any;
-              const providerCount = Number((modelCountRows as any)?.[0]?.cnt ?? 0);
+      // Extract and flatten all skills from JSON arrays
+      const skillSet = new Set<string>();
+      for (const row of (skillRows ?? [])) {
+        try {
+          const skills = JSON.parse(row.skills);
+          if (Array.isArray(skills)) {
+            skills.forEach((skill: string) => {
+              if (typeof skill === 'string' && skill.trim()) {
+                skillSet.add(skill.trim());
+              }
+            });
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
 
-                   // Get distinct AI model list
-                   const [modelRows] = await db.execute(
-                             sql.raw(`SELECT DISTINCT aiModel FROM agents WHERE ${whereClause} AND aiModel IS NOT NULL AND aiModel != ''`)
-                           ) as any;
-              const providerList = (modelRows ?? []).map((r: any) => r.aiModel).filter(Boolean) as string[];
+      // Note: agents table doesn't have 'aiModel' column
+      // Return 0 for providers since we don't track this
+      const providerCount = 0;
+      const providerList: string[] = [];
 
-                   return {
-                             agents: agentCount,
-                             skills: skillCount,
-                             skillList: Array.from(skillSet),
-                             providers: providerCount,
-                             providerList,
-                             mode: wsKey,
-                   };
-      }),
+      return {
+        agents: agentCount,
+        skills: skillCount,
+        skillList: Array.from(skillSet).slice(0, 20), // Limit to 20
+        providers: providerCount,
+        providerList,
+        mode: wsKey,
+      };
+    }),
 
   // Per-mission semantic resource summary (polled by MissionHomePage)
   summaryByMission: protectedProcedure

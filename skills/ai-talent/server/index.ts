@@ -168,11 +168,36 @@ app.get("/health", healthLimiter, async (_req, res) => {
 });
 
 // Mount tRPC router
+app.use("/trpc", (req, res, next) => {
+  console.log('[express] tRPC request:', {
+    method: req.method,
+    url: req.url,
+    path: req.path,
+    query: req.query,
+    hasAuth: !!req.headers.authorization,
+    ts: new Date().toISOString(),
+  });
+  next();
+});
 app.use(
   "/trpc",
   createExpressMiddleware({
     router: appRouter,
     createContext,
+    onError: ({ error, type, path, input, ctx }) => {
+      console.error('[trpc] Error:', {
+        type,
+        path: path ?? 'unknown',
+        errorCode: error.code,
+        errorMessage: error.message,
+        userId: (ctx as any)?.user?.id,
+        ts: new Date().toISOString(),
+      });
+      // Log stack trace in development for debugging
+      if (process.env.NODE_ENV === 'development' && error.cause instanceof Error) {
+        console.error('[trpc] Error cause:', error.cause);
+      }
+    },
   })
 );
 

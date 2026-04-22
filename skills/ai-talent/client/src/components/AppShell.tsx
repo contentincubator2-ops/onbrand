@@ -3,7 +3,7 @@
  * Rail(48px) + Drawer(210px) + Main(flex:1) + RightPanel(264px)
  * All styles are inline, mirroring marketing-os-mockup-v7.html
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { trpc } from "../lib/trpc";
 import { MissionModal } from "./MissionModal";
 import type { DBSquad } from '../types/squad';
@@ -3008,12 +3008,18 @@ function BrainPanel({
       )
     : { data: null, isLoading: false };
 
-  const items: any[] = brainQ.data ?? [];
+  // backend returns { brandId, entries }, where entries is { positioning: [], audience: [], ... }
+  // flatten all category arrays into a single array
+  const brainData = brainQ.data as any;
+  const items: any[] = useMemo(() => {
+    if (!brainData?.entries) return [];
+    return Object.values(brainData.entries).flat() as any[];
+  }, [brainData]);
   const BUDGET = 8000;
-  const used = items.reduce(
+  const used = useMemo(() => items.reduce(
     (s, i) => s + (i.content?.length ?? 0) + (i.title?.length ?? 0),
     0
-  );
+  ), [items]);
   const pct = Math.min(100, Math.round((used / BUDGET) * 100));
 
   if (!brandId) {

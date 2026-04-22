@@ -27,11 +27,18 @@ function getPool(): mysql.Pool {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 async function verifyToken(req: Request): Promise<number | null> {
+  // Support both Bearer token (old) and Cookie session (new)
   const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
+  let raw: string | null = null;
+  if (auth?.startsWith("Bearer ")) {
+    raw = auth.slice(7);
+  } else if ((req as any).cookies?.session) {
+    raw = (req as any).cookies.session;
+  }
+  if (!raw) return null;
   try {
     const secret = new TextEncoder().encode(getJwtSecret());
-    const { payload } = await jwtVerify(auth.slice(7), secret);
+    const { payload } = await jwtVerify(raw, secret);
     return payload.sub ? parseInt(String(payload.sub), 10) : null;
   } catch { return null; }
 }

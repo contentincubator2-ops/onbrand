@@ -132,8 +132,14 @@ export function BrandBrainBar({ brandId, missionId }: Props) {
       )
     : { data: null, isLoading: false };
 
-  const brainItems: any[] = brainQuery.data ?? [];
-  const usedChars = useMemo(() => totalChars(brainItems), [brainQuery.data]);
+  // backend returns { brandId, entries }, where entries is { positioning: [], audience: [], ... }
+  // flatten all category arrays into a single array for totalChars calculation
+  const brainData = brainQuery.data as any;
+  const brainItems: any[] = useMemo(() => {
+    if (!brainData?.entries) return [];
+    return Object.values(brainData.entries).flat() as any[];
+  }, [brainData]);
+  const usedChars = useMemo(() => totalChars(brainItems), [brainItems]);
   const pct       = Math.min(100, Math.round((usedChars / CHAR_BUDGET) * 100));
   const isFull    = pct >= 90;
 

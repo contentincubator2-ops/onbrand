@@ -9,7 +9,7 @@ export const creditsRouter = router({
     const db = await getDb();
     if (!db) return { planCredits: 0, extraCredits: 0, usedCredits: 0, planTier: "trial" };
     const res = await db.execute(sql`
-      SELECT planCredits, topUpCredits, usedCredits, subscriptionPlan
+      SELECT planCredits, extraCredits, usedCredits, planTier
       FROM user_credits
       WHERE userId = ${ctx.user.id}
       LIMIT 1
@@ -19,9 +19,9 @@ export const creditsRouter = router({
     const r = rows[0];
     return {
       planCredits:  r.planCredits  ?? 0,
-      extraCredits: r.topUpCredits ?? 0,
+      extraCredits: r.extraCredits ?? 0,
       usedCredits:  r.usedCredits  ?? 0,
-      planTier:     r.subscriptionPlan ?? "trial",
+      planTier:     r.planTier     ?? "trial",
     };
   }),
 
