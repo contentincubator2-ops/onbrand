@@ -9,7 +9,8 @@
  */
 
 import { randomUUID } from "crypto";
-import { invokeLLM, type InvokeParams } from "../_core/llm";
+import { type InvokeParams } from "../_core/llm";
+import { gatewayInvokeLLM } from "../services/llmGateway";
 import mysql from "mysql2/promise";
 
 // ─── DB 連線 ───────────────────────────────────────────────────────────────────
@@ -209,7 +210,9 @@ async function callLLM(systemPrompt: string, userPrompt: string, maxTokens = 200
     maxTokens: maxTokens,
   };
 
-  const result = await invokeLLM(params);
+  // userId=0 (system): this is called from batch/background positioning jobs,
+  // not directly from a user request. Pass through gateway for global cap enforcement.
+  const result = await gatewayInvokeLLM(params, { userId: 0 });
   const content = result.choices[0]?.message?.content;
   if (!content || typeof content !== "string") {
     throw new Error("LLM returned empty content");

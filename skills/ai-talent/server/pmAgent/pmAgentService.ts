@@ -7,7 +7,7 @@
  * 4. 整合產出後回傳
  */
 
-import { invokeLLM } from '../_core/llm';
+import { gatewayInvokeLLM } from '../services/llmGateway';
 import localPool from '../localDb';
 import { marketingQueue } from '../queue/marketingQueue';
 
@@ -96,14 +96,17 @@ export async function processPMAgentMessage(params: {
     { role: 'user' as const, content: userMessage },
   ];
 
-  // 4. 呼叫 PM Agent LLM
-  const response = await invokeLLM({
-    model: 'anthropic/claude-sonnet-4-5',
-    provider: 'openrouter',
-    messages,
-    max_tokens: 1000,
-    response_format: { type: 'json_object' },
-  });
+  // 4. 呼叫 PM Agent LLM — routed through gateway for semaphore + budget enforcement.
+  const response = await gatewayInvokeLLM(
+    {
+      model: 'anthropic/claude-sonnet-4-5',
+      provider: 'openrouter',
+      messages,
+      max_tokens: 1000,
+      response_format: { type: 'json_object' },
+    },
+    { userId }
+  );
 
   // 從 choices[0].message.content 取得文字
   const rawContent: string = typeof response.choices?.[0]?.message?.content === 'string'

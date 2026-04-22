@@ -8,7 +8,7 @@
  */
 
 import { ENV } from "./env";
-import { invokeLLM } from "./llm";
+import { gatewayInvokeLLM } from "../services/llmGateway";
 
 export type TaskType =
   | "chinese_content"
@@ -141,7 +141,8 @@ export function selectModel(taskType: TaskType): { provider: ModelProvider; mode
 export async function callModel(
   messages: MultiModelMessage[],
   taskType?: TaskType,
-  preferredProvider?: ModelProvider
+  preferredProvider?: ModelProvider,
+  userId = 0
 ): Promise<{ content: string; provider: ModelProvider; model: string }> {
   const availability = getAvailabilityMap();
 
@@ -158,12 +159,11 @@ export async function callModel(
     model = DEFAULT_MODELS[provider];
   }
 
-  // Delegate to the single authoritative LLM invoker
-  const result = await invokeLLM({
-    provider,
-    model,
-    messages,
-  });
+  // Delegate to the gateway — enforces semaphore + daily budget.
+  const result = await gatewayInvokeLLM(
+    { provider, model, messages },
+    { userId }
+  );
 
   const content = result.choices[0]?.message?.content;
   if (typeof content !== "string") {

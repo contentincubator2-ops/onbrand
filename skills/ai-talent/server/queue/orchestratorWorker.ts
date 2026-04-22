@@ -89,7 +89,12 @@ async function* streamGateway(
 
 import { connection, MarketingJobData, MarketingJobResult } from './marketingQueue';
 import { matchAgents } from '../agentMatcher';
-import { invokeLLM, invokeLLMStream } from '../_core/llm';
+// invokeLLM / invokeLLMStream are not called directly here; all LLM traffic
+// flows through the OpenClaw Gateway (callGateway / streamGateway above) or
+// through gatewayInvokeLLM for direct-LLM fallback paths.
+import { gatewayInvokeLLM, gatewayInvokeLLMStream } from '../services/llmGateway';
+// Keep the type import for any future direct-LLM fallback usage.
+import type { InvokeParams } from '../_core/llm';
 import { getModelForTask, inferTaskType } from '../_core/modelRouter';
 import * as fs from 'fs';
 import * as path from 'path';

@@ -26,7 +26,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import localPool from "../localDb";
 import { sql } from "drizzle-orm";
-import { invokeLLM } from "../_core/llm";
+import { gatewayInvokeLLM } from "../services/llmGateway";
 import { randomBytes } from "crypto";
 import { loadAgentContext } from "../agentContextLoader";
 import { getSquadRequirements } from "../_core/squadRequirements";
@@ -815,12 +815,15 @@ ${agentCtx.systemPromptPrefix}`;
 語氣：專業但有溫度，像真正帶過品牌的行銷人。用繁體中文回應。
 長度：控制在 250 字內。${agentCtx.depthLabel}`;
 
-      const llmResult = await invokeLLM({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user",   content: userPrompt },
-        ],
-      });
+      const llmResult = await gatewayInvokeLLM(
+        {
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user",   content: userPrompt },
+          ],
+        },
+        { userId: ctx.user.id }
+      );
       const replyContent = llmResult.choices?.[0]?.message?.content ?? "";
       const reply = typeof replyContent === "string" ? replyContent : JSON.stringify(replyContent);
 

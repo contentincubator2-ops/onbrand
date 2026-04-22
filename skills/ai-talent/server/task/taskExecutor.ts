@@ -1,8 +1,10 @@
 /**
  * taskExecutor.ts — LLM invocation utilities.
  * Wraps invokeLLM with retry, validation, and multi-provider support.
+ * All calls are routed through llmGateway for semaphore + budget enforcement.
  */
-import { invokeLLM, type InvokeParams } from "../_core/llm";
+import { type InvokeParams } from "../_core/llm";
+import { gatewayInvokeLLM } from "../services/llmGateway";
 
 /** Validate LLM response has expected JSON structure */
 export function validateResponse(response: string | null | undefined): boolean {
@@ -37,16 +39,22 @@ export async function retryWithBackoff<T>(
 export async function callOpenAI(
   systemPrompt: string,
   userMessage: string,
-  params?: Partial<InvokeParams>
+  params?: Partial<InvokeParams>,
+  userId = 0
 ): Promise<string> {
-  const result = await invokeLLM({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
-    provider: "openrouter",
-    model: "anthropic/claude-sonnet-4-6",
-    ...params,
-  });
+  // Route through gateway for semaphore + daily budget enforcement.
+  // userId=0 is the system sentinel; callers with a real user should pass it.
+  const result = await gatewayInvokeLLM(
+    {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      provider: "openrouter",
+      model: "anthropic/claude-sonnet-4-6",
+      ...params,
+    },
+    { userId }
+  );
   const msg = result.choices[0]?.message?.content; return typeof msg === "string" ? msg : "";
 }

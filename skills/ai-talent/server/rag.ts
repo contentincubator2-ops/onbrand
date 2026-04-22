@@ -14,7 +14,7 @@
  * - AZURE_SEARCH_INDEX_NAME: e.g., "brand-knowledge"
  */
 
-import { invokeLLM } from "./_core/llm";
+import { gatewayInvokeLLM } from "./services/llmGateway";
 import { ENV } from "./_core/env";
 import { SearchIndexClient, AzureKeyCredential } from "@azure/search-documents";
 
@@ -306,7 +306,9 @@ export async function strategyAgentDelegate(
     .map((a) => `- ${a.name} (${a.slug}): ${a.specialty}`)
     .join("\n");
 
-  const response = await invokeLLM({
+  // Internal system delegation — userId=0 (system context, not a specific user).
+  const response = await gatewayInvokeLLM(
+    {
     messages: [
       {
         role: "system",
@@ -351,7 +353,9 @@ ${agentList}
         },
       },
     },
-  });
+  },
+  { userId: 0 } // system-level delegation call, not bound to a specific user
+  );
 
   try {
     const content = response.choices[0]!.message.content;

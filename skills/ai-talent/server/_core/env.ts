@@ -82,6 +82,13 @@ const envSchema = z.object({
   ELEVENLABS_API_KEY:   z.string().optional(), // ElevenLabs TTS
   CREATOMATE_API_KEY:   z.string().optional(), // Creatomate video composition
 
+  // Redis — used by LLM gateway semaphores + daily token budget.
+  // Falls back to ioredis defaults (localhost:6379) when not set.
+  REDIS_URL: z.string().optional(),
+
+  // LLM Gateway — daily per-user token budget cap (default: 500 000 tokens/day).
+  LLM_DAILY_USER_TOKEN_BUDGET: z.coerce.number().default(500_000),
+
   // App
   PORT: z.coerce.number().default(3101),
 

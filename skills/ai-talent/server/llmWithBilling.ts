@@ -19,7 +19,8 @@
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
-import { invokeLLM, type InvokeParams, type InvokeResult } from "./_core/llm";
+import { type InvokeParams, type InvokeResult } from "./_core/llm";
+import { gatewayInvokeLLM } from "./services/llmGateway";
 import { deductCredits } from "./deductCredits";
 import {
   insertTokenLog,
@@ -256,7 +257,11 @@ export async function invokeLLMWithBilling(
   } = options;
 
   const startMs = Date.now();
-  const response = await invokeLLM({ ...llmOptions, provider: provider as any, model });
+  // Route through the central gateway for semaphore + budget enforcement.
+  const response = await gatewayInvokeLLM(
+    { ...llmOptions, provider: provider as any, model },
+    { userId, orgId: tenantId }
+  );
   const latencyMs = Date.now() - startMs;
 
   const usage = parseTokenUsage(response);

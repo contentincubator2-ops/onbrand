@@ -37,6 +37,7 @@ import { logEvent, newSessionId } from "../_core/sessionLogger";
 // No more Azure sowork_db dependency.
 
 import { invokeLLMStream } from "../_core/llm";
+import { gatewayInvokeLLMStream } from "../services/llmGateway";
 import { loadAgentContext } from "../agentContextLoader";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
@@ -238,15 +239,24 @@ async function* streamFromGateway(
 async function* streamFromLLM(
   systemPrompt: string,
   history: { role: string; content: string }[],
-  userMessage: string
+  userMessage: string,
+  userId?: number
 ): AsyncGenerator<string> {
   const messages = [
     { role: "system" as const, content: systemPrompt },
     ...history.slice(-10).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
     { role: "user" as const, content: userMessage },
   ];
-  for await (const delta of invokeLLMStream({ messages, maxTokens: 4096 })) {
-    yield delta;
+  // Route through gateway when userId is available; fall back to direct call for
+  // unauthenticated/internal paths.
+  if (userId != null) {
+    for await (const delta of gatewayInvokeLLMStream({ messages, maxTokens: 4096 }, { userId })) {
+      yield delta;
+    }
+  } else {
+    for await (const delta of invokeLLMStream({ messages, maxTokens: 4096 })) {
+      yield delta;
+    }
   }
 }
 
@@ -737,7 +747,7 @@ async function tryExecuteSquadChat(params: {
   if (isLeadStep) {
     console.log(`[squadChat] Lead step — using invokeLLMStream directly (skip gateway), step=${currentStep}`);
     try {
-      for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
+      for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage, userId)) {
         fullOutput += chunk;
         send("delta", { text: chunk });
       }
@@ -750,7 +760,7 @@ async function tryExecuteSquadChat(params: {
           ...recentHistory.slice(-10).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
           { role: "user" as const, content: effectiveUserMessage },
         ];
-        for await (const chunk of invokeLLMStream({ messages: forgeMessages, maxTokens: 4096, provider: "forge" })) {
+        for await (const chunk of gatewayInvokeLLMStream({ messages: forgeMessages, maxTokens: 4096, provider: "forge" }, { userId })) {
           fullOutput += chunk;
           send("delta", { text: chunk });
         }
@@ -777,9 +787,9 @@ async function tryExecuteSquadChat(params: {
       }
     } catch (e: any) {
       console.warn(`[squadChat] gateway failed (model=${gatewayModel}):`, e?.message);
-      // Fallback: direct invokeLLMStream
+      // Fallback: direct invokeLLMStream through llmGateway
       try {
-        for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
+        for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage, userId)) {
           fullOutput += chunk;
           send("delta", { text: chunk });
         }
@@ -795,7 +805,7 @@ async function tryExecuteSquadChat(params: {
   if (!fullOutput.trim()) {
     console.warn(`[squadChat] Empty output after streaming (step=${currentStep}). Calling invokeLLMStream as final guard...`);
     try {
-      for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
+      for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage, userId)) {
         fullOutput += chunk;
         send("delta", { text: chunk });
       }
@@ -876,6 +886,7 @@ async function tryExecuteSquadChat(params: {
       brand,
       brandBrain,
       missionId,
+      userId,
       send,
       agent:     { name: agentName, title: agentTitle, specialty: "" }, // will be overwritten by lead lookup inside
     });
@@ -957,12 +968,13 @@ async function runSquadLeadSynthesis(params: {
   brand:                Record<string, string>;
   brandBrain:           Record<string, string[]>;
   missionId:            number;
+  userId:               number;
   send:                 (event: string, data: unknown) => void;
   agent:                { name: string; title: string; specialty: string };
 }): Promise<void> {
   const {
     leadSlot, fallbackLeadAgentId, squadName, squadMethodology,
-    workflowSteps, stepResults, totalSteps, brand, brandBrain, missionId, send,
+    workflowSteps, stepResults, totalSteps, brand, brandBrain, missionId, userId, send,
   } = params;
 
   // 取得 Squad Lead 詳細資料
@@ -1032,12 +1044,11 @@ async function runSquadLeadSynthesis(params: {
     },
   ];
 
-  // 串流 — Squad Lead synthesis: bypass gateway, use invokeLLMStream directly
-  // (Same reason as lead intake: gateway requires valid agent slug, not model names)
+  // 串流 — Squad Lead synthesis: route through llmGateway for rate limiting.
   const synthesisUserMsg = "請整合所有成員的分析成果，提出最終的品牌定位建議。";
   let synthesisOutput = "";
   try {
-    for await (const chunk of streamFromLLM(synthesisPrompt, [], synthesisUserMsg)) {
+    for await (const chunk of streamFromLLM(synthesisPrompt, [], synthesisUserMsg, userId)) {
       synthesisOutput += chunk;
       send("delta", { text: chunk });
     }

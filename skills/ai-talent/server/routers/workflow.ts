@@ -334,7 +334,7 @@ export const workflowRouter = router({
       // SEC: rate limit — 10 requests/minute per IP
       const ip = (ctx as any)?.req?.ip ?? (ctx as any)?.ip ?? 'unknown';
       _checkRateLimit(`runTask:${ip}`, 10);
-      const { invokeLLM } = await import("../_core/llm");
+      const { gatewayInvokeLLM } = await import("../services/llmGateway");
       const { getModelForTask, inferTaskType } = await import("../_core/modelRouter");
 
       const { userRequest, brand, industry, agentName, agentTitle } = input;
@@ -361,16 +361,19 @@ export const workflowRouter = router({
 }`;
 
       try {
-        const response = await invokeLLM({
-          provider: modelConfig.provider as any,
-          model: modelConfig.model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userRequest }
-          ],
-          max_tokens: 1500,
-          response_format: { type: "json_object" },
-        });
+        const response = await gatewayInvokeLLM(
+          {
+            provider: modelConfig.provider as any,
+            model: modelConfig.model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userRequest }
+            ],
+            max_tokens: 1500,
+            response_format: { type: "json_object" },
+          },
+          { userId: ctx.user?.id ?? 0 }
+        );
 
         const rawContent = response.choices?.[0]?.message?.content ?? "";
         let parsed: any;

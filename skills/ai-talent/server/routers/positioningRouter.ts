@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
-import { invokeLLM } from "../_core/llm";
+import { gatewayInvokeLLM } from "../services/llmGateway";
 
 // ── Squad Lead（劉品妤）擔任 QA 審核 + 銜接角色 ───────────────────────────────
 export const SQUAD_LEAD = {
@@ -38,6 +38,7 @@ async function runSquadLeadQA(params: {
   description: string;
   targetMarket: string;
   previousStepsSummary?: string;
+  userId?: number;
 }): Promise<{
   status: "pass" | "flag";
   overallScore: number;
@@ -84,13 +85,16 @@ ${params.stepContent}
 請以劉品妤的角色進行 QA 審核，輸出 JSON。`;
 
   try {
-    const result = await invokeLLM({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      maxTokens: 1000,
-    });
+    const result = await gatewayInvokeLLM(
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        maxTokens: 1000,
+      },
+      { userId: params.userId ?? 0 }
+    );
     const raw = String(result.choices[0]?.message?.content ?? "");
     const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
     const jsonStr = match ? match[1]!.trim() : raw.trim();
@@ -222,6 +226,7 @@ export const positioningRouter = router({
         description,
         targetMarket,
         previousStepsSummary,
+        userId: ctx.user.id,
       });
 
       return {

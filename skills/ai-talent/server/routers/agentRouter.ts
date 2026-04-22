@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { invokeLLM } from "../_core/llm";
+import { gatewayInvokeLLM } from "../services/llmGateway";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getSoworkDb } from "../db";
 import { sql, eq, and } from "drizzle-orm";

@@ -10,7 +10,7 @@
  *   3. 脈絡一致：是否與對話脈絡 / 前幾步的方向一致
  */
 
-import { invokeLLM } from "./_core/llm";
+import { gatewayInvokeLLM } from "./services/llmGateway";
 
 export const SQUAD_LEAD = {
   name: "劉品妤",
@@ -64,6 +64,9 @@ export interface QAParams {
 
   // 定位任務專用
   stepNumber?: number;
+
+  // Gateway context
+  userId?: number;
 }
 
 export async function runSquadLeadQA(params: QAParams): Promise<QAResult> {
@@ -124,13 +127,16 @@ ${params.agentOutput.slice(0, 3500)}
 請以劉品妤身份 QA 審核，輸出 JSON。`;
 
   try {
-    const result = await invokeLLM({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      maxTokens: 800,
-    });
+    const result = await gatewayInvokeLLM(
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        maxTokens: 800,
+      },
+      { userId: params.userId ?? 0 }
+    );
 
     const raw = String(result.choices[0]?.message?.content ?? "");
     const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
