@@ -37,7 +37,8 @@ import { logEvent, newSessionId } from "../_core/sessionLogger";
 // No more Azure sowork_db dependency.
 
 import { invokeLLMStream } from "../_core/llm";
-import { gatewayInvokeLLMStream } from "../services/llmGateway";
+import { gatewayInvokeLLMStream, getRedisClient } from "../services/llmGateway";
+import { pushChunk, sinceSeq, nextSeq, parseLastEventId } from "../_core/sseReplayBuffer";
 import { loadAgentContext } from "../agentContextLoader";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
@@ -1200,6 +1201,60 @@ function safeJson(val: string | null | undefined): any[] {
   } catch { return []; }
 }
 
+// ── Reconnect endpoint: GET /api/chat/reconnect ──────────────────────────────
+// Handles SSE resume via Last-Event-ID header.
+// Returns 410 Gone when buffer is evicted; otherwise replays missed chunks.
+missionChatRouter.get("/reconnect", async (req: Request, res: Response) => {
+  const userId = await verifyToken(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const lastEventId = (req.headers["last-event-id"] as string | undefined)
+    ?? (req.query["lastEventId"] as string | undefined);
+  const parsed = parseLastEventId(lastEventId);
+  if (!parsed) {
+    res.status(400).json({ error: "Missing or malformed Last-Event-ID (expected missionId:seq)" });
+    return;
+  }
+  const { missionId, seq: lastSeq } = parsed;
+
+  let redis;
+  try {
+    redis = getRedisClient();
+  } catch {
+    res.status(503).json({ error: "Redis unavailable" });
+    return;
+  }
+
+  const missed = await sinceSeq(redis, missionId, lastSeq);
+  if (missed === null) {
+    // Buffer evicted (>5 min elapsed or never existed)
+    res.status(410).json({ error: "session_ended", message: "SSE replay buffer expired. Please re-run the step." });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  // Replay missed chunks in order
+  for (const chunk of missed) {
+    try {
+      res.write(`id: ${missionId}:${chunk.seq}\nevent: ${chunk.event}\ndata: ${chunk.data}\n\n`);
+      (res as any).flush?.();
+    } catch { break; }
+  }
+
+  // Signal replay complete
+  try {
+    res.write(`event: replay_done\ndata: ${JSON.stringify({ replayedChunks: missed.length, lastSeq: missed.at(-1)?.seq ?? lastSeq })}\n\n`);
+    (res as any).flush?.();
+  } catch { /* client disconnected */ }
+
+  res.end();
+});
+
 // ── Main chat endpoint ────────────────────────────────────────────────────────
 missionChatRouter.post("/", async (req: Request, res: Response) => {
   const userId = await verifyToken(req);
@@ -1223,15 +1278,51 @@ missionChatRouter.post("/", async (req: Request, res: Response) => {
 
   const sessionId: string = clientSessionId ?? newSessionId();
 
+  // ── SSE replay buffer: set up Redis-backed chunk buffer ───────────────────
+  // When missionId is present, each emitted chunk is stored in Redis so a
+  // reconnecting client can resume via Last-Event-ID.
+  let redis: ReturnType<typeof getRedisClient> | null = null;
+  const sseBufferEnabled = !!missionId;
+  if (sseBufferEnabled) {
+    try { redis = getRedisClient(); } catch { /* Redis unavailable: emit without buffering */ }
+  }
+  // Monotonic sequence counter for this SSE stream (scoped to missionId).
+  let sseSeq = 0;
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
+  /**
+   * send() -- write one SSE event frame with an `id:` line when missionId
+   * is present. Pushes chunk to the Redis replay buffer asynchronously
+   * (non-blocking: fire-and-forget; stream latency is unaffected).
+   */
   const send = (event: string, data: unknown) => {
-    try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); (res as any).flush?.(); }
-    catch { /* disconnected */ }
+    const dataStr = JSON.stringify(data);
+    try {
+      if (missionId && redis) {
+        // Increment seq synchronously via local counter (async Redis incr would
+        // block the stream). We maintain a local counter here and push to Redis
+        // in the background. The Redis sse:seq:<id> counter is the authoritative
+        // reference for replay but the wire id: uses this local counter which
+        // matches seq values in the buffer.
+        sseSeq += 1;
+        const idLine = `id: ${missionId}:${sseSeq}\n`;
+        res.write(`${idLine}event: ${event}\ndata: ${dataStr}\n\n`);
+        (res as any).flush?.();
+        // Buffer asynchronously — don't await
+        const chunk = { seq: sseSeq, event, data: dataStr, ts: Date.now() };
+        pushChunk(redis, missionId!, chunk).catch(() => { /* non-fatal */ });
+        // Keep Redis seq counter in sync (incr without blocking stream)
+        nextSeq(redis, missionId!).catch(() => { /* non-fatal */ });
+      } else {
+        res.write(`event: ${event}\ndata: ${dataStr}\n\n`);
+        (res as any).flush?.();
+      }
+    } catch { /* disconnected */ }
   };
   const keepalive = setInterval(() => { try { res.write(": keepalive\n\n"); } catch { clearInterval(keepalive); } }, 15_000);
 

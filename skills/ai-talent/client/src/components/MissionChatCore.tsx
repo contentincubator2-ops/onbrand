@@ -549,6 +549,9 @@ export default function MissionChatCore({
   // Reset turn counters whenever the active mission changes
   useEffect(() => { setAgentTurnCounts({}); }, [activeMissionId]);
 
+  // ── SSE session-ended state (410 from replay buffer) ─────────────────────
+  const [sseSessionEnded, setSseSessionEnded] = useState(false);
+
   // ── Refs ─────────────────────────────────────────────────────────────────
   const stopRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -560,6 +563,8 @@ export default function MissionChatCore({
   const activeStreamMsgIdRef = useRef<string | null>(null);
   const relayMsgIdRef = useRef<string | null>(null);
   const relayStepCountRef = useRef(0);
+  // SSE Last-Event-ID tracking for reconnect
+  const lastSseEventIdRef = useRef<string | null>(null);
 
   // ── tRPC hooks ───────────────────────────────────────────────────────────
   const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
@@ -968,6 +973,9 @@ export default function MissionChatCore({
       return buffer.slice(remainderStart);
     };
 
+    // Reset session-ended banner when starting a fresh request
+    setSseSessionEnded(false);
+
     try {
       const resp = await fetch("/api/chat", {
         method: "POST",
@@ -986,6 +994,7 @@ export default function MissionChatCore({
       });
       if (!resp.ok || !resp.body) throw new Error(`chat HTTP ${resp.status}`);
       const reader = resp.body.getReader();
+      readerRef.current = reader;
       const decoder = new TextDecoder();
       let buf = "";
       let lastAgentName: string | undefined;
@@ -1000,7 +1009,10 @@ export default function MissionChatCore({
         buf = lines.pop() ?? "";
         let curEvent = "";
         for (const line of lines) {
-          if (line.startsWith("event: ")) { curEvent = line.slice(7).trim(); }
+          if (line.startsWith("id: ")) {
+            // Track Last-Event-ID for reconnect support
+            lastSseEventIdRef.current = line.slice(4).trim();
+          } else if (line.startsWith("event: ")) { curEvent = line.slice(7).trim(); }
           else if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
@@ -1261,6 +1273,68 @@ export default function MissionChatCore({
       }
       return true;
     } catch (err: any) {
+      // ── SSE reconnect via Last-Event-ID ──────────────────────────────────
+      // When the fetch stream drops (wifi blip, nginx restart) and we have a
+      // Last-Event-ID, attempt to replay missed chunks from the server buffer.
+      const lastId = lastSseEventIdRef.current;
+      if (lastId && activeMissionId) {
+        try {
+          const replayResp = await fetch(
+            `/api/chat/reconnect?lastEventId=${encodeURIComponent(lastId)}`,
+            { credentials: "include", headers: token ? { Authorization: `Bearer ${token}` } : {} }
+          );
+          if (replayResp.status === 410) {
+            // Buffer evicted (>5 min) -- show "session ended" prompt
+            setSseSessionEnded(true);
+            const curId = activeStreamMsgIdRef.current ?? streamMsgId;
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === convId
+                  ? { ...c, messages: c.messages.map((m) => m.id === curId
+                      ? { ...m, isStreaming: false }
+                      : m
+                    )}
+                  : c
+              )
+            );
+            setLoading(false);
+            return false;
+          }
+          // Replay OK -- process the buffered chunks
+          if (replayResp.ok && replayResp.body) {
+            const replayReader = replayResp.body.getReader();
+            const replayDecoder = new TextDecoder();
+            let replayBuf = "";
+            while (true) {
+              const { done, value } = await replayReader.read();
+              if (done) break;
+              replayBuf += replayDecoder.decode(value, { stream: true });
+              const replayLines = replayBuf.split("\n");
+              replayBuf = replayLines.pop() ?? "";
+              let replayCurEvent = "";
+              for (const line of replayLines) {
+                if (line.startsWith("id: ")) { lastSseEventIdRef.current = line.slice(4).trim(); }
+                else if (line.startsWith("event: ")) { replayCurEvent = line.slice(7).trim(); }
+                else if (line.startsWith("data: ") && replayCurEvent === "delta") {
+                  try {
+                    const d = JSON.parse(line.slice(6));
+                    if (d.text) {
+                      const curId = activeStreamMsgIdRef.current ?? streamMsgId;
+                      setConversations((prev) => prev.map((c) => c.id === convId
+                        ? { ...c, messages: c.messages.map((m) => m.id === curId
+                            ? { ...m, content: (m.content ?? "") + d.text }
+                            : m
+                          )}
+                        : c
+                      ));
+                    }
+                  } catch { /* skip */ }
+                }
+              }
+            }
+          }
+        } catch { /* reconnect also failed -- fall through to error display */ }
+      }
       const errMsgId = activeStreamMsgIdRef.current ?? streamMsgId;
       setConversations((prev) =>
         prev.map((c) =>
@@ -2176,6 +2250,33 @@ export default function MissionChatCore({
                   : "正在思考最佳策略..."}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* SSE session ended banner (410 -- buffer expired > 5 min) */}
+        {sseSessionEnded && (
+          <div style={{
+            margin: "0 0 12px 0", padding: "12px 16px", borderRadius: 10,
+            background: "#FFF7ED", border: "1px solid #FED7AA",
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <span style={{ fontSize: 18 }}>⏳</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>串流會話已過期</div>
+              <div style={{ fontSize: 11, color: "#B45309", marginTop: 2 }}>
+                連線中斷超過 5 分鐘，無法恢復串流。請重新發送訊息執行此步驟。
+              </div>
+            </div>
+            <button
+              onClick={() => setSseSessionEnded(false)}
+              style={{
+                fontSize: 11, color: "#92400E", background: "none",
+                border: "1px solid #FED7AA", borderRadius: 6,
+                padding: "3px 10px", cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              關閉
+            </button>
           </div>
         )}
 
