@@ -1,0 +1,65 @@
+name: Admin — Reset Brand Positioning
+
+# One-shot: clear AI-estimated positioning on a brand so BrandBrainBar
+# auto-regenerates an estimate grounded in the current brand name/industry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: 'Brand id to reset'
+        required: true
+        type: string
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brandId }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: BRAND_ID
+          script: |
+            set -e
+            source /opt/marketing-os/app/skills/ai-talent/.env 2>/dev/null || true
+            DB_USER="${DB_USER:-root}"
+            DB_HOST="${DB_HOST:-127.0.0.1}"
+            DB_NAME="${DB_NAME:-mos_db}"
+
+            echo "===== Before reset ====="
+            mysql -u"$DB_USER" -p"$DB_PASSWORD" -h"$DB_HOST" "$DB_NAME" -e "
+              SELECT id, name, LEFT(tagline,40) AS tagline, LEFT(valueProposition,40) AS vp,
+                     LEFT(targetMarket,30) AS tm, isEstimate
+              FROM brands WHERE id=$BRAND_ID;
+            "
+
+            echo ""
+            echo "===== Reset ====="
+            mysql -u"$DB_USER" -p"$DB_PASSWORD" -h"$DB_HOST" "$DB_NAME" -e "
+              UPDATE brands SET
+                tagline=NULL,
+                valueProposition=NULL,
+                targetMarket=NULL,
+                audienceA=NULL,
+                audienceB=NULL,
+                emotionalDiff=NULL,
+                functionalDiff=NULL,
+                isEstimate=0
+              WHERE id=$BRAND_ID;
+              SELECT ROW_COUNT() AS rows_updated;
+            "
+
+            echo ""
+            echo "===== After reset ====="
+            mysql -u"$DB_USER" -p"$DB_PASSWORD" -h"$DB_HOST" "$DB_NAME" -e "
+              SELECT id, name, tagline, valueProposition, targetMarket, isEstimate
+              FROM brands WHERE id=$BRAND_ID;
+            "
+
+            echo ""
+            echo "Done. Reload /b/$BRAND_ID/... in the browser — BrandBrainBar will auto-call generateEstimate."
