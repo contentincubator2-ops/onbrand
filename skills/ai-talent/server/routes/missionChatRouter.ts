@@ -31,6 +31,7 @@ import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
+import { synthesizeAgentAsSquad, isAgentSlug, parseAgentSlug, type AgentRow } from "../_core/agentSquadSynth";
 
 // ── All data lives in mos_db — use localPool throughout ──────────────────────
 // localPool → mos_db on localhost (missions, brands, squads, agents, sessions, …)
@@ -518,7 +519,50 @@ async function tryExecuteSquadChat(params: {
   let squadAgents: any[] = [];
   let workflowSteps: any[] = [];
 
+  // ── Agent-mode short-circuit: squadSlug starts with "agent:" ─────────────
+  // Synthesize a single-person squad from the underlying agent row so the rest
+  // of the pipeline (session/steps/LLM) works unchanged.
+  if (isAgentSlug(squadSlug)) {
+    const idOrSlug = parseAgentSlug(squadSlug!)!;
+    const isNumeric = /^\d+$/.test(idOrSlug);
+    try {
+      const [aRows] = await localPool.execute(
+        isNumeric
+          ? `SELECT id, slug, name, title, specialty, primarySkill, methodology, skills, taskType, layer, aiModel, avatarUrl, industries FROM agents WHERE id = ? LIMIT 1`
+          : `SELECT id, slug, name, title, specialty, primarySkill, methodology, skills, taskType, layer, aiModel, avatarUrl, industries FROM agents WHERE slug = ? LIMIT 1`,
+        [idOrSlug],
+      ) as any[];
+      const agent = (aRows as any[])?.[0];
+      if (agent) {
+        const synth = synthesizeAgentAsSquad(agent as AgentRow);
+        squadId = -Math.abs(agent.id);
+        squadName = synth.name;
+        squadMethodology = synth.methodology;
+        squadAgents = [{ agent_id: agent.id, role: agent.title ?? "Specialist", is_lead: 1, order: 1 }];
+        workflowSteps = synth.steps.map((s) => ({
+          order: s.order,
+          name: s.title,
+          description: s.description,
+          requiredSkills: [s.skill],
+          requiredTools: s.requiredTools,
+          tool: s.requiredTools[0] ?? null,
+          outputType: s.outputType,
+          assignedAgentId: agent.id,
+          assignedAgentName: agent.name,
+        }));
+        console.log(`[squadChat] Agent-mode: synthesized ${synth.steps.length} steps for agent id=${agent.id} (${agent.name})`);
+      } else {
+        console.warn(`[squadChat] Agent-mode: agent not found for slug="${squadSlug}"`);
+      }
+    } catch (e: any) {
+      console.warn("[squadChat] Agent-mode lookup error:", e?.message);
+    }
+  }
+
   try {
+    if (workflowSteps.length > 0 && squadAgents.length > 0) {
+      // Already populated by agent-mode short-circuit — skip squads table lookup
+    } else {
     // Read squad + embedded steps (Phase A.2: steps now live on squads.steps)
     const [sRows] = await localPool.execute(
       `SELECT s.id, s.name, s.methodology, s.agents, s.steps as workflowSteps
@@ -553,6 +597,7 @@ async function tryExecuteSquadChat(params: {
     } else {
       console.warn(`[squadChat] Squad not found for slug="${squadSlug}"`);
     }
+    } // close: if (agent-mode pre-populated) { } else { ... }
   } catch (e: any) {
     console.warn("[squadChat] squad fetch error:", e?.message);
   }

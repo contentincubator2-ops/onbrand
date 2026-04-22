@@ -566,7 +566,10 @@ export default function MissionChatCore({
   const relayStepCountRef = useRef(0);
 
   // ── tRPC hooks ───────────────────────────────────────────────────────────
-  const [activeBrandId, setActiveBrandId] = useState<number | null>(null);
+  // Seed activeBrandId from initialBrandId (URL :brandId param) so brand-scoped
+  // views (BrandBrainBar, brand-filtered squad recommendations) render the
+  // correct brand immediately, even before any mission is selected.
+  const [activeBrandId, setActiveBrandId] = useState<number | null>(initialBrandId ?? null);
   const createAndExecute = trpc.task.createAndExecute.useMutation();
   const workflowStart = trpc.workflow.start.useMutation();
   const saveMessage = trpc.conversation.saveMessage.useMutation();
@@ -667,13 +670,33 @@ export default function MissionChatCore({
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
-  // Sync activeBrandId from mission data (most reliable source)
+  // Sync activeBrandId from mission data (most reliable source when mission is set)
   useEffect(() => {
     const mBrandId = (missionDataQuery.data as any)?.brandId;
     if (mBrandId && mBrandId !== activeBrandId) {
       setActiveBrandId(mBrandId);
     }
   }, [missionDataQuery.data, activeBrandId]);
+
+  // Sync activeBrandId from initialBrandId (URL :brandId) when no mission is active.
+  // This lets the user switch brand in the picker and have BrandBrainBar follow
+  // without having to first open a mission belonging to that brand.
+  useEffect(() => {
+    if (!activeMissionId && initialBrandId && initialBrandId !== activeBrandId) {
+      setActiveBrandId(initialBrandId);
+    }
+  }, [initialBrandId, activeMissionId, activeBrandId]);
+
+  // Listen for global brand-changed events fired by AppShell's brand picker
+  // so components deep in the tree re-render against the new brand.
+  useEffect(() => {
+    const onChange = (e: any) => {
+      const id = e?.detail?.brandId;
+      if (id && id !== activeBrandId) setActiveBrandId(id);
+    };
+    window.addEventListener("brand-changed", onChange);
+    return () => window.removeEventListener("brand-changed", onChange);
+  }, [activeBrandId]);
 
   useEffect(() => {
     if (brandsQuery.isSuccess && brands.length > 0 && !activeBrandId) {

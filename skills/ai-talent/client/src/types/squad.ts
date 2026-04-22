@@ -11,6 +11,8 @@ export interface DBSquadLead {
 
 /** A squad chip returned from getRecommendedSquads */
 export interface DBSquad {
+  /** Discriminator: "squad" = real DB squad; "agent" = synthesized single-agent squad */
+  type?: "squad" | "agent";
   squadId: number;
   slug: string;
   name: string;
@@ -20,6 +22,12 @@ export interface DBSquad {
   agentCount?: number;
   lead?: DBSquadLead | null;
   matchScore?: number;
+  // ── Agent-chip extras (only present when type === "agent") ────────────
+  agentId?: number;
+  agentTitle?: string | null;
+  primarySkill?: string | null;
+  avatarUrl?: string | null;
+  stepCount?: number;
 }
 
 /** A real DB agent returned from getMembersById */

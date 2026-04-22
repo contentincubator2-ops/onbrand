@@ -11,6 +11,7 @@ import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
+import { synthesizeAgentAsSquad, isAgentSlug, parseAgentSlug, type AgentRow } from "../_core/agentSquadSynth";
 
 export const missionSquadRouter = Router();
 
@@ -52,6 +53,55 @@ missionSquadRouter.get("/:missionId/squad", async (req: Request, res: Response) 
     if (!mission) {
       res.status(404).json({ error: "Mission not found" });
       return;
+    }
+
+    // ── Agent-mode: squadSlug starts with "agent:" → synthesize single-person squad
+    if (mission.squadSlug && isAgentSlug(mission.squadSlug)) {
+      const idOrSlug = parseAgentSlug(mission.squadSlug)!;
+      const isNumeric = /^\d+$/.test(idOrSlug);
+      const [aRows] = await localPool.execute(
+        isNumeric
+          ? `SELECT id, slug, name, title, specialty, primarySkill, methodology, skills, taskType, layer, aiModel, avatarUrl, industries FROM agents WHERE id = ? LIMIT 1`
+          : `SELECT id, slug, name, title, specialty, primarySkill, methodology, skills, taskType, layer, aiModel, avatarUrl, industries FROM agents WHERE slug = ? LIMIT 1`,
+        [idOrSlug],
+      ) as any[];
+      const agent = (aRows as any[])?.[0];
+      if (agent) {
+        const synth = synthesizeAgentAsSquad(agent as AgentRow);
+        const [sessionRows] = await localPool.execute(
+          `SELECT currentStepIndex, status FROM squad_chat_sessions WHERE missionId = ? ORDER BY updatedAt DESC LIMIT 1`,
+          [missionId],
+        ) as any[];
+        const session = (sessionRows as any[])?.[0];
+        const currentStepIndex = session?.currentStepIndex ?? 0;
+        const sessionStatus = session?.status ?? "pending";
+
+        const membersWithStatus = synth.steps.map((s, idx) => {
+          let status: "pending" | "running" | "done";
+          if (idx < currentStepIndex) status = "done";
+          else if (idx === currentStepIndex) status = sessionStatus === "completed" ? "done" : sessionStatus === "in_progress" ? "running" : "pending";
+          else status = "pending";
+          return {
+            agentName: agent.name,
+            agentTitle: agent.title ?? "Specialist",
+            model: agent.aiModel ?? "claude-opus-4-6",
+            skills: [s.skill],
+            status,
+            completedStep: s.title,
+            hasOutput: idx < currentStepIndex,
+          };
+        });
+
+        res.json({
+          missionId,
+          workspace: mission.workspace,
+          title: mission.title,
+          squadSlug: mission.squadSlug,
+          squadName: synth.name,
+          squad: membersWithStatus,
+        });
+        return;
+      }
     }
 
     // 若任務有 squadSlug，從 squads 表讀取成員資訊

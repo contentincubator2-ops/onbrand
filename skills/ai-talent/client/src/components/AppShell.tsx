@@ -4,11 +4,29 @@
  * All styles are inline, mirroring marketing-os-mockup-v7.html
  */
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { MissionModal } from "./MissionModal";
 import type { DBSquad } from '../types/squad';
 import { useLang } from "../lib/i18n";
 import Settings from "../pages/Settings";
+
+// ─── Persisted brand selection key ──────────────────────────────────────────
+// Written when user clicks a brand in the top-left picker, read by AppShell
+// and MissionChatCore on mount so the brand context is consistent across
+// page-level navigations. A `brand-changed` window event lets already-mounted
+// components react without a full reload.
+const BRAND_KEY = "sowork.selectedBrandId";
+function readPersistedBrandId(): number | null {
+  try {
+    const raw = localStorage.getItem(BRAND_KEY);
+    return raw ? Number(raw) || null : null;
+  } catch { return null; }
+}
+function persistBrandId(id: number) {
+  try { localStorage.setItem(BRAND_KEY, String(id)); } catch {}
+  try { window.dispatchEvent(new CustomEvent("brand-changed", { detail: { brandId: id } })); } catch {}
+}
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
 
@@ -628,6 +646,10 @@ function Drawer({
     undefined,
     { refetchOnWindowFocus: false }
   );
+  const navigate = useNavigate();
+  const urlParams = useParams<{ brandId?: string; missionId?: string; workspace?: string }>();
+  const urlBrandId = urlParams.brandId ? Number(urlParams.brandId) : null;
+
   const [selectedBrandIdx, setSelectedBrandIdx] = useState(0);
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
   const deleteBrand = trpc.brand.delete.useMutation({
@@ -636,6 +658,47 @@ function Drawer({
   const brandList = (brands as any[]) ?? [];
   const selectedBrand = brandList[selectedBrandIdx] ?? null;
   const selectedBrandId: number | null = selectedBrand?.id ?? null;
+
+  // ── Brand selection sync ────────────────────────────────────────────────
+  // Priority: URL :brandId param > localStorage > brand[0]
+  // Once brands load, align selectedBrandIdx to URL/localStorage/default.
+  useEffect(() => {
+    if (!brandList.length) return;
+    const targetId = urlBrandId ?? readPersistedBrandId();
+    if (targetId) {
+      const idx = brandList.findIndex((b: any) => b.id === targetId);
+      if (idx >= 0 && idx !== selectedBrandIdx) {
+        setSelectedBrandIdx(idx);
+        return;
+      }
+    }
+    // If URL has no brand and localStorage has no brand, persist the default
+    if (!targetId && selectedBrand?.id) persistBrandId(selectedBrand.id);
+  }, [brandList.length, urlBrandId]);
+
+  // Listen for external brand changes (from other components or tabs)
+  useEffect(() => {
+    const onChange = (e: any) => {
+      const id = e?.detail?.brandId;
+      if (!id) return;
+      const idx = brandList.findIndex((b: any) => b.id === id);
+      if (idx >= 0) setSelectedBrandIdx(idx);
+    };
+    window.addEventListener("brand-changed", onChange);
+    return () => window.removeEventListener("brand-changed", onChange);
+  }, [brandList]);
+
+  // Helper — user clicks a brand in the picker
+  const switchBrand = (brand: any) => {
+    if (!brand?.id) return;
+    persistBrandId(brand.id);
+    const idx = brandList.findIndex((b: any) => b.id === brand.id);
+    if (idx >= 0) setSelectedBrandIdx(idx);
+    setBrandDropdownOpen(false);
+    // Navigate to the brand-scoped root so any active mission clears and
+    // downstream components (MissionChatCore, BrandBrainBar) re-fetch.
+    navigate(`/b/${brand.id}/_/m/_`);
+  };
 
   // Workspace data
   const { data: workspaces, isLoading: wsLoading } = trpc.workspace.list.useQuery(
@@ -797,7 +860,7 @@ function Drawer({
                     }}
                   >
                     <div
-                      onClick={() => { setSelectedBrandIdx(idx); setBrandDropdownOpen(false); }}
+                      onClick={() => switchBrand(brand)}
                       style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}
                     >
                       <div style={{

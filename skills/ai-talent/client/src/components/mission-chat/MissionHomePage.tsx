@@ -31,19 +31,27 @@ function SquadChip({
   squad, isSelected, onClick,
 }: { squad: DBSquad; isSelected: boolean; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
+  const isAgent = squad.type === "agent";
+
+  // Agent chips use a warm accent color to visually distinguish from squad chips
+  const accentSel  = isAgent ? "#2B5CE6" : "#1A1A18";
+  const bgSel      = isAgent ? "#2B5CE6" : "#1A1A18";
 
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      title={isAgent
+        ? `${squad.name}${squad.primarySkill ? ` · ${squad.primarySkill}` : ""}`
+        : squad.name}
       style={{
         borderRadius: 10,
         padding: "7px 14px",
         fontSize: 13, fontWeight: 500,
         cursor: "pointer",
-        border: isSelected ? "1.5px solid #1A1A18" : hovered ? "1.5px solid #C8C7C3" : "1.5px solid #E4E3E1",
-        background: isSelected ? "#1A1A18" : hovered ? "#F9F9F8" : "#FFFFFF",
+        border: isSelected ? `1.5px solid ${accentSel}` : hovered ? "1.5px solid #C8C7C3" : "1.5px solid #E4E3E1",
+        background: isSelected ? bgSel : hovered ? "#F9F9F8" : "#FFFFFF",
         color: isSelected ? "#FFFFFF" : "#4A4A45",
         transition: "all 0.15s",
         fontFamily: "inherit",
@@ -51,15 +59,34 @@ function SquadChip({
         boxShadow: isSelected ? "0 2px 8px rgba(26,26,24,0.15)" : hovered ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
       }}
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-        stroke={isSelected ? "rgba(255,255,255,0.8)" : "#9B9990"}
-        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <circle cx="12" cy="12" r="6"/>
-        <circle cx="12" cy="12" r="2"/>
-      </svg>
+      {isAgent ? (
+        // Single-person silhouette for agent chip
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke={isSelected ? "rgba(255,255,255,0.85)" : "#2B5CE6"}
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
+        </svg>
+      ) : (
+        // Concentric target icon for squad chip
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke={isSelected ? "rgba(255,255,255,0.8)" : "#9B9990"}
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="6"/>
+          <circle cx="12" cy="12" r="2"/>
+        </svg>
+      )}
       <span>{squad.name}</span>
-      {squad.lead?.name && (
+      {isAgent && squad.primarySkill && (
+        <span style={{
+          fontSize: 10, color: isSelected ? "rgba(255,255,255,0.6)" : "#9B9990",
+          fontWeight: 400,
+        }}>
+          · {squad.primarySkill}
+        </span>
+      )}
+      {!isAgent && squad.lead?.name && (
         <span style={{
           fontSize: 10, color: isSelected ? "rgba(255,255,255,0.6)" : "#9B9990",
           fontWeight: 400,

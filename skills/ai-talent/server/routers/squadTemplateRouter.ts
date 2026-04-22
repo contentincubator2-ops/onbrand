@@ -31,6 +31,7 @@ import { randomBytes } from "crypto";
 import { loadAgentContext } from "../agentContextLoader";
 import { getSquadRequirements } from "../_core/squadRequirements";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
+import { synthesizeAgentAsSquad, type AgentRow } from "../_core/agentSquadSynth";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -387,7 +388,8 @@ export const squadTemplateRouter = router({
         }
       }
 
-      return top.map(({ row, agents, score, leadAgentId }) => ({
+      const squadChips = top.map(({ row, agents, score, leadAgentId }) => ({
+        type:        "squad" as const,
         squadId:     row.id as number,
         slug:        (row.slug ?? "") as string,
         name:        (row.name ?? "") as string,
@@ -402,6 +404,101 @@ export const squadTemplateRouter = router({
         } : null,
         matchScore: score,
       }));
+
+      // ── 8. Agent chips — synthesize top agents as single-person squads ────
+      // This unlocks 17k+ agents as potential chips. Agents are keyword-scored
+      // against the same mission keywords/workspace tags. A typical mix is
+      // 60% squad / 40% agent so both appear in the chip row.
+      const agentChips: any[] = [];
+      try {
+        const agentLimit = Math.max(2, Math.floor(input.limit / 2));
+        // Keyword LIKE clause on agent.specialty / primarySkill / title / skills JSON
+        const kwConditions: string[] = [];
+        const kwParams: any[] = [];
+        for (const kw of missionKeywords.slice(0, 8)) {
+          const esc = `%${escapeLike(kw)}%`;
+          kwConditions.push(`(a.specialty LIKE ? OR a.primarySkill LIKE ? OR a.title LIKE ? OR JSON_SEARCH(a.skills, 'one', ?) IS NOT NULL)`);
+          kwParams.push(esc, esc, esc, kw);
+        }
+        for (const tag of effectiveTags.slice(0, 4)) {
+          const esc = `%${escapeLike(tag)}%`;
+          kwConditions.push(`(a.specialty LIKE ? OR a.primarySkill LIKE ? OR a.title LIKE ?)`);
+          kwParams.push(esc, esc, esc);
+        }
+        // No layer filter — any agent can surface as a chip. We already rank
+        // by rating + keyword score, so weak matches fall to the bottom.
+        const whereClause = kwConditions.length
+          ? `WHERE (${kwConditions.join(" OR ")})`
+          : `WHERE 1=1`;
+
+        const [agentRows] = await localPool.execute(
+          `SELECT a.id, a.slug, a.name, a.title, a.specialty, a.primarySkill,
+                  a.methodology, a.skills, a.taskType, a.layer, a.aiModel, a.avatarUrl
+           FROM agents a
+           ${whereClause}
+           ORDER BY (a.rating IS NOT NULL) DESC, a.rating DESC, a.id DESC
+           LIMIT ${agentLimit * 3}`,
+          kwParams,
+        ) as any[];
+
+        // JS-side scoring — mirror squad scoring logic at smaller scale
+        const scored = (agentRows as AgentRow[]).map((a: any) => {
+          let score = 0;
+          const specialty = String(a.specialty ?? "").toLowerCase();
+          const primary   = String(a.primarySkill ?? "").toLowerCase();
+          const title     = String(a.title ?? "").toLowerCase();
+          for (const kw of missionKeywords) {
+            const k = kw.toLowerCase();
+            if (specialty.includes(k)) score += 3;
+            if (primary.includes(k))   score += 5;
+            if (title.includes(k))     score += 2;
+          }
+          for (const tag of effectiveTags) {
+            const tl = tag.toLowerCase();
+            if (specialty.includes(tl)) score += 2;
+            if (primary.includes(tl))   score += 3;
+          }
+          return { agent: a, score };
+        });
+        scored.sort((x, y) => y.score - x.score);
+
+        // De-dupe against squad lead ids already shown
+        const shownLeadIds = new Set(squadChips.map((s) => s.lead?.agentId).filter(Boolean));
+
+        for (const { agent, score } of scored) {
+          if (agentChips.length >= agentLimit) break;
+          if (shownLeadIds.has(agent.id)) continue;
+          const synth = synthesizeAgentAsSquad(agent);
+          agentChips.push({
+            type:        "agent" as const,
+            squadId:     synth.squadId,       // negative, used as lookup key
+            slug:        synth.slug,           // "agent:<id-or-slug>"
+            name:        agent.name,            // chip shows agent name directly
+            description: agent.specialty ?? null,
+            agentId:     agent.id,
+            agentTitle:  agent.title ?? null,
+            primarySkill: agent.primarySkill ?? null,
+            avatarUrl:   agent.avatarUrl ?? null,
+            stepCount:   synth.steps.length,
+            lead: {
+              agentId: agent.id,
+              name:    agent.name,
+              title:   agent.title ?? "Specialist",
+            },
+            matchScore: score,
+          });
+        }
+      } catch (e) {
+        console.error("[squadRouter] agent-chip enrichment error:", e);
+      }
+
+      // Merge: interleave squads and agents by matchScore so top picks surface
+      const merged = [...squadChips, ...agentChips]
+        .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
+        .slice(0, input.limit + Math.floor(input.limit / 2));
+
+      console.log(`[squadRouter] chips: ${squadChips.length} squad + ${agentChips.length} agent → merged ${merged.length}`);
+      return merged;
     }),
 
   // ── getMembersById ──────────────────────────────────────────────────────────
@@ -409,6 +506,60 @@ export const squadTemplateRouter = router({
   getMembersById: protectedProcedure
     .input(z.object({ squadId: z.number() }))
     .query(async ({ input }) => {
+      // ── Agent-mode: negative squadId = synthesized single-agent squad ───────
+      // Chip recommender sends squadId=-agentId for agent chips. Look up the
+      // underlying agent row and synthesize it into squad shape so the sidebar
+      // renders identically to a real squad.
+      if (input.squadId < 0) {
+        const agentId = Math.abs(input.squadId);
+        const [aRows] = await localPool.execute(
+          `SELECT id, slug, name, title, specialty, primarySkill, methodology,
+                  skills, taskType, layer, aiModel, avatarUrl, industries
+           FROM agents WHERE id = ? LIMIT 1`,
+          [agentId],
+        ) as any[];
+        const agent = (aRows as any[])?.[0];
+        if (!agent) {
+          console.warn(`[squadRouter.getMembersById] Synth agent not found id=${agentId}`);
+          return { squadName: "", lead: null, agents: [], steps: [], showcases: [], methodology: "" };
+        }
+        const synth = synthesizeAgentAsSquad(agent as AgentRow);
+        const leadMember = {
+          agentId:      agent.id as number,
+          role:         (agent.title ?? "Specialist") as string,
+          isLead:       true,
+          order:        1,
+          name:         (agent.name ?? "") as string,
+          title:        (agent.title ?? "") as string,
+          specialty:    (agent.specialty ?? "") as string,
+          primarySkill: (agent.primarySkill ?? "") as string,
+          aiModel:      (agent.aiModel ?? "") as string,
+          avatarUrl:    (agent.avatarUrl ?? null) as string | null,
+        };
+        const enrichedSteps = synth.steps.map((s) => ({
+          order: s.order,
+          name: s.title,
+          title: s.title,
+          description: s.description,
+          requiredSkills: [s.skill],
+          requiredTools: s.requiredTools,
+          tool: s.requiredTools[0] ?? null,
+          outputType: s.outputType,
+          assignedAgentId: agent.id,
+          assignedAgentName: agent.name,
+          assignedAgentPrimarySkill: agent.primarySkill ?? null,
+          assignedAgentAiModel: agent.aiModel ?? null,
+        }));
+        return {
+          squadName:   synth.name,
+          methodology: synth.methodology,
+          lead:        leadMember,
+          agents:      [],
+          steps:       enrichedSteps,
+          showcases:   [],
+        };
+      }
+
       // squads and agents live on VM local DB (localPool)
       // Read `steps` directly from squads table (migrated from squad_template in Phase A.2)
       const [squadRows] = await localPool.execute(
@@ -629,7 +780,34 @@ export const squadTemplateRouter = router({
       type AgentDef = { agentName: string; agentRole: string; agentTitle: string; model: string; skills: string[]; isLead?: boolean };
       let agentDefs: AgentDef[] = [];
 
-      if (input.squadId) {
+      if (input.squadId && input.squadId < 0) {
+        // Agent-mode: negative squadId = synthesized single-agent squad
+        try {
+          const agentId = Math.abs(input.squadId);
+          const [aRows] = await localPool.execute(
+            `SELECT id, slug, name, title, specialty, primarySkill, methodology, skills, taskType, layer, aiModel, avatarUrl, industries
+             FROM agents WHERE id = ? LIMIT 1`,
+            [agentId],
+          ) as any[];
+          const agent = (aRows as any[])?.[0];
+          if (agent) {
+            const synth = synthesizeAgentAsSquad(agent as AgentRow);
+            squadTitle = `${brandName} × ${agent.name}`;
+            agentDefs = [{
+              agentName:  agent.name,
+              agentRole:  agent.title ?? "specialist",
+              agentTitle: agent.title ?? "Specialist",
+              model:      agent.aiModel ?? "claude-sonnet",
+              skills:     agent.primarySkill ? [agent.primarySkill] : [],
+              isLead:     true,
+            }];
+            // Overwrite squadType with synth slug so missions.squadSlug stores "agent:<id>"
+            (input as any).squadType = synth.slug;
+          }
+        } catch (e) {
+          console.error("[squadRouter] assemble: agent-mode lookup error:", e);
+        }
+      } else if (input.squadId) {
         // Pull real members from squads (lives on VM local DB — localPool)
         try {
           const [sqRows] = await localPool.execute(

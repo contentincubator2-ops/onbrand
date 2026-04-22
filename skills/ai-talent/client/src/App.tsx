@@ -110,8 +110,9 @@ function MissionPage() {
       squadStepProgress={squadStepProgress}
     >
       <MissionChatCore
-        key={`mission-${numericMissionId}`}
+        key={`mission-${numericMissionId}-brand-${brandIdParam ?? "_"}`}
         activeMissionId={numericMissionId}
+        initialBrandId={brandIdParam ? Number(brandIdParam) || null : null}
         onMissionCreated={(id) => {
           // When a new mission is created, stay on the same brand/workspace if available
           if (brandIdParam && workspace) {
@@ -197,6 +198,9 @@ function IndexPage() {
     >
       <MissionChatCore
         activeMissionId={null}
+        initialBrandId={(() => {
+          try { return Number(localStorage.getItem("sowork.selectedBrandId")) || null; } catch { return null; }
+        })()}
         onMissionCreated={(id) => navigate(`/m/${id}`)}
         onSquadPreview={(squad) => setActiveSquad(squad)}
         onSquadStepProgress={setSquadStepProgress}
