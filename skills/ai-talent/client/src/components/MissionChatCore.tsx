@@ -1971,8 +1971,13 @@ export default function MissionChatCore({
               />
             )}
 
-            {/* DeliverableBlock — Squad Lead 最終輸出成品卡（Canva 模式：任務有終點） */}
-            {msg.role === "assistant" && !msg.isStreaming && msg.isSquadLead && msg.content && msg.content.length > 50 && (() => {
+            {/* DeliverableBlock — Squad Lead 最終輸出成品卡（Canva 模式：任務有終點）
+                只有在 Lead 完成最終交付步驟時才顯示成品卡；Intake（任務確認）不是交付物，
+                不應該被再渲染成一張獨立卡片，否則使用者會看到同一段 RECAP 文字出現兩次。 */}
+            {msg.role === "assistant" && !msg.isStreaming && msg.isSquadLead && msg.content && msg.content.length > 50
+              && !(msg.squadStepLabel ?? "").includes("任務確認")
+              && msg.squadStep !== undefined && msg.squadStep > 0
+              && (() => {
               const deliverableItems: DeliverableItem[] = [{
                 id: parseInt(msg.id.replace(/\D/g, "").slice(-8) || "1"),
                 title: msg.squadStepLabel ?? "任務成品",
