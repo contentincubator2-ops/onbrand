@@ -91,7 +91,9 @@ function hashStr(s: string): number {
 }
 
 function pick<T>(arr: T[], seed: number): T {
-  return arr[seed % arr.length];
+  // Use unsigned modulo; seed may be large or shifted; guard against NaN/negative.
+  const idx = Math.abs(seed | 0) % arr.length;
+  return arr[idx];
 }
 
 /**
@@ -118,8 +120,10 @@ function parseMethodology(m: string | null): {
   // Strip parens content for easier split
   const noParen = raw.replace(/\s*\([^)]*\)\s*/g, "").trim();
 
-  // Try "Author – Framework" or "Author - Framework" (en/em dash)
-  const dashMatch = noParen.match(/^(.+?)\s*[–—\-]\s*(.+)$/);
+  // Try "Author – Framework" with en/em dash, OR ASCII "-" with REQUIRED whitespace
+  // around it. Without required whitespace, "benefit-based" would falsely parse as
+  // author="benefit" / shortName="based".
+  const dashMatch = noParen.match(/^(.+?)\s+[–—\-]\s+(.+)$/) ?? noParen.match(/^(.+?)\s*[–—]\s*(.+)$/);
   if (dashMatch) {
     const author = dashMatch[1].trim();
     let shortName = dashMatch[2].trim();
@@ -196,9 +200,9 @@ function buildLeadAgent(squad: {
   const seed = hashStr(squad.slug);
 
   const surname = pick(SURNAMES, seed);
-  const given = pick(GIVEN_NAMES, seed >> 3);
-  const efirst = pick(EN_FIRST, seed >> 5);
-  const elast = pick(EN_LAST, seed >> 7);
+  const given = pick(GIVEN_NAMES, (seed * 7) >>> 0);
+  const efirst = pick(EN_FIRST, (seed * 13) >>> 0);
+  const elast = pick(EN_LAST, (seed * 19) >>> 0);
 
   const zhSub = zhSubtitleFor(parsed.shortName);
   const cnName = `${surname}${given}`;
