@@ -10,7 +10,7 @@
  *   1. Title — snippet (url)
  */
 
-import { registerTool } from "./index";
+import { registerTool } from "./registry";
 import { addCitation } from "./citationStore";
 
 const SERPER_KEY = process.env.SERPER_API_KEY ?? "";

@@ -6,7 +6,7 @@
  * grouped by kind + truncated excerpts.
  */
 
-import { registerTool } from "./index";
+import { registerTool } from "./registry";
 import { getCitations } from "./citationStore";
 
 registerTool({

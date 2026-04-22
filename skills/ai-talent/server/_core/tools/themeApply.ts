@@ -6,7 +6,7 @@
  * static SoWork theme; future versions can swap themes per brand.
  */
 
-import { registerTool } from "./index";
+import { registerTool } from "./registry";
 
 export interface BoardroomTheme {
   name: string;

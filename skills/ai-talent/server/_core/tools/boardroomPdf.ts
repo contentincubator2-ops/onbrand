@@ -15,7 +15,7 @@
  * and served via /static/boardroom-exports/... (assumes express.static wire-up).
  */
 
-import { registerTool } from "./index";
+import { registerTool } from "./registry";
 import { getCitations } from "./citationStore";
 import { getTheme } from "./themeApply";
 import PDFDocument from "pdfkit";

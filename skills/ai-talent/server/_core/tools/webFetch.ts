@@ -3,7 +3,7 @@
  * Wraps the existing fetchReadable() from ../webFetcher for LLM-directed use.
  */
 
-import { registerTool } from "./index";
+import { registerTool } from "./registry";
 import { fetchReadable } from "../webFetcher";
 import { addCitation } from "./citationStore";
 

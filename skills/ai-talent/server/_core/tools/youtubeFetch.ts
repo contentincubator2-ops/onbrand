@@ -11,7 +11,7 @@
  * No API key required. Rate limits are YouTube's — best-effort.
  */
 
-import { registerTool } from "./index";
+import { registerTool } from "./registry";
 import { addCitation } from "./citationStore";
 
 const TIMEOUT_MS = 10000;

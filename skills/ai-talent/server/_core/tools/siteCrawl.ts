@@ -9,7 +9,7 @@
  *   3. Fetch up to `maxPages` (default 4, max 8), concat as separate sections
  */
 
-import { registerTool } from "./index";
+import { registerTool } from "./registry";
 import { fetchReadable } from "../webFetcher";
 import { addCitation } from "./citationStore";
 
