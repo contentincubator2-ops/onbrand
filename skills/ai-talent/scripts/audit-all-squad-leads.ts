@@ -22,7 +22,6 @@ interface SquadRow {
   slug: string;
   name: string;
   methodology: string | null;
-  methodology_author: string | null;
   workspace: string | null;
   strategy_layer: string | null;
   agents: string | null;
@@ -113,7 +112,7 @@ async function main() {
 
   // Pull all active squads
   const [squadRows] = await pool.query(
-    `SELECT id, slug, name, methodology, methodology_author, workspace, strategy_layer, agents, is_active
+    `SELECT id, slug, name, methodology, workspace, strategy_layer, agents, is_active
        FROM squads
       WHERE is_active = 1
       ORDER BY strategy_layer, id`,
