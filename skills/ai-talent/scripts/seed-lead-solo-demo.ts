@@ -218,6 +218,9 @@ interface SquadSpec {
   methodology: string;
   leadAgentId: number;
   steps: Step[];
+  tier?: string;
+  strategyLayer?: string;
+  token?: number;
 }
 
 async function upsertSquad(spec: SquadSpec) {
@@ -229,24 +232,31 @@ async function upsertSquad(spec: SquadSpec) {
     { agent_id: spec.leadAgentId, role: spec.name.split(" ")[0] + " Lead", is_lead: 1, order: 1 },
   ]);
 
+  const tier = spec.tier ?? "core";
+  const strategyLayer = spec.strategyLayer ?? "L1_brand";
+  const token = spec.token ?? 70000;
+
   if ((found as any[])[0]?.id) {
     const id = (found as any[])[0].id;
     await localPool.execute(
       `UPDATE squads SET name = ?, methodology = ?, lead_agent_id = ?, architecture = 'lead_solo',
-         steps = ?, agents = ?, missionType = ?, workspace = ?, is_active = 1, updatedAt = NOW()
+         steps = ?, agents = ?, missionType = ?, workspace = ?,
+         tier = ?, strategy_layer = ?, token = ?,
+         is_active = 1, updated_at = NOW()
        WHERE id = ?`,
       [spec.name, spec.methodology, spec.leadAgentId, stepsJson, agentsJson,
-       spec.missionType, spec.workspace, id],
+       spec.missionType, spec.workspace, tier, strategyLayer, token, id],
     );
     console.log(`  ↷ upsert squad: ${spec.slug} (id=${id})`);
     return id;
   }
   const [result] = await localPool.execute(
     `INSERT INTO squads (slug, name, methodology, lead_agent_id, architecture,
-        steps, agents, missionType, workspace, is_active, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, 'lead_solo', ?, ?, ?, ?, 1, NOW(), NOW())`,
+        steps, agents, missionType, workspace, tier, strategy_layer, token,
+        is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'lead_solo', ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
     [spec.slug, spec.name, spec.methodology, spec.leadAgentId, stepsJson, agentsJson,
-     spec.missionType, spec.workspace],
+     spec.missionType, spec.workspace, tier, strategyLayer, token],
   ) as any[];
   const id = (result as any).insertId;
   console.log(`  ✓ new squad: ${spec.slug} (id=${id})`);
@@ -308,6 +318,7 @@ async function seedSquads(ids: { maryId: number; deissId: number; hormoziId: num
     workspace: "social",
     methodology: "Ryan Deiss — Customer Value Optimization (traffic temperature × value ladder)",
     leadAgentId: ids.deissId,
+    strategyLayer: "L4_channel",
     steps: [
       {
         order: 1,
@@ -352,6 +363,7 @@ async function seedSquads(ids: { maryId: number; deissId: number; hormoziId: num
     workspace: "campaign",
     methodology: "Alex Hormozi — $100M Offers Value Equation Framework",
     leadAgentId: ids.hormoziId,
+    strategyLayer: "L5_campaign",
     steps: [
       {
         order: 1,
