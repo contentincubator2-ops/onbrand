@@ -42,6 +42,17 @@ import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
 import { computeMissionResources } from "./missionResourceComputer";
+import {
+  isShuttingDown,
+  shutdown,
+  registerSseStream,
+  registerWorkerClose,
+} from "./_core/shutdown";
+import localPool from "./localDb";
+import { connection as redisConnection } from "./queue/marketingQueue";
+
+// Re-export registerSseStream so SSE route handlers can register themselves
+export { registerSseStream };
 
 const app = express();
 
@@ -154,6 +165,11 @@ app.use("/api/missions", missionSquadRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 app.get("/health", healthLimiter, async (_req, res) => {
+  // Step 1 of graceful shutdown: flip to 503 immediately so LB stops routing.
+  if (isShuttingDown) {
+    res.status(503).json({ status: "shutting_down", service: "ai-talent", ts: new Date().toISOString() });
+    return;
+  }
   const [dbOk, soworkDbOk] = await Promise.all([pingDb(), pingSoworkDb()]);
   const billingQueueLength = getBillingRetryQueueLength();
   res.json({
@@ -277,10 +293,23 @@ const server = app.listen(PORT, async () => {
   console.log(`[server] sowork-enterprise listening on port ${PORT}`);
   console.log(`[server] health: http://localhost:${PORT}/health`);
   await runStartupMigrations();
-  startOrchestratorWorker();
+
+  // Start BullMQ workers; capture their instances so we can coordinate shutdown.
+  // Each worker registers its own process.once('SIGTERM', () => worker.close(false))
+  // internally (#13 owns that logic). Here we capture the close() promise so the
+  // shutdown coordinator (issue #25) can wait for drain to complete.
+  const orchestratorWorker = startOrchestratorWorker();
   console.log("[A2A] Orchestrator Worker started");
-  startSquadLeaderWorker();
+  const squadLeaderWorker = startSquadLeaderWorker();
   console.log("[A2A] Squad Leader Worker started");
+
+  // Register worker close factories with the shutdown coordinator.
+  // The factories are called during SIGTERM shutdown (step 4).
+  // BullMQ worker.close(false) is idempotent — calling it after #13's own
+  // SIGTERM handler already called it just returns the same draining promise.
+  registerWorkerClose(() => orchestratorWorker.close(false));
+  registerWorkerClose(() => squadLeaderWorker.close(false));
+
   // STAB-3: Recover any billing records persisted to disk during previous crash
   const recovered = await loadBillingFallbackLog();
   if (recovered > 0) {
@@ -288,6 +317,11 @@ const server = app.listen(PORT, async () => {
   }
   // Backfill mission resources for existing missions (fire-and-forget)
   backfillMissionResources();
+
+  // PM2 readiness signal (issue #14 — leave intact if already present, no-op if not)
+  if (typeof process.send === "function") {
+    process.send("ready");
+  }
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {
@@ -298,24 +332,23 @@ server.on("error", (err: NodeJS.ErrnoException) => {
   throw err;
 });
 
-// Graceful shutdown handler
-const shutdown = async (signal: string) => {
-  console.log(`[server] ${signal} received, shutting down gracefully...`);
-  server.close(async () => {
-    try {
-      await closeDb();
-      console.log("[server] DB connections closed");
-    } catch { /* silent */ }
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(1), 10_000); // 10s force exit
-};
+// ─── Graceful shutdown (#25) ──────────────────────────────────────────────────
+// The shutdown() coordinator from _core/shutdown.ts handles all of:
+//   1. /health → 503 (isShuttingDown flag, set as first action in shutdown())
+//   2. server.close() — stop new connections
+//   3. Drain SSE streams with `event: bye` within SHUTDOWN_TIMEOUT_MS/2
+//   4. Wait for BullMQ workers (their SIGTERM handlers already called worker.close(false))
+//   5. Close DB pools + Redis
+//   6. process.exit(0)
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+const triggerShutdown = (signal: string) =>
+  shutdown({ signal, server, localPool, redisConn: redisConnection });
+
+process.on("SIGTERM", () => triggerShutdown("SIGTERM"));
+process.on("SIGINT",  () => triggerShutdown("SIGINT"));
 process.on("uncaughtException", (err) => {
   console.error("[server] uncaughtException:", err);
-  shutdown("uncaughtException");
+  triggerShutdown("uncaughtException");
 });
 process.on("unhandledRejection", (reason) => {
   console.error("[server] unhandledRejection:", reason);
