@@ -37,6 +37,7 @@ import { logEvent, newSessionId } from "../_core/sessionLogger";
 // No more Azure sowork_db dependency.
 
 import { invokeLLMStream } from "../_core/llm";
+import { buildGroundedContextFromUrls } from "../_core/webFetcher";
 import { loadAgentContext } from "../agentContextLoader";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
@@ -734,13 +735,43 @@ async function tryExecuteSquadChat(params: {
 
   let fullOutput = "";
 
+  // ── URL grounding (anti-hallucination pre-pass) ───────────────────────────
+  // Scan the user's latest message + last few history items for URLs, fetch
+  // them, and inject the readable content into the system prompt. Without
+  // this, Leads like Mary Allen invent hero copy from memory when asked
+  // about specific websites. Scoped to Lead steps where hallucination risk
+  // is highest (intake + synthesis). Specialist steps stay untouched to
+  // keep their gateway latency budget intact.
+  let effectiveSystemPrompt = systemPrompt;
+  if (isLeadStep) {
+    try {
+      const historyTexts = recentHistory.map(m => (typeof m.content === "string" ? m.content : "")).slice(-4);
+      const { block, fetched } = await buildGroundedContextFromUrls(effectiveUserMessage, historyTexts);
+      if (block) {
+        effectiveSystemPrompt = systemPrompt + "\n\n" + "─".repeat(40) + "\n\n" + block;
+        const okCount = fetched.filter(f => f.ok).length;
+        const failCount = fetched.length - okCount;
+        console.log(`[squadChat] URL grounding: fetched ${okCount} ok, ${failCount} failed, urls=${fetched.map(f => f.url).join(", ")}`);
+        // Surface to UI so the user sees "we actually read the page"
+        send("info", {
+          kind: "url_grounding",
+          ok: okCount,
+          failed: failCount,
+          urls: fetched.map(f => ({ url: f.url, ok: f.ok, title: f.title, error: f.error })),
+        });
+      }
+    } catch (err: any) {
+      console.warn(`[squadChat] URL grounding failed (non-fatal):`, err?.message);
+    }
+  }
+
   // ── Squad Lead step: bypass gateway entirely, call LLM directly ────────────
   // Gateway requires "openclaw/{agent_slug}" format. Model names are NOT valid slugs
   // and silently produce empty streams. Direct LLM call (openrouter → forge) is reliable.
   if (isLeadStep) {
     console.log(`[squadChat] Lead step — using invokeLLMStream directly (skip gateway), step=${currentStep}`);
     try {
-      for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
+      for await (const chunk of streamFromLLM(effectiveSystemPrompt, recentHistory, effectiveUserMessage)) {
         fullOutput += chunk;
         send("delta", { text: chunk });
       }
@@ -749,7 +780,7 @@ async function tryExecuteSquadChat(params: {
       try {
         // Forge fallback — uses BUILT_IN_FORGE_API_KEY / BUILT_IN_FORGE_API_URL
         const forgeMessages = [
-          { role: "system" as const, content: systemPrompt },
+          { role: "system" as const, content: effectiveSystemPrompt },
           ...recentHistory.slice(-10).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
           { role: "user" as const, content: effectiveUserMessage },
         ];
