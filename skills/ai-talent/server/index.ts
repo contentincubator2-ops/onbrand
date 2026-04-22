@@ -42,6 +42,7 @@ import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
 import { computeMissionResources } from "./missionResourceComputer";
+import { backpressureMiddleware } from "./middleware/backpressure";
 
 const app = express();
 
@@ -142,11 +143,13 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: tr
 // ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
 app.use("/api/export", exportRouter);
-app.use("/api/a2a", a2aStreamRouter);
+// BP-1: Backpressure guard on A2A SSE stream route
+app.use("/api/a2a", backpressureMiddleware, a2aStreamRouter);
 
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
-app.use("/api/chat", missionChatRouter);  // Mission chat 統一入口 (squad-first routing)
+// BP-1: Backpressure guard — shed load on /api/chat and /api/a2a (hot SSE routes)
+app.use("/api/chat", backpressureMiddleware, missionChatRouter);  // Mission chat 統一入口 (squad-first routing)
 app.use("/api/pm", pmRouter);
 app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);
