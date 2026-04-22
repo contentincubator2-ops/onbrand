@@ -28,7 +28,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
-import { getJwtSecret } from "../_core/env";
+import { ENV, getJwtSecret } from "../_core/env";
 import localPool from "../localDb";
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 
@@ -51,9 +51,15 @@ import { buildSquadAgentPrompt, buildSecondOpinionPrompt, buildLeadSynthesisProm
 
 export const missionChatRouter = Router();
 
-const GATEWAY_HTTP = "http://localhost:18790";
-const GATEWAY_TOKEN = "mos-pm-claw-2026";
-const SENDGRID_KEY = process.env.SENDGRID_API_KEY ?? "";
+function requireGateway(): { http: string; token: string } {
+  const http = ENV.GATEWAY_HTTP;
+  const token = ENV.GATEWAY_TOKEN;
+  if (!http || !token) {
+    throw new Error("[missionChatRouter] GATEWAY_HTTP and GATEWAY_TOKEN must be set in env");
+  }
+  return { http, token };
+}
+const SENDGRID_KEY = ENV.SENDGRID_API_KEY ?? "";
 const PPT_EMAIL = "cjwang@sowork.tw";
 
 // P0 fix: use localPool (mos_db) for all DB operations
@@ -196,9 +202,10 @@ async function* streamFromGateway(
   agentId: string,
   messages: { role: string; content: string }[]
 ): AsyncGenerator<{ event: string; data: unknown }> {
-  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+  const { http, token } = requireGateway();
+  const resp = await fetch(`${http}/v1/chat/completions`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${GATEWAY_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: agentId, messages, stream: true }),
     signal: AbortSignal.timeout(180_000),
   });

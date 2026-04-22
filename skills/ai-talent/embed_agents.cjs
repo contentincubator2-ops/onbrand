@@ -1,22 +1,37 @@
 #!/usr/bin/env node
 // Batch embed all agents using text-embedding-3-large (3072 dims)
-// Usage: node embed_agents.js
+// Usage: node embed_agents.cjs
+//
+// Requires the following env vars (set via .env / Doppler — never committed):
+//   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+//   AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY
+//   AZURE_OPENAI_EMBEDDING_DEPLOYMENT (optional, defaults to text-embedding-3-large)
 
 const mysql = require('mysql2/promise');
 const https = require('https');
 
+function requireEnv(name) {
+  const v = process.env[name];
+  if (!v) {
+    console.error(`[embed] Missing required env var: ${name}`);
+    console.error(`[embed] Load your .env (e.g. \`set -a && source .env && set +a\`) then retry.`);
+    process.exit(1);
+  }
+  return v;
+}
+
 const DB_CONFIG = {
-  host: 'ytcreator-ai-server.mysql.database.azure.com',
-  port: 3306,
-  user: 'openclaw',
-  password: 'u40d6d070db7e92982940a62ee40c4261',
-  database: 'sowork_db',
-  ssl: { rejectUnauthorized: false },
+  host:     requireEnv('DB_HOST'),
+  port:     parseInt(process.env.DB_PORT || '3306', 10),
+  user:     requireEnv('DB_USER'),
+  password: requireEnv('DB_PASSWORD'),
+  database: requireEnv('DB_NAME'),
+  ssl: (process.env.DB_SSL ?? 'true') === 'true' ? { rejectUnauthorized: false } : undefined,
 };
 
-const AZURE_ENDPOINT = 'https://sowork-foundry-claw-api-router.openai.azure.com';
-const AZURE_KEY = 'FQV8iUhxE67wByWpUfVCgBLmDW338pQecBNYFRg7Xkz400MgUb8nJQQJ99CCACYeBjFXJ3w3AAAAACOGuzAa';
-const DEPLOYMENT = 'text-embedding-3-large';
+const AZURE_ENDPOINT = requireEnv('AZURE_OPENAI_ENDPOINT').replace(/\/+$/, '');
+const AZURE_KEY      = requireEnv('AZURE_OPENAI_API_KEY');
+const DEPLOYMENT     = process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT || 'text-embedding-3-large';
 const BATCH_SIZE = 20;
 const DELAY_MS = 500; // rate limit buffer
 
@@ -86,7 +101,7 @@ async function main() {
           `INSERT INTO agent_embeddings (agent_id, embed_text, embedding, embed_model)
            VALUES (?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE embedding=VALUES(embedding), embed_model=VALUES(embed_model), updated_at=NOW()`,
-          [agent.id, texts[j].slice(0, 500), embStr, 'text-embedding-3-large']
+          [agent.id, texts[j].slice(0, 500), embStr, DEPLOYMENT]
         );
       }
       done += batch.length;

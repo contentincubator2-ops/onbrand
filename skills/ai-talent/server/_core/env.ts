@@ -46,6 +46,18 @@ const envSchema = z.object({
   AZURE_SEARCH_API_KEY:    z.string().optional(),
   AZURE_SEARCH_INDEX_NAME: z.string().default("brand-knowledge"),
 
+  // Azure OpenAI (embeddings + chat). Required when running RAG/embedding flows.
+  AZURE_OPENAI_ENDPOINT: z.string().url().optional(),
+  AZURE_OPENAI_API_KEY:  z.string().optional(),
+  AZURE_OPENAI_EMBEDDING_DEPLOYMENT: z.string().default("text-embedding-3-large"),
+
+  // OpenClaw Gateway (PM orchestrator / squad workers). Required in production.
+  GATEWAY_HTTP:  z.string().url().optional(),
+  GATEWAY_TOKEN: z.string().optional(),
+
+  // Transactional email (PPT delivery, unsubscribe flows)
+  SENDGRID_API_KEY: z.string().optional(),
+
   // OAuth — optional for deployments that don't use them
   OAUTH_SERVER_URL:    z.string().optional(),
   OWNER_OPEN_ID:       z.string().optional(),

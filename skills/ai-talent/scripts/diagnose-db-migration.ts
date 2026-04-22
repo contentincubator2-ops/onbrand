@@ -109,15 +109,21 @@ async function checkDatabase(
 async function main() {
   console.log('🔍 Phase PreA: Database Consolidation Diagnostic\n');
 
-  // Get environment variables or use defaults
-  const soworkHost = process.env.SOWORK_DB_HOST || 'ytcreator-ai-server.mysql.database.azure.com';
-  const soworkUser = process.env.SOWORK_DB_USER || 'ytcreator';
-  const soworkPassword = process.env.SOWORK_DB_PASSWORD || '';
+  // Get environment variables — no hardcoded production fallbacks. Fail fast
+  // if required credentials are missing (see docs/runbooks/secret-rotation.md).
+  const must = (name: string): string => {
+    const v = process.env[name];
+    if (!v) throw new Error(`[diagnose-db-migration] Missing required env var: ${name}`);
+    return v;
+  };
+  const soworkHost = must('SOWORK_DB_HOST');
+  const soworkUser = must('SOWORK_DB_USER');
+  const soworkPassword = must('SOWORK_DB_PASSWORD');
   const soworkDatabase = process.env.SOWORK_DB_NAME || 'sowork_db';
 
   const localHost = process.env.LOCAL_DB_HOST || 'localhost';
-  const localUser = process.env.LOCAL_DB_USER || 'mos_user';
-  const localPassword = process.env.LOCAL_DB_PASSWORD || 'mos_secure_2026';
+  const localUser = must('LOCAL_DB_USER');
+  const localPassword = must('LOCAL_DB_PASSWORD');
   const localDatabase = process.env.LOCAL_DB_NAME || 'mos_db';
 
   console.log('📊 Connecting to databases...\n');

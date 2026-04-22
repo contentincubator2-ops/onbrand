@@ -1,3 +1,13 @@
+// PM2 process config for Marketing-OS (ai-talent skill).
+//
+// Secrets have been removed from this file (see issue #1). Runtime env now comes
+// from `.env` or Doppler; PM2 inherits the shell env. When launching locally:
+//
+//   set -a && source .env && set +a
+//   pm2 start ecosystem.config.cjs --update-env
+//
+// See docs/runbooks/secret-rotation.md for the full secret-management flow.
+
 module.exports = {
   apps: [{
     name: 'marketing-os',
@@ -9,30 +19,10 @@ module.exports = {
     max_restarts: 10,
     restart_delay: 5000,
     max_memory_restart: '512M',
+    // No literal secrets. Everything the app needs is read via process.env at
+    // runtime; env.ts (zod-validated) will fail fast if anything required is missing.
     env: {
       NODE_ENV: 'production',
-      SKILLS_PATH: '/home/azureuser/A2A-Marketing-Claw/skills',
-      PORT: '3101',
-      TRUST_PROXY: '1',
-      DB_HOST: 'ytcreator-ai-server.mysql.database.azure.com',
-      DB_PORT: '3306',
-      DB_USER: 'openclaw',
-      DB_PASSWORD: 'u40d6d070db7e92982940a62ee40c4261',
-      DB_NAME: 'sowork_db',
-      DB_SSL: 'true',
-      JWT_SECRET: 'mos-enterprise-jwt-secret-2026-sowork-ai',
-      GOOGLE_GEMINI_API_KEY: 'AIzaSyAGOLFGqgCBSMy_mAKd0YOULgJLGMdPPiA',
-      OPENROUTER_API_KEY: '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',
-      AZURE_FOUNDRY_API_KEY: 'EMw03pDcy50OuvxhLf6Ad2a5bMDWdkxCwEaXbnqCUT44D9WZp8MqJQQJ99CCACYeBjFXJ3w3AAAAACOGi40x',
-      AZURE_FOUNDRY_PROJECT_ENDPOINT: 'https://soworkclawagents.services.ai.azure.com/api/projects/proj-sowork-claw',
-      AZURE_OPENAI_ENDPOINT: 'https://soworkclawagents.openai.azure.com/openai/v1',
-      GOOGLE_AI_API_KEY: 'AIzaSyAGOLFGqgCBSMy_mAKd0YOULgJLGMdPPiA',
-      SESSION_SECRET: 'mos-enterprise-secret-2026',
-      LOCAL_DB_HOST: 'localhost',
-      LOCAL_DB_PORT: '3306',
-      LOCAL_DB_USER: 'mos_user',
-      LOCAL_DB_PASSWORD: 'mos_secure_2026',
-      LOCAL_DB_NAME: 'mos_db',
     },
     error_file: '/home/azureuser/logs/marketing-os-error.log',
     out_file: '/home/azureuser/logs/marketing-os-out.log',

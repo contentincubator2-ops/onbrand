@@ -32,19 +32,25 @@ async function executePhasePreA() {
     success: false,
   };
 
-  // Connection configurations
+  // Connection configurations — production credentials must come from env.
+  // No hardcoded production fallbacks: fail fast if SOWORK_DB_* is missing.
+  const must = (name: string): string => {
+    const v = process.env[name];
+    if (!v) throw new Error(`[execute-phase-prea] Missing required env var: ${name}`);
+    return v;
+  };
   const soworkConfig = {
-    host: process.env.SOWORK_DB_HOST || 'ytcreator-ai-server.mysql.database.azure.com',
-    user: process.env.SOWORK_DB_USER || 'lahbqgrqit',
-    password: process.env.SOWORK_DB_PASSWORD || 'SoWork2026db',
-    database: process.env.SOWORK_DB_NAME || 'sowork_db',
+    host:     must('SOWORK_DB_HOST'),
+    user:     must('SOWORK_DB_USER'),
+    password: must('SOWORK_DB_PASSWORD'),
+    database: must('SOWORK_DB_NAME'),
   };
 
   const mosConfig = {
-    host: process.env.LOCAL_DB_HOST || 'localhost',
-    port: parseInt(process.env.LOCAL_DB_PORT || '3306'),
-    user: process.env.LOCAL_DB_USER || 'mos_user',
-    password: process.env.LOCAL_DB_PASSWORD || 'mos_secure_2026',
+    host:     process.env.LOCAL_DB_HOST || 'localhost',
+    port:     parseInt(process.env.LOCAL_DB_PORT || '3306'),
+    user:     must('LOCAL_DB_USER'),
+    password: must('LOCAL_DB_PASSWORD'),
     database: process.env.LOCAL_DB_NAME || 'mos_db',
   };
 

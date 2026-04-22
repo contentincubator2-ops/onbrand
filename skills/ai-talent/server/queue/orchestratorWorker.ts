@@ -1,9 +1,16 @@
 import { Worker, Job } from 'bullmq';
 import { logEvent, newSessionId } from "../_core/sessionLogger";
+import { ENV } from "../_core/env";
 
 // ── OpenClaw Gateway helper ───────────────────────────────────────────────────
-const GATEWAY_HTTP = "http://localhost:18790";
-const GATEWAY_TOKEN = "mos-pm-claw-2026";
+function requireGateway(): { http: string; token: string } {
+  const http = ENV.GATEWAY_HTTP;
+  const token = ENV.GATEWAY_TOKEN;
+  if (!http || !token) {
+    throw new Error("[orchestratorWorker] GATEWAY_HTTP and GATEWAY_TOKEN must be set in env");
+  }
+  return { http, token };
+}
 
 async function callGateway(
   agentId: string,
@@ -11,13 +18,14 @@ async function callGateway(
   stream = false,
   ctx?: { sessionId?: string; userId?: number | null }
 ): Promise<string> {
+  const { http, token } = requireGateway();
   const t0 = Date.now();
   const sid = ctx?.sessionId ?? newSessionId();
   try {
-    const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+    const resp = await fetch(`${http}/v1/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GATEWAY_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ model: agentId, messages, stream }),
@@ -45,10 +53,11 @@ async function* streamGateway(
   agentId: string,
   messages: { role: string; content: string }[]
 ): AsyncGenerator<string> {
-  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+  const { http, token } = requireGateway();
+  const resp = await fetch(`${http}/v1/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${GATEWAY_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model: agentId, messages, stream: true }),

@@ -1,9 +1,25 @@
+#!/usr/bin/env node
+// Populate squad_members from squads.members JSON.
+// Reads DB credentials from env: LOCAL_DB_HOST, LOCAL_DB_USER, LOCAL_DB_PASSWORD, LOCAL_DB_NAME.
+
 const mysql = require('mysql2/promise');
+
+function requireEnv(name) {
+  const v = process.env[name];
+  if (!v) {
+    console.error(`[assign] Missing required env var: ${name}`);
+    console.error(`[assign] Load your .env (e.g. \`set -a && source .env && set +a\`) then retry.`);
+    process.exit(1);
+  }
+  return v;
+}
 
 async function main() {
   const conn = await mysql.createConnection({
-    host: 'localhost', user: 'mos_user',
-    password: 'mos_secure_2026', database: 'mos_db'
+    host:     requireEnv('LOCAL_DB_HOST'),
+    user:     requireEnv('LOCAL_DB_USER'),
+    password: requireEnv('LOCAL_DB_PASSWORD'),
+    database: requireEnv('LOCAL_DB_NAME'),
   });
 
   // Get all squads with their members JSON

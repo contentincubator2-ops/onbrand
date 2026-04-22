@@ -1,0 +1,55 @@
+# Gitleaks config for Marketing-OS. Catches committed secrets before they reach
+# main. Runs in CI (see .github/workflows/ci.yml) and optionally as a pre-commit
+# hook; see docs/runbooks/secret-rotation.md for local setup.
+#
+# Philosophy:
+#   - Use the bundled default rule pack for provider keys.
+#   - Add Marketing-OS–specific patterns for the gateway token + DB URLs.
+#   - Allow-list paths that intentionally contain placeholder strings
+#     (.env.example, this config, the rotation runbook).
+
+title = "Marketing-OS gitleaks config"
+
+[extend]
+useDefault = true
+
+# ── Marketing-OS rules ───────────────────────────────────────────────────────
+
+[[rules]]
+id = "openclaw-gateway-token"
+description = "OpenClaw Gateway bearer token"
+regex = '''mos-pm-claw-[0-9]{4}'''
+tags = ["openclaw", "gateway"]
+
+[[rules]]
+id = "azure-mysql-password-url"
+description = "Azure MySQL connection string with embedded password"
+regex = '''mysql:\/\/[A-Za-z0-9_.-]+:[^@\s"']+@[A-Za-z0-9.-]+\.mysql\.database\.azure\.com'''
+tags = ["azure", "mysql"]
+
+[[rules]]
+id = "azure-openai-api-key"
+description = "Azure OpenAI / Foundry API key (52-char alnum, typical shape)"
+regex = '''['"][A-Za-z0-9]{52}['"]'''
+tags = ["azure", "openai"]
+# The 52-char pattern also matches JWT secrets and some hashes; require adjacency
+# to an AZURE/OPENAI token to cut false positives.
+[rules.allowlist]
+regexes = [
+  '''node_modules''',
+  '''package-lock\.json''',
+]
+
+# ── Allow-list ───────────────────────────────────────────────────────────────
+# Paths where placeholder/example strings are expected.
+
+[allowlist]
+description = "Allow examples, configs, and docs that intentionally contain patterns"
+paths = [
+  '''\.env\.example$''',
+  '''\.gitleaks\.toml$''',
+  '''docs/runbooks/secret-rotation\.md$''',
+  '''docs/superpowers/specs/.*\.md$''',
+  '''package-lock\.json$''',
+  '''node_modules/.*''',
+]

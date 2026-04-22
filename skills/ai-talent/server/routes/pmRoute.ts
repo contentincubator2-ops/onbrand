@@ -11,19 +11,29 @@
 
 import { Router, Request, Response } from "express";
 import { createConnection } from "mysql2/promise";
+import { ENV } from "../_core/env";
 
 const router = Router();
 
-const GATEWAY_HTTP = "http://localhost:18790";
-const GATEWAY_TOKEN = "mos-pm-claw-2026";
+function requireGateway(): { http: string; token: string } {
+  const http = ENV.GATEWAY_HTTP;
+  const token = ENV.GATEWAY_TOKEN;
+  if (!http || !token) {
+    throw new Error("[pmRoute] GATEWAY_HTTP and GATEWAY_TOKEN must be set in env");
+  }
+  return { http, token };
+}
 const DEFAULT_AGENT = "openclaw/pm";
 
 async function queryDbAgents(keyword: string): Promise<string> {
   let conn;
   try {
     conn = await createConnection({
-      host: "localhost", user: "mos_user",
-      password: "mos_secure_2026", database: "mos_db", connectTimeout: 3000,
+      host:     ENV.LOCAL_DB_HOST ?? "localhost",
+      user:     ENV.LOCAL_DB_USER ?? "mos_user",
+      password: ENV.LOCAL_DB_PASSWORD ?? "",
+      database: ENV.LOCAL_DB_NAME ?? "mos_db",
+      connectTimeout: 3000,
     });
     const kw = `%${keyword}%`;
     const [rows] = await conn.execute(
@@ -53,6 +63,7 @@ async function streamViaGatewayHTTP(
   onDone: (full: string) => void,
   onError: (err: string) => void
 ): Promise<void> {
+  const { http, token } = requireGateway();
   const body = JSON.stringify({
     model: agentId,
     messages: [{ role: "user", content: message }],
@@ -60,10 +71,10 @@ async function streamViaGatewayHTTP(
     user: sessionKey,  // stable session routing
   });
 
-  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
+  const resp = await fetch(`${http}/v1/chat/completions`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${GATEWAY_TOKEN}`,
+      "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
       "x-openclaw-session-key": sessionKey,
     },
