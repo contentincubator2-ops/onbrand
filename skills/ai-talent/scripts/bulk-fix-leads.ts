@@ -377,7 +377,7 @@ async function main() {
       });
 
       await pool.execute(
-        `UPDATE squads SET agents = ?, updatedAt = NOW() WHERE id = ?`,
+        `UPDATE squads SET agents = ?, updated_at = NOW() WHERE id = ?`,
         [JSON.stringify(newAgents), sq.id],
       );
 
