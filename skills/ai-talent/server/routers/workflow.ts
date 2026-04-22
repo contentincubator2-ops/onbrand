@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { marketingQueue } from '../queue/marketingQueue';
+import { buildJobId } from '../queue/jobId';
 import { randomUUID } from 'crypto';
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -414,17 +415,21 @@ export const workflowRouter = router({
       // SEC: rate limit — 10 requests/minute per IP
       const ip = (ctx as any)?.req?.ip ?? (ctx as any)?.ip ?? 'unknown';
       _checkRateLimit(`start:${ip}`, 10);
-      const jobId = randomUUID();
-      const job = await marketingQueue.add('execute-task', {
-        jobId,
+      // Use a stable mission ID derived from the request so that duplicate
+      // submissions within a session are idempotent (BullMQ dedupes on jobId).
+      const missionId = randomUUID();
+      const payload = {
+        jobId: missionId,
         userRequest: input.userRequest,
         brand: input.brand,
         industry: input.industry,
         taskType: input.taskType,
-      }, {
-        jobId,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
+      };
+      const deterministicJobId = buildJobId(missionId, 'execute-task', payload as Record<string, unknown>);
+      const job = await marketingQueue.add('execute-task', payload, {
+        jobId: deterministicJobId,
+        // defaultJobOptions (attempts:5, backoff:exponential) already applied
+        // by the Queue constructor; explicit overrides can still be passed here.
       });
       return { jobId: job.id, status: 'queued' };
     }),
@@ -491,13 +496,20 @@ export const workflowRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { squadQueue } = await import('../queue/squadLeaderWorker');
-      const jobId = Date.now().toString();
-      const job = await squadQueue.add('squad-task', {
-        jobId,
+      const missionId = randomUUID();
+      const payload = {
+        jobId: missionId,
         ...input,
-      }, {
-        attempts: 2,
-        backoff: { type: 'exponential', delay: 3000 },
+      };
+      const deterministicJobId = buildJobId(
+        missionId,
+        'squad-task',
+        payload as Record<string, unknown>,
+      );
+      const job = await squadQueue.add('squad-task', payload, {
+        jobId: deterministicJobId,
+        // defaultJobOptions (attempts:5, backoff:exponential) already applied
+        // by the Queue constructor.
       });
       return { jobId: job.id, status: 'queued' };
     }),

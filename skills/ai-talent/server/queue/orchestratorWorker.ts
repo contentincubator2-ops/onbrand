@@ -1,4 +1,4 @@
-import { Worker, Job } from 'bullmq';
+import { Worker, Job, UnrecoverableError } from 'bullmq';
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 import { ENV } from "../_core/env";
 
@@ -34,6 +34,10 @@ async function callGateway(
     if (!resp.ok) {
       const errText = await resp.text();
       logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug: agentId, eventType: "gateway_error", isGatewayOk: false, latencyMs: Date.now()-t0, errorMsg: `${resp.status}: ${errText.slice(0,200)}` });
+      // 4xx errors are caller mistakes; retrying won't help — short-circuit.
+      if (resp.status >= 400 && resp.status < 500) {
+        throw new UnrecoverableError(`Gateway ${resp.status}: ${errText}`);
+      }
       throw new Error(`Gateway ${resp.status}: ${errText}`);
     }
     const data = await resp.json() as any;
@@ -87,7 +91,9 @@ async function* streamGateway(
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { connection, MarketingJobData, MarketingJobResult } from './marketingQueue';
+import { connection, MarketingJobData, MarketingJobResult, DEFAULT_JOB_OPTIONS } from './marketingQueue';
+import { moveToDlq } from './dlq';
+export { UnrecoverableError };
 import { matchAgents } from '../agentMatcher';
 import { invokeLLM, invokeLLMStream } from '../_core/llm';
 import { getModelForTask, inferTaskType } from '../_core/modelRouter';
@@ -237,14 +243,47 @@ export function startOrchestratorWorker() {
     {
       connection,
       concurrency: 5,
+      // Queue-level default options (attempts + backoff) are set on the Queue
+      // itself via defaultJobOptions; worker just needs the connection config.
     }
   );
 
   worker.on('completed', (job) => {
     console.log('[A2A Worker] Job ' + job.id + ' completed');
   });
+
   worker.on('failed', (job, err) => {
     console.error('[A2A Worker] Job ' + (job ? job.id : '?') + ' failed:', err.message);
+    if (!job) return;
+    // Only move to DLQ when all attempts are exhausted.
+    if (job.attemptsMade >= (job.opts.attempts ?? DEFAULT_JOB_OPTIONS.attempts)) {
+      void moveToDlq('marketing-jobs', {
+        originalJobId: job.id,
+        sourceQueue: 'marketing-jobs',
+        jobName: job.name,
+        data: job.data,
+        failedReason: job.failedReason ?? err.message,
+        stacktrace: job.stacktrace ?? [],
+        attemptsMade: job.attemptsMade,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Graceful shutdown on SIGTERM (issue #13 — worker side only).
+  // HTTP / SSE / pool shutdown is tracked in issue #25.
+  // worker.close(false) = graceful drain (wait for active jobs to finish).
+  // A process-level SIGKILL / watchdog should enforce the 30 s hard limit.
+  process.once('SIGTERM', () => {
+    console.log('[A2A Worker] SIGTERM received, closing worker gracefully (30 s window)...');
+    worker.close(false).catch((err) => {
+      console.error('[A2A Worker] Error during graceful shutdown:', err);
+    });
+    // Hard-kill after 30 s if the worker hasn't drained by then.
+    setTimeout(() => {
+      console.error('[A2A Worker] Graceful shutdown timed out (30 s), forcing exit.');
+      process.exit(1);
+    }, 30_000).unref();
   });
 
   console.log('[A2A Worker] Orchestrator started, listening for marketing-jobs...');

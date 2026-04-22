@@ -1,4 +1,4 @@
-import { Worker, Job, Queue } from 'bullmq';
+import { Worker, Job, Queue, UnrecoverableError } from 'bullmq';
 import { logEvent, newSessionId } from "../_core/sessionLogger";
 import { ENV } from "../_core/env";
 
@@ -32,6 +32,10 @@ async function callGateway(
       const errText = await resp.text();
       logEvent({ sessionId: sid, userId: ctx?.userId, agentSlug, eventType: "gateway_error",
         isGatewayOk: false, latencyMs: Date.now() - t0, errorMsg: `${resp.status}: ${errText.slice(0, 200)}` });
+      // 4xx errors are caller mistakes; retrying won't help — short-circuit.
+      if (resp.status >= 400 && resp.status < 500) {
+        throw new UnrecoverableError(`Gateway ${resp.status}: ${errText}`);
+      }
       throw new Error(`Gateway ${resp.status}: ${errText}`);
     }
     const data    = await resp.json() as any;
@@ -51,7 +55,9 @@ async function callGateway(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { connection } from './marketingQueue';
+import { connection, DEFAULT_JOB_OPTIONS } from './marketingQueue';
+import { moveToDlq } from './dlq';
+export { UnrecoverableError };
 import localPool from '../localDb';
 
 export interface SquadJobData {
@@ -82,7 +88,10 @@ export interface SquadJobResult {
   executionTimeMs: number;
 }
 
-export const squadQueue = new Queue('squad-jobs', { connection });
+export const squadQueue = new Queue('squad-jobs', {
+  connection,
+  defaultJobOptions: DEFAULT_JOB_OPTIONS,
+});
 
 // ── Gateway slug resolver ─────────────────────────────────────────────────────
 // OpenClaw gateway requires "openclaw/<slug>" format.
@@ -299,13 +308,45 @@ export function startSquadLeaderWorker() {
   );
 
   worker.on("completed", (job) => {
-    console.log(`[Squad Worker] ✅ job ${job.id} completed in ${job.returnvalue?.executionTimeMs}ms`);
+    console.log(`[Squad Worker] job ${job.id} completed in ${job.returnvalue?.executionTimeMs}ms`);
   });
+
   worker.on("failed", (job, err) => {
-    console.error(`[Squad Worker] ❌ job ${job?.id} failed:`, err.message);
+    console.error(`[Squad Worker] job ${job?.id} failed:`, err.message);
+    if (!job) return;
+    // Only move to DLQ when all attempts are exhausted.
+    if (job.attemptsMade >= (job.opts.attempts ?? DEFAULT_JOB_OPTIONS.attempts)) {
+      void moveToDlq('squad-jobs', {
+        originalJobId: job.id,
+        sourceQueue: 'squad-jobs',
+        jobName: job.name,
+        data: job.data,
+        failedReason: job.failedReason ?? err.message,
+        stacktrace: job.stacktrace ?? [],
+        attemptsMade: job.attemptsMade,
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
+
   worker.on("error", (err) => {
     console.error(`[Squad Worker] worker error:`, err.message);
+  });
+
+  // Graceful shutdown on SIGTERM (issue #13 — worker side only).
+  // HTTP / SSE / pool shutdown is tracked in issue #25.
+  // worker.close(false) = graceful drain (wait for active jobs to finish).
+  // A process-level SIGKILL / watchdog should enforce the 30 s hard limit.
+  process.once('SIGTERM', () => {
+    console.log('[Squad Worker] SIGTERM received, closing worker gracefully (30 s window)...');
+    worker.close(false).catch((err) => {
+      console.error('[Squad Worker] Error during graceful shutdown:', err);
+    });
+    // Hard-kill after 30 s if the worker hasn't drained by then.
+    setTimeout(() => {
+      console.error('[Squad Worker] Graceful shutdown timed out (30 s), forcing exit.');
+      process.exit(1);
+    }, 30_000).unref();
   });
 
   console.log("[Squad Worker] Step-driven Squad Leader Worker started (concurrency: 3)");

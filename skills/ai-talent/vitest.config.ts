@@ -20,6 +20,9 @@ export default defineConfig({
       "**/node_modules/**",
       "client/src/components/chat/AgentNavigation.test.tsx",
       "client/src/components/chat/TaskProgressTracker.test.tsx",
+      // Tests moved to mission-chat/ in recent commits — same jsx-dev-runtime issue.
+      "client/src/components/mission-chat/AgentNavigation.test.tsx",
+      "client/src/components/mission-chat/TaskProgressTracker.test.tsx",
     ],
     environmentMatchGlobs: [
       ["client/src/**/*.test.{ts,tsx}", "jsdom"],

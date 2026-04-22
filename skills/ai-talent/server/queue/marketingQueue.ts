@@ -5,7 +5,19 @@ export const connection = new IORedis(process.env.REDIS_URL || 'redis://localhos
   maxRetriesPerRequest: null,
 });
 
-export const marketingQueue = new Queue('marketing-jobs', { connection });
+/**
+ * Default retry options applied to every job on every queue.
+ * Callers may override per-add, but this sets the floor.
+ */
+export const DEFAULT_JOB_OPTIONS = {
+  attempts: 5,
+  backoff: { type: 'exponential' as const, delay: 2000 },
+} as const;
+
+export const marketingQueue = new Queue('marketing-jobs', {
+  connection,
+  defaultJobOptions: DEFAULT_JOB_OPTIONS,
+});
 
 export interface MarketingJobData {
   jobId: string;
