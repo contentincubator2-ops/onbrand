@@ -1,0 +1,77 @@
+name: Admin — Bulk Fix Squad Leads (Plan B)
+
+# For every squad whose Lead is a placeholder (primarily id=25 李承翰)
+# or whose Lead primarySkill doesn't align with the squad's methodology,
+# generate a methodology-aligned Lead agent and swap it in.
+#
+# Allowlist skips the 9 L1 Leads already re-seeded by L1-brand.ts.
+# Blocklist skips squad #11 (golden reference brand-archetype-positioning).
+#
+# Run dry-run FIRST to preview which squads will be touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run (preview) or apply (write to DB)'
+        required: true
+        type: choice
+        options:
+          - dry-run
+          - apply
+      only:
+        description: 'Optional comma-separated squad ids (e.g. 637,639,640)'
+        required: false
+        type: string
+
+jobs:
+  bulk-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          MODE: ${{ inputs.mode }}
+          ONLY_IDS: ${{ inputs.only }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 900s
+          envs: MODE,ONLY_IDS,GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Step 1: Pull latest main ====="
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 2: Run bulk-fix-leads (mode=$MODE) ====="
+            cd "$AI"
+            CMD_ARGS=""
+            if [ "$MODE" = "apply" ]; then
+              CMD_ARGS="--apply"
+            else
+              CMD_ARGS="--dry-run"
+            fi
+            if [ -n "$ONLY_IDS" ]; then
+              CMD_ARGS="$CMD_ARGS --only=$ONLY_IDS"
+            fi
+            echo "Running: npx tsx scripts/bulk-fix-leads.ts $CMD_ARGS"
+            npx tsx scripts/bulk-fix-leads.ts $CMD_ARGS
+
+            if [ "$MODE" = "apply" ]; then
+              echo ""
+              echo "===== Step 3: Re-run audit to verify ====="
+              npx tsx scripts/audit-all-squad-leads.ts 2>&1 | grep -A 6 "Per-layer summary" | head -10
+            fi
+
+            echo ""
+            echo "===== Done ====="
