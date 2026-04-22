@@ -54,6 +54,15 @@ async function callGateway(
 import { connection } from './marketingQueue';
 import localPool from '../localDb';
 
+// Heartbeat helpers (issue #14): write heartbeat:<queue> to Redis with 10 s TTL.
+// /ready fails if the key is missing or >20 s old.
+const HEARTBEAT_TTL_S = 10;
+async function writeHeartbeat(queueName: string): Promise<void> {
+  try {
+    await connection.set(`heartbeat:${queueName}`, String(Date.now()), "EX", HEARTBEAT_TTL_S);
+  } catch { /* non-fatal */ }
+}
+
 export interface SquadJobData {
   jobId:       string;
   squadId:     number;
@@ -106,9 +115,16 @@ function gatewaySlug(slug?: string | null): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function startSquadLeaderWorker() {
+  // Write an initial heartbeat so /ready doesn't fail before the first job.
+  // Refresh on every job cycle (TTL = 10 s) and via a periodic timer.
+  writeHeartbeat('squad-leader').catch(() => {});
+  const heartbeatTimer = setInterval(() => writeHeartbeat('squad-leader'), 8_000);
+  heartbeatTimer.unref?.();
+
   const worker = new Worker<SquadJobData, SquadJobResult>(
     'squad-jobs',
     async (job: Job<SquadJobData>) => {
+      await writeHeartbeat('squad-leader'); // refresh on each job
       const startTime = Date.now();
       const { squadId, userRequest, brand, industry, userId } = job.data;
       const ctx = { sessionId: newSessionId(), userId };

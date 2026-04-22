@@ -42,6 +42,7 @@ import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
 import { computeMissionResources } from "./missionResourceComputer";
+import { runReadinessChecks, BUILD_VERSION, BUILD_COMMIT } from "./readiness";
 
 const app = express();
 
@@ -113,7 +114,8 @@ if (existsSync(publicDir)) {
     if (
       req.path.startsWith("/trpc") ||
       req.path.startsWith("/api") ||
-      req.path === "/health"
+      req.path === "/health" ||
+      req.path === "/ready"
     ) {
       return next();
     }
@@ -136,8 +138,9 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 app.use("/trpc", limiter);
 
-// SEC-7: Separate, more lenient rate limiter for /health (no version info leaked)
-const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, validate: false });
+// SEC-7: Separate, more lenient rate limiters for probe endpoints
+const healthLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, validate: false });
+const readyLimiter  = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, validate: false });
 
 // ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
@@ -152,19 +155,28 @@ app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);
 app.use("/api/missions", missionSquadRouter);
 
-// ─── Health check (SEC-7: no version number) ────────────────────────────────
-app.get("/health", healthLimiter, async (_req, res) => {
-  const [dbOk, soworkDbOk] = await Promise.all([pingDb(), pingSoworkDb()]);
-  const billingQueueLength = getBillingRetryQueueLength();
+// ─── Liveness probe — fast, no external deps ────────────────────────────────
+// GET /health  (<50 ms target)
+// Returns: { status: "ok", version, commit }
+// version = package.json version; commit = GIT_COMMIT env or git rev-parse HEAD at boot.
+app.get("/health", healthLimiter, (_req, res) => {
   res.json({
-    status:  dbOk && soworkDbOk && billingQueueLength === 0 ? "ok" : "degraded",
-    service: "ai-talent",
-    // SEC-7: version intentionally omitted
-    db:      dbOk ? "connected" : "unreachable",
-    soworkDb: soworkDbOk ? "connected" : "unreachable",
-    billingQueueLength,          // monitor: alert if > 10
-    ts:      new Date().toISOString(),
+    status:  "ok",
+    version: BUILD_VERSION,
+    commit:  BUILD_COMMIT,
   });
+});
+
+// ─── Readiness probe — checks all hard dependencies ─────────────────────────
+// GET /ready
+// Checks: MySQL SELECT 1 (500 ms timeout), Redis PING, BullMQ worker heartbeats,
+//         schema_migrations dirty=0, cached LLM provider probe (60 s TTL).
+// LLM probe failures → status "degraded", HTTP 200 (non-fatal).
+// All other failures → status "fail", HTTP 503.
+app.get("/ready", readyLimiter, async (_req, res) => {
+  const result = await runReadinessChecks();
+  const httpStatus = result.status === "fail" ? 503 : 200;
+  res.status(httpStatus).json(result);
 });
 
 // Mount tRPC router
@@ -275,7 +287,8 @@ async function backfillMissionResources(): Promise<void> {
 
 const server = app.listen(PORT, async () => {
   console.log(`[server] sowork-enterprise listening on port ${PORT}`);
-  console.log(`[server] health: http://localhost:${PORT}/health`);
+  console.log(`[server] liveness:   http://localhost:${PORT}/health`);
+  console.log(`[server] readiness:  http://localhost:${PORT}/ready`);
   await runStartupMigrations();
   startOrchestratorWorker();
   console.log("[A2A] Orchestrator Worker started");
@@ -288,6 +301,23 @@ const server = app.listen(PORT, async () => {
   }
   // Backfill mission resources for existing missions (fire-and-forget)
   backfillMissionResources();
+
+  // PM2 --wait-ready: signal readiness to the process manager once /ready passes.
+  // runReadinessChecks() is called once here; PM2 stops waiting and starts routing
+  // traffic only after this signal is sent. LLM probe failures are non-fatal.
+  try {
+    const readiness = await runReadinessChecks();
+    if (readiness.status !== "fail") {
+      if (typeof process.send === "function") {
+        process.send("ready");
+        console.log("[server] sent 'ready' to PM2");
+      }
+    } else {
+      console.warn("[server] readiness check failed at startup — not sending 'ready':", readiness.checks);
+    }
+  } catch (err) {
+    console.error("[server] readiness probe error at startup:", err);
+  }
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {

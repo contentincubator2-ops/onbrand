@@ -79,7 +79,6 @@ jobs:
 
             echo "===== Restart (delete + start fresh) ====="
             AI=/opt/marketing-os/app/skills/ai-talent
-            TSX=$AI/node_modules/.bin/tsx
 
             # Source .env into shell so PM2's forked process inherits real env
             # vars. This avoids ESM import-hoisting race where env.ts runs
@@ -89,14 +88,29 @@ jobs:
             set +a
             echo "JWT_SECRET in shell: $([ -n "$JWT_SECRET" ] && echo YES || echo NO)"
 
+            # Expose the current git commit so server/readiness.ts can embed it
+            # in /health and /ready responses without running git at runtime.
+            export GIT_COMMIT=$(git -C "$APP" rev-parse HEAD)
+            echo "GIT_COMMIT: $GIT_COMMIT"
+
             pm2 delete marketing-os 2>/dev/null || true
-            pm2 start "$TSX" --name marketing-os --cwd "$AI" --update-env -- server/index.ts
+            # NOTE (issue #14): ecosystem.config.cjs sets wait_ready=true and
+            # listen_timeout=30000. PM2 blocks until the server calls
+            # process.send('ready'), which happens after runReadinessChecks()
+            # passes at boot -- preventing traffic from hitting a partially-
+            # initialized instance during rolling restarts.
+            #
+            # If you must start ad-hoc without the ecosystem file, pass flags:
+            #   pm2 start tsx --wait-ready --listen-timeout 30000 \
+            #     --name marketing-os --cwd "$AI" -- server/index.ts
+            pm2 start "$AI/ecosystem.config.cjs" --update-env
             pm2 save --force
 
-            echo "===== Health check ====="
+            echo "===== Liveness + readiness check ====="
             sleep 5
             pm2 list | head -5
-            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
+            curl -s -o /dev/null -w "HTTP %{http_code} (liveness)\n"  http://127.0.0.1:3101/health || true
+            curl -s -o /dev/null -w "HTTP %{http_code} (readiness)\n" http://127.0.0.1:3101/ready  || true
 
             echo "===== Error log (if still failing) ====="
             tail -20 ~/.pm2/logs/marketing-os-error.log 2>/dev/null || true

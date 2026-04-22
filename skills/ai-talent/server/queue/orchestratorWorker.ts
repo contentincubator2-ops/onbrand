@@ -96,6 +96,15 @@ import * as path from 'path';
 
 const SKILLS_PATH = process.env.SKILLS_PATH || '/home/azureuser/A2A-Marketing-Claw/skills';
 
+// Heartbeat helpers (issue #14): write heartbeat:<queue> to Redis with 10 s TTL.
+// /ready fails if the key is missing or >20 s old.
+const HEARTBEAT_TTL_S = 10;
+async function writeHeartbeat(queueName: string): Promise<void> {
+  try {
+    await connection.set(`heartbeat:${queueName}`, String(Date.now()), "EX", HEARTBEAT_TTL_S);
+  } catch { /* non-fatal — heartbeat failure should not kill the worker */ }
+}
+
 function loadSkillMd(taskType: string): string {
   try {
     const skillDir = path.join(SKILLS_PATH, taskType);
@@ -118,9 +127,16 @@ function loadSkillMd(taskType: string): string {
 }
 
 export function startOrchestratorWorker() {
+  // Write an initial heartbeat immediately so /ready doesn't fail before the
+  // first job arrives. Refresh on every job cycle (TTL = 10 s).
+  writeHeartbeat('marketing-jobs').catch(() => {});
+  const heartbeatTimer = setInterval(() => writeHeartbeat('marketing-jobs'), 8_000);
+  heartbeatTimer.unref?.(); // don't keep Node process alive for this alone
+
   const worker = new Worker<MarketingJobData, MarketingJobResult>(
     'marketing-jobs',
     async (job: Job<MarketingJobData>) => {
+      await writeHeartbeat('marketing-jobs'); // refresh on each job
       console.log('[A2A Worker] Processing job ' + job.id + ': ' + job.data.userRequest.slice(0, 50));
 
       const { userRequest, brand, industry, taskType, userId } = job.data;

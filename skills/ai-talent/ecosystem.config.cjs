@@ -7,6 +7,13 @@
 //   pm2 start ecosystem.config.cjs --update-env
 //
 // See docs/runbooks/secret-rotation.md for the full secret-management flow.
+//
+// wait_ready + listen_timeout (issue #14):
+//   PM2 holds traffic until the server calls process.send('ready'). The server
+//   sends 'ready' after runReadinessChecks() passes for the first time at boot.
+//   listen_timeout is 30 s; if 'ready' is not received in time PM2 kills the
+//   instance and retries (up to max_restarts), preventing partially-initialized
+//   instances from receiving traffic.
 
 module.exports = {
   apps: [{
@@ -19,6 +26,10 @@ module.exports = {
     max_restarts: 10,
     restart_delay: 5000,
     max_memory_restart: '512M',
+    // Readiness gate — PM2 waits for process.send('ready') before routing
+    // traffic. Server sends it after /ready passes once at startup (issue #14).
+    wait_ready:     true,
+    listen_timeout: 30000, // 30 s — enough for DB/Redis/migrations to stabilise
     // No literal secrets. Everything the app needs is read via process.env at
     // runtime; env.ts (zod-validated) will fail fast if anything required is missing.
     env: {
