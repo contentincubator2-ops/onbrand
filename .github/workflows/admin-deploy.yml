@@ -1,0 +1,58 @@
+name: Admin — Deploy to VM
+
+# Pulls latest main, installs dependencies, rebuilds the client,
+# restarts the single marketing-os pm2 process. Use this after
+# pushing server or client changes that need to take effect on
+# marketing-os.sowork.ai.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Step 1: Pull latest main ====="
+            cd "$APP"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 2: Server dependencies ====="
+            cd "$AI"
+            npm install --legacy-peer-deps 2>&1 | tail -5
+
+            echo ""
+            echo "===== Step 3: Client build ====="
+            cd "$AI/client"
+            npm install --legacy-peer-deps 2>&1 | tail -5
+            npm run build 2>&1 | tail -10
+            echo "Frontend build done:"
+            stat -c '%y %s bytes' "$AI/public/index.html"
+
+            echo ""
+            echo "===== Step 4: Restart pm2 ====="
+            pm2 restart marketing-os 2>&1 | tail -5 || pm2 start "npx tsx server/index.ts" \
+              --name marketing-os --cwd "$AI" 2>&1 | tail -5
+            pm2 save
+
+            echo ""
+            echo "===== Step 5: Health check ====="
+            sleep 4
+            pm2 list | head -6
+            curl -s -o /dev/null -w "Backend /health: HTTP %{http_code}\n" http://127.0.0.1:3101/health
+
+            echo ""
+            echo "===== Done ====="
