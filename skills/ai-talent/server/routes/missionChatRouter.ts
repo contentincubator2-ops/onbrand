@@ -47,7 +47,7 @@ import { recordMissionExport } from "./exportsRoute";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
 import { getOrCreateSquadSession, saveStepResultOnly, advanceToNextStep, resetSquadSession } from "../_core/squadSessionManager";
 import { persistReportSection } from "../_core/reportPersistence";
-import { buildSquadAgentPrompt, buildSecondOpinionPrompt, buildLeadSynthesisPrompt } from "../_core/agentPromptBuilder";
+import { buildSquadAgentPrompt, buildSecondOpinionPrompt, buildLeadSynthesisPrompt, buildLeadIntakeGuide } from "../_core/agentPromptBuilder";
 import { applyBoardroomDiagnostic } from "../_core/boardroomValidator";
 
 export const missionChatRouter = Router();
@@ -651,7 +651,16 @@ async function tryExecuteSquadChat(params: {
         "",
         "─".repeat(40),
         "",
+        "【方法論背景（供你參考，但不得一次性對用戶複述）】",
         leadAgentDetail.methodology,
+        "",
+        "─".repeat(40),
+        "",
+        // Mode B guardrail: even when the Lead has a custom methodology (e.g.
+        // Dunford 10 問、StoryBrand 7 問), the intake flow MUST follow the
+        // sequential 1-question-at-a-time RECAP-first format. Without this,
+        // Leads dump the whole methodology questionnaire in turn one.
+        buildLeadIntakeGuide(),
       ].join("\n")
     : buildSquadAgentPrompt({
         agent: {
