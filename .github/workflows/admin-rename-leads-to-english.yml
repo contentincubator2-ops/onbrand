@@ -1,0 +1,56 @@
+name: Admin — Rename Squad Leads to English Names
+
+# Swap `agents.name` to `agents.englishName` for every Lead agent created
+# by L1-brand.ts + bulk-fix-leads.ts (id >= 238844).
+#
+# Run dry-run FIRST to preview.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run (preview) or apply (write to DB)'
+        required: true
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          MODE: ${{ inputs.mode }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          envs: MODE,GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Step 1: Pull latest main ====="
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 2: Run rename-leads-to-english (mode=$MODE) ====="
+            cd "$AI"
+            if [ "$MODE" = "apply" ]; then
+              npx tsx scripts/rename-leads-to-english.ts --apply
+            else
+              npx tsx scripts/rename-leads-to-english.ts --dry-run
+            fi
+
+            echo ""
+            echo "===== Done ====="

@@ -152,11 +152,8 @@ export function AgentBubbleHeader({
             </span>
           )}
         </div>
-        {agentTitle && (
-          <span style={{ fontSize: 11, color: "#6B6A66" }}>{agentTitle}</span>
-        )}
-        {/* Skill + Model badges — shown only on non-lead steps */}
-        {(!isLead && !isSecondOpinion) && (agentSkill || agentModel) && (
+        {/* Skill + Model badges — shown for all agents (lead/specialist/second-opinion) */}
+        {(agentSkill || agentModel) && (
           <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
             {agentSkill && (
               <span style={{
