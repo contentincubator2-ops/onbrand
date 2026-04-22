@@ -346,7 +346,7 @@ async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // DEBT-1: Real multi-provider routing
-  const providerKey = params.provider ?? "openrouter";
+  const providerKey = params.provider ?? (process.env.LLM_DEFAULT_PROVIDER as any) ?? "openrouter";
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
@@ -460,7 +460,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
 // ─── Streaming invoke function ──────────────────────────────────────────────
 export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<string> {
-  const providerKey = params.provider ?? "openrouter";
+  const providerKey = params.provider ?? (process.env.LLM_DEFAULT_PROVIDER as any) ?? "openrouter";
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
