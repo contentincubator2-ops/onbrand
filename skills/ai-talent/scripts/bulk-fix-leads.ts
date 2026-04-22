@@ -239,9 +239,12 @@ function buildLeadAgent(squad: {
     bio_en,
     avatarUrl: `${DICEBEAR_AVATAR}${encodeURIComponent(slug)}`,
     coverUrl:  `${DICEBEAR_COVER}${encodeURIComponent(squad.slug)}`,
-    // agents.workspace is a short enum-like column (≤64 chars on VM schema).
-    // Squad.workspace can be a long descriptor, so fall back to a safe short value.
-    workspace: (squad.workspace && squad.workspace.length <= 60 ? squad.workspace : "strategy"),
+    // agents.workspace is a short column (varchar(30) on VM schema).
+    // Squad.workspace can be a long descriptor/multi-value string, so fall
+    // back to a safe short enum value. Hard-cap at 20 chars to be safe.
+    workspace: (squad.workspace && squad.workspace.length <= 20 && !/[\s,/]/.test(squad.workspace)
+      ? squad.workspace
+      : "strategy"),
     methodology: squad.methodology ?? parsed.shortName,
   };
 }
