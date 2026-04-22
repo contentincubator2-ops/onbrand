@@ -856,3 +856,33 @@ export const artifactReviews = mysqlTable("artifact_reviews", {
 });
 export type ArtifactReview = typeof artifactReviews.$inferSelect;
 export type InsertArtifactReview = typeof artifactReviews.$inferInsert;
+
+// ─── Brand KB Usage (Knowledge Base size tracking) ────────────────────────────
+// Design choice: plain table (not materialized view) for simplicity and
+// cross-DB compatibility. bytesUsed is recomputed on every upload/delete via
+// SUM(fileSize) and written here. lastComputedAt lets callers know staleness.
+// A materialized view would require MySQL 8.0+ CTE tricks and cannot be
+// easily maintained transactionally — the table approach is simpler and
+// sufficient for the ~100 MB / 500 MB cap use case.
+export const brandKbUsage = mysqlTable("brand_kb_usage", {
+  id:             int("id").autoincrement().primaryKey(),
+  orgId:          int("orgId"),                         // company/owner userId (nullable for solo users)
+  brandId:        int("brandId").notNull().unique(),    // one row per brand
+  bytesUsed:      int("bytesUsed").default(0).notNull(),
+  lastComputedAt: timestamp("lastComputedAt").defaultNow().notNull(),
+});
+export type BrandKbUsage = typeof brandKbUsage.$inferSelect;
+export type InsertBrandKbUsage = typeof brandKbUsage.$inferInsert;
+
+// ─── Admin KB Override flag (per-brand) ──────────────────────────────────────
+// Stored in a separate slim table to avoid wide-table migrations on `brands`.
+// When adminKbOverride=true, the hard limit is bypassed for that brand.
+// Every toggle is audit-logged via sessionLogger.
+export const brandKbAdminOverride = mysqlTable("brand_kb_admin_override", {
+  brandId:         int("brandId").primaryKey(),
+  adminKbOverride: boolean("adminKbOverride").default(false).notNull(),
+  updatedBy:       int("updatedBy"),                    // userId of admin who last changed
+  updatedAt:       timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type BrandKbAdminOverride = typeof brandKbAdminOverride.$inferSelect;
+export type InsertBrandKbAdminOverride = typeof brandKbAdminOverride.$inferInsert;
