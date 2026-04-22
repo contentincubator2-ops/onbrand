@@ -119,15 +119,39 @@ async function main() {
   );
   const squads = squadRows as SquadRow[];
 
-  // Collect unique Lead agent IDs across all squads (first agent in each squad.agents array)
+  // Debug: dump a few sample agents JSON structures to understand the format
+  console.log("\n── Sample agents JSON (first 3 squads with non-null agents) ──");
+  let shown = 0;
+  for (const sq of squads) {
+    if (shown >= 3) break;
+    if (!sq.agents) continue;
+    console.log(`squad #${sq.id} ${sq.slug}: ${sq.agents.slice(0, 400)}${sq.agents.length > 400 ? "..." : ""}`);
+    shown++;
+  }
+  console.log("");
+
+  // Collect unique Lead agent IDs across all squads. The `agents` JSON can be:
+  //   - array of numbers: [238844, 25, 26, ...]
+  //   - array of objects: [{id: 238844, role: "lead", ...}, ...]
+  //   - array of objects with `agentId`: [{agentId: 238844, ...}, ...]
+  //   - array of objects with `isLead: true` marking the lead (not necessarily first)
   const leadIds = new Set<number>();
   const squadLeadMap = new Map<number, number>(); // squad.id -> leadAgentId
   for (const sq of squads) {
     const agents = parseAgents(sq.agents);
     if (agents.length === 0) continue;
-    const lead = agents[0];
-    const leadId = typeof lead === "number" ? lead : lead?.id;
-    if (typeof leadId === "number") {
+
+    // Try to find the lead: isLead=true first, else first element
+    let leadEntry: any = agents.find((a: any) => a && typeof a === "object" && (a.isLead === true || a.is_lead === true || a.role === "lead"));
+    if (!leadEntry) leadEntry = agents[0];
+
+    let leadId: number | undefined;
+    if (typeof leadEntry === "number") leadId = leadEntry;
+    else if (leadEntry && typeof leadEntry === "object") {
+      leadId = leadEntry.id ?? leadEntry.agentId ?? leadEntry.agent_id;
+      if (typeof leadId === "string") leadId = parseInt(leadId, 10);
+    }
+    if (typeof leadId === "number" && !isNaN(leadId)) {
       leadIds.add(leadId);
       squadLeadMap.set(sq.id, leadId);
     }
