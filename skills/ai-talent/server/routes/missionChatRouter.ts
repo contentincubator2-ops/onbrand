@@ -36,8 +36,9 @@ import { logEvent, newSessionId } from "../_core/sessionLogger";
 // localPool → mos_db on localhost (missions, brands, squads, agents, sessions, …)
 // No more Azure sowork_db dependency.
 
-import { invokeLLMStream } from "../_core/llm";
+import { invokeLLM, invokeLLMStream } from "../_core/llm";
 import { buildGroundedContextFromUrls } from "../_core/webFetcher";
+import { getToolsForStep, invokeToolCall, type ToolContext } from "../_core/tools";
 import { loadAgentContext } from "../agentContextLoader";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
@@ -243,6 +244,124 @@ async function* streamFromLLM(
   for await (const delta of invokeLLMStream({ messages, maxTokens: 4096 })) {
     yield delta;
   }
+}
+
+// ── Tool-aware Lead execution (non-streaming, emits delta chunks for UI parity) ──
+/**
+ * Run a Lead step that has `requiredTools` declared. Uses non-streaming
+ * invokeLLM in a tool-call loop: model emits tool_calls → we execute each →
+ * append role="tool" messages → re-invoke until model returns final text.
+ *
+ * Emits UI events:
+ *   tool_call   { name, args }
+ *   tool_result { name, ok, preview, durationMs }
+ *   delta       { text } — chunked final content so the existing frontend renders it
+ *
+ * Returns the full final content (assistant text) for session persistence.
+ */
+async function runLeadWithTools(params: {
+  systemPrompt: string;
+  history: { role: string; content: string }[];
+  userMessage: string;
+  toolNames: string[];
+  ctx: ToolContext;
+  send: (event: string, data: unknown) => void;
+  maxRounds?: number;
+}): Promise<string> {
+  const { systemPrompt, history, userMessage, toolNames, ctx, send } = params;
+  const maxRounds = params.maxRounds ?? 6;
+
+  const { llmTools, executors } = getToolsForStep(toolNames);
+
+  const messages: any[] = [
+    { role: "system", content: systemPrompt },
+    ...history.slice(-10).map(m => ({ role: m.role, content: m.content })),
+    { role: "user", content: userMessage },
+  ];
+
+  let finalText = "";
+
+  for (let round = 0; round < maxRounds; round++) {
+    const result = await invokeLLM({
+      messages,
+      tools: llmTools,
+      toolChoice: "auto",
+      provider: "openrouter",
+      maxTokens: 4096,
+    });
+
+    const choice = result.choices?.[0];
+    const msg = choice?.message;
+    if (!msg) break;
+
+    const toolCalls = msg.tool_calls ?? [];
+
+    // Capture assistant message (content + tool_calls) so tool results can reference ids
+    messages.push({
+      role: "assistant",
+      content: typeof msg.content === "string" ? msg.content : "",
+      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+    });
+
+    if (toolCalls.length === 0) {
+      // Final answer — stream it to the UI in chunks
+      const text = typeof msg.content === "string"
+        ? msg.content
+        : Array.isArray(msg.content)
+          ? msg.content.map((p: any) => (p?.type === "text" ? p.text : "")).join("")
+          : "";
+      finalText = text;
+      const CHUNK = 80;
+      for (let i = 0; i < text.length; i += CHUNK) {
+        send("delta", { text: text.slice(i, i + CHUNK) });
+      }
+      break;
+    }
+
+    // Execute tool calls in parallel, append results
+    const results = await Promise.all(toolCalls.map(async (tc: any) => {
+      const name = tc.function?.name ?? "";
+      const argsRaw = tc.function?.arguments ?? "";
+      send("tool_call", { name, argsRaw: argsRaw.slice(0, 500) });
+      const inv = await invokeToolCall(name, argsRaw, ctx, tc.id);
+      send("tool_result", {
+        name,
+        ok: inv.ok,
+        durationMs: inv.durationMs,
+        preview: inv.resultText.slice(0, 400),
+      });
+      return { tc, inv };
+    }));
+
+    for (const { tc, inv } of results) {
+      messages.push({
+        role: "tool",
+        tool_call_id: tc.id,
+        content: inv.resultText,
+      });
+    }
+    // Loop: next invokeLLM will see assistant + tool messages, produce either more tool_calls or final text.
+  }
+
+  if (!finalText) {
+    // Safety fallback: if we exhausted rounds without text, ask the model once more without tools.
+    const finalResult = await invokeLLM({
+      messages: [
+        ...messages,
+        { role: "user", content: "請根據以上工具結果，輸出最終回覆給用戶（中文，無需再呼叫工具）。" },
+      ],
+      provider: "openrouter",
+      maxTokens: 4096,
+    });
+    const text = (finalResult.choices?.[0]?.message?.content as string) ?? "";
+    finalText = text;
+    const CHUNK = 80;
+    for (let i = 0; i < text.length; i += CHUNK) {
+      send("delta", { text: text.slice(i, i + CHUNK) });
+    }
+  }
+
+  return finalText;
 }
 
 // ── Generate and send PPT ─────────────────────────────────────────────────────
@@ -582,11 +701,9 @@ async function tryExecuteSquadChat(params: {
   const normalizeModel = (m?: string | null) =>
     m ? (m.includes("/") ? m : `openclaw/${m}`) : null;
 
-  const agentModel = isLeadStep
-    ? "direct-llm"                                           // Lead intake: bypass gateway (see streaming below)
-    : (normalizeModel(specialistDetail?.aiModel)             // Specialist step: use specialist's model
-        ?? normalizeModel(leadAgentDetail?.aiModel)          // Fallback: Lead's model
-        ?? "openclaw/pm");                                   // Final fallback (valid gateway slug)
+  // Lead-solo: every step uses direct LLM (no gateway), model is always the Lead's.
+  const agentModel = "direct-llm";
+  void normalizeModel; // kept to preserve imports; no gateway routing in Lead-solo
 
   console.log(`[squadChat] Lead="${agentName}", step=${currentStep}, skill="${agentSkill}", model="${agentModel}"`);
 
@@ -694,30 +811,56 @@ async function tryExecuteSquadChat(params: {
         isLead:          isLeadStep,
       });
 
-  // ── 9. 串流 LLM 回應 ────────────────────────────────────────────────────────
-  // A2A Handoff: non-lead steps receive previous agent's output as explicit handoff
-  // context in the user message. This models true agent-to-agent communication where
-  // each agent explicitly receives the prior agent's deliverable and acts on it.
+  // ── 9. Lead-solo: 組合 user message（加入上一步成果 + 本步 playbook）───────
+  // Lead-solo 下每一步都是同一位 Lead 執行，沒有 A2A 交接；只需把上一步成果
+  // 跟當前步驟的 playbook 指引灌進 user message。
   let effectiveUserMessage = userMessage;
   const isReplyToSameAgent = session.status === "awaiting_reply" && !isContinueSignal;
 
-  if (!isLeadStep) {
-    if (isReplyToSameAgent && session.stepResults[currentStep]) {
-      // 用戶在跟剛完成的 Agent 繼續對話 — 讓 Agent 看到自己之前的輸出
-      const myPrevOutput = session.stepResults[currentStep] ?? "";
-      effectiveUserMessage = `【你在上一輪的分析成果】\n\n${myPrevOutput.slice(0, 1500)}\n\n${"─".repeat(40)}\n【用戶的跟進問題】${userMessage}\n\n請根據你的分析成果，直接回答用戶的問題或修改你的輸出。`;
-    } else if (Object.keys(session.stepResults).length > 0) {
-      // 正常 A2A 交接 — 新步驟接收上一步成果
-      const prevKey = currentStep - 1;
-      const prevOutput = session.stepResults[prevKey]
-        ?? session.stepResults[Math.max(...Object.keys(session.stepResults).map(Number))]
-        ?? null;
-      if (prevOutput) {
-        const prevWorkflowStep = workflowSteps[Math.min(currentStep - 2, workflowSteps.length - 1)];
-        const prevStepTitle = prevWorkflowStep?.title ?? prevWorkflowStep?.name ?? `Step ${currentStep - 1}`;
-        effectiveUserMessage = `【A2A 交接文件 — 來自「${prevStepTitle}」的成果】\n\n${prevOutput.slice(0, 2500)}\n\n${"─".repeat(40)}\n【你的任務】${workflowStep.description ?? stepLabel}\n\n請基於上方的交接成果，執行你負責的步驟。用戶原始請求：${userMessage}`;
-      }
+  // Load step-level playbook (Lead-solo: squads.steps[].skill → playbooks/{skill}.md)
+  let stepPlaybook: string | null = null;
+  const skillSlug = (workflowStep as any)?.skill;
+  if (skillSlug && !isLeadStep) {
+    const { loadPlaybook } = await import("../_core/playbookLoader");
+    stepPlaybook = loadPlaybook(skillSlug);
+    if (stepPlaybook) {
+      console.log(`[squadChat] loaded playbook: ${skillSlug}.md (${stepPlaybook.length} chars)`);
     }
+  }
+
+  if (!isLeadStep) {
+    const priorKeys = Object.keys(session.stepResults).map(Number).filter(n => n < currentStep).sort((a, b) => a - b);
+    const priorContext = priorKeys.length > 0
+      ? priorKeys.map(k => {
+          const wstep = workflowSteps[Math.max(0, k - 1)] ?? {};
+          const title = wstep?.title ?? wstep?.name ?? `Step ${k}`;
+          return `【Step ${k} — ${title}】\n${(session.stepResults[k] ?? "").slice(0, 1200)}`;
+        }).join("\n\n")
+      : "";
+
+    const parts: string[] = [];
+    if (stepPlaybook) {
+      parts.push("【本步驟 Playbook】");
+      parts.push(stepPlaybook);
+      parts.push("─".repeat(40));
+    }
+    if (priorContext) {
+      parts.push("【前幾步成果（供你延續）】");
+      parts.push(priorContext);
+      parts.push("─".repeat(40));
+    }
+    parts.push(`【本步驟任務】${workflowStep.description ?? stepLabel}`);
+    parts.push(`【用戶訊息】${userMessage}`);
+
+    if (isReplyToSameAgent && session.stepResults[currentStep]) {
+      parts.push("");
+      parts.push("─".repeat(40));
+      parts.push("【你在上一輪的輸出（用戶正在跟進）】");
+      parts.push((session.stepResults[currentStep] ?? "").slice(0, 1500));
+      parts.push("請根據你的輸出回答用戶的跟進問題，或調整你的產出。");
+    }
+
+    effectiveUserMessage = parts.join("\n\n");
   }
 
   // Phase D2: Each step's agent reads the last 20 chat messages for context continuity.
@@ -742,84 +885,65 @@ async function tryExecuteSquadChat(params: {
   // about specific websites. Scoped to Lead steps where hallucination risk
   // is highest (intake + synthesis). Specialist steps stay untouched to
   // keep their gateway latency budget intact.
+  // URL grounding runs for every step — Lead-solo needs it uniformly.
   let effectiveSystemPrompt = systemPrompt;
-  if (isLeadStep) {
-    try {
-      const historyTexts = recentHistory.map(m => (typeof m.content === "string" ? m.content : "")).slice(-4);
-      const { block, fetched } = await buildGroundedContextFromUrls(effectiveUserMessage, historyTexts);
-      if (block) {
-        effectiveSystemPrompt = systemPrompt + "\n\n" + "─".repeat(40) + "\n\n" + block;
-        const okCount = fetched.filter(f => f.ok).length;
-        const failCount = fetched.length - okCount;
-        console.log(`[squadChat] URL grounding: fetched ${okCount} ok, ${failCount} failed, urls=${fetched.map(f => f.url).join(", ")}`);
-        // Surface to UI so the user sees "we actually read the page"
-        send("info", {
-          kind: "url_grounding",
-          ok: okCount,
-          failed: failCount,
-          urls: fetched.map(f => ({ url: f.url, ok: f.ok, title: f.title, error: f.error })),
-        });
-      }
-    } catch (err: any) {
-      console.warn(`[squadChat] URL grounding failed (non-fatal):`, err?.message);
+  try {
+    const historyTexts = recentHistory.map(m => (typeof m.content === "string" ? m.content : "")).slice(-4);
+    const { block, fetched } = await buildGroundedContextFromUrls(effectiveUserMessage, historyTexts);
+    if (block) {
+      effectiveSystemPrompt = systemPrompt + "\n\n" + "─".repeat(40) + "\n\n" + block;
+      const okCount = fetched.filter(f => f.ok).length;
+      const failCount = fetched.length - okCount;
+      console.log(`[squadChat] URL grounding: fetched ${okCount} ok, ${failCount} failed, urls=${fetched.map(f => f.url).join(", ")}`);
+      send("info", {
+        kind: "url_grounding",
+        ok: okCount,
+        failed: failCount,
+        urls: fetched.map(f => ({ url: f.url, ok: f.ok, title: f.title, error: f.error })),
+      });
     }
+  } catch (err: any) {
+    console.warn(`[squadChat] URL grounding failed (non-fatal):`, err?.message);
   }
 
-  // ── Squad Lead step: bypass gateway entirely, call LLM directly ────────────
-  // Gateway requires "openclaw/{agent_slug}" format. Model names are NOT valid slugs
-  // and silently produce empty streams. Direct LLM call (openrouter → forge) is reliable.
-  if (isLeadStep) {
-    console.log(`[squadChat] Lead step — using invokeLLMStream directly (skip gateway), step=${currentStep}`);
+  // ── Lead-solo unified execution ─────────────────────────────────────────────
+  // Every step is executed by the Squad Lead with tool access declared on the step.
+  // No more gateway / specialist dispatch — the Lead is the sole executor.
+  const stepTools: string[] = Array.isArray((workflowStep as any)?.requiredTools)
+    ? ((workflowStep as any).requiredTools as string[]).filter(Boolean)
+    : [];
+
+  console.log(`[squadChat] Lead-solo step=${currentStep}, tools=[${stepTools.join(", ")}]`);
+
+  try {
+    const toolCtx: ToolContext = {
+      missionId,
+      sessionId: session?.id != null ? String(session.id) : String(missionId),
+      brand: { name: brand.name, website: brand.website, id: brandId ?? undefined },
+      callerAgentId: leadAgentDetail?.id,
+      callerAgentName: agentName,
+    };
+    const text = await runLeadWithTools({
+      systemPrompt: effectiveSystemPrompt,
+      history: recentHistory,
+      userMessage: effectiveUserMessage,
+      toolNames: stepTools,
+      ctx: toolCtx,
+      send,
+    });
+    fullOutput += text;
+  } catch (err: any) {
+    console.warn(`[squadChat] Lead tool-loop failed: ${err?.message}. Falling back to plain stream...`);
     try {
       for await (const chunk of streamFromLLM(effectiveSystemPrompt, recentHistory, effectiveUserMessage)) {
         fullOutput += chunk;
         send("delta", { text: chunk });
       }
-    } catch (e: any) {
-      console.warn(`[squadChat] invokeLLMStream (openrouter) failed for lead step: ${e?.message}. Trying forge...`);
-      try {
-        // Forge fallback — uses BUILT_IN_FORGE_API_KEY / BUILT_IN_FORGE_API_URL
-        const forgeMessages = [
-          { role: "system" as const, content: effectiveSystemPrompt },
-          ...recentHistory.slice(-10).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
-          { role: "user" as const, content: effectiveUserMessage },
-        ];
-        for await (const chunk of invokeLLMStream({ messages: forgeMessages, maxTokens: 4096, provider: "forge" })) {
-          fullOutput += chunk;
-          send("delta", { text: chunk });
-        }
-      } catch (e2: any) {
-        console.warn(`[squadChat] forge also failed for lead step: ${e2?.message}. Trying gateway pm...`);
-        // Final fallback: gateway with pm (known valid slug)
-        try {
-          for await (const { event, data } of streamFromGateway("openclaw/pm", messages)) {
-            send(event, data);
-            if (event === "delta") fullOutput += (data as any).text ?? "";
-          }
-        } catch (e3: any) {
-          console.error(`[squadChat] All LLM providers failed for lead step: ${e3?.message}`);
-        }
-      }
-    }
-  } else {
-    // ── Specialist steps: use gateway with agent slug ──────────────────────────
-    const gatewayModel = agentModel === "direct-llm" ? "openclaw/pm" : agentModel;
-    try {
-      for await (const { event, data } of streamFromGateway(gatewayModel, messages)) {
-        send(event, data);
-        if (event === "delta") fullOutput += (data as any).text ?? "";
-      }
-    } catch (e: any) {
-      console.warn(`[squadChat] gateway failed (model=${gatewayModel}):`, e?.message);
-      // Fallback: direct invokeLLMStream
-      try {
-        for await (const chunk of streamFromLLM(systemPrompt, recentHistory, effectiveUserMessage)) {
-          fullOutput += chunk;
-          send("delta", { text: chunk });
-        }
-      } catch (e2: any) {
-        console.warn("[squadChat] invokeLLMStream fallback also failed:", e2?.message);
-      }
+    } catch (e2: any) {
+      console.error(`[squadChat] All LLM paths failed: ${e2?.message}`);
+      const errMsg = "抱歉，LLM 服務暫時無回應，請稍後再試或聯絡管理員。";
+      fullOutput = errMsg;
+      send("delta", { text: errMsg });
     }
   }
 

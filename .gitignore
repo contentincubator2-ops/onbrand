@@ -31,8 +31,13 @@ skills/mobile/.env
 scripts/install-all.sh
 scripts/verify-env.sh
 *.md
+!skills/ai-talent/server/_core/playbooks/*.md
 
 # Local-only: dumps, dev-only env, scratch
 .local/
 .env.*.local
 skills/ai-talent/scripts/squad-classification-draft.csv
+
+# SSH keys — NEVER commit
+*.pem
+*.key

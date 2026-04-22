@@ -84,6 +84,22 @@ app.use((req, _res, next) => {
 
 // ─── Serve frontend build (SPA static files) ─────────────────────────────────
 // Client builds to ../public (relative to server/ CWD = skills/ai-talent)
+// Boardroom deliverable exports (generated PDFs) — served as downloadable files.
+// Must be registered BEFORE the SPA fallback so the catch-all doesn't swallow these URLs.
+const boardroomDir = process.env.BOARDROOM_EXPORT_DIR
+  ?? join(process.cwd(), "storage", "boardroom-exports");
+const boardroomPrefix = process.env.BOARDROOM_EXPORT_URL_PREFIX ?? "/static/boardroom-exports";
+app.use(boardroomPrefix, express.static(boardroomDir, {
+  maxAge: "1h",
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".pdf")) {
+      res.setHeader("content-type", "application/pdf");
+      // Inline — let the browser preview; user can download via browser UI
+      res.setHeader("content-disposition", "inline");
+    }
+  },
+}));
+
 const publicDir = join(process.cwd(), "public");
 if (existsSync(publicDir)) {
   // Assets (hashed filenames) — cache 1 year
@@ -113,6 +129,7 @@ if (existsSync(publicDir)) {
     if (
       req.path.startsWith("/trpc") ||
       req.path.startsWith("/api") ||
+      req.path.startsWith("/static/") ||
       req.path === "/health"
     ) {
       return next();
