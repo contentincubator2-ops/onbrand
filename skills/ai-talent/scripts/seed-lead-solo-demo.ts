@@ -23,6 +23,16 @@ const ARCHIVE_DIR = path.resolve(
   "A2A-Marketing-Claw-archive", "2026-04-22-a2a-version", "db-dumps",
 );
 
+const DEMO_USER_ID = Number(process.env.DEMO_USER_ID ?? 1235277);
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "x";
+}
+
 async function columnExists(table: string, column: string): Promise<boolean> {
   const [rows] = await localPool.execute(
     `SELECT COUNT(*) as c FROM information_schema.columns
@@ -117,9 +127,10 @@ async function findOrCreateAgent(spec: LeadAgentSpec): Promise<number> {
     return id;
   }
   const [result] = await localPool.execute(
-    `INSERT INTO agents (name, title, specialty, primarySkill, methodology, aiModel, avatarUrl, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    `INSERT INTO agents (slug, name, title, layer, specialty, primarySkill, methodology, aiModel, avatarUrl, createdAt, updatedAt)
+     VALUES (?, ?, ?, 'strategy', ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
+      slugify(spec.name),
       spec.name,
       spec.title,
       spec.specialty,
@@ -395,10 +406,11 @@ async function ensureBrand(): Promise<number> {
     return id;
   }
   const [result] = await localPool.execute(
-    `INSERT INTO brands (name, website, industry, description, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, NOW(), NOW())`,
-    ["復華投信", "https://www.fhtrust.com.tw/", "投信 / 資產管理",
-     "復華投信為台灣老牌投信業者，提供基金、ETF、退休理財等資產管理服務。"],
+    `INSERT INTO brands (name, slug, website, industry, description, createdBy, userId, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ["復華投信", "fuh-hwa-investment-trust", "https://www.fhtrust.com.tw/", "投信 / 資產管理",
+     "復華投信為台灣老牌投信業者，提供基金、ETF、退休理財等資產管理服務。",
+     DEMO_USER_ID, DEMO_USER_ID],
   ) as any[];
   const id = (result as any).insertId;
   console.log(`  ✓ new brand: 復華投信 (id=${id})`);
@@ -421,9 +433,9 @@ async function ensureMission(brandId: number, title: string, squadSlug: string, 
     return id;
   }
   const [result] = await localPool.execute(
-    `INSERT INTO missions (brandId, title, squadSlug, workspace, status, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, 'active', NOW(), NOW())`,
-    [brandId, title, squadSlug, workspace],
+    `INSERT INTO missions (userId, brandId, title, squadSlug, workspace, status, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, 'active', NOW(), NOW())`,
+    [DEMO_USER_ID, brandId, title, squadSlug, workspace],
   ) as any[];
   const id = (result as any).insertId;
   console.log(`  ✓ new mission: ${title} (id=${id})`);
