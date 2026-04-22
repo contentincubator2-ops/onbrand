@@ -802,6 +802,8 @@ export interface SquadPromptInput {
   missionTitle: string;
   squadName: string;
   squadMethodology: string;
+  squadMethodologyAuthor?: string;   // e.g. "Al Ries & Jack Trout"
+  squadMethodologyYear?: number;     // e.g. 1981
   agentRole: string;              // 在這個 squad 裡的角色
   workflowStep: WorkflowStepDef;  // 本步驟定義
   stepIndex: number;              // 0 = lead intake, 1+ = workflow steps
@@ -816,6 +818,7 @@ export interface SquadPromptInput {
 export function buildSquadAgentPrompt(input: SquadPromptInput): string {
   const {
     agent, specialistContext, brand, workspace, missionTitle, squadName, squadMethodology,
+    squadMethodologyAuthor, squadMethodologyYear,
     agentRole, workflowStep, stepIndex, totalSteps,
     previousResults, brandBrain, isLead,
   } = input;
@@ -849,6 +852,8 @@ export function buildSquadAgentPrompt(input: SquadPromptInput): string {
     squadMethodology,
     workflowStep.outputType ?? workflowStep.output,
     specialistContext,
+    squadMethodologyAuthor,
+    squadMethodologyYear,
   );
 
   const sections = [
@@ -1029,6 +1034,125 @@ function buildStepSection(
  * - 執行步驟：強制第一字符為 ## 標題，從根源殺死 filler openers
  * - 最終步驟：有完整輸出結構骨架
  */
+/**
+ * Universal Boardroom contract appended to every mid-step and final-step
+ * agent output. This is the Layer-1 data-integrity gate that applies to
+ * ALL squads regardless of methodology.
+ *
+ * The contract requires:
+ *   (1) Methodology anchor block at top (name, author, year)
+ *   (2) Confidence declaration (HIGH / MEDIUM / LOW / UNSUPPORTED)
+ *   (3) Inline [N] citation anchors on every data claim
+ *   (4) ## Sources section at the end listing [N] refs
+ *   (5) [ASSUMPTION] tag on any claim without a source
+ *
+ * The frontend BoardroomSection renderer parses these conventions and
+ * renders methodology headers, citation anchors, confidence badges,
+ * and the sources block.
+ */
+function buildBoardroomContract(
+  squadMethodology?: string,
+  squadMethodologyAuthor?: string,
+  squadMethodologyYear?: number,
+): string {
+  const methodLabel = squadMethodology ?? "本小組方法論";
+  const authorLabel = squadMethodologyAuthor
+    ? squadMethodologyAuthor + (squadMethodologyYear ? `（${squadMethodologyYear}）` : "")
+    : "（方法論作者未標示）";
+
+  return [
+    "",
+    "【Boardroom 品質契約（全步驟通用強制規定）】",
+    "你的輸出必須符合董事會級分析品質，依以下五條硬性契約執行：",
+    "",
+    "  (1) 方法論錨點（Methodology Anchor）— 輸出開頭的 ## 二級標題之後，立即插入以下格式的錨點行：",
+    `      > **Methodology**: ${methodLabel} — ${authorLabel}`,
+    "      此行一字不得少；用戶的 UI 會把它渲染成方法論標頭。",
+    "",
+    "  (2) 信心等級宣告（Confidence）— 在錨點行下一行，單獨一行，格式固定為：",
+    "      > **Confidence**: HIGH | MEDIUM | LOW | UNSUPPORTED — [一句話依據，≤30 字]",
+    "      HIGH = 有可驗證的數據 / 明確方法論支撐；",
+    "      MEDIUM = 有合理邏輯鏈但關鍵數據缺失；",
+    "      LOW = 以判斷為主，可驗證性低；",
+    "      UNSUPPORTED = 本次沒有足夠資料，仍依方法論給出方向。",
+    "",
+    "  (3) 引用錨點（Inline Citations）— 每個數據、統計、競品事實、引語，後面必須緊跟 [N] 編號，例如：",
+    "      「[品牌X] 在 Google Trends 中近半年搜尋量成長 40% [1]」",
+    "      編號從 [1] 開始遞增，每個獨立來源一個編號，重複來源復用同一編號。",
+    "",
+    "  (4) 假設標記（Assumptions）— 任何沒有具體來源、但你仍要提出的判斷，後面標注 [ASSUMPTION]，例如：",
+    "      「受眾對高單價訂閱制仍有抗拒 [ASSUMPTION]」",
+    "      [ASSUMPTION] 標記不計入引用編號。",
+    "",
+    "  (5) Sources 區塊（收尾）— 輸出末段（在「下一步 / 確認問題」之前）必須附上：",
+    "      ## Sources",
+    "      [1] 來源描述 — 取自 [GA / FB Ads Library / octolens / 品牌官網 / 公開報告] — [日期或版本]",
+    "      [2] ...",
+    "      若本次沒有真實 API 數據，請誠實標註 `[來源: 行業估算值 — 建議串接 GA/FB Ads 取得真實數據]`",
+    "",
+    "【硬性檢查】缺任一項（方法論錨點 / Confidence / 至少 1 個 [N] 或 [ASSUMPTION] / ## Sources）視為無效輸出。",
+  ].join("\n");
+}
+
+/**
+ * Stress-test step contract — replaces the generic boardroom contract
+ * when outputType === "stress-test-evidence-brief". This step is always
+ * the LAST step and is always executed by the Squad Lead; its job is to
+ * audit all prior step outputs and compile the boardroom evidence brief.
+ */
+function buildStressTestContract(
+  squadMethodology?: string,
+  squadMethodologyAuthor?: string,
+  squadMethodologyYear?: number,
+): string {
+  const methodLabel = squadMethodology ?? "本小組方法論";
+  const authorLabel = squadMethodologyAuthor
+    ? squadMethodologyAuthor + (squadMethodologyYear ? `（${squadMethodologyYear}）` : "")
+    : "";
+
+  return [
+    "【執行指引 — Boardroom 壓力測試與證據整理（Squad Lead 最後一步）】",
+    "語言：繁體中文（硬性規定）。字數上限：900 字。",
+    "禁止開頭語：不得以「好的」「讓我整合」「綜合以上」「作為 Squad Lead」「感謝各位」開頭。",
+    "你的第一個字符必須是 Markdown 二級標題（## 開頭）。",
+    "",
+    "【輸出結構（強制六區塊，按順序）】",
+    "",
+    "## 策略壓力測試與證據簡報",
+    `> **Methodology**: ${methodLabel}${authorLabel ? " — " + authorLabel : ""}`,
+    "> **Confidence**: [HIGH/MEDIUM/LOW] — [整體分析的信心依據，一句話]",
+    "",
+    "### 1. 關鍵結論清單（含信心標注）",
+    "逐條列出前述所有步驟的關鍵結論（至少 4 條），每條格式：",
+    "  - **[結論摘要]** — [HIGH/MEDIUM/LOW] — [引用來源 [N] 或 [ASSUMPTION]]",
+    "",
+    "### 2. 五題壓力測試",
+    "對上述結論執行以下五題測試，每題一行回應（若某題通過，寫「通過：[理由]」；若不通過，寫「風險：[具體破綻]」）：",
+    "  - **Q1 反論攻擊**：有什麼證據會直接推翻核心結論？",
+    "  - **Q2 競品反制**：若主要競品採取反向策略，我們的結論是否仍成立？",
+    "  - **Q3 受眾質疑**：受眾最可能提出的反對聲音是什麼？我們如何回應？",
+    "  - **Q4 時效性**：這個結論在 6 個月後是否仍有效？",
+    "  - **Q5 實作可行性**：落地過程中最大的執行風險是什麼？",
+    "",
+    "### 3. 核心假設清單",
+    "列出本次分析依賴的未驗證假設（至少 3 條），格式：",
+    "  - **[假設內容]** [ASSUMPTION] — 驗證建議：[具體驗證方法]",
+    "",
+    "### 4. 下一步行動（按優先序）",
+    "  1. [立即可執行] — [具體動作，含負責方]",
+    "  2. [30 天內] — [具體動作]",
+    "  3. [季度級] — [具體動作]",
+    "",
+    "## Sources",
+    "[1] [來源描述 — 取自 ... — 日期]",
+    "[2] ...",
+    "（至少 3 條來源；若無真實數據串接，誠實標註 `[行業估算值]`）",
+    "",
+    "---",
+    "**確認問題**：五題壓力測試中，哪一題你認為風險最高、最值得優先處理？",
+  ].join("\n");
+}
+
 function buildBehaviorGuide(
   isLead: boolean,
   stepIndex: number,
@@ -1036,7 +1160,18 @@ function buildBehaviorGuide(
   squadMethodology?: string,
   outputType?: string,
   specialistContext?: SpecialistContext,
+  squadMethodologyAuthor?: string,
+  squadMethodologyYear?: number,
 ): string {
+  // ── Stress-test step（Lead 最後一步 Boardroom gate）─────────────────────────
+  if (outputType === "stress-test-evidence-brief") {
+    return buildStressTestContract(
+      squadMethodology,
+      squadMethodologyAuthor,
+      squadMethodologyYear,
+    );
+  }
+
   // ── Squad Lead 開場 Intake ─────────────────────────────────────────────────
   if (isLead && stepIndex === 0) {
     return [
@@ -1117,6 +1252,7 @@ function buildBehaviorGuide(
       "  2. [30 天內，具體動作]",
       "  3. [長期（3 個月以上），具體動作]",
       "  （下一步行動區塊結束後停止，不得有其他補充）",
+      buildBoardroomContract(squadMethodology, squadMethodologyAuthor, squadMethodologyYear),
     ].join("\n");
   }
 
@@ -1161,6 +1297,15 @@ function buildBehaviorGuide(
       `     **確認問題**：[針對你剛才輸出內容的 1 個具體確認問題，不得是開放泛問]`,
     );
   }
+
+  // 通用 Boardroom 契約（所有中段步驟一律附加）
+  baseGuide.push(
+    buildBoardroomContract(
+      squadMethodology,
+      squadMethodologyAuthor,
+      squadMethodologyYear,
+    ),
+  );
 
   return baseGuide.join("\n");
 }

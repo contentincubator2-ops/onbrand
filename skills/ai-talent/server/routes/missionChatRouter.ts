@@ -48,6 +48,7 @@ import { getEmbedding, cosineSimilarity } from "../_core/embedding";
 import { getOrCreateSquadSession, saveStepResultOnly, advanceToNextStep, resetSquadSession } from "../_core/squadSessionManager";
 import { persistReportSection } from "../_core/reportPersistence";
 import { buildSquadAgentPrompt, buildSecondOpinionPrompt, buildLeadSynthesisPrompt } from "../_core/agentPromptBuilder";
+import { applyBoardroomDiagnostic } from "../_core/boardroomValidator";
 
 export const missionChatRouter = Router();
 
@@ -798,6 +799,27 @@ async function tryExecuteSquadChat(params: {
       const errMsg = "抱歉，LLM 服務暫時無回應，請稍後再試或聯絡管理員。";
       fullOutput = errMsg;
       send("delta", { text: errMsg });
+    }
+  }
+
+  // ── 9.5 Boardroom 契約驗證與補丁 ──────────────────────────────────────────
+  // Skip for Lead intake (step 0) — intake is conversational, not analytical.
+  // Also skip discussion mode (user follow-up, not a step output).
+  if (!isLeadStep && !isDiscussionMode && fullOutput && fullOutput.length > 200) {
+    const diag = applyBoardroomDiagnostic(fullOutput, {
+      squadMethodology,
+      // author/year not yet in squads schema; validator handles gracefully
+    });
+    if (diag.appliedFallback) {
+      console.log(
+        `[boardroomValidator] mission=${missionId} step=${currentStep} ` +
+        `patched missing: ${diag.check.missing.join(", ")}`,
+      );
+      fullOutput = diag.output;
+      // Surface the patch to the client so the stream reflects the
+      // enriched final state (client already has the original; append
+      // an "update" event that the renderer can re-parse).
+      send("final", { text: fullOutput });
     }
   }
 

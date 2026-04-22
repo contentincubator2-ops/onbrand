@@ -38,12 +38,18 @@ function buildAgentsJson(members: ResolvedMember[]) {
  * Build the `steps` JSON column (inline on squads table):
  * [{order, name, description, tool, outputType, requiredSkills,
  *   assignedAgentId, assignedAgentSlug, assignedAgentName}]
+ *
+ * Auto-appends a Boardroom "stress-test-evidence-brief" step at the end
+ * (assigned to the Lead) if the spec doesn't already include one. This
+ * is the universal Layer-1 Boardroom quality gate — every squad ends with
+ * the Lead stress-testing the analysis, surfacing assumptions, and
+ * compiling the evidence brief with citations.
  */
 function buildStepsJson(spec: SquadSpec, members: ResolvedMember[]) {
   const byRole = new Map<string, ResolvedMember>();
   for (const m of members) byRole.set(m.spec.role, m);
 
-  return spec.workflow.map((step) => {
+  const baseSteps = spec.workflow.map((step) => {
     const member = byRole.get(step.stepMemberRole);
     if (!member) {
       throw new Error(
@@ -62,6 +68,40 @@ function buildStepsJson(spec: SquadSpec, members: ResolvedMember[]) {
       assignedAgentName: member.agent.name,
     };
   });
+
+  // Skip auto-append if a stress-test step is already in the spec
+  const alreadyHasStressTest = baseSteps.some(
+    (s) => s.outputType === "stress-test-evidence-brief",
+  );
+  if (alreadyHasStressTest) return baseSteps;
+
+  const leadMember = members.find((m) => m.spec.isLead);
+  if (!leadMember) return baseSteps; // can't auto-assign without a lead
+
+  const lastOrder = baseSteps.reduce((max, s) => Math.max(max, s.order), 0);
+  baseSteps.push({
+    order: lastOrder + 1,
+    name: "策略壓力測試與證據整理",
+    description:
+      `作為 Squad Lead，整合前述所有步驟的發現，以 ${spec.methodologyAuthor ?? "本小組"} ${spec.methodology} 方法論為基準，` +
+      "產出 Boardroom-grade 證據簡報：(1) 每個關鍵結論標注信心等級（HIGH/MEDIUM/LOW/UNSUPPORTED）" +
+      "與一句依據；(2) 逐條引用來源並用 [1][2] 錨點標注；(3) 對前述結論執行 5 題壓力測試" +
+      "（反論、競品反制、受眾質疑、時效性、實作可行性），每題一行回應；(4) 列出尚未驗證的核心假設" +
+      "[ASSUMPTION] 與下一步驗證建議。",
+    tool: "internal" as const,
+    outputType: "stress-test-evidence-brief",
+    requiredSkills: [
+      "evidence-synthesis",
+      "assumption-testing",
+      "citation-sourcing",
+      "boardroom-reporting",
+    ],
+    assignedAgentId: leadMember.agent.id,
+    assignedAgentSlug: leadMember.agent.slug,
+    assignedAgentName: leadMember.agent.name,
+  });
+
+  return baseSteps;
 }
 
 /**

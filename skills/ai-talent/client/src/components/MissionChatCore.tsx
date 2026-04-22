@@ -20,6 +20,7 @@ import { SaveToBrainButton } from "./mission-chat/SaveToBrainButton";
 import { MentionAutocomplete, useMentionParser, type MentionAgent } from "./mission-chat/MentionAutocomplete";
 import { PositioningBar } from "./mission-chat/PositioningBar";
 import { MarkdownRenderer } from "./mission-chat/MarkdownRenderer";
+import { BoardroomMessageRenderer } from "./mission-chat/BoardroomMessageRenderer";
 import { BrandPositioningBook, parsePositioningData } from "./mission-chat/BrandPositioningBook";
 import DeliverableBlock, { type DeliverableItem } from "./mission-chat/DeliverableBlock";
 import { CustomSquadDialog } from "./mission-chat/CustomSquadDialog";
@@ -1936,7 +1937,7 @@ export default function MissionChatCore({
                 {msg.role === "user" ? (
                   <span>{msg.content}</span>
                 ) : (
-                  <MarkdownRenderer
+                  <BoardroomMessageRenderer
                     content={msg.content}
                     isStreaming={msg.isStreaming}
                   />
