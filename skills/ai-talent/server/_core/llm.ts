@@ -362,7 +362,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // SEC-4: Obfuscate error — don't leak key names in logs/responses
   if (!apiKey) throw new Error("LLM provider not configured");
 
-  const model = params.model ?? config.defaultModel;
+  // Model remapping: callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6",
+  // "claude-opus-4-6"). When the active provider isn't OpenRouter, those model names
+  // don't resolve — remap to that provider's defaultModel so the call succeeds.
+  let model = params.model ?? config.defaultModel;
+  if (providerKey !== "openrouter") {
+    const looksLikeOpenRouterStyle = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
+    if (looksLikeOpenRouterStyle) {
+      model = config.defaultModel;
+    }
+  }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
   const {
@@ -474,7 +483,16 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
   }
   if (!apiKey) throw new Error("LLM provider not configured");
 
-  const model = params.model ?? config.defaultModel;
+  // Model remapping: callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6",
+  // "claude-opus-4-6"). When the active provider isn't OpenRouter, those model names
+  // don't resolve — remap to that provider's defaultModel so the call succeeds.
+  let model = params.model ?? config.defaultModel;
+  if (providerKey !== "openrouter") {
+    const looksLikeOpenRouterStyle = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
+    if (looksLikeOpenRouterStyle) {
+      model = config.defaultModel;
+    }
+  }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
   const { messages, tools, toolChoice, tool_choice } = params;
