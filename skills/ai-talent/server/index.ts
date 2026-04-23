@@ -220,15 +220,24 @@ app.use(
 
 const PORT = ENV.PORT;
 
-// P1-2: Periodic billing retry queue flush (every 60s)
-setInterval(async () => {
-  try {
-    const flushed = await flushBillingRetryQueue();
-    if (flushed > 0) console.log(`[billing] flushed ${flushed} queued records`);
-  } catch (err) {
-    console.error("[billing] flush error:", err);
-  }
-}, 60_000);
+// On Vercel, long-running workers, setInterval loops, and process signal
+// handlers don't fit the serverless model — each invocation is short-lived
+// and shares no state. The billing flush is handled by a Vercel Cron
+// (api/cron/flush-billing-queue.ts); BullMQ workers must run on a
+// separate host (VM / Railway / Fly / GCE). See docs/VERCEL-DEPLOY.md.
+const IS_VERCEL = !!process.env.VERCEL;
+
+// P1-2: Periodic billing retry queue flush (every 60s) — skipped on Vercel
+if (!IS_VERCEL) {
+  setInterval(async () => {
+    try {
+      const flushed = await flushBillingRetryQueue();
+      if (flushed > 0) console.log(`[billing] flushed ${flushed} queued records`);
+    } catch (err) {
+      console.error("[billing] flush error:", err);
+    }
+  }, 60_000);
+}
 
 // Run idempotent DB migrations on startup (uses server's own DB connection)
 async function runStartupMigrations() {
@@ -315,52 +324,54 @@ async function backfillMissionResources(): Promise<void> {
   }
 }
 
-const server = app.listen(PORT, async () => {
-  console.log(`[server] sowork-enterprise listening on port ${PORT}`);
-  console.log(`[server] health: http://localhost:${PORT}/health`);
-  await runStartupMigrations();
-  startOrchestratorWorker();
-  console.log("[A2A] Orchestrator Worker started");
-  startSquadLeaderWorker();
-  console.log("[A2A] Squad Leader Worker started");
-  // STAB-3: Recover any billing records persisted to disk during previous crash
-  const recovered = await loadBillingFallbackLog();
-  if (recovered > 0) {
-    console.log(`[server] recovered ${recovered} billing records from fallback log`);
-  }
-  // Backfill mission resources for existing missions (fire-and-forget)
-  backfillMissionResources();
-});
-
-server.on("error", (err: NodeJS.ErrnoException) => {
-  if (err.code === "EADDRINUSE") {
-    console.error(`[server] FATAL: Port ${PORT} already in use. Set PORT env to a different port.`);
-    process.exit(1);
-  }
-  throw err;
-});
-
-// Graceful shutdown handler
-const shutdown = async (signal: string) => {
-  console.log(`[server] ${signal} received, shutting down gracefully...`);
-  server.close(async () => {
-    try {
-      await closeDb();
-      console.log("[server] DB connections closed");
-    } catch { /* silent */ }
-    process.exit(0);
+if (!IS_VERCEL) {
+  const server = app.listen(PORT, async () => {
+    console.log(`[server] sowork-enterprise listening on port ${PORT}`);
+    console.log(`[server] health: http://localhost:${PORT}/health`);
+    await runStartupMigrations();
+    startOrchestratorWorker();
+    console.log("[A2A] Orchestrator Worker started");
+    startSquadLeaderWorker();
+    console.log("[A2A] Squad Leader Worker started");
+    // STAB-3: Recover any billing records persisted to disk during previous crash
+    const recovered = await loadBillingFallbackLog();
+    if (recovered > 0) {
+      console.log(`[server] recovered ${recovered} billing records from fallback log`);
+    }
+    // Backfill mission resources for existing missions (fire-and-forget)
+    backfillMissionResources();
   });
-  setTimeout(() => process.exit(1), 10_000); // 10s force exit
-};
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("uncaughtException", (err) => {
-  console.error("[server] uncaughtException:", err);
-  shutdown("uncaughtException");
-});
-process.on("unhandledRejection", (reason) => {
-  console.error("[server] unhandledRejection:", reason);
-});
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`[server] FATAL: Port ${PORT} already in use. Set PORT env to a different port.`);
+      process.exit(1);
+    }
+    throw err;
+  });
+
+  // Graceful shutdown handler
+  const shutdown = async (signal: string) => {
+    console.log(`[server] ${signal} received, shutting down gracefully...`);
+    server.close(async () => {
+      try {
+        await closeDb();
+        console.log("[server] DB connections closed");
+      } catch { /* silent */ }
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10_000); // 10s force exit
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("uncaughtException", (err) => {
+    console.error("[server] uncaughtException:", err);
+    shutdown("uncaughtException");
+  });
+  process.on("unhandledRejection", (reason) => {
+    console.error("[server] unhandledRejection:", reason);
+  });
+}
 
 export default app;

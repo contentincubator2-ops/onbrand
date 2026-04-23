@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm install --legacy-peer-deps && npm install --prefix client --legacy-peer-deps",
+  "buildCommand": "npm run build --prefix client",
+  "outputDirectory": "public",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
+  "functions": {
+    "api/index.ts": {
+      "runtime": "nodejs22.x",
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    { "source": "/trpc/:path*",   "destination": "/api/index" },
+    { "source": "/api/:path*",    "destination": "/api/index" },
+    { "source": "/slack/:path*",  "destination": "/api/index" },
+    { "source": "/health",        "destination": "/api/index" }
+  ],
+  "crons": [
+    { "path": "/api/cron/flush-billing-queue", "schedule": "*/5 * * * *" }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "TRUST_PROXY": "1"
+  }
+}
