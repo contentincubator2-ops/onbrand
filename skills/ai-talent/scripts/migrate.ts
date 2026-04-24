@@ -166,6 +166,24 @@ async function main() {
     `);
     console.log("[migrate] brand_report_sections: OK");
 
+    // 6. users.registrationIp + users.lastLoginIp (idempotent)
+    //    Drizzle schema added these for signup/login IP tracking; Azure
+    //    sowork_db users was missing them, causing `Unknown column` on
+    //    every auth query from Vercel.
+    for (const col of ["registrationIp", "lastLoginIp"] as const) {
+      const [exists] = await conn.execute(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?`,
+        [col],
+      ) as any;
+      if ((exists as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE users ADD COLUMN \`${col}\` VARCHAR(45) NULL`);
+        console.log(`[migrate] users.${col}: added`);
+      } else {
+        console.log(`[migrate] users.${col}: already exists, skipped`);
+      }
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
