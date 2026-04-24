@@ -10,6 +10,12 @@ pnpm-lock.yaml
 # needs them during buildCommand. After bundling, the buildCommand itself
 # deletes api/*.ts so Vercel function discovery only picks up the bundled
 # .js files.
+#
+# Do ignore local bundle artifacts (produced by running the bundle script
+# locally). Vercel regenerates them during buildCommand. Uploading both
+# .ts and .js triggers "conflicting paths" error before build even starts.
+api/index.js
+api/cron/flush-billing-queue.js
 .env
 .env.*
 !.env.example
