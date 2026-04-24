@@ -6,12 +6,10 @@ client/node_modules
 # it, it auto-switches to pnpm and fails with ERR_PNPM_OUTDATED_LOCKFILE.
 pnpm-lock.yaml
 
-# Let Vercel only see bundled api/*.js (produced by scripts/bundle-vercel-fns.mjs
-# during buildCommand). Shipping the .ts would make @vercel/node compile them
-# individually and fail on extension-less relative imports at runtime.
-api/**/*.ts
-server/**/*.ts
-!server/@types/**/*.ts
+# Note: we must NOT ignore server/**/*.ts or api/**/*.ts here — esbuild
+# needs them during buildCommand. After bundling, the buildCommand itself
+# deletes api/*.ts so Vercel function discovery only picks up the bundled
+# .js files.
 .env
 .env.*
 !.env.example
