@@ -58,7 +58,7 @@ export type ToolChoice =
 // DEBT-1: Add provider + model params for multi-provider routing
 export type InvokeParams = {
   messages: Message[];
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex";
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex" | "gemini";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -173,6 +173,14 @@ const PROVIDER_CONFIG: Record<
       : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
     defaultModel: "gpt-4o-mini",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+  },
+  // Google Gemini — AI Studio / Generative Language API (OpenAI-compatible shim)
+  // Endpoint: https://generativelanguage.googleapis.com/v1beta/openai
+  // Key: GEMINI_API_KEY (from AI Studio)
+  gemini: {
+    baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: "gemini-2.5-flash",
+    getKey:       () => (ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
   },
   // Google Vertex AI — OpenAI-compatible endpoint (uses service account)
   "google-vertex": {
