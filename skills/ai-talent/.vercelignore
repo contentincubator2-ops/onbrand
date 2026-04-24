@@ -6,16 +6,9 @@ client/node_modules
 # it, it auto-switches to pnpm and fails with ERR_PNPM_OUTDATED_LOCKFILE.
 pnpm-lock.yaml
 
-# Note: we must NOT ignore server/**/*.ts or api/**/*.ts here — esbuild
-# needs them during buildCommand. After bundling, the buildCommand itself
-# deletes api/*.ts so Vercel function discovery only picks up the bundled
-# .js files.
-#
-# Do ignore local bundle artifacts (produced by running the bundle script
-# locally). Vercel regenerates them during buildCommand. Uploading both
-# .ts and .js triggers "conflicting paths" error before build even starts.
-api/index.js
-api/cron/flush-billing-queue.js
+# server/**/*.ts stays uploaded — esbuild needs them during buildCommand
+# to bundle api/*.ts. The bundle script overwrites api/*.ts with
+# self-contained bundled output before Vercel compiles functions.
 .env
 .env.*
 !.env.example

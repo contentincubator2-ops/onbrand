@@ -2,12 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm install --legacy-peer-deps && npm install --prefix client --legacy-peer-deps",
-  "buildCommand": "node scripts/bundle-vercel-fns.mjs && rm api/index.ts api/cron/flush-billing-queue.ts && npm run build --prefix client",
+  "buildCommand": "node scripts/bundle-vercel-fns.mjs && npm run build --prefix client",
   "outputDirectory": "public",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "functions": {
-    "api/**/*.ts": { "maxDuration": 300 },
-    "api/**/*.js": { "maxDuration": 300 }
+    "api/**/*.ts": { "maxDuration": 300 }
   },
   "rewrites": [
     { "source": "/trpc/:path*",   "destination": "/api/index" },

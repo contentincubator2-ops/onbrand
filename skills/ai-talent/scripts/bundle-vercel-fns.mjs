@@ -1,50 +1,65 @@
 /**
- * Bundle api/*.ts into self-contained .js files for Vercel Functions.
+ * Bundle api/*.ts into self-contained files for Vercel Functions.
  *
  * Why: package.json has `"type": "module"`, and Node ESM requires explicit
  * `.js` extensions on every relative import. The server codebase uses
  * extension-less imports (tsx handles this in dev / on the VM), so once
- * @vercel/node compiles each file individually, runtime fails with
+ * @vercel/node compiled each file individually, runtime failed with
  * ERR_MODULE_NOT_FOUND on the first relative import.
  *
- * Solution: run esbuild at build time to bundle each api/*.ts entry +
- * all its relative imports into a single .js file. node_modules stay
- * external (installed via npm at install-time) so we don't ship huge
- * bundles and keep native deps (mysql2, bcryptjs) working.
+ * Approach: esbuild bundles each api/*.ts entry + its full transitive
+ * import graph into a single file, then OVERWRITES the source .ts file
+ * with that bundled output. Valid JS is valid TS, so @vercel/node's
+ * TypeScript compilation of the now-bundled .ts file succeeds, and at
+ * runtime there are no relative imports left to resolve.
  *
- * Called from vercel.json `buildCommand`. api/**\/*.ts is listed in
- * .vercelignore so Vercel picks up the .js output only.
+ * node_modules stay external (packages: 'external') so native deps
+ * (mysql2, bcryptjs, pdfkit) keep working and bundle size stays small.
+ *
+ * Called from vercel.json `buildCommand`. Run order matters: this
+ * MUST run before Vercel's function compilation step, which is exactly
+ * what happens — `buildCommand` finishes before @vercel/node looks at
+ * `api/`.
  */
 import { build } from "esbuild";
-import { rmSync } from "node:fs";
+import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { dirname } from "node:path";
+
+const tmpDir = "api/_bundle";
+rmSync(tmpDir, { recursive: true, force: true });
+mkdirSync(tmpDir, { recursive: true });
 
 const entries = [
-  { in: "api/index.ts",                     out: "api/index.js" },
-  { in: "api/cron/flush-billing-queue.ts",  out: "api/cron/flush-billing-queue.js" },
+  { in: "api/index.ts",                    tmp: `${tmpDir}/index.js`,               final: "api/index.ts" },
+  { in: "api/cron/flush-billing-queue.ts", tmp: `${tmpDir}/flush-billing-queue.js`, final: "api/cron/flush-billing-queue.ts" },
 ];
-
-// Clean stale output so a failed build doesn't silently ship old code.
-for (const e of entries) {
-  try { rmSync(e.out); } catch { /* ok */ }
-}
 
 await Promise.all(entries.map(e =>
   build({
     entryPoints: [e.in],
-    outfile: e.out,
+    outfile: e.tmp,
     bundle: true,
     platform: "node",
     format: "esm",
     target: "node22",
-    packages: "external",       // keep npm deps as runtime imports
-    tsconfig: "tsconfig.json",  // pick up paths + other TS settings
-    sourcemap: "inline",        // smaller than separate .map; helps Vercel traces
+    packages: "external",
+    tsconfig: "tsconfig.json",
+    sourcemap: "inline",
     logLevel: "info",
-    // Some libs (e.g. drizzle-orm's drivers) ship conditional exports
-    // that need these flags to resolve correctly on Node ESM.
     mainFields: ["module", "main"],
     conditions: ["node", "import"],
   })
 ));
 
-console.log("[bundle-vercel-fns] done:", entries.map(e => e.out).join(", "));
+// Atomically replace each source .ts with its bundled output. Still a
+// valid TS file (JS is TS), so @vercel/node can compile it without
+// hitting any relative imports.
+for (const e of entries) {
+  mkdirSync(dirname(e.final), { recursive: true });
+  const { readFileSync } = await import("node:fs");
+  writeFileSync(e.final, readFileSync(e.tmp));
+}
+
+rmSync(tmpDir, { recursive: true, force: true });
+
+console.log("[bundle-vercel-fns] overwrote:", entries.map(e => e.final).join(", "));
