@@ -2,13 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm install --legacy-peer-deps && npm install --prefix client --legacy-peer-deps",
-  "buildCommand": "npm run build --prefix client",
+  "buildCommand": "node scripts/bundle-vercel-fns.mjs && npm run build --prefix client",
   "outputDirectory": "public",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "functions": {
-    "api/index.ts": {
-      "maxDuration": 300,
-      "memory": 1024
+    "api/index.js": {
+      "maxDuration": 300
     }
   },
   "rewrites": [
