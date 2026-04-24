@@ -287,6 +287,223 @@ async function main() {
     `);
     console.log("[migrate] brand_tool_credentials: OK");
 
+    // ───────────────────────────────────────────────────────────────
+    // 7. Decision AI tables (decisions / options / evidence / outcomes
+    //    + triage_sessions + execution_combinations)
+    //
+    //    Pivot: Marketing OS squads stop being "workflow executors" and
+    //    start producing Decision Records. Each squad run writes a row
+    //    into `decisions` with options, evidence refs, recommendation,
+    //    confidence, reversibility, audit score, stale date.
+    //
+    //    All tables are additive — they do NOT alter `squads` or any
+    //    existing table. Backwards-compatible with current workflow engine.
+    // ───────────────────────────────────────────────────────────────
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS decisions (
+        id                  BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId             INT          NOT NULL,
+        squadId             INT          NULL,
+        missionId           INT          NULL,
+        decisionType        VARCHAR(64)  NOT NULL,
+        parentDecisionId    BIGINT       NULL,
+        status              ENUM('draft','recommended','approved','active','stale','archived','dissented')
+                                         NOT NULL DEFAULT 'draft',
+        title               VARCHAR(255) NULL,
+        summary             TEXT         NULL,
+        recommendedOptionId BIGINT       NULL,
+        confidence          DECIMAL(4,3) NULL,
+        reversibility       ENUM('one-way','two-way') NOT NULL DEFAULT 'two-way',
+        auditScore          SMALLINT     NULL,
+        auditedAt           TIMESTAMP(3) NULL,
+        activatedAt         TIMESTAMP(3) NULL,
+        staleAt             TIMESTAMP(3) NULL,
+        publishedAt         TIMESTAMP(3) NULL,
+        decidedBy           VARCHAR(128) NULL,
+        decidedAt           TIMESTAMP(3) NULL,
+        payload             JSON         NULL,
+        createdAt           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                         ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_brand_status (brandId, status),
+        INDEX idx_brand_type   (brandId, decisionType),
+        INDEX idx_parent       (parentDecisionId),
+        INDEX idx_stale        (status, staleAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] decisions: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS decision_options (
+        id                BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        decisionId        BIGINT       NOT NULL,
+        label             VARCHAR(255) NOT NULL,
+        rationale         TEXT         NULL,
+        pros              JSON         NULL,
+        cons              JSON         NULL,
+        expectedOutcome   TEXT         NULL,
+        isRecommended     TINYINT(1)   NOT NULL DEFAULT 0,
+        orderIndex        SMALLINT     NOT NULL DEFAULT 0,
+        createdAt         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_decision (decisionId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] decision_options: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS decision_evidence (
+        id          BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        decisionId  BIGINT       NOT NULL,
+        sourceType  ENUM('scout','market_data','archetype','user_input','calc','parent_decision')
+                                 NOT NULL,
+        sourceRef   VARCHAR(255) NOT NULL,
+        weight      DECIMAL(4,3) NULL,
+        stance      ENUM('supports','contradicts','neutral') NOT NULL DEFAULT 'supports',
+        snippet     TEXT         NULL,
+        createdAt   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_decision (decisionId),
+        INDEX idx_source   (sourceType, sourceRef)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] decision_evidence: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS decision_outcomes (
+        id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        decisionId      BIGINT       NOT NULL,
+        observedAt      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        metrics         JSON         NULL,
+        verdict         ENUM('win','loss','push','inconclusive') NULL,
+        lessonsLearned  TEXT         NULL,
+        reportedBy      VARCHAR(128) NULL,
+        INDEX idx_decision (decisionId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] decision_outcomes: OK");
+
+    // Diagnostic wizard state — point B of the UX pivot
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS decision_triage_sessions (
+        id                    BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId               INT          NOT NULL,
+        userId                INT          NULL,
+        trigger               VARCHAR(64)  NOT NULL,
+        stageOrScale          VARCHAR(64)  NULL,
+        recommendedDecisionIds JSON        NULL,
+        selectedDecisionId    BIGINT       NULL,
+        notes                 TEXT         NULL,
+        createdAt             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_brand (brandId, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] decision_triage_sessions: OK");
+
+    // Strategy × Channel × KPI combinator — point D of the UX pivot
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS execution_combinations (
+        id                   BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId              INT          NOT NULL,
+        strategyDecisionId   BIGINT       NOT NULL,
+        channelId            VARCHAR(32)  NOT NULL,
+        kpiTarget            VARCHAR(64)  NULL,
+        generatedOutput      LONGTEXT     NULL,
+        auditScore           SMALLINT     NULL,
+        auditIssues          JSON         NULL,
+        status               ENUM('generated','audited','approved','published','dissented')
+                                          NOT NULL DEFAULT 'generated',
+        publishedAt          TIMESTAMP(3) NULL,
+        createdAt            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                          ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_brand_channel (brandId, channelId),
+        INDEX idx_strategy      (strategyDecisionId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] execution_combinations: OK");
+
+    // ─── 8. Decision AI phase 2 — templates, chat threads, image gen ─────
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS user_methodology_templates (
+        id                 BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId            INT          NOT NULL,
+        userId             INT          NOT NULL,
+        baseSquadId        INT          NULL,
+        slug               VARCHAR(160) NOT NULL,
+        name               VARCHAR(255) NOT NULL,
+        description        TEXT         NULL,
+        accent             ENUM('teal','red','blue') NOT NULL DEFAULT 'teal',
+        stepsOverride      JSON         NULL,
+        promptsOverride    JSON         NULL,
+        scheduleCron       VARCHAR(64)  NULL,
+        scheduleNextRunAt  TIMESTAMP(3) NULL,
+        runCount           INT          NOT NULL DEFAULT 0,
+        avgAuditScore      DECIMAL(5,2) NULL,
+        lastRunAt          TIMESTAMP(3) NULL,
+        createdAt          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                         ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_brand_slug (brandId, slug),
+        INDEX idx_brand_user     (brandId, userId),
+        INDEX idx_schedule       (scheduleNextRunAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] user_methodology_templates: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS decision_chat_threads (
+        id           BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        decisionId   BIGINT       NOT NULL,
+        brandId      INT          NOT NULL,
+        agentId      INT          NULL,
+        title        VARCHAR(255) NULL,
+        createdAt    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_decision (decisionId),
+        INDEX idx_brand (brandId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] decision_chat_threads: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS decision_chat_messages (
+        id          BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        threadId    BIGINT       NOT NULL,
+        decisionId  BIGINT       NOT NULL,
+        role        ENUM('user','agent','mention','system') NOT NULL,
+        authorUserId  INT        NULL,
+        authorAgentId INT        NULL,
+        mentionUserIds JSON      NULL,
+        content     MEDIUMTEXT   NOT NULL,
+        createdAt   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_thread (threadId, createdAt),
+        INDEX idx_decision (decisionId, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] decision_chat_messages: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS generated_images (
+        id             BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId        INT          NOT NULL,
+        decisionId     BIGINT       NULL,
+        optionId       BIGINT       NULL,
+        provider       VARCHAR(32)  NOT NULL,
+        model          VARCHAR(64)  NOT NULL,
+        prompt         TEXT         NOT NULL,
+        negativePrompt TEXT         NULL,
+        sizeSpec       VARCHAR(24)  NULL,
+        url            VARCHAR(1024) NULL,
+        b64DataKey     VARCHAR(255) NULL,
+        cost           DECIMAL(8,4) NULL,
+        status         ENUM('pending','ready','failed') NOT NULL DEFAULT 'pending',
+        errorMsg       TEXT         NULL,
+        createdAt      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_brand_decision (brandId, decisionId),
+        INDEX idx_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] generated_images: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

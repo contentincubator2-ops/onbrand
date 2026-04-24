@@ -34,6 +34,7 @@
     "db:build-L1-v2": "tsx scripts/squad-builder/index.ts L1-brand-v2",
     "db:build-L1-v2-dry": "tsx scripts/squad-builder/index.ts L1-brand-v2 --dry-run",
     "db:upgrade-lead-fields": "tsx scripts/upgrade-lead-agent-fields.ts",
+    "db:upgrade-mvp-squads": "tsx scripts/decision-ai/upgrade-mvp-squads.ts",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
     "lint": "tsc --noEmit"

@@ -25,6 +25,13 @@ import { brandBrainRouter } from "./brandBrainRouter";
 import { strategyDeckRouter } from "./strategyDeckRouter";
 import { brandIntelRouter } from "./brandIntelRouter";
 import { toolCredRouter } from "./toolCredRouter";
+import { decisionRouter } from "./decisionRouter";
+import { triageRouter } from "./triageRouter";
+import { auditRouter } from "./auditRouter";
+import { templateRouter } from "./templateRouter";
+import { boardRouter } from "./boardRouter";
+import { calendarRouter } from "./calendarRouter";
+import { imageRouter } from "./imageRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -53,6 +60,13 @@ export const appRouter = router({
   strategyDeck:  strategyDeckRouter,
   brandIntel:    brandIntelRouter,
   toolCred:      toolCredRouter,
+  decision:      decisionRouter,
+  triage:        triageRouter,
+  audit:         auditRouter,
+  template:      templateRouter,
+  board:         boardRouter,
+  calendar:      calendarRouter,
+  image:         imageRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -120,6 +120,33 @@ function genAgentKey(squadUid: string, agentName: string): string {
 
 export const squadTemplateRouter = router({
 
+  // ── listByBrand ──────────────────────────────────────────────────────────────
+  // Returns ALL active squad templates, lightly hydrated, for the Studio
+  // TemplateRack / MethodologyStudio pages. Unlike getRecommendedSquads this
+  // is brand-scoped but does not rank by mission; the Studio picks by slug.
+  listByBrand: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async () => {
+      const [rows] = await localPool.execute(
+        `SELECT id, slug, name, description, members, workflow_steps, tier, strategy_layer
+           FROM squads
+          WHERE is_active = 1
+          ORDER BY COALESCE(tier, 99) ASC, id ASC
+          LIMIT 200`
+      ) as any[];
+      return (rows as any[]).map((r) => ({
+        id: r.id,
+        slug: r.slug,
+        name: r.name,
+        description: r.description,
+        tier: r.tier,
+        strategyLayer: r.strategy_layer,
+        members: safeJsonParse<any[]>(r.members, []),
+        steps: safeJsonParse<any[]>(r.workflow_steps, []),
+        workflow_steps: safeJsonParse<any[]>(r.workflow_steps, []),
+      }));
+    }),
+
   // ── getRecommendedSquads ─────────────────────────────────────────────────────
   // 從 squads 按 workspace + brand + mission 評分，回傳前 N 個 squad chips
   getRecommendedSquads: protectedProcedure

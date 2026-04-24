@@ -9,6 +9,13 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import StrategyDeckPage from "./pages/StrategyDeckPage";
+import TriagePage from "./studio/pages/TriagePage";
+import TemplateRackPage from "./studio/pages/TemplateRackPage";
+import StudioPage from "./studio/pages/StudioPage";
+import PublishGatePage from "./studio/pages/PublishGatePage";
+import MyLibraryPage from "./studio/pages/MyLibraryPage";
+import BoardPage from "./studio/pages/BoardPage";
+import CalendarPage from "./studio/pages/CalendarPage";
 import AppShell from "./components/AppShell";
 import MissionChatCore from "./components/MissionChatCore";
 import type { SquadStepProgress } from "./components/MissionChatCore";
@@ -228,6 +235,16 @@ export default function App() {
         <Route path="/onboarding" element={<RequireAuth><OnboardingWizard onComplete={() => window.location.href = "/"} /></RequireAuth>} />
         {/* Strategy Deck (Phase 1) — card-based UI replacement */}
         <Route path="/b/:brandId/deck" element={<RequireAuth><StrategyDeckPage /></RequireAuth>} />
+
+        {/* Studio (Decision AI methodology workspace) */}
+        <Route path="/studio/:brandId/triage" element={<RequireAuth><TriagePage /></RequireAuth>} />
+        <Route path="/studio/:brandId/templates" element={<RequireAuth><TemplateRackPage /></RequireAuth>} />
+        <Route path="/studio/:brandId/session/:sessionId" element={<RequireAuth><StudioPage /></RequireAuth>} />
+        <Route path="/studio/:brandId/publish" element={<RequireAuth><PublishGatePage /></RequireAuth>} />
+        <Route path="/studio/:brandId/library" element={<RequireAuth><MyLibraryPage /></RequireAuth>} />
+        <Route path="/studio/:brandId/board" element={<RequireAuth><BoardPage /></RequireAuth>} />
+        <Route path="/studio/:brandId/calendar" element={<RequireAuth><CalendarPage /></RequireAuth>} />
+        <Route path="/studio/:brandId" element={<RequireAuth><Navigate to="templates" replace /></RequireAuth>} />
         {/* Primary URL format: /b/:brandId/:workspace/m/:missionId */}
         <Route
           path="/b/:brandId/:workspace/m/:missionId"
