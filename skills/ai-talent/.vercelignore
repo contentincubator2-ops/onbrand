@@ -1,5 +1,10 @@
 node_modules
 client/node_modules
+
+# Force npm (via vercel.json installCommand). pnpm-lock.yaml is kept for
+# local dev but is stale vs package.json (missing pdfkit) — if Vercel sees
+# it, it auto-switches to pnpm and fails with ERR_PNPM_OUTDATED_LOCKFILE.
+pnpm-lock.yaml
 .env
 .env.*
 !.env.example
