@@ -33,6 +33,7 @@ export interface MarketingJobData {
   industry?: string;
   taskType?: string;
   userId?: number;
+  sessionId?: string;
 }
 
 export interface MarketingJobResult {

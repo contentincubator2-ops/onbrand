@@ -291,7 +291,11 @@ export function startSquadLeaderWorker() {
         executionTimeMs:  Date.now() - startTime,
       };
     },
-    { connection, concurrency: 3 }
+    // `connection` comes from marketingQueue and is typed loosely
+    // (unknown) because on Vercel it throws on access. On the VM path
+    // (the only place where startSquadLeaderWorker actually runs) it
+    // resolves to the BullMQ-compatible ioredis instance.
+    { connection: connection as never, concurrency: 3 }
   );
 
   worker.on("completed", (job) => {

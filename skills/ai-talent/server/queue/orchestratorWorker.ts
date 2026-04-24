@@ -226,7 +226,8 @@ export function startOrchestratorWorker() {
       };
     },
     {
-      connection,
+      // See squadLeaderWorker for the `connection as never` rationale.
+      connection: connection as never,
       concurrency: 5,
     }
   );
