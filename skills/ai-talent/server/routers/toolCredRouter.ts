@@ -337,8 +337,10 @@ export const toolCredRouter = router({
       return { ok: true };
     }),
 
-  // Health-check stub — Batch 2-2 will wire real per-tool test calls.
-  // For now we just flip status to 'ok' if the credential decrypts cleanly.
+  // Real per-tool health check (Batch 2-2d).
+  // Routes to credTesters.ts which actually pings the API or runs the
+  // browser login flow. For browser-login tools (opview/meltwater/gwi)
+  // this takes 20-40s and spends one Browserbase session credit.
   test: protectedProcedure
     .input(z.object({ brandId: z.number(), tool: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -354,13 +356,27 @@ export const toolCredRouter = router({
         `);
         return { ok: false, status: "error", message: "Credential not readable (may need re-entry)" };
       }
-      // Placeholder — Batch 2-2 replaces this with real API ping per tool.
+
+      const { runCredTest } = await import("../_core/scouts/credTesters");
+      const started = Date.now();
+      const result = await runCredTest(input.tool, cred.payload);
+      const elapsedMs = Date.now() - started;
+      const newStatus = result.ok ? "ok" : "error";
+      const errorMsg = result.ok ? null : result.message;
+
       await db.execute(sql`
         UPDATE brand_tool_credentials
-        SET status = 'ok', lastTestedAt = NOW(3), lastError = NULL
+        SET status = ${newStatus}, lastTestedAt = NOW(3), lastError = ${errorMsg}
         WHERE brandId = ${input.brandId} AND tool = ${input.tool}
       `);
-      return { ok: true, status: "ok", message: "Credential stored and decrypted successfully (real health-check pending Batch 2-2)" };
+
+      return {
+        ok: result.ok,
+        status: newStatus,
+        message: result.message,
+        detail: result.detail,
+        elapsedMs,
+      };
     }),
 
   // ─── Browser runtime smoke test (Batch 2-2a) ──────────────────────────────
