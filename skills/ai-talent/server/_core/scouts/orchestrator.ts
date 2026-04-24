@@ -12,13 +12,30 @@ import type { IntelItem, Scout, ScoutContext, ScoutResult } from "./types";
 import { perplexityScout } from "./perplexityScout";
 import { googleNewsScout } from "./googleNewsScout";
 import { googleTrendsScout } from "./googleTrendsScout";
+import { youtubeDataScout } from "./youtubeDataScout";
+import { redditScout } from "./redditScout";
+import { ahrefsScout } from "./ahrefsScout";
+import { similarwebScout } from "./similarwebScout";
+import { semrushScout } from "./semrushScout";
+import { opviewScout } from "./opviewScout";
+import { meltwaterScout } from "./meltwaterScout";
+import { gwiScout } from "./gwiScout";
 
 export const SCOUT_REGISTRY: Scout[] = [
+  // Tier: free — always on (subject to env flags)
   perplexityScout,
   googleNewsScout,
   googleTrendsScout,
-  // Batch 2-2c: ahrefs, similarweb, semrush, youtube-data, reddit, opview,
-  //             meltwater, gwi
+  // Tier: api_key — activate per-brand when cred stored
+  youtubeDataScout,
+  redditScout,
+  ahrefsScout,
+  similarwebScout,
+  semrushScout,
+  // Tier: browser_login — ToS-risk, requires signed disclaimer
+  opviewScout,
+  meltwaterScout,
+  gwiScout,
 ];
 
 export interface OrchestratorOutput {
