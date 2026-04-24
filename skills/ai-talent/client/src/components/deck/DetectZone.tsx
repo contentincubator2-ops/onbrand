@@ -17,6 +17,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
+import { ToolCredDrawer } from "./ToolCredDrawer";
 
 // ─── Tokens ────────────────────────────────────────────────────────────────
 const C = {
@@ -94,6 +95,7 @@ export function DetectZone({ brandId }: { brandId: number }) {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   const signalsQuery = trpc.brandIntel.listByBrand.useQuery(
     { brandId, limit: 100 },
@@ -167,6 +169,9 @@ export function DetectZone({ brandId }: { brandId: number }) {
             自動情報 + 我的釘選 → 即時餵進 AI 策略產生
           </div>
         </div>
+        <button style={btnGhost} onClick={() => setToolsOpen(true)}>
+          🔌 工具連線
+        </button>
         <button style={btnGhost} onClick={() => setWatchlistOpen(true)}>
           🎯 關鍵字設定{hasWatchlist ? "" : " ·  建議"}
         </button>
@@ -306,6 +311,9 @@ export function DetectZone({ brandId }: { brandId: number }) {
             await refetchAll();
           }}
         />
+      )}
+      {toolsOpen && (
+        <ToolCredDrawer brandId={brandId} onClose={() => setToolsOpen(false)} />
       )}
       {watchlistOpen && (
         <WatchlistDrawer

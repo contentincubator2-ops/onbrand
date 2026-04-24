@@ -251,6 +251,42 @@ async function main() {
     `);
     console.log("[migrate] brand_watchlist: OK");
 
+    // Intel zone — brand_tool_credentials (Phase 2A Ext Batch 2-1)
+    // Per-brand credentials for third-party marketing tools (Similarweb, Ahrefs,
+    // SEMrush, GWI, Meltwater, Opview, Reddit, YouTube, etc.). Payload is a JSON
+    // blob encrypted at rest via _core/encryption.ts (AES-256-GCM).
+    //
+    // authType:
+    //   api_key           — single API token (Ahrefs, Similarweb, YouTube)
+    //   username_password — browser-automation login (Opview, Meltwater, GWI)
+    //   oauth_token       — OAuth refresh+access (Reddit, future Meta/LinkedIn)
+    //
+    // We NEVER return encryptedPayload back to the client; UI reads maskedFields
+    // which is rebuilt server-side on each read.
+    //
+    // UNIQUE KEY (brandId, tool) ensures one credential row per tool per brand;
+    // upsert via ON DUPLICATE KEY UPDATE.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_tool_credentials (
+        id                INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId           INT          NOT NULL,
+        userId            INT          NULL,
+        tool              VARCHAR(64)  NOT NULL,
+        authType          ENUM('api_key','username_password','oauth_token') NOT NULL,
+        encryptedPayload  TEXT         NOT NULL,
+        fieldHints        JSON         NULL,
+        status            ENUM('pending','ok','error','expired') NOT NULL DEFAULT 'pending',
+        lastTestedAt      TIMESTAMP(3) NULL,
+        lastError         VARCHAR(500) NULL,
+        termsAcceptedAt   TIMESTAMP(3) NULL,
+        createdAt         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_brand_tool (brandId, tool),
+        INDEX idx_brand_status (brandId, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_tool_credentials: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
