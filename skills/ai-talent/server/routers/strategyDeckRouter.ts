@@ -236,6 +236,205 @@ export const strategyDeckRouter = router({
       return { ok: true };
     }),
 
+  // ── Auto-fill (Phase 1.5) ──────────────────────────────────────────────────
+  // Reads brand context (brands row + brand_brain) and asks the LLM to produce
+  // a JSON config matching the methodology's field schema. Frontend merges the
+  // result into the user's current config (user can still edit).
+  autoFill: protectedProcedure
+    .input(
+      z.object({
+        strategyId: z.number(),
+        overwriteFilled: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const strategy = await loadStrategy(ctx.user.id, input.strategyId);
+      const methodology = getMethodology(strategy.methodologySlug);
+      if (!methodology) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown methodology" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // 1. Load brand context
+      const [brandRows] = (await db.execute(sql`
+        SELECT name, industry, description, tagline,
+               valueProposition, targetMarket, audienceA, audienceB,
+               emotionalDiff, functionalDiff
+        FROM brands WHERE id = ${strategy.brandId} LIMIT 1
+      `)) as any;
+      const brand = (Array.isArray(brandRows) ? brandRows[0] : null) ?? {};
+
+      const [brainRows] = (await db.execute(sql`
+        SELECT category, content FROM brand_brain
+        WHERE brandId = ${strategy.brandId}
+        ORDER BY updatedAt DESC
+        LIMIT 40
+      `)) as any;
+      const brainByCategory: Record<string, string[]> = {};
+      for (const r of ((brainRows as any[]) ?? [])) {
+        const cat = r.category ?? "general";
+        (brainByCategory[cat] ??= []).push(r.content);
+      }
+
+      // 2. Determine which fields to (re)generate
+      const currentConfig: Record<string, any> = (() => {
+        if (!strategy.config) return {};
+        if (typeof strategy.config === "string") {
+          try { return JSON.parse(strategy.config); } catch { return {}; }
+        }
+        return strategy.config;
+      })();
+
+      const fieldsToFill = methodology.fields.filter((f) => {
+        if (input.overwriteFilled) return true;
+        const v = currentConfig[f.key];
+        if (v == null) return true;
+        if (typeof v === "string" && !v.trim()) return true;
+        if (Array.isArray(v) && v.length === 0) return true;
+        return false;
+      });
+
+      if (fieldsToFill.length === 0) {
+        return { config: currentConfig, filledKeys: [], skipped: "already-complete" as const };
+      }
+
+      // 3. Build JSON schema for structured output
+      const schemaProperties: Record<string, any> = {};
+      for (const f of fieldsToFill) {
+        if (f.type === "list") {
+          schemaProperties[f.key] = {
+            type: "array",
+            items: { type: "string" },
+            description: f.label,
+          };
+        } else {
+          schemaProperties[f.key] = {
+            type: "string",
+            description: f.label,
+          };
+        }
+      }
+
+      // 4. Build system + user prompt
+      const brandBlock = [
+        brand.name && `品牌名稱：${brand.name}`,
+        brand.industry && `產業：${brand.industry}`,
+        brand.tagline && `標語：${brand.tagline}`,
+        brand.description && `品牌描述：${brand.description}`,
+        brand.valueProposition && `價值主張：${brand.valueProposition}`,
+        brand.targetMarket && `目標市場：${brand.targetMarket}`,
+        brand.audienceA && `主要受眾 A：${brand.audienceA}`,
+        brand.audienceB && `次要受眾 B：${brand.audienceB}`,
+        brand.emotionalDiff && `情感差異：${brand.emotionalDiff}`,
+        brand.functionalDiff && `功能差異：${brand.functionalDiff}`,
+      ].filter(Boolean).join("\n");
+
+      const brainBlock = Object.entries(brainByCategory)
+        .slice(0, 8)
+        .map(([cat, items]) =>
+          `【${cat}】\n${items.slice(0, 6).map((x) => `- ${String(x).slice(0, 400)}`).join("\n")}`
+        )
+        .join("\n\n");
+
+      const fieldsDescription = fieldsToFill
+        .map((f) => `- ${f.key} (${f.label})${f.type === "list" ? " [陣列]" : ""}`)
+        .join("\n");
+
+      const alreadyFilledDesc = methodology.fields
+        .filter((f) => !fieldsToFill.find((x) => x.key === f.key))
+        .map((f) => `- ${f.key}: ${JSON.stringify(currentConfig[f.key])}`)
+        .join("\n");
+
+      const systemPrompt = [
+        `你是資深品牌策略顧問，現在要依「${methodology.name}」方法論（作者：${methodology.author}）幫用戶的品牌產出策略卡內容。`,
+        ``,
+        `方法論核心：${methodology.summary}`,
+        ``,
+        `規則：`,
+        `1. 僅輸出 JSON，符合指定 schema。不要加說明、不要 markdown、不要 code fence。`,
+        `2. 每個欄位要具體、可執行，不要空話。`,
+        `3. 如果品牌資料不足以產出某欄位，就基於方法論常見做法合理推斷，但要具體。`,
+        `4. 用繁體中文。`,
+        `5. 欄位內容避免超過 200 字；陣列型欄位 3–5 項為佳，每項 15 字內。`,
+      ].join("\n");
+
+      const userPrompt = [
+        `【品牌資料】`,
+        brandBlock || "（品牌基本欄位多數為空，請盡量依品牌名稱與產業推斷）",
+        ``,
+        brainBlock ? `【品牌大腦（Brain）摘錄】\n${brainBlock}\n` : "",
+        alreadyFilledDesc ? `【用戶已填欄位（不要改）】\n${alreadyFilledDesc}\n` : "",
+        `【請產出的欄位】`,
+        fieldsDescription,
+      ].filter(Boolean).join("\n");
+
+      // 5. Call LLM with JSON object output
+      let parsed: Record<string, any> = {};
+      try {
+        const result = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          maxTokens: 1200,
+          responseFormat: { type: "json_object" },
+        } as any);
+        const rawContent = (result as any)?.choices?.[0]?.message?.content;
+        const raw = typeof rawContent === "string"
+          ? rawContent
+          : Array.isArray(rawContent)
+            ? rawContent.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("")
+            : "";
+        // Strip any accidental ```json fences
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+        parsed = JSON.parse(cleaned);
+      } catch (err: any) {
+        console.error("[strategyDeck.autoFill] LLM failed:", err?.message);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "AI 產生失敗，請稍後再試或改用手動輸入",
+        });
+      }
+
+      // 6. Coerce list fields — sometimes LLM returns comma-string, normalize
+      for (const f of fieldsToFill) {
+        const v = parsed[f.key];
+        if (f.type === "list") {
+          if (typeof v === "string") {
+            parsed[f.key] = v.split(/[,、\n;；]/).map((s) => s.trim()).filter(Boolean);
+          } else if (!Array.isArray(v)) {
+            parsed[f.key] = [];
+          }
+        } else if (Array.isArray(v)) {
+          parsed[f.key] = v.join("、");
+        } else if (v == null) {
+          parsed[f.key] = "";
+        } else {
+          parsed[f.key] = String(v);
+        }
+      }
+
+      // 7. Merge and persist
+      const merged = input.overwriteFilled
+        ? { ...currentConfig, ...parsed }
+        : { ...parsed, ...currentConfig, ...Object.fromEntries(
+            fieldsToFill.map((f) => [f.key, parsed[f.key]])
+          ) };
+
+      await db.execute(sql`
+        UPDATE brand_strategies
+        SET config = ${JSON.stringify(merged)}
+        WHERE id = ${input.strategyId}
+      `);
+
+      return {
+        config: merged,
+        filledKeys: fieldsToFill.map((f) => f.key),
+        skipped: null as null,
+      };
+    }),
+
   // ── Mini chat drawer ───────────────────────────────────────────────────────
   listMessages: protectedProcedure
     .input(z.object({ strategyId: z.number() }))

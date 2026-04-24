@@ -49,6 +49,7 @@ export function StrategyCardDetail({
   const activateMutation = trpc.strategyDeck.activate.useMutation();
   const archiveMutation = trpc.strategyDeck.archive.useMutation();
   const removeMutation = trpc.strategyDeck.remove.useMutation();
+  const autoFillMutation = trpc.strategyDeck.autoFill.useMutation();
 
   const [flipped, setFlipped] = useState(false);
   const [name, setName] = useState("");
@@ -92,6 +93,35 @@ export function StrategyCardDetail({
     if (!confirm("封存這張策略卡？後續執行不會再引用，但歷史會保留。")) return;
     await archiveMutation.mutateAsync({ id: strategyId } as any);
     await strategyQuery.refetch();
+  }
+
+  const [autoFilling, setAutoFilling] = useState(false);
+  async function autoFill(overwrite: boolean) {
+    if (autoFilling) return;
+    // If there are unsaved changes, save them first so the server sees current state
+    if (dirty) {
+      try { await updateMutation.mutateAsync({ id: strategyId, name, config } as any); } catch {}
+    }
+    setAutoFilling(true);
+    try {
+      const res = await autoFillMutation.mutateAsync({
+        strategyId,
+        overwriteFilled: overwrite,
+      });
+      if ((res as any)?.skipped === "already-complete") {
+        alert("所有欄位都已填好 — 如果想重新產生，請點「全部覆蓋重寫」。");
+        return;
+      }
+      // Merge the server's merged config into local state
+      const newConfig = (res as any)?.config ?? {};
+      setConfig(newConfig);
+      setDirty(false);
+      await strategyQuery.refetch();
+    } catch (err: any) {
+      alert(err?.message ?? "AI 產生失敗，請稍後再試");
+    } finally {
+      setAutoFilling(false);
+    }
   }
 
   async function remove() {
@@ -176,6 +206,8 @@ export function StrategyCardDetail({
             setName={(v) => { setName(v); setDirty(true); }}
             config={config}
             setConfig={(v) => { setConfig(v); setDirty(true); }}
+            onAutoFill={autoFill}
+            autoFilling={autoFilling}
           />
         )}
 
@@ -232,6 +264,8 @@ function FrontFace({
   setName,
   config,
   setConfig,
+  onAutoFill,
+  autoFilling,
 }: {
   strategy: any;
   methodology: any;
@@ -239,6 +273,8 @@ function FrontFace({
   setName: (v: string) => void;
   config: Record<string, any>;
   setConfig: (v: Record<string, any>) => void;
+  onAutoFill: (overwrite: boolean) => Promise<void>;
+  autoFilling: boolean;
 }) {
   if (!strategy) {
     return <div style={{ padding: 32, color: C.textDim }}>載入中…</div>;
@@ -286,15 +322,65 @@ function FrontFace({
         <div style={{ marginTop: 10 }}>
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: 0.6,
-              color: C.textDim,
-              textTransform: "uppercase",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
               margin: "14px 0 10px",
+              gap: 8,
+              flexWrap: "wrap",
             }}
           >
-            方法論欄位
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 0.6,
+                color: C.textDim,
+                textTransform: "uppercase",
+              }}
+            >
+              方法論欄位
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => onAutoFill(false)}
+                disabled={autoFilling}
+                title="AI 會讀取品牌資料＋方法論，把空白欄位填起來，你可以再調整"
+                style={{
+                  ...aiBtn,
+                  opacity: autoFilling ? 0.55 : 1,
+                  cursor: autoFilling ? "wait" : "pointer",
+                }}
+              >
+                {autoFilling ? "產生中…" : "🤖 AI 產生空白欄位"}
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm("重新產生會覆蓋所有已填的欄位（包含你手動改過的）。確定？")) {
+                    onAutoFill(true);
+                  }
+                }}
+                disabled={autoFilling}
+                title="覆蓋所有欄位重新產生"
+                style={{
+                  ...aiBtnGhost,
+                  opacity: autoFilling ? 0.55 : 1,
+                  cursor: autoFilling ? "wait" : "pointer",
+                }}
+              >
+                🔄 全部覆蓋
+              </button>
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: C.textDim,
+              marginBottom: 10,
+              lineHeight: 1.55,
+            }}
+          >
+            想省事就按「AI 產生」，它會依你品牌資料 + 這套方法論自動填。想自己寫也可以直接打字。
           </div>
           {fields.map((f) => (
             <Field key={f.key} label={f.label}>
@@ -690,6 +776,27 @@ const secondaryBtn: React.CSSProperties = {
   padding: "8px 14px",
   borderRadius: 6,
   fontSize: 13,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+const aiBtn: React.CSSProperties = {
+  background: C.accent,
+  color: "#fff",
+  border: "none",
+  padding: "6px 11px",
+  borderRadius: 6,
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+const aiBtnGhost: React.CSSProperties = {
+  background: "#fff",
+  color: "#6B6A64",
+  border: `1px solid #E4E3E1`,
+  padding: "6px 10px",
+  borderRadius: 6,
+  fontSize: 12,
   cursor: "pointer",
   fontFamily: "inherit",
 };
