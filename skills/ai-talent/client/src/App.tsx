@@ -8,6 +8,7 @@ import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import OnboardingWizard from "./pages/OnboardingWizard";
+import StrategyDeckPage from "./pages/StrategyDeckPage";
 import AppShell from "./components/AppShell";
 import MissionChatCore from "./components/MissionChatCore";
 import type { SquadStepProgress } from "./components/MissionChatCore";
@@ -225,6 +226,8 @@ export default function App() {
 
         {/* Protected routes */}
         <Route path="/onboarding" element={<RequireAuth><OnboardingWizard onComplete={() => window.location.href = "/"} /></RequireAuth>} />
+        {/* Strategy Deck (Phase 1) — card-based UI replacement */}
+        <Route path="/b/:brandId/deck" element={<RequireAuth><StrategyDeckPage /></RequireAuth>} />
         {/* Primary URL format: /b/:brandId/:workspace/m/:missionId */}
         <Route
           path="/b/:brandId/:workspace/m/:missionId"

@@ -40,6 +40,12 @@ jobs:
             npm install --legacy-peer-deps 2>&1 | tail -5
 
             echo ""
+            echo "===== Step 2b: DB migrations (idempotent) ====="
+            npx tsx scripts/migrate.ts 2>&1 | tail -30 || {
+              echo "[deploy] migrations failed — continuing anyway; check logs"
+            }
+
+            echo ""
             echo "===== Step 3: Client build ====="
             cd "$AI/client"
             npm install --legacy-peer-deps 2>&1 | tail -5

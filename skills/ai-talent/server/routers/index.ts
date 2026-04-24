@@ -22,6 +22,7 @@ import { messageRouter } from "./messageRouter";
 import { squadTemplateRouter } from "./squadTemplateRouter";
 import { reportRouter } from "./reportRouter";
 import { brandBrainRouter } from "./brandBrainRouter";
+import { strategyDeckRouter } from "./strategyDeckRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -47,6 +48,7 @@ export const appRouter = router({
   squad:         squadTemplateRouter,  // TRPC key kept as "squad" for backward compatibility (frontend uses trpc.squad.*)
   report:        reportRouter,
   brandBrain:    brandBrainRouter,
+  strategyDeck:  strategyDeckRouter,
 });
 
 export type AppRouter = typeof appRouter;

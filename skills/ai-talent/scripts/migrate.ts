@@ -166,6 +166,46 @@ async function main() {
     `);
     console.log("[migrate] brand_report_sections: OK");
 
+    // Strategy Deck — brand_strategies table
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_strategies (
+        id                INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId           INT          NOT NULL,
+        userId            INT          NULL,
+        methodologySlug   VARCHAR(100) NOT NULL,
+        methodologyName   VARCHAR(255) NOT NULL,
+        methodologyAuthor VARCHAR(255) NULL,
+        layer             VARCHAR(32)  NULL,
+        name              VARCHAR(255) NOT NULL,
+        status            ENUM('draft','active','archived') NOT NULL DEFAULT 'draft',
+        summary           TEXT         NULL,
+        config            JSON         NULL,
+        activatedAt       TIMESTAMP(3) NULL,
+        expiresAt         TIMESTAMP(3) NULL,
+        archivedAt        TIMESTAMP(3) NULL,
+        createdAt         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_brand         (brandId),
+        INDEX idx_status        (status),
+        INDEX idx_brand_status  (brandId, status),
+        INDEX idx_expires       (expiresAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_strategies: OK");
+
+    // Strategy chat — lightweight per-strategy mini conversations (card-back drawer)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_strategy_messages (
+        id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        strategyId  INT          NOT NULL,
+        role        ENUM('user','assistant','system') NOT NULL,
+        content     LONGTEXT     NOT NULL,
+        createdAt   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_strategy (strategyId, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_strategy_messages: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
