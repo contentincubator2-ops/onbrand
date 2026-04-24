@@ -114,6 +114,8 @@ export function DetectZone({ brandId }: { brandId: number }) {
   const watchlist = watchlistQuery.data as any;
   const feedData = feedQuery.data as any;
   const feedItems = (feedData?.items ?? []) as any[];
+  const feedSource: string | undefined = feedData?.source;
+  const feedKeywordsUsed: string[] = (feedData?.keywords ?? []) as string[];
 
   const filteredFeed = useMemo(() => {
     if (feedFilter === "all") return feedItems;
@@ -225,9 +227,40 @@ export function DetectZone({ brandId }: { brandId: number }) {
             ))}
           </div>
 
+          {/* Feed status strip (debug-friendly) */}
+          {!feedQuery.isLoading && hasWatchlist && (
+            <div
+              style={{
+                fontSize: 11,
+                color: feedSource === "error" ? C.danger : C.textMuted,
+                padding: "0 0 8px",
+              }}
+            >
+              來源狀態：
+              {feedSource === "market_data" && (
+                <span style={{ color: "#2B8A3E" }}>
+                  ✓ market_data · 找到 {feedItems.length} 筆 · 使用 {feedKeywordsUsed.length} 個關鍵字
+                </span>
+              )}
+              {feedSource === "empty-watchlist" && <span>watchlist 空的 — 去「關鍵字設定」加入</span>}
+              {feedSource === "error" && (
+                <span>❌ market_data 查詢失敗（看 server log）— keywords: {feedKeywordsUsed.slice(0, 5).join(", ")}…</span>
+              )}
+              {feedSource === "none" && <span>DB 未連線</span>}
+              {feedSource === undefined && <span>—</span>}
+            </div>
+          )}
+
           {/* Feed list */}
           {feedQuery.isLoading ? (
             <CenteredMessage text="載入情報中…" />
+          ) : feedQuery.isError ? (
+            <EmptyState
+              title="情報抓取失敗"
+              hint={(feedQuery.error as any)?.message ?? "請重試或檢查 server log"}
+              cta="🔄 重試"
+              onCta={() => feedQuery.refetch()}
+            />
           ) : !hasWatchlist ? (
             <EmptyState
               title="尚未設定追蹤關鍵字"
@@ -235,10 +268,23 @@ export function DetectZone({ brandId }: { brandId: number }) {
               cta="🎯 開啟設定"
               onCta={() => setWatchlistOpen(true)}
             />
+          ) : feedSource === "error" ? (
+            <EmptyState
+              title="market_data 查詢錯誤"
+              hint={`keywords 已送出（${feedKeywordsUsed.length} 個）但後端拋錯，請看 server log`}
+              cta="🔄 重試"
+              onCta={() => feedQuery.refetch()}
+            />
           ) : filteredFeed.length === 0 ? (
             <EmptyState
-              title="這個分類近期沒有相關情報"
-              hint="試試其他分類，或去設定補充關鍵字"
+              title={feedItems.length === 0 ? "近 14 天沒有匹配關鍵字的情報" : "這個分類近期沒有相關情報"}
+              hint={
+                feedItems.length === 0
+                  ? `已搜尋 ${feedKeywordsUsed.length} 個關鍵字 · 試著加入更通用的產業詞`
+                  : "試試其他分類，或去設定補充關鍵字"
+              }
+              cta="🎯 調整關鍵字"
+              onCta={() => setWatchlistOpen(true)}
             />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
