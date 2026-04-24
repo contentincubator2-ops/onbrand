@@ -76,6 +76,23 @@ function truncate(s: string | null | undefined, n: number): string {
   if (!s) return "";
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
+const SCOUT_LABELS: Record<string, string> = {
+  "perplexity": "Perplexity",
+  "google-news": "Google 新聞",
+  "google-trends": "Google 趨勢",
+  "ahrefs": "Ahrefs",
+  "similarweb": "Similarweb",
+  "semrush": "SEMrush",
+  "youtube-data": "YouTube",
+  "reddit": "Reddit",
+  "opview": "Opview",
+  "meltwater": "Meltwater",
+  "gwi": "GWI",
+};
+function scoutLabel(id: string): string {
+  return SCOUT_LABELS[id] ?? id;
+}
+
 function timeAgo(iso?: string): string {
   if (!iso) return "";
   const t = new Date(iso).getTime();
@@ -116,6 +133,12 @@ export function DetectZone({ brandId }: { brandId: number }) {
   const feedItems = (feedData?.items ?? []) as any[];
   const feedSource: string | undefined = feedData?.source;
   const feedKeywordsUsed: string[] = (feedData?.keywords ?? []) as string[];
+  const feedScouts: Array<{ id: string; ok: boolean; count: number; elapsedMs: number; skipped?: string; error?: string }> =
+    (feedData?.scouts ?? []) as any[];
+  const availableScouts: number = feedData?.availableScouts ?? 0;
+  const authedScouts: number = feedData?.authedScouts ?? 0;
+  const unauthedScouts: Array<{ id: string; label: string; tier: string; requiredTool?: string }> =
+    (feedData?.unauthedScouts ?? []) as any[];
 
   const filteredFeed = useMemo(() => {
     if (feedFilter === "all") return feedItems;
@@ -197,7 +220,7 @@ export function DetectZone({ brandId }: { brandId: number }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>📡 自動情報</span>
               <span style={{ fontSize: 11, color: C.textMuted }}>
-                過去 14 天 · AI 即時上網（Perplexity sonar）
+                多來源即時抓取 · {authedScouts}/{availableScouts} 個情報員上工
               </span>
             </div>
             <button
@@ -236,19 +259,56 @@ export function DetectZone({ brandId }: { brandId: number }) {
                 padding: "0 0 8px",
               }}
             >
-              來源狀態：
-              {feedSource === "llm-web" && (
+              {feedSource === "scouts" && (
                 <span style={{ color: "#2B8A3E" }}>
-                  ✓ AI 上網 · 找到 {feedItems.length} 筆 · {feedKeywordsUsed.length} 個關鍵字
+                  ✓ 共 {feedItems.length} 筆
                   {feedData?.cached ? "（快取）" : ""}
+                  {" · "}
+                  {feedScouts.filter((s) => s.ok).map((s) => `${scoutLabel(s.id)} ${s.count}`).join(" / ")}
+                </span>
+              )}
+              {feedSource === "empty-scouts" && (
+                <span>
+                  情報員都有上工但沒抓到資料 · 試著調整關鍵字
                 </span>
               )}
               {feedSource === "empty-watchlist" && <span>watchlist 空的 — 去「關鍵字設定」加入</span>}
               {feedSource === "error" && (
-                <span>❌ AI 抓取失敗（{feedData?.error ?? "看 server log"}）</span>
+                <span>❌ 抓取失敗（{feedData?.error ?? "看 server log"}）</span>
               )}
               {feedSource === "none" && <span>DB 未連線</span>}
               {feedSource === undefined && <span>—</span>}
+            </div>
+          )}
+
+          {/* Connect-more-tools nudge */}
+          {!feedQuery.isLoading && hasWatchlist && unauthedScouts.length > 0 && (
+            <div
+              style={{
+                fontSize: 11.5,
+                color: C.textMuted,
+                background: C.accentSoft,
+                border: `1px dashed ${C.accent}`,
+                borderRadius: 8,
+                padding: "8px 10px",
+                marginBottom: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ color: C.accent, fontWeight: 600 }}>💡 連更多工具、抓更深情報：</span>
+              <span>
+                目前還有 {unauthedScouts.length} 個情報員待授權（
+                {unauthedScouts.map((u) => scoutLabel(u.id)).join("、")}）
+              </span>
+              <button
+                style={{ ...btnMini, borderColor: C.accent, color: C.accent, marginLeft: "auto" }}
+                onClick={() => setToolsOpen(true)}
+              >
+                🔌 去連線
+              </button>
             </div>
           )}
 
@@ -271,8 +331,8 @@ export function DetectZone({ brandId }: { brandId: number }) {
             />
           ) : feedSource === "error" ? (
             <EmptyState
-              title="AI 抓取失敗"
-              hint={(feedData?.error as string) ?? `已送出 ${feedKeywordsUsed.length} 個關鍵字，但 Perplexity 回傳錯誤`}
+              title="情報抓取失敗"
+              hint={(feedData?.error as string) ?? `${feedKeywordsUsed.length} 個關鍵字已送出但 orchestrator 報錯`}
               cta="🔄 重試"
               onCta={() => feedQuery.refetch()}
             />

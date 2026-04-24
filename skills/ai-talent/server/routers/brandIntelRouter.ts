@@ -15,6 +15,8 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
+import { runScouts } from "../_core/scouts/orchestrator";
+import { loadToolCredential } from "./toolCredRouter";
 
 const typeSchema = z.enum(["competitor", "trend", "social", "internal", "manual"]);
 
@@ -351,14 +353,14 @@ export const brandIntelRouter = router({
       return suggestion;
     }),
 
-  // ─── Auto-feed via web-grounded LLM (Perplexity sonar) ───────────────────
-  // Previous version queried sowork_db.market_data. Replaced by LLM-driven
-  // web fetch so coverage isn't limited to whatever pre-crawled rows exist.
+  // ─── Auto-feed via scout orchestrator (Batch 2-2b) ───────────────────────
+  // Runs all available scouts (perplexity, google news, google trends …) in
+  // parallel. Tier B/C scouts activate when the brand has stored creds. Each
+  // scout fails in isolation; per-scout status is returned so UI can show
+  // "連 N 個來源（M 個需授權）".
   //
-  // Strategy: call Perplexity sonar-pro (web-grounded) with the brand's
-  // watchlist and ask for JSON array of recent news/trend/social items.
   // Cached in-process per (brandId) with 20-min TTL so multiple tab opens
-  // don't re-burn the LLM budget.
+  // don't re-burn the scout budget.
 
   feedAuto: protectedProcedure
     .input(
@@ -411,82 +413,54 @@ export const brandIntelRouter = router({
         return { ...cached.payload, cached: true };
       }
 
-      // Build Perplexity prompt
-      const system =
-        "You are a marketing intel agent. Given a brand's watchlist, fetch RECENT real news/trend/social items " +
-        "from the open web (search grounded). Prefer items within the last " + input.days + " days. " +
-        "Return ONLY a JSON object: {\"items\":[{\"type\":\"competitor_news\"|\"trending_topic\"|\"social_trend\"," +
-        "\"title\":string,\"content\":string (<=220 chars summary),\"source\":string (publisher/domain)," +
-        "\"url\":string,\"publishedAt\":\"YYYY-MM-DD\" or ISO,\"relevanceScore\":0..1}]}. " +
-        "Rules: no duplicate titles; each item must cite a real URL; content must reflect the article, not filler. " +
-        "Mix types — aim ~50% competitor_news, ~30% trending_topic, ~20% social_trend. Cap at " + input.limit + " items.";
-
-      const userMsg = [
-        brandName ? `【Brand】${brandName}` : "",
-        brandRow?.industry ? `【Industry】${brandRow.industry}` : "",
-        competitors.length ? `【Competitors to watch】${competitors.join(", ")}` : "",
-        keywords.length ? `【Keywords】${keywords.join(", ")}` : "",
-        industries.length ? `【Industry tags】${industries.join(", ")}` : "",
-        `【Recency】past ${input.days} days`,
-        `【Target】${input.limit} items`,
-      ].filter(Boolean).join("\n");
-
-      let items: any[] = [];
-      let providerUsed = "perplexity";
+      // Run scout orchestrator — parallel, isolated failures
       try {
-        const result = await invokeLLM({
-          provider: "perplexity",
-          model: "sonar-pro",
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: userMsg },
-          ],
-          maxTokens: 2400,
-          responseFormat: { type: "json_object" },
-        } as any);
-        const rawContent = (result as any)?.choices?.[0]?.message?.content;
-        const raw = typeof rawContent === "string"
-          ? rawContent
-          : Array.isArray(rawContent)
-            ? rawContent.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("")
-            : "";
-        const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-        // Perplexity sometimes returns a JSON array directly, sometimes {items:[...]}
-        const parsed = JSON.parse(cleaned);
-        items = Array.isArray(parsed) ? parsed : (parsed?.items ?? []);
+        const out = await runScouts(
+          {
+            brandId: input.brandId,
+            brandName,
+            industry: brandRow?.industry ?? undefined,
+            keywords,
+            competitors,
+            industryTags: industries,
+            days: input.days,
+            limit: input.limit,
+            loadCred: async (tool: string) => {
+              const c = await loadToolCredential(input.brandId, tool);
+              return c ? c.payload : null;
+            },
+          },
+          60_000
+        );
+
+        const payload = {
+          items: out.items,
+          keywords: kwAll,
+          source: out.items.length > 0 ? "scouts" : "empty-scouts",
+          scouts: out.scouts.map((s) => ({
+            id: s.scoutId,
+            ok: s.ok,
+            count: s.items.length,
+            elapsedMs: s.elapsedMs,
+            skipped: s.skipped,
+            error: s.error,
+          })),
+          availableScouts: out.availableScouts,
+          authedScouts: out.authedScouts,
+          unauthedScouts: out.unauthedScouts,
+          fetchedAt: out.fetchedAt,
+        };
+        feedAutoCache.set(bucketKey, { ts: now, payload });
+        return { ...payload, cached: false };
       } catch (err: any) {
-        console.error("[brandIntel.feedAuto] perplexity failed:", err?.message);
-        // Fallback: try the default provider with no web grounding (will mostly fail)
-        return { items: [], keywords: kwAll, source: "error", error: err?.message ?? "LLM failed" };
+        console.error("[brandIntel.feedAuto] orchestrator failed:", err?.message);
+        return {
+          items: [],
+          keywords: kwAll,
+          source: "error",
+          error: err?.message ?? "orchestrator failed",
+        };
       }
-
-      // Normalize + type-check
-      const ALLOWED = new Set(["competitor_news", "trending_topic", "social_trend"]);
-      const normalized = items
-        .filter((x) => x && typeof x === "object" && ALLOWED.has(x.type) && typeof x.title === "string")
-        .slice(0, input.limit)
-        .map((x: any, idx: number) => ({
-          key: `${x.type}-${idx}-${x.publishedAt ?? ""}`,
-          type: x.type,
-          title: String(x.title).slice(0, 240),
-          content: String(x.content ?? "").slice(0, 600),
-          source: String(x.source ?? "").slice(0, 120) || "web",
-          url: typeof x.url === "string" ? x.url.slice(0, 500) : undefined,
-          publishedAt: typeof x.publishedAt === "string" ? x.publishedAt : undefined,
-          relevanceScore: typeof x.relevanceScore === "number"
-            ? Math.max(0, Math.min(1, x.relevanceScore))
-            : 0.6,
-        }));
-
-      const payload = {
-        items: normalized,
-        keywords: kwAll,
-        source: "llm-web",
-        provider: providerUsed,
-        fetchedAt: new Date().toISOString(),
-      };
-      feedAutoCache.set(bucketKey, { ts: now, payload });
-      return { ...payload, cached: false };
     }),
 
   // Pin a market_data row → brand_intel_signals so autoFill can reference it.
