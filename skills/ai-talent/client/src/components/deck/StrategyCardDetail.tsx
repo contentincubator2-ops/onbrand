@@ -10,6 +10,7 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
+import { synthesizeStrategy } from "./strategySynth";
 
 const C = {
   overlay:    "rgba(18,18,16,0.45)",
@@ -244,6 +245,10 @@ function FrontFace({
   }
 
   const fields = (methodology?.fields ?? []) as any[];
+  const synth = useMemo(
+    () => synthesizeStrategy(strategy?.methodologySlug, config),
+    [strategy?.methodologySlug, config]
+  );
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "20px 22px" }}>
@@ -328,6 +333,129 @@ function FrontFace({
               )}
             </Field>
           ))}
+        </div>
+      )}
+
+      {/* Synthesis — shows what the filled config means as a strategy */}
+      {synth && (
+        <div style={{ marginTop: 24 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              margin: "14px 0 10px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 0.6,
+                color: C.textDim,
+                textTransform: "uppercase",
+              }}
+            >
+              策略解讀
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim }}>
+              完成度 {Math.round(synth.completeness * 100)}%
+            </div>
+          </div>
+
+          {/* Completeness bar */}
+          <div
+            style={{
+              height: 4,
+              background: "#EDECEA",
+              borderRadius: 2,
+              overflow: "hidden",
+              marginBottom: 14,
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.round(synth.completeness * 100)}%`,
+                height: "100%",
+                background:
+                  synth.completeness >= 0.7
+                    ? C.active
+                    : synth.completeness >= 0.4
+                    ? C.warn
+                    : C.danger,
+                transition: "width 0.3s",
+              }}
+            />
+          </div>
+
+          {/* Headline */}
+          <div
+            style={{
+              padding: "12px 14px",
+              background: C.accentSoft,
+              borderRadius: 8,
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: C.text,
+              marginBottom: 12,
+              fontWeight: 500,
+            }}
+          >
+            {synth.headline}
+          </div>
+
+          {/* Blocks */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {synth.blocks.map((b, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: 12,
+                  border: `1px solid ${C.borderSoft}`,
+                  borderRadius: 8,
+                  background: "#fff",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: C.text,
+                    marginBottom: 6,
+                  }}
+                >
+                  {b.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: C.textMuted,
+                    lineHeight: 1.7,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {b.body}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {synth.gaps.length > 0 && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: "8px 12px",
+                background: "#FFF7E6",
+                border: "1px solid #F5D9A0",
+                borderRadius: 6,
+                fontSize: 11.5,
+                color: "#7A5A1E",
+                lineHeight: 1.55,
+              }}
+            >
+              還有 {synth.gaps.length} 個欄位沒填 — 填完會讓這個策略更完整、執行時 AI 才能正確引用。
+            </div>
+          )}
         </div>
       )}
 

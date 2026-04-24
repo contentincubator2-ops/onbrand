@@ -241,29 +241,32 @@ function Rail({ activeTab, onTabChange, notifCount }: {
       <div style={logoStyle}>S</div>
       {/* Strategy Deck entry (Phase 1 Beta). Reads selected brand from localStorage
           since Rail is nested and doesn't have direct access to brand state. */}
-      <button
-        title="Strategy Deck (Beta)"
-        onClick={() => {
-          const brandId = readPersistedBrandId();
-          if (brandId) navigate(`/b/${brandId}/deck`);
-          else alert("請先選一個品牌");
-        }}
-        style={{
-          ...btnBase,
-          background: "#FDEFE3",
-          color: "#E8631A",
-          marginBottom: 6,
-          border: "1px solid #F5C9A7",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="5" width="7" height="14" rx="1.5" />
-            <rect x="14" y="5" width="7" height="14" rx="1.5" />
-          </svg>
-          <span style={{ fontSize: 7, color: "inherit", lineHeight: 1, fontWeight: 700 }}>Deck</span>
-        </div>
-      </button>
+      {(() => {
+        const isOnDeck = typeof window !== "undefined" && window.location.pathname.endsWith("/deck");
+        return (
+          <button
+            title="Strategy Deck (Beta)"
+            onClick={() => {
+              const brandId = readPersistedBrandId();
+              if (brandId) navigate(`/b/${brandId}/deck`);
+              else alert("請先選一個品牌");
+            }}
+            style={{
+              ...btnBase,
+              background: isOnDeck ? "#E8E7E4" : "transparent",
+              color: isOnDeck ? "#1A1A18" : "#9B9990",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="5" width="7" height="14" rx="1.5" />
+                <rect x="14" y="5" width="7" height="14" rx="1.5" />
+              </svg>
+              <span style={{ fontSize: 8, color: "inherit", lineHeight: 1 }}>Deck</span>
+            </div>
+          </button>
+        );
+      })()}
       {tabs.map(tab => (
         <button
           key={tab.id}
