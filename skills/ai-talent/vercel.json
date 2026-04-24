@@ -6,9 +6,8 @@
   "outputDirectory": "public",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "functions": {
-    "api/index.js": {
-      "maxDuration": 300
-    }
+    "api/**/*.ts": { "maxDuration": 300 },
+    "api/**/*.js": { "maxDuration": 300 }
   },
   "rewrites": [
     { "source": "/trpc/:path*",   "destination": "/api/index" },
