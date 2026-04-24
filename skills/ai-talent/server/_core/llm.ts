@@ -171,7 +171,7 @@ const PROVIDER_CONFIG: Record<
     baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
       ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
       : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
-    defaultModel: "gpt-4o-mini",
+    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4o-mini",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
   // Google Gemini — AI Studio / Generative Language API (OpenAI-compatible shim)
