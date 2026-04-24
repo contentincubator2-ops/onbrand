@@ -265,14 +265,33 @@ export const strategyDeckRouter = router({
       `)) as any;
       const brand = (Array.isArray(brandRows) ? brandRows[0] : null) ?? {};
 
-      const [brainRows] = (await db.execute(sql`
-        SELECT category, content FROM brand_brain
-        WHERE brandId = ${strategy.brandId}
-        ORDER BY updatedAt DESC
-        LIMIT 40
-      `)) as any;
+      // brand_brain uses snake_case columns (brand_id, updated_at) in production
+      let brainRows: any[] = [];
+      try {
+        const [rows] = (await db.execute(sql`
+          SELECT category, content FROM brand_brain
+          WHERE brand_id = ${strategy.brandId}
+          ORDER BY updated_at DESC
+          LIMIT 40
+        `)) as any;
+        brainRows = (rows as any[]) ?? [];
+      } catch (err: any) {
+        // Fallback for alt schema (camelCase) — don't kill autofill if brain is unavailable
+        try {
+          const [rows] = (await db.execute(sql`
+            SELECT category, content FROM brand_brain
+            WHERE brandId = ${strategy.brandId}
+            ORDER BY updatedAt DESC
+            LIMIT 40
+          `)) as any;
+          brainRows = (rows as any[]) ?? [];
+        } catch {
+          console.warn("[strategyDeck.autoFill] brand_brain read failed, continuing without:", err?.message);
+          brainRows = [];
+        }
+      }
       const brainByCategory: Record<string, string[]> = {};
-      for (const r of ((brainRows as any[]) ?? [])) {
+      for (const r of brainRows) {
         const cat = r.category ?? "general";
         (brainByCategory[cat] ??= []).push(r.content);
       }
