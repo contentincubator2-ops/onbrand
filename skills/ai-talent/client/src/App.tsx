@@ -24,6 +24,66 @@ import { trpc } from "./lib/trpc";
 import type { DBSquad } from "./types/squad";
 import { LanguageProvider } from "./lib/i18n";
 
+// ── StudioEntry: compact top-right pill shown on mission pages ──────────────
+function StudioEntryPill({ brandId }: { brandId: number | null }) {
+  const navigate = useNavigate();
+  if (!brandId) return null;
+  return (
+    <button
+      onClick={() => navigate(`/studio/${brandId}/triage`)}
+      title="Open Decision AI Studio"
+      style={{
+        position: "absolute", top: 14, right: 18, zIndex: 50,
+        padding: "7px 14px", borderRadius: 999,
+        background: "#0A0A0A", color: "#FFFFFF",
+        fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase",
+        border: "none", cursor: "pointer", fontWeight: 500,
+        boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+      }}
+    >
+      Open Studio →
+    </button>
+  );
+}
+
+// ── StudioEntry: prominent homepage card ────────────────────────────────────
+function StudioEntryCard({ brandId }: { brandId: number | null }) {
+  const navigate = useNavigate();
+  if (!brandId) return null;
+  return (
+    <div
+      style={{
+        position: "absolute", top: 16, right: 20, zIndex: 50,
+        maxWidth: 340, background: "#FFFFFF",
+        border: "1px solid #E4E3E1", borderLeft: "3px solid #C8322E",
+        padding: "14px 18px", display: "flex", flexDirection: "column", gap: 6,
+        boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+      }}
+    >
+      <div style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9B9990" }}>
+        New · Decision AI
+      </div>
+      <div style={{ fontSize: 15, color: "#1A1A18", fontWeight: 600, lineHeight: 1.3 }}>
+        Start a new methodology
+      </div>
+      <div style={{ fontSize: 12, color: "#6A6A62", lineHeight: 1.45 }}>
+        Diagnose → pick a framework → 6 agent-led steps → publish gate.
+      </div>
+      <button
+        onClick={() => navigate(`/studio/${brandId}/triage`)}
+        style={{
+          alignSelf: "flex-start", marginTop: 4,
+          padding: "6px 14px", background: "#0A0A0A", color: "#FFFFFF",
+          fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase",
+          border: "none", cursor: "pointer",
+        }}
+      >
+        Open Studio →
+      </button>
+    </div>
+  );
+}
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
@@ -117,6 +177,8 @@ function MissionPage() {
       activeSquad={activeSquad}
       squadStepProgress={squadStepProgress}
     >
+      <div style={{ position: "relative", height: "100%" }}>
+        <StudioEntryPill brandId={brandIdParam ? Number(brandIdParam) || null : null} />
       <MissionChatCore
         key={`mission-${numericMissionId}-brand-${brandIdParam ?? "_"}`}
         activeMissionId={numericMissionId}
@@ -134,6 +196,7 @@ function MissionPage() {
         }}
         onSquadStepProgress={setSquadStepProgress}
       />
+      </div>
     </AppShell>
   );
 }
@@ -204,15 +267,22 @@ function IndexPage() {
       activeSquad={activeSquad}
       squadStepProgress={squadStepProgress}
     >
-      <MissionChatCore
-        activeMissionId={null}
-        initialBrandId={(() => {
-          try { return Number(localStorage.getItem("sowork.selectedBrandId")) || null; } catch { return null; }
-        })()}
-        onMissionCreated={(id) => navigate(`/m/${id}`)}
-        onSquadPreview={(squad) => setActiveSquad(squad)}
-        onSquadStepProgress={setSquadStepProgress}
-      />
+      <div style={{ position: "relative", height: "100%" }}>
+        <StudioEntryCard
+          brandId={(() => {
+            try { return Number(localStorage.getItem("sowork.selectedBrandId")) || null; } catch { return null; }
+          })()}
+        />
+        <MissionChatCore
+          activeMissionId={null}
+          initialBrandId={(() => {
+            try { return Number(localStorage.getItem("sowork.selectedBrandId")) || null; } catch { return null; }
+          })()}
+          onMissionCreated={(id) => navigate(`/m/${id}`)}
+          onSquadPreview={(squad) => setActiveSquad(squad)}
+          onSquadStepProgress={setSquadStepProgress}
+        />
+      </div>
     </AppShell>
   );
 }
