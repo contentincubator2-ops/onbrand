@@ -388,7 +388,7 @@ async function main() {
         id                    BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
         brandId               INT          NOT NULL,
         userId                INT          NULL,
-        trigger               VARCHAR(64)  NOT NULL,
+        `trigger`             VARCHAR(64)  NOT NULL,
         stageOrScale          VARCHAR(64)  NULL,
         recommendedDecisionIds JSON        NULL,
         selectedDecisionId    BIGINT       NULL,

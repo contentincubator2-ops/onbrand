@@ -1,9 +1,9 @@
 name: Admin — Deploy to VM
 
 # Pulls latest main, installs dependencies, rebuilds the client,
-# restarts the single marketing-os pm2 process. Use this after
+# restarts the single ai-marketer pm2 process. Use this after
 # pushing server or client changes that need to take effect on
-# marketing-os.sowork.ai.
+# ai-marketer.sowork.ai.
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
           envs: GH_TOKEN
           script: |
             set -e
-            APP=/opt/marketing-os/app
+            APP=/opt/ai-marketer/app
             AI=$APP/skills/ai-talent
 
             echo "===== Step 1: Pull latest main ====="
@@ -55,8 +55,8 @@ jobs:
 
             echo ""
             echo "===== Step 4: Restart pm2 ====="
-            pm2 restart marketing-os 2>&1 | tail -5 || pm2 start "npx tsx server/index.ts" \
-              --name marketing-os --cwd "$AI" 2>&1 | tail -5
+            pm2 restart ai-marketer 2>&1 | tail -5 || pm2 start "npx tsx server/index.ts" \
+              --name ai-marketer --cwd "$AI" 2>&1 | tail -5
             pm2 save
 
             echo ""
