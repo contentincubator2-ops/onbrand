@@ -81,7 +81,45 @@ class DbQueue<TData, TResult> implements JobQueue<TData, TResult> {
       VALUES (${id}, ${this.queueName}, ${name}, ${JSON.stringify(data)}, 'waiting', 0)
       ON DUPLICATE KEY UPDATE data = VALUES(data), name = VALUES(name)
     `);
+
+    // Fast-path dispatch: fire POST to /api/worker/execute-task without
+    // awaiting. Register with Vercel's waitUntil so the runtime doesn't
+    // freeze the function before fetch fires. If this fetch fails, the
+    // cron drainer (/api/cron/drain-queue) picks the job up after 30s.
+    void this.dispatchAsync(id);
+
     return this.handle(id, "waiting", 0, null, null);
+  }
+
+  private async dispatchAsync(jobId: string): Promise<void> {
+    // Only marketing-jobs currently has a worker endpoint. Squad jobs
+    // stay queued until their own worker is ported.
+    if (this.queueName !== "marketing-jobs") return;
+
+    const baseUrl =
+      process.env.APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+    if (!baseUrl) return;
+
+    const fire = fetch(`${baseUrl}/api/worker/execute-task`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${process.env.CRON_SECRET ?? ""}`,
+      },
+      body: JSON.stringify({ jobId }),
+    }).catch(() => {
+      /* swallow — cron drain will retry */
+    });
+
+    try {
+      const { waitUntil } = await import("@vercel/functions");
+      waitUntil(fire);
+    } catch {
+      // @vercel/functions not available (e.g. running locally). The plain
+      // Promise above will still settle in dev environments that keep the
+      // event loop alive until idle.
+    }
   }
 
   async getJob(id: string): Promise<JobHandle<TResult> | null> {

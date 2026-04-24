@@ -15,7 +15,8 @@
     { "source": "/health",        "destination": "/api/index" }
   ],
   "crons": [
-    { "path": "/api/cron/flush-billing-queue", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/flush-billing-queue", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/drain-queue",         "schedule": "*/1 * * * *" }
   ],
   "env": {
     "NODE_ENV": "production",

@@ -32,6 +32,8 @@ mkdirSync(tmpDir, { recursive: true });
 const entries = [
   { in: "api/index.ts",                    tmp: `${tmpDir}/index.js`,               final: "api/index.ts" },
   { in: "api/cron/flush-billing-queue.ts", tmp: `${tmpDir}/flush-billing-queue.js`, final: "api/cron/flush-billing-queue.ts" },
+  { in: "api/cron/drain-queue.ts",         tmp: `${tmpDir}/drain-queue.js`,         final: "api/cron/drain-queue.ts" },
+  { in: "api/worker/execute-task.ts",      tmp: `${tmpDir}/execute-task.js`,        final: "api/worker/execute-task.ts" },
 ];
 
 await Promise.all(entries.map(e =>
