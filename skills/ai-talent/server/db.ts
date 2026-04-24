@@ -24,9 +24,13 @@ export async function getDb(): Promise<DB> {
 
   pool = createPool({
     host:     process.env.LOCAL_DB_HOST     || "localhost",
+    port:     Number(process.env.LOCAL_DB_PORT) || 3306,
     user:     process.env.LOCAL_DB_USER     || "mos_user",
     password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
     database: process.env.LOCAL_DB_NAME     || "mos_db",
+    // Azure MySQL requires TLS; enable when DB_SSL=true. Empty ssl object
+    // makes mysql2 use its bundled CA bundle + server cert validation.
+    ssl:      process.env.DB_SSL === "true" ? {} : undefined,
     connectionLimit:      10,
     waitForConnections:   true,
     queueLimit:           0,
