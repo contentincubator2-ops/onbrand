@@ -227,7 +227,7 @@ export const triageRouter = router({
 
       const [result] = (await db.execute(sql`
         INSERT INTO decision_triage_sessions
-          (brandId, userId, `trigger`, stageOrScale, recommendedDecisionIds, notes)
+          (brandId, userId, \`trigger\`, stageOrScale, recommendedDecisionIds, notes)
         VALUES
           (${input.brandId}, ${ctx.user.id}, ${input.trigger},
            ${input.stageOrScale ?? null},
