@@ -230,6 +230,27 @@ async function main() {
     `);
     console.log("[migrate] brand_intel_signals: OK");
 
+    // Intel zone — brand_watchlist (Phase 2A Ext)
+    // Tracks which keywords/competitor names the DetectZone auto-feed should
+    // surface from sowork_db.market_data. One row per brand; JSON arrays for
+    // keywords and competitorNames. suggestedBy/suggestedAt track the last LLM
+    // recommendation so we can diff user edits vs AI suggestions.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_watchlist (
+        id               INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId          INT          NOT NULL UNIQUE,
+        userId           INT          NULL,
+        keywords         JSON         NULL,
+        competitorNames  JSON         NULL,
+        industryTags     JSON         NULL,
+        suggestedBy      VARCHAR(64)  NULL,
+        suggestedAt      TIMESTAMP(3) NULL,
+        createdAt        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_watchlist: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

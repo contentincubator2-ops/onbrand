@@ -14,6 +14,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { invokeLLM } from "../_core/llm";
 
 const typeSchema = z.enum(["competitor", "trend", "social", "internal", "manual"]);
 const relevanceSchema = z.enum(["high", "medium", "low"]);
@@ -174,5 +175,290 @@ export const brandIntelRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.execute(sql`DELETE FROM brand_intel_signals WHERE id = ${input.id}`);
       return { ok: true };
+    }),
+
+  // ─── Watchlist (Phase 2A Ext) ─────────────────────────────────────────────
+  // One row per brand. Tracks keywords + competitor names that drive the
+  // DetectZone auto-feed (queries sowork_db.market_data with these terms).
+
+  getWatchlist: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const db = await getDb();
+      if (!db) return null;
+      const [rows] = (await db.execute(sql`
+        SELECT id, brandId, keywords, competitorNames, industryTags,
+               suggestedBy, suggestedAt, updatedAt
+        FROM brand_watchlist
+        WHERE brandId = ${input.brandId}
+        LIMIT 1
+      `)) as any;
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (!row) return null;
+      const parseJson = (v: any): any[] => {
+        if (Array.isArray(v)) return v;
+        if (typeof v === "string") {
+          try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+        }
+        return [];
+      };
+      return {
+        id: row.id,
+        brandId: row.brandId,
+        keywords: parseJson(row.keywords),
+        competitorNames: parseJson(row.competitorNames),
+        industryTags: parseJson(row.industryTags),
+        suggestedBy: row.suggestedBy,
+        suggestedAt: row.suggestedAt,
+        updatedAt: row.updatedAt,
+      };
+    }),
+
+  setWatchlist: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.number(),
+        keywords: z.array(z.string().min(1).max(100)).max(30).default([]),
+        competitorNames: z.array(z.string().min(1).max(100)).max(30).default([]),
+        industryTags: z.array(z.string().min(1).max(60)).max(10).default([]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const kw = JSON.stringify(input.keywords);
+      const cn = JSON.stringify(input.competitorNames);
+      const it = JSON.stringify(input.industryTags);
+      await db.execute(sql`
+        INSERT INTO brand_watchlist (brandId, userId, keywords, competitorNames, industryTags)
+        VALUES (${input.brandId}, ${ctx.user.id}, ${kw}, ${cn}, ${it})
+        ON DUPLICATE KEY UPDATE
+          keywords = ${kw},
+          competitorNames = ${cn},
+          industryTags = ${it}
+      `);
+      return { ok: true };
+    }),
+
+  // LLM-generated watchlist suggestions. Reads brand name + brand_brain (if any)
+  // and returns suggested keywords / competitorNames / industryTags. Client shows
+  // these as suggestion chips — user picks which to keep.
+  suggestWatchlist: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // 1. Load brand basics
+      const [brandRows] = (await db.execute(sql`
+        SELECT id, name, industry, description
+        FROM brands WHERE id = ${input.brandId} LIMIT 1
+      `)) as any;
+      const brand = (Array.isArray(brandRows) ? brandRows[0] : null) ?? {};
+      if (!brand?.id) throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+
+      // 2. Try to read brand_brain (handle snake_case + camelCase schemas)
+      let brainText = "";
+      try {
+        const [r] = (await db.execute(sql`
+          SELECT content FROM brand_brain WHERE brand_id = ${input.brandId}
+          ORDER BY updated_at DESC LIMIT 1
+        `)) as any;
+        const row = Array.isArray(r) ? r[0] : null;
+        if (row?.content) brainText = String(row.content).slice(0, 3000);
+      } catch {
+        try {
+          const [r] = (await db.execute(sql`
+            SELECT content FROM brand_brain WHERE brandId = ${input.brandId}
+            ORDER BY updatedAt DESC LIMIT 1
+          `)) as any;
+          const row = Array.isArray(r) ? r[0] : null;
+          if (row?.content) brainText = String(row.content).slice(0, 3000);
+        } catch { /* no brain table or no row */ }
+      }
+
+      // 3. Ask LLM for structured watchlist suggestions
+      const systemPrompt =
+        "你是品牌情報分析師。根據給定的品牌資訊，建議追蹤用的關鍵字、競品名稱、產業標籤。" +
+        "只輸出 JSON：{\"keywords\":string[], \"competitorNames\":string[], \"industryTags\":string[], \"rationale\":string}。" +
+        "規則：\n" +
+        "- keywords: 8–15 個中英文混合的搜尋詞（避免只有品牌自己的名字）\n" +
+        "- competitorNames: 5–10 個真實可辨識的競品公司/品牌名（必須是現存品牌，不要虛構）\n" +
+        "- industryTags: 3–5 個產業分類\n" +
+        "- rationale: 50 字內說明這個名單的邏輯";
+
+      const userPrompt = [
+        `【品牌名稱】${brand.name ?? ""}`,
+        brand.industry ? `【產業】${brand.industry}` : "",
+        brand.description ? `【簡介】${String(brand.description).slice(0, 500)}` : "",
+        brainText ? `【品牌大腦摘錄】\n${brainText}` : "",
+      ].filter(Boolean).join("\n");
+
+      let parsed: any = {};
+      try {
+        const result = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          maxTokens: 600,
+          responseFormat: { type: "json_object" },
+        } as any);
+        const rawContent = (result as any)?.choices?.[0]?.message?.content;
+        const raw = typeof rawContent === "string"
+          ? rawContent
+          : Array.isArray(rawContent)
+            ? rawContent.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("")
+            : "";
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+        parsed = JSON.parse(cleaned);
+      } catch (err: any) {
+        console.error("[brandIntel.suggestWatchlist] LLM failed:", err?.message);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "AI 建議失敗，請稍後再試",
+        });
+      }
+
+      const toStringArr = (v: any, cap: number): string[] =>
+        Array.isArray(v)
+          ? v.map((x) => String(x ?? "").trim()).filter(Boolean).slice(0, cap)
+          : [];
+      const suggestion = {
+        keywords: toStringArr(parsed.keywords, 20),
+        competitorNames: toStringArr(parsed.competitorNames, 15),
+        industryTags: toStringArr(parsed.industryTags, 8),
+        rationale: String(parsed.rationale ?? "").slice(0, 300),
+      };
+
+      // 4. Mark suggestedBy/suggestedAt on existing watchlist (or create empty row)
+      //    so the UI can show "AI suggested N hours ago"
+      await db.execute(sql`
+        INSERT INTO brand_watchlist (brandId, userId, suggestedBy, suggestedAt)
+        VALUES (${input.brandId}, ${ctx.user.id}, 'llm', NOW(3))
+        ON DUPLICATE KEY UPDATE
+          suggestedBy = 'llm',
+          suggestedAt = NOW(3)
+      `);
+
+      return suggestion;
+    }),
+
+  // ─── Auto-feed from sowork_db.market_data ────────────────────────────────
+  // Queries market_data with the brand's watchlist keywords and returns
+  // grouped results (competitor_news / trending_topic / social_trend).
+  // Front-end renders these in newsflow-style cards; user can pin any row
+  // to brand_intel_signals via pinFromAuto.
+
+  feedAuto: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.number(),
+        days: z.number().min(1).max(90).default(14),
+        limit: z.number().min(1).max(100).default(30),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const db = await getDb();
+      if (!db) return { items: [], keywords: [], source: "none" };
+
+      // Load watchlist
+      const [wrows] = (await db.execute(sql`
+        SELECT keywords, competitorNames, industryTags
+        FROM brand_watchlist WHERE brandId = ${input.brandId} LIMIT 1
+      `)) as any;
+      const w = Array.isArray(wrows) ? wrows[0] : null;
+      const parseJson = (v: any): string[] => {
+        if (Array.isArray(v)) return v;
+        if (typeof v === "string") {
+          try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+        }
+        return [];
+      };
+      const kw = [
+        ...parseJson(w?.keywords),
+        ...parseJson(w?.competitorNames),
+        ...parseJson(w?.industryTags),
+      ]
+        .map((s) => String(s).trim())
+        .filter((s) => s.length >= 2);
+
+      if (!kw.length) return { items: [], keywords: [], source: "empty-watchlist" };
+
+      // Delegate to market-intel skill (reuses its sanitization + type allowlist)
+      try {
+        const mod = (await import(
+          "../../../market-intel/server/marketIntel.ts" as any
+        )) as { fetchMarketIntel: (opts: any) => Promise<any[]> };
+        const { fetchMarketIntel } = mod;
+        const results = await fetchMarketIntel({
+          keywords: kw,
+          types: ["competitor_news", "trending_topic", "social_trend"],
+          days: input.days,
+          limit: input.limit,
+        });
+        return {
+          items: results.map((r: any, idx: number) => ({
+            key: `${r.type}-${idx}-${r.publishedAt}`,
+            type: r.type, // competitor_news | trending_topic | social_trend
+            title: r.title,
+            content: r.content,
+            source: r.source,
+            publishedAt: r.publishedAt,
+            relevanceScore: r.relevanceScore,
+          })),
+          keywords: kw,
+          source: "market_data",
+        };
+      } catch (err: any) {
+        console.error("[brandIntel.feedAuto] market_data failed:", err?.message);
+        return { items: [], keywords: kw, source: "error" };
+      }
+    }),
+
+  // Pin a market_data row → brand_intel_signals so autoFill can reference it.
+  // Accepts the raw card fields (title / source / content / url / type) because
+  // market_data rows aren't stable across refreshes.
+  pinFromAuto: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.number(),
+        type: z.enum(["competitor_news", "trending_topic", "social_trend"]),
+        title: z.string().min(1).max(500),
+        content: z.string().max(8000).optional(),
+        source: z.string().min(1).max(255),
+        url: z.string().max(1000).optional(),
+        publishedAt: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const typeMap: Record<string, string> = {
+        competitor_news: "competitor",
+        trending_topic:  "trend",
+        social_trend:    "social",
+      };
+      const mapped = typeMap[input.type] ?? "manual";
+      // Use publishedAt if valid, else NOW()
+      const capturedAt = input.publishedAt && !Number.isNaN(Date.parse(input.publishedAt))
+        ? new Date(input.publishedAt).toISOString().slice(0, 19).replace("T", " ")
+        : null;
+      const [result] = (await db.execute(sql`
+        INSERT INTO brand_intel_signals
+          (brandId, userId, type, source, headline, body, url, relevance, capturedAt)
+        VALUES
+          (${input.brandId}, ${ctx.user.id}, ${mapped}, ${input.source},
+           ${input.title}, ${input.content ?? null}, ${input.url ?? null},
+           'medium',
+           ${capturedAt ? sql`${capturedAt}` : sql`NOW(3)`})
+      `)) as any;
+      const insertId = (result as any)?.insertId ?? 0;
+      return { id: insertId, mappedType: mapped };
     }),
 });
