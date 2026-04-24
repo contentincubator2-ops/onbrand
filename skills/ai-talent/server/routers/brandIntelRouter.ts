@@ -17,6 +17,10 @@ import { sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 
 const typeSchema = z.enum(["competitor", "trend", "social", "internal", "manual"]);
+
+// In-process cache for LLM-driven auto-feed (brandId-scoped, 20-min TTL).
+// Prevents repeated tab opens from re-burning Perplexity credits.
+const feedAutoCache = new Map<string, { ts: number; payload: any }>();
 const relevanceSchema = z.enum(["high", "medium", "low"]);
 
 async function assertBrandOwner(userId: number, brandId: number): Promise<void> {
@@ -347,18 +351,22 @@ export const brandIntelRouter = router({
       return suggestion;
     }),
 
-  // ─── Auto-feed from sowork_db.market_data ────────────────────────────────
-  // Queries market_data with the brand's watchlist keywords and returns
-  // grouped results (competitor_news / trending_topic / social_trend).
-  // Front-end renders these in newsflow-style cards; user can pin any row
-  // to brand_intel_signals via pinFromAuto.
+  // ─── Auto-feed via web-grounded LLM (Perplexity sonar) ───────────────────
+  // Previous version queried sowork_db.market_data. Replaced by LLM-driven
+  // web fetch so coverage isn't limited to whatever pre-crawled rows exist.
+  //
+  // Strategy: call Perplexity sonar-pro (web-grounded) with the brand's
+  // watchlist and ask for JSON array of recent news/trend/social items.
+  // Cached in-process per (brandId) with 20-min TTL so multiple tab opens
+  // don't re-burn the LLM budget.
 
   feedAuto: protectedProcedure
     .input(
       z.object({
         brandId: z.number(),
         days: z.number().min(1).max(90).default(14),
-        limit: z.number().min(1).max(100).default(30),
+        limit: z.number().min(1).max(50).default(24),
+        force: z.boolean().default(false),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -366,7 +374,7 @@ export const brandIntelRouter = router({
       const db = await getDb();
       if (!db) return { items: [], keywords: [], source: "none" };
 
-      // Load watchlist
+      // Load watchlist + brand name
       const [wrows] = (await db.execute(sql`
         SELECT keywords, competitorNames, industryTags
         FROM brand_watchlist WHERE brandId = ${input.brandId} LIMIT 1
@@ -379,45 +387,106 @@ export const brandIntelRouter = router({
         }
         return [];
       };
-      const kw = [
-        ...parseJson(w?.keywords),
-        ...parseJson(w?.competitorNames),
-        ...parseJson(w?.industryTags),
-      ]
-        .map((s) => String(s).trim())
-        .filter((s) => s.length >= 2);
+      const keywords = parseJson(w?.keywords).map((s) => String(s).trim()).filter((s) => s.length >= 2);
+      const competitors = parseJson(w?.competitorNames).map((s) => String(s).trim()).filter((s) => s.length >= 2);
+      const industries = parseJson(w?.industryTags).map((s) => String(s).trim()).filter((s) => s.length >= 2);
+      const kwAll = [...keywords, ...competitors, ...industries];
 
-      if (!kw.length) return { items: [], keywords: [], source: "empty-watchlist" };
-
-      // Delegate to market-intel skill (reuses its sanitization + type allowlist)
-      try {
-        const mod = (await import(
-          "../../../market-intel/server/marketIntel.ts" as any
-        )) as { fetchMarketIntel: (opts: any) => Promise<any[]> };
-        const { fetchMarketIntel } = mod;
-        const results = await fetchMarketIntel({
-          keywords: kw,
-          types: ["competitor_news", "trending_topic", "social_trend"],
-          days: input.days,
-          limit: input.limit,
-        });
-        return {
-          items: results.map((r: any, idx: number) => ({
-            key: `${r.type}-${idx}-${r.publishedAt}`,
-            type: r.type, // competitor_news | trending_topic | social_trend
-            title: r.title,
-            content: r.content,
-            source: r.source,
-            publishedAt: r.publishedAt,
-            relevanceScore: r.relevanceScore,
-          })),
-          keywords: kw,
-          source: "market_data",
-        };
-      } catch (err: any) {
-        console.error("[brandIntel.feedAuto] market_data failed:", err?.message);
-        return { items: [], keywords: kw, source: "error" };
+      if (!kwAll.length) {
+        return { items: [], keywords: [], source: "empty-watchlist" };
       }
+
+      const [brandRows] = (await db.execute(sql`
+        SELECT name, industry FROM brands WHERE id = ${input.brandId} LIMIT 1
+      `)) as any;
+      const brandRow = Array.isArray(brandRows) ? brandRows[0] : null;
+      const brandName = String(brandRow?.name ?? "").trim();
+
+      // Cache key — invalidate every 20 min
+      const CACHE_TTL_MS = 20 * 60 * 1000;
+      const bucketKey = JSON.stringify({ b: input.brandId, d: input.days, l: input.limit, kw: kwAll.sort() });
+      const cached = feedAutoCache.get(bucketKey);
+      const now = Date.now();
+      if (!input.force && cached && now - cached.ts < CACHE_TTL_MS) {
+        return { ...cached.payload, cached: true };
+      }
+
+      // Build Perplexity prompt
+      const system =
+        "You are a marketing intel agent. Given a brand's watchlist, fetch RECENT real news/trend/social items " +
+        "from the open web (search grounded). Prefer items within the last " + input.days + " days. " +
+        "Return ONLY a JSON object: {\"items\":[{\"type\":\"competitor_news\"|\"trending_topic\"|\"social_trend\"," +
+        "\"title\":string,\"content\":string (<=220 chars summary),\"source\":string (publisher/domain)," +
+        "\"url\":string,\"publishedAt\":\"YYYY-MM-DD\" or ISO,\"relevanceScore\":0..1}]}. " +
+        "Rules: no duplicate titles; each item must cite a real URL; content must reflect the article, not filler. " +
+        "Mix types — aim ~50% competitor_news, ~30% trending_topic, ~20% social_trend. Cap at " + input.limit + " items.";
+
+      const userMsg = [
+        brandName ? `【Brand】${brandName}` : "",
+        brandRow?.industry ? `【Industry】${brandRow.industry}` : "",
+        competitors.length ? `【Competitors to watch】${competitors.join(", ")}` : "",
+        keywords.length ? `【Keywords】${keywords.join(", ")}` : "",
+        industries.length ? `【Industry tags】${industries.join(", ")}` : "",
+        `【Recency】past ${input.days} days`,
+        `【Target】${input.limit} items`,
+      ].filter(Boolean).join("\n");
+
+      let items: any[] = [];
+      let providerUsed = "perplexity";
+      try {
+        const result = await invokeLLM({
+          provider: "perplexity",
+          model: "sonar-pro",
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: userMsg },
+          ],
+          maxTokens: 2400,
+          responseFormat: { type: "json_object" },
+        } as any);
+        const rawContent = (result as any)?.choices?.[0]?.message?.content;
+        const raw = typeof rawContent === "string"
+          ? rawContent
+          : Array.isArray(rawContent)
+            ? rawContent.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("")
+            : "";
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+        // Perplexity sometimes returns a JSON array directly, sometimes {items:[...]}
+        const parsed = JSON.parse(cleaned);
+        items = Array.isArray(parsed) ? parsed : (parsed?.items ?? []);
+      } catch (err: any) {
+        console.error("[brandIntel.feedAuto] perplexity failed:", err?.message);
+        // Fallback: try the default provider with no web grounding (will mostly fail)
+        return { items: [], keywords: kwAll, source: "error", error: err?.message ?? "LLM failed" };
+      }
+
+      // Normalize + type-check
+      const ALLOWED = new Set(["competitor_news", "trending_topic", "social_trend"]);
+      const normalized = items
+        .filter((x) => x && typeof x === "object" && ALLOWED.has(x.type) && typeof x.title === "string")
+        .slice(0, input.limit)
+        .map((x: any, idx: number) => ({
+          key: `${x.type}-${idx}-${x.publishedAt ?? ""}`,
+          type: x.type,
+          title: String(x.title).slice(0, 240),
+          content: String(x.content ?? "").slice(0, 600),
+          source: String(x.source ?? "").slice(0, 120) || "web",
+          url: typeof x.url === "string" ? x.url.slice(0, 500) : undefined,
+          publishedAt: typeof x.publishedAt === "string" ? x.publishedAt : undefined,
+          relevanceScore: typeof x.relevanceScore === "number"
+            ? Math.max(0, Math.min(1, x.relevanceScore))
+            : 0.6,
+        }));
+
+      const payload = {
+        items: normalized,
+        keywords: kwAll,
+        source: "llm-web",
+        provider: providerUsed,
+        fetchedAt: new Date().toISOString(),
+      };
+      feedAutoCache.set(bucketKey, { ts: now, payload });
+      return { ...payload, cached: false };
     }),
 
   // Pin a market_data row → brand_intel_signals so autoFill can reference it.

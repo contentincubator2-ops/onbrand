@@ -145,7 +145,7 @@ export function DetectZone({ brandId }: { brandId: number }) {
         title: item.title,
         content: item.content,
         source: item.source || "unknown",
-        url: undefined,
+        url: item.url || undefined,
         publishedAt: item.publishedAt || undefined,
       });
       await signalsQuery.refetch();
@@ -197,7 +197,7 @@ export function DetectZone({ brandId }: { brandId: number }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>📡 自動情報</span>
               <span style={{ fontSize: 11, color: C.textMuted }}>
-                過去 14 天 · 來源 sowork_db.market_data
+                過去 14 天 · AI 即時上網（Perplexity sonar）
               </span>
             </div>
             <button
@@ -237,14 +237,15 @@ export function DetectZone({ brandId }: { brandId: number }) {
               }}
             >
               來源狀態：
-              {feedSource === "market_data" && (
+              {feedSource === "llm-web" && (
                 <span style={{ color: "#2B8A3E" }}>
-                  ✓ market_data · 找到 {feedItems.length} 筆 · 使用 {feedKeywordsUsed.length} 個關鍵字
+                  ✓ AI 上網 · 找到 {feedItems.length} 筆 · {feedKeywordsUsed.length} 個關鍵字
+                  {feedData?.cached ? "（快取）" : ""}
                 </span>
               )}
               {feedSource === "empty-watchlist" && <span>watchlist 空的 — 去「關鍵字設定」加入</span>}
               {feedSource === "error" && (
-                <span>❌ market_data 查詢失敗（看 server log）— keywords: {feedKeywordsUsed.slice(0, 5).join(", ")}…</span>
+                <span>❌ AI 抓取失敗（{feedData?.error ?? "看 server log"}）</span>
               )}
               {feedSource === "none" && <span>DB 未連線</span>}
               {feedSource === undefined && <span>—</span>}
@@ -270,8 +271,8 @@ export function DetectZone({ brandId }: { brandId: number }) {
             />
           ) : feedSource === "error" ? (
             <EmptyState
-              title="market_data 查詢錯誤"
-              hint={`keywords 已送出（${feedKeywordsUsed.length} 個）但後端拋錯，請看 server log`}
+              title="AI 抓取失敗"
+              hint={(feedData?.error as string) ?? `已送出 ${feedKeywordsUsed.length} 個關鍵字，但 Perplexity 回傳錯誤`}
               cta="🔄 重試"
               onCta={() => feedQuery.refetch()}
             />
@@ -463,9 +464,21 @@ function AutoFeedCard({
 
       {/* footer: source + pin */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span style={{ fontSize: 11, color: C.textMuted }}>
-          📰 {truncate(item.source, 40)}
-        </span>
+        {item.url ? (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 11, color: C.accent, textDecoration: "none" }}
+            title={item.url}
+          >
+            📰 {truncate(item.source, 40)} ↗
+          </a>
+        ) : (
+          <span style={{ fontSize: 11, color: C.textMuted }}>
+            📰 {truncate(item.source, 40)}
+          </span>
+        )}
         <button
           style={{
             ...btnMini,
