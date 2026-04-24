@@ -166,7 +166,33 @@ async function main() {
     `);
     console.log("[migrate] brand_report_sections: OK");
 
-    // 6. users.registrationIp + users.lastLoginIp (idempotent)
+    // 6. queued_jobs — DB-backed queue rows for Vercel-native execution.
+    //    Replaces BullMQ/Redis state on Vercel (see server/queue/marketingQueue.ts).
+    //    The VM path still uses BullMQ, so this table is Vercel-only data.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS queued_jobs (
+        id             VARCHAR(64)  NOT NULL PRIMARY KEY,
+        queue          VARCHAR(64)  NOT NULL,
+        name           VARCHAR(100) NOT NULL,
+        data           LONGTEXT     NOT NULL,
+        status         ENUM('waiting','active','completed','failed')
+                       NOT NULL DEFAULT 'waiting',
+        progress       INT          NOT NULL DEFAULT 0,
+        result         LONGTEXT     NULL,
+        failed_reason  TEXT         NULL,
+        attempts       INT          NOT NULL DEFAULT 0,
+        created_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updated_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                              ON UPDATE CURRENT_TIMESTAMP(3),
+        started_at     DATETIME(3)  NULL,
+        completed_at   DATETIME(3)  NULL,
+        INDEX idx_queue_status (queue, status),
+        INDEX idx_status_updated (status, updated_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] queued_jobs: OK");
+
+    // 7. users.registrationIp + users.lastLoginIp (idempotent)
     //    Drizzle schema added these for signup/login IP tracking; Azure
     //    sowork_db users was missing them, causing `Unknown column` on
     //    every auth query from Vercel.

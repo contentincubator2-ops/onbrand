@@ -43,7 +43,7 @@ async function callGateway(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { connection } from './marketingQueue';
+import { connection, squadQueue as _squadQueue } from './marketingQueue';
 import localPool from '../localDb';
 
 export interface SquadJobData {
@@ -74,7 +74,11 @@ export interface SquadJobResult {
   executionTimeMs: number;
 }
 
-export const squadQueue = new Queue('squad-jobs', { connection });
+// squadQueue is now defined in marketingQueue.ts (unified provider that
+// routes to BullMQ on the VM or the DB-backed queue on Vercel). Re-export
+// here only for backwards compatibility — new code should import directly
+// from './marketingQueue'.
+export const squadQueue = _squadQueue;
 
 // ── Gateway slug resolver ─────────────────────────────────────────────────────
 // OpenClaw gateway requires "openclaw/<slug>" format.
