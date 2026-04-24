@@ -13,7 +13,9 @@ import { join } from "path";
 // CWD is set to skills/ai-talent/ so .env lives right there.
 const envPath = join(process.cwd(), ".env");
 console.log('[server] Loading .env from:', envPath);
-const result = dotenvConfig({ path: envPath });
+// override: true — otherwise pm2's cached env wins over .env edits and
+// LLM provider switches (via admin-* workflows) silently don't take effect.
+const result = dotenvConfig({ path: envPath, override: true });
 console.log('[server] dotenv result:', { error: result.error, parsed: result.parsed ? 'YES' : 'NO' });
 console.log('[server] JWT_SECRET loaded:', process.env.JWT_SECRET ? 'YES' : 'NO');
 
