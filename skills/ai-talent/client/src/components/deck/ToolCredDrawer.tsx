@@ -109,7 +109,10 @@ export function ToolCredDrawer({
               連接外部行銷工具，讓自動情報更完整。憑證加密後存放。
             </div>
           </div>
-          <button style={btnMini} onClick={onClose}>✕</button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <BrowserPingButton />
+            <button style={btnMini} onClick={onClose}>✕</button>
+          </div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: 18, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -259,6 +262,44 @@ function ToolRow({
         </button>
       </div>
     </div>
+  );
+}
+
+// Tests the shared browser runtime (Batch 2-2a). Not tied to any specific
+// tool — verifies Browserbase / local Chromium pipeline works at all.
+function BrowserPingButton() {
+  const [busy, setBusy] = useState(false);
+  const pingMut = trpc.toolCred.browserPing.useMutation();
+  async function run() {
+    setBusy(true);
+    try {
+      const r = (await pingMut.mutateAsync({ url: "https://example.com" })) as any;
+      const lines = [
+        `✅ Browser runtime OK`,
+        `Provider: ${r.provider}`,
+        `Session: ${r.sessionId}`,
+        `URL: ${r.finalUrl}`,
+        `Title: ${r.title}`,
+        r.h1 ? `H1: ${r.h1}` : "",
+        `Elapsed: ${r.elapsedMs} ms`,
+        r.debugUrl ? `Live view: ${r.debugUrl}` : "",
+      ].filter(Boolean).join("\n");
+      alert(lines);
+    } catch (e: any) {
+      alert("❌ Browser runtime test 失敗：\n" + (e?.message ?? "未知錯誤"));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button
+      style={{ ...btnMini, background: busy ? "#F5F5F4" : C.accentSoft, color: C.accent, borderColor: C.accentSoft }}
+      onClick={run}
+      disabled={busy}
+      title="測試虛擬瀏覽器管線是否正常"
+    >
+      {busy ? "測試中…" : "🧪 Browser ping"}
+    </button>
   );
 }
 

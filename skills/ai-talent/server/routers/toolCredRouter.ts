@@ -19,6 +19,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { encrypt, decrypt } from "../_core/encryption";
+import { getBrowserProvider, currentProviderName } from "../_core/browser";
 
 // ─── Tool catalog ───────────────────────────────────────────────────────────
 // Declared here so the router, the UI, and future agents share one source of
@@ -360,5 +361,59 @@ export const toolCredRouter = router({
         WHERE brandId = ${input.brandId} AND tool = ${input.tool}
       `);
       return { ok: true, status: "ok", message: "Credential stored and decrypted successfully (real health-check pending Batch 2-2)" };
+    }),
+
+  // ─── Browser runtime smoke test (Batch 2-2a) ──────────────────────────────
+  // Verifies the headless-browser pipeline end-to-end: picks the configured
+  // provider (Browserbase or local), opens a session, navigates to a safe
+  // target (example.com by default), grabs title + H1, closes cleanly.
+  //
+  // Runs end-to-end in ~5-10s for Browserbase, slightly faster locally.
+  // Safe to call repeatedly — each call costs one Browserbase session credit.
+  browserPing: protectedProcedure
+    .input(
+      z.object({
+        url: z.string().url().max(500).default("https://example.com"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const started = Date.now();
+      let provider;
+      try {
+        provider = await getBrowserProvider();
+      } catch (err: any) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Browser provider init failed: ${err?.message ?? String(err)}`,
+        });
+      }
+
+      try {
+        const payload = await provider.run(
+          async ({ page, sessionId, providerName, debugUrl }) => {
+            await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: 20_000 });
+            const title = await page.title();
+            const h1 = await page
+              .locator("h1")
+              .first()
+              .textContent({ timeout: 3_000 })
+              .catch(() => null);
+            const finalUrl = page.url();
+            return { sessionId, providerName, debugUrl, title, h1, finalUrl };
+          },
+          { timeoutMs: 60_000, label: "browserPing" }
+        );
+        return {
+          ok: true,
+          provider: currentProviderName() ?? payload.providerName,
+          elapsedMs: Date.now() - started,
+          ...payload,
+        };
+      } catch (err: any) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `browserPing failed after ${Date.now() - started}ms: ${err?.message ?? String(err)}`,
+        });
+      }
     }),
 });
