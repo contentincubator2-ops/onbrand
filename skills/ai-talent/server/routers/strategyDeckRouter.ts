@@ -296,6 +296,27 @@ export const strategyDeckRouter = router({
         (brainByCategory[cat] ??= []).push(r.content);
       }
 
+      // Load recent intel signals (last 20, prioritising 'high' relevance)
+      let intelRows: any[] = [];
+      try {
+        const [rows] = (await db.execute(sql`
+          SELECT type, source, headline, body, relevance, capturedAt
+          FROM brand_intel_signals
+          WHERE brandId = ${strategy.brandId}
+            AND capturedAt >= DATE_SUB(NOW(), INTERVAL 120 DAY)
+          ORDER BY FIELD(relevance, 'high','medium','low'), capturedAt DESC
+          LIMIT 20
+        `)) as any;
+        intelRows = (rows as any[]) ?? [];
+      } catch (err: any) {
+        console.warn("[strategyDeck.autoFill] intel read failed:", err?.message);
+        intelRows = [];
+      }
+      const intelByType: Record<string, any[]> = {};
+      for (const r of intelRows) {
+        (intelByType[r.type] ??= []).push(r);
+      }
+
       // 2. Determine which fields to (re)generate
       const currentConfig: Record<string, any> = (() => {
         if (!strategy.config) return {};
@@ -373,16 +394,41 @@ export const strategyDeckRouter = router({
         `規則：`,
         `1. 僅輸出 JSON，符合指定 schema。不要加說明、不要 markdown、不要 code fence。`,
         `2. 每個欄位要具體、可執行，不要空話。`,
-        `3. 如果品牌資料不足以產出某欄位，就基於方法論常見做法合理推斷，但要具體。`,
-        `4. 用繁體中文。`,
-        `5. 欄位內容避免超過 200 字；陣列型欄位 3–5 項為佳，每項 15 字內。`,
+        `3. 如果有提供「情報訊號」，優先引用具體的競品名稱、數據、日期，避免通則。`,
+        `4. 如果品牌資料/情報不足以產出某欄位，再基於方法論常見做法合理推斷，但要具體。`,
+        `5. 用繁體中文。`,
+        `6. 欄位內容避免超過 200 字；陣列型欄位 3–5 項為佳，每項 15 字內。`,
       ].join("\n");
+
+      // Intel block — recent real-world signals grounding the strategy
+      const typeLabels: Record<string, string> = {
+        competitor: "競品動態",
+        trend: "產業趨勢",
+        social: "社群聲量",
+        internal: "內部數據",
+        manual: "手動記錄",
+      };
+      const intelBlock = Object.entries(intelByType)
+        .map(([type, items]) => {
+          const label = typeLabels[type] ?? type;
+          const lines = items.slice(0, 6).map((i: any) => {
+            const date = i.capturedAt
+              ? new Date(i.capturedAt).toISOString().slice(0, 10)
+              : "";
+            const rel = i.relevance === "high" ? "⭐" : "";
+            const body = i.body ? ` — ${String(i.body).slice(0, 200)}` : "";
+            return `- ${rel}[${date}] ${i.source}：${i.headline}${body}`;
+          });
+          return `【${label}】\n${lines.join("\n")}`;
+        })
+        .join("\n\n");
 
       const userPrompt = [
         `【品牌資料】`,
         brandBlock || "（品牌基本欄位多數為空，請盡量依品牌名稱與產業推斷）",
         ``,
         brainBlock ? `【品牌大腦（Brain）摘錄】\n${brainBlock}\n` : "",
+        intelBlock ? `【近 120 天情報訊號（請在欄位中具體引用）】\n${intelBlock}\n` : "",
         alreadyFilledDesc ? `【用戶已填欄位（不要改）】\n${alreadyFilledDesc}\n` : "",
         `【請產出的欄位】`,
         fieldsDescription,

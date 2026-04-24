@@ -27,6 +27,7 @@ import { DiagnosticWizard } from "../components/deck/DiagnosticWizard";
 import { StrategyCardDetail } from "../components/deck/StrategyCardDetail";
 import { StrategyCard } from "../components/deck/StrategyCard";
 import { ZoneTimeline } from "../components/deck/ZoneTimeline";
+import { DetectZone } from "../components/deck/DetectZone";
 import type { DeckZone } from "../components/deck/types";
 
 // ─── Colors / tokens ────────────────────────────────────────────────────────
@@ -176,7 +177,7 @@ export default function StrategyDeckPage() {
             onCreate={() => setShowWizard(true)}
           />
         )}
-        {activeZone === "detect" && <PlaceholderZone title="偵測情報" subtitle="市場監聽、競品動態、情境雷達 — Phase 4" />}
+        {activeZone === "detect" && <DetectZone brandId={brandId} />}
         {activeZone === "make" && <PlaceholderZone title="製作執行" subtitle="策略 × 通路 × 目標組合器 — Phase 2" />}
         {activeZone === "review" && <PlaceholderZone title="複盤優化" subtitle="效果歸因、AB 總結、下一步建議 — Phase 4" />}
       </div>

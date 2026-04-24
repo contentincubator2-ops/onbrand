@@ -206,6 +206,30 @@ async function main() {
     `);
     console.log("[migrate] brand_strategy_messages: OK");
 
+    // Intel zone — brand_intel_signals table (Phase 2A)
+    // One row = one "情報點": competitor move, trend, social mention, internal data, or manual note.
+    // Strategy deck autoFill reads recent signals to ground its output in real data.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_intel_signals (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId      INT          NOT NULL,
+        userId       INT          NULL,
+        type         ENUM('competitor','trend','social','internal','manual') NOT NULL DEFAULT 'manual',
+        source       VARCHAR(255) NOT NULL,
+        headline     VARCHAR(500) NOT NULL,
+        body         TEXT         NULL,
+        url          VARCHAR(1000) NULL,
+        relevance    ENUM('high','medium','low') NOT NULL DEFAULT 'medium',
+        capturedAt   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        createdAt    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_brand           (brandId, capturedAt),
+        INDEX idx_brand_type      (brandId, type),
+        INDEX idx_brand_relevance (brandId, relevance, capturedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_intel_signals: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

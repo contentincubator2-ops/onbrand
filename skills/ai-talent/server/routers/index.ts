@@ -23,6 +23,7 @@ import { squadTemplateRouter } from "./squadTemplateRouter";
 import { reportRouter } from "./reportRouter";
 import { brandBrainRouter } from "./brandBrainRouter";
 import { strategyDeckRouter } from "./strategyDeckRouter";
+import { brandIntelRouter } from "./brandIntelRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -49,6 +50,7 @@ export const appRouter = router({
   report:        reportRouter,
   brandBrain:    brandBrainRouter,
   strategyDeck:  strategyDeckRouter,
+  brandIntel:    brandIntelRouter,
 });
 
 export type AppRouter = typeof appRouter;
