@@ -47,21 +47,20 @@ export default function TemplateRackPage() {
       )
     : null;
 
+  // Canonical squad shape — see squadTemplateRouter.listByBrand
   const allSquads: any[] = (squadsQuery?.data as any[]) ?? [];
   const enriched = recommendations.map((r) => {
     const sq = allSquads.find((s: any) => s.slug === r.squadSlug);
     const steps = Array.isArray(sq?.steps)
-      ? sq.steps.map((st: any) => st?.name ?? st?.title ?? "Step")
-      : Array.isArray(sq?.workflow_steps)
-      ? sq.workflow_steps.map((st: any) => st?.name ?? st?.title ?? "Step")
+      ? sq.steps.map((st: any) => st?.name ?? "Step")
       : [];
     return {
       ...r,
       squadId: sq?.id,
-      author: sq?.methodology_author ?? sq?.methodologyAuthor ?? "",
-      year: sq?.methodology_year ?? sq?.methodologyYear ?? "",
+      author: sq?.methodology?.author ?? "",
+      year: sq?.methodology?.year ?? "",
       steps: steps.slice(0, 6),
-      tokenBudget: sq?.token_budget ?? sq?.tokenBudget ?? null,
+      tokenBudget: sq?.tokenBudget ?? null,
     };
   });
 

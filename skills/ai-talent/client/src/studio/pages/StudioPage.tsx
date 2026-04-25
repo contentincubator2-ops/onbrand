@@ -59,13 +59,15 @@ export default function StudioPage() {
     return all.find((s: any) => s.id === squadId || s.slug === squadSlug);
   }, [squadsQuery.data, squadId, squadSlug]);
 
+  // Canonical squad shape — see squadTemplateRouter.listByBrand
   const steps = useMemo(() => {
-    const raw = squad?.steps ?? squad?.workflow_steps ?? [];
+    const raw = squad?.steps ?? [];
     return (Array.isArray(raw) ? raw : []).map((s: any, i: number) => ({
-      order: i,
-      name: s?.name ?? s?.title ?? `Step ${i + 1}`,
-      agent: s?.agentName ?? s?.owner ?? "Agent",
-      requiredSkills: s?.requiredSkills ?? [],
+      order: s?.order ?? i,
+      name: s?.name ?? `Step ${i + 1}`,
+      agent: s?.assignedAgentName ?? s?.requiredSkill ?? "Agent",
+      requiredSkill: s?.requiredSkill ?? null,
+      assignedAgentId: s?.assignedAgentId ?? null,
       outputType: s?.outputType ?? null,
     }));
   }, [squad]);

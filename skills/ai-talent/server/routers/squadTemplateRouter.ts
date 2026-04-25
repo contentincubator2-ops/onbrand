@@ -121,24 +121,26 @@ function genAgentKey(squadUid: string, agentName: string): string {
 export const squadTemplateRouter = router({
 
   // ── listByBrand ──────────────────────────────────────────────────────────────
-  // Returns ALL active squad templates, lightly hydrated, for the Studio
-  // TemplateRack / MethodologyStudio pages. Unlike getRecommendedSquads this
-  // is brand-scoped but does not rank by mission; the Studio picks by slug.
+  // Returns ALL active squad templates as a CANONICAL shape (Phase 0 of the
+  // schema-consolidation plan). The frontend reads ONLY these fields:
   //
-  // NOTE on LIMIT: triage recommends slugs across both `core` and `defer`
-  // tiers (e.g. consumer-insight-intelligence sits ~pos 631 by tier-then-id
-  // order). A LIMIT 200 caused StudioPage's find() to return undefined →
-  // "Squad not found". Bumped to 1000 to cover all active rows.
+  //   { id, slug, name, description, tier, strategyLayer,
+  //     methodology: { author, year, source, summary } | null,
+  //     lead:    { agentId, name, primarySkill } | null,
+  //     members: [{ agentId, name, role, isLead, primarySkill, aiModel }],
+  //     steps:   [{ order, name, description, requiredSkill,
+  //                 assignedAgentId, assignedAgentName, outputType,
+  //                 tools, prompts? }],
+  //     tokenBudget, workflowComplete }
+  //
+  // Internally this folds two legacy sources for steps:
+  //   - `squads.steps` (inline)            — 164 squads
+  //   - `squad_workflow_templates.steps`   — 135 squads (richer; has prompts)
+  // Phase 1 will backfill swt → squads.steps and the LEFT JOIN goes away.
+  // COLLATE needed: squads.slug = utf8mb4_general_ci, swt.taskType = unicode_ci.
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async () => {
-      // Workflow steps live in TWO places:
-      //   1. `squads.steps` (inline JSON, older) — covers 164 squads
-      //   2. `squad_workflow_templates.steps` keyed by taskType=slug (curated,
-      //      newer) — covers 135 squads with richer per-step prompts/outputs
-      // Prefer the curated table when present, fall back to inline.
-      // COLLATE needed because squads.slug is utf8mb4_general_ci while
-      // squad_workflow_templates.taskType is utf8mb4_unicode_ci.
       const [rows] = await localPool.execute(
         `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps AS inline_steps,
                 s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
@@ -151,26 +153,130 @@ export const squadTemplateRouter = router({
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
           LIMIT 1000`
       ) as any[];
-      return (rows as any[]).map((r) => {
-        const members = safeJsonParse<any[]>(r.agents, []);
+
+      type RawRow = any;
+      const raw = rows as RawRow[];
+
+      // ── Pass 1: collect every agent id we'll need to resolve ────────────────
+      const agentIdSet = new Set<number>();
+      const perRow = raw.map((r) => {
+        const membersRaw = safeJsonParse<any[]>(r.agents, []);
         const curated = safeJsonParse<any[]>(r.curated_steps, []);
         const inline = safeJsonParse<any[]>(r.inline_steps, []);
-        // Prefer curated (richer schema with prompts/output); fall back to inline.
-        const steps = curated.length > 0 ? curated : inline;
+        const stepsRaw = curated.length > 0 ? curated : inline;
+        const stepsSrc: "curated" | "inline" | "none" =
+          curated.length > 0 ? "curated" : inline.length > 0 ? "inline" : "none";
+
+        if (r.lead_agent_id) agentIdSet.add(Number(r.lead_agent_id));
+        for (const m of membersRaw) {
+          if (m?.agent_id) agentIdSet.add(Number(m.agent_id));
+        }
+        for (const s of stepsRaw) {
+          if (s?.assignedAgentId) agentIdSet.add(Number(s.assignedAgentId));
+        }
+        return { r, membersRaw, stepsRaw, stepsSrc };
+      });
+
+      // ── Pass 2: batch resolve agents ────────────────────────────────────────
+      const agentMap: Record<number, any> = {};
+      if (agentIdSet.size > 0) {
+        const ids = [...agentIdSet].join(",");
+        try {
+          const [aRows] = await localPool.execute(
+            `SELECT id, name, title, primarySkill, aiModel FROM agents WHERE id IN (${ids})`
+          ) as any[];
+          for (const a of aRows as any[]) agentMap[a.id] = a;
+        } catch (e) {
+          console.error("[squadRouter.listByBrand] agent batch lookup failed:", e);
+        }
+      }
+
+      // ── Pass 3: build canonical shape ───────────────────────────────────────
+      return perRow.map(({ r, membersRaw, stepsRaw, stepsSrc }) => {
+        // members
+        const members = membersRaw
+          .map((m: any) => {
+            const a = agentMap[Number(m.agent_id)];
+            if (!a) return null;
+            return {
+              agentId: Number(m.agent_id),
+              name: a.name ?? "",
+              role: m.role ?? a.title ?? "",
+              isLead: !!(m.is_lead === true || m.is_lead === 1),
+              primarySkill: a.primarySkill ?? null,
+              aiModel: a.aiModel ?? null,
+            };
+          })
+          .filter(Boolean) as Array<{
+            agentId: number; name: string; role: string;
+            isLead: boolean; primarySkill: string | null; aiModel: string | null;
+          }>;
+
+        // lead — prefer explicit lead_agent_id (resolved); fall back to is_lead member
+        let lead: { agentId: number; name: string; primarySkill: string | null } | null = null;
+        if (r.lead_agent_id && agentMap[Number(r.lead_agent_id)]) {
+          const a = agentMap[Number(r.lead_agent_id)];
+          lead = { agentId: Number(r.lead_agent_id), name: a.name ?? "", primarySkill: a.primarySkill ?? null };
+        } else {
+          const ml = members.find((m) => m.isLead);
+          if (ml) lead = { agentId: ml.agentId, name: ml.name, primarySkill: ml.primarySkill };
+        }
+
+        // steps — normalize curated vs inline shape into one
+        const steps = stepsRaw.map((s: any, i: number) => {
+          // curated keys: { step, title, description, owner, output, prompts, sections }
+          // inline keys:  { order, skill, title|name, outputType, description, requiredTools, assignedAgentId }
+          const order = Number(s.order ?? s.step ?? i + 1);
+          const requiredSkill =
+            (Array.isArray(s.requiredSkills) && s.requiredSkills[0]) ||
+            s.skill || s.requiredSkill || s.owner || null;
+          const assignedAgentId = s.assignedAgentId ? Number(s.assignedAgentId) : null;
+          const assignedAgent = assignedAgentId ? agentMap[assignedAgentId] : null;
+          return {
+            order,
+            name: s.name ?? s.title ?? `Step ${order}`,
+            description: s.description ?? null,
+            requiredSkill,
+            assignedAgentId,
+            assignedAgentName: assignedAgent?.name ?? s.assignedAgentName ?? null,
+            outputType: s.outputType ?? s.output ?? null,
+            tools: Array.isArray(s.requiredTools) ? s.requiredTools
+                 : Array.isArray(s.tools) ? s.tools : [],
+            ...(Array.isArray(s.prompts) && s.prompts.length ? { prompts: s.prompts } : {}),
+          };
+        });
+
+        // methodology — could be string OR JSON object in DB; normalize
+        let methodology: { author?: string; year?: number; source?: string; summary?: string } | null = null;
+        if (r.methodology) {
+          if (typeof r.methodology === "object") {
+            methodology = r.methodology;
+          } else if (typeof r.methodology === "string") {
+            // try parse JSON; if fails, treat as summary string
+            try {
+              const parsed = JSON.parse(r.methodology);
+              methodology = typeof parsed === "object" ? parsed : { summary: r.methodology };
+            } catch {
+              methodology = { summary: r.methodology };
+            }
+          }
+        }
+
         return {
-          id: r.id,
-          slug: r.slug,
-          name: r.name,
-          description: r.description,
-          tier: r.tier,
-          strategyLayer: r.strategy_layer,
-          methodology: r.methodology ?? null,
-          leadAgentId: r.lead_agent_id ?? null,
-          tokenBudget: r.token ?? null,
+          id: Number(r.id),
+          slug: String(r.slug),
+          name: String(r.name ?? ""),
+          description: r.description ?? null,
+          tier: r.tier ?? null,
+          strategyLayer: r.strategy_layer ?? null,
+          methodology,
+          lead,
           members,
           steps,
-          workflow_steps: steps,
-          stepsSource: curated.length > 0 ? "curated" : inline.length > 0 ? "inline" : "none",
+          tokenBudget: r.token ?? null,
+          workflowComplete: steps.length > 0,
+          // diagnostic only — UI should not depend on this
+          _debug: { stepsSource: stepsSrc },
         };
       });
     }),
