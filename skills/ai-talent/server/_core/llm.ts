@@ -58,6 +58,7 @@ export type ToolChoice =
 // DEBT-1: Add provider + model params for multi-provider routing
 export type InvokeParams = {
   messages: Message[];
+  // Note: "openrouter" is deprecated — at runtime it's silently routed to LLM_DEFAULT_PROVIDER.
   provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex" | "gemini";
   model?: string;
   tools?: Tool[];
@@ -146,14 +147,9 @@ const PROVIDER_CONFIG: Record<
     getKey:       () => ENV.PERPLEXITY_API_KEY ?? "",
   },
   google: {
-    baseUrl:      "https://openrouter.ai/api/v1",
-    defaultModel: "google/gemma-4-31b-it",
-    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
-  },
-  openrouter: {
-    baseUrl:      "https://openrouter.ai/api/v1",
-    defaultModel: "anthropic/claude-sonnet-4-6",
-    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? "",
+    baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: "gemini-2.5-flash",
+    getKey:       () => (ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
   },
   anthropic: {
     baseUrl:      "https://api.anthropic.com/v1",
@@ -352,9 +348,19 @@ async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/
 
 // ─── Main invoke function ─────────────────────────────────────────────────────
 
+// Deprecated provider aliases — silently route to the configured default
+// so we don't have to edit every legacy call site that hardcoded a now-disabled provider.
+const DEPRECATED_PROVIDERS = new Set(["openrouter"]);
+function resolveProvider(requested: string | undefined): string {
+  const def = (process.env.LLM_DEFAULT_PROVIDER as any) || "azure-foundry";
+  if (!requested) return def;
+  if (DEPRECATED_PROVIDERS.has(requested)) return def;
+  return requested;
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // DEBT-1: Real multi-provider routing
-  const providerKey = params.provider ?? (process.env.LLM_DEFAULT_PROVIDER as any) ?? "openrouter";
+  const providerKey = resolveProvider(params.provider as any);
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
@@ -370,15 +376,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // SEC-4: Obfuscate error — don't leak key names in logs/responses
   if (!apiKey) throw new Error("LLM provider not configured");
 
-  // Model remapping: callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6",
-  // "claude-opus-4-6"). When the active provider isn't OpenRouter, those model names
-  // don't resolve — remap to that provider's defaultModel so the call succeeds.
+  // Model remapping: legacy callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6").
+  // Since we no longer use OpenRouter, remap any of those to the active provider's defaultModel.
   let model = params.model ?? config.defaultModel;
-  if (providerKey !== "openrouter") {
-    const looksLikeOpenRouterStyle = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
-    if (looksLikeOpenRouterStyle) {
-      model = config.defaultModel;
-    }
+  const looksLikeProviderPrefixed = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
+  if (looksLikeProviderPrefixed) {
+    model = config.defaultModel;
   }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
@@ -437,35 +440,6 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    // Auto-fallback: if azure-foundry returns DeploymentNotFound, retry with openrouter
-    if (
-      providerKey === "azure-foundry" &&
-      (response.status === 404 || errorText.includes("DeploymentNotFound"))
-    ) {
-      console.warn("[LLM] Azure Foundry deployment not found, falling back to openrouter");
-      const fallbackConfig = PROVIDER_CONFIG["openrouter"]!;
-      const fallbackKey = fallbackConfig.getKey();
-      if (fallbackKey) {
-        const fallbackModel = (params.model && !params.model.includes("/"))
-          ? "openai/" + params.model
-          : "openai/gpt-4o-mini";
-        const fallbackUrl = fallbackConfig.baseUrl + "/chat/completions";
-        const fallbackResp = await fetch(fallbackUrl, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": "Bearer " + fallbackKey,
-          },
-          body: JSON.stringify({ ...payload, model: fallbackModel }),
-        });
-        if (fallbackResp.ok) {
-          console.warn("[LLM] Fallback to openrouter/" + fallbackModel + " succeeded");
-          return (await fallbackResp.json()) as InvokeResult;
-        }
-        const fallbackErr = await fallbackResp.text();
-        throw new Error("LLM fallback failed: " + fallbackResp.status + " – " + fallbackErr);
-      }
-    }
     throw new Error(
       `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
     );
@@ -477,7 +451,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
 // ─── Streaming invoke function ──────────────────────────────────────────────
 export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<string> {
-  const providerKey = params.provider ?? (process.env.LLM_DEFAULT_PROVIDER as any) ?? "openrouter";
+  const providerKey = resolveProvider(params.provider as any);
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
@@ -491,15 +465,11 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
   }
   if (!apiKey) throw new Error("LLM provider not configured");
 
-  // Model remapping: callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6",
-  // "claude-opus-4-6"). When the active provider isn't OpenRouter, those model names
-  // don't resolve — remap to that provider's defaultModel so the call succeeds.
+  // Model remapping: legacy callers pass provider-prefixed strings; remap to the active provider's defaultModel.
   let model = params.model ?? config.defaultModel;
-  if (providerKey !== "openrouter") {
-    const looksLikeOpenRouterStyle = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
-    if (looksLikeOpenRouterStyle) {
-      model = config.defaultModel;
-    }
+  const looksLikeProviderPrefixed = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
+  if (looksLikeProviderPrefixed) {
+    model = config.defaultModel;
   }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 

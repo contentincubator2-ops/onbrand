@@ -23,7 +23,7 @@ jobs:
           envs: GH_TOKEN
           script: |
             set -e
-            APP=/opt/ai-marketer/app
+            APP=/opt/marketing-os/app
             AI=$APP/skills/ai-talent
 
             echo "===== Step 1: Pull latest main ====="
