@@ -20,6 +20,7 @@
     "db:migrate-swt-apply": "tsx scripts/migrate-swt-to-inline.ts --apply",
     "db:align-leads": "tsx scripts/align-squad-leads.ts",
     "db:seed-l1-strategists": "tsx scripts/seed-l1-missing-strategists.ts",
+    "db:sync-is-lead": "tsx scripts/sync-agents-is-lead.ts",
     "db:seed-local": "tsx scripts/seed-local-squads.ts",
     "db:seed-missing": "tsx scripts/seed-missing-squads.ts",
     "db:analyze-squads": "tsx scripts/analyze-existing-squads.ts",
