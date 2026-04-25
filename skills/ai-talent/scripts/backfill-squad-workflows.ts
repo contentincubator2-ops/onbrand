@@ -151,6 +151,36 @@ async function loadAgents(pool: Pool, agentIds: number[]): Promise<Map<number, A
   return m;
 }
 
+/**
+ * Fallback when a squad's member references are all orphaned: pick 4-6
+ * real agents from the DB. Prefer agents whose `layer` matches the
+ * squad's strategy_layer / tier; otherwise just take the first N with
+ * a non-null primarySkill.
+ */
+async function pickFallbackAgents(pool: Pool, squad: SquadRow, count = 5): Promise<AgentRow[]> {
+  const layer = (squad.strategy_layer ?? squad.tier ?? "").toString();
+  // Try layer-matched first
+  if (layer) {
+    const [rows] = await pool.execute(
+      `SELECT id, slug, name, primarySkill
+       FROM agents
+       WHERE layer = ? AND primarySkill IS NOT NULL AND primarySkill != ''
+       ORDER BY id ASC LIMIT ?`,
+      [layer, count],
+    ) as any[];
+    if ((rows as AgentRow[]).length >= 3) return rows as AgentRow[];
+  }
+  // Fallback: any agent with a primarySkill
+  const [rows] = await pool.execute(
+    `SELECT id, slug, name, primarySkill
+     FROM agents
+     WHERE primarySkill IS NOT NULL AND primarySkill != ''
+     ORDER BY id ASC LIMIT ?`,
+    [count],
+  ) as any[];
+  return rows as AgentRow[];
+}
+
 async function generateSteps(squad: SquadRow, members: MemberAgent[]): Promise<LlmStep[]> {
   const sys = `You design 4-6 step execution workflows for marketing-strategy squads.
 Output STRICT JSON: { "steps": [{ "name": string, "description": string, "requiredSkill": string, "outputType": string }] }
@@ -298,23 +328,41 @@ async function main() {
           role: pickRole(a) || ar.name,
         };
       }).filter(Boolean) as MemberAgent[];
+      let usedFallback = false;
       if (members.length === 0) {
-        const sample = JSON.stringify(agentsJson).slice(0, 120);
-        console.log(`${tag}  SKIP — agent ids couldn't be resolved (sample=${sample})`);
-        skipped++; continue;
+        // Fallback: pick real agents from DB so the squad becomes qualified.
+        const subs = await pickFallbackAgents(pool, sq, 5);
+        if (subs.length === 0) {
+          const sample = JSON.stringify(agentsJson).slice(0, 120);
+          console.log(`${tag}  SKIP — orphan refs + no fallback agents (sample=${sample})`);
+          skipped++; continue;
+        }
+        usedFallback = true;
+        for (let mi = 0; mi < subs.length; mi++) {
+          const ar = subs[mi];
+          members.push({
+            agentId: ar.id,
+            agentName: ar.name,
+            agentSlug: ar.slug ?? null,
+            primarySkill: ar.primarySkill ?? null,
+            isLead: mi === 0,
+            role: ar.name,
+          });
+        }
       }
 
       const llmSteps = await generateSteps(sq, members);
       const finalSteps = buildFinalSteps(llmSteps, members);
 
+      const stub = usedFallback ? " [stub-agents]" : "";
       if (DRY) {
-        console.log(`${tag}  DRY  → ${finalSteps.length} steps: ${finalSteps.map((s) => s.name).join(" / ")}`);
+        console.log(`${tag}  DRY${stub}  → ${finalSteps.length} steps: ${finalSteps.map((s) => s.name).join(" / ")}`);
       } else {
         await pool.execute(
           `UPDATE squads SET steps = ? WHERE id = ?`,
           [JSON.stringify(finalSteps), sq.id]
         );
-        console.log(`${tag}  OK   → ${finalSteps.length} steps written`);
+        console.log(`${tag}  OK${stub}   → ${finalSteps.length} steps written`);
       }
       ok++;
     } catch (e: any) {
