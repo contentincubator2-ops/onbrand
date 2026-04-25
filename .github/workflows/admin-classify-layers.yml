@@ -1,0 +1,65 @@
+name: Admin — Classify Squads (tier + strategy_layer)
+
+# Runs scripts/classify-squads-tier.ts --apply on the VM so the
+# methodology catalog L1-L6 filter chips have actual data to filter on.
+# Most squads were stuck at strategy_layer='unassigned' (migrate default),
+# so the catalog filter returned only 1 result per layer.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "true = write to DB, false = dry-run (CSV only)"
+        required: false
+        default: "true"
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLY: ${{ inputs.apply }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          envs: GH_TOKEN,APPLY
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Pull latest main ====="
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Run classifier (apply=$APPLY) ====="
+            cd "$AI"
+            if [ -f .env ]; then set -a; source .env; set +a; fi
+
+            if [ "$APPLY" = "true" ]; then
+              npx tsx scripts/classify-squads-tier.ts --apply 2>&1 | tail -120
+            else
+              npx tsx scripts/classify-squads-tier.ts 2>&1 | tail -120
+            fi
+
+            echo ""
+            echo "===== Verify: layer distribution ====="
+            mysql --defaults-extra-file=<(printf '[client]\nuser=%s\npassword=%s\nhost=%s\n' "$DB_USER" "$DB_PASSWORD" "${DB_HOST:-127.0.0.1}") \
+                  "$DB_NAME" -e "
+              SELECT strategy_layer, COUNT(*) AS n
+              FROM squads
+              WHERE deleted_at IS NULL
+              GROUP BY strategy_layer
+              ORDER BY strategy_layer;
+            " 2>&1 || true
+
+            echo "===== Done ====="
