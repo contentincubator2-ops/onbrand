@@ -71,4 +71,32 @@ jobs:
             done
 
             echo ""
+            echo "===== Full chat-capable model list ====="
+            curl -sS -H "api-key: $KEY" "$HOST/openai/models?api-version=2024-08-01-preview" \
+              | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+for m in data.get("data", []):
+  caps = m.get("capabilities", {})
+  if caps.get("chat_completion"):
+    print(f"  {m[\"id\"]:40s} status={m.get(\"lifecycle_status\")} chat=Y")
+' 2>/dev/null || echo "(parse failed)"
+
+            echo ""
+            echo "===== Try every chat-capable id as a deployment name ====="
+            CHAT_IDS=$(curl -sS -H "api-key: $KEY" "$HOST/openai/models?api-version=2024-08-01-preview" \
+              | python3 -c 'import json,sys; [print(m["id"]) for m in json.load(sys.stdin).get("data",[]) if m.get("capabilities",{}).get("chat_completion")]' 2>/dev/null)
+            for FULL in $CHAT_IDS; do
+              SHORT="${FULL%-*}"  # strip trailing -version
+              for NAME in "$FULL" "$SHORT"; do
+                CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+                  -H "api-key: $KEY" -H "content-type: application/json" \
+                  -d "{\"model\":\"$NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":3}" \
+                  "$EP/openai/v1/chat/completions")
+                echo "  deployment=$NAME -> HTTP $CODE"
+                [ "$CODE" = "200" ] && break
+              done
+            done
+
+            echo ""
             echo "Done."
