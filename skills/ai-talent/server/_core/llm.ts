@@ -409,7 +409,11 @@ function detectLanguage(messages: Message[]): "zh" | "ja" | "ko" | "en" {
 // Verified-working Azure Foundry deployments (probed 2026-04-25):
 // gpt-4o (OpenAI), DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3, Kimi-K2.5
 const AZURE_MODEL_BY_LANG: Record<string, string> = {
-  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-5",
+  // Note: probe (2026-04-25) confirms `gpt-5-nano` is the only deployed gpt-5
+  // family member on the Foundry project. `gpt-5` / `gpt-5-mini` / `gpt-5-chat`
+  // exist in the model catalog but no deployment is published under those names.
+  // The reasoning-model param translation below handles max_completion_tokens.
+  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-5-nano",
   ja: process.env.AZURE_FOUNDRY_MODEL_JA || "gpt-4o",
   ko: process.env.AZURE_FOUNDRY_MODEL_KO || "gpt-4o",
   en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4o",
