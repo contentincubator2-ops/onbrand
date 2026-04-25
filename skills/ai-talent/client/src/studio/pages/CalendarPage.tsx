@@ -12,7 +12,8 @@ import { trpc } from "../../lib/trpc";
 
 function monthGrid(year: number, month: number) {
   const first = new Date(Date.UTC(year, month - 1, 1));
-  const offset = first.getUTCDay(); // 0=Sun
+  // WEEK starts MON; getUTCDay() returns 0=Sun..6=Sat → remap so MON=0..SUN=6
+  const offset = (first.getUTCDay() + 6) % 7;
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const cells: Array<{ d: number | null; key: string }> = [];
   for (let i = 0; i < offset; i++) cells.push({ d: null, key: `pad-${i}` });

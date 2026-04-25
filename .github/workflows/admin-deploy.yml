@@ -55,8 +55,10 @@ jobs:
 
             echo ""
             echo "===== Step 4: Restart pm2 ====="
-            pm2 restart ai-marketer 2>&1 | tail -5 || pm2 start "npx tsx server/index.ts" \
-              --name ai-marketer --cwd "$AI" 2>&1 | tail -5
+            # Real server is the `marketing-os` pm2 entry (per ecosystem.config.cjs).
+            # The `ai-marketer` entry is a stale broken process — do not touch.
+            pm2 restart marketing-os --update-env 2>&1 | tail -5 || \
+              pm2 start "$AI/ecosystem.config.cjs" --only marketing-os 2>&1 | tail -5
             pm2 save
 
             echo ""

@@ -124,6 +124,11 @@ export const squadTemplateRouter = router({
   // Returns ALL active squad templates, lightly hydrated, for the Studio
   // TemplateRack / MethodologyStudio pages. Unlike getRecommendedSquads this
   // is brand-scoped but does not rank by mission; the Studio picks by slug.
+  //
+  // NOTE on LIMIT: triage recommends slugs across both `core` and `defer`
+  // tiers (e.g. consumer-insight-intelligence sits ~pos 631 by tier-then-id
+  // order). A LIMIT 200 caused StudioPage's find() to return undefined →
+  // "Squad not found". Bumped to 1000 to cover all active rows.
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async () => {
@@ -132,7 +137,7 @@ export const squadTemplateRouter = router({
            FROM squads
           WHERE is_active = 1
           ORDER BY COALESCE(tier, 99) ASC, id ASC
-          LIMIT 200`
+          LIMIT 1000`
       ) as any[];
       return (rows as any[]).map((r) => ({
         id: r.id,
