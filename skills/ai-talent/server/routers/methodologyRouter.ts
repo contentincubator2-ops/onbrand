@@ -324,6 +324,7 @@ export const methodologyRouter = router({
             SELECT id, slug, name, description, agents, steps, methodology,
                    lead_agent_id AS leadAgentId, tier, strategy_layer AS strategyLayer,
                    source, parent_squad_id AS parentSquadId, ingest_source_url AS ingestSourceUrl,
+                   hero_image_url AS heroImageUrl,
                    token AS tokenBudget, workspace
               FROM squads WHERE id=${input.id} AND is_active=1 LIMIT 1
           `)
@@ -331,6 +332,7 @@ export const methodologyRouter = router({
             SELECT id, slug, name, description, agents, steps, methodology,
                    lead_agent_id AS leadAgentId, tier, strategy_layer AS strategyLayer,
                    source, parent_squad_id AS parentSquadId, ingest_source_url AS ingestSourceUrl,
+                   hero_image_url AS heroImageUrl,
                    token AS tokenBudget, workspace
               FROM squads WHERE slug=${input.slug ?? ""} AND is_active=1 LIMIT 1
           `);
@@ -370,6 +372,7 @@ export const methodologyRouter = router({
         description: row.description,
         tier: row.tier,
         strategyLayer: row.strategyLayer,
+        heroImageUrl: row.heroImageUrl ?? null,
         source: row.source,
         parentSquadId: row.parentSquadId,
         ingestSourceUrl: row.ingestSourceUrl,
@@ -446,7 +449,8 @@ export const methodologyRouter = router({
 
       // Load all active squad methodologies (cap 200 — plenty for ranking)
       const sr: any = await db.execute(sql`
-        SELECT id, slug, name, description, methodology, tier, strategy_layer AS strategyLayer, source
+        SELECT id, slug, name, description, methodology, tier, strategy_layer AS strategyLayer,
+               source, hero_image_url AS heroImageUrl
           FROM squads
          WHERE is_active=1
          ORDER BY id ASC LIMIT 200
@@ -538,6 +542,7 @@ ${mission.description ? `說明：${mission.description}\n` : ""}${mission.works
             description: sq.description ?? "",
             tier: sq.tier ?? null,
             strategyLayer: sq.strategyLayer ?? null,
+            heroImageUrl: sq.heroImageUrl ?? null,
             source: sq.source ?? "seeded",
             author: author ?? null,
             rationale: r.rationale,

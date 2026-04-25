@@ -59,6 +59,8 @@ export interface MethodologyCardProps {
   /** Whole-card click. */
   onClick?: () => void;
   className?: string;
+  /** When set, replaces the algorithmic glyph with a real image (gpt-image-1 hero). */
+  heroImageUrl?: string | null;
 }
 
 export default function MethodologyCard({
@@ -73,6 +75,7 @@ export default function MethodologyCard({
   onCtaClick,
   onClick,
   className = "",
+  heroImageUrl,
 }: MethodologyCardProps) {
   const lk: MosLayer = resolveLayer(layer ?? null);
   const tone = LAYER_TOKENS[lk];
@@ -126,19 +129,42 @@ export default function MethodologyCard({
         />
       </header>
 
-      {/* ── HERO: glyph in tinted square ──────────────────────────── */}
+      {/* ── HERO: gpt-image hero photo, fallback to algorithmic glyph ─ */}
       <div className="relative px-5 pt-4">
-        <div className="relative w-full" style={{ aspectRatio: "5 / 3" }}>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <MethodologyGlyph
-              seed={seed ?? title}
-              layer={lk}
-              size={148}
-              withBackground
-            />
-          </div>
+        <div className="relative w-full overflow-hidden" style={{ aspectRatio: "5 / 3" }}>
+          {heroImageUrl ? (
+            <>
+              <img
+                src={heroImageUrl}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{
+                  background: tone.bg + "11",
+                }}
+              />
+              {/* hairline tint to blend image with layer palette */}
+              <div
+                className="absolute inset-0 pointer-events-none mix-blend-multiply opacity-25"
+                style={{ background: tone.bg }}
+                aria-hidden
+              />
+            </>
+          ) : (
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ background: tone.bg + "11" }}
+            >
+              <MethodologyGlyph
+                seed={seed ?? title}
+                layer={lk}
+                size={148}
+                withBackground
+              />
+            </div>
+          )}
           {/* faint corner mark */}
-          <div className="absolute top-1 right-1 text-[0.56rem] tracking-[0.28em] uppercase text-mos-soft">
+          <div className="absolute top-1 right-1 text-[0.56rem] tracking-[0.28em] uppercase text-mos-soft mix-blend-difference">
             {String((typeof seed === "string" ? hashStr(seed) : (seed ?? 0)) % 100).padStart(2, "0")}
           </div>
         </div>

@@ -19,7 +19,8 @@ import MethodologyCard from "../components/methodology/MethodologyCard";
 import StepEditor, { type StepDraft } from "../components/methodology/StepEditor";
 import ForkPromptBar from "../components/methodology/ForkPromptBar";
 import ChatDrawer from "../components/mission/ChatDrawer";
-import { accentForIndex } from "../../studio/primitives/tokens";
+import { accentForIndex, LAYER_TOKENS, resolveLayer } from "../../studio/primitives/tokens";
+import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 
 export default function MissionDetail() {
   const { missionId } = useParams<{ missionId: string }>();
@@ -276,6 +277,7 @@ export default function MissionDetail() {
           <MethodologyCard
             layer={sq.strategyLayer ?? sq.tier ?? null}
             seed={sq.slug ?? sq.id ?? id}
+            heroImageUrl={sq.heroImageUrl ?? null}
             title={sq.name ?? sq.slug}
             author={sq.methodology?.author ? `${sq.methodology.author}${sq.methodology?.year ? " · " + sq.methodology.year : ""}` : null}
             source={sq.source ?? "seeded"}
@@ -442,49 +444,114 @@ function RecommendationPanel({
       )}
 
       {recs && recs.length > 0 && (
-        <ol className="space-y-2.5">
+        <div className="grid grid-cols-1 gap-3">
           {recs.map((r: any, i: number) => (
-            <li
+            <RecTile
               key={r.slug}
-              className="group border border-mos-hair bg-white hover:border-mos-ink transition"
-            >
-              <div className="flex items-stretch">
-                <div className="flex flex-col items-center justify-center w-12 bg-mos-cream/60 text-mos-soft border-r border-mos-hair">
-                  <span className="font-display text-[0.84rem] text-mos-ink">0{i + 1}</span>
-                </div>
-                <div className="flex-1 px-4 py-3.5">
-                  <div className="flex items-center gap-2 text-[0.62rem] tracking-[0.18em] uppercase text-mos-soft mb-0.5">
-                    <span>{r.strategyLayer ?? "LAYER"}</span>
-                    <span>·</span>
-                    <span>{(r.source ?? "seeded").toUpperCase()}</span>
-                    {r.author && (
-                      <>
-                        <span>·</span>
-                        <span className="normal-case tracking-normal text-mos-muted">{r.author}</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="font-display text-[1rem] text-mos-ink leading-tight">
-                    {r.name}
-                  </div>
-                  {r.rationale && (
-                    <div className="mt-1 text-[0.8rem] text-mos-body leading-snug">
-                      {r.rationale}
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => handlePick(r.slug)}
-                  disabled={!!picking}
-                  className="px-5 text-[0.7rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-40 disabled:cursor-wait"
-                >
-                  {picking === r.slug ? "套用中…" : "套用"}
-                </button>
-              </div>
-            </li>
+              rec={r}
+              index={i}
+              picking={picking === r.slug}
+              disabled={!!picking}
+              onPick={() => handlePick(r.slug)}
+            />
           ))}
-        </ol>
+        </div>
       )}
     </div>
+  );
+}
+
+// ── Canva-style recommendation tile ───────────────────────────────────
+//
+// Big pastel block with the methodology hero image on the right and
+// title/rationale on the left, mirroring the "簡報 / 海報 / 履歷" pattern
+// from Canva's template gallery. Layer drives the tint colour.
+function RecTile({
+  rec,
+  index,
+  picking,
+  disabled,
+  onPick,
+}: {
+  rec: any;
+  index: number;
+  picking: boolean;
+  disabled: boolean;
+  onPick: () => void;
+}) {
+  const lk = resolveLayer(rec.strategyLayer ?? rec.tier ?? null);
+  const tone = LAYER_TOKENS[lk];
+  return (
+    <button
+      onClick={onPick}
+      disabled={disabled}
+      className="group relative flex items-stretch overflow-hidden rounded-md border border-mos-hair text-left transition hover:shadow-lift disabled:opacity-50 disabled:cursor-wait"
+      style={{ background: `linear-gradient(135deg, ${tone.bg}1F 0%, ${tone.bg}0A 100%)` }}
+    >
+      {/* Left: copy */}
+      <div className="flex-1 min-w-0 p-4">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-sm"
+            style={{ background: tone.bg }}
+            aria-hidden
+          />
+          <span className="font-display text-[0.58rem] tracking-[0.26em] uppercase text-mos-ink">
+            {lk}
+          </span>
+          <span className="text-[0.58rem] tracking-[0.18em] uppercase text-mos-soft">
+            · {tone.shortLabel}
+          </span>
+        </div>
+        <div className="font-display text-[1rem] leading-tight text-mos-ink line-clamp-2">
+          {rec.name}
+        </div>
+        {rec.author && (
+          <div className="mt-0.5 text-[0.66rem] tracking-[0.04em] text-mos-muted truncate">
+            {rec.author}
+          </div>
+        )}
+        {rec.rationale && (
+          <div className="mt-2 text-[0.74rem] text-mos-body leading-snug line-clamp-3">
+            {rec.rationale}
+          </div>
+        )}
+        <div
+          className="mt-3 inline-flex items-center gap-1 text-[0.66rem] tracking-[0.18em] uppercase font-medium"
+          style={{ color: tone.bg }}
+        >
+          {picking ? "套用中…" : "套用"} →
+        </div>
+      </div>
+      {/* Right: hero illustration */}
+      <div
+        className="relative shrink-0 w-[40%] min-w-[120px] max-w-[180px]"
+        style={{ background: tone.bg + "22" }}
+      >
+        {rec.heroImageUrl ? (
+          <img
+            src={rec.heroImageUrl}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover transition group-hover:scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <MethodologyGlyph
+              seed={rec.slug ?? rec.id ?? index}
+              layer={lk}
+              size={84}
+            />
+          </div>
+        )}
+      </div>
+      {/* corner number — Canva-y order tag */}
+      <span
+        className="absolute top-2 left-2 font-display text-[0.58rem] tracking-[0.26em] uppercase text-mos-soft/80"
+        aria-hidden
+      >
+        0{index + 1}
+      </span>
+    </button>
   );
 }

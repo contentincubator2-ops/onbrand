@@ -138,6 +138,7 @@ export default function MethodologyCatalog() {
               key={s.id ?? s.slug ?? i}
               layer={s.strategyLayer ?? s.tier ?? null}
               seed={s.slug ?? s.id ?? i}
+              heroImageUrl={s.heroImageUrl ?? null}
               title={s.name ?? s.slug}
               author={author}
               source={s.source ?? "seeded"}
