@@ -159,24 +159,24 @@ async function loadAgents(pool: Pool, agentIds: number[]): Promise<Map<number, A
  */
 async function pickFallbackAgents(pool: Pool, squad: SquadRow, count = 5): Promise<AgentRow[]> {
   const layer = (squad.strategy_layer ?? squad.tier ?? "").toString();
+  const lim = Math.max(3, Math.min(20, Math.floor(count))); // safe inline literal
   // Try layer-matched first
   if (layer) {
-    const [rows] = await pool.execute(
+    const [rows] = await pool.query(
       `SELECT id, slug, name, primarySkill
        FROM agents
        WHERE layer = ? AND primarySkill IS NOT NULL AND primarySkill != ''
-       ORDER BY id ASC LIMIT ?`,
-      [layer, count],
+       ORDER BY id ASC LIMIT ${lim}`,
+      [layer],
     ) as any[];
     if ((rows as AgentRow[]).length >= 3) return rows as AgentRow[];
   }
   // Fallback: any agent with a primarySkill
-  const [rows] = await pool.execute(
+  const [rows] = await pool.query(
     `SELECT id, slug, name, primarySkill
      FROM agents
      WHERE primarySkill IS NOT NULL AND primarySkill != ''
-     ORDER BY id ASC LIMIT ?`,
-    [count],
+     ORDER BY id ASC LIMIT ${lim}`,
   ) as any[];
   return rows as AgentRow[];
 }
