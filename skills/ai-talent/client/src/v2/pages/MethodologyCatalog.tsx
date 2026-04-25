@@ -53,9 +53,12 @@ export default function MethodologyCatalog() {
 
   const filtered = useMemo(() => {
     if (!layerFilter) return merged;
-    return merged.filter((s) =>
-      ((s.tier || s.strategyLayer || "") as string).toUpperCase().includes(layerFilter)
-    );
+    return merged.filter((s) => {
+      // strategyLayer holds L1_brand..L6_validation/unassigned (the real layer).
+      // tier is core/defer/kill (UI tiering, not layer) — don't match against it.
+      const layerStr = String(s.strategyLayer ?? s.strategy_layer ?? "").toUpperCase();
+      return layerStr.includes(layerFilter);
+    });
   }, [merged, layerFilter]);
 
   return (
