@@ -125,7 +125,7 @@ async function main() {
       name: r.name,
       tier: r.tier,
       strategyLayer: r.strategy_layer,
-      tokenBudget: r.token AS token_budget,
+      tokenBudget: r.token_budget,
       methodology: safeJson(r.methodology, null),
       workspace: safeJson(r.workspace, null),
       lead,
