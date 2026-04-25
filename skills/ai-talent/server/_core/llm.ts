@@ -409,7 +409,7 @@ function detectLanguage(messages: Message[]): "zh" | "ja" | "ko" | "en" {
 // Verified-working Azure Foundry deployments (probed 2026-04-25):
 // gpt-4o (OpenAI), DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3, Kimi-K2.5
 const AZURE_MODEL_BY_LANG: Record<string, string> = {
-  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "Kimi-K2.5",
+  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-5",
   ja: process.env.AZURE_FOUNDRY_MODEL_JA || "gpt-4o",
   ko: process.env.AZURE_FOUNDRY_MODEL_KO || "gpt-4o",
   en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4o",
@@ -418,6 +418,25 @@ const AZURE_MODEL_BY_LANG: Record<string, string> = {
 function pickAzureModelForMessages(messages: Message[]): string {
   const lang = detectLanguage(messages);
   return AZURE_MODEL_BY_LANG[lang] ?? "gpt-4o";
+}
+
+// Reasoning-model param translation.
+// gpt-5*, o1*, o3*, o4* on Azure / OpenAI reject `max_tokens` and require
+// `max_completion_tokens` instead. They also reject `temperature` overrides.
+// Apply this to the outbound payload right before fetch().
+const REASONING_MODEL_RE = /^(gpt-5|o1|o3|o4)/i;
+function isReasoningModel(model: string): boolean {
+  return REASONING_MODEL_RE.test(model);
+}
+function adaptPayloadForModel(payload: Record<string, unknown>, model: string): void {
+  if (!isReasoningModel(model)) return;
+  if ("max_tokens" in payload) {
+    payload.max_completion_tokens = payload.max_tokens;
+    delete payload.max_tokens;
+  }
+  // Reasoning models reject temperature overrides; strip if present
+  delete payload.temperature;
+  delete payload.top_p;
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
@@ -490,6 +509,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
+  adaptPayloadForModel(payload, model);
+
   // Azure Foundry uses api-key header, others use Bearer token
   const authHeaders: Record<string, string> = providerKey === "azure-foundry"
     ? { "api-key": apiKey }
@@ -557,6 +578,8 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
   if (normalizedToolChoice) {
     payload.tool_choice = normalizedToolChoice;
   }
+
+  adaptPayloadForModel(payload, model);
 
   // Azure Foundry uses api-key header, others use Bearer token
   const streamAuthHeaders: Record<string, string> = providerKey === "azure-foundry"
