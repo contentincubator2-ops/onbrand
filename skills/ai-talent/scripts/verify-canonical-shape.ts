@@ -35,10 +35,10 @@ async function main() {
   try {
     if (!target) {
       const [h]: any = await pool.execute(`
-        SELECT COUNT(*) total,
-               SUM(IF(lead_agent_id IS NOT NULL,1,0)) lead,
-               SUM(IF(JSON_LENGTH(COALESCE(steps,JSON_ARRAY()))>0,1,0)) steps,
-               SUM(IF(lead_agent_id IS NOT NULL AND JSON_LENGTH(COALESCE(steps,JSON_ARRAY()))>0,1,0)) ready
+        SELECT COUNT(*) AS total,
+               SUM(IF(lead_agent_id IS NOT NULL,1,0)) AS has_lead,
+               SUM(IF(JSON_LENGTH(COALESCE(steps,JSON_ARRAY()))>0,1,0)) AS has_steps,
+               SUM(IF(lead_agent_id IS NOT NULL AND JSON_LENGTH(COALESCE(steps,JSON_ARRAY()))>0,1,0)) AS ready
           FROM squads WHERE is_active=1`);
       console.log("Squad health:", h[0]);
 
@@ -64,9 +64,9 @@ async function main() {
     const isId = /^\d+$/.test(target);
     const [rows]: any = await pool.execute(
       isId
-        ? `SELECT id, slug, name, description, agents, steps, tier, strategy_layer, methodology, lead_agent_id, token_budget, workspace
+        ? `SELECT id, slug, name, description, agents, steps, tier, strategy_layer, methodology, lead_agent_id, token AS token_budget, workspace
              FROM squads WHERE id = ?`
-        : `SELECT id, slug, name, description, agents, steps, tier, strategy_layer, methodology, lead_agent_id, token_budget, workspace
+        : `SELECT id, slug, name, description, agents, steps, tier, strategy_layer, methodology, lead_agent_id, token AS token_budget, workspace
              FROM squads WHERE slug = ?`,
       [isId ? Number(target) : target]
     );
@@ -125,7 +125,7 @@ async function main() {
       name: r.name,
       tier: r.tier,
       strategyLayer: r.strategy_layer,
-      tokenBudget: r.token_budget,
+      tokenBudget: r.token AS token_budget,
       methodology: safeJson(r.methodology, null),
       workspace: safeJson(r.workspace, null),
       lead,
