@@ -65,6 +65,66 @@ const LAYER_THEME: Record<string, string> = {
   L6: "validation dashboard, gauges and charts, audit clipboard with checklist",
 };
 
+/**
+ * Infer L1-L6 from slug + name when strategy_layer is "unassigned" / null.
+ * First match wins; precedence ordered specific → general.
+ */
+const LAYER_KEYWORDS: Array<{ layer: string; patterns: RegExp[] }> = [
+  {
+    layer: "L6",
+    patterns: [
+      /audit|validation|stress[-_ ]?test|consistenc|integrity|monitor|scorecard|watchtower|sentiment|audit-/i,
+      /驗證|校準|監測|稽核|健診|追蹤/,
+    ],
+  },
+  {
+    layer: "L5",
+    patterns: [
+      /campaign|launch|event|plf|tribe|cem|activation|ted|networking|culture-building|product-launch/i,
+      /活動|發布|啟動|大會|論壇|品牌活動/,
+    ],
+  },
+  {
+    layer: "L4",
+    patterns: [
+      /(^|[-_/])(fb|facebook|ig|instagram|linkedin|li|youtube|yt|tiktok|x[-_]twitter|threads|line|wechat|pinterest|reddit|pr)([-_/]|$)/i,
+      /social[-_ ]?channel|social[-_ ]?content|content[-_ ]?strategy|performance[-_ ]?marketing|paid[-_ ]?(ads|media)|seo|ecommerce|funnel|growth/i,
+      /貼文|社群|廣告|通路|內容創作|公關/,
+    ],
+  },
+  {
+    layer: "L3",
+    patterns: [
+      /audience|persona|icp|stp|vals|tribes|segment|psychograph|ethnograph|generational/i,
+      /受眾|客群|分眾|人物誌/,
+    ],
+  },
+  {
+    layer: "L2",
+    patterns: [
+      /product|pmf|jtbd|fab|kano|chasm|4p|value[-_ ]?prop|benefit[-_ ]?ladder/i,
+      /產品|價值主張/,
+    ],
+  },
+  {
+    layer: "L1",
+    patterns: [
+      /brand|archetype|positioning|differentiation|cbbe|equity|narrative|story|blue[-_ ]?ocean|category[-_ ]?design|purpose|mind[-_ ]?position/i,
+      /品牌|原型|定位|策略組|策略師|gtm|策略/,
+    ],
+  },
+];
+
+function inferLayer(slug: string, name: string, declared: string | null): string {
+  const d = (declared || "").toString().toUpperCase();
+  if (/^L[1-6]$/.test(d.slice(0, 2))) return d.slice(0, 2);
+  const hay = `${slug} ${name}`;
+  for (const { layer, patterns } of LAYER_KEYWORDS) {
+    if (patterns.some((p) => p.test(hay))) return layer;
+  }
+  return "L1";
+}
+
 interface Row {
   id: number;
   slug: string;
@@ -78,8 +138,7 @@ interface Row {
 }
 
 function buildPrompt(r: Row): string {
-  const layer = (r.strategy_layer || r.tier || "L1").toString().toUpperCase();
-  const layerKey = layer.startsWith("L") ? layer.slice(0, 2) : "L1";
+  const layerKey = inferLayer(r.slug, r.name, r.strategy_layer || r.tier);
   const theme = LAYER_THEME[layerKey] ?? LAYER_THEME.L1;
   const author = r.methodology_author ? `, methodology by ${r.methodology_author}` : "";
   const subject = r.name.replace(/[\u3000-\u303f\uff00-\uffef]/g, "").trim() || r.slug;
@@ -164,8 +223,10 @@ async function main() {
       const r = squads[i];
       const tag = `[${i + 1}/${squads.length}] #${r.id} ${r.slug}`;
       const prompt = buildPrompt(r);
+      const inferredLayer = inferLayer(r.slug, r.name, r.strategy_layer || r.tier);
       if (DRY) {
-        console.log(`${tag}\n  prompt: ${prompt}\n`);
+        console.log(`${tag}  layer=${inferredLayer}  name="${r.name}"`);
+        console.log(`  prompt: ${prompt}\n`);
         skipped++;
         continue;
       }
