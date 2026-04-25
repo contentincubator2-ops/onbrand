@@ -65,11 +65,21 @@ jobs:
             echo ""
             echo "===== Step 2: Migrate (adds hero_image_url col if missing) ====="
             cd "$AI"
+            # Save the OPENAI_API_KEY we got from GitHub Secret BEFORE sourcing
+            # .env, because the VM's .env has its own (likely stale) key that
+            # would otherwise win.
+            SAVED_OPENAI_KEY="${OPENAI_API_KEY}"
             if [ -f .env ]; then
               set -a
               # shellcheck disable=SC1091
               source .env
               set +a
+            fi
+            if [ -n "$SAVED_OPENAI_KEY" ]; then
+              export OPENAI_API_KEY="$SAVED_OPENAI_KEY"
+              echo "[env] OPENAI_API_KEY: using GitHub Secret (prefix: ${OPENAI_API_KEY:0:10}…)"
+            else
+              echo "[env] OPENAI_API_KEY: using VM .env value"
             fi
             npx tsx scripts/migrate.ts 2>&1 | tail -40 || true
 
