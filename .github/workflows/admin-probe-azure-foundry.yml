@@ -44,10 +44,13 @@ jobs:
             }
 
             probe "P1: project /openai/v1/models"           "$EP/openai/v1/models"
-            probe "P2: project /models?api-version=2024-05-01-preview" "$EP/models?api-version=2024-05-01-preview"
-            probe "P3: host /openai/deployments?api-version=2024-08-01-preview" "$HOST/openai/deployments?api-version=2024-08-01-preview"
-            probe "P4: host /openai/models?api-version=2024-08-01-preview"     "$HOST/openai/models?api-version=2024-08-01-preview"
-            probe "P5: project /openai/deployments?api-version=2024-08-01-preview" "$EP/openai/deployments?api-version=2024-08-01-preview"
+            probe "P2: host /openai/deployments?api-version=2024-10-21"          "$HOST/openai/deployments?api-version=2024-10-21"
+            probe "P3: host /openai/deployments?api-version=2024-06-01"          "$HOST/openai/deployments?api-version=2024-06-01"
+            probe "P4: host /openai/deployments?api-version=2023-05-15"          "$HOST/openai/deployments?api-version=2023-05-15"
+            probe "P5: host /openai/models?api-version=2024-10-21"               "$HOST/openai/models?api-version=2024-10-21"
+            probe "P6: host /models?api-version=2024-10-21"                      "$HOST/models?api-version=2024-10-21"
+            probe "P7: project /api/v1/deployments"                              "$EP/api/v1/deployments"
+            probe "P8: host /api/v1/deployments"                                 "$HOST/api/v1/deployments"
 
             echo "===== Try chat.completions on common deployment names ====="
             for MODEL in gpt-4o-mini gpt-4o gpt-4 gpt-35-turbo gpt-4o-2024-08-06 o1-mini gpt-5 model-router; do
@@ -76,19 +79,37 @@ jobs:
               | jq -r '.data[] | select(.capabilities.chat_completion==true) | "  \(.id)  status=\(.lifecycle_status)"'
 
             echo ""
-            echo "===== Try every chat-capable id as a deployment name ====="
-            CHAT_IDS=$(curl -sS -H "api-key: $KEY" "$HOST/openai/models?api-version=2024-08-01-preview" \
-              | jq -r '.data[] | select(.capabilities.chat_completion==true) | .id')
-            for FULL in $CHAT_IDS; do
-              SHORT=$(echo "$FULL" | sed -E 's/-[0-9.]+$//')
-              for NAME in "$FULL" "$SHORT"; do
-                CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
-                  -H "api-key: $KEY" -H "content-type: application/json" \
-                  -d "{\"model\":\"$NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":3}" \
-                  "$EP/openai/v1/chat/completions")
-                echo "  deployment=$NAME -> HTTP $CODE"
-                [ "$CODE" = "200" ] && break
-              done
+            echo "===== List deployments from working endpoint (if any) ====="
+            for AV in 2024-10-21 2024-06-01 2023-05-15; do
+              echo "--- api-version=$AV ---"
+              curl -sS -H "api-key: $KEY" "$HOST/openai/deployments?api-version=$AV" \
+                | jq -r '.data[]? | "  deployment=\(.id // .deployment_id // .name)  model=\(.model // .properties.model.name // "?")  status=\(.status // .properties.provisioningState // "?")"' 2>/dev/null \
+                || echo "(no parseable deployments)"
+            done
+
+            echo ""
+            echo "===== Probe a wider set of likely deployment names ====="
+            for NAME in \
+              gpt-4o gpt-4o-mini gpt-4 gpt-4-turbo gpt-4.1 gpt-4.1-mini gpt-4.1-nano \
+              gpt-5 gpt-5-mini gpt-5-nano gpt-5-chat gpt-5.1 gpt-5.1-chat \
+              o1 o1-mini o3 o3-mini o4-mini o3-deep-research \
+              gpt-35-turbo gpt-35-turbo-16k \
+              DeepSeek-R1 DeepSeek-V3 DeepSeek-V3.1 DeepSeek-V3.2 \
+              Mistral-Large Mistral-Large-3 Mistral-small Mistral-Nemo \
+              Kimi-K2 Kimi-K2.5 Kimi-K2.6 Kimi-K2-Thinking \
+              Phi-3 Phi-4 Llama-3 Llama-3.1 Cohere-command-R \
+              text-embedding-3-large text-embedding-3-small \
+              dall-e-3 whisper sora model-router; do
+              CODE=$(curl -sS -o /tmp/deploy_resp -w "%{http_code}" \
+                -H "api-key: $KEY" -H "content-type: application/json" \
+                -d "{\"model\":\"$NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":3}" \
+                "$EP/openai/v1/chat/completions")
+              if [ "$CODE" = "200" ]; then
+                echo "  ✅ deployment=$NAME"
+              elif [ "$CODE" != "404" ]; then
+                ERR=$(jq -r '.error.code // .error.type // .error.message // ""' /tmp/deploy_resp 2>/dev/null | head -c 80)
+                echo "  ⚠️  deployment=$NAME -> HTTP $CODE ($ERR)"
+              fi
             done
 
             echo ""

@@ -358,6 +358,68 @@ function resolveProvider(requested: string | undefined): string {
   return requested;
 }
 
+// ─── Language-aware model routing ──────────────────────────────────────────
+//
+// Heuristic: scan the last 2 user/system messages for CJK / Korean / Japanese.
+// If the conversation is mostly Chinese, prefer a model that handles 中文 well
+// (Kimi / DeepSeek). For everything else, default to gpt-4o.
+//
+// Routes can be tuned via env (AZURE_FOUNDRY_MODEL_ZH / AZURE_FOUNDRY_MODEL_EN);
+// if those aren't set we fall back to verified-working Azure Foundry deployments.
+
+function detectLanguage(messages: Message[]): "zh" | "ja" | "ko" | "en" {
+  const sample = messages
+    .slice(-3)
+    .map((m) => {
+      if (typeof m.content === "string") return m.content;
+      if (Array.isArray(m.content)) {
+        return m.content
+          .map((p) => (typeof p === "string" ? p : (p as TextContent).text ?? ""))
+          .join(" ");
+      }
+      return "";
+    })
+    .join(" ")
+    .slice(0, 2000);
+
+  if (!sample) return "en";
+
+  // Count chars by script
+  let zh = 0, ja = 0, ko = 0, total = 0;
+  for (const ch of sample) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code < 0x80) { total++; continue; }
+    total++;
+    // CJK Unified Ideographs (Han characters, used by both zh & ja kanji)
+    if (code >= 0x4e00 && code <= 0x9fff) zh++;
+    // Hiragana / Katakana → Japanese-specific
+    else if ((code >= 0x3040 && code <= 0x309f) || (code >= 0x30a0 && code <= 0x30ff)) ja++;
+    // Hangul → Korean
+    else if ((code >= 0xac00 && code <= 0xd7af) || (code >= 0x1100 && code <= 0x11ff)) ko++;
+  }
+
+  // If Hiragana/Katakana present → Japanese (overrides Han count)
+  if (ja > 5) return "ja";
+  if (ko > 5) return "ko";
+  // ≥30% CJK characters → Chinese
+  if (total > 0 && zh / total >= 0.3) return "zh";
+  return "en";
+}
+
+// Verified-working Azure Foundry deployments (probed 2026-04-25):
+// gpt-4o (OpenAI), DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3, Kimi-K2.5
+const AZURE_MODEL_BY_LANG: Record<string, string> = {
+  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "Kimi-K2.5",
+  ja: process.env.AZURE_FOUNDRY_MODEL_JA || "gpt-4o",
+  ko: process.env.AZURE_FOUNDRY_MODEL_KO || "gpt-4o",
+  en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4o",
+};
+
+function pickAzureModelForMessages(messages: Message[]): string {
+  const lang = detectLanguage(messages);
+  return AZURE_MODEL_BY_LANG[lang] ?? "gpt-4o";
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // DEBT-1: Real multi-provider routing
   const providerKey = resolveProvider(params.provider as any);
@@ -382,6 +444,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const looksLikeProviderPrefixed = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
   if (looksLikeProviderPrefixed) {
     model = config.defaultModel;
+  }
+  // Azure Foundry: when the caller didn't pin a model, pick by message language.
+  if (providerKey === "azure-foundry" && !params.model) {
+    model = pickAzureModelForMessages(params.messages);
   }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
@@ -470,6 +536,9 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
   const looksLikeProviderPrefixed = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
   if (looksLikeProviderPrefixed) {
     model = config.defaultModel;
+  }
+  if (providerKey === "azure-foundry" && !params.model) {
+    model = pickAzureModelForMessages(params.messages);
   }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
