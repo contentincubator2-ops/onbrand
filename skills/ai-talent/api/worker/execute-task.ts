@@ -93,8 +93,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       .filter(Boolean)
       .join(" ");
 
+    // Provider/model defaults align with what's actually deployed on the
+    // SoWork Azure Foundry project (proj-sowork-claw): Phi-4 + deepseek-r1.
+    // OpenRouter is out of credits, gpt-4o-mini isn't deployed on Foundry,
+    // so neither of llm.ts's built-in defaults works without overriding.
+    // Allow env override (LLM_PROVIDER / LLM_MODEL) so future redeploys
+    // pick a different model without touching code.
+    const provider = process.env.LLM_PROVIDER || "azure-foundry";
+    const model = process.env.LLM_MODEL || "Phi-4";
+
     const t0 = Date.now();
     const llm = await invokeLLM({
+      provider: provider as any,
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: payload.userRequest ?? "" },
