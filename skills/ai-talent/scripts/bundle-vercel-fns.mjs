@@ -53,15 +53,19 @@ await Promise.all(entries.map(e =>
   })
 ));
 
-// Atomically replace each source .ts with its bundled output. Still a
-// valid TS file (JS is TS), so @vercel/node can compile it without
-// hitting any relative imports.
-for (const e of entries) {
-  mkdirSync(dirname(e.final), { recursive: true });
-  const { readFileSync } = await import("node:fs");
-  writeFileSync(e.final, readFileSync(e.tmp));
+// Only overwrite the source .ts on the Vercel build runner. Locally
+// running this for validation must not corrupt the working tree —
+// previous behaviour silently committed bundled output as source.
+const onVercel = process.env.VERCEL === "1" || process.env.CI === "true";
+
+if (onVercel) {
+  for (const e of entries) {
+    mkdirSync(dirname(e.final), { recursive: true });
+    const { readFileSync } = await import("node:fs");
+    writeFileSync(e.final, readFileSync(e.tmp));
+  }
+  rmSync(tmpDir, { recursive: true, force: true });
+  console.log("[bundle-vercel-fns] overwrote (Vercel build):", entries.map(e => e.final).join(", "));
+} else {
+  console.log("[bundle-vercel-fns] local validation only (set VERCEL=1 to overwrite). Bundle output left in", tmpDir);
 }
-
-rmSync(tmpDir, { recursive: true, force: true });
-
-console.log("[bundle-vercel-fns] overwrote:", entries.map(e => e.final).join(", "));
