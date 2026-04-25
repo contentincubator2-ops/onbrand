@@ -274,22 +274,33 @@ async function main() {
         console.log(`${tag}  SKIP — no agents JSON`);
         skipped++; continue;
       }
-      const agentIds = agentsJson.map((a: any) => Number(a.agent_id)).filter((n: number) => Number.isFinite(n));
+      // Member entries may use `agent_id`, `agentId`, or `id` (legacy).
+      const pickAgentId = (a: any): number => {
+        const v = a?.agent_id ?? a?.agentId ?? a?.id;
+        return Number(v);
+      };
+      const pickIsLead = (a: any): boolean =>
+        !!(a?.is_lead ?? a?.isLead ?? a?.lead);
+      const pickRole = (a: any): string =>
+        String(a?.role ?? a?.title ?? a?.name ?? "");
+
+      const agentIds = agentsJson.map(pickAgentId).filter((n: number) => Number.isFinite(n));
       const agentsById = await loadAgents(pool, agentIds);
       const members: MemberAgent[] = agentsJson.map((a: any) => {
-        const ar = agentsById.get(Number(a.agent_id));
+        const ar = agentsById.get(pickAgentId(a));
         if (!ar) return null;
         return {
           agentId: ar.id,
           agentName: ar.name,
           agentSlug: ar.slug ?? null,
           primarySkill: ar.primarySkill ?? null,
-          isLead: !!a.is_lead,
-          role: String(a.role ?? ar.name),
+          isLead: pickIsLead(a),
+          role: pickRole(a) || ar.name,
         };
       }).filter(Boolean) as MemberAgent[];
       if (members.length === 0) {
-        console.log(`${tag}  SKIP — agent ids couldn't be resolved`);
+        const sample = JSON.stringify(agentsJson).slice(0, 120);
+        console.log(`${tag}  SKIP — agent ids couldn't be resolved (sample=${sample})`);
         skipped++; continue;
       }
 
