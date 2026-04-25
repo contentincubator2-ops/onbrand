@@ -57,7 +57,6 @@ jobs:
                   "$DB_NAME" -e "
               SELECT strategy_layer, COUNT(*) AS n
               FROM squads
-              WHERE deleted_at IS NULL
               GROUP BY strategy_layer
               ORDER BY strategy_layer;
             " 2>&1 || true

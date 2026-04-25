@@ -92,12 +92,19 @@ function parseWorkspace(ws: string | null): string[] {
   }
 }
 
+/** Coerce JSON column / null / unknown into a flat searchable string. */
+function stringify(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+
 function classify(sq: SquadRow): Classification {
   const ws = parseWorkspace(sq.workspace);
   const mt = (sq.missionType ?? "").toLowerCase();
-  const meth = (sq.methodology ?? "").toLowerCase();
+  const meth = stringify(sq.methodology).toLowerCase();
   const slug = sq.slug.toLowerCase();
-  const tags = (sq.tags ?? "").toLowerCase();
+  const tags = stringify(sq.tags).toLowerCase();
   const name = (sq.name ?? "").toLowerCase();
 
   // ── KILL rules (apply first) ─────────────────────────────────────────────
