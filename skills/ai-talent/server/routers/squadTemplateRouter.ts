@@ -121,8 +121,8 @@ function genAgentKey(squadUid: string, agentName: string): string {
 export const squadTemplateRouter = router({
 
   // ── listByBrand ──────────────────────────────────────────────────────────────
-  // Returns ALL active squad templates as a CANONICAL shape (Phase 0 of the
-  // schema-consolidation plan). The frontend reads ONLY these fields:
+  // Returns ALL active squad templates as a CANONICAL shape. The frontend
+  // reads ONLY these fields:
   //
   //   { id, slug, name, description, tier, strategyLayer,
   //     methodology: { author, year, source, summary } | null,
@@ -133,22 +133,16 @@ export const squadTemplateRouter = router({
   //                 tools, prompts? }],
   //     tokenBudget, workflowComplete }
   //
-  // Internally this folds two legacy sources for steps:
-  //   - `squads.steps` (inline)            — 164 squads
-  //   - `squad_workflow_templates.steps`   — 135 squads (richer; has prompts)
-  // Phase 1 will backfill swt → squads.steps and the LEFT JOIN goes away.
-  // COLLATE needed: squads.slug = utf8mb4_general_ci, swt.taskType = unicode_ci.
+  // Phase 1 (2026-04-25) consolidated workflow steps into `squads.steps`
+  // (canonical shape). The legacy `squad_workflow_templates` table was
+  // backfilled into squads.steps and dropped — no more LEFT JOIN needed.
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async () => {
       const [rows] = await localPool.execute(
-        `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps AS inline_steps,
-                s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
-                t.steps AS curated_steps
+        `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
+                s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token
            FROM squads s
-           LEFT JOIN squad_workflow_templates t
-             ON t.taskType COLLATE utf8mb4_unicode_ci = s.slug COLLATE utf8mb4_unicode_ci
-            AND t.isActive = 1
           WHERE s.is_active = 1
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
           LIMIT 1000`
@@ -161,11 +155,7 @@ export const squadTemplateRouter = router({
       const agentIdSet = new Set<number>();
       const perRow = raw.map((r) => {
         const membersRaw = safeJsonParse<any[]>(r.agents, []);
-        const curated = safeJsonParse<any[]>(r.curated_steps, []);
-        const inline = safeJsonParse<any[]>(r.inline_steps, []);
-        const stepsRaw = curated.length > 0 ? curated : inline;
-        const stepsSrc: "curated" | "inline" | "none" =
-          curated.length > 0 ? "curated" : inline.length > 0 ? "inline" : "none";
+        const stepsRaw = safeJsonParse<any[]>(r.steps, []);
 
         if (r.lead_agent_id) agentIdSet.add(Number(r.lead_agent_id));
         for (const m of membersRaw) {
@@ -174,7 +164,7 @@ export const squadTemplateRouter = router({
         for (const s of stepsRaw) {
           if (s?.assignedAgentId) agentIdSet.add(Number(s.assignedAgentId));
         }
-        return { r, membersRaw, stepsRaw, stepsSrc };
+        return { r, membersRaw, stepsRaw };
       });
 
       // ── Pass 2: batch resolve agents ────────────────────────────────────────
@@ -192,7 +182,7 @@ export const squadTemplateRouter = router({
       }
 
       // ── Pass 3: build canonical shape ───────────────────────────────────────
-      return perRow.map(({ r, membersRaw, stepsRaw, stepsSrc }) => {
+      return perRow.map(({ r, membersRaw, stepsRaw }) => {
         // members
         const members = membersRaw
           .map((m: any) => {
@@ -275,8 +265,6 @@ export const squadTemplateRouter = router({
           steps,
           tokenBudget: r.token ?? null,
           workflowComplete: steps.length > 0,
-          // diagnostic only — UI should not depend on this
-          _debug: { stepsSource: stepsSrc },
         };
       });
     }),
