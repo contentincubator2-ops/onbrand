@@ -1,0 +1,74 @@
+name: Admin — Probe Azure Foundry deployments
+
+# Probe the configured Azure Foundry project for available model deployments
+# across multiple URL patterns. Outputs which deployments exist and which
+# URL pattern works, so we can wire llm.ts correctly.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set +e
+            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            set -a; source "$ENV_FILE"; set +a
+
+            EP="${AZURE_FOUNDRY_PROJECT_ENDPOINT%/}"
+            KEY="$AZURE_FOUNDRY_API_KEY"
+            # Resource host = strip /api/projects/... — gives https://{name}.services.ai.azure.com
+            HOST=$(echo "$EP" | sed -E 's|/api/projects/.*$||')
+
+            echo "===== Endpoints under test ====="
+            echo "PROJECT_ENDPOINT: $EP"
+            echo "HOST_ROOT      : $HOST"
+            echo ""
+
+            # Test patterns. Each prints HTTP code + first 12 lines of body.
+            probe() {
+              local label="$1" url="$2"
+              echo "--- $label ---"
+              echo "GET $url"
+              curl -sS -o /tmp/resp.txt -w "HTTP %{http_code}\n" \
+                -H "api-key: $KEY" "$url"
+              head -c 1500 /tmp/resp.txt; echo ""
+              echo ""
+            }
+
+            probe "P1: project /openai/v1/models"           "$EP/openai/v1/models"
+            probe "P2: project /models?api-version=2024-05-01-preview" "$EP/models?api-version=2024-05-01-preview"
+            probe "P3: host /openai/deployments?api-version=2024-08-01-preview" "$HOST/openai/deployments?api-version=2024-08-01-preview"
+            probe "P4: host /openai/models?api-version=2024-08-01-preview"     "$HOST/openai/models?api-version=2024-08-01-preview"
+            probe "P5: project /openai/deployments?api-version=2024-08-01-preview" "$EP/openai/deployments?api-version=2024-08-01-preview"
+
+            echo "===== Try chat.completions on common deployment names ====="
+            for MODEL in gpt-4o-mini gpt-4o gpt-4 gpt-35-turbo gpt-4o-2024-08-06 o1-mini gpt-5 model-router; do
+              echo "--- POST $EP/openai/v1/chat/completions  model=$MODEL ---"
+              curl -sS -o /tmp/resp.txt -w "HTTP %{http_code}\n" \
+                -H "api-key: $KEY" -H "content-type: application/json" \
+                -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":5}" \
+                "$EP/openai/v1/chat/completions"
+              head -c 500 /tmp/resp.txt; echo ""
+            done
+
+            echo ""
+            echo "===== Try with api-version query string ====="
+            for MODEL in gpt-4o-mini gpt-4o gpt-4; do
+              echo "--- POST .../openai/v1/chat/completions?api-version=2024-08-01-preview model=$MODEL ---"
+              curl -sS -o /tmp/resp.txt -w "HTTP %{http_code}\n" \
+                -H "api-key: $KEY" -H "content-type: application/json" \
+                -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":5}" \
+                "$EP/openai/v1/chat/completions?api-version=2024-08-01-preview"
+              head -c 500 /tmp/resp.txt; echo ""
+            done
+
+            echo ""
+            echo "Done."
