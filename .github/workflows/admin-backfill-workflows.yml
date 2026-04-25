@@ -58,8 +58,20 @@ jobs:
             echo "Commit: $(git log --oneline -1)"
 
             echo ""
-            echo "===== Step 2: Pre-audit ====="
+            echo "===== Step 1.5: Source app .env into shell ====="
             cd "$AI"
+            if [ -f .env ]; then
+              set -a
+              # shellcheck disable=SC1091
+              source .env
+              set +a
+              echo "[env] sourced .env (JWT_SECRET set: $([ -n "$JWT_SECRET" ] && echo yes || echo no))"
+            else
+              echo "[env] WARN: .env not found at $AI"
+            fi
+
+            echo ""
+            echo "===== Step 2: Pre-audit ====="
             npx tsx scripts/audit-workflow-completeness.ts 2>&1 | tail -30 || true
 
             echo ""
