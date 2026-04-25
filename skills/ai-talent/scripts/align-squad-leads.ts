@@ -122,9 +122,10 @@ function scoreAgent(squad: SquadRow, agent: AgentRow, stepRequiredSkill: string 
     reasons.push(`tokens=[${overlap.join(",")}](+${add})`);
   }
 
-  // 3) Author name match — both slug and primarySkill carry the same surname
+  // 3) Author name match — both slug AND primarySkill have the surname
+  //    as a STANDALONE token (avoid 'rand' matching inside 'brand').
   for (const author of KNOWN_AUTHORS) {
-    if (slug.includes(author) && ps.includes(author)) {
+    if (slugTokens.includes(author) && psTokens.includes(author)) {
       score += 30;
       reasons.push(`author=${author}(+30)`);
     }
