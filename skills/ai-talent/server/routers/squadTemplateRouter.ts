@@ -132,19 +132,31 @@ export const squadTemplateRouter = router({
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async () => {
-      // squads schema: real columns are `agents` (members JSON) and `steps`
-      // (workflow JSON). There is NO `members` or `workflow_steps` column.
+      // Workflow steps live in TWO places:
+      //   1. `squads.steps` (inline JSON, older) — covers 164 squads
+      //   2. `squad_workflow_templates.steps` keyed by taskType=slug (curated,
+      //      newer) — covers 135 squads with richer per-step prompts/outputs
+      // Prefer the curated table when present, fall back to inline.
+      // COLLATE needed because squads.slug is utf8mb4_general_ci while
+      // squad_workflow_templates.taskType is utf8mb4_unicode_ci.
       const [rows] = await localPool.execute(
-        `SELECT id, slug, name, description, agents, steps, tier, strategy_layer,
-                methodology, lead_agent_id, token
-           FROM squads
-          WHERE is_active = 1
-          ORDER BY COALESCE(tier, 99) ASC, id ASC
+        `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps AS inline_steps,
+                s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
+                t.steps AS curated_steps
+           FROM squads s
+           LEFT JOIN squad_workflow_templates t
+             ON t.taskType COLLATE utf8mb4_unicode_ci = s.slug COLLATE utf8mb4_unicode_ci
+            AND t.isActive = 1
+          WHERE s.is_active = 1
+          ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
           LIMIT 1000`
       ) as any[];
       return (rows as any[]).map((r) => {
         const members = safeJsonParse<any[]>(r.agents, []);
-        const steps = safeJsonParse<any[]>(r.steps, []);
+        const curated = safeJsonParse<any[]>(r.curated_steps, []);
+        const inline = safeJsonParse<any[]>(r.inline_steps, []);
+        // Prefer curated (richer schema with prompts/output); fall back to inline.
+        const steps = curated.length > 0 ? curated : inline;
         return {
           id: r.id,
           slug: r.slug,
@@ -158,6 +170,7 @@ export const squadTemplateRouter = router({
           members,
           steps,
           workflow_steps: steps,
+          stepsSource: curated.length > 0 ? "curated" : inline.length > 0 ? "inline" : "none",
         };
       });
     }),
