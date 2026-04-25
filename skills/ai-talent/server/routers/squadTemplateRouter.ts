@@ -132,24 +132,34 @@ export const squadTemplateRouter = router({
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async () => {
+      // squads schema: real columns are `agents` (members JSON) and `steps`
+      // (workflow JSON). There is NO `members` or `workflow_steps` column.
       const [rows] = await localPool.execute(
-        `SELECT id, slug, name, description, members, workflow_steps, tier, strategy_layer
+        `SELECT id, slug, name, description, agents, steps, tier, strategy_layer,
+                methodology, lead_agent_id, token
            FROM squads
           WHERE is_active = 1
           ORDER BY COALESCE(tier, 99) ASC, id ASC
           LIMIT 1000`
       ) as any[];
-      return (rows as any[]).map((r) => ({
-        id: r.id,
-        slug: r.slug,
-        name: r.name,
-        description: r.description,
-        tier: r.tier,
-        strategyLayer: r.strategy_layer,
-        members: safeJsonParse<any[]>(r.members, []),
-        steps: safeJsonParse<any[]>(r.workflow_steps, []),
-        workflow_steps: safeJsonParse<any[]>(r.workflow_steps, []),
-      }));
+      return (rows as any[]).map((r) => {
+        const members = safeJsonParse<any[]>(r.agents, []);
+        const steps = safeJsonParse<any[]>(r.steps, []);
+        return {
+          id: r.id,
+          slug: r.slug,
+          name: r.name,
+          description: r.description,
+          tier: r.tier,
+          strategyLayer: r.strategy_layer,
+          methodology: r.methodology ?? null,
+          leadAgentId: r.lead_agent_id ?? null,
+          tokenBudget: r.token ?? null,
+          members,
+          steps,
+          workflow_steps: steps,
+        };
+      });
     }),
 
   // ── getRecommendedSquads ─────────────────────────────────────────────────────
