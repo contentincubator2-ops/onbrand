@@ -116,24 +116,27 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     await updateJob(jobId, { progress: 80 });
 
+    // invokeLLM returns the OpenAI-compatible shape {choices:[{message:{content}}]}.
+    const raw = llm.choices?.[0]?.message?.content;
     const content =
-      typeof llm.content === "string"
-        ? llm.content
-        : Array.isArray(llm.content)
-          ? llm.content
+      typeof raw === "string"
+        ? raw
+        : Array.isArray(raw)
+          ? raw
               .map((p: any) => (typeof p === "string" ? p : p?.text ?? ""))
               .filter(Boolean)
               .join("\n")
-          : String(llm.content ?? "");
+          : "";
 
     const result = {
       processed: true,
       jobName: row.name,
       queue: row.queue,
-      provider: (llm as any).provider ?? null,
-      model: (llm as any).model ?? null,
+      provider,
+      model: llm.model ?? model,
+      finishReason: llm.choices?.[0]?.finish_reason ?? null,
       content,
-      usage: (llm as any).usage ?? null,
+      usage: llm.usage ?? null,
       llmDurationMs: llmMs,
       echo: {
         userRequest: payload.userRequest,
