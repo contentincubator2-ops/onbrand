@@ -300,7 +300,7 @@ async function main() {
         console.log(`${tag}  DRY  → ${finalSteps.length} steps: ${finalSteps.map((s) => s.name).join(" / ")}`);
       } else {
         await pool.execute(
-          `UPDATE squads SET steps = ?, updatedAt = NOW() WHERE id = ?`,
+          `UPDATE squads SET steps = ? WHERE id = ?`,
           [JSON.stringify(finalSteps), sq.id]
         );
         console.log(`${tag}  OK   → ${finalSteps.length} steps written`);
