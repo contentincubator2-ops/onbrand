@@ -11,6 +11,28 @@ import { accentForIndex } from "../../studio/primitives/tokens";
 export default function MethodologyDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const createMission = trpc.mission.create.useMutation();
+  const [busy, setBusy] = React.useState(false);
+
+  const applyToNewMission = async (squad: any) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const title = `新任務 · ${squad.name ?? squad.slug}`;
+      const description = squad.description ?? "";
+      const res = await createMission.mutateAsync({
+        title,
+        description,
+        squadSlug: squad.slug,
+        methodology: squad.methodology?.author ?? squad.name ?? "",
+      });
+      if (res?.id) navigate(`/m/${res.id}`);
+    } catch (e: any) {
+      alert(`建立任務失敗：${e?.message ?? e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const squadQuery = (trpc.squad as any).getSquadBySlug?.useQuery
     ? (trpc.squad as any).getSquadBySlug.useQuery(
@@ -94,10 +116,11 @@ export default function MethodologyDetail() {
           </div>
 
           <button
-            onClick={() => alert("D3: 創新任務並套用此方法論")}
-            className="mt-6 px-6 py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition"
+            onClick={() => applyToNewMission(s)}
+            disabled={busy}
+            className="mt-6 px-6 py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-40 disabled:cursor-wait"
           >
-            套用到新任務 →
+            {busy ? "建立中…" : "套用到新任務 →"}
           </button>
         </section>
 
@@ -117,8 +140,8 @@ export default function MethodologyDetail() {
             leadName={s.lead?.name ?? "Squad Lead"}
             leadAvatar={(s.lead?.name ?? "S")[0]}
             footerMeta={`${stepObjs.length} steps`}
-            ctaLabel="套用"
-            onCtaClick={() => alert("D3: apply")}
+            ctaLabel={busy ? "建立中…" : "套用"}
+            onCtaClick={() => applyToNewMission(s)}
           />
         </aside>
       </div>

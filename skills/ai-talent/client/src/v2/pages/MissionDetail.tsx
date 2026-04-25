@@ -268,11 +268,11 @@ export default function MissionDetail() {
             </div>
 
             <button
-              disabled
-              className="mt-4 w-full py-3 bg-mos-ink/40 text-white text-[0.74rem] tracking-[0.18em] uppercase cursor-not-allowed"
-              title="D2 接 squad runner，D4 整合 ChatDrawer"
+              onClick={() => setChatOpen(true)}
+              className="mt-4 w-full py-3 bg-mos-ink text-white text-[0.74rem] tracking-[0.18em] uppercase hover:bg-mos-body transition"
+              title="打開對話面板，跟 squad lead 開始這個任務"
             >
-              開始 RUN（D4 接 squad runner）
+              開始對話 RUN →
             </button>
           </>
         )}
