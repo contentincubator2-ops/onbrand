@@ -73,21 +73,14 @@ jobs:
             echo ""
             echo "===== Full chat-capable model list ====="
             curl -sS -H "api-key: $KEY" "$HOST/openai/models?api-version=2024-08-01-preview" \
-              | python3 -c '
-import json, sys
-data = json.load(sys.stdin)
-for m in data.get("data", []):
-  caps = m.get("capabilities", {})
-  if caps.get("chat_completion"):
-    print(f"  {m[\"id\"]:40s} status={m.get(\"lifecycle_status\")} chat=Y")
-' 2>/dev/null || echo "(parse failed)"
+              | jq -r '.data[] | select(.capabilities.chat_completion==true) | "  \(.id)  status=\(.lifecycle_status)"'
 
             echo ""
             echo "===== Try every chat-capable id as a deployment name ====="
             CHAT_IDS=$(curl -sS -H "api-key: $KEY" "$HOST/openai/models?api-version=2024-08-01-preview" \
-              | python3 -c 'import json,sys; [print(m["id"]) for m in json.load(sys.stdin).get("data",[]) if m.get("capabilities",{}).get("chat_completion")]' 2>/dev/null)
+              | jq -r '.data[] | select(.capabilities.chat_completion==true) | .id')
             for FULL in $CHAT_IDS; do
-              SHORT="${FULL%-*}"  # strip trailing -version
+              SHORT=$(echo "$FULL" | sed -E 's/-[0-9.]+$//')
               for NAME in "$FULL" "$SHORT"; do
                 CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
                   -H "api-key: $KEY" -H "content-type: application/json" \
