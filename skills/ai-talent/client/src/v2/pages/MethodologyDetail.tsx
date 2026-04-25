@@ -3,32 +3,45 @@
  * Fetch squad by slug, show the full hero + step list + apply CTA.
  */
 import React from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import MethodologyCard from "../components/methodology/MethodologyCard";
 import { accentForIndex } from "../../studio/primitives/tokens";
+import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 export default function MethodologyDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const ctx = useOutletContext<ShellOutletCtx | undefined>();
+  const brandId = ctx?.brandId ?? null;
+
   const createMission = trpc.mission.create.useMutation();
   const [busy, setBusy] = React.useState(false);
+  const [errMsg, setErrMsg] = React.useState<string | null>(null);
 
   const applyToNewMission = async (squad: any) => {
     if (busy) return;
     setBusy(true);
+    setErrMsg(null);
     try {
       const title = `新任務 · ${squad.name ?? squad.slug}`;
-      const description = squad.description ?? "";
+      const desc = (squad.description ?? "").slice(0, 1000);
       const res = await createMission.mutateAsync({
         title,
-        description,
+        description: desc || undefined,
         squadSlug: squad.slug,
-        methodology: squad.methodology?.author ?? squad.name ?? "",
+        methodology: squad.methodology?.author ?? squad.name ?? undefined,
+        brandId: brandId ?? undefined,
       });
-      if (res?.id) navigate(`/m/${res.id}`);
+      if (!res?.id) {
+        setErrMsg("後端沒有回傳 mission id，請重試");
+        return;
+      }
+      navigate(brandId ? `/b/${brandId}/_/m/${res.id}` : `/m/${res.id}`);
     } catch (e: any) {
-      alert(`建立任務失敗：${e?.message ?? e}`);
+      // eslint-disable-next-line no-console
+      console.error("[MethodologyDetail] mission.create failed:", e);
+      setErrMsg(`建立任務失敗：${e?.message ?? String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -122,6 +135,11 @@ export default function MethodologyDetail() {
           >
             {busy ? "建立中…" : "套用到新任務 →"}
           </button>
+          {errMsg && (
+            <div className="mt-3 text-[0.78rem] text-red-600 whitespace-pre-wrap max-w-[560px]">
+              {errMsg}
+            </div>
+          )}
         </section>
 
         <aside className="col-span-5 flex justify-end">
