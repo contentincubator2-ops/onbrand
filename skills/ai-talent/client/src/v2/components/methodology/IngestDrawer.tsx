@@ -217,20 +217,17 @@ export default function IngestDrawer({
               {/* Preview card */}
               <div className="flex justify-center">
                 <MethodologyCard
-                  accent={accent}
-                  variantIndex={jobId ?? 0}
-                  monogram="INGESTED"
-                  category="新方法論 · 預覽"
+                  layer={(draft as any).strategyLayer ?? (draft as any).tier ?? null}
+                  seed={`ingest-${jobId ?? draft.name}`}
                   title={draft.name}
                   author={
                     draft.author
                       ? `${draft.author}${draft.year ? " · " + draft.year : ""}`
-                      : new URL(url).hostname
+                      : (() => { try { return new URL(url).hostname; } catch { return null; } })()
                   }
+                  source="ingested"
                   steps={previewSteps}
                   leadName={draft.author ?? "TBD"}
-                  leadAvatar={(draft.author ?? "?")[0]}
-                  footerMeta={`${draft.steps.length} steps`}
                   ctaLabel="預覽"
                   onCtaClick={() => {}}
                 />

@@ -14,8 +14,9 @@ import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import MethodologyCard from "../components/methodology/MethodologyCard";
+import LayerLegend from "../components/methodology/LayerLegend";
 import IngestDrawer from "../components/methodology/IngestDrawer";
-import { accentForIndex } from "../../studio/primitives/tokens";
+import type { MosLayer } from "../../studio/primitives/tokens";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 type SourceFilter = "all" | "seeded" | "ingested" | "forked" | "mine";
@@ -39,7 +40,7 @@ export default function MethodologyCatalog() {
   const squads: any[] = (squadsQuery.data as any[]) ?? [];
   const mine: any[] = (mineQuery.data as any[]) ?? [];
 
-  const [layerFilter, setLayerFilter] = useState<string | null>(null);
+  const [layerFilter, setLayerFilter] = useState<MosLayer | null>(null);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -102,15 +103,7 @@ export default function MethodologyCatalog() {
         </FilterRow>
 
         <FilterRow label="策略層">
-          {[null, "L1", "L2", "L3", "L4", "L5", "L6"].map((val) => (
-            <FilterChip
-              key={String(val)}
-              active={layerFilter === val}
-              onClick={() => setLayerFilter(val)}
-            >
-              {val ?? "全部"}
-            </FilterChip>
-          ))}
+          <LayerLegend active={layerFilter} onPick={setLayerFilter} />
         </FilterRow>
       </div>
 
@@ -127,7 +120,6 @@ export default function MethodologyCatalog() {
 
       <div className="flex flex-wrap gap-6">
         {filtered.map((s, i) => {
-          const accent = accentForIndex(i);
           const lead = s.lead?.name ?? s.leadName ?? "Squad Lead";
           const stepObjs = Array.isArray(s.steps) ? s.steps : [];
           const stepRows = stepObjs.slice(0, 4).map((st: any, idx: number) => ({
@@ -135,28 +127,22 @@ export default function MethodologyCatalog() {
             desc: st.requiredSkill ?? st.outputType ?? "",
             glyph: `0${idx + 1}`,
           }));
-          const sourceLabel = (s.source ?? "seeded").toUpperCase();
-          const layerLabel = s.strategyLayer || s.tier || "Layer";
+          const author = s.methodology?.author
+            ? `${s.methodology.author}${s.methodology?.year ? " · " + s.methodology.year : ""}`
+            : s.ingestSourceUrl
+            ? (() => { try { return new URL(s.ingestSourceUrl).hostname; } catch { return null; } })()
+            : null;
 
           return (
             <MethodologyCard
               key={s.id ?? s.slug ?? i}
-              accent={accent}
-              variantIndex={i}
-              monogram={sourceLabel}
-              category={`${layerLabel} · ${sourceLabel}`}
+              layer={s.strategyLayer ?? s.tier ?? null}
+              seed={s.slug ?? s.id ?? i}
               title={s.name ?? s.slug}
-              author={
-                s.methodology?.author
-                  ? `${s.methodology.author}${s.methodology?.year ? " · " + s.methodology.year : ""}`
-                  : s.ingestSourceUrl
-                  ? new URL(s.ingestSourceUrl).hostname
-                  : s.slug
-              }
+              author={author}
+              source={s.source ?? "seeded"}
               steps={stepRows}
               leadName={lead}
-              leadAvatar={lead[0]}
-              footerMeta={`${stepObjs.length} steps`}
               ctaLabel="套用"
               onCtaClick={() => navigate(`/methodology/${s.slug}`)}
               onClick={() => navigate(`/methodology/${s.slug}`)}

@@ -1,220 +1,237 @@
 /**
- * MethodologyCard — rack-card primitive for the new Marketing-OS shell.
+ * MethodologyCard v2 — rack-card primitive for METHODOLOGIES only.
  *
- * Strict adherence to the reference rack-card (Sprint 1 D1, CJ direction
- * 2026-04-25). Each card is one of three colour systems (teal / red / blue)
- * and renders a fixed five-zone composition:
+ * Reference: Dreamstime rack-card mock provided by CJ 2026-04-25.
+ * Decisions locked in same convo:
+ *   1. Colour = MosLayer L1-L6 (not the legacy 3-accent system).
+ *      Each strategy layer has its own palette, see tokens.LAYER_TOKENS.
+ *   2. Hero zone = abstract MethodologyGlyph (algorithmic SVG, no photos).
+ *   3. Methodology card and Mission card are SEPARATE components — this
+ *      one is methodology-only.  Use <MissionCard> for missions.
+ *   4. Eyebrow `L1 · 品牌策略` lives top-left so users can see all 6 layers
+ *      exist as they scroll the catalog.
+ *   5. Source flag (seeded / ingested / forked) sits in the dark footer's
+ *      eyebrow line: `L1 · BRAND · SEEDED`.
  *
- *   1. Brand monogram + category eyebrow (top-left)
- *   2. Organic teardrop hero shape with optional cover image (top-right)
- *   3. Coloured pill that holds the methodology title (mid)
- *   4. "OUR STEPS / 我的服務" 4-row list with circular icons + descriptions
- *   5. Dark CONTACT footer with lead avatar + run-count + CTA pill
+ * Composition (top → bottom):
+ *   ▸ Hairline header band — monogram + L_-eyebrow + accent ribbon
+ *   ▸ Glyph hero zone — soft tinted square with the abstract glyph
+ *   ▸ Title bar — coloured pill carrying the methodology name
+ *   ▸ Author / year sub-line
+ *   ▸ Steps list — circular numbered glyphs with name + skill
+ *   ▸ Dark contact bar — layer chip + author + step count + CTA
  *
- * No emoji. Editorial typography. The card is a vertical 5×7 ratio so
- * 3 fit side-by-side on desktop, 1 wide on mobile. Used by both the
- * MissionsHome wall and the MethodologyGrid swap drawer.
+ * Width: 320px (rack-card 5:7.4). Three fit per row at 1280+.
  */
 
 import React from "react";
-import type { MosAccent } from "../../../studio/primitives/tokens";
-import { ACCENTS } from "../../../studio/primitives/tokens";
+import {
+  LAYER_TOKENS,
+  resolveLayer,
+  type MosLayer,
+} from "../../../studio/primitives/tokens";
+import MethodologyGlyph from "./MethodologyGlyph";
 
 export interface MethodologyStep {
   name: string;
   desc?: string;
-  /** Optional emoji or single character glyph rendered inside the circle. */
   glyph?: string;
 }
 
 export interface MethodologyCardProps {
-  accent: MosAccent;
-  /** small uppercase eyebrow above the title pill — "L1 · 品牌策略" */
-  category: string;
-  /** Brand or methodology monogram, top-left of card. e.g. "SOWORK" */
-  monogram?: string;
-  /** Methodology title shown inside the colour pill. */
+  /** Layer key — drives colour. Accepts "L1"..."L6" or label strings. */
+  layer?: string | MosLayer | null;
+  /** Stable seed for the hero glyph variant — pass squad slug. */
+  seed?: string | number;
+  /** Title shown inside the colour pill. */
   title: string;
-  /** Author / year — small caps under the title pill. */
-  author?: string;
-  /** Cover image rendered inside the organic teardrop hero. */
-  imageUrl?: string;
-  /** Up to 5 steps — extra are truncated to keep the rack-card rhythm. */
+  /** Author / year — e.g. "Carol Pearson · 2001". */
+  author?: string | null;
+  /** Source — "seeded" | "ingested" | "forked" | "mine". Shown in footer. */
+  source?: string | null;
+  /** Up to 4 steps. Beyond that we show "+N more". */
   steps?: MethodologyStep[];
-  /** Lead agent name shown in the dark footer. */
-  leadName?: string;
-  /** Lead agent avatar URL or single-letter initial fallback. */
-  leadAvatar?: string;
-  /** Right-hand small line — "5 steps · ~20 min" or "已執行 12 次". */
-  footerMeta?: string;
-  /** CTA pill label. Default 套用. */
+  /** Lead agent name in footer (no avatar — just text). */
+  leadName?: string | null;
+  /** Right-side CTA pill. */
   ctaLabel?: string;
   onCtaClick?: () => void;
-  /** Whole-card click — separate from CTA so the CTA can stop propagation. */
+  /** Whole-card click. */
   onClick?: () => void;
-  /** Compact = removes some vertical padding for grid density. */
-  compact?: boolean;
-  /** Variant index 0-2 picks one of three asymmetric blob shapes. */
-  variantIndex?: number;
   className?: string;
 }
 
-const BLOBS = ["clip-blob-a", "clip-blob-b", "clip-blob-c"] as const;
-
 export default function MethodologyCard({
-  accent,
-  category,
-  monogram = "SOWORK",
+  layer,
+  seed,
   title,
   author,
-  imageUrl,
+  source,
   steps = [],
   leadName,
-  leadAvatar,
-  footerMeta,
   ctaLabel = "套用",
   onCtaClick,
   onClick,
-  compact = false,
-  variantIndex = 0,
   className = "",
 }: MethodologyCardProps) {
-  const tone = ACCENTS[accent];
-  const blob = BLOBS[variantIndex % BLOBS.length];
-  const visibleSteps = steps.slice(0, 4);
-  const initial = leadAvatar && leadAvatar.length === 1 ? leadAvatar : null;
+  const lk: MosLayer = resolveLayer(layer ?? null);
+  const tone = LAYER_TOKENS[lk];
+  const visible = steps.slice(0, 4);
+  const overflowCount = Math.max(0, steps.length - visible.length);
+  const sourceLabel = (source ?? "seeded").toUpperCase();
 
   return (
-    <div
+    <article
       onClick={onClick}
       className={[
-        "group relative flex flex-col overflow-hidden",
-        "bg-white border border-mos-hair shadow-card",
+        "group relative flex flex-col w-[320px] bg-white",
+        "border border-mos-hair shadow-card overflow-hidden",
         "transition-shadow duration-200",
         onClick ? "cursor-pointer hover:shadow-lift" : "",
-        // 5:7 rack-card ratio. Width capped so 3 fit per row at 1280+.
-        compact ? "w-[300px]" : "w-[320px]",
         className,
       ].join(" ")}
-      style={{ aspectRatio: compact ? "5 / 7" : "5 / 7.4" }}
+      style={{ aspectRatio: "5 / 7.4" }}
     >
-      {/* ────────────────────── ZONE 1+2: Header band ────────────────────── */}
-      <div className="relative px-5 pt-5 pb-2">
-        <div className="font-display text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft">
-          {monogram}
+      {/* ── HEADER: monogram + eyebrow + accent ribbon ─────────────── */}
+      <header className="relative px-5 pt-4 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block w-3.5 h-3.5"
+                style={{ background: tone.bg }}
+                aria-hidden
+              />
+              <span className="font-display text-[0.62rem] tracking-[0.28em] uppercase text-mos-ink">
+                {lk}
+              </span>
+            </div>
+            <div className="mt-1 text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted">
+              {tone.shortLabel} · {tone.label}
+            </div>
+          </div>
+          <div
+            className="font-display text-[0.6rem] tracking-[0.32em] uppercase text-mos-soft"
+            aria-hidden
+          >
+            METHOD
+          </div>
         </div>
-        <div className="mt-1 text-[0.66rem] tracking-[0.2em] uppercase text-mos-muted">
-          {category}
-        </div>
-
-        {/* Organic teardrop hero — absolute, top-right of header */}
+        {/* hairline ribbon under header */}
         <div
-          className={`absolute right-3 top-3 w-[120px] h-[120px] ${blob} overflow-hidden`}
-          style={{ background: tone.bg }}
-        >
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt=""
-              className="w-full h-full object-cover mix-blend-multiply opacity-95"
+          className="absolute left-0 right-0 bottom-0 h-[2px]"
+          style={{
+            background: `linear-gradient(90deg, ${tone.bg} 0%, ${tone.bg} 38%, transparent 38%, transparent 100%)`,
+          }}
+        />
+      </header>
+
+      {/* ── HERO: glyph in tinted square ──────────────────────────── */}
+      <div className="relative px-5 pt-4">
+        <div className="relative w-full" style={{ aspectRatio: "5 / 3" }}>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <MethodologyGlyph
+              seed={seed ?? title}
+              layer={lk}
+              size={148}
+              withBackground
             />
-          ) : (
-            <div
-              className="w-full h-full"
-              style={{
-                background: `linear-gradient(135deg, ${tone.bg} 0%, ${tone.bgInk} 100%)`,
-              }}
-            />
-          )}
+          </div>
+          {/* faint corner mark */}
+          <div className="absolute top-1 right-1 text-[0.56rem] tracking-[0.28em] uppercase text-mos-soft">
+            {String((typeof seed === "string" ? hashStr(seed) : (seed ?? 0)) % 100).padStart(2, "0")}
+          </div>
         </div>
       </div>
 
-      {/* ────────────────────────── ZONE 3: Title pill ───────────────────── */}
-      <div className="px-5 pt-16">
+      {/* ── TITLE pill ────────────────────────────────────────────── */}
+      <div className="px-5 pt-4">
         <div
-          className="inline-block px-4 py-2 max-w-[88%]"
+          className="inline-block px-3.5 py-2 max-w-[92%]"
           style={{ background: tone.bg }}
         >
-          <div className="font-display text-white text-[1.05rem] leading-tight tracking-[-0.005em]">
+          <h3 className="font-display text-white text-[1.04rem] leading-[1.2] tracking-[-0.01em]">
             {title}
-          </div>
+          </h3>
         </div>
         {author && (
-          <div className="mt-2 text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted">
+          <div className="mt-1.5 text-[0.7rem] tracking-[0.06em] text-mos-muted">
             {author}
           </div>
         )}
       </div>
 
-      {/* ─────────────────────────── ZONE 4: Steps ───────────────────────── */}
+      {/* ── STEPS list ────────────────────────────────────────────── */}
       <div className="px-5 pt-4 pb-3 flex-1">
-        <div className="text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft mb-3">
-          我的服務 · OUR STEPS
+        <div className="text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft mb-2.5">
+          工作流 · OUR STEPS
         </div>
-        <ul className="space-y-2.5">
-          {visibleSteps.length === 0 && (
-            <li className="text-[0.78rem] text-mos-soft italic">
+        <ul className="space-y-2">
+          {visible.length === 0 && (
+            <li className="text-[0.76rem] text-mos-soft italic">
               尚未設定執行流程
             </li>
           )}
-          {visibleSteps.map((s, i) => (
+          {visible.map((s, i) => (
             <li key={i} className="flex items-start gap-2.5">
               <span
-                className="mt-[1px] inline-flex w-6 h-6 items-center justify-center rounded-full text-white text-[0.65rem] font-display tracking-[0.04em] shrink-0"
+                className="mt-[1px] inline-flex w-5 h-5 items-center justify-center rounded-full text-white text-[0.62rem] font-display shrink-0"
                 style={{ background: tone.bg }}
               >
                 {s.glyph ?? `0${i + 1}`}
               </span>
               <span className="flex-1 min-w-0">
-                <span className="block text-[0.82rem] leading-tight text-mos-ink font-medium">
+                <span className="block text-[0.8rem] leading-tight text-mos-ink font-medium">
                   {s.name}
                 </span>
                 {s.desc && (
-                  <span className="block mt-0.5 text-[0.7rem] leading-snug text-mos-muted truncate">
+                  <span className="block mt-0.5 text-[0.68rem] leading-snug text-mos-muted truncate">
                     {s.desc}
                   </span>
                 )}
               </span>
             </li>
           ))}
+          {overflowCount > 0 && (
+            <li className="text-[0.66rem] tracking-[0.14em] uppercase text-mos-soft pl-7">
+              + {overflowCount} more
+            </li>
+          )}
         </ul>
       </div>
 
-      {/* ───────────────────────── ZONE 5: CONTACT footer ────────────────── */}
-      <div className="mt-auto bg-mos-ink text-white px-5 py-3 flex items-center gap-3">
-        {/* Avatar circle */}
-        <div
-          className="w-9 h-9 rounded-full flex items-center justify-center font-display text-[0.78rem] shrink-0"
-          style={{ background: tone.bg }}
-        >
-          {leadAvatar && !initial ? (
-            <img src={leadAvatar} alt="" className="w-full h-full rounded-full object-cover" />
-          ) : (
-            <span>{initial ?? (leadName?.[0] ?? "·")}</span>
-          )}
-        </div>
-
+      {/* ── FOOTER: dark contact bar ──────────────────────────────── */}
+      <footer className="mt-auto bg-mos-ink text-white px-4 py-3 flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-[0.6rem] tracking-[0.28em] uppercase text-white/60">
-            CONTACT
+          <div className="text-[0.58rem] tracking-[0.28em] uppercase text-white/55">
+            {lk} · {tone.shortLabel} · {sourceLabel}
           </div>
-          <div className="text-[0.82rem] truncate text-white">
+          <div className="mt-0.5 text-[0.78rem] truncate text-white">
             {leadName ?? "Squad Lead"}
           </div>
-          {footerMeta && (
-            <div className="text-[0.62rem] tracking-[0.1em] text-white/50 truncate">
-              {footerMeta}
+          {steps.length > 0 && (
+            <div className="text-[0.6rem] tracking-[0.1em] text-white/45">
+              {steps.length} steps
             </div>
           )}
         </div>
-
         <button
-          onClick={(e) => { e.stopPropagation(); onCtaClick?.(); }}
-          className="shrink-0 rounded-full px-3.5 py-1.5 text-[0.7rem] tracking-[0.14em] uppercase text-mos-ink bg-white hover:bg-white/90 transition"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCtaClick?.();
+          }}
+          className="shrink-0 rounded-full px-3.5 py-1.5 text-[0.7rem] tracking-[0.16em] uppercase font-medium hover:opacity-90 transition"
+          style={{ background: tone.bg, color: "#fff" }}
         >
           {ctaLabel}
         </button>
-      </div>
-    </div>
+      </footer>
+    </article>
   );
+}
+
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
 }

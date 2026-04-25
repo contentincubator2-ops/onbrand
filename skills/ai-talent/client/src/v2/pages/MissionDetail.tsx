@@ -274,20 +274,17 @@ export default function MissionDetail() {
       <aside className="col-span-3 flex justify-end">
         {sq ? (
           <MethodologyCard
-            accent={accent}
-            variantIndex={Number(sq.id ?? id)}
-            monogram={(sq.tier || "L?").toUpperCase()}
-            category={(sq.strategyLayer || "LAYER") + " · " + (sq.source ?? "seeded").toUpperCase()}
+            layer={sq.strategyLayer ?? sq.tier ?? null}
+            seed={sq.slug ?? sq.id ?? id}
             title={sq.name ?? sq.slug}
-            author={sq.methodology?.author ?? sq.slug}
+            author={sq.methodology?.author ? `${sq.methodology.author}${sq.methodology?.year ? " · " + sq.methodology.year : ""}` : null}
+            source={sq.source ?? "seeded"}
             steps={draft.slice(0, 4).map((s, idx) => ({
               name: s.name,
               desc: s.requiredSkill ?? s.outputType ?? "",
               glyph: `0${idx + 1}`,
             }))}
             leadName={sq.lead?.name ?? "Squad Lead"}
-            leadAvatar={(sq.lead?.name ?? "S")[0]}
-            footerMeta={`${draft.length} steps`}
             ctaLabel="預覽"
             onCtaClick={() => navigate(`/methodology/${sq.slug}`)}
           />

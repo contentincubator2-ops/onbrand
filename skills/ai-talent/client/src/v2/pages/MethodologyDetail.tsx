@@ -144,20 +144,17 @@ export default function MethodologyDetail() {
 
         <aside className="col-span-5 flex justify-end">
           <MethodologyCard
-            accent={accent}
-            variantIndex={Number(s.id ?? 0)}
-            monogram={(s.tier || "L?").toUpperCase()}
-            category={(s.strategyLayer || "LAYER") + " · " + (s.source ?? "seeded").toUpperCase()}
+            layer={s.strategyLayer ?? s.tier ?? null}
+            seed={s.slug ?? s.id ?? 0}
             title={s.name ?? s.slug}
-            author={s.methodology?.author ?? s.slug}
+            author={s.methodology?.author ? `${s.methodology.author}${s.methodology?.year ? " · " + s.methodology.year : ""}` : null}
+            source={s.source ?? "seeded"}
             steps={stepObjs.slice(0, 4).map((st: any, idx: number) => ({
               name: st.name ?? `Step ${idx + 1}`,
               desc: st.requiredSkill ?? st.outputType ?? "",
               glyph: `0${idx + 1}`,
             }))}
             leadName={s.lead?.name ?? "Squad Lead"}
-            leadAvatar={(s.lead?.name ?? "S")[0]}
-            footerMeta={`${stepObjs.length} steps`}
             ctaLabel={busy ? "建立中…" : "套用"}
             onCtaClick={() => applyToNewMission(s)}
           />

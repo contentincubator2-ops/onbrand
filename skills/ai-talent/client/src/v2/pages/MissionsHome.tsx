@@ -8,8 +8,8 @@
 import React, { useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
-import MethodologyCard from "../components/methodology/MethodologyCard";
-import { accentForIndex } from "../../studio/primitives/tokens";
+import MissionCard from "../components/mission/MissionCard";
+import LayerLegend from "../components/methodology/LayerLegend";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 interface MissionRow {
@@ -19,6 +19,9 @@ interface MissionRow {
   workspace?: string | null;
   methodology?: string | null;
   squadSlug?: string | null;
+  squadName?: string | null;
+  squadLayer?: string | null;
+  squadStepCount?: number | null;
   brandId?: number | null;
   status?: string | null;
   brandName?: string | null;
@@ -152,53 +155,28 @@ export default function MissionsHome() {
       )}
 
       {rows.length > 0 && (
-        <div className="flex flex-wrap gap-6">
-          {rows.map((m, i) => {
-            const accent = accentForIndex(i);
-            const methodologyLabel = (m.methodology || "").trim();
-            const brandTag = (m.brandName ?? "SOWORK").toUpperCase().slice(0, 14);
-            const wsLabel = m.workspace ? m.workspace.toUpperCase() : "WORKSPACE";
-            const statusLabel = m.status === "completed" ? "已完成" : "進行中";
-
-            return (
-              <MethodologyCard
+        <>
+          <LayerLegend className="mb-6" />
+          <div className="flex flex-wrap gap-6">
+            {rows.map((m) => (
+              <MissionCard
                 key={m.id}
-                accent={accent}
-                variantIndex={i}
-                monogram={brandTag}
-                category={`${wsLabel} · ${statusLabel}`}
                 title={m.title}
-                author={
-                  methodologyLabel
-                    ? `方法論 · ${methodologyLabel}`
-                    : m.squadSlug
-                    ? `Squad · ${m.squadSlug}`
-                    : "尚未挑選方法論"
-                }
-                steps={
-                  m.description
-                    ? [
-                        { name: "任務需求", desc: m.description.slice(0, 60), glyph: "01" },
-                        { name: "方法論套用", desc: methodologyLabel || "尚未挑選", glyph: "02" },
-                        { name: "Squad 執行", desc: m.squadSlug || "待派工", glyph: "03" },
-                        { name: "成果交付", desc: "等待產出", glyph: "04" },
-                      ]
-                    : []
-                }
-                leadName={m.brandName ?? "Squad Lead"}
-                leadAvatar={(m.brandName ?? "S")[0].toUpperCase()}
-                footerMeta={
-                  m.updatedAt
-                    ? `更新 · ${new Date(m.updatedAt).toLocaleDateString("zh-TW")}`
-                    : undefined
-                }
-                ctaLabel="進入"
-                onCtaClick={() => goToMission(m)}
+                brief={m.description ?? null}
+                brandName={m.brandName ?? null}
+                workspace={m.workspace ?? null}
+                status={m.status ?? "active"}
+                methodologySlug={m.squadSlug ?? null}
+                methodologyName={m.squadName ?? m.methodology ?? m.squadSlug ?? null}
+                methodologyLayer={m.squadLayer ?? null}
+                stepCount={m.squadStepCount ?? null}
+                lastUpdated={m.updatedAt ?? null}
                 onClick={() => goToMission(m)}
+                onCtaClick={() => goToMission(m)}
               />
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </main>
   );
