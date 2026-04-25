@@ -129,7 +129,7 @@ export default function TemplateRackPage() {
               action={
                 <button
                   onClick={() =>
-                    navigate(`/studio/${brandId}/session/new`, {
+                    navigate(`/studio/${brandId}/session/${r.squadSlug}`, {
                       state: {
                         squadSlug: r.squadSlug,
                         squadId: r.squadId,

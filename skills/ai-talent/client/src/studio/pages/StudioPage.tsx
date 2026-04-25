@@ -29,13 +29,21 @@ interface LocationState {
 }
 
 export default function StudioPage() {
-  const { brandId } = useParams<{ brandId: string }>();
+  const { brandId, sessionId } = useParams<{ brandId: string; sessionId: string }>();
   const navigate = useNavigate();
   const loc = useLocation();
   const state = (loc.state as LocationState | null) ?? null;
 
+  // The :sessionId URL segment can be:
+  //   - "new" (legacy — no squad info, only state has it)
+  //   - a numeric squadId
+  //   - a squad slug (canonical going forward — survives reload + sharing)
+  const sidIsNumeric = !!sessionId && /^\d+$/.test(sessionId);
+  const sidIsSlug = !!sessionId && !sidIsNumeric && sessionId !== "new";
+
   const accent: MosAccent = state?.accent ?? "red";
-  const squadId = state?.squadId;
+  const squadId = state?.squadId ?? (sidIsNumeric ? Number(sessionId) : undefined);
+  const squadSlug = state?.squadSlug ?? (sidIsSlug ? sessionId : undefined);
   const brandIdNum = Number(brandId);
 
   const brandQuery = trpc.brand.get.useQuery(
@@ -48,8 +56,8 @@ export default function StudioPage() {
   );
   const squad = useMemo(() => {
     const all = (squadsQuery.data as any[]) ?? [];
-    return all.find((s: any) => s.id === squadId || s.slug === state?.squadSlug);
-  }, [squadsQuery.data, squadId, state?.squadSlug]);
+    return all.find((s: any) => s.id === squadId || s.slug === squadSlug);
+  }, [squadsQuery.data, squadId, squadSlug]);
 
   const steps = useMemo(() => {
     const raw = squad?.steps ?? squad?.workflow_steps ?? [];
