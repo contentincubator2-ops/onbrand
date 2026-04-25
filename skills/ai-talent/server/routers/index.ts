@@ -32,6 +32,7 @@ import { templateRouter } from "./templateRouter";
 import { boardRouter } from "./boardRouter";
 import { calendarRouter } from "./calendarRouter";
 import { imageRouter } from "./imageRouter";
+import { methodologyRouter } from "./methodologyRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -67,6 +68,7 @@ export const appRouter = router({
   board:         boardRouter,
   calendar:      calendarRouter,
   image:         imageRouter,
+  methodology:   methodologyRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -27,6 +27,30 @@ export const missionRouter = router({
       return db.select().from(missions).where(and(...conditions)).orderBy(desc(missions.updatedAt));
     }),
 
+  // List ALL missions for the current user across every brand. Powers the
+  // new MissionsHome (任務牆) — Sprint 1 D1. Returns mission rows joined
+  // with brand name + squad slug so the rack-card can render without an
+  // extra round-trip per card.
+  listAllForUser: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.execute(sql`
+        SELECT m.id, m.title, m.description, m.workspace, m.methodology,
+               m.squad_slug AS squadSlug, m.brand_id AS brandId,
+               m.status, m.updated_at AS updatedAt,
+               b.name AS brandName
+          FROM missions m
+          LEFT JOIN brands b ON b.id = m.brand_id
+         WHERE m.user_id = ${ctx.user.id}
+         ORDER BY m.updated_at DESC
+         LIMIT 60
+      `);
+      // drizzle returns [rows, fields] for raw execute on mysql2
+      const data = Array.isArray(rows) ? rows[0] : (rows as any).rows ?? rows;
+      return Array.isArray(data) ? data : [];
+    }),
+
   // List all missions for a brand across all workspaces
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))

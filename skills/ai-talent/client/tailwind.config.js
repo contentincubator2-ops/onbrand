@@ -73,6 +73,20 @@ export default {
         ".clip-notch-bl": {
           clipPath: "polygon(0 0, 100% 0, 100% 100%, 18% 100%, 0 82%)",
         },
+        // Organic teardrop / leaf hero for the methodology rack-card.
+        // Matches the reference: rounded top-left, sharp pointed bottom-right.
+        ".clip-blob-a": {
+          clipPath:
+            "path('M 20 0 C 130 0, 230 30, 240 110 C 248 180, 200 240, 110 250 C 40 256, 0 200, 0 130 C 0 60, 0 0, 20 0 Z')",
+        },
+        ".clip-blob-b": {
+          clipPath:
+            "path('M 0 30 C 0 0, 70 0, 140 0 C 220 0, 250 60, 240 140 C 232 210, 170 250, 90 248 C 30 246, 0 200, 0 130 Z')",
+        },
+        ".clip-blob-c": {
+          clipPath:
+            "path('M 30 0 C 120 0, 250 20, 245 120 C 240 220, 160 250, 90 245 C 20 240, 0 180, 0 100 C 0 40, 0 0, 30 0 Z')",
+        },
       });
     },
   ],

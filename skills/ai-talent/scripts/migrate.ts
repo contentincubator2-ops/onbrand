@@ -504,6 +504,72 @@ async function main() {
     `);
     console.log("[migrate] generated_images: OK");
 
+    // ─── Methodology provenance (Sprint 1, 2026-04-25) ─────────────────────
+    // Adds the columns that turn squads.* into a versioned methodology
+    // graph: every squad knows where it came from (seeded / ingested
+    // from a URL / forked from another squad), who created it, and
+    // what its parent is. Powers MethodologyCatalog source pills,
+    // the IngestDrawer, and the Hermes-style "save as new methodology"
+    // flow on MissionDetail dirty edits.
+    const wantsCol = async (col: string): Promise<boolean> => {
+      const [r] = await conn.execute(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'squads' AND COLUMN_NAME = ?`,
+        [col]
+      ) as any;
+      return (r as any[]).length === 0;
+    };
+    if (await wantsCol("source")) {
+      await conn.execute(`
+        ALTER TABLE squads
+          ADD COLUMN source ENUM('seeded','ingested','forked')
+            CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            NOT NULL DEFAULT 'seeded'
+      `);
+      await conn.execute(`CREATE INDEX idx_squads_source ON squads(source)`);
+      console.log("[migrate] squads.source: added (default 'seeded')");
+    } else {
+      console.log("[migrate] squads.source: already exists, skipped");
+    }
+    if (await wantsCol("parent_squad_id")) {
+      await conn.execute(`ALTER TABLE squads ADD COLUMN parent_squad_id INT NULL`);
+      await conn.execute(`CREATE INDEX idx_squads_parent ON squads(parent_squad_id)`);
+      console.log("[migrate] squads.parent_squad_id: added");
+    } else {
+      console.log("[migrate] squads.parent_squad_id: already exists, skipped");
+    }
+    if (await wantsCol("created_by_user_id")) {
+      await conn.execute(`ALTER TABLE squads ADD COLUMN created_by_user_id INT NULL`);
+      await conn.execute(`CREATE INDEX idx_squads_creator ON squads(created_by_user_id)`);
+      console.log("[migrate] squads.created_by_user_id: added");
+    } else {
+      console.log("[migrate] squads.created_by_user_id: already exists, skipped");
+    }
+    if (await wantsCol("ingest_source_url")) {
+      await conn.execute(`ALTER TABLE squads ADD COLUMN ingest_source_url VARCHAR(1024) NULL`);
+      console.log("[migrate] squads.ingest_source_url: added");
+    } else {
+      console.log("[migrate] squads.ingest_source_url: already exists, skipped");
+    }
+
+    // squad_ingest_jobs — async ingest log so users can retry / audit.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS squad_ingest_jobs (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        userId        INT NOT NULL,
+        sourceUrl     VARCHAR(1024) NOT NULL,
+        status        ENUM('pending','extracting','reviewing','done','failed') NOT NULL DEFAULT 'pending',
+        extracted     LONGTEXT NULL,
+        squadId       INT NULL,
+        errorMsg      TEXT NULL,
+        createdAt     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_user (userId),
+        INDEX idx_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] squad_ingest_jobs: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

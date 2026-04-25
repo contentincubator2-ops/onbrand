@@ -4,7 +4,12 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { trpc, trpcClient } from "./lib/trpc";
 import { ToastProvider } from "./components/ui/Toast";
+// v2 frontend rebuild — Sprint 1 (2026-04-25). The legacy App is kept on
+// disk for one cycle then removed. Flip USE_V2 to false to fall back.
 import App from "./App";
+import AppV2 from "./v2/app/AppV2";
+const USE_V2 = true;
+const RootApp = USE_V2 ? AppV2 : App;
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -58,7 +63,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
           <QueryClientProvider client={queryClient}>
             <BrowserRouter>
-              <App />
+              <RootApp />
             </BrowserRouter>
           </QueryClientProvider>
         </trpc.Provider>
