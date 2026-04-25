@@ -551,6 +551,18 @@ async function main() {
     } else {
       console.log("[migrate] squads.ingest_source_url: already exists, skipped");
     }
+    if (await wantsCol("hero_image_url")) {
+      await conn.execute(`ALTER TABLE squads ADD COLUMN hero_image_url VARCHAR(1024) NULL`);
+      console.log("[migrate] squads.hero_image_url: added");
+    } else {
+      console.log("[migrate] squads.hero_image_url: already exists, skipped");
+    }
+    if (await wantsCol("hero_image_prompt")) {
+      await conn.execute(`ALTER TABLE squads ADD COLUMN hero_image_prompt TEXT NULL`);
+      console.log("[migrate] squads.hero_image_prompt: added");
+    } else {
+      console.log("[migrate] squads.hero_image_prompt: already exists, skipped");
+    }
 
     // squad_ingest_jobs — async ingest log so users can retry / audit.
     await conn.execute(`
