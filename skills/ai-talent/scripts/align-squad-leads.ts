@@ -62,6 +62,7 @@ interface AgentRow {
   title: string | null;
   primarySkill: string | null;
   rating: number | null;
+  workspace: any;
 }
 
 interface Candidate {
@@ -140,12 +141,45 @@ function scoreAgent(squad: SquadRow, agent: AgentRow, stepRequiredSkill: string 
     }
   }
 
-  // 5) Tiny rating bonus to break ties
+  // 5) Workspace overlap — agent and squad share at least one workspace tag.
+  //    Strong signal for author-named methodology squads (e.g. fb-hormozi-offer-first
+  //    has ws=facebook; an agent tagged ["facebook"] is contextually correct).
+  const sqWs = workspaceTokens(squad.workspace);
+  const agWs = workspaceTokens(agent.workspace);
+  if (sqWs.size > 0 && agWs.size > 0) {
+    const shared: string[] = [];
+    for (const w of sqWs) if (agWs.has(w)) shared.push(w);
+    if (shared.length > 0) {
+      score += 25;
+      reasons.push(`workspace=[${shared.join(",")}](+25)`);
+    }
+  }
+
+  // 6) Tiny rating bonus to break ties
   if (typeof agent.rating === "number") {
     score += Math.min(3, agent.rating / 2);
   }
 
   return { agent, score, reasons };
+}
+
+/** Pull tokens out of a workspace JSON value. Accepts string, array, or JSON-string. */
+function workspaceTokens(ws: unknown): Set<string> {
+  const out = new Set<string>();
+  if (ws === null || ws === undefined) return out;
+  let v: any = ws;
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (s.startsWith("[") || s.startsWith("\"")) {
+      try { v = JSON.parse(s); } catch { /* fall through */ }
+    }
+  }
+  if (Array.isArray(v)) {
+    for (const t of v) if (typeof t === "string" && t.trim()) out.add(t.trim().toLowerCase());
+  } else if (typeof v === "string" && v.trim()) {
+    out.add(v.trim().toLowerCase());
+  }
+  return out;
 }
 
 function step1Skill(steps: any[]): string | null {
@@ -217,8 +251,9 @@ async function loadCandidateAgents(pool: Pool): Promise<AgentRow[]> {
   // Agents that have a meaningful primarySkill. We scan all of them and let
   // the scoring filter; this is ~13k rows but fits comfortably in memory.
   const [rows] = await pool.execute(
-    `SELECT id, name, title, primarySkill, rating FROM agents
-      WHERE primarySkill IS NOT NULL AND primarySkill != '' AND primarySkill != 'general'`
+    `SELECT id, name, title, primarySkill, rating, workspace FROM agents
+      WHERE primarySkill IS NOT NULL AND primarySkill != '' AND primarySkill != 'general'
+        AND COALESCE(isAvailable, 1) = 1`
   ) as any[];
   return rows as AgentRow[];
 }
