@@ -420,4 +420,131 @@ export const methodologyRouter = router({
       const rows = Array.isArray(r) ? r[0] : (r as any).rows ?? r;
       return Array.isArray(rows) ? rows : [];
     }),
+
+  // ── AI methodology recommender ───────────────────────────────────────
+  // Given a mission (title + description + workspace), return 3-6 ranked
+  // methodology candidates with one-line rationale each, so the user can
+  // one-click apply instead of scrolling through the catalog.
+  //
+  // Product principle: every step is AI-first, user only confirms.
+  recommend: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      // Load mission (must belong to the caller)
+      const mr: any = await db.execute(sql`
+        SELECT id, title, description, workspace, methodology, squadSlug
+          FROM missions
+         WHERE id=${input.missionId} AND userId=${ctx.user.id}
+         LIMIT 1
+      `);
+      const missionRows = Array.isArray(mr) ? mr[0] : (mr as any).rows ?? mr;
+      const mission = (missionRows as any[])?.[0];
+      if (!mission) throw new Error("Mission not found");
+
+      // Load all active squad methodologies (cap 200 — plenty for ranking)
+      const sr: any = await db.execute(sql`
+        SELECT id, slug, name, description, methodology, tier, strategy_layer AS strategyLayer, source
+          FROM squads
+         WHERE is_active=1
+         ORDER BY id ASC LIMIT 200
+      `);
+      const squadRows = Array.isArray(sr) ? sr[0] : (sr as any).rows ?? sr;
+      const squads: any[] = Array.isArray(squadRows) ? squadRows : [];
+      if (squads.length === 0) return { recommendations: [] };
+
+      // Build a compact catalog string for the LLM
+      const catalog = squads
+        .map((s) => {
+          const auth =
+            (s.methodology && typeof s.methodology === "object"
+              ? (s.methodology as any).author
+              : null) ?? "";
+          const desc = (s.description ?? "").toString().slice(0, 200);
+          return `- slug=${s.slug} | layer=${s.strategyLayer ?? "?"} | ${s.name}${
+            auth ? ` (${auth})` : ""
+          } — ${desc}`;
+        })
+        .join("\n");
+
+      const sys = `You are SoWork Marketing OS's strategic advisor. The user has a marketing mission and you must pick the 5 best methodology squads from the catalog below.
+
+For EACH pick return a JSON object: { slug, rationale }. The rationale is ONE Traditional Chinese sentence (≤ 50 chars) explaining why this methodology fits THIS specific mission — be concrete, reference the mission's goal/audience.
+
+Output STRICT JSON: { "recommendations": [ { "slug": "...", "rationale": "..." }, ... ] }
+- Pick 3 to 6 (prefer 5).
+- Order by best fit first.
+- Slugs must come EXACTLY from the catalog (no invention).
+- If the mission is about brand positioning, lean L1; product, L2; audience, L3; channel content, L4; campaign launch, L5; auditing, L6.
+
+CATALOG:
+${catalog}`;
+
+      const userMsg = `MISSION
+標題：${mission.title}
+${mission.description ? `說明：${mission.description}\n` : ""}${mission.workspace ? `工作區：${mission.workspace}\n` : ""}
+請從上面 catalog 挑出最適合的 5 個 methodology slug，附上一句中文 rationale。`;
+
+      // Call LLM. Give it room to think — many squads.
+      let parsed: { recommendations: Array<{ slug: string; rationale: string }> } = {
+        recommendations: [],
+      };
+      try {
+        const result = await invokeLLM({
+          messages: [
+            { role: "system", content: sys },
+            { role: "user", content: userMsg },
+          ],
+          response_format: { type: "json_object" },
+          maxTokens: 1024,
+        });
+        const content = result.choices?.[0]?.message?.content;
+        const text =
+          typeof content === "string"
+            ? content
+            : Array.isArray(content)
+            ? content
+                .map((p: any) => (p?.type === "text" ? p.text : ""))
+                .join("")
+            : "";
+        const j = JSON.parse(text);
+        if (j && Array.isArray(j.recommendations)) parsed = j;
+      } catch (e) {
+        // Fall back to a deterministic top-5 by id so the UI still renders
+        parsed = {
+          recommendations: squads.slice(0, 5).map((s) => ({
+            slug: s.slug,
+            rationale: "（AI 暫時無法評分，這是 catalog 預設前五名）",
+          })),
+        };
+      }
+
+      // Hydrate each recommendation with full squad info
+      const bySlug = new Map<string, any>(squads.map((s) => [s.slug, s]));
+      const enriched = parsed.recommendations
+        .map((r) => {
+          const sq = bySlug.get(r.slug);
+          if (!sq) return null;
+          const author =
+            sq.methodology && typeof sq.methodology === "object"
+              ? (sq.methodology as any).author
+              : null;
+          return {
+            slug: sq.slug,
+            id: sq.id,
+            name: sq.name,
+            description: sq.description ?? "",
+            tier: sq.tier ?? null,
+            strategyLayer: sq.strategyLayer ?? null,
+            source: sq.source ?? "seeded",
+            author: author ?? null,
+            rationale: r.rationale,
+          };
+        })
+        .filter(Boolean);
+
+      return { recommendations: enriched };
+    }),
 });

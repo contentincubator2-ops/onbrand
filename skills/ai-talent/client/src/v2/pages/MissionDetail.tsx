@@ -156,23 +156,15 @@ export default function MissionDetail() {
       {/* ── MIDDLE: Steps editor ─────────────────────────────────────── */}
       <section className="col-span-5 space-y-3">
         {!sq && !methodologyQuery.isLoading && (
-          <div className="border border-dashed border-mos-hair bg-white p-10 text-center">
-            <div className="text-[0.66rem] tracking-[0.22em] uppercase text-mos-soft mb-2">
-              METHODOLOGY · NONE
-            </div>
-            <h2 className="font-display text-[1.4rem] text-mos-ink mb-2">
-              這個任務還沒套用方法論
-            </h2>
-            <p className="text-[0.86rem] text-mos-muted mb-5">
-              從型錄選一張方法論卡片，squad 會自動接管步驟。
-            </p>
-            <button
-              onClick={onApplyMethodology}
-              className="px-5 py-2.5 text-[0.72rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition"
-            >
-              套用方法論 →
-            </button>
-          </div>
+          <RecommendationPanel
+            missionId={id}
+            onPick={async (slug) => {
+              await updateMission.mutateAsync({ id, squadSlug: slug });
+              await utils?.mission?.getById?.invalidate?.({ id });
+              missionQuery.refetch();
+            }}
+            onBrowseManually={onApplyMethodology}
+          />
         )}
 
         {methodologyQuery.isLoading && (
@@ -343,6 +335,159 @@ function BriefRow({ label, children }: { label: string; children: React.ReactNod
         {label}
       </div>
       <div className="text-[0.86rem] text-mos-body whitespace-pre-wrap">{children}</div>
+    </div>
+  );
+}
+
+// ── AI Methodology Recommendation Panel ────────────────────────────────
+//
+// Auto-fires methodology.recommend when shown, then renders the ranked
+// list. Each card has one-click "套用" so user doesn't have to think
+// about which methodology to pick — AI already ranked + rationalised.
+//
+// Product principle: AI does the work, user only confirms.
+function RecommendationPanel({
+  missionId,
+  onPick,
+  onBrowseManually,
+}: {
+  missionId: number;
+  onPick: (slug: string) => Promise<void>;
+  onBrowseManually: () => void;
+}) {
+  const recommendMut = (trpc as any).methodology.recommend.useMutation();
+  const [recs, setRecs] = useState<any[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [picking, setPicking] = useState<string | null>(null);
+  const [hasFired, setHasFired] = useState(false);
+
+  // Fire once on mount
+  useEffect(() => {
+    if (hasFired) return;
+    setHasFired(true);
+    (async () => {
+      try {
+        const res = await recommendMut.mutateAsync({ missionId });
+        setRecs(res?.recommendations ?? []);
+      } catch (e: any) {
+        // eslint-disable-next-line no-console
+        console.error("[RecommendationPanel] recommend failed:", e);
+        setErr(e?.message ?? String(e));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missionId]);
+
+  const isLoading = recommendMut.isPending || (!recs && !err);
+
+  const handlePick = async (slug: string) => {
+    if (picking) return;
+    setPicking(slug);
+    try {
+      await onPick(slug);
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.error("[RecommendationPanel] apply failed:", e);
+      setErr(`套用失敗：${e?.message ?? String(e)}`);
+    } finally {
+      setPicking(null);
+    }
+  };
+
+  return (
+    <div className="border border-mos-hair bg-white p-7">
+      <div className="flex items-end justify-between mb-5">
+        <div>
+          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft mb-1">
+            AI · METHODOLOGY MATCH
+          </div>
+          <h2 className="font-display text-[1.4rem] text-mos-ink tracking-[-0.015em]">
+            為這個任務挑了這幾個方法論
+          </h2>
+          <p className="mt-1 text-[0.78rem] text-mos-muted max-w-[420px]">
+            按你的任務說明排序。點「套用」一鍵接管步驟，不滿意可以再換。
+          </p>
+        </div>
+        <button
+          onClick={onBrowseManually}
+          className="text-[0.66rem] tracking-[0.18em] uppercase border border-mos-hair px-3 py-1.5 text-mos-muted hover:text-mos-ink hover:border-mos-ink transition"
+        >
+          自己挑 →
+        </button>
+      </div>
+
+      {isLoading && (
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="border border-mos-hair bg-mos-cream/50 h-[78px] animate-pulse" />
+          ))}
+          <div className="text-[0.74rem] text-mos-muted text-center mt-3">AI 配對中…</div>
+        </div>
+      )}
+
+      {err && !isLoading && (
+        <div className="text-[0.78rem] text-red-600 whitespace-pre-wrap">
+          推薦失敗：{err}
+        </div>
+      )}
+
+      {recs && recs.length === 0 && !isLoading && (
+        <div className="text-[0.82rem] text-mos-muted">
+          AI 沒挑出推薦（型錄可能空的）。你可以
+          <button
+            onClick={onBrowseManually}
+            className="ml-1 underline underline-offset-4 text-mos-ink"
+          >
+            自己挑一個
+          </button>
+          。
+        </div>
+      )}
+
+      {recs && recs.length > 0 && (
+        <ol className="space-y-2.5">
+          {recs.map((r: any, i: number) => (
+            <li
+              key={r.slug}
+              className="group border border-mos-hair bg-white hover:border-mos-ink transition"
+            >
+              <div className="flex items-stretch">
+                <div className="flex flex-col items-center justify-center w-12 bg-mos-cream/60 text-mos-soft border-r border-mos-hair">
+                  <span className="font-display text-[0.84rem] text-mos-ink">0{i + 1}</span>
+                </div>
+                <div className="flex-1 px-4 py-3.5">
+                  <div className="flex items-center gap-2 text-[0.62rem] tracking-[0.18em] uppercase text-mos-soft mb-0.5">
+                    <span>{r.strategyLayer ?? "LAYER"}</span>
+                    <span>·</span>
+                    <span>{(r.source ?? "seeded").toUpperCase()}</span>
+                    {r.author && (
+                      <>
+                        <span>·</span>
+                        <span className="normal-case tracking-normal text-mos-muted">{r.author}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="font-display text-[1rem] text-mos-ink leading-tight">
+                    {r.name}
+                  </div>
+                  {r.rationale && (
+                    <div className="mt-1 text-[0.8rem] text-mos-body leading-snug">
+                      {r.rationale}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => handlePick(r.slug)}
+                  disabled={!!picking}
+                  className="px-5 text-[0.7rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-40 disabled:cursor-wait"
+                >
+                  {picking === r.slug ? "套用中…" : "套用"}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
