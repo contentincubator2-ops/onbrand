@@ -136,11 +136,12 @@ async function main() {
   // to /v1/me if the first 404s. Only key validity matters.
   const mk = process.env.MANUS_API_KEY || process.env.MANUS_API_KEY_4 || process.env.MANUS_API_KEY_1;
   if (mk) {
+    // Try X-API-Key first (raw API key auth), then Bearer (JWT auth)
     let r = await tryFetch("Manus", "https://api.manus.im/v1/tasks?limit=1", {
-      headers: { Authorization: `Bearer ${mk}` },
+      headers: { "X-API-Key": mk },
     });
-    if (!r.ok && (r.note?.includes("404") || r.status === 404)) {
-      r = await tryFetch("Manus", "https://api.manus.im/v1/me", {
+    if (!r.ok && r.note?.match(/40\d/)) {
+      r = await tryFetch("Manus", "https://api.manus.im/v1/tasks?limit=1", {
         headers: { Authorization: `Bearer ${mk}` },
       });
     }
