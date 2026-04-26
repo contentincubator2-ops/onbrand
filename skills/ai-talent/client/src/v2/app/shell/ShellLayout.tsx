@@ -188,10 +188,14 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     to: "/boardroom",
-    label: "顧問團",
+    label: "比稿",
     icon: (
+      // 麥克風 — 邀比稿的舞台符號
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2 L14 7 L19 7 L15 10 L17 15 L12 12 L7 15 L9 10 L5 7 L10 7 Z" />
+        <rect x="9" y="3" width="6" height="12" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0" />
+        <path d="M12 18v3" />
+        <path d="M8 21h8" />
       </svg>
     ),
   },

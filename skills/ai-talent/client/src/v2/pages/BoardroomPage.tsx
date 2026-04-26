@@ -1,549 +1,610 @@
 /**
- * BoardroomPage — 顧問區 / Consultation Room
+ * BoardroomPage — 「比稿（邀比稿）」三步流程
  *
- * 對齊使用者反饋：「顧問區是 agents 跟用戶提案，不是用戶跟 agents 提案」
+ *   STEP 1  用戶輸入需求 (concern / brief)
+ *   STEP 2  系統推薦 12 位候選 agent，用戶勾選 3–5 位
+ *   STEP 3  被選中的 agent 各自比稿（4 段格式）
  *
- * UX 重塑：
- *   1. 進到頁面 → 6 位真實 squad lead（從 DB 讀，每個 strategy_layer 一位）
- *      已經在桌邊等候。不是抽象大師，是 SoWork 真的養出來的顧問。
- *   2. 用戶不用先「寫 brief」 — 按下「請顧問為我提案」即可。
- *      6 位顧問依各自小組的方法論主動診斷 + 提方案。
- *   3. 每張卡片 4 段固定結構：
- *        ## 我看見的問題
- *        ## 我的小組會這樣做
- *        ## 第一週可交付
- *        ## 需要您決定的問題
- *   4. 用戶可選在下方「想再多問一句」之後再次召集，把更具體的關注點丟進去。
- *
- * 模型調度：所有顧問預設用 forge（SoWork gateway，最穩），失敗時依序退到
- * qwen / zhipu / openai。多 LLM 多樣性是 flair，不是功能 — 等 VM env 全綠
- * 再開放選擇。
+ * 不再寫死 6 位顧問 — agent 池動態從 query 篩。
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
-type Tone = "research" | "analyze" | "write" | "craft" | "orchestrate";
-
-type SquadLead = {
-  squadId: number;
-  squadSlug: string;
-  squadName: string;
+type Candidate = {
+  agentId: number;
+  name: string;
+  title: string;
+  bio: string | null;
+  primarySkill: string | null;
+  aiModel: string;
+  providerBucket: string;
+  squadId: number | null;
+  squadName: string | null;
   squadMethodology: string | null;
-  strategyLayer: string;
-  layerLabel: string;
-  layerEmoji: string;
-  tone: Tone;
-  order: number;
-  agentId: number | null;
-  agentName: string;
-  agentTitle: string;
-  agentBio: string | null;
-  agentPrimarySkill: string | null;
+  squadStrategyLayer: string | null;
+  matchScore: number;
+  matchReasons: string[];
 };
 
-type Proposal = SquadLead & {
+type Pitch = Candidate & {
   proposal: string;
   provider: string;
   model: string;
   error: string | null;
 };
 
-const TONE_COLOR: Record<Tone, string> = {
-  research: "#2EA4A0",
-  analyze: "#3D6BCC",
-  write: "#E07AAE",
-  craft: "#E8A23B",
-  orchestrate: "#5B3CC8",
-};
-
 const ACCENT = "#5B3CC8";
 const STAGE_GOLD = "#D4B36A";
+const HAIR = "#E5E5E5";
+const INK = "#0E0E10";
+const SUBTLE = "#6B6B70";
 
-// ─── PortraitAvatar (shared with /ai) ────────────────────────────────────
+const PROVIDER_COLOR: Record<string, string> = {
+  "azure-foundry": "#0078D4",
+  anthropic: "#D97757",
+  qwen: "#0E1E40",
+  zhipu: "#1B6EFD",
+  perplexity: "#1FBFB8",
+  forge: "#5B3CC8",
+  openai: "#10A37F",
+  gemini: "#4285F4",
+  google: "#4285F4",
+  cohere: "#FF7759",
+};
 
-function PortraitAvatar({
-  name,
-  tone,
-  size,
-  pulse = false,
-  glow = false,
-  dim = false,
-}: {
-  name: string;
-  tone: Tone;
-  size: number;
-  pulse?: boolean;
-  glow?: boolean;
-  dim?: boolean;
-}) {
-  const ringColor = TONE_COLOR[tone];
-  const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
-    name
-  )}&radius=50&backgroundColor=ffffff,f5f5f5,fef9e7,e8f5e9`;
-  const ringWidth = Math.max(2, Math.round(size * 0.08));
+function PortraitAvatar({ name, size = 72 }: { name: string; size?: number }) {
+  const seed = encodeURIComponent(name || "anon");
+  const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
   return (
     <div
-      className="relative shrink-0"
       style={{
         width: size,
         height: size,
-        opacity: dim ? 0.45 : 1,
-        transition: "opacity 240ms ease",
+        borderRadius: "50%",
+        overflow: "hidden",
+        background: "#F5F2EE",
+        border: `2px solid ${HAIR}`,
+        flexShrink: 0,
       }}
     >
-      {pulse && (
-        <span
-          className="absolute inset-0 rounded-full animate-ping"
-          style={{ background: ringColor, opacity: 0.35 }}
-        />
-      )}
-      <div
-        className="rounded-full overflow-hidden bg-white"
-        style={{
-          width: size,
-          height: size,
-          border: `${ringWidth}px solid ${ringColor}`,
-          boxShadow: glow
-            ? `0 0 0 2px white, 0 0 0 4px ${STAGE_GOLD}, 0 8px 22px rgba(212,179,106,0.45)`
-            : "0 2px 8px rgba(0,0,0,0.18)",
-        }}
-      >
-        <img src={url} alt={name} className="w-full h-full block" />
-      </div>
+      <img src={url} alt={name} width={size} height={size} />
     </div>
   );
 }
 
-// ─── Page ──────────────────────────────────────────────────────────────────
-
-export default function BoardroomPage() {
-  const { brands, brandId } = useOutletContext<ShellOutletCtx>();
-  const currentBrand = useMemo(
-    () => brands.find((b: any) => b.id === brandId) ?? null,
-    [brands, brandId]
-  );
-
-  // Pull real squad leads from DB (one per strategy layer L1–L6)
-  const leadsQuery = (trpc as any).boardroom.listSquadLeads.useQuery(
-    undefined,
-    { refetchOnWindowFocus: false }
-  );
-  const leads: SquadLead[] = (leadsQuery.data as any[]) ?? [];
-
-  const consultMut = (trpc as any).boardroom.consult.useMutation();
-
-  const [proposals, setProposals] = useState<Proposal[] | null>(null);
-  const [concern, setConcern] = useState("");
-  const [running, setRunning] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  // Sequential reveal effect (drama)
-  const [revealedCount, setRevealedCount] = useState(0);
-  useEffect(() => {
-    if (!proposals) {
-      setRevealedCount(0);
-      return;
-    }
-    setRevealedCount(0);
-    let i = 0;
-    const t = setInterval(() => {
-      i += 1;
-      setRevealedCount(i);
-      if (i >= proposals.length) clearInterval(t);
-    }, 600);
-    return () => clearInterval(t);
-  }, [proposals]);
-
-  const handleConsult = async () => {
-    if (!brandId) {
-      setErr("請先在右上角選擇品牌");
-      return;
-    }
-    setRunning(true);
-    setErr(null);
-    setProposals(null);
-    try {
-      const r = await consultMut.mutateAsync({
-        brandId,
-        concern: concern.trim() || undefined,
-      });
-      setProposals((r.proposals as Proposal[]) ?? []);
-    } catch (e: any) {
-      setErr(String(e?.message ?? e));
-    } finally {
-      setRunning(false);
-    }
-  };
-
+function ProviderPill({ provider, model }: { provider: string; model: string }) {
+  const color = PROVIDER_COLOR[provider] || "#888";
   return (
-    <div className="px-8 py-10 max-w-[1280px] mx-auto">
-      {/* ─── Hero ────────────────────────────────────────── */}
-      <div className="mb-8">
-        <div
-          className="text-[0.66rem] tracking-[0.24em] uppercase mb-2"
-          style={{ color: ACCENT }}
-        >
-          BOARDROOM · 顧問區
-        </div>
-        <h1 className="font-display text-[2.4rem] leading-tight text-mos-ink mb-3">
-          {currentBrand
-            ? `${currentBrand.name} 的 6 位顧問已就坐`
-            : "您的諮詢室"}
-        </h1>
-        <p className="text-mos-muted text-[0.95rem] max-w-[680px] leading-relaxed">
-          這裡是顧問向您提案 — 不是您向顧問報告。
-          每位都帶著一支真實的 squad，按下「為我提案」後，他們會用各自小組的方法論主動診斷您的品牌，
-          並提出他們會怎麼做。
-          {currentBrand && (
-            <>
-              {" "}
-              品牌大腦已連線 ·{" "}
-              <span style={{ color: ACCENT }}>{currentBrand.name}</span>
-            </>
-          )}
-        </p>
-      </div>
-
-      {/* ─── Stage: leads waiting at the table ─────────────────── */}
-      <StageRow leads={leads} loading={leadsQuery.isLoading} />
-
-      {/* ─── CTA + optional follow-up question ──────────────────── */}
-      <div
-        className="mt-8 mb-10 rounded-2xl border bg-white p-6"
-        style={{ borderColor: "#E5E5E5" }}
-      >
-        <label className="block">
-          <span className="text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted">
-            想多告訴顧問什麼？（選填）
-          </span>
-          <textarea
-            value={concern}
-            onChange={(e) => setConcern(e.target.value)}
-            placeholder="例：我們最近 IG 互動率掉了一半 / 想在 Q3 進入新品線 / 創辦人想要重塑品牌靈魂…"
-            className="mt-2 w-full min-h-[80px] rounded-lg border border-mos-hair px-3 py-2 text-[0.9rem] focus:outline-none focus:border-mos-ink/50 resize-y"
-          />
-        </label>
-        <p className="text-[0.7rem] text-mos-muted mt-2">
-          留空也可以 — 顧問會主動依您小組的專長點出他們看見的問題。
-        </p>
-
-        <div className="flex items-center justify-between mt-4 gap-4 flex-wrap">
-          <div className="text-[0.74rem] text-mos-muted">
-            {currentBrand ? (
-              <>
-                ✓ 將以 <span className="font-medium text-mos-ink">{currentBrand.name}</span> 的品牌大腦做基礎
-              </>
-            ) : (
-              <span className="text-amber-600">⚠ 尚未選擇品牌</span>
-            )}
-          </div>
-          <button
-            onClick={handleConsult}
-            disabled={running || !brandId || leadsQuery.isLoading}
-            className="px-6 h-11 rounded-xl font-medium text-white disabled:opacity-50 transition hover:brightness-110"
-            style={{ background: ACCENT }}
-          >
-            {running ? "顧問商議中…" : proposals ? "請顧問再提案一輪" : "請各位顧問為我提案 →"}
-          </button>
-        </div>
-
-        {err && (
-          <div className="mt-3 text-[0.78rem] text-red-600">{err}</div>
-        )}
-      </div>
-
-      {/* ─── Proposals ───────────────────────────────────── */}
-      {proposals && (
-        <div className="space-y-4">
-          {proposals.map((p, idx) => (
-            <ProposalCard
-              key={p.squadId}
-              proposal={p}
-              revealed={idx < revealedCount}
-            />
-          ))}
-        </div>
-      )}
-
-      {!proposals && !running && leads.length === 0 && !leadsQuery.isLoading && (
-        <div className="text-center py-12 text-mos-muted text-[0.88rem]">
-          還沒有可諮詢的顧問。請先到任務範本建立至少一個 squad。
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── StageRow: leads waiting at the table ────────────────────────────────
-
-function StageRow({
-  leads,
-  loading,
-}: {
-  leads: SquadLead[];
-  loading: boolean;
-}) {
-  if (loading) {
-    return (
-      <div className="flex items-end justify-center gap-4 py-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="w-20 h-20 rounded-full bg-mos-hair animate-pulse"
-          />
-        ))}
-      </div>
-    );
-  }
-  if (leads.length === 0) {
-    return (
-      <div
-        className="rounded-2xl border bg-mos-paper py-10 text-center text-mos-muted text-[0.86rem]"
-        style={{ borderColor: "#E5E5E5" }}
-      >
-        尚未有 tier=core 的 squad，無法載入顧問桌。
-      </div>
-    );
-  }
-  return (
-    <div
-      className="rounded-2xl border bg-white py-7 px-4"
-      style={{ borderColor: "#E5E5E5" }}
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 600,
+        padding: "2px 8px",
+        borderRadius: 999,
+        color,
+        border: `1px solid ${color}40`,
+        background: `${color}10`,
+        whiteSpace: "nowrap",
+      }}
     >
-      <div className="flex items-end justify-center gap-5 flex-wrap">
-        {leads.map((l) => (
-          <div key={l.squadId} className="flex flex-col items-center gap-2 w-24">
-            <PortraitAvatar
-              name={l.agentName}
-              tone={l.tone}
-              size={72}
-            />
-            <div className="text-[0.74rem] font-medium text-mos-ink truncate max-w-full">
-              {l.agentName}
-            </div>
-            <div
-              className="text-[0.6rem] uppercase tracking-wider text-center leading-tight"
-              style={{ color: TONE_COLOR[l.tone] }}
-            >
-              {l.layerEmoji} {l.layerLabel}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      {provider}
+      {model ? ` · ${model}` : ""}
+    </span>
   );
 }
 
-// ─── ProposalCard: 4-section structure ───────────────────────────────────
-
-function ProposalCard({
-  proposal,
-  revealed,
-}: {
-  proposal: Proposal;
-  revealed: boolean;
-}) {
-  const color = TONE_COLOR[proposal.tone];
-  const sections = parseProposal(proposal.proposal);
-
-  if (!revealed) {
-    return (
-      <div
-        className="rounded-2xl border bg-white p-6 flex items-center gap-4"
-        style={{ borderColor: "#E5E5E5", opacity: 0.4 }}
-      >
-        <PortraitAvatar
-          name={proposal.agentName}
-          tone={proposal.tone}
-          size={56}
-          dim
-        />
-        <div className="text-[0.86rem] text-mos-muted">
-          {proposal.agentName} 正在準備…
-        </div>
-      </div>
-    );
-  }
-
-  if (proposal.error) {
-    return (
-      <div
-        className="rounded-2xl border bg-white p-6"
-        style={{ borderColor: "#E5E5E5" }}
-      >
-        <div className="flex items-start gap-4">
-          <PortraitAvatar
-            name={proposal.agentName}
-            tone={proposal.tone}
-            size={56}
-            dim
-          />
-          <div className="flex-1">
-            <div className="font-display text-[1.05rem] text-mos-ink">
-              {proposal.agentName}
-            </div>
-            <div className="text-[0.7rem] uppercase tracking-wider text-mos-muted mt-1">
-              {proposal.layerEmoji} {proposal.layerLabel} · {proposal.squadName}
-            </div>
-            <div className="mt-3 text-[0.82rem] text-red-600">
-              無法生成提案：{proposal.error}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="rounded-2xl border bg-white p-6 transition-all duration-500"
-      style={{ borderColor: `${color}40` }}
-    >
-      <div className="flex items-start gap-4 mb-4">
-        <PortraitAvatar
-          name={proposal.agentName}
-          tone={proposal.tone}
-          size={64}
-          glow
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline flex-wrap gap-2">
-            <span className="font-display text-[1.15rem] text-mos-ink">
-              {proposal.agentName}
-            </span>
-            <span className="text-[0.78rem] text-mos-muted">
-              {proposal.agentTitle}
-            </span>
-          </div>
-          <div className="text-[0.72rem] uppercase tracking-wider mt-1" style={{ color }}>
-            {proposal.layerEmoji} {proposal.layerLabel} · 帶領小組「{proposal.squadName}」
-          </div>
-          {proposal.squadMethodology && (
-            <div className="text-[0.74rem] text-mos-muted mt-1.5 italic">
-              方法論：{truncate(proposal.squadMethodology, 80)}
-            </div>
-          )}
-        </div>
-        <ProviderPill provider={proposal.provider} model={proposal.model} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-        <ProposalSection
-          icon="🎯"
-          title="我看見的問題"
-          color={color}
-          body={sections.problem}
-        />
-        <ProposalSection
-          icon="🛠"
-          title="我的小組會這樣做"
-          color={color}
-          body={sections.steps}
-        />
-        <ProposalSection
-          icon="📦"
-          title="第一週可交付"
-          color={color}
-          body={sections.deliverables}
-        />
-        <ProposalSection
-          icon="❓"
-          title="需要您決定的問題"
-          color={color}
-          body={sections.decisions}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ProposalSection({
-  icon,
-  title,
-  color,
-  body,
-}: {
-  icon: string;
-  title: string;
-  color: string;
-  body: string;
-}) {
-  return (
-    <div>
-      <div
-        className="text-[0.66rem] tracking-[0.18em] uppercase mb-2 flex items-center gap-1.5"
-        style={{ color }}
-      >
-        <span>{icon}</span>
-        <span>{title}</span>
-      </div>
-      <div className="text-[0.86rem] text-mos-ink leading-relaxed whitespace-pre-line">
-        {body || <span className="text-mos-muted italic">（顧問未提供此項）</span>}
-      </div>
-    </div>
-  );
-}
-
-function ProviderPill({
-  provider,
-  model,
-}: {
-  provider: string;
-  model: string;
-}) {
-  const labelMap: Record<string, { label: string; bg: string }> = {
-    forge: { label: "Forge", bg: "#525866" },
-    qwen: { label: "Qwen", bg: "#D9893E" },
-    zhipu: { label: "Zhipu", bg: "#A8451E" },
-    openai: { label: "GPT", bg: "#0E8567" },
-    perplexity: { label: "Perplexity", bg: "#1F8A9A" },
-  };
-  const m = labelMap[provider] ?? { label: provider, bg: "#525866" };
-  return (
-    <div className="text-right shrink-0">
-      <span
-        className="inline-block text-[0.6rem] tracking-wider uppercase text-white px-2 py-0.5 rounded"
-        style={{ background: m.bg }}
-        title={model}
-      >
-        {m.label}
-      </span>
-    </div>
-  );
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────
-
-function parseProposal(text: string): {
-  problem: string;
-  steps: string;
-  deliverables: string;
-  decisions: string;
-} {
-  const out = { problem: "", steps: "", deliverables: "", decisions: "" };
-  if (!text) return out;
-  const sections = text.split(/^##\s+/m).map((s) => s.trim()).filter(Boolean);
+function parsePitch(md: string): { problem: string; steps: string; deliverables: string; differentiator: string } {
+  if (!md) return { problem: "", steps: "", deliverables: "", differentiator: "" };
+  const sections = md.split(/^##\s+/m).slice(1);
+  const out = { problem: "", steps: "", deliverables: "", differentiator: "" };
   for (const s of sections) {
-    const newlineIdx = s.indexOf("\n");
-    const heading = (newlineIdx >= 0 ? s.slice(0, newlineIdx) : s).trim();
-    const body = (newlineIdx >= 0 ? s.slice(newlineIdx + 1) : "").trim();
-    if (heading.includes("看見") || heading.includes("問題")) out.problem = body || heading;
-    else if (heading.includes("這樣做") || heading.includes("步驟") || heading.includes("方案")) out.steps = body;
-    else if (heading.includes("交付") || heading.includes("產出") || heading.includes("deliver")) out.deliverables = body;
-    else if (heading.includes("決定") || heading.includes("決策") || heading.includes("問題")) {
-      // duplicate match guard — only take if not already taken
-      if (!out.decisions) out.decisions = body;
-    }
-  }
-  // If parsing didn't yield 4 buckets (model didn't follow format), dump raw into "problem"
-  if (!out.problem && !out.steps && !out.deliverables && !out.decisions) {
-    out.problem = text;
+    const [head, ...body] = s.split("\n");
+    const text = body.join("\n").trim();
+    const h = (head || "").trim();
+    if (h.includes("看見") || h.includes("問題") || h.includes("診斷")) out.problem = text;
+    else if (h.includes("這樣做") || h.includes("步驟")) out.steps = text;
+    else if (h.includes("交付") || h.includes("第一週")) out.deliverables = text;
+    else if (h.includes("為什麼選我") || h.includes("選我") || h.includes("獨特")) out.differentiator = text;
   }
   return out;
 }
 
-function truncate(s: string, n: number) {
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+// ─── Page ──────────────────────────────────────────────────────────────────
+export default function BoardroomPage() {
+  const { currentBrand } = useOutletContext<ShellOutletCtx>() ?? ({} as ShellOutletCtx);
+  const brandId = currentBrand?.id;
+  const brandName = currentBrand?.name || "未指定品牌";
+
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [pitches, setPitches] = useState<Pitch[]>([]);
+
+  const recommendMutation = (trpc as any).boardroom.recommendAgents.useQuery(
+    { brandId, query, limit: 12 },
+    { enabled: false }
+  );
+  const pitchMutation = (trpc as any).boardroom.pitch.useMutation();
+
+  const onFindAgents = async () => {
+    if (query.trim().length < 2) return;
+    const r = await recommendMutation.refetch();
+    setCandidates((r.data?.candidates as Candidate[]) ?? []);
+    setSelected(new Set());
+    setStep(2);
+  };
+
+  const toggle = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 5) next.add(id);
+      return next;
+    });
+  };
+
+  const onPitch = async () => {
+    if (selected.size === 0) return;
+    const result = await pitchMutation.mutateAsync({
+      brandId,
+      query,
+      agentIds: Array.from(selected),
+    });
+    setPitches((result.pitches as Pitch[]) ?? []);
+    setStep(3);
+  };
+
+  const reset = () => {
+    setStep(1);
+    setSelected(new Set());
+    setCandidates([]);
+    setPitches([]);
+  };
+
+  return (
+    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "32px 28px 80px" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ fontSize: 12, color: SUBTLE, letterSpacing: 1, fontWeight: 600 }}>
+          BOARDROOM · 比稿（邀比稿）
+        </div>
+        <h1 style={{ fontSize: 32, fontWeight: 700, color: INK, margin: "8px 0 4px" }}>
+          {brandName} · 邀請顧問為您比稿
+        </h1>
+        <p style={{ fontSize: 14, color: SUBTLE, margin: 0 }}>
+          說出您的需求 → 系統推薦候選顧問 → 您勾選 → 顧問各自提案，您當評審
+        </p>
+      </div>
+
+      {/* Step indicator */}
+      <StepIndicator step={step} />
+
+      {/* Step 1: Input */}
+      {step === 1 && (
+        <Step1Input
+          query={query}
+          setQuery={setQuery}
+          onFindAgents={onFindAgents}
+          loading={recommendMutation.isFetching}
+        />
+      )}
+
+      {/* Step 2: Candidate selection */}
+      {step === 2 && (
+        <Step2Candidates
+          candidates={candidates}
+          selected={selected}
+          toggle={toggle}
+          onBack={() => setStep(1)}
+          onPitch={onPitch}
+          pitching={pitchMutation.isPending}
+          query={query}
+        />
+      )}
+
+      {/* Step 3: Pitches */}
+      {step === 3 && <Step3Pitches pitches={pitches} onReset={reset} query={query} />}
+    </div>
+  );
+}
+
+// ─── Step indicator ────────────────────────────────────────────────────────
+function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
+  const steps = [
+    { n: 1, label: "輸入需求" },
+    { n: 2, label: "勾選顧問" },
+    { n: 3, label: "看比稿" },
+  ];
+  return (
+    <div style={{ display: "flex", gap: 0, alignItems: "center", marginBottom: 32, fontSize: 13 }}>
+      {steps.map((s, i) => (
+        <React.Fragment key={s.n}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              opacity: s.n === step ? 1 : 0.4,
+              fontWeight: s.n === step ? 600 : 400,
+              color: s.n <= step ? ACCENT : SUBTLE,
+            }}
+          >
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: "50%",
+                background: s.n <= step ? ACCENT : "#EEE",
+                color: s.n <= step ? "#FFF" : SUBTLE,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+            >
+              {s.n}
+            </div>
+            {s.label}
+          </div>
+          {i < steps.length - 1 && (
+            <div style={{ flex: "0 0 32px", height: 1, background: HAIR, margin: "0 12px" }} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+// ─── Step 1 ────────────────────────────────────────────────────────────────
+function Step1Input({
+  query,
+  setQuery,
+  onFindAgents,
+  loading,
+}: {
+  query: string;
+  setQuery: (s: string) => void;
+  onFindAgents: () => void;
+  loading: boolean;
+}) {
+  const examples = [
+    "我要做新品上市的 IG 內容企劃",
+    "B2B SaaS 想做 LinkedIn 內容增長",
+    "電商品牌想找新的市場定位",
+    "想做品牌故事重塑，但不知道從哪開始",
+  ];
+  return (
+    <div
+      style={{
+        background: "#FFF",
+        border: `1px solid ${HAIR}`,
+        borderRadius: 16,
+        padding: 32,
+      }}
+    >
+      <label style={{ fontSize: 13, fontWeight: 600, color: INK, display: "block", marginBottom: 12 }}>
+        您今天想解決什麼問題？
+      </label>
+      <textarea
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="例：我要做新品上市的 IG 內容企劃，預算有限，想要 30 天內看到效果..."
+        style={{
+          width: "100%",
+          minHeight: 120,
+          padding: 16,
+          borderRadius: 12,
+          border: `1px solid ${HAIR}`,
+          fontSize: 14,
+          fontFamily: "inherit",
+          resize: "vertical",
+          outline: "none",
+          color: INK,
+        }}
+      />
+      <div style={{ marginTop: 12, fontSize: 12, color: SUBTLE }}>
+        快速範例：
+        {examples.map((e) => (
+          <button
+            key={e}
+            onClick={() => setQuery(e)}
+            style={{
+              marginLeft: 6,
+              padding: "4px 10px",
+              fontSize: 12,
+              borderRadius: 999,
+              border: `1px solid ${HAIR}`,
+              background: "#FFF",
+              cursor: "pointer",
+              color: INK,
+            }}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={onFindAgents}
+        disabled={loading || query.trim().length < 2}
+        style={{
+          marginTop: 24,
+          padding: "12px 24px",
+          background: ACCENT,
+          color: "#FFF",
+          border: "none",
+          borderRadius: 999,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: loading || query.trim().length < 2 ? "not-allowed" : "pointer",
+          opacity: loading || query.trim().length < 2 ? 0.5 : 1,
+        }}
+      >
+        {loading ? "搜尋中..." : "找候選顧問 →"}
+      </button>
+    </div>
+  );
+}
+
+// ─── Step 2 ────────────────────────────────────────────────────────────────
+function Step2Candidates({
+  candidates,
+  selected,
+  toggle,
+  onBack,
+  onPitch,
+  pitching,
+  query,
+}: {
+  candidates: Candidate[];
+  selected: Set<number>;
+  toggle: (id: number) => void;
+  onBack: () => void;
+  onPitch: () => void;
+  pitching: boolean;
+  query: string;
+}) {
+  if (candidates.length === 0) {
+    return (
+      <div
+        style={{
+          background: "#FFF",
+          border: `1px solid ${HAIR}`,
+          borderRadius: 16,
+          padding: 48,
+          textAlign: "center",
+          color: SUBTLE,
+        }}
+      >
+        沒有找到匹配的顧問。請回到上一步換個說法。
+        <div>
+          <button onClick={onBack} style={{ marginTop: 16, padding: "8px 16px", border: `1px solid ${HAIR}`, borderRadius: 999, background: "#FFF", cursor: "pointer" }}>
+            ← 重新輸入
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: SUBTLE }}>
+          您的需求：「{query}」 — 系統推薦 {candidates.length} 位候選顧問，請勾選 1–5 位邀請比稿
+        </div>
+        <button onClick={onBack} style={{ fontSize: 12, color: SUBTLE, background: "none", border: "none", cursor: "pointer" }}>
+          ← 修改需求
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 14 }}>
+        {candidates.map((c) => {
+          const isSelected = selected.has(c.agentId);
+          const isMaxedOut = !isSelected && selected.size >= 5;
+          return (
+            <button
+              key={c.agentId}
+              onClick={() => toggle(c.agentId)}
+              disabled={isMaxedOut}
+              style={{
+                textAlign: "left",
+                background: isSelected ? `${ACCENT}08` : "#FFF",
+                border: `2px solid ${isSelected ? ACCENT : HAIR}`,
+                borderRadius: 14,
+                padding: 16,
+                cursor: isMaxedOut ? "not-allowed" : "pointer",
+                opacity: isMaxedOut ? 0.4 : 1,
+                position: "relative",
+                transition: "all 0.15s",
+                fontFamily: "inherit",
+              }}
+            >
+              {isSelected && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    right: 12,
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: ACCENT,
+                    color: "#FFF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  ✓
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                <PortraitAvatar name={c.name} size={56} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginBottom: 2 }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: SUBTLE, lineHeight: 1.3 }}>{c.title}</div>
+                </div>
+              </div>
+
+              {c.squadName && (
+                <div style={{ fontSize: 11, color: ACCENT, fontWeight: 600, marginBottom: 6 }}>
+                  📚 {c.squadName}
+                </div>
+              )}
+
+              {c.matchReasons.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
+                  {c.matchReasons.map((r, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        fontSize: 10,
+                        padding: "2px 6px",
+                        background: `${STAGE_GOLD}20`,
+                        color: "#7A5A1F",
+                        borderRadius: 4,
+                      }}
+                    >
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+                <ProviderPill provider={c.providerBucket} model={c.aiModel} />
+                <span style={{ fontSize: 10, color: SUBTLE }}>匹配 {c.matchScore}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sticky CTA */}
+      <div
+        style={{
+          position: "sticky",
+          bottom: 16,
+          marginTop: 32,
+          display: "flex",
+          justifyContent: "center",
+          zIndex: 10,
+        }}
+      >
+        <button
+          onClick={onPitch}
+          disabled={selected.size === 0 || pitching}
+          style={{
+            padding: "14px 32px",
+            background: ACCENT,
+            color: "#FFF",
+            border: "none",
+            borderRadius: 999,
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: selected.size === 0 || pitching ? "not-allowed" : "pointer",
+            opacity: selected.size === 0 ? 0.4 : 1,
+            boxShadow: "0 8px 24px rgba(91, 60, 200, 0.25)",
+          }}
+        >
+          {pitching ? "顧問撰寫中..." : `邀比稿（已選 ${selected.size} 位） →`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 3 ────────────────────────────────────────────────────────────────
+function Step3Pitches({ pitches, onReset, query }: { pitches: Pitch[]; onReset: () => void; query: string }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 13, color: SUBTLE, marginBottom: 4 }}>客戶需求：</div>
+          <div style={{ fontSize: 15, color: INK, fontWeight: 500 }}>{query}</div>
+        </div>
+        <button
+          onClick={onReset}
+          style={{
+            padding: "8px 16px",
+            border: `1px solid ${HAIR}`,
+            borderRadius: 999,
+            background: "#FFF",
+            cursor: "pointer",
+            fontSize: 13,
+            color: INK,
+          }}
+        >
+          重新比稿
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gap: 16 }}>
+        {pitches.map((p) => (
+          <PitchCard key={p.agentId} pitch={p} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PitchCard({ pitch }: { pitch: Pitch }) {
+  const parsed = useMemo(() => parsePitch(pitch.proposal || ""), [pitch.proposal]);
+  return (
+    <div
+      style={{
+        background: "#FFF",
+        border: `1px solid ${HAIR}`,
+        borderRadius: 16,
+        padding: 24,
+      }}
+    >
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 16 }}>
+        <PortraitAvatar name={pitch.name} size={64} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: INK, margin: 0 }}>{pitch.name}</h3>
+            <ProviderPill provider={pitch.provider} model={pitch.model} />
+          </div>
+          <div style={{ fontSize: 12, color: SUBTLE }}>{pitch.title}</div>
+          {pitch.squadName && (
+            <div style={{ fontSize: 12, color: ACCENT, fontWeight: 600, marginTop: 4 }}>
+              📚 {pitch.squadName}
+              {pitch.squadMethodology ? ` · ${pitch.squadMethodology.slice(0, 60)}` : ""}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {pitch.error ? (
+        <div style={{ padding: 12, background: "#FFF5F5", borderRadius: 8, color: "#D33", fontSize: 13 }}>
+          ⚠ 提案失敗：{pitch.error}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <Section title="我看見的問題" tone="#E07AAE" body={parsed.problem} />
+          <Section title="我會這樣做" tone="#3D6BCC" body={parsed.steps} />
+          <Section title="第一週可交付" tone="#E8A23B" body={parsed.deliverables} />
+          <Section title="為什麼選我" tone="#5B3CC8" body={parsed.differentiator} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Section({ title, tone, body }: { title: string; tone: string; body: string }) {
+  return (
+    <div style={{ borderLeft: `3px solid ${tone}`, paddingLeft: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: tone, letterSpacing: 0.5, marginBottom: 6 }}>
+        {title.toUpperCase()}
+      </div>
+      <div style={{ fontSize: 13, color: INK, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+        {body || "（尚無內容）"}
+      </div>
+    </div>
+  );
 }
