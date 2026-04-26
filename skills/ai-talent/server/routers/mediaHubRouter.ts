@@ -14,6 +14,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { callModel } from "../_core/multiModelRouter";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { buildBrandPrefix } from "../_core/brandContext";
 
 type ChannelDef = {
   id: string;
@@ -160,28 +161,9 @@ export const mediaHubRouter = router({
 
       const totalBudget = input.config.dailyBudget * input.config.durationDays;
 
-      // Brand context
-      let brandPrefix = "";
-      if (input.brandId) {
-        try {
-          const db = await getDb();
-          if (db) {
-            const [rows] = (await db.execute(
-              sql`SELECT category, title, content FROM brand_brain
-                  WHERE brand_id = ${input.brandId} ORDER BY updated_at DESC LIMIT 8`
-            )) as any;
-            if (rows && rows.length > 0) {
-              brandPrefix =
-                "\n\n[品牌大腦摘要]\n" +
-                rows
-                  .map((r: any) => `- ${r.category} / ${r.title}: ${r.content}`)
-                  .join("\n");
-            }
-          }
-        } catch {
-          /* ignore */
-        }
-      }
+      // Brand context — pulled from shared helper so /ai, /boardroom, /media
+      // all inject the same brand_brain summary into LLM system prompts.
+      const brandPrefix = await buildBrandPrefix(input.brandId);
 
       // Channel-specific system prompt
       const systemByChannel: Record<string, string> = {

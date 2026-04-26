@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callModel, type ModelProvider } from "../_core/multiModelRouter";
+import { buildBrandPrefix } from "../_core/brandContext";
 
 type PersonaDef = {
   id: string;
@@ -204,9 +205,13 @@ export const boardroomRouter = router({
         brief: z.string().min(10),
         personaIds: z.array(z.string()).min(1).max(8),
         brandName: z.string().optional(),
+        brandId: z.number().optional(),
       })
     )
     .mutation(async ({ input }) => {
+      // Pull brand_brain into every persona's system prompt so all sharks
+      // pitch within the brand's positioning / TA / voice constraints.
+      const brandPrefix = await buildBrandPrefix(input.brandId);
       const personas: PersonaDef[] = input.personaIds
         .map((id) => PERSONAS[id])
         .filter((p): p is PersonaDef => Boolean(p))
@@ -223,7 +228,7 @@ ${input.brandName ? `品牌：${input.brandName}` : ""}
       const pitches = await Promise.all(
         personas.map(async (p) => {
           try {
-            const result = await callWithFallback(p.system, userPrompt, p.preferredProvider);
+            const result = await callWithFallback(p.system + brandPrefix, userPrompt, p.preferredProvider);
             return {
               personaId: p.id,
               name: p.name,
@@ -258,6 +263,7 @@ ${input.brandName ? `品牌：${input.brandName}` : ""}
       return {
         brief: input.brief,
         brandName: input.brandName ?? null,
+        brandInjected: brandPrefix.length > 0,
         pitches,
         timestamp: new Date().toISOString(),
       };

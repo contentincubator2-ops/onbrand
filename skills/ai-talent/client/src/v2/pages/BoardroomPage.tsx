@@ -178,6 +178,7 @@ export default function BoardroomPage() {
         brief,
         personaIds: picked,
         brandName: currentBrand?.name ?? undefined,
+        brandId: currentBrand?.id ?? undefined,
       });
       setResult({ pitches: r.pitches });
     } catch (e: any) {

@@ -664,27 +664,9 @@ function fillTemplate(tpl: string, inputs: Record<string, string | number | unde
   });
 }
 
-async function buildBrandContext(brandId: number | undefined): Promise<string> {
-  if (!brandId) return "";
-  const db = await getDb();
-  if (!db) return "";
-  try {
-    const [rows] = await db.execute(
-      sql`
-        SELECT category, title, content
-        FROM brand_brain
-        WHERE brand_id = ${brandId}
-        ORDER BY category, updated_at DESC
-        LIMIT 24
-      `
-    ) as any;
-    if (!rows?.length) return "";
-    const lines = (rows as any[]).map((r) => `- [${r.category}] ${r.title}：${r.content}`);
-    return `\n\n[品牌大腦記憶]（請在輸出中體現品牌個性）\n${lines.join("\n")}\n`;
-  } catch {
-    return "";
-  }
-}
+// Brand context now lives in _core/brandContext.ts so every router
+// uses the same source of truth + same 1-min cache.
+import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 
 function tryParseJson(s: string): any | null {
   if (!s) return null;

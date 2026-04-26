@@ -196,6 +196,16 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    to: "/playbooks",
+    label: "成長方案",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 5v14l8-4 8 4V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z" />
+        <path d="M9 9h6" />
+      </svg>
+    ),
+  },
+  {
     to: "/media",
     label: "媒體中心",
     icon: (
