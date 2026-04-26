@@ -11,23 +11,183 @@
  *
  * Auth: Bearer CRON_SECRET in the Authorization header.
  *
- * Processor body: a single LLM turn through the project's invokeLLM
- * provider chain (OpenRouter / Azure Foundry / etc., picked by
- * LLM_DEFAULT_PROVIDER). Not the full A2A orchestration that the VM-side
- * orchestratorWorker.ts does — no agent matching, no skill-md loading,
- * no learning persistence — but it proves the LLM path works through
- * the Vercel queue end-to-end. Richer agent routing iterates from here.
+ * ── Pipeline (ports server/queue/orchestratorWorker.ts to Vercel) ──
+ *   1. matchAgents() — DB lookup against the 21k+ rows in `agents`
+ *      to pick the best specialist for this task. Best-effort:
+ *      failures fall back to a generic AI marketing agent.
+ *   2. Skill-md loading is skipped on Vercel — SKILLS_PATH lives on
+ *      the VM filesystem, not in /var/task.
+ *   3. inferTaskType + getModelForTask — pure helpers, kept as-is.
+ *   4. Research step is skipped on Vercel — the VM version uses
+ *      streamGateway against localhost:18790 (OpenClaw with
+ *      web_search tool), neither of which is reachable from a Vercel
+ *      function. The richer system prompt below compensates by
+ *      pushing the model to be specific without external lookups.
+ *   5. Main LLM turn via invokeLLM (provider chain: azure-foundry →
+ *      auto-fallback to openrouter). Same JSON-output contract as
+ *      the orchestrator: thinking + publishable_content + metadata.
+ *   6. Parse JSON output with the same fallback (raw string into
+ *      publishable_content) if the model didn't return strict JSON.
+ *
+ * Each stage updates queued_jobs.progress/status so the row mirrors
+ * what BullMQ's job.updateProgress() does on the VM.
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { sql } from "drizzle-orm";
 import { getDb } from "../../server/db";
 import { updateJob } from "../../server/queue/marketingQueue";
 import { invokeLLM } from "../../server/_core/llm";
+import { matchAgents } from "../../server/agentMatcher";
+import { inferTaskType, getModelForTask } from "../../server/_core/modelRouter";
 
 async function readBody(req: IncomingMessage): Promise<string> {
   let body = "";
   for await (const chunk of req) body += chunk;
   return body;
+}
+
+interface ExecuteTaskPayload {
+  jobId: string;
+  userRequest: string;
+  brand?: string;
+  industry?: string;
+  taskType?: string;
+  userId?: number;
+  sessionId?: string;
+}
+
+interface ProcessorResult {
+  agent: { name: string; title: string; specialty: string; taskType: string };
+  model: string;
+  provider: string;
+  thinking: string;
+  publishable_content: string;
+  metadata?: Record<string, unknown>;
+  usage: unknown;
+  llmDurationMs: number;
+  finishReason: string | null;
+  notes: string[];
+}
+
+async function runProcessor(
+  jobId: string,
+  payload: ExecuteTaskPayload,
+): Promise<ProcessorResult> {
+  const { userRequest, brand, industry, taskType, userId } = payload;
+  const notes: string[] = [];
+
+  // ── Step 1: agent match ───────────────────────────────────────────
+  await updateJob(jobId, { progress: 10 });
+  let agent = {
+    name: "AI 行銷專家",
+    title: "Marketing Specialist",
+    specialty: "行銷策略與內容創作",
+    taskType: taskType ?? "social_content",
+  };
+  try {
+    const matches = await matchAgents({
+      userId: userId ?? 0,
+      taskType: taskType || "general",
+      taskDescription: userRequest,
+      industry,
+      limit: 1,
+    });
+    const m = matches[0];
+    if (m) {
+      agent = {
+        name: m.name,
+        title: m.title,
+        specialty: m.specialty,
+        taskType: (m as any).taskType ?? agent.taskType,
+      };
+    } else {
+      notes.push("no agent match — using default specialist");
+    }
+  } catch (err) {
+    notes.push(`matchAgents failed: ${(err as Error).message}`);
+  }
+  await updateJob(jobId, { progress: 25 });
+
+  // ── Step 3: model routing (pure) ──────────────────────────────────
+  const inferredType = inferTaskType(userRequest);
+  const modelConfig = getModelForTask(inferredType);
+
+  // ── Step 4: research step skipped on Vercel ───────────────────────
+  notes.push("research stage skipped (no localhost gateway on Vercel)");
+  await updateJob(jobId, { progress: 40 });
+
+  // ── Step 5: main LLM turn ─────────────────────────────────────────
+  const systemPrompt = [
+    `你是 ${agent.name}，${agent.title}。`,
+    `專長：${agent.specialty}`,
+    "",
+    brand ? `品牌：${brand}` : "",
+    industry ? `產業：${industry}` : "",
+    "",
+    "【要求】",
+    "- 產出有具體數據與深度分析的方案，避免空洞行銷語言",
+    "- thinking 至少 300 字",
+    "- publishable_content 用 Markdown 結構化",
+    "",
+    "輸出**必須是合法 JSON**，shape：",
+    `{"thinking":"深度分析 300 字以上","publishable_content":"結構化 Markdown 方案","metadata":{"hashtags":[],"format":"方案類型"}}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const provider = process.env.LLM_PROVIDER || "azure-foundry";
+  const model = process.env.LLM_MODEL || "Phi-4";
+
+  await updateJob(jobId, { progress: 60 });
+
+  const t0 = Date.now();
+  const llm = await invokeLLM({
+    provider: provider as any,
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userRequest },
+    ],
+    maxTokens: 2500,
+  });
+  const llmMs = Date.now() - t0;
+
+  await updateJob(jobId, { progress: 90 });
+
+  // ── Step 6: parse JSON output (with fallback) ─────────────────────
+  const raw = llm.choices?.[0]?.message?.content;
+  const contentStr =
+    typeof raw === "string"
+      ? raw
+      : Array.isArray(raw)
+        ? raw
+            .map((p: any) => (typeof p === "string" ? p : p?.text ?? ""))
+            .filter(Boolean)
+            .join("\n")
+        : "";
+
+  let parsed: { thinking?: string; publishable_content?: string; metadata?: Record<string, unknown> } = {};
+  try {
+    // Tolerate ```json fences if the model wrapped its output.
+    const stripped = contentStr.replace(/^```json\s*|\s*```$/g, "").trim();
+    parsed = JSON.parse(stripped);
+  } catch {
+    parsed = { publishable_content: contentStr, thinking: "" };
+    notes.push("model output was not strict JSON — returned as plain content");
+  }
+
+  return {
+    agent,
+    model: llm.model ?? model,
+    provider,
+    thinking: parsed.thinking ?? "",
+    publishable_content: parsed.publishable_content ?? "",
+    metadata: parsed.metadata,
+    usage: (llm as any).usage ?? null,
+    llmDurationMs: llmMs,
+    finishReason: llm.choices?.[0]?.finish_reason ?? null,
+    notes,
+  };
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
@@ -58,8 +218,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const db = await getDb();
 
-  // Atomic claim — only the first caller wins. affectedRows lets us
-  // detect that another invocation already picked this job up.
+  // Atomic claim — only the first caller wins.
   const [claim] = (await db.execute(sql`
     UPDATE queued_jobs
     SET status = 'active',
@@ -79,65 +238,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const row = rows[0];
     if (!row) throw new Error("job disappeared after claim");
 
-    const payload = JSON.parse(row.data);
-
-    await updateJob(jobId, { progress: 20 });
-
-    const systemPrompt = [
-      "You are a marketing assistant for SoWork Marketing Enterprise.",
-      payload.brand ? `Brand context: ${payload.brand}.` : "",
-      payload.industry ? `Industry: ${payload.industry}.` : "",
-      payload.taskType ? `Requested task type: ${payload.taskType}.` : "",
-      "Respond with concise, actionable, on-brand marketing output.",
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    // Provider/model defaults align with what's actually deployed on the
-    // SoWork Azure Foundry project (proj-sowork-claw): Phi-4 + deepseek-r1.
-    // OpenRouter is out of credits, gpt-4o-mini isn't deployed on Foundry,
-    // so neither of llm.ts's built-in defaults works without overriding.
-    // Allow env override (LLM_PROVIDER / LLM_MODEL) so future redeploys
-    // pick a different model without touching code.
-    const provider = process.env.LLM_PROVIDER || "azure-foundry";
-    const model = process.env.LLM_MODEL || "Phi-4";
-
-    const t0 = Date.now();
-    const llm = await invokeLLM({
-      provider: provider as any,
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: payload.userRequest ?? "" },
-      ],
-      maxTokens: 1500,
-    });
-    const llmMs = Date.now() - t0;
-
-    await updateJob(jobId, { progress: 80 });
-
-    // invokeLLM returns the OpenAI-compatible shape {choices:[{message:{content}}]}.
-    const raw = llm.choices?.[0]?.message?.content;
-    const content =
-      typeof raw === "string"
-        ? raw
-        : Array.isArray(raw)
-          ? raw
-              .map((p: any) => (typeof p === "string" ? p : p?.text ?? ""))
-              .filter(Boolean)
-              .join("\n")
-          : "";
+    const payload: ExecuteTaskPayload = JSON.parse(row.data);
+    const processed = await runProcessor(jobId, payload);
 
     const result = {
-      processed: true,
+      ...processed,
       jobName: row.name,
       queue: row.queue,
-      provider,
-      model: llm.model ?? model,
-      finishReason: llm.choices?.[0]?.finish_reason ?? null,
-      content,
-      usage: llm.usage ?? null,
-      llmDurationMs: llmMs,
       echo: {
         userRequest: payload.userRequest,
         brand: payload.brand,
