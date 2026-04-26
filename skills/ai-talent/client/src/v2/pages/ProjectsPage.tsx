@@ -306,8 +306,8 @@ export default function ProjectsPage() {
             <CreateMenu
               onNewFolder={() => alert("新增資料夾（即將推出）")}
               onNewMission={() => navigate("/methodology")}
-              onUpload={() => setCreateSource("upload")}
-              onIngest={(s) => setCreateSource(s)}
+              onUploadFile={() => alert("上傳檔案（即將推出）")}
+              onUploadFolder={() => alert("上傳資料夾（即將推出）")}
             />
           </div>
         </div>
@@ -612,17 +612,15 @@ function FilterChip({
 /* ─────────────────────────── Create menu (Canva "+" dropdown) ─────── */
 
 function CreateMenu({
-  onNewFolder, onNewMission, onUpload, onIngest,
+  onNewFolder, onNewMission, onUploadFile, onUploadFolder,
 }: {
   onNewFolder: () => void;
   onNewMission: () => void;
-  onUpload: () => void;
-  onIngest: (s: SourceId) => void;
+  onUploadFile: () => void;
+  onUploadFolder: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [ingestOpen, setIngestOpen] = useState(false);
-
-  const close = () => { setOpen(false); setIngestOpen(false); };
+  const close = () => setOpen(false);
 
   return (
     <div className="relative">
@@ -650,8 +648,8 @@ function CreateMenu({
             />
             <MenuItem
               glyph={<GridIcon />}
-              label="新任務（從方法論）"
-              hint="從型錄選一個方法論建立任務"
+              label="新任務"
+              hint="從方法論型錄建立任務"
               onClick={() => { close(); onNewMission(); }}
             />
 
@@ -659,34 +657,16 @@ function CreateMenu({
 
             <MenuItem
               glyph={<UploadIcon />}
-              label="上傳檔案萃取方法論"
-              hint="PDF / DOCX / Markdown / Skill 檔"
-              onClick={() => { close(); onUpload(); }}
+              label="上傳檔案"
+              hint="品牌素材、參考檔、簡報、圖片"
+              onClick={() => { close(); onUploadFile(); }}
             />
-
-            {/* Ingest submenu */}
-            <button
-              onClick={() => setIngestOpen((v) => !v)}
-              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-mos-ink/[0.04] transition text-left"
-            >
-              <span className="w-5 h-5 inline-flex items-center justify-center text-mos-ink/70"><DownloadIcon /></span>
-              <span className="flex-1 min-w-0">
-                <div className="text-[0.84rem] text-mos-ink">從網路萃取</div>
-                <div className="text-[0.66rem] text-mos-muted truncate">網頁、YouTube、GitHub…</div>
-              </span>
-              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-mos-soft transition-transform ${ingestOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-            </button>
-
-            {ingestOpen && (
-              <div className="mx-3 mt-1 mb-1 rounded-lg bg-mos-ink/[0.03] py-1">
-                <SubItem label="網頁文章"        hint="任意 URL"            onClick={() => { close(); onIngest("web"); }} />
-                <SubItem label="YouTube 影片"    hint="逐字稿萃取"           onClick={() => { close(); onIngest("youtube"); }} />
-                <SubItem label="GitHub 專案"     hint="從 README"           onClick={() => { close(); onIngest("github"); }} />
-                <SubItem label="競品案例"        hint="貼上活動連結"         onClick={() => { close(); onIngest("competitor"); }} />
-                <SubItem label="Claude Skill"    hint="貼上 SKILL.md"       onClick={() => { close(); onIngest("claude-skill"); }} />
-                <SubItem label="ChatGPT GPT"     hint="貼上 GPT 指令"       onClick={() => { close(); onIngest("chatgpt-gpt"); }} />
-              </div>
-            )}
+            <MenuItem
+              glyph={<FolderUploadIcon />}
+              label="上傳資料夾"
+              hint="批次上傳整個資料夾"
+              onClick={() => { close(); onUploadFolder(); }}
+            />
           </div>
         </>
       )}
@@ -713,20 +693,6 @@ function MenuItem({
   );
 }
 
-function SubItem({
-  label, hint, onClick,
-}: { label: string; hint?: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white rounded-md transition text-left"
-    >
-      <span className="text-[0.78rem] text-mos-ink">{label}</span>
-      {hint && <span className="text-[0.62rem] text-mos-muted">{hint}</span>}
-    </button>
-  );
-}
-
 function FolderIcon() {
   return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>;
 }
@@ -736,8 +702,8 @@ function GridIcon() {
 function UploadIcon() {
   return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>;
 }
-function DownloadIcon() {
-  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>;
+function FolderUploadIcon() {
+  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v6M9 14l3-3 3 3"/></svg>;
 }
 
 /* ─────────────────────────── Helpers ────────────────────────────────── */
