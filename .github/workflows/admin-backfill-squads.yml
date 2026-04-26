@@ -16,18 +16,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 300s
+          envs: GH_TOKEN
           script: |
             set -e
-            cd /opt/marketing-os/app
-            git fetch --all --prune
+            APP=/opt/marketing-os/app
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
             git reset --hard origin/main
-            cd skills/ai-talent
-            if [ ! -d node_modules ]; then npm install --no-audit --no-fund; fi
+            cd "$APP/skills/ai-talent"
+            if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -5; fi
             echo "════════════════════════════════════════════════════════════════"
             echo "  🔧  Running squad backfill"
             echo "  $(date -u '+%Y-%m-%d %H:%M UTC')"
