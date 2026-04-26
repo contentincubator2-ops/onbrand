@@ -29,11 +29,15 @@ type TaskField = {
   default?: string | number;
 };
 
+type AgentTone = "research" | "write" | "analyze" | "craft" | "orchestrate";
+
 type AgentMeta = {
   id: string;
   name: string;
   role: string;
   skill: string;
+  avatar: string;
+  tone: AgentTone;
   provider: string;
 };
 
@@ -48,10 +52,27 @@ type StageMeta = {
 type TaskMeta = {
   id: string;
   label: string;
+  squadName: string;
+  squadTagline: string;
   etaSeconds: number;
   finalKind: "text" | "swot" | "persona-card" | "swatches" | "name-cards" | "rich-text";
   fields: TaskField[];
   stages: StageMeta[];
+};
+
+const TONE_COLOR: Record<AgentTone, string> = {
+  research: "#2EA4A0",     // teal
+  analyze:  "#3D6BCC",     // indigo
+  write:    "#E07AAE",     // rose
+  craft:    "#E8A23B",     // amber
+  orchestrate: "#5B3CC8",  // brand purple
+};
+const TONE_LABEL: Record<AgentTone, string> = {
+  research: "RESEARCH",
+  analyze: "ANALYZE",
+  write: "WRITE",
+  craft: "CRAFT",
+  orchestrate: "ORCHESTRATE",
 };
 
 type AgentResult = {
@@ -62,6 +83,8 @@ type AgentResult = {
   agentName: string;
   agentRole: string;
   agentSkill: string;
+  agentAvatar: string;
+  agentTone: AgentTone;
   output: string;
   structured: any | null;
   provider: string;
@@ -112,11 +135,10 @@ export default function QuickTasksPage() {
           <h1 className="mt-3 font-display text-[3.4rem] leading-[1.02] tracking-[-0.025em]">
             30 秒產出
           </h1>
-          <p className="mt-4 text-[1rem] leading-relaxed" style={{ color: "#444", maxWidth: 660 }}>
-            一個 brief，多位 agent 分工合作。
-            偵察兵抽情報 · 草稿手寫初稿 · 主編收尾打磨。
+          <p className="mt-4 text-[1rem] leading-relaxed" style={{ color: "#444", maxWidth: 680 }}>
+            每件任務都是一個已經分工好的 Squad — 研究員、寫手、主編各司其職。
             <br />
-            最後 10 秒由 orchestrator 整合，交給你一份完整可用的稿。
+            按 Squad 內建 workflow 接力完成，最後 orchestrator 收尾，交一份可用的稿。
           </p>
 
           <FreeInputBar
@@ -157,20 +179,31 @@ export default function QuickTasksPage() {
                   </div>
                 </div>
                 <div className="mt-4 text-[1.05rem] font-medium tracking-[-0.005em]">
-                  {t.label}
+                  {t.squadName}
                 </div>
-                <div className="mt-2 text-[0.78rem]" style={{ color: "#666" }}>
-                  {t.stages.length} 階段 · {totalAgents} 位 agent 接力
+                <div className="mt-1 text-[0.78rem]" style={{ color: "#666" }}>
+                  {t.squadTagline}
                 </div>
-                <div className="mt-3 flex items-center gap-1 text-[0.7rem]" style={{ color: "#999" }}>
-                  {t.stages.map((s, idx) => (
-                    <React.Fragment key={s.id}>
-                      <span style={{ color: s.isOrchestrator ? INK : "#999" }}>
-                        {s.label}
-                      </span>
-                      {idx < t.stages.length - 1 && <span aria-hidden>›</span>}
-                    </React.Fragment>
+
+                {/* Member avatars stack */}
+                <div className="mt-4 flex items-center gap-1.5">
+                  {t.stages.flatMap((s) => s.agents).map((a) => (
+                    <span
+                      key={a.id}
+                      className="inline-flex items-center justify-center font-display text-[0.74rem] tracking-tight"
+                      style={{
+                        width: 28, height: 28, borderRadius: "50%",
+                        background: TONE_COLOR[a.tone], color: "white",
+                        border: "1.5px solid white", boxShadow: "0 0 0 1px #E5E5E5",
+                      }}
+                      title={`${a.name} · ${a.role}`}
+                    >
+                      {a.avatar}
+                    </span>
                   ))}
+                  <span className="ml-1 text-[0.7rem]" style={{ color: "#999" }}>
+                    {totalAgents} 位
+                  </span>
                 </div>
                 <div className="mt-5 flex items-center gap-1.5 text-[0.7rem] tracking-[0.16em] uppercase opacity-0 group-hover:opacity-100 transition" style={{ color: ACCENT }}>
                   派出 agent <span aria-hidden>→</span>
@@ -298,7 +331,7 @@ function RunPanel({
     for (const s of task.stages) for (const a of s.agents) fresh[k(s.id, a.id)] = { status: "queued" };
     setAgentStates(fresh);
 
-    const prior: Array<{ stageLabel: string; agentName: string; output: string }> = [];
+    const prior: Array<{ stageLabel: string; agentName: string; agentRole: string; output: string }> = [];
 
     for (let si = 0; si < task.stages.length; si++) {
       const stage = task.stages[si];
@@ -343,6 +376,7 @@ function RunPanel({
           prior.push({
             stageLabel: stage.label,
             agentName: item.r.agentName,
+            agentRole: item.r.agentRole,
             output: item.r.output,
           });
         }
@@ -366,11 +400,30 @@ function RunPanel({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b" style={{ borderColor: INK }}>
-          <div>
-            <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: "#888" }}>
-              QUICK TASK · ~ {task.etaSeconds}s · {task.stages.length} 階段管線
+          <div className="flex items-center gap-5">
+            {/* Squad member avatars stacked */}
+            <div className="flex -space-x-2">
+              {task.stages.flatMap((s) => s.agents).slice(0, 5).map((a) => (
+                <span
+                  key={a.id}
+                  className="inline-flex items-center justify-center font-display text-[0.86rem] tracking-tight"
+                  style={{
+                    width: 38, height: 38, borderRadius: "50%",
+                    background: TONE_COLOR[a.tone], color: "white",
+                    border: "2px solid white", boxShadow: "0 0 0 1px #E5E5E5",
+                  }}
+                >
+                  {a.avatar}
+                </span>
+              ))}
             </div>
-            <div className="font-display text-[1.4rem] tracking-[-0.015em] mt-1">{task.label}</div>
+            <div>
+              <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: "#888" }}>
+                SQUAD · ~ {task.etaSeconds}s · {task.stages.length} 階段接力
+              </div>
+              <div className="font-display text-[1.4rem] tracking-[-0.015em] mt-0.5">{task.squadName}</div>
+              <div className="text-[0.78rem]" style={{ color: "#666" }}>{task.squadTagline}</div>
+            </div>
           </div>
           <button onClick={onClose} className="text-[1.4rem] hover:opacity-60 transition" aria-label="關閉">×</button>
         </div>
@@ -551,71 +604,131 @@ function AgentCard({
   const subText = onDark ? "rgba(255,255,255,0.55)" : "#888";
   const mainText = onDark ? "white" : INK;
 
+  const tone = agent.tone;
+  const toneColor = TONE_COLOR[tone];
+  const isWorking = status === "working";
+
   return (
     <article
-      className="transition"
+      className="transition flex"
       style={{
         background: cardBg,
         border: `1px solid ${cardBorder}`,
-        opacity: status === "queued" ? 0.55 : 1,
+        opacity: status === "queued" ? 0.6 : 1,
       }}
     >
-      <header className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: onDark ? "#2C2C32" : HAIR }}>
-        <div className="flex items-center gap-3">
-          <StatusGlyph status={status} onDark={onDark} />
-          <div>
-            <div className="text-[0.86rem] font-medium tracking-[-0.005em]" style={{ color: mainText }}>{agent.name}</div>
-            <div className="text-[0.7rem]" style={{ color: subText }}>{agent.role}</div>
-          </div>
+      {/* Avatar column */}
+      <div
+        className="shrink-0 flex flex-col items-center justify-start pt-4 pb-3 px-3"
+        style={{
+          background: onDark ? "#15151A" : "#FAFAFA",
+          borderRight: `1px solid ${onDark ? "#2C2C32" : HAIR}`,
+        }}
+      >
+        <div className="relative">
+          {/* Pulsing ring when working */}
+          {isWorking && (
+            <span
+              className="absolute inset-0 rounded-full animate-ping"
+              style={{ background: toneColor, opacity: 0.35 }}
+            />
+          )}
+          <span
+            className="relative inline-flex items-center justify-center font-display tracking-tight"
+            style={{
+              width: 56, height: 56, borderRadius: "50%",
+              background: toneColor, color: "white",
+              fontSize: agent.avatar.length > 1 ? "1rem" : "1.4rem",
+              boxShadow: status === "delivered" ? `0 0 0 3px white, 0 0 0 4px ${ACCENT}` : "none",
+            }}
+          >
+            {agent.avatar}
+          </span>
+          {/* Status dot in corner */}
+          <span
+            className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center"
+            style={{
+              width: 18, height: 18, borderRadius: "50%",
+              background: cardBg,
+              border: `2px solid ${cardBg}`,
+            }}
+          >
+            <StatusGlyph status={status} onDark={onDark} />
+          </span>
         </div>
-        <div className="text-right">
-          <div className="text-[0.62rem] tracking-[0.2em] uppercase" style={{ color: subText }}>
-            {agent.skill}
-          </div>
-          <div className="text-[0.68rem] mt-0.5 tabular-nums" style={{ color: subText }}>
-            {status === "queued" && "queued"}
-            {status === "working" && `${(elapsed / 1000).toFixed(1)}s`}
-            {status === "delivered" && state && "result" in state && (
-              <>
-                {(state.result.tookMs / 1000).toFixed(1)}s · {PROVIDER_LABEL[state.result.provider] ?? state.result.provider}
-                {state.result.fellBack && <span style={{ color: "#FFB347" }}> ↺</span>}
-              </>
-            )}
-            {status === "failed" && "failed"}
-          </div>
+        <div className="mt-2 text-[0.6rem] tracking-[0.18em] uppercase" style={{ color: toneColor, fontWeight: 600 }}>
+          {TONE_LABEL[tone]}
         </div>
-      </header>
+      </div>
 
-      <div className="px-4 py-3">
-        {status === "queued" && (
-          <div className="text-[0.78rem]" style={{ color: subText }}>等待派遣…</div>
-        )}
-        {status === "working" && <WorkingShimmer onDark={onDark} />}
-        {status === "failed" && state && "error" in state && (
-          <div className="text-[0.78rem]" style={{ color: "#FF7777" }}>
-            {state.error.length > 180 ? state.error.slice(0, 180) + "…" : state.error}
-          </div>
-        )}
-        {status === "delivered" && state && "result" in state && (
+      {/* Body */}
+      <div className="flex-1 min-w-0">
+        <header className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: onDark ? "#2C2C32" : HAIR }}>
           <div>
-            {/* Show preview of output (truncated for non-orchestrator) */}
-            {!isOrchestrator ? (
-              <pre
-                className="whitespace-pre-wrap text-[0.8rem] leading-[1.55] font-sans"
-                style={{ color: mainText }}
-              >
-                {truncate(state.result.output, 240)}
-              </pre>
-            ) : (
-              <div className="text-[0.78rem]" style={{ color: subText }}>
-                ✓ 主編完成 — 結果見下方完整交付區
-              </div>
-            )}
+            <div className="text-[0.92rem] font-medium tracking-[-0.005em]" style={{ color: mainText }}>{agent.name}</div>
+            <div className="text-[0.74rem]" style={{ color: subText }}>{agent.role} · {agent.skill}</div>
           </div>
-        )}
+          <div className="text-right shrink-0 ml-3">
+            <div className="text-[0.68rem] tabular-nums" style={{ color: subText }}>
+              {status === "queued" && <span>queued</span>}
+              {status === "working" && (
+                <span className="font-medium" style={{ color: toneColor }}>
+                  {(elapsed / 1000).toFixed(1)}s
+                </span>
+              )}
+              {status === "delivered" && state && "result" in state && (
+                <>
+                  {(state.result.tookMs / 1000).toFixed(1)}s · {PROVIDER_LABEL[state.result.provider] ?? state.result.provider}
+                  {state.result.fellBack && <span style={{ color: "#FFB347" }}> ↺</span>}
+                </>
+              )}
+              {status === "failed" && "failed"}
+            </div>
+          </div>
+        </header>
+
+        <div className="px-4 py-3">
+          {status === "queued" && (
+            <div className="text-[0.78rem]" style={{ color: subText }}>等待 {agent.role} 上工…</div>
+          )}
+          {status === "working" && (
+            <div>
+              <div className="text-[0.74rem] mb-2" style={{ color: toneColor, fontWeight: 500 }}>
+                {agent.name} 正在{verbForTone(tone)}…
+              </div>
+              <WorkingShimmer onDark={onDark} />
+            </div>
+          )}
+          {status === "failed" && state && "error" in state && (
+            <div className="text-[0.78rem]" style={{ color: "#FF7777" }}>
+              {state.error.length > 180 ? state.error.slice(0, 180) + "…" : state.error}
+            </div>
+          )}
+          {status === "delivered" && state && "result" in state && (
+            <div>
+              {!isOrchestrator ? (
+                <pre className="whitespace-pre-wrap text-[0.82rem] leading-[1.55] font-sans" style={{ color: mainText }}>
+                  {truncate(state.result.output, 240)}
+                </pre>
+              ) : (
+                <div className="text-[0.82rem]" style={{ color: subText }}>
+                  ✓ 收尾完成 — 完整交付見下方紫框
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </article>
   );
+}
+
+function verbForTone(t: AgentTone): string {
+  if (t === "research") return "翻資料";
+  if (t === "analyze") return "分析";
+  if (t === "write") return "動筆寫稿";
+  if (t === "craft") return "上手雕琢";
+  return "整合收尾";
 }
 
 function truncate(s: string, n: number) {
@@ -670,12 +783,25 @@ function FinalDeliverable({
       style={{ border: `2px solid ${ACCENT}`, background: "white" }}
     >
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: ACCENT }}>
-            FINAL DELIVERABLE · 交付完成
-          </div>
-          <div className="font-display text-[1.25rem] tracking-[-0.015em] mt-1">
-            由 {result.agentName} 收尾
+        <div className="flex items-center gap-3">
+          <span
+            className="inline-flex items-center justify-center font-display tracking-tight shrink-0"
+            style={{
+              width: 44, height: 44, borderRadius: "50%",
+              background: TONE_COLOR[result.agentTone] ?? ACCENT, color: "white",
+              fontSize: result.agentAvatar.length > 1 ? "0.95rem" : "1.2rem",
+              boxShadow: `0 0 0 3px white, 0 0 0 4px ${ACCENT}`,
+            }}
+          >
+            {result.agentAvatar}
+          </span>
+          <div>
+            <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: ACCENT }}>
+              FINAL DELIVERABLE · 交付完成
+            </div>
+            <div className="font-display text-[1.25rem] tracking-[-0.015em]">
+              {result.agentName} · {result.agentRole}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
