@@ -21,6 +21,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
+import IngestDrawer, { type IngestTab } from "../components/methodology/IngestDrawer";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 interface MissionRow {
@@ -51,6 +52,8 @@ interface QuickTile {
   squadSlug?: string;
   workspace?: string;
   isMore?: boolean;
+  /** Open IngestDrawer instead of creating a mission. */
+  opensIngest?: IngestTab;
 }
 
 const QUICK_TILES: QuickTile[] = [
@@ -95,6 +98,10 @@ const QUICK_TILES: QuickTile[] = [
   { glyph: "+",   label: "自訂任務",
     missionTitle: "",
     missionDesc: "" },
+  { glyph: "☁",   label: "上傳",
+    missionTitle: "",
+    missionDesc: "",
+    opensIngest: "upload" },
   { glyph: "···", label: "顯示更多",
     missionTitle: "",
     missionDesc: "",
@@ -193,9 +200,11 @@ export default function MissionsHome() {
   const [customDesc, setCustomDesc] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creatingTpl, setCreatingTpl] = useState<string | null>(null);
+  const [ingestTab, setIngestTab] = useState<IngestTab | null>(null);
 
   const startFromTile = async (t: QuickTile) => {
     if (t.isMore) { navigate("/methodology"); return; }
+    if (t.opensIngest) { setIngestTab(t.opensIngest); return; }
     if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     setError(null);
     setCreatingTpl(t.label);
@@ -438,6 +447,17 @@ export default function MissionsHome() {
           </div>
         )}
       </section>
+
+      {/* ─── Ingest drawer (URL / Upload / GitHub) ─────────────── */}
+      <IngestDrawer
+        open={ingestTab !== null}
+        initialTab={ingestTab ?? "url"}
+        onClose={() => setIngestTab(null)}
+        onCreated={(slug) => {
+          setIngestTab(null);
+          navigate(`/methodology/${slug}`);
+        }}
+      />
     </main>
   );
 }
