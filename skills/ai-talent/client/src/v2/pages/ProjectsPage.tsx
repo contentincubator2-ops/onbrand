@@ -199,11 +199,11 @@ export default function ProjectsPage() {
         {/* Top-right CTAs */}
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <button
-            onClick={() => navigate("/methodology")}
+            onClick={() => navigate("/templates")}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-mos-hair rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
           >
             <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-mos-ink">先看看方法論</span>
+            <span className="text-mos-ink">先看看任務範本</span>
           </button>
           <button
             onClick={() => setCreateSource("recommended")}
@@ -307,7 +307,7 @@ export default function ProjectsPage() {
 
             <CreateMenu
               onNewFolder={() => alert("新增資料夾（即將推出）")}
-              onNewMission={() => navigate("/methodology")}
+              onNewMission={() => navigate("/templates")}
               onUploadFile={() => alert("上傳檔案（即將推出）")}
               onUploadFolder={() => alert("上傳資料夾（即將推出）")}
               onSyncSource={(s) => setSyncSource(s as SyncSource)}
@@ -358,7 +358,7 @@ export default function ProjectsPage() {
               <div className="text-[2.4rem] mb-3">📁</div>
               <div className="text-[0.92rem] text-mos-ink font-medium">還沒有專案</div>
               <div className="mt-1 text-[0.78rem] text-mos-muted">
-                從首頁選個方法論，或從網路萃取一個全新的方法論開始。
+                從首頁選個任務範本，或從網路萃取一個全新的任務範本開始。
               </div>
               <button
                 onClick={() => setCreateSource("recommended")}
@@ -431,7 +431,7 @@ export default function ProjectsPage() {
         onClose={() => setCreateSource(null)}
         onCreated={(slug) => {
           setCreateSource(null);
-          navigate(`/methodology/${slug}`);
+          navigate(`/templates/${slug}`);
         }}
       />
     </main>
@@ -676,7 +676,7 @@ function CreateMenu({
             <MenuItem
               glyph={<GridIcon />}
               label="新任務"
-              hint="從方法論型錄建立任務"
+              hint="從任務範本型錄建立任務"
               onClick={() => { close(); onNewMission(); }}
             />
 

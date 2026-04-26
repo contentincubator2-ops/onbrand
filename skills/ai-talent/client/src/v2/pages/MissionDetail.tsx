@@ -4,7 +4,7 @@
  * Three zones:
  *   Left  — task brief (read-only mission row)
  *   Mid   — applied methodology: editable step list with status pills,
- *           "套用方法論" CTA when none applied, sticky ForkPromptBar
+ *           "套用任務範本" CTA when none applied, sticky ForkPromptBar
  *           when steps differ from the original.
  *   Right — MethodologyCard mirroring the applied methodology
  *
@@ -70,7 +70,7 @@ export default function MissionDetail() {
   const updateMission = trpc.mission.update.useMutation();
   const forkMethodology = (trpc as any).methodology.fork.useMutation();
 
-  const onApplyMethodology = () => navigate("/methodology");
+  const onApplyMethodology = () => navigate("/templates");
 
   const onFork = async (newName: string) => {
     if (!sq) return;
@@ -169,7 +169,7 @@ export default function MissionDetail() {
         )}
 
         {methodologyQuery.isLoading && (
-          <div className="text-[0.82rem] text-mos-muted">載入方法論…</div>
+          <div className="text-[0.82rem] text-mos-muted">載入任務範本…</div>
         )}
 
         {sq && (
@@ -193,7 +193,7 @@ export default function MissionDetail() {
                 onClick={onApplyMethodology}
                 className="px-3 py-1.5 text-[0.66rem] tracking-[0.16em] uppercase border border-mos-hair text-mos-muted hover:text-mos-ink hover:border-mos-ink transition"
               >
-                換方法論
+                換任務範本
               </button>
             </div>
 
@@ -288,11 +288,11 @@ export default function MissionDetail() {
             }))}
             leadName={sq.lead?.name ?? "Squad Lead"}
             ctaLabel="預覽"
-            onCtaClick={() => navigate(`/methodology/${sq.slug}`)}
+            onCtaClick={() => navigate(`/templates/${sq.slug}`)}
           />
         ) : (
           <div className="w-[320px] h-[460px] border border-dashed border-mos-hair bg-white flex items-center justify-center text-[0.74rem] text-mos-soft">
-            尚未套用方法論
+            尚未套用任務範本
           </div>
         )}
       </aside>
@@ -401,7 +401,7 @@ function RecommendationPanel({
             AI · METHODOLOGY MATCH
           </div>
           <h2 className="font-display text-[1.4rem] text-mos-ink tracking-[-0.015em]">
-            為這個任務挑了這幾個方法論
+            為這個任務挑了這幾個任務範本
           </h2>
           <p className="mt-1 text-[0.78rem] text-mos-muted max-w-[420px]">
             按你的任務說明排序。點「套用」一鍵接管步驟，不滿意可以再換。

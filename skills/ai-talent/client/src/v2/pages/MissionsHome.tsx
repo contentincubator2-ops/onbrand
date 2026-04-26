@@ -75,7 +75,7 @@ const QUICK_TILES: QuickTile[] = [
     workspace: "youtube" },
   { glyph: "品",  label: "品牌定位",   layer: "L1", badge: "推薦",
     missionTitle: "品牌定位重塑（12 原型）",
-    missionDesc: "用 Carol Pearson 12 原型方法論梳理品牌個性與市場立足點。",
+    missionDesc: "用 Carol Pearson 12 原型任務範本梳理品牌個性與市場立足點。",
     squadSlug: "brand-archetype-positioning",
     workspace: "brand-positioning" },
   { glyph: "新",  label: "新品上市",   layer: "L5",
@@ -203,7 +203,7 @@ export default function MissionsHome() {
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
 
   const startFromTile = async (t: QuickTile) => {
-    if (t.isMore) { navigate("/methodology"); return; }
+    if (t.isMore) { navigate("/templates"); return; }
     if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
     if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     setError(null);
@@ -274,11 +274,11 @@ export default function MissionsHome() {
         {/* Top-right CTAs (Canva-style: '先睹為快' + '開始試用') */}
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <button
-            onClick={() => navigate("/methodology")}
+            onClick={() => navigate("/templates")}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-mos-hair rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
           >
             <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-mos-ink">先看看方法論</span>
+            <span className="text-mos-ink">先看看任務範本</span>
           </button>
           <button
             onClick={() => setCreateSource("recommended")}
@@ -309,7 +309,7 @@ export default function MissionsHome() {
                 type="text"
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="搜尋方法論、任務模板與最近的項目"
+                placeholder="搜尋任務範本、任務模板與最近的項目"
                 className="w-full pl-14 pr-5 py-[14px] text-[0.92rem] bg-white rounded-full border border-[#5B3CC8]/30 focus:outline-none focus:border-[#5B3CC8] focus:ring-2 focus:ring-[#5B3CC8]/15 transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
               />
             </div>
@@ -354,9 +354,9 @@ export default function MissionsHome() {
         {featured.length > 0 && (
           <>
             <SectionHeader
-              title="為你推薦的方法論"
+              title="為你推薦的任務範本"
               cta="完整型錄 →"
-              onCtaClick={() => navigate("/methodology")}
+              onCtaClick={() => navigate("/templates")}
             />
             <div className="-mx-2 mb-12 overflow-x-auto pb-2">
               <div className="flex gap-4 px-2" style={{ minWidth: "min-content" }}>
@@ -367,7 +367,7 @@ export default function MissionsHome() {
                     busy={creatingTpl === `sq-${sq.slug}`}
                     disabled={!!creatingTpl}
                     onClick={() => startFromSquad(sq)}
-                    onPreview={() => navigate(`/methodology/${sq.slug}`)}
+                    onPreview={() => navigate(`/templates/${sq.slug}`)}
                   />
                 ))}
               </div>
@@ -452,7 +452,7 @@ export default function MissionsHome() {
         onClose={() => setCreateSource(null)}
         onCreated={(slug) => {
           setCreateSource(null);
-          navigate(`/methodology/${slug}`);
+          navigate(`/templates/${slug}`);
         }}
       />
     </main>
@@ -623,7 +623,7 @@ function FeaturedSquadTile({
         disabled={disabled}
         className="mt-1.5 w-full text-[0.66rem] text-mos-muted hover:text-mos-ink transition py-1"
       >
-        預覽方法論 →
+        預覽任務範本 →
       </button>
     </div>
   );

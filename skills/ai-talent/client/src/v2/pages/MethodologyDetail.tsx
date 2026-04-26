@@ -62,9 +62,9 @@ export default function MethodologyDetail() {
   if (!s) {
     return (
       <div className="max-w-[1280px] mx-auto px-8 py-10">
-        <div className="text-mos-muted">找不到方法論「{slug}」。</div>
-        <Link to="/methodology" className="mt-4 inline-block text-mos-ink underline underline-offset-4">
-          ← 回方法論型錄
+        <div className="text-mos-muted">找不到任務範本「{slug}」。</div>
+        <Link to="/templates" className="mt-4 inline-block text-mos-ink underline underline-offset-4">
+          ← 回任務範本型錄
         </Link>
       </div>
     );

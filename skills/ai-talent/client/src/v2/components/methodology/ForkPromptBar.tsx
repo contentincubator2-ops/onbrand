@@ -4,7 +4,7 @@
  *
  * Two actions:
  *   "捨棄變更" → reset to original (parent calls reset)
- *   "存成新方法論" → opens an inline name prompt → calls
+ *   "存成新任務範本" → opens an inline name prompt → calls
  *                    methodology.fork → updates mission's squadSlug.
  *
  * Hermes-style: every customization becomes its own first-class
@@ -36,7 +36,7 @@ export default function ForkPromptBar({
               METHODOLOGY DIRTY
             </div>
             <div className="text-[0.92rem] truncate">
-              你已調整 {dirtyCount} 處 — 要把這份新版本存成自己的方法論嗎？
+              你已調整 {dirtyCount} 處 — 要把這份新版本存成自己的任務範本嗎？
             </div>
           </div>
 
@@ -52,7 +52,7 @@ export default function ForkPromptBar({
                 onClick={() => setEditing(true)}
                 className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase bg-white text-mos-ink hover:bg-white/90"
               >
-                存成新方法論 →
+                存成新任務範本 →
               </button>
             </>
           )}
@@ -62,7 +62,7 @@ export default function ForkPromptBar({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="新方法論名稱"
+                placeholder="新任務範本名稱"
                 className="bg-mos-body border border-white/30 text-white px-3 py-2 text-[0.86rem] focus:outline-none focus:border-white w-[280px]"
                 disabled={busy}
               />

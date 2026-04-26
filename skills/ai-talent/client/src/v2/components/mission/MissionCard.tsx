@@ -173,7 +173,7 @@ export default function MissionCard({
               METHODOLOGY · NONE
             </div>
             <div className="mt-0.5 font-display text-[0.96rem] leading-tight text-mos-muted">
-              尚未套用方法論
+              尚未套用任務範本
             </div>
             <div className="text-[0.68rem] text-mos-soft">進入後 AI 會自動推薦</div>
           </div>

@@ -69,10 +69,10 @@ export default function MethodologyCatalog() {
             METHODOLOGY CATALOG
           </div>
           <h1 className="mt-1 font-display text-[2.4rem] leading-[1.05] text-mos-ink tracking-[-0.02em]">
-            方法論型錄
+            任務範本型錄
           </h1>
           <div className="mt-2 text-[0.86rem] text-mos-muted max-w-[520px]">
-            每張卡片都是已配好 squad、可立即套用的方法論。可以從網路抽取新方法論，或在任務裡調整後 fork 成自己的版本。
+            每張卡片都是已配好 squad、可立即套用的任務範本。可以從網路抽取新任務範本，或在任務裡調整後 fork 成自己的版本。
           </div>
         </div>
         <button
@@ -92,7 +92,7 @@ export default function MethodologyCatalog() {
               ["seeded", "預設"],
               ["ingested", "已收錄"],
               ["forked", "Fork"],
-              ["mine", "我的方法論"],
+              ["mine", "我的任務範本"],
             ] as Array<[SourceFilter, string]>
           ).map(([val, label]) => (
             <FilterChip
@@ -111,14 +111,14 @@ export default function MethodologyCatalog() {
       </div>
 
       {squadsQuery.isLoading && sourceFilter !== "mine" && (
-        <div className="text-[0.82rem] text-mos-muted">載入方法論中…</div>
+        <div className="text-[0.82rem] text-mos-muted">載入任務範本中…</div>
       )}
       {sourceFilter === "mine" && mineQuery.isLoading && (
-        <div className="text-[0.82rem] text-mos-muted">載入我的方法論中…</div>
+        <div className="text-[0.82rem] text-mos-muted">載入我的任務範本中…</div>
       )}
 
       {!squadsQuery.isLoading && filtered.length === 0 && (
-        <div className="text-[0.82rem] text-mos-muted py-10">沒有符合的方法論。</div>
+        <div className="text-[0.82rem] text-mos-muted py-10">沒有符合的任務範本。</div>
       )}
 
       <div className="flex flex-wrap gap-6">
@@ -148,8 +148,8 @@ export default function MethodologyCatalog() {
               steps={stepRows}
               leadName={lead}
               ctaLabel="套用"
-              onCtaClick={() => navigate(`/methodology/${s.slug}`)}
-              onClick={() => navigate(`/methodology/${s.slug}`)}
+              onCtaClick={() => navigate(`/templates/${s.slug}`)}
+              onClick={() => navigate(`/templates/${s.slug}`)}
             />
           );
         })}
@@ -161,11 +161,11 @@ export default function MethodologyCatalog() {
         initialSource="recommended"
         onClose={() => setDrawerOpen(false)}
         onCreated={(slug) => {
-          // Refresh both lists so the new card surfaces in "我的方法論".
+          // Refresh both lists so the new card surfaces in "我的任務範本".
           utils?.methodology?.listMine?.invalidate?.();
           (squadsQuery as any).refetch?.();
           // Jump straight to the detail page of the new methodology.
-          navigate(`/methodology/${slug}`);
+          navigate(`/templates/${slug}`);
         }}
       />
     </main>

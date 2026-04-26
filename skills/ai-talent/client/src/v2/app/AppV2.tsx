@@ -70,8 +70,8 @@ export default function AppV2() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/m/:missionId" element={<MissionDetail />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionDetail />} />
-          <Route path="/methodology" element={<MethodologyCatalog />} />
-          <Route path="/methodology/:slug" element={<MethodologyDetail />} />
+          <Route path="/templates" element={<MethodologyCatalog />} />
+          <Route path="/templates/:slug" element={<MethodologyDetail />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

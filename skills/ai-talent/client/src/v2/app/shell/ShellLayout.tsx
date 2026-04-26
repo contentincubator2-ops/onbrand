@@ -10,7 +10,7 @@
  *   └──┴───────────────────────────────────────┘
  *
  * Sidebar mirrors Canva's left rail: a top "+ 建立" CTA followed by a
- * stack of icon+label nav cells (首頁 / 專案 / 方法論 / 品牌 / AI / 顯示更多).
+ * stack of icon+label nav cells (首頁 / 專案 / 任務範本 / 品牌 / AI / 顯示更多).
  * Active cell shows a subtle left accent bar and tinted background.
  *
  * The sidebar is collapsible — click the chevron at top-left to toggle
@@ -156,9 +156,9 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    to: "/methodology",
-    label: "方法論",
-    matchPrefix: "/methodology",
+    to: "/templates",
+    label: "任務範本",
+    matchPrefix: "/templates",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="16" rx="2" />

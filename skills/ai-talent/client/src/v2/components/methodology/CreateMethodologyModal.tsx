@@ -1,10 +1,10 @@
 /**
  * CreateMethodologyModal — Canva-style full-screen "建立設計" modal,
- * adapted to "新增方法論".
+ * adapted to "新增任務範本".
  *
  * Layout (matches the user's Canva reference screenshot):
  *   ┌─────────────────────────────────────────────────────────────┐
- *   │  新增方法論                                              ×  │
+ *   │  新增任務範本                                              ×  │
  *   ├─────────────┬───────────────────────────────────────────────┤
  *   │ 為你推薦     │  <source-specific input pane>                 │
  *   │ ─── 網路 ──  │                                               │
@@ -76,7 +76,7 @@ const SOURCES: SourceDef[] = [
     label: "為你推薦",
     group: "recommended",
     glyph: "✦",
-    blurb: "依你的品牌與最近任務，推薦最常用的方法論來源。",
+    blurb: "依你的品牌與最近任務，推薦最常用的任務範本來源。",
     inputType: "info",
     ready: true,
   },
@@ -86,7 +86,7 @@ const SOURCES: SourceDef[] = [
     label: "網頁 / 文章",
     group: "web",
     glyph: "W",
-    blurb: "貼上 Wikipedia、Medium、Substack、部落格、研究機構公開網址，系統閱讀後抽取方法論。",
+    blurb: "貼上 Wikipedia、Medium、Substack、部落格、研究機構公開網址，系統閱讀後抽取任務範本。",
     inputType: "url",
     placeholder: "https://en.wikipedia.org/wiki/Jobs_to_be_done",
     ready: true,
@@ -96,7 +96,7 @@ const SOURCES: SourceDef[] = [
     label: "YouTube 影片",
     group: "web",
     glyph: "▶",
-    blurb: "貼上 YouTube 影片連結，系統會閱讀字幕（CC）並萃取出影片中的方法論主軸。",
+    blurb: "貼上 YouTube 影片連結，系統會閱讀字幕（CC）並萃取出影片中的任務範本主軸。",
     inputType: "url",
     placeholder: "https://www.youtube.com/watch?v=...",
     ready: true,
@@ -107,7 +107,7 @@ const SOURCES: SourceDef[] = [
     label: "書籍",
     group: "web",
     glyph: "B",
-    blurb: "輸入書名 + 作者，或直接貼上 Goodreads / Amazon / 出版社頁面 URL。系統會找書中提到的核心方法論。",
+    blurb: "輸入書名 + 作者，或直接貼上 Goodreads / Amazon / 出版社頁面 URL。系統會找書中提到的核心任務範本。",
     inputType: "url",
     placeholder: "https://www.goodreads.com/book/show/...",
     ready: true,
@@ -129,7 +129,7 @@ const SOURCES: SourceDef[] = [
     label: "競爭者案例",
     group: "web",
     glyph: "C",
-    blurb: "貼上競爭品牌的案例頁、品牌故事頁、產品著陸頁，系統倒推他們在用的方法論。",
+    blurb: "貼上競爭品牌的案例頁、品牌故事頁、產品著陸頁，系統倒推他們在用的任務範本。",
     inputType: "url",
     placeholder: "https://nike.com/stories/...",
     ready: true,
@@ -141,7 +141,7 @@ const SOURCES: SourceDef[] = [
     label: "GitHub",
     group: "tools",
     glyph: "G",
-    blurb: "貼上 GitHub repo / 子資料夾 / README 連結，系統抓 README 與 manifest 結構化成方法論。",
+    blurb: "貼上 GitHub repo / 子資料夾 / README 連結，系統抓 README 與 manifest 結構化成任務範本。",
     inputType: "url",
     placeholder: "https://github.com/anthropics/claude-skills/tree/main/marketing-os",
     ready: true,
@@ -164,7 +164,7 @@ const SOURCES: SourceDef[] = [
     label: "ChatGPT GPT",
     group: "tools",
     glyph: "✸",
-    blurb: "貼上你建立的 Custom GPT 的指令 / 描述 / Knowledge 摘要，系統轉換成方法論。",
+    blurb: "貼上你建立的 Custom GPT 的指令 / 描述 / Knowledge 摘要，系統轉換成任務範本。",
     inputType: "text",
     placeholder: "貼上 GPT 的 System Prompt 或匯出 JSON……",
     ready: false,
@@ -175,7 +175,7 @@ const SOURCES: SourceDef[] = [
     label: "Notion 頁面",
     group: "tools",
     glyph: "N",
-    blurb: "貼上公開分享的 Notion 頁面連結，系統讀取頁面內容萃取方法論。",
+    blurb: "貼上公開分享的 Notion 頁面連結，系統讀取頁面內容萃取任務範本。",
     inputType: "url",
     placeholder: "https://your-team.notion.site/...",
     ready: true,
@@ -187,7 +187,7 @@ const SOURCES: SourceDef[] = [
     label: "上傳檔案",
     group: "files",
     glyph: "☁",
-    blurb: "上傳 SOP、操作手冊、方法論草稿、skill 文件（.md / .txt / .json / .pdf）。",
+    blurb: "上傳 SOP、操作手冊、任務範本草稿、skill 文件（.md / .txt / .json / .pdf）。",
     inputType: "file",
     ready: false,
     hint: "支援 .md / .txt / .json / .markdown / .pdf。檔案上傳後在本地預覽，後端萃取下一輪上線。",
@@ -198,7 +198,7 @@ const SOURCES: SourceDef[] = [
     label: "從零開始",
     group: "manual",
     glyph: "+",
-    blurb: "建立空白方法論，自訂步驟、所需技能、產出。適合內部獨家流程。",
+    blurb: "建立空白任務範本，自訂步驟、所需技能、產出。適合內部獨家流程。",
     inputType: "info",
     ready: true,
   },
@@ -387,7 +387,7 @@ export default function CreateMethodologyModal({
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b border-mos-hair">
           <h2 className="font-display text-[1.6rem] text-mos-ink tracking-[-0.015em]">
-            新增方法論
+            新增任務範本
           </h2>
           <button
             onClick={onClose}
@@ -547,7 +547,7 @@ function SourcePane({
       <div className="space-y-4 max-w-[640px]">
         <RecoTile
           label="從 YouTube 影片"
-          desc="貼上 1 條影片連結，30 秒生成方法論。"
+          desc="貼上 1 條影片連結，30 秒生成任務範本。"
           onClick={() => onSwitchSource("youtube")}
         />
         <RecoTile
@@ -562,7 +562,7 @@ function SourcePane({
         />
         <RecoTile
           label="從零開始"
-          desc="自訂步驟，建立你的獨家方法論。"
+          desc="自訂步驟，建立你的獨家任務範本。"
           onClick={() => onSwitchSource("blank")}
         />
       </div>
@@ -574,13 +574,13 @@ function SourcePane({
     return (
       <div className="max-w-[640px] space-y-4">
         <div className="text-[0.86rem] text-mos-body">
-          先在型錄裡開一張空白方法論卡片，再進入編輯器自訂步驟。
+          先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。
         </div>
         <button
-          onClick={() => { onClose(); window.location.assign("/methodology?new=blank"); }}
+          onClick={() => { onClose(); window.location.assign("/templates?new=blank"); }}
           className="px-5 py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition"
         >
-          建立空白方法論 →
+          建立空白任務範本 →
         </button>
       </div>
     );
@@ -667,7 +667,7 @@ function SourcePane({
             <button onClick={() => onSwitchSource("github")} className="underline text-mos-ink">GitHub</button>
             {" "}或{" "}
             <button onClick={() => onSwitchSource("web")} className="underline text-mos-ink">網頁</button>
-            {" "}模式建立方法論。
+            {" "}模式建立任務範本。
           </div>
         )}
       </div>
@@ -1038,7 +1038,7 @@ function ReviewPane({
           onClick={onCommit}
           className="flex-1 py-2.5 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition rounded"
         >
-          確認新增方法論 →
+          確認新增任務範本 →
         </button>
       </div>
     </div>
