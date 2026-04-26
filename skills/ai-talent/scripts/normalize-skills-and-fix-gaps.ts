@@ -399,6 +399,7 @@ async function main() {
           const [r]: any = await pool.execute(insertSql, [s.lead_agent_id, best.slug, best.bp, `lead-method-align:${s.slug}`, 0.75]);
           if (r.affectedRows === 1) {
             cSkillsAdded++;
+            if (!skillMap.has(s.lead_agent_id)) skillMap.set(s.lead_agent_id, new Set());
             skillMap.get(s.lead_agent_id)!.add(best.slug);
           }
         } else cSkillsAdded++;
