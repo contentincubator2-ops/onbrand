@@ -1,0 +1,37 @@
+name: Admin — Classify outputTypes
+
+# Read-only. Runs scripts/classify-outputtypes.ts on the VM:
+#   1. classify all distinct step.outputType strings into 7 categories
+#   2. print layer x category matrix
+#   3. write data/outputtype-taxonomy.json (committed back via separate PR)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            cd "$APP/skills/ai-talent"
+            if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -5; fi
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  🔖 Classify outputTypes"
+            echo "════════════════════════════════════════════════════════════════"
+            npm run db:classify-outputtypes
