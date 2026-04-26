@@ -1,0 +1,60 @@
+name: Admin — Full coverage backfill (skills + leads)
+
+# Three-stage backfill so:
+#   - skill_catalog gains 60+ marketing-domain skills
+#   - every agent has ≥3 skills (token match + universal backstop)
+#   - every squad lead has ≥3 lead-fit skills
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Show planned writes only"
+        type: boolean
+        default: true
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 900s
+          envs: GH_TOKEN,DRY_RUN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            cd "$APP/skills/ai-talent"
+            if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -5; fi
+            DRY=""
+            if [ "$DRY_RUN" = "true" ]; then DRY="--dry-run"; fi
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  ① Expand skill_catalog (marketing-canon)"
+            echo "════════════════════════════════════════════════════════════════"
+            npx tsx scripts/expand-marketing-skills.ts
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  ② Backfill universal skills (≥3 per agent)  ${DRY}"
+            echo "════════════════════════════════════════════════════════════════"
+            npx tsx scripts/backfill-universal-skills.ts $DRY
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  ③ Backfill lead skills (≥3 per squad lead)  ${DRY}"
+            echo "════════════════════════════════════════════════════════════════"
+            npx tsx scripts/backfill-lead-skills.ts $DRY
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  ④ Final audit"
+            echo "════════════════════════════════════════════════════════════════"
+            npx tsx scripts/audit-skill-coverage-full.ts
