@@ -1,14 +1,20 @@
 /**
- * QuickTasksPage — 30 秒產出 · 多 Agent 並行調度區
+ * QuickTasksPage — 30 秒產出 · 多 Agent 分工合作管線
  *
- * 設計原則：
- *   1. 編輯級黑白：白底 + 黑字 + #5B3CC8 紫單一強調，hairline 1px 黑線、無 emoji
- *   2. 自由輸入大對話框（學 Canva）→ 後端路由 → 自動跳到對應任務
- *   3. 10 件任務 tile，全部承諾 < 30 秒
- *   4. 跑任務時：每個 agent 一張卡片，依序從 queued → working → delivered
- *   5. 結構化任務（SWOT / Persona / 色票 / 命名）回 JSON 直接渲染成卡片
+ * 視覺敘事：
+ *   Stage 1（並行）: 偵察兵同時掃情報   → 卡片同時亮
+ *   Stage 2（並行）: 草稿手寫初稿        → 卡片同時亮
+ *   Stage N（最後）: Orchestrator 收尾   → 黑底主編卡，倒數收齊一份交付
+ *
+ * 設計：
+ *   - 編輯級黑白：白底 + 黑字 + 紫 #5B3CC8 強調
+ *   - 自由輸入框 → 路由到 task
+ *   - Tile 編號 01-10
+ *   - RunPanel 是大頁，左 brief / 右 stage 軌道
+ *   - 每個 stage 一條橫向卡片群，stage 之間有 ↓ 箭頭
+ *   - Orchestrator stage 卡片黑底白字，副標「最終交付」
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
 
 /* ─────────────────────────── Types ─────────────────────────────────────── */
@@ -27,28 +33,40 @@ type AgentMeta = {
   id: string;
   name: string;
   role: string;
+  skill: string;
   provider: string;
+};
+
+type StageMeta = {
+  id: string;
+  label: string;
+  description: string;
+  isOrchestrator: boolean;
+  agents: AgentMeta[];
 };
 
 type TaskMeta = {
   id: string;
   label: string;
   etaSeconds: number;
-  outputKind:
-    | "text" | "chips" | "swot" | "persona-card"
-    | "swatches" | "name-cards" | "compare-2col" | "rewrite-3col";
+  finalKind: "text" | "swot" | "persona-card" | "swatches" | "name-cards" | "rich-text";
   fields: TaskField[];
-  agents: AgentMeta[];
+  stages: StageMeta[];
 };
 
 type AgentResult = {
+  taskId: string;
+  stageId: string;
+  stageLabel: string;
   agentId: string;
   agentName: string;
   agentRole: string;
+  agentSkill: string;
   output: string;
   structured: any | null;
   provider: string;
   model: string;
+  fellBack: boolean;
   tookMs: number;
   brandInjected: boolean;
 };
@@ -83,14 +101,9 @@ export default function QuickTasksPage() {
     [tasks, activeId]
   );
 
-  const onRoute = (taskId: string, inputs: Record<string, string | number>) => {
-    setPrefilled(inputs);
-    setActiveId(taskId);
-  };
-
   return (
     <main className="bg-white pb-24" style={{ color: INK }}>
-      {/* ─── HERO ─── */}
+      {/* HERO */}
       <section className="border-b" style={{ borderColor: HAIR }}>
         <div className="max-w-[1200px] mx-auto px-8 pt-20 pb-12">
           <div className="font-display text-[0.6rem] tracking-[0.32em] uppercase" style={{ color: "#888" }}>
@@ -99,18 +112,21 @@ export default function QuickTasksPage() {
           <h1 className="mt-3 font-display text-[3.4rem] leading-[1.02] tracking-[-0.025em]">
             30 秒產出
           </h1>
-          <p className="mt-4 text-[1rem] leading-relaxed" style={{ color: "#444", maxWidth: 640 }}>
-            告訴我們你要什麼，三個 AI 模型同時為你的品牌動筆。
+          <p className="mt-4 text-[1rem] leading-relaxed" style={{ color: "#444", maxWidth: 660 }}>
+            一個 brief，多位 agent 分工合作。
+            偵察兵抽情報 · 草稿手寫初稿 · 主編收尾打磨。
             <br />
-            或從下方挑一件，我們派出最對的 agent 班底。
+            最後 10 秒由 orchestrator 整合，交給你一份完整可用的稿。
           </p>
 
-          {/* Free input bar */}
-          <FreeInputBar onRoute={onRoute} disabled={tasksQuery.isLoading} />
+          <FreeInputBar
+            onRoute={(taskId, inputs) => { setPrefilled(inputs); setActiveId(taskId); }}
+            disabled={tasksQuery.isLoading}
+          />
         </div>
       </section>
 
-      {/* ─── Tile menu ─── */}
+      {/* TILE MENU */}
       <section className="max-w-[1200px] mx-auto px-8 mt-14">
         <div className="flex items-end justify-between mb-6">
           <h2 className="font-display text-[1.5rem] tracking-[-0.015em]">所有任務</h2>
@@ -124,57 +140,58 @@ export default function QuickTasksPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: HAIR }}>
-          {tasks.map((t, i) => (
-            <button
-              key={t.id}
-              onClick={() => { setPrefilled({}); setActiveId(t.id); }}
-              className="group text-left bg-white p-6 hover:bg-[#FAFAFA] transition relative"
-            >
-              <div className="flex items-start justify-between">
-                <div
-                  className="font-display text-[2rem] tracking-[-0.02em]"
-                  style={{ color: i < tasks.length ? ACCENT : INK }}
-                >
-                  {String(i + 1).padStart(2, "0")}
+          {tasks.map((t, i) => {
+            const totalAgents = t.stages.reduce((n, s) => n + s.agents.length, 0);
+            return (
+              <button
+                key={t.id}
+                onClick={() => { setPrefilled({}); setActiveId(t.id); }}
+                className="group text-left bg-white p-6 hover:bg-[#FAFAFA] transition relative"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="font-display text-[2rem] tracking-[-0.02em]" style={{ color: ACCENT }}>
+                    {String(i + 1).padStart(2, "0")}
+                  </div>
+                  <div className="text-[0.66rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>
+                    ~ {t.etaSeconds}s
+                  </div>
                 </div>
-                <div className="text-[0.66rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>
-                  ~ {t.etaSeconds}s
+                <div className="mt-4 text-[1.05rem] font-medium tracking-[-0.005em]">
+                  {t.label}
                 </div>
-              </div>
-              <div className="mt-4 text-[1.05rem] font-medium tracking-[-0.005em]">
-                {t.label}
-              </div>
-              <div className="mt-2 text-[0.78rem]" style={{ color: "#666" }}>
-                {t.agents.length === 1
-                  ? `${t.agents[0].name} 單獨交付`
-                  : `${t.agents.length} 位 agent 並行 · ${t.agents.map((a) => a.name.split(" · ")[0]).join(" / ")}`}
-              </div>
-              <div className="mt-5 flex items-center gap-1.5 text-[0.7rem] tracking-[0.16em] uppercase opacity-0 group-hover:opacity-100 transition" style={{ color: ACCENT }}>
-                派出 agent
-                <span aria-hidden>→</span>
-              </div>
-            </button>
-          ))}
+                <div className="mt-2 text-[0.78rem]" style={{ color: "#666" }}>
+                  {t.stages.length} 階段 · {totalAgents} 位 agent 接力
+                </div>
+                <div className="mt-3 flex items-center gap-1 text-[0.7rem]" style={{ color: "#999" }}>
+                  {t.stages.map((s, idx) => (
+                    <React.Fragment key={s.id}>
+                      <span style={{ color: s.isOrchestrator ? INK : "#999" }}>
+                        {s.label}
+                      </span>
+                      {idx < t.stages.length - 1 && <span aria-hidden>›</span>}
+                    </React.Fragment>
+                  ))}
+                </div>
+                <div className="mt-5 flex items-center gap-1.5 text-[0.7rem] tracking-[0.16em] uppercase opacity-0 group-hover:opacity-100 transition" style={{ color: ACCENT }}>
+                  派出 agent <span aria-hidden>→</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* ─── Run modal ─── */}
       {activeTask && (
-        <RunPanel
-          task={activeTask}
-          prefilled={prefilled}
-          onClose={() => setActiveId(null)}
-        />
+        <RunPanel task={activeTask} prefilled={prefilled} onClose={() => setActiveId(null)} />
       )}
     </main>
   );
 }
 
-/* ─────────────────────────── Free input bar ────────────────────────────── */
+/* ─────────────────────────── Free input ────────────────────────────────── */
 
 function FreeInputBar({
-  onRoute,
-  disabled,
+  onRoute, disabled,
 }: {
   onRoute: (taskId: string, inputs: Record<string, string | number>) => void;
   disabled?: boolean;
@@ -182,19 +199,16 @@ function FreeInputBar({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
-
   const routeMut = (trpc as any).quickTask?.route?.useMutation?.();
 
   const submit = async () => {
     if (!text.trim() || busy || !routeMut) return;
-    setBusy(true);
-    setHint(null);
+    setBusy(true); setHint(null);
     try {
       const r = await routeMut.mutateAsync({ text: text.trim() });
       if (!r.taskId || r.confidence < 0.4) {
-        setHint("沒有完全匹配的任務 — 請從下方選一件，或換個說法再試。");
+        setHint("沒有完全匹配的任務 — 請從下方選一件，或換個說法。");
       } else {
-        // Convert string inputs to expected types (fields will coerce)
         onRoute(r.taskId, r.inputs ?? {});
         setText("");
       }
@@ -214,7 +228,7 @@ function FreeInputBar({
         <span aria-hidden style={{ color: ACCENT }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"
-                  stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </span>
         <input
@@ -234,11 +248,7 @@ function FreeInputBar({
           {busy ? "路由中…" : "派 Agent"}
         </button>
       </div>
-      {hint && (
-        <div className="mt-2 text-[0.78rem]" style={{ color: "#888" }}>
-          {hint}
-        </div>
-      )}
+      {hint && <div className="mt-2 text-[0.78rem]" style={{ color: "#888" }}>{hint}</div>}
       <div className="mt-2 text-[0.7rem] tracking-[0.16em] uppercase" style={{ color: "#AAA" }}>
         AUTO-MATCH · 你的品牌大腦會自動帶入
       </div>
@@ -250,25 +260,17 @@ function FreeInputBar({
 
 function RunPanel({
   task, prefilled, onClose,
-}: {
-  task: TaskMeta;
-  prefilled: Record<string, string | number>;
-  onClose: () => void;
-}) {
+}: { task: TaskMeta; prefilled: Record<string, string | number>; onClose: () => void }) {
   const [inputs, setInputs] = useState<Record<string, string | number>>(() => {
     const init: Record<string, string | number> = {};
-    for (const f of task.fields) {
-      if (f.default !== undefined) init[f.key] = f.default;
-    }
+    for (const f of task.fields) if (f.default !== undefined) init[f.key] = f.default;
     return { ...init, ...prefilled };
   });
 
-  const [agentStates, setAgentStates] = useState<Record<string, AgentState>>(() => {
-    const m: Record<string, AgentState> = {};
-    for (const a of task.agents) m[a.id] = { status: "queued" };
-    return m;
-  });
+  // states keyed by `${stageId}:${agentId}`
+  const [agentStates, setAgentStates] = useState<Record<string, AgentState>>({});
   const [hasRun, setHasRun] = useState(false);
+  const [activeStageIdx, setActiveStageIdx] = useState<number>(-1);
 
   const runMut = (trpc as any).quickTask.runAgent.useMutation();
 
@@ -279,142 +281,177 @@ function RunPanel({
       return v !== undefined && String(v).trim().length > 0;
     });
 
-  const allDelivered = task.agents.every(
-    (a) => agentStates[a.id]?.status === "delivered" || agentStates[a.id]?.status === "failed"
-  );
+  const k = (stageId: string, agentId: string) => `${stageId}:${agentId}`;
+
+  const finalAgent = useMemo(() => {
+    const last = task.stages[task.stages.length - 1];
+    return last?.agents[last.agents.length - 1] ?? null;
+  }, [task]);
+  const finalState = finalAgent
+    ? agentStates[k(task.stages[task.stages.length - 1].id, finalAgent.id)]
+    : undefined;
 
   const runAll = async () => {
     setHasRun(true);
-    // Reset state to queued, then immediately mark working with staggered start
-    const reset: Record<string, AgentState> = {};
-    for (const a of task.agents) reset[a.id] = { status: "queued" };
-    setAgentStates(reset);
+    // Reset
+    const fresh: Record<string, AgentState> = {};
+    for (const s of task.stages) for (const a of s.agents) fresh[k(s.id, a.id)] = { status: "queued" };
+    setAgentStates(fresh);
 
-    // Fan out — all agents in parallel. Stagger start markers by 80ms for visual.
-    task.agents.forEach((agent, idx) => {
-      setTimeout(() => {
-        setAgentStates((s) => ({ ...s, [agent.id]: { status: "working", startedAt: Date.now() } }));
-      }, idx * 80);
+    const prior: Array<{ stageLabel: string; agentName: string; output: string }> = [];
 
-      runMut
-        .mutateAsync({ taskId: task.id, agentId: agent.id, inputs })
-        .then((r: AgentResult) => {
-          setAgentStates((s) => ({ ...s, [agent.id]: { status: "delivered", result: r } }));
-        })
-        .catch((e: any) => {
-          setAgentStates((s) => ({
-            ...s,
-            [agent.id]: { status: "failed", error: String(e?.message ?? e) },
+    for (let si = 0; si < task.stages.length; si++) {
+      const stage = task.stages[si];
+      setActiveStageIdx(si);
+
+      // Mark all this stage's agents working (staggered visual)
+      stage.agents.forEach((a, idx) => {
+        setTimeout(() => {
+          setAgentStates((prev) => ({
+            ...prev,
+            [k(stage.id, a.id)]: { status: "working", startedAt: Date.now() },
           }));
-        });
-    });
+        }, idx * 100);
+      });
+
+      // Fire all in parallel, await all
+      const results = await Promise.all(
+        stage.agents.map(async (a) => {
+          try {
+            const r = await runMut.mutateAsync({
+              taskId: task.id,
+              stageId: stage.id,
+              agentId: a.id,
+              inputs,
+              prior: prior.slice(), // pass copy of accumulated prior
+            });
+            setAgentStates((prev) => ({ ...prev, [k(stage.id, a.id)]: { status: "delivered", result: r } }));
+            return { ok: true as const, r };
+          } catch (e: any) {
+            setAgentStates((prev) => ({
+              ...prev,
+              [k(stage.id, a.id)]: { status: "failed", error: String(e?.message ?? e) },
+            }));
+            return { ok: false as const, error: String(e?.message ?? e), agentName: a.name };
+          }
+        })
+      );
+
+      // Add successful outputs to prior for next stage
+      for (const item of results) {
+        if (item.ok) {
+          prior.push({
+            stageLabel: stage.label,
+            agentName: item.r.agentName,
+            output: item.r.output,
+          });
+        }
+      }
+
+      // If ALL agents in this stage failed, stop the pipeline
+      if (results.every((x) => !x.ok)) {
+        setActiveStageIdx(-1);
+        return;
+      }
+    }
+    setActiveStageIdx(-1);
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/60 overflow-y-auto"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/60 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-white w-[min(1180px,96vw)] my-8 self-start"
+        className="bg-white w-[min(1200px,96vw)] my-8 self-start"
         onClick={(e) => e.stopPropagation()}
         style={{ border: `1px solid ${INK}` }}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between px-8 py-5 border-b"
-          style={{ borderColor: INK }}
-        >
+        <div className="flex items-center justify-between px-8 py-5 border-b" style={{ borderColor: INK }}>
           <div>
             <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: "#888" }}>
-              QUICK TASK · ~ {task.etaSeconds}s
+              QUICK TASK · ~ {task.etaSeconds}s · {task.stages.length} 階段管線
             </div>
-            <div className="font-display text-[1.4rem] tracking-[-0.015em] mt-1">
-              {task.label}
-            </div>
+            <div className="font-display text-[1.4rem] tracking-[-0.015em] mt-1">{task.label}</div>
           </div>
           <button onClick={onClose} className="text-[1.4rem] hover:opacity-60 transition" aria-label="關閉">×</button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[360px_1fr]">
-          {/* Form */}
+        <div className="grid grid-cols-1 md:grid-cols-[340px_1fr]">
+          {/* BRIEF */}
           <div className="p-8 border-r space-y-5" style={{ borderColor: HAIR }}>
-            <div className="text-[0.66rem] tracking-[0.24em] uppercase" style={{ color: "#888" }}>
-              BRIEF
-            </div>
+            <div className="text-[0.66rem] tracking-[0.24em] uppercase" style={{ color: "#888" }}>BRIEF</div>
             {task.fields.map((f) => (
-              <FieldInput
-                key={f.key}
-                field={f}
-                value={inputs[f.key]}
-                onChange={(v) => setInputs((p) => ({ ...p, [f.key]: v }))}
-              />
+              <FieldInput key={f.key} field={f} value={inputs[f.key]}
+                onChange={(v) => setInputs((p) => ({ ...p, [f.key]: v }))} />
             ))}
             <button
               onClick={runAll}
-              disabled={!requiredOk}
+              disabled={!requiredOk || activeStageIdx >= 0}
               className="w-full mt-3 py-3 text-[0.78rem] tracking-[0.22em] uppercase disabled:opacity-40 transition"
               style={{ background: INK, color: "white" }}
             >
-              {hasRun ? "再派一輪" : `派出 ${task.agents.length} 位 agent`}
+              {activeStageIdx >= 0 ? "管線執行中…" : hasRun ? "重新派出" : `派出管線（${task.stages.length} 階段）`}
             </button>
 
-            <div className="text-[0.7rem] tracking-[0.14em] uppercase pt-2" style={{ color: "#AAA" }}>
-              AGENT 班底
-            </div>
-            <div className="space-y-2">
-              {task.agents.map((a) => (
-                <div key={a.id} className="text-[0.78rem] flex items-center gap-2" style={{ color: "#444" }}>
-                  <span
-                    className="inline-block w-1.5 h-1.5 rounded-full"
-                    style={{ background: ACCENT }}
-                  />
-                  <span className="font-medium" style={{ color: INK }}>{a.name}</span>
-                  <span style={{ color: "#999" }}>· {a.role}</span>
-                </div>
+            <div className="text-[0.7rem] tracking-[0.14em] uppercase pt-2" style={{ color: "#AAA" }}>管線概覽</div>
+            <ol className="space-y-2 text-[0.78rem]">
+              {task.stages.map((s, i) => (
+                <li key={s.id} className="flex items-start gap-2">
+                  <span className="font-display tabular-nums shrink-0" style={{ color: s.isOrchestrator ? INK : "#999" }}>
+                    0{i + 1}
+                  </span>
+                  <div>
+                    <div className="font-medium" style={{ color: s.isOrchestrator ? INK : "#444" }}>
+                      {s.label}
+                      {s.isOrchestrator && (
+                        <span className="ml-2 text-[0.6rem] tracking-[0.18em] uppercase px-1.5 py-0.5 align-middle"
+                              style={{ background: INK, color: "white" }}>
+                          ORCHESTRATOR
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[0.74rem]" style={{ color: "#999" }}>{s.description}</div>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
 
-          {/* Live agent rail + outputs */}
-          <div className="p-8 bg-[#FAFAFA] min-h-[480px]">
+          {/* PIPELINE */}
+          <div className="p-8 bg-[#FAFAFA] min-h-[520px]">
             {!hasRun && (
-              <div className="h-full min-h-[400px] flex items-center justify-center text-center">
+              <div className="h-full min-h-[460px] flex items-center justify-center text-center">
                 <div>
-                  <div className="text-[0.7rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>
-                    READY
-                  </div>
+                  <div className="text-[0.7rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>READY</div>
                   <div className="mt-3 font-display text-[1.5rem] tracking-[-0.015em]">
-                    {task.agents.length} 位 agent 已就位
+                    {task.stages.length} 階段管線已就位
                   </div>
-                  <div className="mt-2 text-[0.85rem]" style={{ color: "#666", maxWidth: 380 }}>
-                    填好左邊的 brief，點「派出 agent」<br />
-                    每位用不同模型同時動筆，依序回到桌上
+                  <div className="mt-2 text-[0.85rem]" style={{ color: "#666", maxWidth: 420 }}>
+                    填好左邊的 brief，點「派出管線」<br />
+                    每個階段的 agent 會同時動工，前一階段交棒給下一階段
                   </div>
                 </div>
               </div>
             )}
 
             {hasRun && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div className="text-[0.66rem] tracking-[0.24em] uppercase" style={{ color: "#888" }}>
-                    {allDelivered ? "ALL DELIVERED" : "AGENTS WORKING"}
-                  </div>
-                  <ProgressDots states={agentStates} agents={task.agents} />
-                </div>
-
-                {task.agents.map((a) => (
-                  <AgentCard
-                    key={a.id}
-                    agent={a}
-                    state={agentStates[a.id]}
-                    outputKind={task.outputKind}
-                  />
+              <div className="space-y-0">
+                {task.stages.map((stage, si) => (
+                  <React.Fragment key={stage.id}>
+                    <StageBlock
+                      stage={stage}
+                      stageIdx={si}
+                      states={agentStates}
+                      isActive={activeStageIdx === si}
+                      kFn={k}
+                      finalKind={task.finalKind}
+                    />
+                    {si < task.stages.length - 1 && <Handoff />}
+                  </React.Fragment>
                 ))}
 
-                {allDelivered && task.outputKind === "rewrite-3col" && (
-                  <CompareGrid agents={task.agents} states={agentStates} />
+                {/* Final deliverable */}
+                {finalState?.status === "delivered" && "result" in finalState && (
+                  <FinalDeliverable result={finalState.result} finalKind={task.finalKind} />
                 )}
               </div>
             )}
@@ -425,106 +462,171 @@ function RunPanel({
   );
 }
 
-/* ─────────────────────────── Agent card ────────────────────────────────── */
+/* ─────────────────────────── Stage block ───────────────────────────────── */
 
-function ProgressDots({
-  states, agents,
-}: { states: Record<string, AgentState>; agents: AgentMeta[] }) {
+function StageBlock({
+  stage, stageIdx, states, isActive, kFn, finalKind,
+}: {
+  stage: StageMeta;
+  stageIdx: number;
+  states: Record<string, AgentState>;
+  isActive: boolean;
+  kFn: (sId: string, aId: string) => string;
+  finalKind: TaskMeta["finalKind"];
+}) {
+  const isOrch = stage.isOrchestrator;
+
   return (
-    <div className="flex items-center gap-1.5">
-      {agents.map((a) => {
-        const s = states[a.id]?.status ?? "queued";
-        const color = s === "delivered" ? ACCENT : s === "failed" ? "#C44" : s === "working" ? INK : "#DDD";
-        return (
-          <span
+    <section
+      className="p-5 transition"
+      style={{
+        background: isOrch ? INK : "white",
+        color: isOrch ? "white" : INK,
+        border: `1px solid ${isOrch ? INK : HAIR}`,
+        boxShadow: isActive ? `0 0 0 2px ${ACCENT}` : "none",
+      }}
+    >
+      <header className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="font-display text-[1.6rem] tabular-nums tracking-tight"
+            style={{ color: isOrch ? "white" : ACCENT }}
+          >
+            0{stageIdx + 1}
+          </div>
+          <div>
+            <div className="text-[0.62rem] tracking-[0.24em] uppercase opacity-70">
+              {isOrch ? "ORCHESTRATOR · 收尾" : `STAGE ${stageIdx + 1} · 並行`}
+            </div>
+            <div className="font-display text-[1.15rem] tracking-[-0.01em]">{stage.label}</div>
+          </div>
+        </div>
+        <div className="text-[0.72rem] opacity-70">{stage.description}</div>
+      </header>
+
+      <div className={`grid gap-3 ${stage.agents.length > 1 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
+        {stage.agents.map((a) => (
+          <AgentCard
             key={a.id}
-            className="inline-block w-2 h-2 rounded-full transition"
-            style={{ background: color }}
+            agent={a}
+            state={states[kFn(stage.id, a.id)]}
+            onDark={isOrch}
+            isOrchestrator={isOrch}
+            finalKind={finalKind}
           />
-        );
-      })}
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Handoff() {
+  return (
+    <div className="flex items-center justify-center py-3">
+      <div className="flex items-center gap-2">
+        <div className="w-px h-5" style={{ background: "#CCC" }} />
+        <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: "#999" }}>HANDOFF</div>
+        <div className="w-px h-5" style={{ background: "#CCC" }} />
+      </div>
     </div>
   );
 }
 
+/* ─────────────────────────── Agent card ────────────────────────────────── */
+
 function AgentCard({
-  agent, state, outputKind,
+  agent, state, onDark, isOrchestrator, finalKind,
 }: {
   agent: AgentMeta;
   state: AgentState | undefined;
-  outputKind: TaskMeta["outputKind"];
+  onDark: boolean;
+  isOrchestrator: boolean;
+  finalKind: TaskMeta["finalKind"];
 }) {
   const status = state?.status ?? "queued";
   const elapsed = useElapsed(status === "working" ? (state as any).startedAt : null);
 
+  const cardBg = onDark ? "#1B1B1F" : "white";
+  const cardBorder = onDark ? "#2C2C32" : (status === "delivered" ? INK : HAIR);
+  const subText = onDark ? "rgba(255,255,255,0.55)" : "#888";
+  const mainText = onDark ? "white" : INK;
+
   return (
     <article
-      className="bg-white transition"
+      className="transition"
       style={{
-        border: `1px solid ${status === "delivered" ? INK : HAIR}`,
+        background: cardBg,
+        border: `1px solid ${cardBorder}`,
         opacity: status === "queued" ? 0.55 : 1,
       }}
     >
-      <header
-        className="flex items-center justify-between px-5 py-3 border-b"
-        style={{ borderColor: HAIR }}
-      >
+      <header className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: onDark ? "#2C2C32" : HAIR }}>
         <div className="flex items-center gap-3">
-          <StatusGlyph status={status} />
+          <StatusGlyph status={status} onDark={onDark} />
           <div>
-            <div className="text-[0.92rem] font-medium tracking-[-0.005em]">{agent.name}</div>
-            <div className="text-[0.72rem]" style={{ color: "#888" }}>{agent.role}</div>
+            <div className="text-[0.86rem] font-medium tracking-[-0.005em]" style={{ color: mainText }}>{agent.name}</div>
+            <div className="text-[0.7rem]" style={{ color: subText }}>{agent.role}</div>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[0.66rem] tracking-[0.2em] uppercase" style={{ color: "#888" }}>
-            {PROVIDER_LABEL[agent.provider] ?? agent.provider}
+          <div className="text-[0.62rem] tracking-[0.2em] uppercase" style={{ color: subText }}>
+            {agent.skill}
           </div>
-          <div className="text-[0.72rem] mt-0.5 tabular-nums" style={{ color: "#999" }}>
+          <div className="text-[0.68rem] mt-0.5 tabular-nums" style={{ color: subText }}>
             {status === "queued" && "queued"}
             {status === "working" && `${(elapsed / 1000).toFixed(1)}s`}
-            {status === "delivered" && state && "result" in state && `${(state.result.tookMs / 1000).toFixed(1)}s`}
+            {status === "delivered" && state && "result" in state && (
+              <>
+                {(state.result.tookMs / 1000).toFixed(1)}s · {PROVIDER_LABEL[state.result.provider] ?? state.result.provider}
+                {state.result.fellBack && <span style={{ color: "#FFB347" }}> ↺</span>}
+              </>
+            )}
             {status === "failed" && "failed"}
           </div>
         </div>
       </header>
 
-      <div className="px-5 py-4">
+      <div className="px-4 py-3">
         {status === "queued" && (
-          <div className="text-[0.82rem]" style={{ color: "#AAA" }}>等待派遣…</div>
+          <div className="text-[0.78rem]" style={{ color: subText }}>等待派遣…</div>
         )}
-        {status === "working" && <WorkingShimmer />}
+        {status === "working" && <WorkingShimmer onDark={onDark} />}
         {status === "failed" && state && "error" in state && (
-          <div className="text-[0.82rem]" style={{ color: "#C44" }}>{state.error}</div>
+          <div className="text-[0.78rem]" style={{ color: "#FF7777" }}>
+            {state.error.length > 180 ? state.error.slice(0, 180) + "…" : state.error}
+          </div>
         )}
         {status === "delivered" && state && "result" in state && (
-          <OutputRenderer kind={outputKind} result={state.result} />
+          <div>
+            {/* Show preview of output (truncated for non-orchestrator) */}
+            {!isOrchestrator ? (
+              <pre
+                className="whitespace-pre-wrap text-[0.8rem] leading-[1.55] font-sans"
+                style={{ color: mainText }}
+              >
+                {truncate(state.result.output, 240)}
+              </pre>
+            ) : (
+              <div className="text-[0.78rem]" style={{ color: subText }}>
+                ✓ 主編完成 — 結果見下方完整交付區
+              </div>
+            )}
+          </div>
         )}
       </div>
-      {status === "delivered" && state && "result" in state && state.result.brandInjected && (
-        <div className="px-5 pb-3">
-          <span
-            className="inline-block text-[0.64rem] tracking-[0.18em] uppercase px-2 py-0.5"
-            style={{ border: `1px solid ${ACCENT}`, color: ACCENT }}
-          >
-            BRAND BRAIN INJECTED
-          </span>
-        </div>
-      )}
     </article>
   );
 }
 
-function StatusGlyph({ status }: { status: AgentState["status"] }) {
+function truncate(s: string, n: number) {
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+
+function StatusGlyph({ status, onDark }: { status: AgentState["status"]; onDark: boolean }) {
   if (status === "queued")
-    return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "#DDD" }} />;
+    return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: onDark ? "#444" : "#DDD" }} />;
   if (status === "working")
-    return (
-      <span
-        className="inline-block w-3 h-3 rounded-full animate-pulse"
-        style={{ background: INK }}
-      />
-    );
+    return <span className="inline-block w-3 h-3 rounded-full animate-pulse" style={{ background: onDark ? "white" : INK }} />;
   if (status === "delivered")
     return (
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -535,12 +637,14 @@ function StatusGlyph({ status }: { status: AgentState["status"] }) {
   return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "#C44" }} />;
 }
 
-function WorkingShimmer() {
+function WorkingShimmer({ onDark }: { onDark: boolean }) {
+  const a = onDark ? "#2A2A30" : "#EEE";
+  const b = onDark ? "#3A3A42" : "#DDD";
   return (
     <div className="space-y-2">
-      <div className="h-3 w-[68%] rounded bg-gradient-to-r from-[#EEE] via-[#DDD] to-[#EEE] animate-pulse" />
-      <div className="h-3 w-[92%] rounded bg-gradient-to-r from-[#EEE] via-[#DDD] to-[#EEE] animate-pulse" />
-      <div className="h-3 w-[40%] rounded bg-gradient-to-r from-[#EEE] via-[#DDD] to-[#EEE] animate-pulse" />
+      <div className="h-2.5 w-[68%] rounded animate-pulse" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${a})` }} />
+      <div className="h-2.5 w-[92%] rounded animate-pulse" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${a})` }} />
+      <div className="h-2.5 w-[40%] rounded animate-pulse" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${a})` }} />
     </div>
   );
 }
@@ -555,23 +659,52 @@ function useElapsed(startedAt: number | null) {
   return startedAt ? now - startedAt : 0;
 }
 
-/* ─────────────────────────── Output renderers ──────────────────────────── */
+/* ─────────────────────────── Final deliverable ─────────────────────────── */
 
-function OutputRenderer({
-  kind, result,
-}: { kind: TaskMeta["outputKind"]; result: AgentResult }) {
-  if (kind === "swot" && result.structured) return <SwotGrid data={result.structured} />;
-  if (kind === "persona-card" && result.structured) return <PersonaCard data={result.structured} />;
-  if (kind === "swatches" && Array.isArray(result.structured)) return <Swatches data={result.structured} />;
-  if (kind === "name-cards" && Array.isArray(result.structured)) return <NameCards data={result.structured} />;
-  // text / chips / compare-2col / rewrite-3col → just show text in card
+function FinalDeliverable({
+  result, finalKind,
+}: { result: AgentResult; finalKind: TaskMeta["finalKind"] }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <pre className="whitespace-pre-wrap text-[0.92rem] leading-[1.6] flex-1 font-sans" style={{ color: INK }}>
-        {result.output}
-      </pre>
-      <CopyButton text={result.output} />
-    </div>
+    <section
+      className="mt-6 p-6"
+      style={{ border: `2px solid ${ACCENT}`, background: "white" }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: ACCENT }}>
+            FINAL DELIVERABLE · 交付完成
+          </div>
+          <div className="font-display text-[1.25rem] tracking-[-0.015em] mt-1">
+            由 {result.agentName} 收尾
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {result.brandInjected && (
+            <span className="text-[0.62rem] tracking-[0.18em] uppercase px-2 py-0.5"
+              style={{ border: `1px solid ${ACCENT}`, color: ACCENT }}>
+              BRAND BRAIN
+            </span>
+          )}
+          <CopyButton text={result.output} />
+        </div>
+      </div>
+
+      <div>
+        {finalKind === "swot" && result.structured && <SwotGrid data={result.structured} />}
+        {finalKind === "persona-card" && result.structured && <PersonaCard data={result.structured} />}
+        {finalKind === "swatches" && Array.isArray(result.structured) && <Swatches data={result.structured} />}
+        {finalKind === "name-cards" && Array.isArray(result.structured) && <NameCards data={result.structured} />}
+        {(finalKind === "text" || finalKind === "rich-text" ||
+          (finalKind === "swot" && !result.structured) ||
+          (finalKind === "persona-card" && !result.structured) ||
+          (finalKind === "swatches" && !result.structured) ||
+          (finalKind === "name-cards" && !result.structured)) && (
+          <pre className="whitespace-pre-wrap text-[0.95rem] leading-[1.7] font-sans" style={{ color: INK }}>
+            {result.output}
+          </pre>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -582,19 +715,21 @@ function CopyButton({ text }: { text: string }) {
       onClick={async () => {
         try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
       }}
-      className="text-[0.66rem] tracking-[0.18em] uppercase px-2.5 py-1 transition shrink-0"
+      className="text-[0.66rem] tracking-[0.18em] uppercase px-2.5 py-1 transition"
       style={{ border: `1px solid ${HAIR}`, color: copied ? ACCENT : "#888" }}
     >
-      {copied ? "已複製" : "複製"}
+      {copied ? "已複製" : "複製全文"}
     </button>
   );
 }
+
+/* ─────────────────────────── Structured renderers ──────────────────────── */
 
 function SwotGrid({ data }: { data: any }) {
   const cell = (title: string, items: string[], color: string) => (
     <div className="p-4" style={{ border: `1px solid ${HAIR}` }}>
       <div className="text-[0.66rem] tracking-[0.22em] uppercase" style={{ color }}>{title}</div>
-      <ul className="mt-2 space-y-1.5 text-[0.85rem]" style={{ color: INK }}>
+      <ul className="mt-2 space-y-1.5 text-[0.85rem]">
         {(items ?? []).map((it, i) => <li key={i}>· {it}</li>)}
       </ul>
     </div>
@@ -608,7 +743,7 @@ function SwotGrid({ data }: { data: any }) {
         {cell("THREATS", data.threats ?? [], "#C44")}
       </div>
       {data.advice && (
-        <div className="mt-4 p-4 text-[0.86rem] leading-relaxed" style={{ background: "#F5F2FE", color: INK }}>
+        <div className="mt-4 p-4 text-[0.86rem] leading-relaxed" style={{ background: "#F5F2FE" }}>
           <span className="text-[0.64rem] tracking-[0.22em] uppercase mr-2" style={{ color: ACCENT }}>STRATEGY</span>
           {data.advice}
         </div>
@@ -621,10 +756,8 @@ function PersonaCard({ data }: { data: any }) {
   const initials = String(data.name ?? "?").trim().slice(0, 2);
   return (
     <div className="grid grid-cols-[88px_1fr] gap-5">
-      <div
-        className="w-[88px] h-[88px] flex items-center justify-center font-display text-[1.6rem] tracking-tight"
-        style={{ background: ACCENT, color: "white" }}
-      >
+      <div className="w-[88px] h-[88px] flex items-center justify-center font-display text-[1.6rem] tracking-tight"
+        style={{ background: ACCENT, color: "white" }}>
         {initials}
       </div>
       <div>
@@ -700,32 +833,6 @@ function NameCards({ data }: { data: any[] }) {
   );
 }
 
-function CompareGrid({
-  agents, states,
-}: { agents: AgentMeta[]; states: Record<string, AgentState> }) {
-  return (
-    <div className="mt-2 pt-5 border-t" style={{ borderColor: HAIR }}>
-      <div className="text-[0.66rem] tracking-[0.24em] uppercase mb-3" style={{ color: ACCENT }}>
-        三派並列 · 直接比較
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#EEE]">
-        {agents.map((a) => {
-          const s = states[a.id];
-          const text = s?.status === "delivered" && "result" in s ? s.result.output : "";
-          return (
-            <div key={a.id} className="bg-white p-4">
-              <div className="text-[0.66rem] tracking-[0.2em] uppercase mb-2" style={{ color: "#888" }}>
-                {a.name}
-              </div>
-              <pre className="whitespace-pre-wrap text-[0.84rem] leading-[1.55] font-sans" style={{ color: INK }}>{text}</pre>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /* ─────────────────────────── Field input ───────────────────────────────── */
 
 function FieldInput({
@@ -746,18 +853,14 @@ function FieldInput({
 
   if (field.kind === "longtext")
     return (
-      <label className="block">
-        {labelEl}
-        <textarea
-          value={String(v)} onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder} rows={5} className={inputCls} style={baseStyle}
-        />
+      <label className="block">{labelEl}
+        <textarea value={String(v)} onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder} rows={5} className={inputCls} style={baseStyle} />
       </label>
     );
   if (field.kind === "select")
     return (
-      <label className="block">
-        {labelEl}
+      <label className="block">{labelEl}
         <select value={String(v)} onChange={(e) => onChange(e.target.value)} className={inputCls} style={baseStyle}>
           {(field.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
@@ -765,20 +868,16 @@ function FieldInput({
     );
   if (field.kind === "number")
     return (
-      <label className="block">
-        {labelEl}
+      <label className="block">{labelEl}
         <input type="number" value={String(v)} onChange={(e) => onChange(Number(e.target.value))}
           placeholder={field.placeholder} className={inputCls} style={baseStyle} />
       </label>
     );
   return (
-    <label className="block">
-      {labelEl}
-      <input
-        type={field.kind === "url" ? "url" : "text"}
-        value={String(v)} onChange={(e) => onChange(e.target.value)}
-        placeholder={field.placeholder} className={inputCls} style={baseStyle}
-      />
+    <label className="block">{labelEl}
+      <input type={field.kind === "url" ? "url" : "text"} value={String(v)}
+        onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder}
+        className={inputCls} style={baseStyle} />
     </label>
   );
 }
