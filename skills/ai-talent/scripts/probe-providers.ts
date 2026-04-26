@@ -155,13 +155,24 @@ async function main() {
     results.push(r);
   } else results.push({ name: "Manus", ok: false, note: "missing env" });
 
-  // 11b. Hailuo / MiniMax (video + audio)
+  // 11b. Hailuo / MiniMax (video + audio) — try multiple base URLs
   const hk = process.env.HAILUO_API_KEY || process.env.MINIMAX_API_KEY;
   if (hk) {
-    // MiniMax accepts Bearer; /v1/get_balance is the cheapest read endpoint
-    results.push(await tryFetch("Hailuo / MiniMax", "https://api.minimaxi.chat/v1/get_balance", {
-      headers: { Authorization: `Bearer ${hk}` },
-    }));
+    const bases = [
+      "https://api.minimax.chat/v1/text/chatcompletion_v2",
+      "https://api.minimaxi.chat/v1/text/chatcompletion_v2",
+      "https://api.minimax.io/v1/text/chatcompletion_v2",
+    ];
+    let r: any = null;
+    for (const url of bases) {
+      r = await tryFetch("Hailuo / MiniMax", url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${hk}` },
+        body: JSON.stringify({ model: "MiniMax-Text-01", messages: [{ role: "user", content: "ping" }], max_tokens: 5 }),
+      });
+      if (r.ok || (r.note && !r.note.includes("404") && !r.note.includes("Not Found"))) break;
+    }
+    results.push(r);
   } else results.push({ name: "Hailuo / MiniMax", ok: false, note: "missing env" });
 
   // 12. Zhipu / GLM
