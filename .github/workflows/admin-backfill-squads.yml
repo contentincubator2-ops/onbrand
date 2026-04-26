@@ -1,0 +1,35 @@
+name: Admin — Backfill squads (description / methodology / lead)
+
+# Runs scripts/backfill-squads.ts on the VM.
+# Steps A+B+C+D+E:
+#   A) Fill blank descriptions
+#   B) Derive methodology from slug / lead.primarySkill (round 1)
+#   C) Assign lead_agent_id to orphan squads via primarySkill matching
+#   D) Re-derive methodology for newly-led squads (round 2)
+#   E) Print final coverage scorecard
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            cd /opt/marketing-os/app
+            git fetch --all --prune
+            git reset --hard origin/main
+            cd skills/ai-talent
+            if [ ! -d node_modules ]; then npm install --no-audit --no-fund; fi
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  🔧  Running squad backfill"
+            echo "  $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "════════════════════════════════════════════════════════════════"
+            npm run db:backfill-squads
