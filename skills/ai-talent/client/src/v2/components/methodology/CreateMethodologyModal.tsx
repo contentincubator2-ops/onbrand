@@ -300,7 +300,16 @@ export default function CreateMethodologyModal({
     const data = jobQuery?.data;
     if (!data) return;
     if (data.status === "reviewing" && data.extracted) {
-      setDraft(data.extracted);
+      // Backend Zod schema requires year/author as strings, but the LLM
+      // sometimes returns year as a number (e.g. 2003 instead of "2003").
+      // Coerce to string at the trust boundary so finalize never fails.
+      const ex = data.extracted;
+      setDraft({
+        ...ex,
+        year:   ex.year   != null ? String(ex.year)   : undefined,
+        author: ex.author != null ? String(ex.author) : undefined,
+        name:   String(ex.name ?? ""),
+      });
       setPhase("review");
     } else if (data.status === "failed") {
       setError(data.errorMsg ?? "extraction failed");
@@ -331,19 +340,22 @@ export default function CreateMethodologyModal({
     if (!draft || !jobId || !finalizeMutation) return;
     setPhase("saving");
     try {
+      // Defence-in-depth: coerce all string-expected fields one more time
+      // before hitting the Zod schema on the backend.
+      const asStr = (v: any) => (v == null || v === "" ? undefined : String(v));
       const r = await finalizeMutation.mutateAsync({
         jobId,
         methodology: {
-          name: draft.name,
-          author: draft.author,
-          year: draft.year,
-          description: draft.description,
-          primarySkill: draft.primarySkill,
+          name:         String(draft.name ?? ""),
+          author:       asStr(draft.author),
+          year:         asStr(draft.year),
+          description:  asStr(draft.description),
+          primarySkill: asStr(draft.primarySkill),
           steps: draft.steps.map((s) => ({
-            name: s.name,
-            description: s.description,
-            requiredSkill: s.requiredSkill,
-            outputType: s.outputType,
+            name:          String(s.name ?? ""),
+            description:   asStr(s.description),
+            requiredSkill: asStr(s.requiredSkill),
+            outputType:    asStr(s.outputType),
           })),
         },
       });
@@ -463,7 +475,7 @@ export default function CreateMethodologyModal({
             )}
 
             {phase === "extract" && (
-              <ExtractingState url={url} />
+              <ExtractingFeed source={active} url={url} />
             )}
 
             {phase === "review" && draft && (
@@ -714,33 +726,218 @@ function RecoTile({ label, desc, onClick }: { label: string; desc: string; onCli
 // Extracting state
 // ─────────────────────────────────────────────────────────────────────
 
-function ExtractingState({ url }: { url: string }) {
+// ─────────────────────────────────────────────────────────────────────
+// ExtractingFeed — Claude-Code-style activity log while ingest runs.
+//
+// Shows a stream of agent / skill / tool-call rows so the user feels
+// the system is actively working. Per source we have a hand-written
+// script of ~16 events; events stream in at 280-650ms intervals,
+// rotating between 3 named "agents" so you see a team at work.
+//
+// The feed is purely cosmetic — the real ingest job runs in parallel
+// on the backend. If the job finishes before the script ends we still
+// show the rest (cap at ~12s) so the experience feels coherent.
+// ─────────────────────────────────────────────────────────────────────
+
+type FeedEvent = {
+  kind: "agent" | "skill" | "fetch" | "read" | "search" | "plan" | "extract" | "match" | "write";
+  arg: string;
+  agent?: AgentName;
+};
+
+type AgentName = "Researcher" | "Knowledge Extractor" | "Squad Composer" | "Taxonomy Classifier";
+
+const AGENT_GLYPH: Record<AgentName, string> = {
+  "Researcher":            "🤖",
+  "Knowledge Extractor":   "🧠",
+  "Squad Composer":        "✦",
+  "Taxonomy Classifier":   "◇",
+};
+
+const KIND_GLYPH: Record<FeedEvent["kind"], string> = {
+  agent:   "✦",
+  skill:   "✧",
+  fetch:   "🌐",
+  read:    "📖",
+  search:  "🔍",
+  plan:    "📋",
+  extract: "⚙",
+  match:   "↔",
+  write:   "✏",
+};
+
+const KIND_LABEL: Record<FeedEvent["kind"], string> = {
+  agent:   "agent",
+  skill:   "skill",
+  fetch:   "fetch_url",
+  read:    "read_file",
+  search:  "search",
+  plan:    "plan",
+  extract: "extract",
+  match:   "match_skill",
+  write:   "write_squad",
+};
+
+function buildScript(source: SourceDef, url: string): FeedEvent[] {
+  const host = (() => { try { return new URL(url).hostname; } catch { return source.id; } })();
+  const path = (() => { try { return new URL(url).pathname.slice(0, 48); } catch { return ""; } })();
+
+  // Source-specific opening: how do we read the source?
+  const openers: Record<string, FeedEvent[]> = {
+    github: [
+      { kind: "agent",  arg: "Researcher",                agent: "Researcher" },
+      { kind: "skill",  arg: "github-repo-reader" },
+      { kind: "fetch",  arg: `${host}${path}` },
+      { kind: "read",   arg: "README.md" },
+      { kind: "read",   arg: "SKILL.md (if present)" },
+      { kind: "search", arg: "framework|methodology|step|stage" },
+    ],
+    youtube: [
+      { kind: "agent",  arg: "Researcher",                agent: "Researcher" },
+      { kind: "skill",  arg: "youtube-transcript-reader" },
+      { kind: "fetch",  arg: `${host}${path}` },
+      { kind: "read",   arg: "video metadata" },
+      { kind: "read",   arg: "captions (CC)" },
+      { kind: "search", arg: "framework|step|principle" },
+    ],
+    book: [
+      { kind: "agent",  arg: "Researcher",                agent: "Researcher" },
+      { kind: "skill",  arg: "book-summary-extractor" },
+      { kind: "fetch",  arg: `${host}${path}` },
+      { kind: "read",   arg: "table of contents" },
+      { kind: "read",   arg: "chapter summaries" },
+    ],
+    podcast: [
+      { kind: "agent",  arg: "Researcher",                agent: "Researcher" },
+      { kind: "skill",  arg: "podcast-transcript-reader" },
+      { kind: "fetch",  arg: `${host}${path}` },
+      { kind: "read",   arg: "episode transcript" },
+    ],
+    web: [
+      { kind: "agent",  arg: "Researcher",                agent: "Researcher" },
+      { kind: "skill",  arg: "readability-extract" },
+      { kind: "fetch",  arg: `${host}${path}` },
+      { kind: "read",   arg: "article body" },
+      { kind: "search", arg: "author|year|methodology" },
+    ],
+    competitor: [
+      { kind: "agent",  arg: "Researcher",                agent: "Researcher" },
+      { kind: "skill",  arg: "case-study-deconstruct" },
+      { kind: "fetch",  arg: `${host}${path}` },
+      { kind: "read",   arg: "campaign narrative" },
+    ],
+    notion: [
+      { kind: "agent",  arg: "Researcher",                agent: "Researcher" },
+      { kind: "skill",  arg: "notion-page-reader" },
+      { kind: "fetch",  arg: `${host}${path}` },
+      { kind: "read",   arg: "page blocks" },
+    ],
+  };
+
+  const opener = openers[source.id] ?? openers.web;
+
+  // Universal middle: extraction → classification → squad assembly.
+  const middle: FeedEvent[] = [
+    { kind: "agent",   arg: "Knowledge Extractor",   agent: "Knowledge Extractor" },
+    { kind: "skill",   arg: "structure-extraction" },
+    { kind: "plan",    arg: "8 candidate steps identified" },
+    { kind: "extract", arg: "name + author + year" },
+    { kind: "extract", arg: "core sequence (5–8 steps)" },
+    { kind: "extract", arg: "required skills per step" },
+    { kind: "agent",   arg: "Taxonomy Classifier",   agent: "Taxonomy Classifier" },
+    { kind: "skill",   arg: "layer-classifier" },
+    { kind: "match",   arg: "L1 brand · L2 product · L3 audience · L4 channel · L5 campaign · L6 audit" },
+  ];
+
+  const closer: FeedEvent[] = [
+    { kind: "agent",  arg: "Squad Composer",         agent: "Squad Composer" },
+    { kind: "skill",  arg: "agent-roster-match" },
+    { kind: "match",  arg: "lead agent ↔ primary skill" },
+    { kind: "match",  arg: "members ↔ step requirements" },
+    { kind: "write",  arg: "draft squad ready for review" },
+  ];
+
+  return [...opener, ...middle, ...closer];
+}
+
+function ExtractingFeed({ source, url }: { source: SourceDef; url: string }) {
+  const script = useMemo(() => buildScript(source, url), [source, url]);
+  const [events, setEvents] = useState<FeedEvent[]>([]);
+  const [activeAgent, setActiveAgent] = useState<AgentName>("Researcher");
+
+  useEffect(() => {
+    let cancelled = false;
+    let i = 0;
+    const tick = () => {
+      if (cancelled || i >= script.length) return;
+      const next = script[i++];
+      setEvents((prev) => [...prev, next]);
+      if (next.agent) setActiveAgent(next.agent);
+      const delay = 280 + Math.random() * 370;
+      window.setTimeout(tick, delay);
+    };
+    // Small initial delay so the panel feels responsive
+    window.setTimeout(tick, 120);
+    return () => { cancelled = true; };
+  }, [script]);
+
   const host = (() => { try { return new URL(url).hostname; } catch { return url; } })();
+
   return (
-    <div className="max-w-[640px] space-y-4">
-      <div className="border border-mos-hair bg-white p-6 rounded-lg">
-        <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft">STATUS</div>
-        <div className="mt-1 font-display text-[1.4rem] text-mos-ink">抽取中…</div>
-        <div className="mt-2 text-[0.82rem] text-mos-muted">
-          系統正在閱讀 {host}，從中找出方法論名稱、作者、步驟、所需技能。
+    <div className="max-w-[720px] space-y-4">
+      {/* Header strip — current agent + status */}
+      <div className="border border-mos-hair bg-white p-5 rounded-lg flex items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-mos-paper flex items-center justify-center text-[1.2rem]">
+          {AGENT_GLYPH[activeAgent]}
         </div>
-        <div className="mt-4 h-1 bg-mos-hair overflow-hidden rounded">
-          <div
-            className="h-full"
-            style={{
-              width: "40%",
-              background: "linear-gradient(90deg, #1A9B8E, #1E7FD4)",
-              animation: "ingestPulse 1.4s ease-in-out infinite",
-            }}
-          />
+        <div className="flex-1 min-w-0">
+          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft">
+            ACTIVE AGENT
+          </div>
+          <div className="font-display text-[1.05rem] text-mos-ink truncate">
+            {activeAgent}
+          </div>
+          <div className="text-[0.74rem] text-mos-muted truncate">
+            正在分析 {host}…
+          </div>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "0ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "200ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "400ms" }} />
         </div>
       </div>
-      <style>{`
-        @keyframes ingestPulse {
-          0%   { transform: translateX(-30%); }
-          100% { transform: translateX(180%); }
-        }
-      `}</style>
+
+      {/* Activity feed */}
+      <div className="border border-mos-hair bg-mos-paper rounded-lg overflow-hidden">
+        <div className="px-4 py-2 border-b border-mos-hair text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft bg-white">
+          ACTIVITY
+        </div>
+        <div className="px-4 py-3 max-h-[340px] overflow-y-auto font-mono space-y-1.5">
+          {events.map((e, i) => (
+            <FeedRow key={i} event={e} fading={i < events.length - 6} />
+          ))}
+          <div className="text-[0.78rem] text-mos-soft flex items-center gap-2">
+            <span className="inline-block w-1.5 h-3 bg-mos-ink animate-pulse" />
+            <span>working…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeedRow({ event, fading }: { event: FeedEvent; fading: boolean }) {
+  return (
+    <div
+      className={[
+        "flex items-baseline gap-2 text-[0.78rem] transition-opacity",
+        fading ? "opacity-60" : "opacity-100",
+      ].join(" ")}
+    >
+      <span className="w-4 shrink-0 text-center" aria-hidden>{KIND_GLYPH[event.kind]}</span>
+      <span className="text-mos-soft tracking-[0.04em] w-[88px] shrink-0">{KIND_LABEL[event.kind]}:</span>
+      <span className="text-mos-ink truncate">{event.arg}</span>
     </div>
   );
 }
