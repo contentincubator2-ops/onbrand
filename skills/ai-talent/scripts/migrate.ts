@@ -582,6 +582,58 @@ async function main() {
     `);
     console.log("[migrate] squad_ingest_jobs: OK");
 
+    // project_sync_jobs — Pipedream-driven asset sync from FB/IG/YT/Drive/etc.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS project_sync_jobs (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        userId          INT NOT NULL,
+        brandId         INT NULL,
+        missionId       INT NULL,
+        source          VARCHAR(32) NOT NULL,
+        sourceParams    JSON NULL,
+        pipedreamRunId  VARCHAR(128) NULL,
+        status          ENUM('pending','running','done','failed') NOT NULL DEFAULT 'pending',
+        assetCount      INT NOT NULL DEFAULT 0,
+        progressPct     INT NOT NULL DEFAULT 0,
+        errorMsg        TEXT NULL,
+        webhookSecret   VARCHAR(64) NOT NULL,
+        createdAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_user (userId),
+        INDEX idx_brand (brandId),
+        INDEX idx_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] project_sync_jobs: OK");
+
+    // project_assets — synced assets land here for use in missions.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS project_assets (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        userId        INT NOT NULL,
+        brandId       INT NULL,
+        missionId     INT NULL,
+        syncJobId     INT NULL,
+        source        VARCHAR(32) NOT NULL,
+        kind          VARCHAR(32) NOT NULL,
+        title         VARCHAR(512) NULL,
+        externalId    VARCHAR(256) NULL,
+        externalUrl   VARCHAR(1024) NULL,
+        mediaUrl      VARCHAR(1024) NULL,
+        thumbnailUrl  VARCHAR(1024) NULL,
+        mimeType      VARCHAR(64) NULL,
+        sizeBytes     BIGINT NULL,
+        textContent   LONGTEXT NULL,
+        meta          JSON NULL,
+        createdAt     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_user (userId),
+        INDEX idx_brand (brandId),
+        INDEX idx_mission (missionId),
+        INDEX idx_job (syncJobId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] project_assets: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

@@ -33,6 +33,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
+import ProjectSyncModal, { type SyncSource } from "../components/projects/ProjectSyncModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 interface MissionRow {
@@ -89,6 +90,7 @@ export default function ProjectsPage() {
   const [sortDesc, setSortDesc] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
+  const [syncSource, setSyncSource] = useState<SyncSource | null>(null);
 
   // Type filter options derived from data
   const typeOptions = useMemo(() => {
@@ -308,7 +310,7 @@ export default function ProjectsPage() {
               onNewMission={() => navigate("/methodology")}
               onUploadFile={() => alert("上傳檔案（即將推出）")}
               onUploadFolder={() => alert("上傳資料夾（即將推出）")}
-              onSyncSource={(s) => alert(`同步 ${s}（即將推出）`)}
+              onSyncSource={(s) => setSyncSource(s as SyncSource)}
             />
           </div>
         </div>
@@ -413,6 +415,14 @@ export default function ProjectsPage() {
           )}
         </div>
       </section>
+
+      {/* Project sync modal (Pipedream-driven) */}
+      <ProjectSyncModal
+        open={syncSource !== null}
+        source={syncSource}
+        brandId={brandId}
+        onClose={() => setSyncSource(null)}
+      />
 
       {/* Create modal */}
       <CreateMethodologyModal
