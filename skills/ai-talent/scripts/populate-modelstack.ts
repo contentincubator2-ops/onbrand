@@ -19,11 +19,11 @@
  *
  * Strategy:
  *   - Azure AI Foundry is priority for primary_llm whenever the agent's
- *     aiModel is a Foundry-deployed family (gpt-*/o3/o4/Phi-*/Llama-*/
- *     DeepSeek-*/Kimi-*/Mistral-*/MAI-*).
- *   - fal.ai is the universal multimedia carrier (Flux/Kling/MiniMax-Video/
- *     LTX/ElevenLabs/Whisper/Stable-Audio) for everyone except OpenAI-native
- *     stacks which prefer gpt-image-1/dall-e-3/tts-1/whisper-1.
+ *     aiModel is a Foundry-deployed family (gpt, o3, o4, Phi, Llama,
+ *     DeepSeek, Kimi, Mistral, MAI).
+ *   - fal.ai is the universal multimedia carrier (Flux, Kling, MiniMax-Video,
+ *     LTX, ElevenLabs, Whisper, Stable-Audio) for everyone except OpenAI-native
+ *     stacks which prefer gpt-image-1, dall-e-3, tts-1, whisper-1.
  *   - Cohere embed v4 is the default embed model; Azure 3-large fallback.
  *   - Tavily for web_search, Browserbase for browser, Meta Graph for social.
  *
