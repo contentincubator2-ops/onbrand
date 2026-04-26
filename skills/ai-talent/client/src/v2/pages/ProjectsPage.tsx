@@ -308,6 +308,7 @@ export default function ProjectsPage() {
               onNewMission={() => navigate("/methodology")}
               onUploadFile={() => alert("上傳檔案（即將推出）")}
               onUploadFolder={() => alert("上傳資料夾（即將推出）")}
+              onSyncSource={(s) => alert(`同步 ${s}（即將推出）`)}
             />
           </div>
         </div>
@@ -611,16 +612,32 @@ function FilterChip({
 
 /* ─────────────────────────── Create menu (Canva "+" dropdown) ─────── */
 
+type SyncSource =
+  | "facebook" | "instagram" | "youtube" | "website"
+  | "google-drive" | "onedrive" | "dropbox";
+
+const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; glyph: string; color: string }> = [
+  { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片",   glyph: "f",  color: "#1877F2" },
+  { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",         glyph: "ig", color: "#E4405F" },
+  { id: "youtube",      label: "YouTube 頻道",    hint: "抓影片清單、縮圖",     glyph: "▶",  color: "#FF0000" },
+  { id: "website",      label: "官網 / 部落格",   hint: "抓品牌素材、文章",     glyph: "🌐", color: "#525866" },
+  { id: "google-drive", label: "Google Drive",    hint: "同步整個資料夾",       glyph: "G",  color: "#1A73E8" },
+  { id: "onedrive",     label: "OneDrive",        hint: "同步整個資料夾",       glyph: "☁",  color: "#0078D4" },
+  { id: "dropbox",      label: "Dropbox",         hint: "同步整個資料夾",       glyph: "▽",  color: "#0061FF" },
+];
+
 function CreateMenu({
-  onNewFolder, onNewMission, onUploadFile, onUploadFolder,
+  onNewFolder, onNewMission, onUploadFile, onUploadFolder, onSyncSource,
 }: {
   onNewFolder: () => void;
   onNewMission: () => void;
   onUploadFile: () => void;
   onUploadFolder: () => void;
+  onSyncSource: (s: SyncSource) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const close = () => setOpen(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const close = () => { setOpen(false); setSyncOpen(false); };
 
   return (
     <div className="relative">
@@ -667,6 +684,45 @@ function CreateMenu({
               hint="批次上傳整個資料夾"
               onClick={() => { close(); onUploadFolder(); }}
             />
+
+            <div className="my-1.5 mx-3 h-px bg-mos-hair" />
+
+            {/* Cloud / web sync submenu */}
+            <button
+              onClick={() => setSyncOpen((v) => !v)}
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-mos-ink/[0.04] transition text-left"
+            >
+              <span className="w-5 h-5 inline-flex items-center justify-center text-mos-ink/70"><CloudSyncIcon /></span>
+              <span className="flex-1 min-w-0">
+                <div className="text-[0.84rem] text-mos-ink">從雲端 / 網路同步</div>
+                <div className="text-[0.66rem] text-mos-muted truncate">FB、IG、YT、官網、雲端硬碟</div>
+              </span>
+              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-mos-soft transition-transform ${syncOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+
+            {syncOpen && (
+              <div className="mx-3 mt-1 mb-1 rounded-lg bg-mos-ink/[0.03] py-1">
+                {SYNC_SOURCES.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => { close(); onSyncSource(s.id); }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-white rounded-md transition text-left"
+                  >
+                    <span
+                      className="w-5 h-5 inline-flex items-center justify-center text-white text-[0.6rem] font-bold rounded shrink-0"
+                      style={{ background: s.color }}
+                      aria-hidden
+                    >
+                      {s.glyph}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <div className="text-[0.78rem] text-mos-ink truncate">{s.label}</div>
+                      <div className="text-[0.62rem] text-mos-muted truncate">{s.hint}</div>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -701,6 +757,9 @@ function GridIcon() {
 }
 function UploadIcon() {
   return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>;
+}
+function CloudSyncIcon() {
+  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 18a4 4 0 0 0 0-8 5 5 0 0 0-9.6-1A4 4 0 0 0 7 18"/><path d="M12 12v6M9 15l3 3 3-3"/></svg>;
 }
 function FolderUploadIcon() {
   return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v6M9 14l3-3 3 3"/></svg>;
