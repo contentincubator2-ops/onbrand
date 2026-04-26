@@ -104,7 +104,7 @@ const TASKS: Record<string, TaskDef> = {
         agents: [{
           id: "hook-writer",
           name: "林志豪", role: "資深 IG hook 寫手", skill: "Hook 寫作",
-          avatar: "豪", tone: "write", preferredProvider: "openai",
+          avatar: "豪", tone: "write", preferredProvider: "forge",
           system: "你是資深 IG hook 寫手。讀上方受眾洞察，寫 8 個 hook 草稿（每個不超過 30 字），編號列表。針對洞察出的痛點下手。",
           userTemplate: "原素材：\n{{material}}",
         }],
@@ -117,7 +117,7 @@ const TASKS: Record<string, TaskDef> = {
         agents: [{
           id: "perf-editor",
           name: "Sarah Chen", role: "表現優化編輯", skill: "A/B 優化",
-          avatar: "SC", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "SC", tone: "orchestrate", preferredProvider: "forge",
           system: `你是 IG 表現優化編輯，懂 IG 演算法與 hook 的轉換率。從上方 8 個草稿中選 3 個最強的（用「滑動指數 / 留言觸發 / 收藏潛力」三條評分），並對 #1 多寫 1 個 A/B 變體。輸出格式：
 
 **TOP 3 HOOKS**
@@ -168,7 +168,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "tagline-writer",
           name: "陳冠宇", role: "資深 tagline 寫手", skill: "標語創作",
-          avatar: "宇", tone: "write", preferredProvider: "openai",
+          avatar: "宇", tone: "write", preferredProvider: "forge",
           system: "你是資深品牌標語寫手。基於上方原型與關鍵字，寫 10 個中文 tagline 草稿（每個不超過 12 字），純列表編號。中後段可以更實驗性。",
           userTemplate: "品牌：{{brand}}\n精神：{{spirit}}",
         }],
@@ -181,7 +181,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "campaign-strategist",
           name: "Mark Liu", role: "Campaign 策略主編", skill: "標語應用策略",
-          avatar: "ML", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "ML", tone: "orchestrate", preferredProvider: "forge",
           system: `你是 campaign 策略主編。從上方 10 個 tagline 中：
 1. 挑 1 個「主推」— 最能跑廣告、好記、長壽
 2. 挑 3 個「備案」— 用於不同情境（年輕族群 / 嚴肅版 / 短促銷）
@@ -237,7 +237,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "copywriter",
           name: "張育誠", role: "資深 copywriter", skill: "文案改寫",
-          avatar: "誠", tone: "write", preferredProvider: "openai",
+          avatar: "誠", tone: "write", preferredProvider: "forge",
           system: "你是資深 copywriter。**嚴格依照診斷師處方指定的策略**改寫，不要自選策略。輸出 1 個完整改寫版本，跟原文案一樣的長度範圍。",
           userTemplate: "原文案：\n{{material}}\n讀者：{{audience}}",
         }],
@@ -250,7 +250,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "cta-designer",
           name: "Eric Wong", role: "CTA & 收尾編輯", skill: "CTA 設計",
-          avatar: "EW", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "EW", tone: "orchestrate", preferredProvider: "forge",
           system: `你是 CTA 設計與收尾編輯。讀上方診斷處方與改寫版本，輸出：
 
 **最終文案**
@@ -293,7 +293,7 @@ B: [變體 — 改了什麼，8 字內說明]
           {
             id: "external-analyst",
             name: "王芝寧", role: "市場掃描分析師", skill: "O + T 掃描",
-            avatar: "寧", tone: "analyze", preferredProvider: "google",
+            avatar: "寧", tone: "analyze", preferredProvider: "forge",
             system: "你是市場外部分析師。**只負責** Opportunities (O) 和 Threats (T)，不要碰內部。輸出 3 個 O 與 3 個 T，純列表 O1-O3 / T1-T3，每點 20 字內。",
             userTemplate: "對象：\n{{material}}",
           },
@@ -307,7 +307,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "swot-strategist",
           name: "James Lin", role: "策略整合主編", skill: "策略整合",
-          avatar: "JL", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "JL", tone: "orchestrate", preferredProvider: "forge",
           system: `你是品牌策略主編。整合上方內外部分析師的情報，輸出嚴格 JSON（不要 markdown 圍欄）：
 {
   "strengths": ["...", "...", "..."],
@@ -363,7 +363,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "persona-editor",
           name: "Olivia Park", role: "Persona 整合主編", skill: "Persona 整合",
-          avatar: "OP", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "OP", tone: "orchestrate", preferredProvider: "forge",
           system: `你是用戶研究主編。整合上方雙線研究，輸出嚴格 JSON（不要 markdown 圍欄）：
 {
   "name": "中文姓名",
@@ -409,7 +409,7 @@ B: [變體 — 改了什麼，8 字內說明]
           {
             id: "en-namer",
             name: "Daniel Cooper", role: "英文命名師", skill: "英文命名",
-            avatar: "DC", tone: "write", preferredProvider: "openai",
+            avatar: "DC", tone: "write", preferredProvider: "forge",
             system: "You are an English brand naming specialist. Output 8 English candidates (single word or compound), considering memorability, searchability, domain availability. Pure list with numbering. **English only, no Chinese characters.**",
             userTemplate: "Subject:\n{{material}}\nStyle: {{style}}",
           },
@@ -423,7 +423,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "pair-editor",
           name: "Felicia Tang", role: "命名配對主編", skill: "雙語配對",
-          avatar: "FT", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "FT", tone: "orchestrate", preferredProvider: "forge",
           system: `你是命名配對主編。從上方中文 8 個 + 英文 8 個草稿中，挑出 5 組最佳的中英配對（也可微調）。輸出嚴格 JSON 陣列（不要 markdown 圍欄）：
 [{"chinese":"...","english":"...","meaning":"一句話寓意"}, ...]
 共 5 組。`,
@@ -454,7 +454,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "translator",
           name: "簡建翔", role: "資深翻譯員", skill: "忠實翻譯",
-          avatar: "翔", tone: "research", preferredProvider: "google",
+          avatar: "翔", tone: "research", preferredProvider: "forge",
           system: "你是專業翻譯員。做忠實直譯，保留原意與術語。輸出 1 段譯文，不要解釋。",
           userTemplate: "從 {{from}} 翻成 {{to}}：\n{{material}}",
         }],
@@ -479,7 +479,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "qa-editor",
           name: "Nathaniel Ho", role: "翻譯校對主編", skill: "QA 校對",
-          avatar: "NH", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "NH", tone: "orchestrate", preferredProvider: "forge",
           system: `你是翻譯校對主編。比對上方直譯版與在地化版，輸出最終交付：
 
 **最終譯文**
@@ -539,7 +539,7 @@ B: [變體 — 改了什麼，8 字內說明]
         agents: [{
           id: "prompt-engineer",
           name: "Lucas Reyes", role: "Prompt 工程師", skill: "Prompt 工程",
-          avatar: "LR", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "LR", tone: "orchestrate", preferredProvider: "forge",
           system: `你是 Midjourney/DALL·E prompt 工程師。整合上方美術指導（構圖+色調）與燈光師（光線+氛圍）的決策，輸出 3 個英文 prompt 變體：
 
 **Variant 1 — Hero**
@@ -590,7 +590,7 @@ prompt: ...`,
         agents: [{
           id: "b2b-editor",
           name: "Kelly Wu", role: "B2B 觀點編輯", skill: "觀點寫作",
-          avatar: "KW", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "KW", tone: "orchestrate", preferredProvider: "forge",
           system: "你是 B2B 觀點編輯。基於上方 3 個事實，寫一段 LinkedIn 摘要：3 句中文，第 3 句必須是觀點或 CTA。直接交稿。",
           userTemplate: "內容：\n{{material}}",
         }],
@@ -630,7 +630,7 @@ prompt: ...`,
         agents: [{
           id: "color-engineer",
           name: "Hugo Martín", role: "色彩工程師", skill: "色彩工程",
-          avatar: "HM", tone: "craft", preferredProvider: "google",
+          avatar: "HM", tone: "craft", preferredProvider: "forge",
           system: `你是色彩工程師。基於 mood，輸出 5 個具體色（hex + 名字），純列表編號（先不寫用法）。每行格式：
 1. #A12B3C — 名字`,
           userTemplate: "品牌：{{brand}}\n精神：{{spirit}}",
@@ -644,7 +644,7 @@ prompt: ...`,
         agents: [{
           id: "color-applier",
           name: "Priya Anand", role: "色彩應用主編", skill: "色彩應用",
-          avatar: "PA", tone: "orchestrate", preferredProvider: "openai",
+          avatar: "PA", tone: "orchestrate", preferredProvider: "forge",
           system: `你是色彩應用主編。基於上方 5 個 hex 色，為每色補上角色與用法。輸出嚴格 JSON 陣列（不要 markdown 圍欄）：
 [{"hex":"#A12B3C","name":"...","role":"primary|secondary|accent|neutral|highlight","usage":"一句話用法建議"}, ...]
 共 5 色，第一色為 primary。`,

@@ -75,6 +75,67 @@ const TONE_LABEL: Record<AgentTone, string> = {
   orchestrate: "ORCHESTRATE",
 };
 
+/**
+ * PortraitAvatar — Agentforce-style cartoon portrait inside tone-colored ring.
+ * Uses DiceBear avataaars (no API key, free, deterministic per seed).
+ */
+function PortraitAvatar({
+  name, tone, size, glow = false, pulse = false, dim = false,
+}: {
+  name: string;
+  tone: AgentTone;
+  size: number;
+  glow?: boolean;     // delivered state — outer accent ring
+  pulse?: boolean;    // working state — animate ring
+  dim?: boolean;      // queued state — dim
+}) {
+  const ringColor = TONE_COLOR[tone];
+  const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}&radius=50&backgroundColor=ffffff,f5f5f5,fef9e7,e8f5e9`;
+  const ringWidth = Math.max(2, Math.round(size * 0.08));
+  return (
+    <span
+      style={{
+        position: "relative",
+        display: "inline-block",
+        width: size, height: size, flexShrink: 0,
+        opacity: dim ? 0.5 : 1,
+      }}
+    >
+      {pulse && (
+        <span
+          aria-hidden
+          className="animate-ping"
+          style={{
+            position: "absolute", inset: 0, borderRadius: "50%",
+            background: ringColor, opacity: 0.4,
+          }}
+        />
+      )}
+      <span
+        style={{
+          position: "relative",
+          display: "block",
+          width: size, height: size,
+          borderRadius: "50%",
+          border: `${ringWidth}px solid ${ringColor}`,
+          background: "#F2F2F2",
+          overflow: "hidden",
+          boxShadow: glow ? `0 0 0 2px white, 0 0 0 4px ${ACCENT}` : undefined,
+        }}
+      >
+        <img
+          src={url}
+          alt={name}
+          width={size - ringWidth * 2}
+          height={size - ringWidth * 2}
+          style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
+          loading="lazy"
+        />
+      </span>
+    </span>
+  );
+}
+
 type AgentResult = {
   taskId: string;
   stageId: string;
@@ -188,17 +249,8 @@ export default function QuickTasksPage() {
                 {/* Member avatars stack */}
                 <div className="mt-4 flex items-center gap-1.5">
                   {t.stages.flatMap((s) => s.agents).map((a) => (
-                    <span
-                      key={a.id}
-                      className="inline-flex items-center justify-center font-display text-[0.74rem] tracking-tight"
-                      style={{
-                        width: 28, height: 28, borderRadius: "50%",
-                        background: TONE_COLOR[a.tone], color: "white",
-                        border: "1.5px solid white", boxShadow: "0 0 0 1px #E5E5E5",
-                      }}
-                      title={`${a.name} · ${a.role}`}
-                    >
-                      {a.avatar}
+                    <span key={a.id} title={`${a.name} · ${a.role}`}>
+                      <PortraitAvatar name={a.name} tone={a.tone} size={32} />
                     </span>
                   ))}
                   <span className="ml-1 text-[0.7rem]" style={{ color: "#999" }}>
@@ -404,17 +456,7 @@ function RunPanel({
             {/* Squad member avatars stacked */}
             <div className="flex -space-x-2">
               {task.stages.flatMap((s) => s.agents).slice(0, 5).map((a) => (
-                <span
-                  key={a.id}
-                  className="inline-flex items-center justify-center font-display text-[0.86rem] tracking-tight"
-                  style={{
-                    width: 38, height: 38, borderRadius: "50%",
-                    background: TONE_COLOR[a.tone], color: "white",
-                    border: "2px solid white", boxShadow: "0 0 0 1px #E5E5E5",
-                  }}
-                >
-                  {a.avatar}
-                </span>
+                <PortraitAvatar key={a.id} name={a.name} tone={a.tone} size={42} />
               ))}
             </div>
             <div>
@@ -626,24 +668,14 @@ function AgentCard({
         }}
       >
         <div className="relative">
-          {/* Pulsing ring when working */}
-          {isWorking && (
-            <span
-              className="absolute inset-0 rounded-full animate-ping"
-              style={{ background: toneColor, opacity: 0.35 }}
-            />
-          )}
-          <span
-            className="relative inline-flex items-center justify-center font-display tracking-tight"
-            style={{
-              width: 56, height: 56, borderRadius: "50%",
-              background: toneColor, color: "white",
-              fontSize: agent.avatar.length > 1 ? "1rem" : "1.4rem",
-              boxShadow: status === "delivered" ? `0 0 0 3px white, 0 0 0 4px ${ACCENT}` : "none",
-            }}
-          >
-            {agent.avatar}
-          </span>
+          <PortraitAvatar
+            name={agent.name}
+            tone={tone}
+            size={64}
+            pulse={isWorking}
+            glow={status === "delivered"}
+            dim={status === "queued"}
+          />
           {/* Status dot in corner */}
           <span
             className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center"
@@ -784,17 +816,8 @@ function FinalDeliverable({
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <span
-            className="inline-flex items-center justify-center font-display tracking-tight shrink-0"
-            style={{
-              width: 44, height: 44, borderRadius: "50%",
-              background: TONE_COLOR[result.agentTone] ?? ACCENT, color: "white",
-              fontSize: result.agentAvatar.length > 1 ? "0.95rem" : "1.2rem",
-              boxShadow: `0 0 0 3px white, 0 0 0 4px ${ACCENT}`,
-            }}
-          >
-            {result.agentAvatar}
-          </span>
+          <PortraitAvatar name={result.agentName} tone={result.agentTone} size={52} glow />
+
           <div>
             <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: ACCENT }}>
               FINAL DELIVERABLE · 交付完成
