@@ -150,8 +150,8 @@ async function main() {
   } else results.push({ name: "Zhipu", ok: false, note: "missing env" });
 
   // 13. Alibaba Qwen / DashScope
-  if (process.env.DASHSCOPE_API_KEY || process.env.ALIBABA_API_KEY) {
-    const k = process.env.DASHSCOPE_API_KEY || process.env.ALIBABA_API_KEY!;
+  if (process.env.DASHSCOPE_API_KEY || process.env.ALIBABA_API_KEY || process.env.QWEN_API_KEY) {
+    const k = process.env.DASHSCOPE_API_KEY || process.env.ALIBABA_API_KEY || process.env.QWEN_API_KEY!;
     results.push(await tryFetch("Qwen DashScope", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
