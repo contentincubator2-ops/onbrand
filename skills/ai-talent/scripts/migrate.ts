@@ -192,7 +192,45 @@ async function main() {
     `);
     console.log("[migrate] queued_jobs: OK");
 
-    // 7. users.registrationIp + users.lastLoginIp (idempotent)
+    // 7. brands columns the drizzle schema expects but Azure sowork_db
+    //    is missing. Code paths that read these (positioningSummary,
+    //    positioningReport, brandVoice, soworkAnalysis, isDefault) would
+    //    otherwise raise ER_BAD_FIELD_ERROR like users.registrationIp did.
+    for (const col of [
+      { name: "positioningSummary", type: "TEXT NULL" },
+      { name: "positioningReport",  type: "JSON NULL" },
+      { name: "brandVoice",         type: "TEXT NULL" },
+      { name: "soworkAnalysis",     type: "JSON NULL" },
+      { name: "isDefault",          type: "TINYINT(1) NOT NULL DEFAULT 0" },
+    ] as const) {
+      const [exists] = await conn.execute(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands' AND COLUMN_NAME = ?`,
+        [col.name],
+      ) as any;
+      if ((exists as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE \`brands\` ADD COLUMN \`${col.name}\` ${col.type}`);
+        console.log(`[migrate] brands.${col.name}: added`);
+      } else {
+        console.log(`[migrate] brands.${col.name}: already exists, skipped`);
+      }
+    }
+
+    // 8. chat_messages.phaseOrder (idempotent)
+    {
+      const [exists] = await conn.execute(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chat_messages' AND COLUMN_NAME = 'phaseOrder'`,
+      ) as any;
+      if ((exists as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE \`chat_messages\` ADD COLUMN \`phaseOrder\` INT NULL`);
+        console.log("[migrate] chat_messages.phaseOrder: added");
+      } else {
+        console.log("[migrate] chat_messages.phaseOrder: already exists, skipped");
+      }
+    }
+
+    // 9. users.registrationIp + users.lastLoginIp (idempotent)
     //    Drizzle schema added these for signup/login IP tracking; Azure
     //    sowork_db users was missing them, causing `Unknown column` on
     //    every auth query from Vercel.
