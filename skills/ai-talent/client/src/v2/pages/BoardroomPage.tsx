@@ -1,13 +1,23 @@
 /**
- * BoardroomPage — Shark Tank "聽比稿" pitch arena.
+ * BoardroomPage — 顧問區 / Consultation Room
  *
- * UX:
- *   1. Stage hero with spotlights — user as "主席 (Chairman)" 坐主席台
- *   2. 6 sharks 排成 panel，每位綁不同 LLM provider
- *   3. brief 輸入 → 「請各位上台簡報」→ pitches 依 pitchOrder 一個個亮燈
- *   4. 每位 shark 的提案像 pitch deck slide，採納 = "I'm in"，退件 = "I'm out"
+ * 對齊使用者反饋：「顧問區是 agents 跟用戶提案，不是用戶跟 agents 提案」
  *
- * Reuses tone-colored PortraitAvatar (DiceBear) — same design language as /ai。
+ * UX 重塑：
+ *   1. 進到頁面 → 6 位真實 squad lead（從 DB 讀，每個 strategy_layer 一位）
+ *      已經在桌邊等候。不是抽象大師，是 SoWork 真的養出來的顧問。
+ *   2. 用戶不用先「寫 brief」 — 按下「請顧問為我提案」即可。
+ *      6 位顧問依各自小組的方法論主動診斷 + 提方案。
+ *   3. 每張卡片 4 段固定結構：
+ *        ## 我看見的問題
+ *        ## 我的小組會這樣做
+ *        ## 第一週可交付
+ *        ## 需要您決定的問題
+ *   4. 用戶可選在下方「想再多問一句」之後再次召集，把更具體的關注點丟進去。
+ *
+ * 模型調度：所有顧問預設用 forge（SoWork gateway，最穩），失敗時依序退到
+ * qwen / zhipu / openai。多 LLM 多樣性是 flair，不是功能 — 等 VM env 全綠
+ * 再開放選擇。
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
@@ -16,26 +26,25 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 type Tone = "research" | "analyze" | "write" | "craft" | "orchestrate";
 
-type Persona = {
-  id: string;
-  name: string;
-  title: string;
-  bio: string;
-  pitchOrder: number;
+type SquadLead = {
+  squadId: number;
+  squadSlug: string;
+  squadName: string;
+  squadMethodology: string | null;
+  strategyLayer: string;
+  layerLabel: string;
+  layerEmoji: string;
   tone: Tone;
-  preferredProvider: string;
-  catchphrase: string;
+  order: number;
+  agentId: number | null;
+  agentName: string;
+  agentTitle: string;
+  agentBio: string | null;
+  agentPrimarySkill: string | null;
 };
 
-type Pitch = {
-  personaId: string;
-  name: string;
-  title: string;
-  bio: string;
-  tone: Tone;
-  pitchOrder: number;
-  catchphrase: string;
-  pitch: string;
+type Proposal = SquadLead & {
+  proposal: string;
   provider: string;
   model: string;
   error: string | null;
@@ -49,20 +58,10 @@ const TONE_COLOR: Record<Tone, string> = {
   orchestrate: "#5B3CC8",
 };
 
-const PROVIDER_BADGE: Record<string, { label: string; bg: string }> = {
-  openai: { label: "GPT", bg: "#0E8567" },
-  google: { label: "Gemini", bg: "#3D7BD9" },
-  perplexity: { label: "Perplexity", bg: "#1F8A9A" },
-  cohere: { label: "Cohere", bg: "#7849C2" },
-  qwen: { label: "Qwen", bg: "#D9893E" },
-  zhipu: { label: "Zhipu", bg: "#A8451E" },
-  forge: { label: "Forge", bg: "#525866" },
-};
-
 const ACCENT = "#5B3CC8";
 const STAGE_GOLD = "#D4B36A";
 
-// ─── PortraitAvatar (shared design language with /ai) ───────────────────────
+// ─── PortraitAvatar (shared with /ai) ────────────────────────────────────
 
 function PortraitAvatar({
   name,
@@ -126,575 +125,425 @@ export default function BoardroomPage() {
     [brands, brandId]
   );
 
-  const personasQuery =
-    (trpc as any).boardroom?.listPersonas?.useQuery?.(undefined, {
-      refetchOnWindowFocus: false,
-    }) ?? { data: [], isLoading: false };
-  const personas: Persona[] = (personasQuery.data as any[]) ?? [];
+  // Pull real squad leads from DB (one per strategy layer L1–L6)
+  const leadsQuery = (trpc as any).boardroom.listSquadLeads.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false }
+  );
+  const leads: SquadLead[] = (leadsQuery.data as any[]) ?? [];
 
-  const [brief, setBrief] = useState("");
-  const [picked, setPicked] = useState<string[]>([]);
-  const [adopted, setAdopted] = useState<string[]>([]);
+  const consultMut = (trpc as any).boardroom.consult.useMutation();
 
-  const runMut = (trpc as any).boardroom.run.useMutation();
-  const [result, setResult] = useState<{ pitches: Pitch[] } | null>(null);
+  const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  const [concern, setConcern] = useState("");
+  const [running, setRunning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Stage entrance: which pitchOrder is currently "on mic"
+  // Sequential reveal effect (drama)
   const [revealedCount, setRevealedCount] = useState(0);
-
   useEffect(() => {
-    if (personas.length > 0 && picked.length === 0) {
-      setPicked(personas.map((p) => p.id));
-    }
-  }, [personas]);
-
-  // Once result lands, stagger reveal one by one (for Shark Tank drama)
-  useEffect(() => {
-    if (!result) {
+    if (!proposals) {
       setRevealedCount(0);
       return;
     }
     setRevealedCount(0);
     let i = 0;
-    const interval = setInterval(() => {
+    const t = setInterval(() => {
       i += 1;
       setRevealedCount(i);
-      if (i >= result.pitches.length) clearInterval(interval);
-    }, 700);
-    return () => clearInterval(interval);
-  }, [result]);
+      if (i >= proposals.length) clearInterval(t);
+    }, 600);
+    return () => clearInterval(t);
+  }, [proposals]);
 
-  const togglePersona = (id: string) => {
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  };
-
-  const onRun = async () => {
+  const handleConsult = async () => {
+    if (!brandId) {
+      setErr("請先在右上角選擇品牌");
+      return;
+    }
+    setRunning(true);
     setErr(null);
-    setResult(null);
-    setAdopted([]);
+    setProposals(null);
     try {
-      const r = await runMut.mutateAsync({
-        brief,
-        personaIds: picked,
-        brandName: currentBrand?.name ?? undefined,
-        brandId: currentBrand?.id ?? undefined,
+      const r = await consultMut.mutateAsync({
+        brandId,
+        concern: concern.trim() || undefined,
       });
-      setResult({ pitches: r.pitches });
+      setProposals((r.proposals as Proposal[]) ?? []);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
+    } finally {
+      setRunning(false);
     }
   };
 
-  const toggleAdopt = (personaId: string) => {
-    setAdopted((p) =>
-      p.includes(personaId) ? p.filter((x) => x !== personaId) : [...p, personaId]
-    );
-  };
-
-  const onReset = () => {
-    setResult(null);
-    setAdopted([]);
-    setErr(null);
-  };
-
   return (
-    <main className="pb-20" style={{ background: "#0A0813" }}>
-      {/* HERO — Shark Tank stage */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 60% at 50% 0%, #2A1F4A 0%, #14102A 55%, #0A0813 100%)",
-        }}
+    <div className="px-8 py-10 max-w-[1280px] mx-auto">
+      {/* ─── Hero ────────────────────────────────────────── */}
+      <div className="mb-8">
+        <div
+          className="text-[0.66rem] tracking-[0.24em] uppercase mb-2"
+          style={{ color: ACCENT }}
+        >
+          BOARDROOM · 顧問區
+        </div>
+        <h1 className="font-display text-[2.4rem] leading-tight text-mos-ink mb-3">
+          {currentBrand
+            ? `${currentBrand.name} 的 6 位顧問已就坐`
+            : "您的諮詢室"}
+        </h1>
+        <p className="text-mos-muted text-[0.95rem] max-w-[680px] leading-relaxed">
+          這裡是顧問向您提案 — 不是您向顧問報告。
+          每位都帶著一支真實的 squad，按下「為我提案」後，他們會用各自小組的方法論主動診斷您的品牌，
+          並提出他們會怎麼做。
+          {currentBrand && (
+            <>
+              {" "}
+              品牌大腦已連線 ·{" "}
+              <span style={{ color: ACCENT }}>{currentBrand.name}</span>
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* ─── Stage: leads waiting at the table ─────────────────── */}
+      <StageRow leads={leads} loading={leadsQuery.isLoading} />
+
+      {/* ─── CTA + optional follow-up question ──────────────────── */}
+      <div
+        className="mt-8 mb-10 rounded-2xl border bg-white p-6"
+        style={{ borderColor: "#E5E5E5" }}
       >
-        {/* spotlights */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            left: "20%",
-            top: "-10%",
-            width: "30%",
-            height: "70%",
-            background:
-              "radial-gradient(ellipse at center top, rgba(212,179,106,0.18) 0%, transparent 60%)",
-            filter: "blur(20px)",
-          }}
-        />
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            right: "20%",
-            top: "-10%",
-            width: "30%",
-            height: "70%",
-            background:
-              "radial-gradient(ellipse at center top, rgba(91,60,200,0.20) 0%, transparent 60%)",
-            filter: "blur(20px)",
-          }}
-        />
+        <label className="block">
+          <span className="text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted">
+            想多告訴顧問什麼？（選填）
+          </span>
+          <textarea
+            value={concern}
+            onChange={(e) => setConcern(e.target.value)}
+            placeholder="例：我們最近 IG 互動率掉了一半 / 想在 Q3 進入新品線 / 創辦人想要重塑品牌靈魂…"
+            className="mt-2 w-full min-h-[80px] rounded-lg border border-mos-hair px-3 py-2 text-[0.9rem] focus:outline-none focus:border-mos-ink/50 resize-y"
+          />
+        </label>
+        <p className="text-[0.7rem] text-mos-muted mt-2">
+          留空也可以 — 顧問會主動依您小組的專長點出他們看見的問題。
+        </p>
 
-        <div className="relative max-w-[1280px] mx-auto px-8 pt-16 pb-12 text-center">
-          <div
-            className="font-display text-[0.62rem] tracking-[0.36em] uppercase"
-            style={{ color: STAGE_GOLD }}
-          >
-            SHARK TANK · PITCH ARENA
+        <div className="flex items-center justify-between mt-4 gap-4 flex-wrap">
+          <div className="text-[0.74rem] text-mos-muted">
+            {currentBrand ? (
+              <>
+                ✓ 將以 <span className="font-medium text-mos-ink">{currentBrand.name}</span> 的品牌大腦做基礎
+              </>
+            ) : (
+              <span className="text-amber-600">⚠ 尚未選擇品牌</span>
+            )}
           </div>
-          <h1
-            className="mt-2 font-display text-[3.2rem] leading-[1.05] tracking-[-0.02em]"
-            style={{ color: "#F5EFD9" }}
+          <button
+            onClick={handleConsult}
+            disabled={running || !brandId || leadsQuery.isLoading}
+            className="px-6 h-11 rounded-xl font-medium text-white disabled:opacity-50 transition hover:brightness-110"
+            style={{ background: ACCENT }}
           >
-            聽比稿
-          </h1>
-          <p
-            className="mt-3 text-[0.95rem] max-w-[640px] mx-auto"
-            style={{ color: "#C9C2D9" }}
-          >
-            你坐主席台。6 位行銷大師輪流上台簡報，每位綁定不同 LLM。
-            <br />
-            一個個聽完 — 喊「I'm in」收下，「I'm out」退件。
-          </p>
+            {running ? "顧問商議中…" : proposals ? "請顧問再提案一輪" : "請各位顧問為我提案 →"}
+          </button>
+        </div>
 
-          {/* Stage with chairman + sharks */}
-          <div className="mt-12 mx-auto max-w-[860px]">
-            {/* Chairman */}
-            <div className="flex flex-col items-center mb-8">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center text-[1.5rem]"
-                style={{
-                  background: "linear-gradient(135deg, #D4B36A 0%, #B58A3D 100%)",
-                  boxShadow: "0 8px 24px rgba(212,179,106,0.45)",
-                }}
-              >
-                👑
-              </div>
-              <div
-                className="mt-2 font-display text-[0.62rem] tracking-[0.28em] uppercase"
-                style={{ color: STAGE_GOLD }}
-              >
-                CHAIRMAN · 主席
-              </div>
-              <div
-                className="text-[0.84rem]"
-                style={{ color: "#F5EFD9" }}
-              >
-                {currentBrand?.name ?? "你"}
-              </div>
+        {err && (
+          <div className="mt-3 text-[0.78rem] text-red-600">{err}</div>
+        )}
+      </div>
+
+      {/* ─── Proposals ───────────────────────────────────── */}
+      {proposals && (
+        <div className="space-y-4">
+          {proposals.map((p, idx) => (
+            <ProposalCard
+              key={p.squadId}
+              proposal={p}
+              revealed={idx < revealedCount}
+            />
+          ))}
+        </div>
+      )}
+
+      {!proposals && !running && leads.length === 0 && !leadsQuery.isLoading && (
+        <div className="text-center py-12 text-mos-muted text-[0.88rem]">
+          還沒有可諮詢的顧問。請先到任務範本建立至少一個 squad。
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── StageRow: leads waiting at the table ────────────────────────────────
+
+function StageRow({
+  leads,
+  loading,
+}: {
+  leads: SquadLead[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-end justify-center gap-4 py-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="w-20 h-20 rounded-full bg-mos-hair animate-pulse"
+          />
+        ))}
+      </div>
+    );
+  }
+  if (leads.length === 0) {
+    return (
+      <div
+        className="rounded-2xl border bg-mos-paper py-10 text-center text-mos-muted text-[0.86rem]"
+        style={{ borderColor: "#E5E5E5" }}
+      >
+        尚未有 tier=core 的 squad，無法載入顧問桌。
+      </div>
+    );
+  }
+  return (
+    <div
+      className="rounded-2xl border bg-white py-7 px-4"
+      style={{ borderColor: "#E5E5E5" }}
+    >
+      <div className="flex items-end justify-center gap-5 flex-wrap">
+        {leads.map((l) => (
+          <div key={l.squadId} className="flex flex-col items-center gap-2 w-24">
+            <PortraitAvatar
+              name={l.agentName}
+              tone={l.tone}
+              size={72}
+            />
+            <div className="text-[0.74rem] font-medium text-mos-ink truncate max-w-full">
+              {l.agentName}
             </div>
+            <div
+              className="text-[0.6rem] uppercase tracking-wider text-center leading-tight"
+              style={{ color: TONE_COLOR[l.tone] }}
+            >
+              {l.layerEmoji} {l.layerLabel}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-            {/* Sharks panel — arc layout */}
-            <div className="flex justify-center items-end gap-4 flex-wrap">
-              {personas.map((p) => {
-                const onMic =
-                  result &&
-                  revealedCount > 0 &&
-                  result.pitches[revealedCount - 1]?.personaId === p.id;
-                const alreadyPitched =
-                  result &&
-                  result.pitches.findIndex((x) => x.personaId === p.id) <
-                    revealedCount - 1;
-                const queued = !result || (!onMic && !alreadyPitched);
-                return (
-                  <div
-                    key={p.id}
-                    className="flex flex-col items-center"
-                    style={{ width: 96 }}
-                  >
-                    <PortraitAvatar
-                      name={p.name}
-                      tone={p.tone}
-                      size={64}
-                      pulse={!!onMic}
-                      glow={!!onMic}
-                      dim={result ? !onMic && !alreadyPitched : false}
-                    />
-                    <div
-                      className="mt-2 font-display text-[0.78rem] text-center leading-tight"
-                      style={{ color: "#F5EFD9" }}
-                    >
-                      {p.name}
-                    </div>
-                    <div
-                      className="text-[0.6rem] tracking-[0.14em] uppercase"
-                      style={{
-                        color:
-                          PROVIDER_BADGE[p.preferredProvider]?.bg ?? "#999",
-                      }}
-                    >
-                      {PROVIDER_BADGE[p.preferredProvider]?.label ?? p.preferredProvider}
-                    </div>
-                  </div>
-                );
-              })}
+// ─── ProposalCard: 4-section structure ───────────────────────────────────
+
+function ProposalCard({
+  proposal,
+  revealed,
+}: {
+  proposal: Proposal;
+  revealed: boolean;
+}) {
+  const color = TONE_COLOR[proposal.tone];
+  const sections = parseProposal(proposal.proposal);
+
+  if (!revealed) {
+    return (
+      <div
+        className="rounded-2xl border bg-white p-6 flex items-center gap-4"
+        style={{ borderColor: "#E5E5E5", opacity: 0.4 }}
+      >
+        <PortraitAvatar
+          name={proposal.agentName}
+          tone={proposal.tone}
+          size={56}
+          dim
+        />
+        <div className="text-[0.86rem] text-mos-muted">
+          {proposal.agentName} 正在準備…
+        </div>
+      </div>
+    );
+  }
+
+  if (proposal.error) {
+    return (
+      <div
+        className="rounded-2xl border bg-white p-6"
+        style={{ borderColor: "#E5E5E5" }}
+      >
+        <div className="flex items-start gap-4">
+          <PortraitAvatar
+            name={proposal.agentName}
+            tone={proposal.tone}
+            size={56}
+            dim
+          />
+          <div className="flex-1">
+            <div className="font-display text-[1.05rem] text-mos-ink">
+              {proposal.agentName}
+            </div>
+            <div className="text-[0.7rem] uppercase tracking-wider text-mos-muted mt-1">
+              {proposal.layerEmoji} {proposal.layerLabel} · {proposal.squadName}
+            </div>
+            <div className="mt-3 text-[0.82rem] text-red-600">
+              無法生成提案：{proposal.error}
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    );
+  }
 
-      {/* BODY */}
-      <section className="max-w-[1280px] mx-auto px-8 -mt-6 relative z-10">
-        {!result && (
-          <div
-            className="rounded-2xl p-8"
-            style={{
-              background: "#fff",
-              boxShadow: "0 18px 60px rgba(20,16,42,0.42)",
-            }}
-          >
-            <div className="flex items-center gap-3 mb-5">
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[0.74rem] text-white"
-                style={{ background: "#14102A" }}
-              >
-                1
-              </div>
-              <h2 className="font-display text-[1.2rem] text-mos-ink tracking-[-0.01em]">
-                今天要 sharks 評什麼？
-              </h2>
-            </div>
-            <textarea
-              value={brief}
-              onChange={(e) => setBrief(e.target.value)}
-              placeholder="例：我們新一季想推 Z 世代咖啡，希望 6 個月內在台北開 3 家店。怎麼定位、怎麼上市、預算 800 萬。"
-              rows={6}
-              className="w-full px-4 py-3 text-[0.92rem] bg-mos-paper border border-mos-hair rounded-lg focus:outline-none focus:border-[#5B3CC8] transition"
-            />
-
-            <div className="flex items-center gap-3 mt-8 mb-4">
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[0.74rem] text-white"
-                style={{ background: "#14102A" }}
-              >
-                2
-              </div>
-              <h2 className="font-display text-[1.2rem] text-mos-ink tracking-[-0.01em]">
-                點名上台的 sharks
-              </h2>
-              <div className="text-[0.74rem] text-mos-muted ml-auto">
-                {picked.length} / {personas.length} 位已選
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {personas.map((p) => {
-                const active = picked.includes(p.id);
-                const badge = PROVIDER_BADGE[p.preferredProvider];
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => togglePersona(p.id)}
-                    className={[
-                      "text-left p-4 rounded-xl border transition flex items-start gap-3",
-                      active
-                        ? "border-[#14102A] bg-[#14102A]/5"
-                        : "border-mos-hair bg-white hover:border-mos-ink",
-                    ].join(" ")}
-                  >
-                    <PortraitAvatar name={p.name} tone={p.tone} size={48} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="font-display text-[1rem] text-mos-ink tracking-[-0.01em]">
-                          {p.name}
-                        </div>
-                        {badge && (
-                          <span
-                            className="text-[0.58rem] tracking-[0.18em] uppercase px-1.5 py-0.5 rounded text-white"
-                            style={{ background: badge.bg }}
-                          >
-                            {badge.label}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[0.72rem] text-mos-muted">
-                        {p.title}
-                      </div>
-                      <div className="mt-1 text-[0.78rem] text-mos-body line-clamp-2">
-                        {p.bio}
-                      </div>
-                      <div
-                        className="mt-1.5 text-[0.72rem] italic"
-                        style={{ color: TONE_COLOR[p.tone] }}
-                      >
-                        「{p.catchphrase}」
-                      </div>
-                    </div>
-                    <div
-                      className={[
-                        "w-5 h-5 rounded-full border-2 shrink-0 mt-1 flex items-center justify-center",
-                        active
-                          ? "bg-[#14102A] border-[#14102A]"
-                          : "border-mos-hair",
-                      ].join(" ")}
-                    >
-                      {active && (
-                        <span className="text-white text-[0.7rem]">✓</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {err && (
-              <div className="mt-5 text-[0.84rem] text-mos-red bg-mos-red/5 px-4 py-3 rounded-lg">
-                {err}
-              </div>
-            )}
-
-            <button
-              onClick={onRun}
-              disabled={
-                brief.trim().length < 10 ||
-                picked.length === 0 ||
-                runMut.isPending
-              }
-              className="mt-6 w-full py-3.5 text-[0.82rem] tracking-[0.22em] uppercase rounded-full text-white disabled:opacity-40 transition"
-              style={{
-                background: "#14102A",
-                boxShadow: "0 6px 20px rgba(20,16,42,0.40)",
-              }}
-            >
-              {runMut.isPending ? "Sharks 上台簡報中…" : "🎤 請各位 sharks 上台"}
-            </button>
-
-            <div className="mt-2 text-center text-[0.7rem] text-mos-muted">
-              將同時調用 {picked.length} 個不同 LLM 並行運算 · 約 60 秒
-            </div>
+  return (
+    <div
+      className="rounded-2xl border bg-white p-6 transition-all duration-500"
+      style={{ borderColor: `${color}40` }}
+    >
+      <div className="flex items-start gap-4 mb-4">
+        <PortraitAvatar
+          name={proposal.agentName}
+          tone={proposal.tone}
+          size={64}
+          glow
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline flex-wrap gap-2">
+            <span className="font-display text-[1.15rem] text-mos-ink">
+              {proposal.agentName}
+            </span>
+            <span className="text-[0.78rem] text-mos-muted">
+              {proposal.agentTitle}
+            </span>
           </div>
-        )}
-
-        {/* RESULTS */}
-        {result && (
-          <div>
-            <div className="flex items-end justify-between mb-5 pt-4">
-              <div>
-                <div
-                  className="font-display text-[0.62rem] tracking-[0.28em] uppercase"
-                  style={{ color: STAGE_GOLD }}
-                >
-                  比稿現場 · LIVE PITCHES
-                </div>
-                <h2
-                  className="font-display text-[1.6rem] tracking-[-0.015em] mt-1"
-                  style={{ color: "#F5EFD9" }}
-                >
-                  Sharks 提案
-                </h2>
-                <div
-                  className="mt-1 text-[0.78rem] line-clamp-2 max-w-[680px]"
-                  style={{ color: "#C9C2D9" }}
-                >
-                  Brief：{brief}
-                </div>
-              </div>
-              <button
-                onClick={onReset}
-                className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase border rounded-full transition"
-                style={{
-                  borderColor: "rgba(245,239,217,0.3)",
-                  color: "#C9C2D9",
-                }}
-              >
-                ← 改 brief 重來
-              </button>
-            </div>
-
-            <div className="space-y-5">
-              {result.pitches.map((pitch, i) => {
-                const isAdopted = adopted.includes(pitch.personaId);
-                const badge = PROVIDER_BADGE[pitch.provider];
-                const visible = i < revealedCount;
-                const isOnMic = i === revealedCount - 1;
-                return (
-                  <article
-                    key={pitch.personaId}
-                    className="rounded-2xl overflow-hidden flex transition-all duration-500"
-                    style={{
-                      opacity: visible ? 1 : 0,
-                      transform: visible
-                        ? "translateY(0)"
-                        : "translateY(16px)",
-                      pointerEvents: visible ? "auto" : "none",
-                      background: "#FFFFFF",
-                      border: isAdopted
-                        ? `2px solid ${STAGE_GOLD}`
-                        : isOnMic
-                        ? `2px solid ${ACCENT}`
-                        : "1px solid #E5E5E5",
-                      boxShadow: isAdopted
-                        ? "0 12px 36px rgba(212,179,106,0.35)"
-                        : isOnMic
-                        ? "0 12px 36px rgba(91,60,200,0.25)"
-                        : "0 6px 20px rgba(0,0,0,0.18)",
-                    }}
-                  >
-                    {/* Left rail — speaker portrait + nameplate */}
-                    <div
-                      className="px-6 py-6 flex flex-col items-center text-center shrink-0"
-                      style={{
-                        background: "#14102A",
-                        width: 200,
-                        color: "#F5EFD9",
-                      }}
-                    >
-                      <div
-                        className="font-display text-[0.55rem] tracking-[0.28em] uppercase mb-3"
-                        style={{ color: STAGE_GOLD }}
-                      >
-                        Pitch #{pitch.pitchOrder}
-                      </div>
-                      <PortraitAvatar
-                        name={pitch.name}
-                        tone={pitch.tone}
-                        size={84}
-                        glow={isAdopted}
-                        pulse={isOnMic}
-                      />
-                      <div className="mt-3 font-display text-[1rem] tracking-[-0.01em]">
-                        {pitch.name}
-                      </div>
-                      <div
-                        className="text-[0.66rem] mt-0.5"
-                        style={{ color: "#C9C2D9" }}
-                      >
-                        {pitch.title}
-                      </div>
-                      {badge && (
-                        <span
-                          className="mt-3 text-[0.56rem] tracking-[0.18em] uppercase px-2 py-0.5 rounded text-white"
-                          style={{ background: badge.bg }}
-                        >
-                          {badge.label}
-                        </span>
-                      )}
-                      <div
-                        className="mt-3 text-[0.7rem] italic leading-snug"
-                        style={{ color: TONE_COLOR[pitch.tone] }}
-                      >
-                        「{pitch.catchphrase}」
-                      </div>
-                    </div>
-
-                    {/* Pitch deck */}
-                    <div className="flex-1 flex flex-col">
-                      <div className="px-6 py-5 flex-1">
-                        {pitch.error ? (
-                          <div className="text-[0.84rem] text-mos-red bg-mos-red/5 px-4 py-3 rounded-lg">
-                            這位 shark 沒能上台：{pitch.error}
-                          </div>
-                        ) : (
-                          <pre className="whitespace-pre-wrap text-[0.88rem] leading-relaxed text-mos-ink font-sans">
-                            {pitch.pitch}
-                          </pre>
-                        )}
-                      </div>
-
-                      <footer className="px-6 py-3 border-t border-mos-hair flex items-center gap-3 bg-mos-paper">
-                        <button
-                          onClick={() => toggleAdopt(pitch.personaId)}
-                          disabled={!!pitch.error}
-                          className={[
-                            "px-5 py-2 text-[0.72rem] tracking-[0.18em] uppercase rounded-full transition disabled:opacity-30",
-                          ].join(" ")}
-                          style={
-                            isAdopted
-                              ? {
-                                  background: STAGE_GOLD,
-                                  color: "#14102A",
-                                  fontWeight: 500,
-                                }
-                              : {
-                                  background: "#14102A",
-                                  color: "#F5EFD9",
-                                }
-                          }
-                        >
-                          {isAdopted ? "✓ I'm in" : "I'm in"}
-                        </button>
-                        <button
-                          onClick={() =>
-                            adopted.includes(pitch.personaId) &&
-                            toggleAdopt(pitch.personaId)
-                          }
-                          className="px-5 py-2 text-[0.72rem] tracking-[0.18em] uppercase border border-mos-hair text-mos-muted hover:text-mos-ink hover:border-mos-ink rounded-full transition"
-                        >
-                          I'm out
-                        </button>
-                        <div className="flex-1" />
-                        <button
-                          onClick={() =>
-                            navigator.clipboard?.writeText?.(pitch.pitch)
-                          }
-                          className="px-3 py-2 text-[0.7rem] tracking-[0.18em] uppercase border border-mos-hair text-mos-muted hover:text-mos-ink hover:border-mos-ink rounded-full transition"
-                        >
-                          複製
-                        </button>
-                      </footer>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-
-            {revealedCount < result.pitches.length && (
-              <div
-                className="mt-6 text-center text-[0.74rem] tracking-[0.18em] uppercase"
-                style={{ color: STAGE_GOLD }}
-              >
-                下一位 shark 準備上台… ({revealedCount}/{result.pitches.length})
-              </div>
-            )}
-
-            {/* Chairman ruling */}
-            {revealedCount >= result.pitches.length && adopted.length > 0 && (
-              <div
-                className="mt-8 p-6 rounded-2xl flex items-center gap-4"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #14102A 0%, #2A1F4A 100%)",
-                  color: "#F5EFD9",
-                  border: `1px solid ${STAGE_GOLD}`,
-                }}
-              >
-                <div className="text-[2rem]">👑</div>
-                <div className="flex-1">
-                  <div
-                    className="font-display text-[0.62rem] tracking-[0.28em] uppercase"
-                    style={{ color: STAGE_GOLD }}
-                  >
-                    主席決議 · CHAIRMAN'S RULING
-                  </div>
-                  <div className="mt-1 text-[0.92rem]">
-                    收下 {adopted.length} 位 sharks —{" "}
-                    {adopted
-                      .map(
-                        (id) =>
-                          result.pitches.find((p) => p.personaId === id)?.name
-                      )
-                      .filter(Boolean)
-                      .join("、")}
-                  </div>
-                </div>
-                <button
-                  onClick={() => alert("匯出比稿紀錄 PDF（即將推出）")}
-                  className="px-5 py-2.5 text-[0.72rem] tracking-[0.18em] uppercase rounded-full"
-                  style={{ background: STAGE_GOLD, color: "#14102A" }}
-                >
-                  匯出比稿紀錄
-                </button>
-                <button
-                  onClick={() => alert("存進品牌大腦（即將推出）")}
-                  className="px-5 py-2.5 text-[0.72rem] tracking-[0.18em] uppercase rounded-full border"
-                  style={{ borderColor: STAGE_GOLD, color: STAGE_GOLD }}
-                >
-                  存進品牌大腦
-                </button>
-              </div>
-            )}
+          <div className="text-[0.72rem] uppercase tracking-wider mt-1" style={{ color }}>
+            {proposal.layerEmoji} {proposal.layerLabel} · 帶領小組「{proposal.squadName}」
           </div>
-        )}
-      </section>
-    </main>
+          {proposal.squadMethodology && (
+            <div className="text-[0.74rem] text-mos-muted mt-1.5 italic">
+              方法論：{truncate(proposal.squadMethodology, 80)}
+            </div>
+          )}
+        </div>
+        <ProviderPill provider={proposal.provider} model={proposal.model} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <ProposalSection
+          icon="🎯"
+          title="我看見的問題"
+          color={color}
+          body={sections.problem}
+        />
+        <ProposalSection
+          icon="🛠"
+          title="我的小組會這樣做"
+          color={color}
+          body={sections.steps}
+        />
+        <ProposalSection
+          icon="📦"
+          title="第一週可交付"
+          color={color}
+          body={sections.deliverables}
+        />
+        <ProposalSection
+          icon="❓"
+          title="需要您決定的問題"
+          color={color}
+          body={sections.decisions}
+        />
+      </div>
+    </div>
   );
+}
+
+function ProposalSection({
+  icon,
+  title,
+  color,
+  body,
+}: {
+  icon: string;
+  title: string;
+  color: string;
+  body: string;
+}) {
+  return (
+    <div>
+      <div
+        className="text-[0.66rem] tracking-[0.18em] uppercase mb-2 flex items-center gap-1.5"
+        style={{ color }}
+      >
+        <span>{icon}</span>
+        <span>{title}</span>
+      </div>
+      <div className="text-[0.86rem] text-mos-ink leading-relaxed whitespace-pre-line">
+        {body || <span className="text-mos-muted italic">（顧問未提供此項）</span>}
+      </div>
+    </div>
+  );
+}
+
+function ProviderPill({
+  provider,
+  model,
+}: {
+  provider: string;
+  model: string;
+}) {
+  const labelMap: Record<string, { label: string; bg: string }> = {
+    forge: { label: "Forge", bg: "#525866" },
+    qwen: { label: "Qwen", bg: "#D9893E" },
+    zhipu: { label: "Zhipu", bg: "#A8451E" },
+    openai: { label: "GPT", bg: "#0E8567" },
+    perplexity: { label: "Perplexity", bg: "#1F8A9A" },
+  };
+  const m = labelMap[provider] ?? { label: provider, bg: "#525866" };
+  return (
+    <div className="text-right shrink-0">
+      <span
+        className="inline-block text-[0.6rem] tracking-wider uppercase text-white px-2 py-0.5 rounded"
+        style={{ background: m.bg }}
+        title={model}
+      >
+        {m.label}
+      </span>
+    </div>
+  );
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+function parseProposal(text: string): {
+  problem: string;
+  steps: string;
+  deliverables: string;
+  decisions: string;
+} {
+  const out = { problem: "", steps: "", deliverables: "", decisions: "" };
+  if (!text) return out;
+  const sections = text.split(/^##\s+/m).map((s) => s.trim()).filter(Boolean);
+  for (const s of sections) {
+    const newlineIdx = s.indexOf("\n");
+    const heading = (newlineIdx >= 0 ? s.slice(0, newlineIdx) : s).trim();
+    const body = (newlineIdx >= 0 ? s.slice(newlineIdx + 1) : "").trim();
+    if (heading.includes("看見") || heading.includes("問題")) out.problem = body || heading;
+    else if (heading.includes("這樣做") || heading.includes("步驟") || heading.includes("方案")) out.steps = body;
+    else if (heading.includes("交付") || heading.includes("產出") || heading.includes("deliver")) out.deliverables = body;
+    else if (heading.includes("決定") || heading.includes("決策") || heading.includes("問題")) {
+      // duplicate match guard — only take if not already taken
+      if (!out.decisions) out.decisions = body;
+    }
+  }
+  // If parsing didn't yield 4 buckets (model didn't follow format), dump raw into "problem"
+  if (!out.problem && !out.steps && !out.deliverables && !out.decisions) {
+    out.problem = text;
+  }
+  return out;
+}
+
+function truncate(s: string, n: number) {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }

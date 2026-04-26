@@ -26,7 +26,10 @@ export type ModelProvider =
   | "google"
   | "cohere"
   | "openai"
-  | "forge";
+  | "forge"
+  | "azure-foundry"
+  | "anthropic"
+  | "gemini";
 
 export interface MultiModelMessage {
   role: "system" | "user" | "assistant";
@@ -73,14 +76,18 @@ export function detectTaskType(content: string): TaskType {
 // NOTE: google + cohere removed from priority lists — Google generative API
 // key is blocked by service policy (API_KEY_SERVICE_BLOCKED 403) and Cohere
 // key in prod env returns 401. Re-enable once those are fixed.
+// Azure Foundry is the canonical "always works" route on the SoWork VM
+// (project endpoint + AZURE_FOUNDRY_API_KEY are baked in to llm.ts default).
+// We list it FIRST for every task type so the boardroom never silently dies
+// when forge / qwen / zhipu env keys aren't set on a deployment.
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
-  chinese_content: ["qwen", "zhipu", "forge", "openai"],
-  creative_writing: ["zhipu", "qwen", "forge", "openai"],
-  search_realtime: ["perplexity", "forge", "openai"],
-  analysis: ["qwen", "zhipu", "forge", "openai"],
-  classification: ["qwen", "zhipu", "forge", "openai"],
-  coding: ["forge", "openai"],
-  general: ["forge", "qwen", "zhipu", "openai"],
+  chinese_content: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
+  creative_writing: ["azure-foundry", "zhipu", "qwen", "forge", "openai"],
+  search_realtime: ["perplexity", "azure-foundry", "forge", "openai"],
+  analysis: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
+  classification: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
+  coding: ["azure-foundry", "forge", "openai"],
+  general: ["azure-foundry", "forge", "qwen", "zhipu", "openai"],
 };
 
 const DEFAULT_MODELS: Record<ModelProvider, string> = {
@@ -91,6 +98,9 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
   cohere: "command-r-plus",
   openai: "gpt-4o-mini",
   forge: "gemini-2.5-flash",
+  "azure-foundry": "gpt-4o",
+  anthropic: "claude-sonnet-4-6",
+  gemini: "gemini-2.5-flash",
 };
 
 /**
@@ -99,14 +109,19 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
  */
 function getAvailabilityMap(): Record<ModelProvider, boolean> {
   return {
-    qwen:       !!ENV.QWEN_API_KEY,
-    zhipu:      !!ENV.ZHIPU_API_KEY,
-    perplexity: !!ENV.PERPLEXITY_API_KEY,
+    qwen:           !!ENV.QWEN_API_KEY,
+    zhipu:          !!ENV.ZHIPU_API_KEY,
+    perplexity:     !!ENV.PERPLEXITY_API_KEY,
     // google + cohere are force-disabled — see TASK_PRIORITY_MAP comment
-    google:     false,
-    cohere:     false,
-    openai:     !!ENV.OPENAI_API_KEY,
-    forge:      !!ENV.BUILT_IN_FORGE_API_KEY,
+    google:         false,
+    cohere:         false,
+    openai:         !!ENV.OPENAI_API_KEY,
+    forge:          !!ENV.BUILT_IN_FORGE_API_KEY,
+    // Azure Foundry: project endpoint defaults via llm.ts even without env;
+    // only a missing API key truly breaks it.
+    "azure-foundry": !!(ENV as any).AZURE_FOUNDRY_API_KEY,
+    anthropic:      !!(ENV as any).ANTHROPIC_API_KEY,
+    gemini:         !!((ENV as any).GEMINI_API_KEY || (ENV as any).GOOGLE_AI_API_KEY),
   };
 }
 
@@ -119,7 +134,10 @@ function selectProvider(taskType: TaskType): ModelProvider {
   for (const provider of TASK_PRIORITY_MAP[taskType]) {
     if (availability[provider]) return provider;
   }
-  return "forge";
+  // Last-resort fallback: azure-foundry has a baked-in endpoint default in
+  // llm.ts and is the only provider that works on the SoWork VM out-of-the-box
+  // when other env keys aren't set.
+  return "azure-foundry";
 }
 
 /**
@@ -154,16 +172,21 @@ export async function callModel(
   let model: string;
 
   if (preferredProvider) {
-    // Strict mode: when a preferred provider is requested, honor it or throw.
-    // Silently picking a different provider leads to confusing errors (e.g.
-    // boardroom shark advertised as "Forge" but actually hitting Google 403).
-    if (!availability[preferredProvider]) {
-      throw new Error(
-        `[multiModelRouter] preferred provider "${preferredProvider}" not available (API key missing or disabled)`
+    // Soft mode: honor preferred provider when its key is set, otherwise
+    // gracefully degrade to the task-type priority list (which now leads with
+    // azure-foundry — the SoWork VM's verified-working route). Hard throws
+    // here have been confirmed by the user to break the boardroom UX.
+    if (availability[preferredProvider]) {
+      provider = preferredProvider;
+      model = DEFAULT_MODELS[provider];
+    } else {
+      const type = taskType ?? detectTaskType(messages.map(m => m.content).join(" "));
+      provider = selectProvider(type);
+      model = DEFAULT_MODELS[provider];
+      console.warn(
+        `[multiModelRouter] preferred "${preferredProvider}" unavailable (key missing); falling back to "${provider}"`
       );
     }
-    provider = preferredProvider;
-    model = DEFAULT_MODELS[provider];
   } else {
     const type = taskType ?? detectTaskType(messages.map(m => m.content).join(" "));
     provider = selectProvider(type);
