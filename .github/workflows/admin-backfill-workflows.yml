@@ -1,0 +1,92 @@
+name: Admin — Backfill Squad Workflows (LLM)
+
+# For every active squad whose steps[] doesn't pass the audit gate,
+# generate a 4-6 step workflow via LLM (azure-foundry zh → gpt-5-nano),
+# assign each step to the best-matching squad member by primarySkill,
+# and write the result to squads.steps.
+#
+# Idempotent: skips squads that already qualify.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = compute new steps but don't write"
+        required: false
+        default: "true"
+      limit:
+        description: "Max squads to process this run (blank = all)"
+        required: false
+        default: ""
+      layer:
+        description: "Restrict to layers e.g. L1 or L1,L4 (blank = all)"
+        required: false
+        default: ""
+      slugs:
+        description: "Comma-separated slugs to restrict (blank = all)"
+        required: false
+        default: ""
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          LIMIT: ${{ inputs.limit }}
+          LAYER: ${{ inputs.layer }}
+          SLUGS: ${{ inputs.slugs }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3600s
+          envs: GH_TOKEN,DRY_RUN,LIMIT,LAYER,SLUGS
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Step 1: Pull latest main ====="
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 1.5: Source app .env into shell ====="
+            cd "$AI"
+            if [ -f .env ]; then
+              set -a
+              # shellcheck disable=SC1091
+              source .env
+              set +a
+              echo "[env] sourced .env (JWT_SECRET set: $([ -n "$JWT_SECRET" ] && echo yes || echo no))"
+            else
+              echo "[env] WARN: .env not found at $AI"
+            fi
+
+            echo ""
+            echo "===== Step 2: Pre-audit ====="
+            npx tsx scripts/audit-workflow-completeness.ts 2>&1 | tail -30 || true
+
+            echo ""
+            echo "===== Step 3: Run backfill ====="
+            FLAGS=""
+            if [ "$DRY_RUN" = "true" ]; then FLAGS="$FLAGS --dry-run"; fi
+            if [ -n "$LIMIT" ]; then FLAGS="$FLAGS --limit=$LIMIT"; fi
+            if [ -n "$LAYER" ]; then FLAGS="$FLAGS --layer=$LAYER"; fi
+            if [ -n "$SLUGS" ]; then FLAGS="$FLAGS --slugs=$SLUGS"; fi
+            echo "[backfill] flags: $FLAGS"
+            npx tsx scripts/backfill-squad-workflows.ts $FLAGS 2>&1 | tail -800
+
+            echo ""
+            echo "===== Step 4: Post-audit ====="
+            npx tsx scripts/audit-workflow-completeness.ts 2>&1 | tail -30 || true
+
+            echo ""
+            echo "===== Done ====="

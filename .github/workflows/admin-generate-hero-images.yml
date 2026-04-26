@@ -1,0 +1,108 @@
+name: Admin — Generate Squad Hero Images (gpt-image-1)
+
+# For every active squad without hero_image_url, generate a 3D pastel
+# mockup illustration via OpenAI gpt-image-1 and save to
+# /opt/marketing-os/app/public/squad-hero/{slug}.png + DB row update.
+#
+# Idempotent unless --regenerate.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = print prompts only, no API calls"
+        required: false
+        default: "true"
+      limit:
+        description: "Max squads this run (blank = all)"
+        required: false
+        default: "5"
+      slugs:
+        description: "Comma-separated slugs to restrict (blank = all)"
+        required: false
+        default: ""
+      regenerate:
+        description: "true = also redo squads that already have hero_image_url"
+        required: false
+        default: "false"
+      quality:
+        description: "low | medium | high | auto (default medium)"
+        required: false
+        default: "medium"
+
+jobs:
+  hero:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          LIMIT: ${{ inputs.limit }}
+          SLUGS: ${{ inputs.slugs }}
+          REGEN: ${{ inputs.regenerate }}
+          QUALITY: ${{ inputs.quality }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 7200s
+          envs: GH_TOKEN,OPENAI_API_KEY,DRY_RUN,LIMIT,SLUGS,REGEN,QUALITY
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Step 1: Pull latest main ====="
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 2: Migrate (adds hero_image_url col if missing) ====="
+            cd "$AI"
+            # Save the OPENAI_API_KEY we got from GitHub Secret BEFORE sourcing
+            # .env, because the VM's .env has its own (likely stale) key that
+            # would otherwise win.
+            SAVED_OPENAI_KEY="${OPENAI_API_KEY}"
+            if [ -f .env ]; then
+              set -a
+              # shellcheck disable=SC1091
+              source .env
+              set +a
+            fi
+            if [ -n "$SAVED_OPENAI_KEY" ]; then
+              export OPENAI_API_KEY="$SAVED_OPENAI_KEY"
+              echo "[env] OPENAI_API_KEY: using GitHub Secret (prefix: ${OPENAI_API_KEY:0:10}…)"
+            else
+              echo "[env] OPENAI_API_KEY: using VM .env value"
+            fi
+            npx tsx scripts/migrate.ts 2>&1 | tail -40 || true
+
+            echo ""
+            echo "===== Step 3: Ensure output dir ====="
+            mkdir -p $AI/public/squad-hero
+            ls -la $AI/public/squad-hero | head -5 || true
+
+            echo ""
+            echo "===== Step 4: Generate hero images ====="
+            FLAGS=""
+            if [ "$DRY_RUN" = "true" ]; then FLAGS="$FLAGS --dry-run"; fi
+            if [ -n "$LIMIT" ]; then FLAGS="$FLAGS --limit=$LIMIT"; fi
+            if [ -n "$SLUGS" ]; then FLAGS="$FLAGS --slugs=$SLUGS"; fi
+            if [ "$REGEN" = "true" ]; then FLAGS="$FLAGS --regenerate"; fi
+            if [ -n "$QUALITY" ]; then FLAGS="$FLAGS --quality=$QUALITY"; fi
+            echo "[hero-img] flags: $FLAGS"
+            npx tsx scripts/generate-squad-hero-images.ts $FLAGS 2>&1 | tail -800
+
+            echo ""
+            echo "===== Step 5: Files written ====="
+            ls -1 $AI/public/squad-hero | wc -l
+            ls -lah $AI/public/squad-hero | tail -10 || true
+
+            echo ""
+            echo "===== Done ====="

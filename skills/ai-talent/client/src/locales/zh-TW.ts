@@ -81,7 +81,7 @@ export const zh = {
   section_deliverables:    "成果交付",
   squad_no_workflow:       "此小隊尚未設定執行流程",
   squad_no_agents:         "無成員資料",
-  methodology_label:       "方法論",
+  methodology_label:       "任務範本",
   commercial_validation:   "Commercial Validation",
   label_agent_count:       "位成員",
 

@@ -1,0 +1,80 @@
+name: Admin — Migrate swt → squads.steps
+
+# Phase 1 of schema consolidation. Backfills squads.steps from
+# squad_workflow_templates and re-normalizes inline steps to the
+# canonical shape. Re-runnable; transactional; rolls back on any error.
+#
+# Modes (workflow_dispatch input):
+#   dry-run  — print plan + sample, NO writes
+#   apply    — write canonical steps to squads.steps in a single tx
+#
+# After `apply` succeeds and listByBrand verified clean, run
+# admin-drop-swt.yml (Phase 4) to DROP the legacy table.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run or apply"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - apply
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MIGRATE_MODE: ${{ inputs.mode }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          envs: GH_TOKEN,MIGRATE_MODE
+          script: |
+            set -e
+            APP=/opt/ai-marketer/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Step 1: Pull latest main ====="
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Step 2: Ensure deps ====="
+            cd "$AI"
+            npm install --legacy-peer-deps 2>&1 | tail -3
+
+            echo ""
+            echo "===== Step 3: Pre-migration snapshot ====="
+            mysql --defaults-file=/etc/mysql/mos_user.cnf mos_db -e "
+              SELECT
+                (SELECT COUNT(*) FROM squads WHERE is_active=1) AS sq_active,
+                (SELECT COUNT(*) FROM squads WHERE is_active=1 AND JSON_LENGTH(COALESCE(steps, JSON_ARRAY()))>0) AS sq_with_steps,
+                (SELECT COUNT(*) FROM squad_workflow_templates WHERE isActive=1) AS swt_active;
+            " 2>&1 || echo "(snapshot via mysql cli skipped — will rely on script output)"
+
+            echo ""
+            echo "===== Step 4: Run migration (mode=$MIGRATE_MODE) ====="
+            if [ "$MIGRATE_MODE" = "apply" ]; then
+              npx tsx scripts/migrate-swt-to-inline.ts --apply
+            else
+              npx tsx scripts/migrate-swt-to-inline.ts --dry-run
+            fi
+
+            echo ""
+            echo "===== Step 5: Done ====="
+            echo "Mode was: $MIGRATE_MODE"
+            if [ "$MIGRATE_MODE" = "apply" ]; then
+              echo "Next: verify Studio UI, then run admin-drop-swt.yml"
+            fi

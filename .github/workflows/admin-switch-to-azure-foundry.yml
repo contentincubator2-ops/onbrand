@@ -1,0 +1,105 @@
+name: Admin — Switch LLM to Azure Foundry
+
+# One-shot: (1) list available deployments on the given Azure Foundry project
+# so we can see what model names are valid, (2) upsert AZURE_FOUNDRY_* +
+# LLM_DEFAULT_PROVIDER in the VM .env, (3) optionally set AZURE_FOUNDRY_MODEL,
+# (4) restart pm2, (5) live smoke-test chat/completions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      azureApiKey:
+        description: 'Azure Foundry API key (masked in logs)'
+        required: true
+        type: string
+      azureEndpoint:
+        description: 'Azure Foundry project endpoint (no trailing slash)'
+        required: true
+        type: string
+        default: 'https://sowork-app-production-resource.services.ai.azure.com/api/projects/sowork-app-production'
+      deploymentName:
+        description: 'Deployment/model name to use. Leave empty to list only (no env change).'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mask API key in logs
+        run: echo "::add-mask::${{ inputs.azureApiKey }}"
+
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          AZ_KEY: ${{ inputs.azureApiKey }}
+          AZ_ENDPOINT: ${{ inputs.azureEndpoint }}
+          AZ_MODEL: ${{ inputs.deploymentName }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: AZ_KEY,AZ_ENDPOINT,AZ_MODEL
+          script: |
+            set +e
+            BASE="${AZ_ENDPOINT%/}/openai/v1"
+            echo "===== Step 1: List available deployments / models ====="
+            echo "GET $BASE/models"
+            curl -s -m 20 "$BASE/models" \
+              -H "Authorization: Bearer $AZ_KEY" \
+              -H "api-key: $AZ_KEY" \
+              | head -c 4000
+            echo ""
+            echo ""
+
+            if [ -z "$AZ_MODEL" ]; then
+              echo "No deploymentName provided — listed above. Re-run with deploymentName filled in."
+              exit 0
+            fi
+
+            echo "===== Step 2: Upsert env ====="
+            set -e
+            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            test -f "$ENV_FILE" || { echo ".env not found at $ENV_FILE"; exit 1; }
+            cp "$ENV_FILE" "$ENV_FILE.bak.$(date +%Y%m%d)" 2>/dev/null || true
+
+            upsert() {
+              local key="$1" val="$2"
+              if grep -q "^${key}=" "$ENV_FILE"; then
+                sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+                echo "updated ${key}"
+              else
+                echo "${key}=${val}" >> "$ENV_FILE"
+                echo "added ${key}"
+              fi
+            }
+
+            upsert AZURE_FOUNDRY_API_KEY "$AZ_KEY"
+            upsert AZURE_FOUNDRY_PROJECT_ENDPOINT "$AZ_ENDPOINT"
+            upsert AZURE_FOUNDRY_MODEL "$AZ_MODEL"
+            upsert LLM_DEFAULT_PROVIDER "azure-foundry"
+
+            echo ""
+            echo "===== Step 3: Verification ====="
+            grep -E '^(AZURE_FOUNDRY_(PROJECT_ENDPOINT|MODEL|API_KEY)|LLM_DEFAULT_PROVIDER)=' "$ENV_FILE" \
+              | sed 's/\(AZURE_FOUNDRY_API_KEY=\).*/\1***REDACTED***/'
+
+            echo ""
+            echo "===== Step 4: Restart pm2 ====="
+            cd /opt/marketing-os/app/skills/ai-talent
+            pm2 restart marketing-os --update-env 2>&1 | tail -6 || true
+            sleep 2
+
+            echo ""
+            echo "===== Step 5: Live smoke test ====="
+            echo "POST $BASE/chat/completions (model=$AZ_MODEL)"
+            curl -s -m 30 -X POST "$BASE/chat/completions" \
+              -H "Authorization: Bearer $AZ_KEY" \
+              -H "api-key: $AZ_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"model\":\"$AZ_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"say ok in two words\"}],\"max_tokens\":20}" \
+              | head -c 1500
+            echo ""
+            echo ""
+            echo "Done."

@@ -2,6 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Decision AI fonts ─────────────────────────────────────────────────── */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* ─── Decision AI (MOS) design tokens ───────────────────────────────────── */
+:root {
+  --mos-teal:     #1A9B8E;
+  --mos-teal-ink: #0E6B62;
+  --mos-red:      #C8322E;
+  --mos-red-ink:  #8B1F1C;
+  --mos-blue:     #1E7FD4;
+  --mos-blue-ink: #14558F;
+  --mos-ink:      #0A0A0A;
+  --mos-body:     #1E1E1E;
+  --mos-muted:    #6B6B6B;
+  --mos-soft:     #9B9B9B;
+  --mos-hair:     #E4E4E4;
+  --mos-paper:    #FAFAF7;
+  --mos-white:    #FFFFFF;
+}
+
+/* Studio-scope typography reset: clean editorial look, no emoji-driven colour. */
+.mos-scope {
+  color: var(--mos-ink);
+  background: var(--mos-white);
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+.mos-scope .mos-display {
+  font-family: "Inter Tight", "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mos-scope .mos-eyebrow {
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  color: var(--mos-muted);
+  font-weight: 500;
+}
+
+.mos-scope .mos-rule {
+  border-top: 1px solid var(--mos-hair);
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

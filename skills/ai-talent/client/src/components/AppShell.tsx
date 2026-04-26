@@ -196,6 +196,7 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   notifCount: number;
 }) {
   const { t } = useLang();
+  const navigate = useNavigate();
   const railStyle: React.CSSProperties = {
     width: 48, minWidth: 48,
     background: "#F2F1EF",
@@ -238,6 +239,71 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   return (
     <div style={railStyle}>
       <div style={logoStyle}>S</div>
+      {/* Strategy Deck entry (Phase 1 Beta). Reads selected brand from localStorage
+          since Rail is nested and doesn't have direct access to brand state. */}
+      {(() => {
+        const isOnDeck = typeof window !== "undefined" && window.location.pathname.endsWith("/deck");
+        return (
+          <button
+            title="Strategy Deck (Beta)"
+            onClick={() => {
+              const brandId = readPersistedBrandId();
+              if (brandId) navigate(`/b/${brandId}/deck`);
+              else alert("請先選一個品牌");
+            }}
+            style={{
+              ...btnBase,
+              background: isOnDeck ? "#E8E7E4" : "transparent",
+              color: isOnDeck ? "#1A1A18" : "#9B9990",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="5" width="7" height="14" rx="1.5" />
+                <rect x="14" y="5" width="7" height="14" rx="1.5" />
+              </svg>
+              <span style={{ fontSize: 8, color: "inherit", lineHeight: 1 }}>Deck</span>
+            </div>
+          </button>
+        );
+      })()}
+      {/* Studio entry (Decision AI methodology workspace).
+          Hidden on homepage ("/") and mission pages (/m/:id, /b/:b/:ws/m/:id)
+          because those surfaces expose their own Studio CTA; shown everywhere
+          else so /deck / settings / etc. still have a nav handle. */}
+      {(() => {
+        if (typeof window === "undefined") return null;
+        const p = window.location.pathname;
+        const onHomeOrMission =
+          p === "/" || p.startsWith("/m/") || /^\/b\/[^/]+\/[^/]+\/m\//.test(p);
+        if (onHomeOrMission) return null;
+        const isOnStudio = p.startsWith("/studio/");
+        return (
+          <button
+            title="Studio"
+            onClick={() => {
+              const brandId = readPersistedBrandId();
+              if (brandId) navigate(`/studio/${brandId}/triage`);
+              else alert("請先選一個品牌");
+            }}
+            style={{
+              ...btnBase,
+              background: isOnStudio ? "#E8E7E4" : "transparent",
+              color: isOnStudio ? "#1A1A18" : "#9B9990",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h6v6H4z" />
+                <path d="M14 4h6v6h-6z" />
+                <path d="M4 14h6v6H4z" />
+                <path d="M17 14v6M14 17h6" />
+              </svg>
+              <span style={{ fontSize: 8, color: "inherit", lineHeight: 1 }}>Studio</span>
+            </div>
+          </button>
+        );
+      })()}
       {tabs.map(tab => (
         <button
           key={tab.id}

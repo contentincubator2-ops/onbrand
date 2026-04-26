@@ -13,7 +13,9 @@ import { join } from "path";
 // CWD is set to skills/ai-talent/ so .env lives right there.
 const envPath = join(process.cwd(), ".env");
 console.log('[server] Loading .env from:', envPath);
-const result = dotenvConfig({ path: envPath });
+// override: true — otherwise pm2's cached env wins over .env edits and
+// LLM provider switches (via admin-* workflows) silently don't take effect.
+const result = dotenvConfig({ path: envPath, override: true });
 console.log('[server] dotenv result:', { error: result.error, parsed: result.parsed ? 'YES' : 'NO' });
 console.log('[server] JWT_SECRET loaded:', process.env.JWT_SECRET ? 'YES' : 'NO');
 
@@ -36,6 +38,7 @@ import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
 import { missionSquadRouter } from "./routes/missionSquadRoute";
+import { projectSyncCallbackRouter } from "./routes/projectSyncCallbackRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
@@ -168,6 +171,7 @@ app.use("/api/pm", pmRouter);
 app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);
 app.use("/api/missions", missionSquadRouter);
+app.use("/api/project-sync", projectSyncCallbackRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 app.get("/health", healthLimiter, async (_req, res) => {

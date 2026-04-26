@@ -58,7 +58,8 @@ export type ToolChoice =
 // DEBT-1: Add provider + model params for multi-provider routing
 export type InvokeParams = {
   messages: Message[];
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex";
+  // Note: "openrouter" is deprecated — at runtime it's silently routed to LLM_DEFAULT_PROVIDER.
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex" | "gemini";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -146,14 +147,9 @@ const PROVIDER_CONFIG: Record<
     getKey:       () => ENV.PERPLEXITY_API_KEY ?? "",
   },
   google: {
-    baseUrl:      "https://openrouter.ai/api/v1",
-    defaultModel: "google/gemma-4-31b-it",
-    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
-  },
-  openrouter: {
-    baseUrl:      "https://openrouter.ai/api/v1",
-    defaultModel: "anthropic/claude-sonnet-4-6",
-    getKey:       () => (ENV as any).OPENROUTER_API_KEY ?? "",
+    baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: "gemini-2.5-flash",
+    getKey:       () => (ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
   },
   anthropic: {
     baseUrl:      "https://api.anthropic.com/v1",
@@ -171,8 +167,16 @@ const PROVIDER_CONFIG: Record<
     baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
       ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
       : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
-    defaultModel: "gpt-4o-mini",
+    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4o",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+  },
+  // Google Gemini — AI Studio / Generative Language API (OpenAI-compatible shim)
+  // Endpoint: https://generativelanguage.googleapis.com/v1beta/openai
+  // Key: GEMINI_API_KEY (from AI Studio)
+  gemini: {
+    baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: "gemini-2.5-flash",
+    getKey:       () => (ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
   },
   // Google Vertex AI — OpenAI-compatible endpoint (uses service account)
   "google-vertex": {
@@ -344,9 +348,104 @@ async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/
 
 // ─── Main invoke function ─────────────────────────────────────────────────────
 
+// Deprecated provider aliases — silently route to the configured default
+// so we don't have to edit every legacy call site that hardcoded a now-disabled provider.
+const DEPRECATED_PROVIDERS = new Set(["openrouter"]);
+function resolveProvider(requested: string | undefined): string {
+  const def = (process.env.LLM_DEFAULT_PROVIDER as any) || "azure-foundry";
+  if (!requested) return def;
+  if (DEPRECATED_PROVIDERS.has(requested)) return def;
+  return requested;
+}
+
+// ─── Language-aware model routing ──────────────────────────────────────────
+//
+// Heuristic: scan the last 2 user/system messages for CJK / Korean / Japanese.
+// If the conversation is mostly Chinese, prefer a model that handles 中文 well
+// (Kimi / DeepSeek). For everything else, default to gpt-4o.
+//
+// Routes can be tuned via env (AZURE_FOUNDRY_MODEL_ZH / AZURE_FOUNDRY_MODEL_EN);
+// if those aren't set we fall back to verified-working Azure Foundry deployments.
+
+function detectLanguage(messages: Message[]): "zh" | "ja" | "ko" | "en" {
+  const sample = messages
+    .slice(-3)
+    .map((m) => {
+      if (typeof m.content === "string") return m.content;
+      if (Array.isArray(m.content)) {
+        return m.content
+          .map((p) => (typeof p === "string" ? p : (p as TextContent).text ?? ""))
+          .join(" ");
+      }
+      return "";
+    })
+    .join(" ")
+    .slice(0, 2000);
+
+  if (!sample) return "en";
+
+  // Count chars by script
+  let zh = 0, ja = 0, ko = 0, total = 0;
+  for (const ch of sample) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code < 0x80) { total++; continue; }
+    total++;
+    // CJK Unified Ideographs (Han characters, used by both zh & ja kanji)
+    if (code >= 0x4e00 && code <= 0x9fff) zh++;
+    // Hiragana / Katakana → Japanese-specific
+    else if ((code >= 0x3040 && code <= 0x309f) || (code >= 0x30a0 && code <= 0x30ff)) ja++;
+    // Hangul → Korean
+    else if ((code >= 0xac00 && code <= 0xd7af) || (code >= 0x1100 && code <= 0x11ff)) ko++;
+  }
+
+  // If Hiragana/Katakana present → Japanese (overrides Han count)
+  if (ja > 5) return "ja";
+  if (ko > 5) return "ko";
+  // ≥30% CJK characters → Chinese
+  if (total > 0 && zh / total >= 0.3) return "zh";
+  return "en";
+}
+
+// Verified-working Azure Foundry deployments (probed 2026-04-25):
+// gpt-4o (OpenAI), DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3, Kimi-K2.5
+const AZURE_MODEL_BY_LANG: Record<string, string> = {
+  // Note: probe (2026-04-25) confirms `gpt-5-nano` is the only deployed gpt-5
+  // family member on the Foundry project. `gpt-5` / `gpt-5-mini` / `gpt-5-chat`
+  // exist in the model catalog but no deployment is published under those names.
+  // The reasoning-model param translation below handles max_completion_tokens.
+  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-5-nano",
+  ja: process.env.AZURE_FOUNDRY_MODEL_JA || "gpt-4o",
+  ko: process.env.AZURE_FOUNDRY_MODEL_KO || "gpt-4o",
+  en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4o",
+};
+
+function pickAzureModelForMessages(messages: Message[]): string {
+  const lang = detectLanguage(messages);
+  return AZURE_MODEL_BY_LANG[lang] ?? "gpt-4o";
+}
+
+// Reasoning-model param translation.
+// gpt-5*, o1*, o3*, o4* on Azure / OpenAI reject `max_tokens` and require
+// `max_completion_tokens` instead. They also reject `temperature` overrides.
+// Apply this to the outbound payload right before fetch().
+const REASONING_MODEL_RE = /^(gpt-5|o1|o3|o4)/i;
+function isReasoningModel(model: string): boolean {
+  return REASONING_MODEL_RE.test(model);
+}
+function adaptPayloadForModel(payload: Record<string, unknown>, model: string): void {
+  if (!isReasoningModel(model)) return;
+  if ("max_tokens" in payload) {
+    payload.max_completion_tokens = payload.max_tokens;
+    delete payload.max_tokens;
+  }
+  // Reasoning models reject temperature overrides; strip if present
+  delete payload.temperature;
+  delete payload.top_p;
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // DEBT-1: Real multi-provider routing
-  const providerKey = params.provider ?? (process.env.LLM_DEFAULT_PROVIDER as any) ?? "openrouter";
+  const providerKey = resolveProvider(params.provider as any);
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
@@ -362,15 +461,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // SEC-4: Obfuscate error — don't leak key names in logs/responses
   if (!apiKey) throw new Error("LLM provider not configured");
 
-  // Model remapping: callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6",
-  // "claude-opus-4-6"). When the active provider isn't OpenRouter, those model names
-  // don't resolve — remap to that provider's defaultModel so the call succeeds.
+  // Model remapping: legacy callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6").
+  // Since we no longer use OpenRouter, remap any of those to the active provider's defaultModel.
   let model = params.model ?? config.defaultModel;
-  if (providerKey !== "openrouter") {
-    const looksLikeOpenRouterStyle = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
-    if (looksLikeOpenRouterStyle) {
-      model = config.defaultModel;
-    }
+  const looksLikeProviderPrefixed = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
+  if (looksLikeProviderPrefixed) {
+    model = config.defaultModel;
+  }
+  // Azure Foundry: when the caller didn't pin a model, pick by message language.
+  if (providerKey === "azure-foundry" && !params.model) {
+    model = pickAzureModelForMessages(params.messages);
   }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
@@ -413,6 +513,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
+  adaptPayloadForModel(payload, model);
+
   // Azure Foundry uses api-key header, others use Bearer token
   const authHeaders: Record<string, string> = providerKey === "azure-foundry"
     ? { "api-key": apiKey }
@@ -429,35 +531,6 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    // Auto-fallback: if azure-foundry returns DeploymentNotFound, retry with openrouter
-    if (
-      providerKey === "azure-foundry" &&
-      (response.status === 404 || errorText.includes("DeploymentNotFound"))
-    ) {
-      console.warn("[LLM] Azure Foundry deployment not found, falling back to openrouter");
-      const fallbackConfig = PROVIDER_CONFIG["openrouter"]!;
-      const fallbackKey = fallbackConfig.getKey();
-      if (fallbackKey) {
-        const fallbackModel = (params.model && !params.model.includes("/"))
-          ? "openai/" + params.model
-          : "openai/gpt-4o-mini";
-        const fallbackUrl = fallbackConfig.baseUrl + "/chat/completions";
-        const fallbackResp = await fetch(fallbackUrl, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": "Bearer " + fallbackKey,
-          },
-          body: JSON.stringify({ ...payload, model: fallbackModel }),
-        });
-        if (fallbackResp.ok) {
-          console.warn("[LLM] Fallback to openrouter/" + fallbackModel + " succeeded");
-          return (await fallbackResp.json()) as InvokeResult;
-        }
-        const fallbackErr = await fallbackResp.text();
-        throw new Error("LLM fallback failed: " + fallbackResp.status + " – " + fallbackErr);
-      }
-    }
     throw new Error(
       `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
     );
@@ -469,7 +542,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
 // ─── Streaming invoke function ──────────────────────────────────────────────
 export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<string> {
-  const providerKey = params.provider ?? (process.env.LLM_DEFAULT_PROVIDER as any) ?? "openrouter";
+  const providerKey = resolveProvider(params.provider as any);
   const config = PROVIDER_CONFIG[providerKey];
   if (!config) throw new Error(`Unknown LLM provider: ${providerKey}`);
 
@@ -483,15 +556,14 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
   }
   if (!apiKey) throw new Error("LLM provider not configured");
 
-  // Model remapping: callers pass OpenRouter-style strings ("anthropic/claude-sonnet-4-6",
-  // "claude-opus-4-6"). When the active provider isn't OpenRouter, those model names
-  // don't resolve — remap to that provider's defaultModel so the call succeeds.
+  // Model remapping: legacy callers pass provider-prefixed strings; remap to the active provider's defaultModel.
   let model = params.model ?? config.defaultModel;
-  if (providerKey !== "openrouter") {
-    const looksLikeOpenRouterStyle = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
-    if (looksLikeOpenRouterStyle) {
-      model = config.defaultModel;
-    }
+  const looksLikeProviderPrefixed = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
+  if (looksLikeProviderPrefixed) {
+    model = config.defaultModel;
+  }
+  if (providerKey === "azure-foundry" && !params.model) {
+    model = pickAzureModelForMessages(params.messages);
   }
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
@@ -510,6 +582,8 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
   if (normalizedToolChoice) {
     payload.tool_choice = normalizedToolChoice;
   }
+
+  adaptPayloadForModel(payload, model);
 
   // Azure Foundry uses api-key header, others use Bearer token
   const streamAuthHeaders: Record<string, string> = providerKey === "azure-foundry"

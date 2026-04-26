@@ -1,9 +1,9 @@
 name: Admin — Deploy to VM
 
 # Pulls latest main, installs dependencies, rebuilds the client,
-# restarts the single marketing-os pm2 process. Use this after
+# restarts the single ai-marketer pm2 process. Use this after
 # pushing server or client changes that need to take effect on
-# marketing-os.sowork.ai.
+# ai-marketer.sowork.ai.
 
 on:
   workflow_dispatch:
@@ -40,6 +40,12 @@ jobs:
             npm install --legacy-peer-deps 2>&1 | tail -5
 
             echo ""
+            echo "===== Step 2b: DB migrations (idempotent) ====="
+            npx tsx scripts/migrate.ts 2>&1 | tail -30 || {
+              echo "[deploy] migrations failed — continuing anyway; check logs"
+            }
+
+            echo ""
             echo "===== Step 3: Client build ====="
             cd "$AI/client"
             npm install --legacy-peer-deps 2>&1 | tail -5
@@ -49,8 +55,10 @@ jobs:
 
             echo ""
             echo "===== Step 4: Restart pm2 ====="
-            pm2 restart marketing-os 2>&1 | tail -5 || pm2 start "npx tsx server/index.ts" \
-              --name marketing-os --cwd "$AI" 2>&1 | tail -5
+            # Real server is the `marketing-os` pm2 entry (per ecosystem.config.cjs).
+            # The `ai-marketer` entry is a stale broken process — do not touch.
+            pm2 restart marketing-os --update-env 2>&1 | tail -5 || \
+              pm2 start "$AI/ecosystem.config.cjs" --only marketing-os 2>&1 | tail -5
             pm2 save
 
             echo ""

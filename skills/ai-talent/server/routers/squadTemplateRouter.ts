@@ -120,6 +120,157 @@ function genAgentKey(squadUid: string, agentName: string): string {
 
 export const squadTemplateRouter = router({
 
+  // ── listByBrand ──────────────────────────────────────────────────────────────
+  // Returns ALL active squad templates as a CANONICAL shape. The frontend
+  // reads ONLY these fields:
+  //
+  //   { id, slug, name, description, tier, strategyLayer,
+  //     methodology: { author, year, source, summary } | null,
+  //     lead:    { agentId, name, primarySkill } | null,
+  //     members: [{ agentId, name, role, isLead, primarySkill, aiModel }],
+  //     steps:   [{ order, name, description, requiredSkill,
+  //                 assignedAgentId, assignedAgentName, outputType,
+  //                 tools, prompts? }],
+  //     tokenBudget, workflowComplete }
+  //
+  // Phase 1 (2026-04-25) consolidated workflow steps into `squads.steps`
+  // (canonical shape). The legacy `squad_workflow_templates` table was
+  // backfilled into squads.steps and dropped — no more LEFT JOIN needed.
+  listByBrand: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async () => {
+      const [rows] = await localPool.execute(
+        `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
+                s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
+                s.hero_image_url
+           FROM squads s
+          WHERE s.is_active = 1
+          ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
+          LIMIT 1000`
+      ) as any[];
+
+      type RawRow = any;
+      const raw = rows as RawRow[];
+
+      // ── Pass 1: collect every agent id we'll need to resolve ────────────────
+      const agentIdSet = new Set<number>();
+      const perRow = raw.map((r) => {
+        const membersRaw = safeJsonParse<any[]>(r.agents, []);
+        const stepsRaw = safeJsonParse<any[]>(r.steps, []);
+
+        if (r.lead_agent_id) agentIdSet.add(Number(r.lead_agent_id));
+        for (const m of membersRaw) {
+          if (m?.agent_id) agentIdSet.add(Number(m.agent_id));
+        }
+        for (const s of stepsRaw) {
+          if (s?.assignedAgentId) agentIdSet.add(Number(s.assignedAgentId));
+        }
+        return { r, membersRaw, stepsRaw };
+      });
+
+      // ── Pass 2: batch resolve agents ────────────────────────────────────────
+      const agentMap: Record<number, any> = {};
+      if (agentIdSet.size > 0) {
+        const ids = [...agentIdSet].join(",");
+        try {
+          const [aRows] = await localPool.execute(
+            `SELECT id, name, title, primarySkill, aiModel FROM agents WHERE id IN (${ids})`
+          ) as any[];
+          for (const a of aRows as any[]) agentMap[a.id] = a;
+        } catch (e) {
+          console.error("[squadRouter.listByBrand] agent batch lookup failed:", e);
+        }
+      }
+
+      // ── Pass 3: build canonical shape ───────────────────────────────────────
+      return perRow.map(({ r, membersRaw, stepsRaw }) => {
+        // members
+        const members = membersRaw
+          .map((m: any) => {
+            const a = agentMap[Number(m.agent_id)];
+            if (!a) return null;
+            return {
+              agentId: Number(m.agent_id),
+              name: a.name ?? "",
+              role: m.role ?? a.title ?? "",
+              isLead: !!(m.is_lead === true || m.is_lead === 1),
+              primarySkill: a.primarySkill ?? null,
+              aiModel: a.aiModel ?? null,
+            };
+          })
+          .filter(Boolean) as Array<{
+            agentId: number; name: string; role: string;
+            isLead: boolean; primarySkill: string | null; aiModel: string | null;
+          }>;
+
+        // lead — prefer explicit lead_agent_id (resolved); fall back to is_lead member
+        let lead: { agentId: number; name: string; primarySkill: string | null } | null = null;
+        if (r.lead_agent_id && agentMap[Number(r.lead_agent_id)]) {
+          const a = agentMap[Number(r.lead_agent_id)];
+          lead = { agentId: Number(r.lead_agent_id), name: a.name ?? "", primarySkill: a.primarySkill ?? null };
+        } else {
+          const ml = members.find((m) => m.isLead);
+          if (ml) lead = { agentId: ml.agentId, name: ml.name, primarySkill: ml.primarySkill };
+        }
+
+        // steps — normalize curated vs inline shape into one
+        const steps = stepsRaw.map((s: any, i: number) => {
+          // curated keys: { step, title, description, owner, output, prompts, sections }
+          // inline keys:  { order, skill, title|name, outputType, description, requiredTools, assignedAgentId }
+          const order = Number(s.order ?? s.step ?? i + 1);
+          const requiredSkill =
+            (Array.isArray(s.requiredSkills) && s.requiredSkills[0]) ||
+            s.skill || s.requiredSkill || s.owner || null;
+          const assignedAgentId = s.assignedAgentId ? Number(s.assignedAgentId) : null;
+          const assignedAgent = assignedAgentId ? agentMap[assignedAgentId] : null;
+          return {
+            order,
+            name: s.name ?? s.title ?? `Step ${order}`,
+            description: s.description ?? null,
+            requiredSkill,
+            assignedAgentId,
+            assignedAgentName: assignedAgent?.name ?? s.assignedAgentName ?? null,
+            outputType: s.outputType ?? s.output ?? null,
+            tools: Array.isArray(s.requiredTools) ? s.requiredTools
+                 : Array.isArray(s.tools) ? s.tools : [],
+            ...(Array.isArray(s.prompts) && s.prompts.length ? { prompts: s.prompts } : {}),
+          };
+        });
+
+        // methodology — could be string OR JSON object in DB; normalize
+        let methodology: { author?: string; year?: number; source?: string; summary?: string } | null = null;
+        if (r.methodology) {
+          if (typeof r.methodology === "object") {
+            methodology = r.methodology;
+          } else if (typeof r.methodology === "string") {
+            // try parse JSON; if fails, treat as summary string
+            try {
+              const parsed = JSON.parse(r.methodology);
+              methodology = typeof parsed === "object" ? parsed : { summary: r.methodology };
+            } catch {
+              methodology = { summary: r.methodology };
+            }
+          }
+        }
+
+        return {
+          id: Number(r.id),
+          slug: String(r.slug),
+          name: String(r.name ?? ""),
+          description: r.description ?? null,
+          tier: r.tier ?? null,
+          strategyLayer: r.strategy_layer ?? null,
+          heroImageUrl: r.hero_image_url ?? null,
+          methodology,
+          lead,
+          members,
+          steps,
+          tokenBudget: r.token ?? null,
+          workflowComplete: steps.length > 0,
+        };
+      });
+    }),
+
   // ── getRecommendedSquads ─────────────────────────────────────────────────────
   // 從 squads 按 workspace + brand + mission 評分，回傳前 N 個 squad chips
   getRecommendedSquads: protectedProcedure

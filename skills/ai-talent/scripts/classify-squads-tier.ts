@@ -92,12 +92,19 @@ function parseWorkspace(ws: string | null): string[] {
   }
 }
 
+/** Coerce JSON column / null / unknown into a flat searchable string. */
+function stringify(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+
 function classify(sq: SquadRow): Classification {
   const ws = parseWorkspace(sq.workspace);
   const mt = (sq.missionType ?? "").toLowerCase();
-  const meth = (sq.methodology ?? "").toLowerCase();
+  const meth = stringify(sq.methodology).toLowerCase();
   const slug = sq.slug.toLowerCase();
-  const tags = (sq.tags ?? "").toLowerCase();
+  const tags = stringify(sq.tags).toLowerCase();
   const name = (sq.name ?? "").toLowerCase();
 
   // ── KILL rules (apply first) ─────────────────────────────────────────────
@@ -275,25 +282,108 @@ function classify(sq: SquadRow): Classification {
     };
   }
 
-  // ── L6 Validation — no existing squads match; reserved for Week 2 ───────
-
-  // ── Fallback ─────────────────────────────────────────────────────────────
-  // Generic strategy squads without clear layer signal -> defer
-  if (ws.includes("strategy") || ws.length === 0) {
+  // ── L6 Validation ───────────────────────────────────────────────────────
+  if (
+    /\b(audit|monitor|tracker|consistency|sentiment|brand-health|stress-test|funnel-integrity|measurement|analytics|reporting|dashboard|kpi)\b/.test(slug) ||
+    /\b(audit|monitor|tracker|sentiment|brand-health|measurement|analytics)\b/.test(meth) ||
+    ws.includes("monitoring") ||
+    ws.includes("analytics") ||
+    ws.includes("measurement")
+  ) {
     return {
       tier: "defer",
-      layer: "unassigned",
-      confidence: 0.4,
-      reason: "generic strategy / no workspace signal — needs human review",
+      layer: "L6_validation",
+      confidence: 0.6,
+      reason: "audit / measurement / monitoring",
     };
   }
 
-  // Everything else (website, analytics-only, monitoring) -> defer
+  // ── L4 Channel — broad fallback for any channel-shaped workspace/slug ───
+  // Catches website, seo, tiktok, twitter, podcast, blog, ads, etc.
+  const broadChannelWs = [
+    "website", "seo", "sem", "ads", "google-ads", "tiktok", "twitter", "x",
+    "threads", "podcast", "blog", "email", "content", "video", "shorts",
+    "newsletter", "messenger", "line", "wechat", "weibo", "xhs", "rednote",
+    "pinterest", "snapchat", "reddit", "discord", "twitch", "social",
+  ];
+  const broadChannelHit =
+    ws.some((w) => broadChannelWs.includes(w)) ||
+    /^(seo-|sem-|ads-|web-|tk-|tw-|tt-|pod-|blog-|news-|line-|xhs-|red-|pin-|reddit-)/.test(slug) ||
+    /\b(seo|sem|tiktok|twitter|podcast|blog|newsletter|landing-page|web)\b/.test(name);
+  if (broadChannelHit) {
+    return {
+      tier: "defer",
+      layer: "L4_channel",
+      confidence: 0.6,
+      reason: `broad channel match (workspace/slug/name)`,
+    };
+  }
+
+  // ── L5 Campaign — broad fallback ────────────────────────────────────────
+  if (
+    /\b(promo|promotion|sale|seasonal|holiday|black-friday|双11|双12|新品|year-end)\b/.test(slug + " " + name) ||
+    /\b(promo|promotion|seasonal|holiday)\b/.test(meth)
+  ) {
+    return {
+      tier: "defer",
+      layer: "L5_campaign",
+      confidence: 0.55,
+      reason: "broad campaign / promo signal",
+    };
+  }
+
+  // ── L1 Brand — broad fallback for anything obviously brand-shaped ───────
+  if (
+    /\b(brand|品牌|positioning|定位|archetype|原型|story|敘事|narrative)\b/.test(slug + " " + name + " " + meth) ||
+    ws.includes("brand")
+  ) {
+    return {
+      tier: "defer",
+      layer: "L1_brand",
+      confidence: 0.5,
+      reason: "broad brand signal",
+    };
+  }
+
+  // ── L3 Audience — broad fallback ────────────────────────────────────────
+  if (
+    /\b(persona|audience|customer|consumer|受眾|客戶|tribe|community)\b/.test(slug + " " + name + " " + meth)
+  ) {
+    return {
+      tier: "defer",
+      layer: "L3_audience",
+      confidence: 0.5,
+      reason: "broad audience signal",
+    };
+  }
+
+  // ── L2 Product — broad fallback ─────────────────────────────────────────
+  if (
+    /\b(product|產品|sku|offer|pricing|定價|feature)\b/.test(slug + " " + name + " " + meth)
+  ) {
+    return {
+      tier: "defer",
+      layer: "L2_product",
+      confidence: 0.5,
+      reason: "broad product signal",
+    };
+  }
+
+  // ── Final fallback — bucket into L4 if any workspace at all, else L1 ────
+  // Prefer L4 because most unmatched squads are channel/execution.
+  if (ws.length > 0) {
+    return {
+      tier: "defer",
+      layer: "L4_channel",
+      confidence: 0.3,
+      reason: `final fallback — workspace=${JSON.stringify(ws)}`,
+    };
+  }
   return {
     tier: "defer",
-    layer: "unassigned",
-    confidence: 0.5,
-    reason: `workspace=${JSON.stringify(ws)} — not a clear agency core`,
+    layer: "L1_brand",
+    confidence: 0.2,
+    reason: "no workspace signal — defaulted to L1 brand",
   };
 }
 

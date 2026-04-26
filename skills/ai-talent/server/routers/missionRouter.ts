@@ -27,6 +27,44 @@ export const missionRouter = router({
       return db.select().from(missions).where(and(...conditions)).orderBy(desc(missions.updatedAt));
     }),
 
+  // List ALL missions for the current user across every brand. Powers the
+  // new MissionsHome (任務牆) — Sprint 1 D1. Returns mission rows joined
+  // with brand name + squad slug so the rack-card can render without an
+  // extra round-trip per card.
+  listAllForUser: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.execute(sql`
+        SELECT m.id, m.title, m.description, m.workspace, m.methodology,
+               m.squad_slug AS squadSlug, m.brand_id AS brandId,
+               m.status, m.updated_at AS updatedAt,
+               b.name AS brandName,
+               s.name AS squadName,
+               s.strategy_layer AS squadLayer,
+               s.steps AS squadSteps
+          FROM missions m
+          LEFT JOIN brands b ON b.id = m.brand_id
+          LEFT JOIN squads s ON s.slug = m.squad_slug
+         WHERE m.user_id = ${ctx.user.id}
+         ORDER BY m.updated_at DESC
+         LIMIT 60
+      `);
+      // drizzle returns [rows, fields] for raw execute on mysql2
+      const data = Array.isArray(rows) ? rows[0] : (rows as any).rows ?? rows;
+      const arr = Array.isArray(data) ? data : [];
+      // Compute step count per row from steps JSON, then drop the raw JSON
+      return arr.map((r: any) => {
+        let steps: any = r.squadSteps;
+        if (typeof steps === "string") {
+          try { steps = JSON.parse(steps); } catch { steps = null; }
+        }
+        const stepCount = Array.isArray(steps) ? steps.length : null;
+        const { squadSteps, ...rest } = r;
+        return { ...rest, squadStepCount: stepCount };
+      });
+    }),
+
   // List all missions for a brand across all workspaces
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))

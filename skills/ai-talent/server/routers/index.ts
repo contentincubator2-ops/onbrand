@@ -22,6 +22,22 @@ import { messageRouter } from "./messageRouter";
 import { squadTemplateRouter } from "./squadTemplateRouter";
 import { reportRouter } from "./reportRouter";
 import { brandBrainRouter } from "./brandBrainRouter";
+import { strategyDeckRouter } from "./strategyDeckRouter";
+import { brandIntelRouter } from "./brandIntelRouter";
+import { toolCredRouter } from "./toolCredRouter";
+import { decisionRouter } from "./decisionRouter";
+import { triageRouter } from "./triageRouter";
+import { auditRouter } from "./auditRouter";
+import { templateRouter } from "./templateRouter";
+import { boardRouter } from "./boardRouter";
+import { calendarRouter } from "./calendarRouter";
+import { imageRouter } from "./imageRouter";
+import { methodologyRouter } from "./methodologyRouter";
+import { projectSyncRouter } from "./projectSyncRouter";
+import { quickTaskRouter } from "./quickTaskRouter";
+import { boardroomRouter } from "./boardroomRouter";
+import { mediaHubRouter } from "./mediaHubRouter";
+import { playbookRouter } from "./playbookRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -47,6 +63,22 @@ export const appRouter = router({
   squad:         squadTemplateRouter,  // TRPC key kept as "squad" for backward compatibility (frontend uses trpc.squad.*)
   report:        reportRouter,
   brandBrain:    brandBrainRouter,
+  strategyDeck:  strategyDeckRouter,
+  brandIntel:    brandIntelRouter,
+  toolCred:      toolCredRouter,
+  decision:      decisionRouter,
+  triage:        triageRouter,
+  audit:         auditRouter,
+  template:      templateRouter,
+  board:         boardRouter,
+  calendar:      calendarRouter,
+  image:         imageRouter,
+  methodology:   methodologyRouter,
+  projectSync:   projectSyncRouter,
+  quickTask:     quickTaskRouter,
+  boardroom:     boardroomRouter,
+  mediaHub:      mediaHubRouter,
+  playbook:      playbookRouter,
 });
 
 export type AppRouter = typeof appRouter;

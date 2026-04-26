@@ -1,0 +1,47 @@
+name: Admin — Quick diagnose
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            echo "===== PM2 status ====="
+            pm2 list | head -6
+
+            echo ""
+            echo "===== PM2 error log (last 80, filtered) ====="
+            for f in /home/*/.pm2/logs/marketing-os-error.log /root/.pm2/logs/marketing-os-error.log; do
+              if [ -f "$f" ]; then
+                echo "--- $f ---"
+                tail -120 "$f"
+              fi
+            done
+
+            echo ""
+            echo "===== PM2 out log (last 40) ====="
+            for f in /home/*/.pm2/logs/marketing-os-out.log /root/.pm2/logs/marketing-os-out.log; do
+              if [ -f "$f" ]; then
+                echo "--- $f ---"
+                tail -40 "$f"
+              fi
+            done
+
+            echo ""
+            echo "===== Test endpoints ====="
+            echo -n "/health: "; curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/health
+            echo -n "/auth/login page: "; curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/auth/login
+            echo -n "/api/auth/me: "; curl -s -X POST -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/api/auth/me
+
+            echo ""
+            echo "===== Frontend bundle check ====="
+            ls -la /opt/marketing-os/app/skills/ai-talent/public/assets/ 2>&1 | head -10

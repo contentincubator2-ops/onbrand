@@ -1,0 +1,850 @@
+/**
+ * quickTaskRouter — 30 秒產出 · 預製 Squad 接力交付
+ *
+ * 架構修正（v3）：
+ *   每個任務 = 一個「已分工好的 Squad」，成員 skill **完全獨立不重複**。
+ *   避免兩個成員都在「寫 hook」這種偽分工。改成像真實 agency：
+ *     - 受眾研究員（research skill）
+ *     - hook 寫手（writing skill）
+ *     - 表現編輯（A/B 變體 skill）
+ *   每人做一件別人不會的事，串成接力，最後 orchestrator 整合。
+ *
+ * Squad 結構：
+ *   stages[]：管線階段
+ *   每個 stage 1-2 位成員（不再有兩位同 skill 並行）
+ *   多人並行只發生在「同一階段需要不同視角」（如內部 vs 外部分析）
+ *
+ * Provider 容錯：preferred 失敗 → forge fallback（同 v2）
+ */
+import { z } from "zod";
+import { router, protectedProcedure } from "../_core/trpc";
+import { callModel, type ModelProvider } from "../_core/multiModelRouter";
+import { getDb } from "../db";
+import { sql } from "drizzle-orm";
+
+type FieldDef = {
+  key: string;
+  label: string;
+  kind: "text" | "longtext" | "url" | "select" | "number";
+  placeholder?: string;
+  options?: string[];
+  required?: boolean;
+  default?: string | number;
+};
+
+type AgentDef = {
+  id: string;
+  name: string;
+  /** 一句話角色描述 */
+  role: string;
+  /** 唯一專長標籤（同 squad 內不重複） */
+  skill: string;
+  /** 視覺：頭像縮寫（2 字） */
+  avatar: string;
+  /** 視覺：頭像底色 token — research / write / orchestrate / analyze / craft */
+  tone: "research" | "write" | "analyze" | "craft" | "orchestrate";
+  preferredProvider: ModelProvider;
+  system: string;
+  userTemplate: string;
+};
+
+type StageDef = {
+  id: string;
+  label: string;
+  description: string;
+  agents: AgentDef[]; // 1-2 個，多 agent 時必須 skill 互補
+  isOrchestrator?: boolean;
+};
+
+type TaskDef = {
+  id: string;
+  label: string;
+  /** Squad 對外的名字 */
+  squadName: string;
+  /** Squad 一句話定位 */
+  squadTagline: string;
+  etaSeconds: number;
+  finalKind: "text" | "swot" | "persona-card" | "swatches" | "name-cards" | "rich-text";
+  fields: FieldDef[];
+  stages: StageDef[];
+};
+
+/* ──────────────────────────── SQUAD CATALOG ────────────────────────────── */
+
+const TASKS: Record<string, TaskDef> = {
+  /* ─── 1. IG Hook Squad ────────────────────────────────────────────── */
+  "ig-hooks": {
+    id: "ig-hooks",
+    label: "IG Hook",
+    squadName: "IG Hook Squad",
+    squadTagline: "受眾研究 → Hook 創作 → 表現優化 三人接力",
+    etaSeconds: 24,
+    finalKind: "text",
+    fields: [
+      { key: "material", label: "素材", kind: "longtext", required: true,
+        placeholder: "貼一段文章、產品描述或活動主題…" },
+    ],
+    stages: [
+      {
+        id: "research",
+        label: "受眾洞察",
+        description: "找出這群人此刻最在意什麼",
+        agents: [{
+          id: "audience-researcher",
+          name: "曾雅婷", role: "受眾洞察師", skill: "受眾研究",
+          avatar: "雅", tone: "research", preferredProvider: "qwen",
+          system: "你是受眾洞察師。讀素材後，輸出 3 個受眾此刻最在意的痛點 / 渴望（不是泛泛的人口屬性，是具體的心理狀態），每個一行 25 字內，純列表。",
+          userTemplate: "素材：\n{{material}}",
+        }],
+      },
+      {
+        id: "create",
+        label: "Hook 創作",
+        description: "用洞察寫 8 個 hook 草稿",
+        agents: [{
+          id: "hook-writer",
+          name: "林志豪", role: "資深 IG hook 寫手", skill: "Hook 寫作",
+          avatar: "豪", tone: "write", preferredProvider: "forge",
+          system: "你是資深 IG hook 寫手。讀上方受眾洞察，寫 8 個 hook 草稿（每個不超過 30 字），編號列表。針對洞察出的痛點下手。",
+          userTemplate: "原素材：\n{{material}}",
+        }],
+      },
+      {
+        id: "optimize",
+        label: "表現優化",
+        description: "選 3 個最強並做 A/B 變體",
+        isOrchestrator: true,
+        agents: [{
+          id: "perf-editor",
+          name: "Sarah Chen", role: "表現優化編輯", skill: "A/B 優化",
+          avatar: "SC", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是 IG 表現優化編輯，懂 IG 演算法與 hook 的轉換率。從上方 8 個草稿中選 3 個最強的（用「滑動指數 / 留言觸發 / 收藏潛力」三條評分），並對 #1 多寫 1 個 A/B 變體。輸出格式：
+
+**TOP 3 HOOKS**
+1. [hook 內文]（為何選：8 字內）
+2. [hook 內文]（為何選：8 字內）
+3. [hook 內文]（為何選：8 字內）
+
+**A/B 變體（針對 #1）**
+A: [原版]
+B: [變體 — 改了什麼，8 字內說明]
+
+直接交稿，不要解釋方法論。`,
+          userTemplate: "原素材：\n{{material}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 2. Tagline Squad ────────────────────────────────────────────── */
+  "tagline": {
+    id: "tagline",
+    label: "Tagline",
+    squadName: "Tagline Squad",
+    squadTagline: "原型定位 → Tagline 創作 → 主推策略 三人接力",
+    etaSeconds: 22,
+    finalKind: "text",
+    fields: [
+      { key: "brand", label: "品牌名", kind: "text", required: true },
+      { key: "spirit", label: "品牌精神", kind: "longtext", required: true },
+    ],
+    stages: [
+      {
+        id: "archetype",
+        label: "原型定位",
+        description: "用 12 原型鎖定品牌人格",
+        agents: [{
+          id: "archetype-strategist",
+          name: "周佳穎", role: "品牌原型策略師", skill: "12 原型分析",
+          avatar: "穎", tone: "analyze", preferredProvider: "qwen",
+          system: "你是 Pearson 12 原型策略師。從品牌精神中辨認最適合的原型（英雄/智者/創造者/反叛者/照顧者/探險家/魔法師/天真者/凡夫/情人/弄臣/統治者）。輸出：1 行原型名 + 1 行 30 字內理由 + 3 個能體現此原型的關鍵字。",
+          userTemplate: "品牌：{{brand}}\n精神：{{spirit}}",
+        }],
+      },
+      {
+        id: "create",
+        label: "Tagline 創作",
+        description: "依原型寫 10 個 tagline 草稿",
+        agents: [{
+          id: "tagline-writer",
+          name: "陳冠宇", role: "資深 tagline 寫手", skill: "標語創作",
+          avatar: "宇", tone: "write", preferredProvider: "forge",
+          system: "你是資深品牌標語寫手。基於上方原型與關鍵字，寫 10 個中文 tagline 草稿（每個不超過 12 字），純列表編號。中後段可以更實驗性。",
+          userTemplate: "品牌：{{brand}}\n精神：{{spirit}}",
+        }],
+      },
+      {
+        id: "strategize",
+        label: "主推策略",
+        description: "選 1 主推 + 3 備案 + 應用情境",
+        isOrchestrator: true,
+        agents: [{
+          id: "campaign-strategist",
+          name: "Mark Liu", role: "Campaign 策略主編", skill: "標語應用策略",
+          avatar: "ML", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是 campaign 策略主編。從上方 10 個 tagline 中：
+1. 挑 1 個「主推」— 最能跑廣告、好記、長壽
+2. 挑 3 個「備案」— 用於不同情境（年輕族群 / 嚴肅版 / 短促銷）
+
+輸出格式：
+**主推**：[tagline]
+應用情境：（30 字內 — 適合用在哪、為什麼）
+
+**備案 A** [tagline] — 用於：（10 字內）
+**備案 B** [tagline] — 用於：（10 字內）
+**備案 C** [tagline] — 用於：（10 字內）`,
+          userTemplate: "品牌：{{brand}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 3. 改寫文案 Squad ───────────────────────────────────────────── */
+  "rewrite-copy": {
+    id: "rewrite-copy",
+    label: "改寫文案",
+    squadName: "Copy Doctor Squad",
+    squadTagline: "診斷 → 改寫 → CTA 三人接力",
+    etaSeconds: 24,
+    finalKind: "text",
+    fields: [
+      { key: "material", label: "原文案", kind: "longtext", required: true },
+      { key: "audience", label: "目標讀者", kind: "text", placeholder: "例：30-40 歲新手媽媽" },
+    ],
+    stages: [
+      {
+        id: "diagnose",
+        label: "病因診斷",
+        description: "找出原文案失血在哪、處方該下什麼",
+        agents: [{
+          id: "copy-doctor",
+          name: "黃詩涵", role: "文案診斷師", skill: "文案診斷",
+          avatar: "涵", tone: "analyze", preferredProvider: "qwen",
+          system: `你是資深文案診斷師。讀原文案，輸出：
+
+**病因**（3 點，每點 20 字內）
+- 例：太抽象 / 沒利益 / 沒急迫
+
+**處方**（1 句指定一個改寫策略）
+- 從「恐懼訴求 / 反差敘事 / 數字證據 / 故事帶入 / 反問句」五選一，給後面寫手用。`,
+          userTemplate: "原文案：\n{{material}}\n讀者：{{audience}}",
+        }],
+      },
+      {
+        id: "rewrite",
+        label: "改寫執行",
+        description: "依處方寫 1 個改寫版（不再三派競爭）",
+        agents: [{
+          id: "copywriter",
+          name: "張育誠", role: "資深 copywriter", skill: "文案改寫",
+          avatar: "誠", tone: "write", preferredProvider: "forge",
+          system: "你是資深 copywriter。**嚴格依照診斷師處方指定的策略**改寫，不要自選策略。輸出 1 個完整改寫版本，跟原文案一樣的長度範圍。",
+          userTemplate: "原文案：\n{{material}}\n讀者：{{audience}}",
+        }],
+      },
+      {
+        id: "cta",
+        label: "CTA + 收尾",
+        description: "加 CTA、檢查節奏、潤飾交稿",
+        isOrchestrator: true,
+        agents: [{
+          id: "cta-designer",
+          name: "Eric Wong", role: "CTA & 收尾編輯", skill: "CTA 設計",
+          avatar: "EW", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是 CTA 設計與收尾編輯。讀上方診斷處方與改寫版本，輸出：
+
+**最終文案**
+（改寫版微調後，不超過原文案 1.2 倍長度）
+
+**CTA**
+（一行，動詞起手，不超過 12 字）
+
+**改了什麼**（30 字內 — 跟原文案差在哪）`,
+          userTemplate: "原文案：\n{{material}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 4. SWOT Squad ───────────────────────────────────────────────── */
+  "swot": {
+    id: "swot",
+    label: "SWOT 分析",
+    squadName: "SWOT Squad",
+    squadTagline: "內部 + 外部並行掃描 → 策略整合",
+    etaSeconds: 20,
+    finalKind: "swot",
+    fields: [
+      { key: "material", label: "品牌 / 產品 / 情境", kind: "longtext", required: true },
+    ],
+    stages: [
+      {
+        id: "scan",
+        label: "情報並行掃描",
+        description: "內外部分析師同時上",
+        agents: [
+          {
+            id: "internal-analyst",
+            name: "李宗翰", role: "內部營運分析師", skill: "S + W 掃描",
+            avatar: "翰", tone: "analyze", preferredProvider: "qwen",
+            system: "你是內部營運分析師。**只負責** Strengths (S) 和 Weaknesses (W)，不要碰外部。輸出 3 個 S 與 3 個 W，純列表 S1-S3 / W1-W3，每點 20 字內。",
+            userTemplate: "對象：\n{{material}}",
+          },
+          {
+            id: "external-analyst",
+            name: "王芝寧", role: "市場掃描分析師", skill: "O + T 掃描",
+            avatar: "寧", tone: "analyze", preferredProvider: "forge",
+            system: "你是市場外部分析師。**只負責** Opportunities (O) 和 Threats (T)，不要碰內部。輸出 3 個 O 與 3 個 T，純列表 O1-O3 / T1-T3，每點 20 字內。",
+            userTemplate: "對象：\n{{material}}",
+          },
+        ],
+      },
+      {
+        id: "synthesize",
+        label: "策略整合",
+        description: "整合 4 象限 + 給出 SO/ST/WO/WT 策略選擇",
+        isOrchestrator: true,
+        agents: [{
+          id: "swot-strategist",
+          name: "James Lin", role: "策略整合主編", skill: "策略整合",
+          avatar: "JL", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是品牌策略主編。整合上方內外部分析師的情報，輸出嚴格 JSON（不要 markdown 圍欄）：
+{
+  "strengths": ["...", "...", "..."],
+  "weaknesses": ["...", "...", "..."],
+  "opportunities": ["...", "...", "..."],
+  "threats": ["...", "...", "..."],
+  "advice": "80 字內中文策略建議，明確指出建議走 SO/ST/WO/WT 哪一條，並給一句具體行動。"
+}`,
+          userTemplate: "對象：\n{{material}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 5. Persona Squad ────────────────────────────────────────────── */
+  "audience-persona": {
+    id: "audience-persona",
+    label: "受眾 Persona",
+    squadName: "Persona Squad",
+    squadTagline: "Demo + Psycho 並行研究 → 名片整合",
+    etaSeconds: 20,
+    finalKind: "persona-card",
+    fields: [
+      { key: "material", label: "產品 / 服務", kind: "longtext", required: true },
+    ],
+    stages: [
+      {
+        id: "research",
+        label: "雙線研究",
+        description: "Demographics 與 Psychographics 同時跑",
+        agents: [
+          {
+            id: "demo-researcher",
+            name: "蔡佩珊", role: "Demographics 研究員", skill: "人口統計",
+            avatar: "珊", tone: "research", preferredProvider: "qwen",
+            system: "你是人口統計研究員。輸出該產品最可能的目標 persona 之人口輪廓，純列表：年齡 / 職業 / 地點 / 收入 / 婚姻狀態 / 教育，每行一個。**只負責人口屬性，不要碰心理。**",
+            userTemplate: "產品：\n{{material}}",
+          },
+          {
+            id: "psycho-researcher",
+            name: "鄭翔安", role: "Psychographics 研究員", skill: "心理輪廓",
+            avatar: "安", tone: "research", preferredProvider: "zhipu",
+            system: "你是心理輪廓研究員。輸出該產品目標 persona 的心理面：3 個價值觀 / 3 個痛點 / 3 個媒體平台習慣，分段純列表。**只負責心理，不要碰人口屬性。**",
+            userTemplate: "產品：\n{{material}}",
+          },
+        ],
+      },
+      {
+        id: "synthesize",
+        label: "名片整合",
+        description: "把雙線研究合成一張可用 persona 名片",
+        isOrchestrator: true,
+        agents: [{
+          id: "persona-editor",
+          name: "Olivia Park", role: "Persona 整合主編", skill: "Persona 整合",
+          avatar: "OP", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是用戶研究主編。整合上方雙線研究，輸出嚴格 JSON（不要 markdown 圍欄）：
+{
+  "name": "中文姓名",
+  "tagline": "一句話概括這個人",
+  "demographics": { "age": "32", "occupation": "...", "location": "...", "income": "..." },
+  "values": ["...", "...", "..."],
+  "painPoints": ["...", "...", "..."],
+  "platforms": ["...", "...", "..."],
+  "hookLine": "一句話 — 我能怎麼打動他"
+}`,
+          userTemplate: "產品：\n{{material}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 6. 命名 Squad ───────────────────────────────────────────────── */
+  "name-it": {
+    id: "name-it",
+    label: "命名",
+    squadName: "Naming Squad",
+    squadTagline: "中文 + 英文並行命名 → 配對成組",
+    etaSeconds: 20,
+    finalKind: "name-cards",
+    fields: [
+      { key: "material", label: "對象描述", kind: "longtext", required: true },
+      { key: "style", label: "風格", kind: "select",
+        options: ["科技感", "文青", "家庭親切", "高端奢華", "玩味諧音"], default: "文青" },
+    ],
+    stages: [
+      {
+        id: "drafts",
+        label: "雙語並行命名",
+        description: "中文命名師與英文命名師獨立發想（各專所長）",
+        agents: [
+          {
+            id: "zh-namer",
+            name: "趙宇恆", role: "中文命名師", skill: "中文命名",
+            avatar: "恆", tone: "write", preferredProvider: "qwen",
+            system: "你是中文命名師。輸出 8 個純中文候選（2-4 字），考量音、形、意，純列表編號。**只給中文，不要任何英文字母。**",
+            userTemplate: "對象：\n{{material}}\n風格：{{style}}",
+          },
+          {
+            id: "en-namer",
+            name: "Daniel Cooper", role: "英文命名師", skill: "英文命名",
+            avatar: "DC", tone: "write", preferredProvider: "forge",
+            system: "You are an English brand naming specialist. Output 8 English candidates (single word or compound), considering memorability, searchability, domain availability. Pure list with numbering. **English only, no Chinese characters.**",
+            userTemplate: "Subject:\n{{material}}\nStyle: {{style}}",
+          },
+        ],
+      },
+      {
+        id: "pair",
+        label: "配對主編",
+        description: "從中英 16 個候選配 5 組最佳組合",
+        isOrchestrator: true,
+        agents: [{
+          id: "pair-editor",
+          name: "Felicia Tang", role: "命名配對主編", skill: "雙語配對",
+          avatar: "FT", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是命名配對主編。從上方中文 8 個 + 英文 8 個草稿中，挑出 5 組最佳的中英配對（也可微調）。輸出嚴格 JSON 陣列（不要 markdown 圍欄）：
+[{"chinese":"...","english":"...","meaning":"一句話寓意"}, ...]
+共 5 組。`,
+          userTemplate: "對象：\n{{material}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 7. 在地化翻譯 Squad ─────────────────────────────────────────── */
+  "translate-localize": {
+    id: "translate-localize",
+    label: "在地化翻譯",
+    squadName: "Localization Squad",
+    squadTagline: "直譯 → 在地化 → 校對 三人接力",
+    etaSeconds: 18,
+    finalKind: "text",
+    fields: [
+      { key: "material", label: "原文", kind: "longtext", required: true },
+      { key: "from", label: "原文語言", kind: "text", default: "英文" },
+      { key: "to", label: "翻譯目標", kind: "text", default: "繁體中文（台灣）" },
+    ],
+    stages: [
+      {
+        id: "literal",
+        label: "忠實直譯",
+        description: "翻譯員先做忠實版本",
+        agents: [{
+          id: "translator",
+          name: "簡建翔", role: "資深翻譯員", skill: "忠實翻譯",
+          avatar: "翔", tone: "research", preferredProvider: "forge",
+          system: "你是專業翻譯員。做忠實直譯，保留原意與術語。輸出 1 段譯文，不要解釋。",
+          userTemplate: "從 {{from}} 翻成 {{to}}：\n{{material}}",
+        }],
+      },
+      {
+        id: "localize",
+        label: "在地化潤飾",
+        description: "在地化文案重寫，加入文化適配",
+        agents: [{
+          id: "localizer",
+          name: "Megumi Yang", role: "在地化文案", skill: "文化在地化",
+          avatar: "MY", tone: "write", preferredProvider: "qwen",
+          system: "你是在地化文案。基於直譯版，重寫成符合目標市場語感的版本（換成在地慣用語、改文化參照、調節奏）。只輸出在地化版，不要解釋。",
+          userTemplate: "原文：\n{{material}}\n目標：{{to}}",
+        }],
+      },
+      {
+        id: "qa",
+        label: "校對主編",
+        description: "比對直譯與在地化，給最終交付 + 動作說明",
+        isOrchestrator: true,
+        agents: [{
+          id: "qa-editor",
+          name: "Nathaniel Ho", role: "翻譯校對主編", skill: "QA 校對",
+          avatar: "NH", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是翻譯校對主編。比對上方直譯版與在地化版，輸出最終交付：
+
+**最終譯文**
+（採用在地化版，必要時微調保留直譯的精準度）
+
+**動了什麼**
+（30 字內 — 在地化版相對直譯版做了哪些關鍵動作）`,
+          userTemplate: "原文：\n{{material}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 8. Hero Prompt Squad ────────────────────────────────────────── */
+  "hero-image-prompt": {
+    id: "hero-image-prompt",
+    label: "Hero 圖 Prompt",
+    squadName: "Visual Prompt Squad",
+    squadTagline: "美術指導 → 燈光師 → Prompt 工程師",
+    etaSeconds: 20,
+    finalKind: "text",
+    fields: [
+      { key: "material", label: "產品 / 場景", kind: "longtext", required: true },
+      { key: "style", label: "風格", kind: "select",
+        options: ["極簡攝影", "電影感", "復古插畫", "賽博龐克", "日系雜誌"], default: "電影感" },
+    ],
+    stages: [
+      {
+        id: "art",
+        label: "美術指導",
+        description: "決定構圖與色調",
+        agents: [{
+          id: "art-director",
+          name: "高景明", role: "美術指導", skill: "構圖色調",
+          avatar: "明", tone: "analyze", preferredProvider: "qwen",
+          system: "你是視覺美術指導。**只負責構圖與色調**（不要碰光線）。輸出 2 行：構圖（鏡位、視角、主視覺重點）/ 色調（主色 2-3 色、調性形容詞）。",
+          userTemplate: "場景：\n{{material}}\n風格：{{style}}",
+        }],
+      },
+      {
+        id: "light",
+        label: "燈光設計",
+        description: "決定光線氛圍",
+        agents: [{
+          id: "lighting-director",
+          name: "施品禾", role: "燈光師", skill: "光線氛圍",
+          avatar: "禾", tone: "analyze", preferredProvider: "zhipu",
+          system: "你是燈光師。**只負責光線氛圍**（不要碰構圖）。輸出 2 行：光源（自然光 / 棚燈 / 街景燈…）/ 氛圍（戲劇 / 柔和 / 神秘 / 俐落…）。",
+          userTemplate: "場景：\n{{material}}\n風格：{{style}}",
+        }],
+      },
+      {
+        id: "craft",
+        label: "Prompt 工程",
+        description: "整合美指 + 燈光成 3 個英文 prompt",
+        isOrchestrator: true,
+        agents: [{
+          id: "prompt-engineer",
+          name: "Lucas Reyes", role: "Prompt 工程師", skill: "Prompt 工程",
+          avatar: "LR", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是 Midjourney/DALL·E prompt 工程師。整合上方美術指導（構圖+色調）與燈光師（光線+氛圍）的決策，輸出 3 個英文 prompt 變體：
+
+**Variant 1 — Hero**
+prompt: ...
+camera: ...
+lighting: ...
+
+**Variant 2 — Editorial**
+prompt: ...
+
+**Variant 3 — Detail**
+prompt: ...`,
+          userTemplate: "場景：\n{{material}}\n風格：{{style}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 9. LinkedIn Squad ───────────────────────────────────────────── */
+  "linkedin-summary": {
+    id: "linkedin-summary",
+    label: "LinkedIn 摘要",
+    squadName: "B2B Insight Squad",
+    squadTagline: "重點抽取 → 觀點編輯",
+    etaSeconds: 14,
+    finalKind: "text",
+    fields: [
+      { key: "material", label: "原文 / 內容", kind: "longtext", required: true },
+    ],
+    stages: [
+      {
+        id: "extract",
+        label: "重點抽取",
+        description: "抽 3 個能成為觀點的事實",
+        agents: [{
+          id: "extractor",
+          name: "邱奕翔", role: "重點抽取分析師", skill: "重點抽取",
+          avatar: "翔", tone: "research", preferredProvider: "qwen",
+          system: "你是內容分析師。從原文中抽 3 個最有觀點價值的「事實 / 數字 / 反直覺發現」，純列表，每點 25 字內。",
+          userTemplate: "內容：\n{{material}}",
+        }],
+      },
+      {
+        id: "write",
+        label: "B2B 觀點編輯",
+        description: "把事實寫成有觀點的 3 句 LinkedIn 摘要",
+        isOrchestrator: true,
+        agents: [{
+          id: "b2b-editor",
+          name: "Kelly Wu", role: "B2B 觀點編輯", skill: "觀點寫作",
+          avatar: "KW", tone: "orchestrate", preferredProvider: "forge",
+          system: "你是 B2B 觀點編輯。基於上方 3 個事實，寫一段 LinkedIn 摘要：3 句中文，第 3 句必須是觀點或 CTA。直接交稿。",
+          userTemplate: "內容：\n{{material}}",
+        }],
+      },
+    ],
+  },
+
+  /* ─── 10. 色票 Squad ──────────────────────────────────────────────── */
+  "color-palette": {
+    id: "color-palette",
+    label: "品牌色票",
+    squadName: "Color Squad",
+    squadTagline: "情緒分析 → 色彩工程 → 應用建議",
+    etaSeconds: 20,
+    finalKind: "swatches",
+    fields: [
+      { key: "brand", label: "品牌名", kind: "text", required: true },
+      { key: "spirit", label: "品牌精神", kind: "longtext", required: true },
+    ],
+    stages: [
+      {
+        id: "mood",
+        label: "情緒分析",
+        description: "從品牌精神抽 mood 形容詞",
+        agents: [{
+          id: "mood-analyst",
+          name: "范靜雅", role: "情緒分析師", skill: "Mood 解讀",
+          avatar: "雅", tone: "research", preferredProvider: "qwen",
+          system: "你是品牌情緒分析師。輸出 5 個 mood 形容詞（中文），純列表。",
+          userTemplate: "品牌：{{brand}}\n精神：{{spirit}}",
+        }],
+      },
+      {
+        id: "engineer",
+        label: "色彩工程",
+        description: "把 mood 翻譯成具體 hex",
+        agents: [{
+          id: "color-engineer",
+          name: "Hugo Martín", role: "色彩工程師", skill: "色彩工程",
+          avatar: "HM", tone: "craft", preferredProvider: "forge",
+          system: `你是色彩工程師。基於 mood，輸出 5 個具體色（hex + 名字），純列表編號（先不寫用法）。每行格式：
+1. #A12B3C — 名字`,
+          userTemplate: "品牌：{{brand}}\n精神：{{spirit}}",
+        }],
+      },
+      {
+        id: "apply",
+        label: "應用建議",
+        description: "為每色寫角色 + 用法，輸出 swatches JSON",
+        isOrchestrator: true,
+        agents: [{
+          id: "color-applier",
+          name: "Priya Anand", role: "色彩應用主編", skill: "色彩應用",
+          avatar: "PA", tone: "orchestrate", preferredProvider: "forge",
+          system: `你是色彩應用主編。基於上方 5 個 hex 色，為每色補上角色與用法。輸出嚴格 JSON 陣列（不要 markdown 圍欄）：
+[{"hex":"#A12B3C","name":"...","role":"primary|secondary|accent|neutral|highlight","usage":"一句話用法建議"}, ...]
+共 5 色，第一色為 primary。`,
+          userTemplate: "品牌：{{brand}}",
+        }],
+      },
+    ],
+  },
+};
+
+/* ──────────────────────────── HELPERS ──────────────────────────────────── */
+
+function fillTemplate(tpl: string, inputs: Record<string, string | number | undefined>): string {
+  return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => {
+    const v = inputs[k];
+    return v === undefined || v === null ? "" : String(v);
+  });
+}
+
+// Brand context now lives in _core/brandContext.ts so every router
+// uses the same source of truth + same 1-min cache.
+import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
+
+function tryParseJson(s: string): any | null {
+  if (!s) return null;
+  let t = s.trim();
+  t = t.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "");
+  const start = t.search(/[{\[]/);
+  if (start > 0) t = t.slice(start);
+  const lastBrace = Math.max(t.lastIndexOf("}"), t.lastIndexOf("]"));
+  if (lastBrace >= 0) t = t.slice(0, lastBrace + 1);
+  try { return JSON.parse(t); } catch { return null; }
+}
+
+async function callWithFallback(
+  messages: { role: "system" | "user" | "assistant"; content: string }[],
+  preferred: ModelProvider
+): Promise<{ content: string; provider: ModelProvider; model: string; fellBack: boolean }> {
+  try {
+    const r = await callModel(messages, undefined, preferred);
+    return { ...r, fellBack: false };
+  } catch (e) {
+    if (preferred === "forge") throw e;
+    try {
+      const r = await callModel(messages, undefined, "forge");
+      return { ...r, fellBack: true };
+    } catch {
+      throw e;
+    }
+  }
+}
+
+function buildPriorContext(
+  prior: Array<{ stageLabel: string; agentName: string; agentRole: string; output: string }>
+): string {
+  if (!prior.length) return "";
+  const grouped: Record<string, Array<{ agentName: string; agentRole: string; output: string }>> = {};
+  for (const p of prior) {
+    (grouped[p.stageLabel] ??= []).push({ agentName: p.agentName, agentRole: p.agentRole, output: p.output });
+  }
+  const sections: string[] = [];
+  for (const [stage, items] of Object.entries(grouped)) {
+    sections.push(`【上一階段：${stage}】`);
+    for (const it of items) {
+      sections.push(`◆ ${it.agentName}（${it.agentRole}）的交付：\n${it.output}`);
+    }
+  }
+  return `\n\n[同事的接力交付]\n${sections.join("\n\n")}\n`;
+}
+
+/* ──────────────────────────── ROUTER ───────────────────────────────────── */
+
+export const quickTaskRouter = router({
+  list: protectedProcedure.query(() => {
+    return Object.values(TASKS).map((t) => ({
+      id: t.id,
+      label: t.label,
+      squadName: t.squadName,
+      squadTagline: t.squadTagline,
+      etaSeconds: t.etaSeconds,
+      finalKind: t.finalKind,
+      fields: t.fields,
+      stages: t.stages.map((s) => ({
+        id: s.id,
+        label: s.label,
+        description: s.description,
+        isOrchestrator: !!s.isOrchestrator,
+        agents: s.agents.map((a) => ({
+          id: a.id,
+          name: a.name,
+          role: a.role,
+          skill: a.skill,
+          avatar: a.avatar,
+          tone: a.tone,
+          provider: a.preferredProvider,
+        })),
+      })),
+    }));
+  }),
+
+  runAgent: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string(),
+        stageId: z.string(),
+        agentId: z.string(),
+        inputs: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+        brandId: z.number().optional(),
+        prior: z.array(z.object({
+          stageLabel: z.string(),
+          agentName: z.string(),
+          agentRole: z.string(),
+          output: z.string(),
+        })).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const def = TASKS[input.taskId];
+      if (!def) throw new Error(`Unknown taskId: ${input.taskId}`);
+      const stage = def.stages.find((s) => s.id === input.stageId);
+      if (!stage) throw new Error(`Unknown stageId: ${input.stageId}`);
+      const agent = stage.agents.find((a) => a.id === input.agentId);
+      if (!agent) throw new Error(`Unknown agentId: ${input.agentId}`);
+
+      const brandPrefix = await buildBrandContext(input.brandId);
+      const priorContext = buildPriorContext(input.prior ?? []);
+      const filledUser = fillTemplate(agent.userTemplate, input.inputs ?? {});
+      const userMsg = priorContext + (priorContext ? "\n\n[原始 brief]\n" : "") + filledUser;
+
+      const messages = [
+        { role: "system" as const, content: agent.system + brandPrefix },
+        { role: "user" as const, content: userMsg },
+      ];
+
+      const startedAt = Date.now();
+      const result = await callWithFallback(messages, agent.preferredProvider);
+      const tookMs = Date.now() - startedAt;
+
+      const isFinalStructured =
+        !!stage.isOrchestrator &&
+        (def.finalKind === "swot" ||
+         def.finalKind === "persona-card" ||
+         def.finalKind === "swatches" ||
+         def.finalKind === "name-cards");
+
+      return {
+        taskId: def.id,
+        stageId: stage.id,
+        stageLabel: stage.label,
+        agentId: agent.id,
+        agentName: agent.name,
+        agentRole: agent.role,
+        agentSkill: agent.skill,
+        agentAvatar: agent.avatar,
+        agentTone: agent.tone,
+        output: result.content,
+        structured: isFinalStructured ? tryParseJson(result.content) : null,
+        provider: result.provider,
+        model: result.model,
+        fellBack: result.fellBack,
+        tookMs,
+        brandInjected: brandPrefix.length > 0,
+      };
+    }),
+
+  route: protectedProcedure
+    .input(z.object({ text: z.string().min(2) }))
+    .mutation(async ({ input }) => {
+      const catalog = Object.values(TASKS).map((t) => {
+        const fieldKeys = t.fields.map((f) => f.key).join(",");
+        return `- ${t.id}（${t.squadName}）needs: [${fieldKeys}]`;
+      }).join("\n");
+
+      const system = `你是路由器。從以下 squad 清單挑出最匹配用戶意圖的 taskId，從用戶輸入抽出對應欄位值。
+
+清單：
+${catalog}
+
+輸出嚴格 JSON：{"taskId":"...","inputs":{...},"confidence":0.0-1.0}
+不匹配回 {"taskId":null,"confidence":0}。`;
+
+      try {
+        const r = await callWithFallback(
+          [
+            { role: "system", content: system },
+            { role: "user", content: input.text },
+          ],
+          "forge"
+        );
+        const parsed = tryParseJson(r.content);
+        if (!parsed || !parsed.taskId || !TASKS[parsed.taskId]) {
+          return { taskId: null as string | null, inputs: {}, confidence: 0 };
+        }
+        return {
+          taskId: parsed.taskId as string,
+          inputs: (parsed.inputs ?? {}) as Record<string, string>,
+          confidence: Number(parsed.confidence ?? 0.5),
+        };
+      } catch {
+        return { taskId: null as string | null, inputs: {}, confidence: 0 };
+      }
+    }),
+});
