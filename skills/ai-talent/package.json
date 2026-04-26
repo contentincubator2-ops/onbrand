@@ -43,6 +43,7 @@
     "db:backfill-squads": "tsx scripts/backfill-squads.ts",
     "db:audit-skill-coverage": "tsx scripts/audit-skill-coverage.ts",
     "db:classify-outputtypes": "tsx scripts/classify-outputtypes.ts",
+    "db:llm-reclassify-outputtypes": "tsx scripts/llm-reclassify-outputtypes.ts",
     "db:upgrade-mvp-squads": "tsx scripts/decision-ai/upgrade-mvp-squads.ts",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
