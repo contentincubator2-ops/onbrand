@@ -70,14 +70,17 @@ export function detectTaskType(content: string): TaskType {
 
 // ─── Provider selection ───────────────────────────────────────────────────────
 
+// NOTE: google + cohere removed from priority lists — Google generative API
+// key is blocked by service policy (API_KEY_SERVICE_BLOCKED 403) and Cohere
+// key in prod env returns 401. Re-enable once those are fixed.
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
-  chinese_content: ["qwen", "zhipu", "openai", "forge"],
-  creative_writing: ["zhipu", "qwen", "openai", "forge"],
-  search_realtime: ["perplexity", "google", "openai", "forge"],
-  analysis: ["google", "openai", "cohere", "qwen", "forge"],
-  classification: ["cohere", "openai", "google", "forge"],
-  coding: ["openai", "google", "forge"],
-  general: ["openai", "qwen", "google", "forge"],
+  chinese_content: ["qwen", "zhipu", "forge", "openai"],
+  creative_writing: ["zhipu", "qwen", "forge", "openai"],
+  search_realtime: ["perplexity", "forge", "openai"],
+  analysis: ["qwen", "zhipu", "forge", "openai"],
+  classification: ["qwen", "zhipu", "forge", "openai"],
+  coding: ["forge", "openai"],
+  general: ["forge", "qwen", "zhipu", "openai"],
 };
 
 const DEFAULT_MODELS: Record<ModelProvider, string> = {
@@ -99,8 +102,9 @@ function getAvailabilityMap(): Record<ModelProvider, boolean> {
     qwen:       !!ENV.QWEN_API_KEY,
     zhipu:      !!ENV.ZHIPU_API_KEY,
     perplexity: !!ENV.PERPLEXITY_API_KEY,
-    google:     !!ENV.GOOGLE_AI_API_KEY,
-    cohere:     !!ENV.COHERE_API_KEY,
+    // google + cohere are force-disabled — see TASK_PRIORITY_MAP comment
+    google:     false,
+    cohere:     false,
     openai:     !!ENV.OPENAI_API_KEY,
     forge:      !!ENV.BUILT_IN_FORGE_API_KEY,
   };
@@ -149,7 +153,15 @@ export async function callModel(
   let provider: ModelProvider;
   let model: string;
 
-  if (preferredProvider && availability[preferredProvider]) {
+  if (preferredProvider) {
+    // Strict mode: when a preferred provider is requested, honor it or throw.
+    // Silently picking a different provider leads to confusing errors (e.g.
+    // boardroom shark advertised as "Forge" but actually hitting Google 403).
+    if (!availability[preferredProvider]) {
+      throw new Error(
+        `[multiModelRouter] preferred provider "${preferredProvider}" not available (API key missing or disabled)`
+      );
+    }
     provider = preferredProvider;
     model = DEFAULT_MODELS[provider];
   } else {
