@@ -58,12 +58,16 @@ function family(m: string): string {
 const PROV_COMPAT: Record<string, Set<string>> = {
   anthropic: new Set(["anthropic"]),
   zai: new Set(["zai"]),
+  zhipu: new Set(["zai"]),
+  glm: new Set(["zai"]),
   openai: new Set(["openai"]),
   google: new Set(["google"]),
   qwen: new Set(["qwen"]),
   deepseek: new Set(["deepseek"]),
   moonshot: new Set(["moonshot"]),
   // Tool wrappers are universal
+  tool: new Set(["*"]),
+  any: new Set(["*"]),
   "fal.ai": new Set(["*"]),
   tavily: new Set(["*"]),
   perplexity: new Set(["*"]),
@@ -71,9 +75,8 @@ const PROV_COMPAT: Record<string, Set<string>> = {
   meta: new Set(["*"]),
   cohere: new Set(["*"]),
   manus: new Set(["*"]),
-  // Aggregator buckets default universal
-  "voltagent": new Set(["*"]),
-  "community": new Set(["*"]),
+  voltagent: new Set(["*"]),
+  community: new Set(["*"]),
 };
 
 function isProviderCompatible(boundProvider: string, fam: string): boolean {
@@ -175,9 +178,16 @@ async function main() {
     // Pick top N (must have score>0 OR fallback to first N from native provider)
     let picks: any[] = scored.filter((x) => x.score > 0).slice(0, MAX_SKILLS).map((x) => x.s);
     if (picks.length < MAX_SKILLS) {
-      // fallback: native provider bucket first, then fal.ai universal
-      const nativeBucket = byProvider[fam] || [];
-      const universal = byProvider["fal.ai"] || [];
+      // fallback: native provider bucket first, then universal "tool" / fal.ai
+      const nativeBucket =
+        byProvider[fam] ||
+        (fam === "zai" ? byProvider["zhipu"] || byProvider["glm"] || [] : []) ||
+        [];
+      const universal = [
+        ...(byProvider["tool"] || []),
+        ...(byProvider["fal.ai"] || []),
+        ...(byProvider["any"] || []),
+      ];
       for (const s of [...nativeBucket, ...universal]) {
         if (picks.length >= MAX_SKILLS) break;
         if (!picks.find((p) => p.slug === s.slug)) picks.push(s);
