@@ -634,6 +634,77 @@ async function main() {
     `);
     console.log("[migrate] project_assets: OK");
 
+    // ─── 9. agents.modelStack — multi-modal model declaration per agent ────
+    // One JSON blob with the agent's full toolkit:
+    //   {
+    //     primary_llm: "gpt-4o" | "claude-opus-4-6" | ...,
+    //     image_gen:   "fal/flux-pro-1.1" | "openai/gpt-image-1" | null,
+    //     video_gen:   "fal/kling-2" | "fal/minimax-video" | null,
+    //     tts:         "fal/elevenlabs-tts" | "openai/tts-1" | null,
+    //     asr:         "fal/whisper" | "openai/whisper" | null,
+    //     embed:       "azure/text-embedding-3-large" | "cohere/embed-v4",
+    //     web_search:  "tavily" | "perplexity" | null,
+    //     browser:     "browserbase" | null,
+    //     social_post: "meta-graph" | null
+    //   }
+    // primary_llm SHOULD mirror agents.aiModel; the rest is opt-in per skill needs.
+    const [agentModelStackCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agents' AND COLUMN_NAME = 'modelStack'
+    `) as any;
+    if ((agentModelStackCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE agents ADD COLUMN modelStack JSON NULL`);
+      console.log("[migrate] agents.modelStack: added");
+    } else {
+      console.log("[migrate] agents.modelStack: already exists, skipped");
+    }
+
+    // ─── 10. skill_catalog — harvested skill registry (anthropic + GLM + tools) ──
+    // Source of truth for orphan-agent skill assignment. Each row binds a skill
+    // to a provider so the skill cannot be moved across model families.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS skill_catalog (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        slug              VARCHAR(160) NOT NULL UNIQUE,
+        name              VARCHAR(255) NOT NULL,
+        source            VARCHAR(64)  NOT NULL,
+        sourceUrl         VARCHAR(1024) NULL,
+        boundProvider     VARCHAR(64)  NOT NULL,
+        compatibleModels  JSON         NULL,
+        category          VARCHAR(64)  NULL,
+        description       TEXT         NULL,
+        tools             JSON         NULL,
+        modelCompat       JSON         NULL,
+        tags              JSON         NULL,
+        harvestedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_provider (boundProvider),
+        INDEX idx_category (category),
+        INDEX idx_source   (source)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] skill_catalog: OK");
+
+    // ─── 11. agent_skill_assignments — orphan agent ↔ skill_catalog binding ──
+    // Tracks which catalog skill each agent has been assigned, with provenance
+    // (matched by primarySkill / aiModel / title token) for later audit.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS agent_skill_assignments (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        agentId       INT NOT NULL,
+        skillSlug     VARCHAR(160) NOT NULL,
+        boundProvider VARCHAR(64)  NOT NULL,
+        matchReason   VARCHAR(64)  NULL,
+        confidence    DECIMAL(4,3) NULL,
+        assignedAt    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_agent_skill (agentId, skillSlug),
+        INDEX idx_agent (agentId),
+        INDEX idx_skill (skillSlug),
+        INDEX idx_provider (boundProvider)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] agent_skill_assignments: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
