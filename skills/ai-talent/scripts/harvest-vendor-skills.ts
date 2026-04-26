@@ -158,12 +158,13 @@ async function main() {
     const repoUrl = `https://github.com/${VENDORS.find(v => v.prefix === s.vendor)!.repo}`;
     if (DRY_RUN) { inserted++; continue; }
     const [r]: any = await pool.execute(
-      `INSERT INTO skill_catalog (slug, name, category, boundProvider, tags, description, source_repo, source_path)
-       VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?)
+      `INSERT INTO skill_catalog (slug, name, category, boundProvider, tags, description, source, source_repo, source_path)
+       VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          name=VALUES(name), description=VALUES(description),
+         source=VALUES(source),
          source_repo=VALUES(source_repo), source_path=VALUES(source_path)`,
-      [slug, s.name, s.vendor, "any", tags, s.description.slice(0, 1024), repoUrl, s.path],
+      [slug, s.name, s.vendor, "any", tags, s.description.slice(0, 1024), `${s.vendor}-skills`, repoUrl, s.path],
     );
     if (r.affectedRows === 1) inserted++;
     else if (r.affectedRows === 2) updated++;

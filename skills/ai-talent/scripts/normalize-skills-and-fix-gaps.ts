@@ -243,11 +243,12 @@ async function main() {
   for (const s of NEW_CATALOG) {
     if (DRY_RUN) { aInserted++; continue; }
     const [r]: any = await pool.execute(
-      `INSERT INTO skill_catalog (slug, name, category, boundProvider, tags, description)
-       VALUES (?, ?, ?, ?, CAST(? AS JSON), ?)
+      `INSERT INTO skill_catalog (slug, name, category, boundProvider, tags, description, source)
+       VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?)
        ON DUPLICATE KEY UPDATE name=VALUES(name), category=VALUES(category),
-         boundProvider=VALUES(boundProvider), tags=VALUES(tags), description=VALUES(description)`,
-      [s.slug, s.name, s.category, s.bp, JSON.stringify(s.tags), s.description],
+         boundProvider=VALUES(boundProvider), tags=VALUES(tags), description=VALUES(description),
+         source=VALUES(source)`,
+      [s.slug, s.name, s.category, s.bp, JSON.stringify(s.tags), s.description, "marketing-canon"],
     );
     if (r.affectedRows === 1) aInserted++;
     else if (r.affectedRows === 2) aUpdated++;
