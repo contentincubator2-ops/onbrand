@@ -22,8 +22,39 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { invokeLLM } from "../server/_core/llm.js";
+import * as dotenv from "dotenv";
 import { getPool, closePool } from "./squad-builder/db.js";
+
+dotenv.config();
+
+// Direct Azure Foundry / OpenAI calls — avoid server/_core/env.ts validation
+// which requires JWT_SECRET etc. (this is a maintenance script, not the server).
+async function callAzureFoundry(messages: any[], model: string, maxTokens = 4096): Promise<string> {
+  const ep = process.env.AZURE_FOUNDRY_PROJECT_ENDPOINT?.replace(/\/$/, "");
+  const key = process.env.AZURE_FOUNDRY_API_KEY;
+  if (!ep || !key) throw new Error("AZURE_FOUNDRY env missing");
+  const url = `${ep}/openai/v1/chat/completions`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "api-key": key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ model, messages, max_completion_tokens: maxTokens }),
+  });
+  if (!r.ok) throw new Error(`foundry ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const j: any = await r.json();
+  return j?.choices?.[0]?.message?.content || "";
+}
+async function callOpenAI(messages: any[], model: string, maxTokens = 4096): Promise<string> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY missing");
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
+  });
+  if (!r.ok) throw new Error(`openai ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const j: any = await r.json();
+  return j?.choices?.[0]?.message?.content || "";
+}
 
 type Category = "text" | "image" | "video" | "audio" | "data" | "interactive" | "multi" | "unknown";
 
@@ -58,28 +89,23 @@ No prose, no code fences.`;
 
 async function classifyBatch(tokens: string[]): Promise<Array<{ token: string; category: Category; reason: string }>> {
   const userMsg = tokens.map((t, i) => `${i + 1}. ${t}`).join("\n");
-  const tryOnce = async (provider: "azure-foundry" | "openai", model: string) => {
-    const resp = await invokeLLM({
-      provider,
-      model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `Classify these ${tokens.length} tokens:\n${userMsg}` },
-      ],
-      max_tokens: 4096,
-    });
-    const text = (resp as any)?.text || (resp as any)?.content || (resp as any)?.choices?.[0]?.message?.content || "";
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: `Classify these ${tokens.length} tokens:\n${userMsg}` },
+  ];
+  const tryOnce = async (caller: () => Promise<string>) => {
+    const text = await caller();
     const cleaned = text.trim().replace(/^```(?:json)?/, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed)) throw new Error("not array");
     return parsed;
   };
   try {
-    return await tryOnce("azure-foundry", "gpt-4o");
+    return await tryOnce(() => callAzureFoundry(messages, "gpt-4o"));
   } catch (e1) {
-    console.log(`  ↻ foundry failed (${(e1 as Error).message?.slice(0, 80)}), retrying with openai gpt-4o-mini`);
+    console.log(`  ↻ foundry failed (${(e1 as Error).message?.slice(0, 80)}), retrying openai gpt-4o-mini`);
     try {
-      return await tryOnce("openai", "gpt-4o-mini");
+      return await tryOnce(() => callOpenAI(messages, "gpt-4o-mini"));
     } catch (e2) {
       console.log(`  ✗ both failed: ${(e2 as Error).message?.slice(0, 80)}`);
       return tokens.map((t) => ({ token: t, category: "unknown" as Category, reason: "llm-error" }));
