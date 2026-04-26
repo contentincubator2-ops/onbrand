@@ -34,6 +34,7 @@ import MissionsHome from "../pages/MissionsHome";
 import MissionDetail from "../pages/MissionDetail";
 import MethodologyCatalog from "../pages/MethodologyCatalog";
 import MethodologyDetail from "../pages/MethodologyDetail";
+import ProjectsPage from "../pages/ProjectsPage";
 
 export default function AppV2() {
   return (
@@ -66,6 +67,7 @@ export default function AppV2() {
           }
         >
           <Route path="/" element={<MissionsHome />} />
+          <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/m/:missionId" element={<MissionDetail />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionDetail />} />
           <Route path="/methodology" element={<MethodologyCatalog />} />
