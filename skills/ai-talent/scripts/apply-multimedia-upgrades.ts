@@ -39,6 +39,9 @@ const PROPOSALS_PATH = resolve(__dirname, "../data/multimedia-upgrade-proposals.
 const DRY_RUN = process.argv.includes("--dry-run");
 const squadArg = process.argv.find((a) => a.startsWith("--squad="));
 const ONLY_SQUAD = squadArg ? parseInt(squadArg.split("=")[1], 10) : 0;
+const carrierArg = process.argv.find((a) => a.startsWith("--carrier="));
+// "fal" (default) | "qwen" | "auto" (qwen for non-OpenAI/Google agents)
+const CARRIER = (carrierArg ? carrierArg.split("=")[1] : "fal").toLowerCase();
 
 type Proposal = {
   squadId: number;
@@ -55,17 +58,35 @@ function alreadySplit(ot: string): boolean {
   return SUFFIXES.some((s) => ot?.endsWith?.(s));
 }
 
+// Producing-API options. fal.ai is universal; Qwen DashScope is the active
+// alternative while fal.ai is admin-locked.
+const FAL = {
+  image: { tool: "fal.ai", aiModel: "fal/flux-pro-1.1" },
+  video: { tool: "fal.ai", aiModel: "fal/kling-2" },
+  audio: { tool: "fal.ai", aiModel: "fal/elevenlabs-tts" },
+};
+const QWEN = {
+  image: { tool: "qwen-dashscope", aiModel: "qwen/qwen-image-plus" },
+  video: { tool: "qwen-dashscope", aiModel: "qwen/wan2.5-t2v-plus" },
+  audio: { tool: "qwen-dashscope", aiModel: "qwen/cosyvoice-v2" },
+};
+
+function pick(kind: "image" | "video" | "audio") {
+  if (CARRIER === "qwen") return QWEN[kind];
+  return FAL[kind];
+}
+
 function buildSubsteps(ot: string, cat: Proposal["currentCategory"]): Array<{ outputType: string; tool: string; aiModel: string }> {
   if (cat === "multi") {
     return [
       { outputType: `${ot}_caption`, tool: "azure-foundry", aiModel: "gpt-4o" },
-      { outputType: `${ot}_image`,   tool: "fal.ai",        aiModel: "fal/flux-pro-1.1" },
-      { outputType: `${ot}_video`,   tool: "fal.ai",        aiModel: "fal/kling-2" },
+      { outputType: `${ot}_image`,   ...pick("image") },
+      { outputType: `${ot}_video`,   ...pick("video") },
     ];
   }
-  if (cat === "image") return [{ outputType: `${ot}_image`, tool: "fal.ai", aiModel: "fal/flux-pro-1.1" }];
-  if (cat === "video") return [{ outputType: `${ot}_video`, tool: "fal.ai", aiModel: "fal/kling-2" }];
-  if (cat === "audio") return [{ outputType: `${ot}_audio`, tool: "fal.ai", aiModel: "fal/elevenlabs-tts" }];
+  if (cat === "image") return [{ outputType: `${ot}_image`, ...pick("image") }];
+  if (cat === "video") return [{ outputType: `${ot}_video`, ...pick("video") }];
+  if (cat === "audio") return [{ outputType: `${ot}_audio`, ...pick("audio") }];
   return [];
 }
 

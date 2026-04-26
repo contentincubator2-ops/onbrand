@@ -46,9 +46,13 @@ const LIMIT = limitFlag ? parseInt(limitFlag.split("=")[1], 10) : 0;
 type ModelStack = {
   primary_llm: string;
   image_gen: string | null;
+  image_gen_backup?: string | null;
   video_gen: string | null;
+  video_gen_backup?: string | null;
   tts: string | null;
+  tts_backup?: string | null;
   asr: string | null;
+  asr_backup?: string | null;
   embed: string;
   web_search: string | null;
   browser: string | null;
@@ -104,18 +108,52 @@ function buildStack(aiModel: string): ModelStack {
       social_post: "meta-graph",
     };
   }
+  // Qwen / Alibaba — DashScope native multimedia (Wan video, Qwen-Image, Cosy TTS)
+  // Useful as a fal.ai-independent path while fal.ai is admin-locked.
+  if (fam === "qwen") {
+    return {
+      primary_llm: aiModel,
+      image_gen: "qwen/qwen-image-plus",
+      video_gen: "qwen/wan2.5-t2v-plus",
+      tts: "qwen/cosyvoice-v2",
+      asr: "qwen/paraformer-v2",
+      embed: "qwen/text-embedding-v4",
+      web_search: "tavily",
+      browser: "browserbase",
+      social_post: "meta-graph",
+    };
+  }
+  // Zhipu / GLM — CogVideoX native, GLM-4V multimodal
+  if (fam === "zai") {
+    return {
+      primary_llm: aiModel,
+      image_gen: "zai/cogview-3-plus",
+      video_gen: "zai/cogvideox-2",
+      tts: "qwen/cosyvoice-v2",
+      asr: "qwen/paraformer-v2",
+      embed: "cohere/embed-v4",
+      web_search: "tavily",
+      browser: "browserbase",
+      social_post: "meta-graph",
+    };
+  }
   // All other families route multimedia through fal.ai (universal carrier)
+  // with Qwen DashScope as the documented backup carrier when fal.ai is down.
   return {
     primary_llm: aiModel,
     image_gen: "fal/flux-pro-1.1",
+    image_gen_backup: "qwen/qwen-image-plus",
     video_gen: "fal/kling-2",
+    video_gen_backup: "qwen/wan2.5-t2v-plus",
     tts: "fal/elevenlabs-tts",
+    tts_backup: "qwen/cosyvoice-v2",
     asr: "fal/whisper",
+    asr_backup: "qwen/paraformer-v2",
     embed: "cohere/embed-v4",
     web_search: "tavily",
     browser: "browserbase",
     social_post: "meta-graph",
-  };
+  } as ModelStack;
 }
 
 async function main() {

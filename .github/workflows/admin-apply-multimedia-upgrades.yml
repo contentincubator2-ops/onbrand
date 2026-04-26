@@ -17,6 +17,11 @@ on:
         description: "Show planned mutations only"
         type: boolean
         default: true
+      carrier:
+        description: "Producing API: fal (default) or qwen (DashScope, while fal.ai locked)"
+        type: choice
+        options: [fal, qwen]
+        default: qwen
 
 jobs:
   apply:
@@ -26,12 +31,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
+          CARRIER: ${{ inputs.carrier }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 240s
-          envs: GH_TOKEN,DRY_RUN
+          envs: GH_TOKEN,DRY_RUN,CARRIER
           script: |
             set -e
             APP=/opt/marketing-os/app
@@ -42,11 +48,9 @@ jobs:
             git reset --hard origin/main
             cd "$APP/skills/ai-talent"
             if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -5; fi
+            ARGS="--carrier=${CARRIER}"
+            if [ "$DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
             echo "════════════════════════════════════════════════════════════════"
-            echo "  🎬 Apply multimedia upgrades (dry_run=${DRY_RUN})"
+            echo "  🎬 Apply multimedia upgrades (args: $ARGS)"
             echo "════════════════════════════════════════════════════════════════"
-            if [ "$DRY_RUN" = "true" ]; then
-              npm run db:apply-multimedia-upgrades-dry
-            else
-              npm run db:apply-multimedia-upgrades
-            fi
+            npx tsx scripts/apply-multimedia-upgrades.ts $ARGS
