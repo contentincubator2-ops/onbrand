@@ -52,6 +52,7 @@
     "db:assign-orphan-skills-dry": "tsx scripts/assign-orphan-skills.ts --dry-run",
     "db:apply-multimedia-upgrades": "tsx scripts/apply-multimedia-upgrades.ts",
     "db:apply-multimedia-upgrades-dry": "tsx scripts/apply-multimedia-upgrades.ts --dry-run",
+    "probe-providers": "tsx scripts/probe-providers.ts",
     "db:upgrade-mvp-squads": "tsx scripts/decision-ai/upgrade-mvp-squads.ts",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
