@@ -222,7 +222,7 @@ function PlaybookDetail({
   onApplied: (missionId: number | null, nextSteps: any[]) => void;
 }) {
   const detailQuery = (trpc as any).playbook.get.useQuery({ id });
-  const applyMut = (trpc as any).playbook.apply.useMutation();
+  const applyMut = (trpc as any).playbook.activate.useMutation();
   const data = detailQuery.data;
 
   const [applying, setApplying] = useState(false);

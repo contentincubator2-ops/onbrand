@@ -640,7 +640,8 @@ export const playbookRouter = router({
     }),
 
   /**
-   * apply — turn a playbook into a real mission + return next-step routes.
+   * activate — turn a playbook into a real mission + return next-step routes.
+   * (renamed from `apply` because tRPC reserves Function.prototype.apply).
    *
    * V1 接法：
    *   1. 在 missions 表建一筆「playbook-led」mission，把 playbook id +
@@ -650,7 +651,7 @@ export const playbookRouter = router({
    *
    * 這樣 user 拿到的不只是 mission ID，而是「下一步要點哪 3 顆按鈕」的清單。
    */
-  apply: protectedProcedure
+  activate: protectedProcedure
     .input(
       z.object({
         playbookId: z.string(),
