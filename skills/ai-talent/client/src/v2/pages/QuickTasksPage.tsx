@@ -14,8 +14,10 @@
  *   - 每個 stage 一條橫向卡片群，stage 之間有 ↓ 箭頭
  *   - Orchestrator stage 卡片黑底白字，副標「最終交付」
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 /* ─────────────────────────── Types ─────────────────────────────────────── */
 
@@ -173,6 +175,12 @@ const INK = "#0E0E10";
 /* ───────────────────────── Page ────────────────────────────────────────── */
 
 export default function QuickTasksPage() {
+  const { brands, brandId } = useOutletContext<ShellOutletCtx>();
+  const currentBrand = useMemo(
+    () => brands.find((b: any) => b.id === brandId) ?? null,
+    [brands, brandId]
+  );
+
   const tasksQuery = (trpc as any).quickTask?.list?.useQuery?.(undefined, {
     refetchOnWindowFocus: false,
   }) ?? { data: [], isLoading: false };
@@ -185,20 +193,51 @@ export default function QuickTasksPage() {
     [tasks, activeId]
   );
 
+  const runRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (activeTask && runRef.current) {
+      runRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [activeId]);
+
   return (
     <main className="bg-white pb-24" style={{ color: INK }}>
       {/* HERO */}
       <section className="border-b" style={{ borderColor: HAIR }}>
-        <div className="max-w-[1200px] mx-auto px-8 pt-20 pb-12">
-          <div className="font-display text-[0.6rem] tracking-[0.32em] uppercase" style={{ color: "#888" }}>
-            QUICK · 30s DELIVERY
+        <div className="max-w-[1280px] mx-auto px-8 pt-16 pb-10">
+          <div className="flex items-center justify-between gap-6 flex-wrap">
+            <div>
+              <div className="font-display text-[0.6rem] tracking-[0.32em] uppercase" style={{ color: "#888" }}>
+                QUICK · 30s DELIVERY
+              </div>
+              <h1 className="mt-3 font-display text-[3.2rem] leading-[1.02] tracking-[-0.025em]">
+                30 秒產出
+              </h1>
+            </div>
+            {currentBrand && (
+              <div
+                className="flex items-center gap-3 px-4 py-2.5"
+                style={{ border: `1px solid ${INK}`, background: "#FAFAFA" }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: ACCENT, boxShadow: `0 0 8px ${ACCENT}` }}
+                />
+                <div>
+                  <div className="text-[0.6rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>
+                    BRAND BRAIN · 已連線
+                  </div>
+                  <div className="text-[0.92rem] font-medium">{currentBrand.name}</div>
+                </div>
+                <div className="text-[0.66rem] ml-2 max-w-[200px]" style={{ color: "#777" }}>
+                  全部 agents 自動帶入此品牌的定位、TA、語氣
+                </div>
+              </div>
+            )}
           </div>
-          <h1 className="mt-3 font-display text-[3.4rem] leading-[1.02] tracking-[-0.025em]">
-            30 秒產出
-          </h1>
-          <p className="mt-4 text-[1rem] leading-relaxed" style={{ color: "#444", maxWidth: 680 }}>
-            每件任務都是一個已經分工好的 Squad — 研究員、寫手、主編各司其職。
-            <br />
+
+          <p className="mt-4 text-[1rem] leading-relaxed" style={{ color: "#444", maxWidth: 720 }}>
+            每件任務都是一個分工好的 Squad — 研究員、寫手、主編各司其職。
             按 Squad 內建 workflow 接力完成，最後 orchestrator 收尾，交一份可用的稿。
           </p>
 
@@ -209,65 +248,81 @@ export default function QuickTasksPage() {
         </div>
       </section>
 
-      {/* TILE MENU */}
-      <section className="max-w-[1200px] mx-auto px-8 mt-14">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="font-display text-[1.5rem] tracking-[-0.015em]">所有任務</h2>
-          <span className="text-[0.72rem] tracking-[0.2em] uppercase" style={{ color: "#888" }}>
-            {tasks.length} TASKS · 全部 &lt; 30s
-          </span>
-        </div>
+      {/* INLINE RUN VIEW — replaces tile grid (no modal) */}
+      {activeTask ? (
+        <section ref={runRef} className="max-w-[1280px] mx-auto px-8 pt-8">
+          <button
+            onClick={() => setActiveId(null)}
+            className="text-[0.72rem] tracking-[0.2em] uppercase px-3 py-1.5 transition hover:bg-[#FAFAFA]"
+            style={{ border: `1px solid ${HAIR}`, color: "#666" }}
+          >
+            ← 回任務牆
+          </button>
+          <div className="mt-5">
+            <RunPanel
+              task={activeTask}
+              prefilled={prefilled}
+              currentBrand={currentBrand}
+              onClose={() => setActiveId(null)}
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="max-w-[1280px] mx-auto px-8 mt-14">
+          <div className="flex items-end justify-between mb-6">
+            <h2 className="font-display text-[1.5rem] tracking-[-0.015em]">所有 Squads</h2>
+            <span className="text-[0.72rem] tracking-[0.2em] uppercase" style={{ color: "#888" }}>
+              {tasks.length} SQUADS · 全部 &lt; 30s
+            </span>
+          </div>
 
-        {tasksQuery.isLoading && (
-          <div className="text-[0.82rem] py-12" style={{ color: "#888" }}>載入任務目錄…</div>
-        )}
+          {tasksQuery.isLoading && (
+            <div className="text-[0.82rem] py-12" style={{ color: "#888" }}>載入任務目錄…</div>
+          )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: HAIR }}>
-          {tasks.map((t, i) => {
-            const totalAgents = t.stages.reduce((n, s) => n + s.agents.length, 0);
-            return (
-              <button
-                key={t.id}
-                onClick={() => { setPrefilled({}); setActiveId(t.id); }}
-                className="group text-left bg-white p-6 hover:bg-[#FAFAFA] transition relative"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="font-display text-[2rem] tracking-[-0.02em]" style={{ color: ACCENT }}>
-                    {String(i + 1).padStart(2, "0")}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ background: HAIR }}>
+            {tasks.map((t, i) => {
+              const totalAgents = t.stages.reduce((n, s) => n + s.agents.length, 0);
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => { setPrefilled({}); setActiveId(t.id); }}
+                  className="group text-left bg-white p-6 hover:bg-[#FAFAFA] transition relative"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="font-display text-[2rem] tracking-[-0.02em]" style={{ color: ACCENT }}>
+                      {String(i + 1).padStart(2, "0")}
+                    </div>
+                    <div className="text-[0.66rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>
+                      ~ {t.etaSeconds}s
+                    </div>
                   </div>
-                  <div className="text-[0.66rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>
-                    ~ {t.etaSeconds}s
+                  <div className="mt-4 text-[1.05rem] font-medium tracking-[-0.005em]">
+                    {t.squadName}
                   </div>
-                </div>
-                <div className="mt-4 text-[1.05rem] font-medium tracking-[-0.005em]">
-                  {t.squadName}
-                </div>
-                <div className="mt-1 text-[0.78rem]" style={{ color: "#666" }}>
-                  {t.squadTagline}
-                </div>
+                  <div className="mt-1 text-[0.78rem]" style={{ color: "#666" }}>
+                    {t.squadTagline}
+                  </div>
 
-                {/* Member avatars stack */}
-                <div className="mt-4 flex items-center gap-1.5">
-                  {t.stages.flatMap((s) => s.agents).map((a) => (
-                    <span key={a.id} title={`${a.name} · ${a.role}`}>
-                      <PortraitAvatar name={a.name} tone={a.tone} size={32} />
+                  {/* Member avatars stack */}
+                  <div className="mt-4 flex items-center gap-1.5">
+                    {t.stages.flatMap((s) => s.agents).map((a) => (
+                      <span key={a.id} title={`${a.name} · ${a.role}`}>
+                        <PortraitAvatar name={a.name} tone={a.tone} size={32} />
+                      </span>
+                    ))}
+                    <span className="ml-1 text-[0.7rem]" style={{ color: "#999" }}>
+                      {totalAgents} 位
                     </span>
-                  ))}
-                  <span className="ml-1 text-[0.7rem]" style={{ color: "#999" }}>
-                    {totalAgents} 位
-                  </span>
-                </div>
-                <div className="mt-5 flex items-center gap-1.5 text-[0.7rem] tracking-[0.16em] uppercase opacity-0 group-hover:opacity-100 transition" style={{ color: ACCENT }}>
-                  派出 agent <span aria-hidden>→</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {activeTask && (
-        <RunPanel task={activeTask} prefilled={prefilled} onClose={() => setActiveId(null)} />
+                  </div>
+                  <div className="mt-5 flex items-center gap-1.5 text-[0.7rem] tracking-[0.16em] uppercase opacity-0 group-hover:opacity-100 transition" style={{ color: ACCENT }}>
+                    派出 squad <span aria-hidden>→</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
     </main>
   );
@@ -344,13 +399,26 @@ function FreeInputBar({
 /* ─────────────────────────── Run panel ─────────────────────────────────── */
 
 function RunPanel({
-  task, prefilled, onClose,
-}: { task: TaskMeta; prefilled: Record<string, string | number>; onClose: () => void }) {
+  task, prefilled, currentBrand, onClose,
+}: {
+  task: TaskMeta;
+  prefilled: Record<string, string | number>;
+  currentBrand: { id: number; name: string } | null;
+  onClose: () => void;
+}) {
   const [inputs, setInputs] = useState<Record<string, string | number>>(() => {
     const init: Record<string, string | number> = {};
     for (const f of task.fields) if (f.default !== undefined) init[f.key] = f.default;
+    // Auto-fill brand from shell context — agents won't ask "what brand"
+    if (currentBrand && !prefilled.brand) init.brand = currentBrand.name;
     return { ...init, ...prefilled };
   });
+
+  // Hide the "brand" field from UI when shell has a current brand selected
+  const visibleFields = useMemo(
+    () => task.fields.filter((f) => !(currentBrand && f.key === "brand")),
+    [task.fields, currentBrand]
+  );
 
   // states keyed by `${stageId}:${agentId}`
   const [agentStates, setAgentStates] = useState<Record<string, AgentState>>({});
@@ -409,6 +477,7 @@ function RunPanel({
               agentId: a.id,
               inputs,
               prior: prior.slice(), // pass copy of accumulated prior
+              brandId: currentBrand?.id, // server-side brand_brain injection
             });
             setAgentStates((prev) => ({ ...prev, [k(stage.id, a.id)]: { status: "delivered", result: r } }));
             return { ok: true as const, r };
@@ -444,12 +513,7 @@ function RunPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/60 overflow-y-auto" onClick={onClose}>
-      <div
-        className="bg-white w-[min(1200px,96vw)] my-8 self-start"
-        onClick={(e) => e.stopPropagation()}
-        style={{ border: `1px solid ${INK}` }}
-      >
+    <div className="bg-white" style={{ border: `1px solid ${INK}` }}>
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b" style={{ borderColor: INK }}>
           <div className="flex items-center gap-5">
@@ -462,19 +526,33 @@ function RunPanel({
             <div>
               <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: "#888" }}>
                 SQUAD · ~ {task.etaSeconds}s · {task.stages.length} 階段接力
+                {currentBrand && (
+                  <span className="ml-2" style={{ color: ACCENT }}>
+                    · 已自動帶入 {currentBrand.name} 的 brand brain
+                  </span>
+                )}
               </div>
               <div className="font-display text-[1.4rem] tracking-[-0.015em] mt-0.5">{task.squadName}</div>
               <div className="text-[0.78rem]" style={{ color: "#666" }}>{task.squadTagline}</div>
             </div>
           </div>
-          <button onClick={onClose} className="text-[1.4rem] hover:opacity-60 transition" aria-label="關閉">×</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-[340px_1fr]">
           {/* BRIEF */}
           <div className="p-8 border-r space-y-5" style={{ borderColor: HAIR }}>
             <div className="text-[0.66rem] tracking-[0.24em] uppercase" style={{ color: "#888" }}>BRIEF</div>
-            {task.fields.map((f) => (
+            {currentBrand && task.fields.some((f) => f.key === "brand") && (
+              <div
+                className="text-[0.74rem] px-3 py-2 flex items-center gap-2"
+                style={{ background: "#F5F2FE", color: ACCENT }}
+              >
+                <span className="text-[0.62rem] tracking-[0.18em] uppercase">BRAND</span>
+                <span className="font-medium" style={{ color: INK }}>{currentBrand.name}</span>
+                <span style={{ color: "#666" }}>已從 shell 自動帶入</span>
+              </div>
+            )}
+            {visibleFields.map((f) => (
               <FieldInput key={f.key} field={f} value={inputs[f.key]}
                 onChange={(v) => setInputs((p) => ({ ...p, [f.key]: v }))} />
             ))}
@@ -552,7 +630,6 @@ function RunPanel({
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 }
@@ -809,6 +886,22 @@ function useElapsed(startedAt: number | null) {
 function FinalDeliverable({
   result, finalKind,
 }: { result: AgentResult; finalKind: TaskMeta["finalKind"] }) {
+  const sendToMediaHub = () => {
+    try {
+      sessionStorage.setItem(
+        "media-hub-pending-asset",
+        JSON.stringify({
+          id: `qt-${result.taskId}-${Date.now()}`,
+          source: "quick-task",
+          title: `${result.agentRole} · ${result.taskId}`,
+          content: result.output,
+        })
+      );
+      window.location.href = "/media?from=quick-task";
+    } catch {
+      window.location.href = "/media";
+    }
+  };
   return (
     <section
       className="mt-6 p-6"
@@ -834,6 +927,13 @@ function FinalDeliverable({
               BRAND BRAIN
             </span>
           )}
+          <button
+            onClick={sendToMediaHub}
+            className="text-[0.66rem] tracking-[0.18em] uppercase px-2.5 py-1 transition"
+            style={{ background: ACCENT, color: "white" }}
+          >
+            🖨 派發到媒體中心
+          </button>
           <CopyButton text={result.output} />
         </div>
       </div>

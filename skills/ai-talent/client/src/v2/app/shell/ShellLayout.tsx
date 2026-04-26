@@ -195,6 +195,16 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    to: "/media",
+    label: "媒體中心",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="6" width="18" height="12" rx="1" />
+        <path d="M7 10v4M11 9v6M15 10v4M19 11v2" />
+      </svg>
+    ),
+  },
 ];
 
 function Sidebar({

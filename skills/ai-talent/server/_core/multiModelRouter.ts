@@ -83,7 +83,7 @@ const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
 const DEFAULT_MODELS: Record<ModelProvider, string> = {
   qwen: "qwen-plus",
   zhipu: "glm-4-flash",
-  perplexity: "llama-3.1-sonar-large-128k-online",
+  perplexity: "sonar-pro",
   google: "gemini-2.0-flash",
   cohere: "command-r-plus",
   openai: "gpt-4o-mini",
