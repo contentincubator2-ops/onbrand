@@ -147,16 +147,39 @@ export default function MissionsHome() {
   }, [squadsQuery.data]);
 
   const [searchQ, setSearchQ] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [sortDesc, setSortDesc] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
   const filteredRows = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((m) =>
-      (m.title ?? "").toLowerCase().includes(q) ||
-      (m.description ?? "").toLowerCase().includes(q) ||
-      (m.squadName ?? "").toLowerCase().includes(q) ||
-      (m.workspace ?? "").toLowerCase().includes(q)
-    );
-  }, [rows, searchQ]);
+    let r = rows;
+    if (q) {
+      r = r.filter((m) =>
+        (m.title ?? "").toLowerCase().includes(q) ||
+        (m.description ?? "").toLowerCase().includes(q) ||
+        (m.squadName ?? "").toLowerCase().includes(q) ||
+        (m.workspace ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (typeFilter !== "all") {
+      r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
+    }
+    r = [...r].sort((a, b) => {
+      const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return sortDesc ? tb - ta : ta - tb;
+    });
+    return r;
+  }, [rows, searchQ, typeFilter, sortDesc]);
+
+  // Build the type filter dropdown options from actual data
+  const typeOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((m) => { if (m.workspace) set.add(m.workspace.toLowerCase()); });
+    return ["all", ...Array.from(set).sort()];
+  }, [rows]);
 
   const goToMission = (m: MissionRow) => {
     const ws = m.workspace || "_";
@@ -233,22 +256,40 @@ export default function MissionsHome() {
     <main>
       {/* ─── Pastel hero ──────────────────────────────────────────── */}
       <section
-        className="px-8 pt-16 pb-12"
+        className="relative px-8 pt-16 pb-12"
         style={{
           background:
             "linear-gradient(135deg, #EAF2FF 0%, #EFE9FB 35%, #F8E8FF 70%, #FFE9F1 100%)",
         }}
       >
+        {/* Top-right CTAs (Canva-style: '先睹為快' + '開始試用') */}
+        <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
+          <button
+            onClick={() => navigate("/methodology")}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-mos-hair rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          >
+            <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
+            <span className="text-mos-ink">先看看方法論</span>
+          </button>
+          <button
+            onClick={() => {
+              setShowCustom(true);
+              window.scrollTo({ top: 600, behavior: "smooth" });
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-white hover:bg-mos-ink/5 border border-mos-ink rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          >
+            <span aria-hidden style={{ color: "#D4A24C" }}>👑</span>
+            <span className="text-mos-ink font-medium">立即建立任務</span>
+          </button>
+        </div>
+
         <div className="max-w-[1280px] mx-auto">
-          <h1 className="text-center font-display text-[2.6rem] leading-[1.08] tracking-[-0.02em] text-mos-ink">
-            你今天要做什麼<span style={{ color: "#5B3CC8" }}>任務</span>？
+          <h1 className="text-center font-display text-[2.4rem] leading-[1.1] tracking-[-0.02em] text-mos-ink">
+            你今天要做什麼<span style={{ color: "#5B3CC8" }}>任務</span>呢？
           </h1>
-          <p className="mt-3 text-center text-[0.92rem] text-mos-muted max-w-[560px] mx-auto">
-            選一個快速開始 — 我們會自動幫你填入任務說明、套用方法論與 squad。
-          </p>
 
           {/* Search bar */}
-          <div className="mt-8 max-w-[680px] mx-auto">
+          <div className="mt-7 max-w-[680px] mx-auto">
             <div className="relative">
               <svg
                 className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-mos-muted pointer-events-none"
@@ -328,12 +369,53 @@ export default function MissionsHome() {
           </>
         )}
 
-        {/* Recent missions */}
-        <SectionHeader
-          title="最近的項目"
-          cta={searchQ ? "" : "全部任務 →"}
-          onCtaClick={() => {/* future: navigate to all-missions */}}
-        />
+        {/* Recent missions — header + filter chips */}
+        <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+          <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">
+            最近的項目
+          </h2>
+          <div className="flex items-center gap-2">
+            <FilterChip
+              label={ownerFilter === "mine" ? "擁有者" : "全部"}
+              onClick={() => setOwnerFilter((v) => (v === "mine" ? "all" : "mine"))}
+            />
+            <FilterChip
+              label={typeFilter === "all" ? "任何類型" : typeFilter}
+              options={typeOptions.map((t) => ({
+                value: t,
+                label: t === "all" ? "任何類型" : t,
+              }))}
+              onSelect={(v) => setTypeFilter(v)}
+            />
+            <IconButton
+              title={sortDesc ? "新→舊" : "舊→新"}
+              onClick={() => setSortDesc((v) => !v)}
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 4v16M7 4l-3 3M7 4l3 3" />
+                <path d="M17 20V4M17 20l-3-3M17 20l3-3" style={{ opacity: sortDesc ? 1 : 0.4 }} />
+              </svg>
+            </IconButton>
+            <IconButton
+              title={viewMode === "grid" ? "切換為列表" : "切換為網格"}
+              onClick={() => setViewMode((v) => (v === "grid" ? "list" : "grid"))}
+            >
+              {viewMode === "grid" ? (
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+                  <rect x="4" y="4" width="7" height="7" rx="1" />
+                  <rect x="13" y="4" width="7" height="7" rx="1" />
+                  <rect x="4" y="13" width="7" height="7" rx="1" />
+                  <rect x="13" y="13" width="7" height="7" rx="1" />
+                </svg>
+              )}
+            </IconButton>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {Array.from({ length: 6 }).map((_, i) => <ThumbSkeleton key={i} />)}
@@ -342,10 +424,16 @@ export default function MissionsHome() {
           <div className="border border-dashed border-mos-hair bg-white py-12 px-10 text-center text-[0.86rem] text-mos-muted rounded-lg">
             {searchQ ? `沒有找到「${searchQ}」相關的項目。` : "還沒有任務 — 從上方挑一個快速開始。"}
           </div>
-        ) : (
+        ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {filteredRows.map((m) => (
               <MissionThumb key={m.id} mission={m} onClick={() => goToMission(m)} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col divide-y divide-mos-hair border border-mos-hair rounded-lg overflow-hidden bg-white">
+            {filteredRows.map((m) => (
+              <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
             ))}
           </div>
         )}
@@ -531,43 +619,212 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
   const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
   const tone = LAYER_TOKENS[lk];
   const updatedTxt = formatRelative(mission.updatedAt);
+  const ws = (mission.workspace ?? "").toLowerCase();
+  const wsBadge = WORKSPACE_BADGE[ws] ?? null;
 
+  return (
+    <div className="group relative">
+      <button
+        onClick={onClick}
+        className="flex flex-col text-left bg-white border border-mos-hair rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 w-full"
+      >
+        <div
+          className="relative w-full overflow-hidden"
+          style={{
+            aspectRatio: "5 / 4",
+            background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)`,
+          }}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <MethodologyGlyph
+              seed={mission.squadSlug ?? mission.id}
+              layer={lk}
+              size={70}
+            />
+          </div>
+          {mission.squadLayer && (
+            <div
+              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded"
+              style={{ background: tone.bg }}
+            >
+              {lk}
+            </div>
+          )}
+        </div>
+        <div className="p-3">
+          <div className="text-[0.82rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
+            {mission.title}
+          </div>
+          <div className="mt-1.5 flex items-center gap-1.5 text-[0.66rem] text-mos-muted">
+            {wsBadge && (
+              <span
+                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-white text-[0.5rem] font-bold shrink-0"
+                style={{ background: wsBadge.color }}
+                aria-label={ws}
+              >
+                {wsBadge.glyph}
+              </span>
+            )}
+            <span className="truncate">{updatedTxt}</span>
+          </div>
+        </div>
+      </button>
+      {/* Hover action — bookmark + ⋯ menu (Canva pattern) */}
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+        <ThumbAction title="收藏" onClick={(e) => { e.stopPropagation(); /* TODO: bookmark */ }}>
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+          </svg>
+        </ThumbAction>
+        <ThumbAction title="更多" onClick={(e) => { e.stopPropagation(); /* TODO: menu */ }}>
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+            <circle cx="5" cy="12" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="19" cy="12" r="1.6" />
+          </svg>
+        </ThumbAction>
+      </div>
+    </div>
+  );
+}
+
+function ThumbAction({
+  title, onClick, children,
+}: { title: string; onClick: (e: React.MouseEvent) => void; children: React.ReactNode }) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className="w-7 h-7 flex items-center justify-center bg-white/95 border border-mos-hair text-mos-ink hover:bg-white hover:border-mos-ink rounded-full shadow-sm transition"
+    >
+      {children}
+    </button>
+  );
+}
+
+function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
+  const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
+  const tone = LAYER_TOKENS[lk];
+  const ws = (mission.workspace ?? "").toLowerCase();
+  const wsBadge = WORKSPACE_BADGE[ws] ?? null;
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col text-left bg-white border border-mos-hair rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200"
+      className="flex items-center gap-4 px-4 py-3 hover:bg-mos-ink/[0.02] transition text-left"
     >
       <div
-        className="relative w-full overflow-hidden"
-        style={{
-          aspectRatio: "4 / 3",
-          background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)`,
-        }}
+        className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
+        style={{ background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)` }}
       >
-        <div className="absolute inset-0 flex items-center justify-center">
-          <MethodologyGlyph
-            seed={mission.squadSlug ?? mission.id}
-            layer={lk}
-            size={64}
-          />
+        <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={36} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[0.88rem] text-mos-ink font-medium truncate">{mission.title}</div>
+        <div className="mt-0.5 flex items-center gap-2 text-[0.7rem] text-mos-muted">
+          <span className="font-display tracking-[0.12em] uppercase">{lk}</span>
+          {wsBadge && (
+            <>
+              <span className="text-mos-soft">·</span>
+              <span className="capitalize">{ws}</span>
+            </>
+          )}
+          <span className="text-mos-soft">·</span>
+          <span>{formatRelative(mission.updatedAt)}</span>
         </div>
-        {mission.squadLayer && (
-          <div
-            className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded"
-            style={{ background: tone.bg }}
-          >
-            {lk}
+      </div>
+      {wsBadge && (
+        <span
+          className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-[0.6rem] font-bold"
+          style={{ background: wsBadge.color }}
+        >
+          {wsBadge.glyph}
+        </span>
+      )}
+    </button>
+  );
+}
+
+const WORKSPACE_BADGE: Record<string, { glyph: string; color: string }> = {
+  facebook:  { glyph: "f",  color: "#1877F2" },
+  instagram: { glyph: "ig", color: "#E4405F" },
+  linkedin:  { glyph: "in", color: "#0A66C2" },
+  youtube:   { glyph: "▶",  color: "#FF0000" },
+  pr:        { glyph: "PR", color: "#525866" },
+  email:     { glyph: "@",  color: "#7B5BC8" },
+  audience:  { glyph: "眾", color: "#E07B0F" },
+  campaign:  { glyph: "→",  color: "#1A9B8E" },
+  "brand-positioning": { glyph: "品", color: "#5B3CC8" },
+};
+
+/* ─────────────────────────── Filter chip + Icon button ─────────────── */
+
+function FilterChip({
+  label, options, onClick, onSelect,
+}: {
+  label: string;
+  options?: Array<{ value: string; label: string }>;
+  onClick?: () => void;
+  onSelect?: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isDropdown = !!options;
+
+  if (!isDropdown) {
+    return (
+      <button
+        onClick={onClick}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition"
+      >
+        {label}
+        <svg viewBox="0 0 24 24" className="w-3 h-3 text-mos-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition capitalize"
+      >
+        {label}
+        <svg viewBox="0 0 24 24" className="w-3 h-3 text-mos-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full mt-1.5 right-0 z-20 min-w-[160px] bg-white border border-mos-hair rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1">
+            {options!.map((o) => (
+              <button
+                key={o.value}
+                onClick={() => { onSelect?.(o.value); setOpen(false); }}
+                className="w-full text-left px-3 py-1.5 text-[0.78rem] text-mos-ink hover:bg-mos-ink/5 transition capitalize"
+              >
+                {o.label}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
-      <div className="p-3">
-        <div className="text-[0.82rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
-          {mission.title}
-        </div>
-        <div className="mt-1 text-[0.65rem] text-mos-muted line-clamp-1">
-          {updatedTxt}
-        </div>
-      </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function IconButton({
+  title, onClick, children,
+}: { title: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className="w-9 h-9 inline-flex items-center justify-center bg-white border border-mos-hair hover:border-mos-ink text-mos-ink rounded-full transition"
+    >
+      {children}
     </button>
   );
 }
