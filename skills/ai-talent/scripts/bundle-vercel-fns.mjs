@@ -50,6 +50,12 @@ await Promise.all(entries.map(e =>
     logLevel: "info",
     mainFields: ["module", "main"],
     conditions: ["node", "import"],
+    // The bundled output is later renamed back to .ts so @vercel/node
+    // picks it up. Without @ts-nocheck, Vercel re-runs tsc on the
+    // concatenated JS and emits dozens of false-positive errors
+    // (implicit-any callback params, narrowed type unions, etc.) that
+    // were valid in the original source. Source-level tsc is clean.
+    banner: { js: "// @ts-nocheck — bundled output, original source is type-checked" },
   })
 ));
 
