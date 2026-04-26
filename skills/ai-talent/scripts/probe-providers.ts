@@ -136,17 +136,33 @@ async function main() {
   // to /v1/me if the first 404s. Only key validity matters.
   const mk = process.env.MANUS_API_KEY || process.env.MANUS_API_KEY_4 || process.env.MANUS_API_KEY_1;
   if (mk) {
-    // Try X-API-Key first (raw API key auth), then Bearer (JWT auth)
-    let r = await tryFetch("Manus", "https://api.manus.im/v1/tasks?limit=1", {
-      headers: { "X-API-Key": mk },
-    });
-    if (!r.ok && r.note?.match(/40\d/)) {
-      r = await tryFetch("Manus", "https://api.manus.im/v1/tasks?limit=1", {
-        headers: { Authorization: `Bearer ${mk}` },
-      });
+    // Try common Manus auth header variants in order
+    const variants: Array<Record<string, string>> = [
+      { "API-KEY": mk },
+      { "Api-Key": mk },
+      { "MANUS-API-KEY": mk },
+      { "manus-api-key": mk },
+      { "X-API-Key": mk },
+      { Authorization: `Bearer ${mk}` },
+    ];
+    let r: any = null;
+    for (const headers of variants) {
+      r = await tryFetch("Manus", "https://api.manus.im/v1/tasks?limit=1", { headers });
+      if (r.ok) break;
+      // If error message changed away from "missing auth", we found the header
+      if (r.note && !r.note.includes("missing authentication")) break;
     }
     results.push(r);
   } else results.push({ name: "Manus", ok: false, note: "missing env" });
+
+  // 11b. Hailuo / MiniMax (video + audio)
+  const hk = process.env.HAILUO_API_KEY || process.env.MINIMAX_API_KEY;
+  if (hk) {
+    // MiniMax accepts Bearer; /v1/get_balance is the cheapest read endpoint
+    results.push(await tryFetch("Hailuo / MiniMax", "https://api.minimaxi.chat/v1/get_balance", {
+      headers: { Authorization: `Bearer ${hk}` },
+    }));
+  } else results.push({ name: "Hailuo / MiniMax", ok: false, note: "missing env" });
 
   // 12. Zhipu / GLM
   if (process.env.ZHIPU_API_KEY) {

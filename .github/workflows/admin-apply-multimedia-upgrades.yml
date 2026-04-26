@@ -20,7 +20,7 @@ on:
       carrier:
         description: "Producing API: fal (default) or qwen (DashScope, while fal.ai locked)"
         type: choice
-        options: [fal, qwen]
+        options: [fal, qwen, hailuo]
         default: qwen
 
 jobs:

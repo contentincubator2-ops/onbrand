@@ -49,6 +49,7 @@ type ModelStack = {
   image_gen_backup?: string | null;
   video_gen: string | null;
   video_gen_backup?: string | null;
+  video_gen_backup_2?: string | null;
   tts: string | null;
   tts_backup?: string | null;
   asr: string | null;
@@ -144,7 +145,8 @@ function buildStack(aiModel: string): ModelStack {
     image_gen: "fal/flux-pro-1.1",
     image_gen_backup: "qwen/qwen-image-plus",
     video_gen: "fal/kling-2",
-    video_gen_backup: "qwen/wan2.5-t2v-plus",
+    video_gen_backup: "minimax/hailuo-02",
+    video_gen_backup_2: "qwen/wan2.5-t2v-plus",
     tts: "fal/elevenlabs-tts",
     tts_backup: "qwen/cosyvoice-v2",
     asr: "fal/whisper",

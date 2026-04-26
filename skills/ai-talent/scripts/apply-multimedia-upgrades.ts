@@ -70,9 +70,17 @@ const QWEN = {
   video: { tool: "qwen-dashscope", aiModel: "qwen/wan2.5-t2v-plus" },
   audio: { tool: "qwen-dashscope", aiModel: "qwen/cosyvoice-v2" },
 };
+// MiniMax / Hailuo — strong video/audio (Hailuo-02 video, T2A speech),
+// no native image; falls back to Qwen for image-only steps.
+const HAILUO = {
+  image: { tool: "qwen-dashscope", aiModel: "qwen/qwen-image-plus" },
+  video: { tool: "minimax-hailuo", aiModel: "minimax/hailuo-02" },
+  audio: { tool: "minimax-hailuo", aiModel: "minimax/speech-02" },
+};
 
 function pick(kind: "image" | "video" | "audio") {
   if (CARRIER === "qwen") return QWEN[kind];
+  if (CARRIER === "hailuo") return HAILUO[kind];
   return FAL[kind];
 }
 
