@@ -212,6 +212,17 @@ const GROUP_LABELS: Record<SourceDef["group"], string> = {
   manual:      "手動建立",
 };
 
+// Pre-compute groups once at module load — pure function of static SOURCES.
+const GROUPED_SOURCES: Array<{ key: SourceDef["group"]; items: SourceDef[] }> = (() => {
+  const groups: Array<{ key: SourceDef["group"]; items: SourceDef[] }> = [];
+  for (const s of SOURCES) {
+    let g = groups.find((x) => x.key === s.group);
+    if (!g) { g = { key: s.group, items: [] }; groups.push(g); }
+    g.items.push(s);
+  }
+  return groups;
+})();
+
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
@@ -358,17 +369,6 @@ export default function CreateMethodologyModal({
 
   if (!open) return null;
 
-  // Group sources for left nav
-  const grouped = useMemo(() => {
-    const groups: Array<{ key: SourceDef["group"]; items: SourceDef[] }> = [];
-    for (const s of SOURCES) {
-      let g = groups.find((x) => x.key === s.group);
-      if (!g) { g = { key: s.group, items: [] }; groups.push(g); }
-      g.items.push(s);
-    }
-    return groups;
-  }, []);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-mos-ink/30 backdrop-blur-sm p-6">
       <div className="bg-white w-full max-w-[1200px] max-h-[88vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
@@ -393,7 +393,7 @@ export default function CreateMethodologyModal({
         <div className="flex-1 flex min-h-0">
           {/* Left nav */}
           <aside className="w-[260px] shrink-0 border-r border-mos-hair overflow-y-auto py-4">
-            {grouped.map((g) => (
+            {GROUPED_SOURCES.map((g) => (
               <div key={g.key} className="mb-3">
                 {GROUP_LABELS[g.key] && (
                   <div className="px-6 py-1.5 text-[0.6rem] tracking-[0.24em] uppercase text-mos-soft">
@@ -458,7 +458,6 @@ export default function CreateMethodologyModal({
                 onFileDrop={onFileDrop}
                 onSubmitUrl={startUrlIngest}
                 onClose={onClose}
-                onCreated={onCreated}
                 onSwitchSource={setActiveId}
               />
             )}
@@ -517,7 +516,6 @@ function SourcePane({
   onFileDrop,
   onSubmitUrl,
   onClose,
-  onCreated,
   onSwitchSource,
 }: {
   source: SourceDef;
@@ -529,7 +527,6 @@ function SourcePane({
   onFileDrop: (e: React.DragEvent) => void;
   onSubmitUrl: () => void;
   onClose: () => void;
-  onCreated: (slug: string) => void;
   onSwitchSource: (id: SourceId) => void;
 }) {
   // ── Recommended landing ───────────────────────────────────────────

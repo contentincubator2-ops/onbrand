@@ -5,8 +5,8 @@
  * dimensions:
  *   - layer (L1–L6)
  *   - source (seeded / ingested / forked / mine)
- *   - "+ 從網路新增" opens IngestDrawer (LLM-extract a methodology
- *     from any URL → preview → commit as a new squad).
+ *   - "+ 從網路新增" opens CreateMethodologyModal (Canva-style source
+ *     picker → LLM-extract → preview → commit as a new squad).
  *
  * Click a card → /methodology/:slug detail page.
  */
@@ -15,7 +15,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import MethodologyCard from "../components/methodology/MethodologyCard";
 import LayerLegend from "../components/methodology/LayerLegend";
-import IngestDrawer from "../components/methodology/IngestDrawer";
+import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
 import type { MosLayer } from "../../studio/primitives/tokens";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
@@ -155,9 +155,10 @@ export default function MethodologyCatalog() {
         })}
       </div>
 
-      {/* ─── Ingest drawer ──────────────────────────────────────────── */}
-      <IngestDrawer
+      {/* ─── Create methodology modal (Canva-style source picker) ──── */}
+      <CreateMethodologyModal
         open={drawerOpen}
+        initialSource="recommended"
         onClose={() => setDrawerOpen(false)}
         onCreated={(slug) => {
           // Refresh both lists so the new card surfaces in "我的方法論".
