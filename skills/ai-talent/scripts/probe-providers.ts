@@ -132,12 +132,19 @@ async function main() {
     }));
   } else results.push({ name: "Browserbase", ok: false, note: "missing env" });
 
-  // 11. Manus
-  const mk = process.env.MANUS_API_KEY || process.env.MANUS_API_KEY_1;
+  // 11. Manus — try /v1/tasks (list endpoint per public docs); fall back
+  // to /v1/me if the first 404s. Only key validity matters.
+  const mk = process.env.MANUS_API_KEY || process.env.MANUS_API_KEY_4 || process.env.MANUS_API_KEY_1;
   if (mk) {
-    results.push(await tryFetch("Manus", "https://api.manus.im/v1/agents", {
+    let r = await tryFetch("Manus", "https://api.manus.im/v1/tasks?limit=1", {
       headers: { Authorization: `Bearer ${mk}` },
-    }));
+    });
+    if (!r.ok && (r.note?.includes("404") || r.status === 404)) {
+      r = await tryFetch("Manus", "https://api.manus.im/v1/me", {
+        headers: { Authorization: `Bearer ${mk}` },
+      });
+    }
+    results.push(r);
   } else results.push({ name: "Manus", ok: false, note: "missing env" });
 
   // 12. Zhipu / GLM
