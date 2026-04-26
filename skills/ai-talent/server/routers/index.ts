@@ -34,6 +34,8 @@ import { calendarRouter } from "./calendarRouter";
 import { imageRouter } from "./imageRouter";
 import { methodologyRouter } from "./methodologyRouter";
 import { projectSyncRouter } from "./projectSyncRouter";
+import { quickTaskRouter } from "./quickTaskRouter";
+import { boardroomRouter } from "./boardroomRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -71,6 +73,8 @@ export const appRouter = router({
   image:         imageRouter,
   methodology:   methodologyRouter,
   projectSync:   projectSyncRouter,
+  quickTask:     quickTaskRouter,
+  boardroom:     boardroomRouter,
 });
 
 export type AppRouter = typeof appRouter;

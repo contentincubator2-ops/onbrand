@@ -36,6 +36,8 @@ import MethodologyCatalog from "../pages/MethodologyCatalog";
 import MethodologyDetail from "../pages/MethodologyDetail";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
+import QuickTasksPage from "../pages/QuickTasksPage";
+import BoardroomPage from "../pages/BoardroomPage";
 
 export default function AppV2() {
   return (
@@ -70,6 +72,8 @@ export default function AppV2() {
           <Route path="/" element={<MissionsHome />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/brands" element={<BrandsPage />} />
+          <Route path="/ai" element={<QuickTasksPage />} />
+          <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/m/:missionId" element={<MissionDetail />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionDetail />} />
           <Route path="/templates" element={<MethodologyCatalog />} />
