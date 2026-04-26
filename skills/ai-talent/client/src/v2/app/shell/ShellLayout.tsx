@@ -19,7 +19,7 @@
  * automatically.
  */
 import React from "react";
-import { Outlet, useNavigate, useLocation, NavLink } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import BrandSwitcher from "./BrandSwitcher";
 

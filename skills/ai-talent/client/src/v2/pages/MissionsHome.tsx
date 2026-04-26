@@ -21,7 +21,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
-import IngestDrawer, { type IngestTab } from "../components/methodology/IngestDrawer";
+import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 interface MissionRow {
@@ -52,8 +52,8 @@ interface QuickTile {
   squadSlug?: string;
   workspace?: string;
   isMore?: boolean;
-  /** Open IngestDrawer instead of creating a mission. */
-  opensIngest?: IngestTab;
+  /** Open CreateMethodologyModal instead of creating a mission. */
+  opensIngest?: SourceId;
 }
 
 const QUICK_TILES: QuickTile[] = [
@@ -200,11 +200,11 @@ export default function MissionsHome() {
   const [customDesc, setCustomDesc] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creatingTpl, setCreatingTpl] = useState<string | null>(null);
-  const [ingestTab, setIngestTab] = useState<IngestTab | null>(null);
+  const [createSource, setCreateSource] = useState<SourceId | null>(null);
 
   const startFromTile = async (t: QuickTile) => {
     if (t.isMore) { navigate("/methodology"); return; }
-    if (t.opensIngest) { setIngestTab(t.opensIngest); return; }
+    if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
     if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     setError(null);
     setCreatingTpl(t.label);
@@ -281,10 +281,7 @@ export default function MissionsHome() {
             <span className="text-mos-ink">先看看方法論</span>
           </button>
           <button
-            onClick={() => {
-              setShowCustom(true);
-              window.scrollTo({ top: 600, behavior: "smooth" });
-            }}
+            onClick={() => setCreateSource("recommended")}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-white hover:bg-mos-ink/5 border border-mos-ink rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
           >
             <span aria-hidden style={{ color: "#D4A24C" }}>👑</span>
@@ -448,13 +445,13 @@ export default function MissionsHome() {
         )}
       </section>
 
-      {/* ─── Ingest drawer (URL / Upload / GitHub) ─────────────── */}
-      <IngestDrawer
-        open={ingestTab !== null}
-        initialTab={ingestTab ?? "url"}
-        onClose={() => setIngestTab(null)}
+      {/* ─── Create-methodology modal (Canva-style source picker) ── */}
+      <CreateMethodologyModal
+        open={createSource !== null}
+        initialSource={createSource ?? "recommended"}
+        onClose={() => setCreateSource(null)}
         onCreated={(slug) => {
-          setIngestTab(null);
+          setCreateSource(null);
           navigate(`/methodology/${slug}`);
         }}
       />
