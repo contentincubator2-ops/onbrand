@@ -622,10 +622,6 @@ function FilterChip({
 
 /* ─────────────────────────── Create menu (Canva "+" dropdown) ─────── */
 
-type SyncSource =
-  | "facebook" | "instagram" | "youtube" | "website"
-  | "google-drive" | "onedrive" | "dropbox";
-
 const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; glyph: string; color: string }> = [
   { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片",   glyph: "f",  color: "#1877F2" },
   { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",         glyph: "ig", color: "#E4405F" },
