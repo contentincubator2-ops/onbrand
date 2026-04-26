@@ -72,16 +72,18 @@ export default function BrandsPage() {
         { enabled: !!brandId, refetchOnWindowFocus: false }
       )
     : { data: [], isLoading: false };
-  const brain: any[] = (brainQuery.data as any[]) ?? [];
+  const brainEntries: Record<string, any[]> =
+    ((brainQuery.data as any)?.entries as Record<string, any[]>) ?? {};
 
   const countByCat = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const b of brain) {
-      const c = String(b.category ?? "other");
-      out[c] = (out[c] ?? 0) + 1;
+    for (const [cat, arr] of Object.entries(brainEntries)) {
+      out[cat] = Array.isArray(arr) ? arr.length : 0;
     }
+    // alias: tile uses "competitor" singular, server returns "competitors"
+    out["competitor"] = out["competitors"] ?? 0;
     return out;
-  }, [brain]);
+  }, [brainEntries]);
 
   const TILES: AssetTile[] = [
     {
