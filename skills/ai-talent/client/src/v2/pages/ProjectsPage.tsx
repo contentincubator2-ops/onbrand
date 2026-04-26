@@ -303,13 +303,12 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            <button
-              onClick={() => setCreateSource("recommended")}
-              title="建立新專案"
-              className="w-9 h-9 inline-flex items-center justify-center bg-mos-ink text-white hover:bg-mos-ink/90 rounded-full transition"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
+            <CreateMenu
+              onNewFolder={() => alert("新增資料夾（即將推出）")}
+              onNewMission={() => navigate("/methodology")}
+              onUpload={() => setCreateSource("upload")}
+              onIngest={(s) => setCreateSource(s)}
+            />
           </div>
         </div>
       </section>
@@ -608,6 +607,137 @@ function FilterChip({
       )}
     </div>
   );
+}
+
+/* ─────────────────────────── Create menu (Canva "+" dropdown) ─────── */
+
+function CreateMenu({
+  onNewFolder, onNewMission, onUpload, onIngest,
+}: {
+  onNewFolder: () => void;
+  onNewMission: () => void;
+  onUpload: () => void;
+  onIngest: (s: SourceId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [ingestOpen, setIngestOpen] = useState(false);
+
+  const close = () => { setOpen(false); setIngestOpen(false); };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="新增項目"
+        className="w-9 h-9 inline-flex items-center justify-center bg-mos-ink text-white hover:bg-mos-ink/90 rounded-full transition"
+      >
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={close} />
+          <div className="absolute top-full mt-2 right-0 z-40 w-[260px] bg-white border border-mos-hair rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.10)] py-2">
+            <div className="px-4 pt-1 pb-2 text-[0.62rem] tracking-[0.18em] uppercase text-mos-soft">
+              新增項目
+            </div>
+
+            <MenuItem
+              glyph={<FolderIcon />}
+              label="新增資料夾"
+              hint="把任務分類（如客戶、季度）"
+              onClick={() => { close(); onNewFolder(); }}
+            />
+            <MenuItem
+              glyph={<GridIcon />}
+              label="新任務（從方法論）"
+              hint="從型錄選一個方法論建立任務"
+              onClick={() => { close(); onNewMission(); }}
+            />
+
+            <div className="my-1.5 mx-3 h-px bg-mos-hair" />
+
+            <MenuItem
+              glyph={<UploadIcon />}
+              label="上傳檔案萃取方法論"
+              hint="PDF / DOCX / Markdown / Skill 檔"
+              onClick={() => { close(); onUpload(); }}
+            />
+
+            {/* Ingest submenu */}
+            <button
+              onClick={() => setIngestOpen((v) => !v)}
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-mos-ink/[0.04] transition text-left"
+            >
+              <span className="w-5 h-5 inline-flex items-center justify-center text-mos-ink/70"><DownloadIcon /></span>
+              <span className="flex-1 min-w-0">
+                <div className="text-[0.84rem] text-mos-ink">從網路萃取</div>
+                <div className="text-[0.66rem] text-mos-muted truncate">網頁、YouTube、GitHub…</div>
+              </span>
+              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-mos-soft transition-transform ${ingestOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+
+            {ingestOpen && (
+              <div className="mx-3 mt-1 mb-1 rounded-lg bg-mos-ink/[0.03] py-1">
+                <SubItem label="網頁文章"        hint="任意 URL"            onClick={() => { close(); onIngest("web"); }} />
+                <SubItem label="YouTube 影片"    hint="逐字稿萃取"           onClick={() => { close(); onIngest("youtube"); }} />
+                <SubItem label="GitHub 專案"     hint="從 README"           onClick={() => { close(); onIngest("github"); }} />
+                <SubItem label="競品案例"        hint="貼上活動連結"         onClick={() => { close(); onIngest("competitor"); }} />
+                <SubItem label="Claude Skill"    hint="貼上 SKILL.md"       onClick={() => { close(); onIngest("claude-skill"); }} />
+                <SubItem label="ChatGPT GPT"     hint="貼上 GPT 指令"       onClick={() => { close(); onIngest("chatgpt-gpt"); }} />
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  glyph, label, hint, onClick,
+}: {
+  glyph: React.ReactNode; label: string; hint?: string; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-mos-ink/[0.04] transition text-left"
+    >
+      <span className="w-5 h-5 inline-flex items-center justify-center text-mos-ink/70">{glyph}</span>
+      <span className="flex-1 min-w-0">
+        <div className="text-[0.84rem] text-mos-ink">{label}</div>
+        {hint && <div className="text-[0.66rem] text-mos-muted truncate">{hint}</div>}
+      </span>
+    </button>
+  );
+}
+
+function SubItem({
+  label, hint, onClick,
+}: { label: string; hint?: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white rounded-md transition text-left"
+    >
+      <span className="text-[0.78rem] text-mos-ink">{label}</span>
+      {hint && <span className="text-[0.62rem] text-mos-muted">{hint}</span>}
+    </button>
+  );
+}
+
+function FolderIcon() {
+  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>;
+}
+function GridIcon() {
+  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
+}
+function UploadIcon() {
+  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>;
+}
+function DownloadIcon() {
+  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>;
 }
 
 /* ─────────────────────────── Helpers ────────────────────────────────── */
