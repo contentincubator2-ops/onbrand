@@ -22,6 +22,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
+import { SquadEntityCard } from "../components/SquadEntityCard";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -400,19 +401,17 @@ export default function MissionsHome() {
             />
 
             {featured.length > 0 ? (
-              <div className="-mx-2 mb-12 overflow-x-auto pb-2">
-                <div className="flex gap-4 px-2" style={{ minWidth: "min-content" }}>
-                  {featured.map((sq: any) => (
-                    <FeaturedSquadTile
-                      key={sq.id ?? sq.slug}
-                      squad={sq}
-                      busy={creatingTpl === `sq-${sq.slug}`}
-                      disabled={!!creatingTpl}
-                      onClick={() => startFromSquad(sq)}
-                      onPreview={() => navigate(`/templates/${sq.slug}`)}
-                    />
-                  ))}
-                </div>
+              <div className="mb-12 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {featured.map((sq: any) => (
+                  <SquadEntityCard
+                    key={sq.id ?? sq.slug}
+                    squad={sq}
+                    busy={creatingTpl === `sq-${sq.slug}`}
+                    disabled={!!creatingTpl}
+                    onClick={() => startFromSquad(sq)}
+                    onPreview={() => navigate(`/templates/${sq.slug}`)}
+                  />
+                ))}
               </div>
             ) : (
               <div className="mb-12 border border-dashed border-mos-hair bg-white py-10 px-6 text-center text-[0.84rem] text-mos-muted rounded-sm">
