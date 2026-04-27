@@ -23,6 +23,12 @@ export default {
           hair:   "#E4E4E4",
           paper:  "#FAFAF7",
           white:  "#FFFFFF",
+          // SoWork brand accents (per sowork-ai-v2 Monocle system)
+          cream:  "#FAF9F6",
+          "cream-dark": "#F5F1E8",
+          orange: "#FF6B35",
+          "orange-hover": "#E55A2B",
+          "orange-light": "#FFF7ED",
         },
       },
       fontFamily: {

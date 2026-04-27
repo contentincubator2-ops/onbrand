@@ -138,20 +138,39 @@ export default function MissionsHome() {
 
   const isLoading = allQuery?.isLoading ?? fallbackQuery.isLoading;
 
-  // ── Featured templates: pick 8 strong squads, prefer L1/L5 + has steps
+  // ── Layer filter for featured strip
+  const [selectedLayer, setSelectedLayer] = useState<MosLayer | "ALL">("ALL");
+
+  const allSquads = useMemo(
+    () => ((squadsQuery.data as any[]) ?? []).filter((s) => Array.isArray(s.steps) && s.steps.length > 0),
+    [squadsQuery.data],
+  );
+
+  // Count squads per layer (for nav badges)
+  const layerCounts = useMemo(() => {
+    const c: Record<string, number> = { ALL: allSquads.length, L1: 0, L2: 0, L3: 0, L4: 0, L5: 0, L6: 0 };
+    for (const s of allSquads) {
+      const k = (s.strategyLayer ?? "").toString().slice(0, 2);
+      if (k in c) c[k]++;
+    }
+    return c;
+  }, [allSquads]);
+
+  // Featured: filter by selected layer, then sort, then slice
   const featured = useMemo(() => {
-    const all = (squadsQuery.data as any[]) ?? [];
-    const hasSteps = all.filter((s) => Array.isArray(s.steps) && s.steps.length > 0);
-    const pool = hasSteps.length >= 8 ? hasSteps : all;
-    const layerOrder = ["L1", "L5", "L3", "L2", "L4", "L6"];
-    return [...pool]
+    const layerOrder = ["L1", "L2", "L3", "L4", "L5", "L6"];
+    const filtered =
+      selectedLayer === "ALL"
+        ? allSquads
+        : allSquads.filter((s) => (s.strategyLayer ?? "").toString().slice(0, 2) === selectedLayer);
+    return [...filtered]
       .sort((a, b) => {
         const la = (a.strategyLayer ?? "L9").slice(0, 2);
         const lb = (b.strategyLayer ?? "L9").slice(0, 2);
         return layerOrder.indexOf(la) - layerOrder.indexOf(lb);
       })
-      .slice(0, 12);
-  }, [squadsQuery.data]);
+      .slice(0, selectedLayer === "ALL" ? 12 : 24);
+  }, [allSquads, selectedLayer]);
 
   const [searchQ, setSearchQ] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
@@ -263,36 +282,44 @@ export default function MissionsHome() {
 
   return (
     <main>
-      {/* ─── Pastel hero ──────────────────────────────────────────── */}
+      {/* ─── Cream hero (SoWork Monocle palette) ──────────────────── */}
       <section
-        className="relative px-8 pt-16 pb-12"
+        className="relative px-8 pt-16 pb-12 border-b border-mos-hair"
         style={{
           background:
-            "linear-gradient(135deg, #EAF2FF 0%, #EFE9FB 35%, #F8E8FF 70%, #FFE9F1 100%)",
+            "radial-gradient(ellipse at 50% 0%, #FFF7ED 0%, #FAF9F6 45%, #F5F1E8 100%)",
         }}
       >
-        {/* Top-right CTAs (Canva-style: '先睹為快' + '開始試用') */}
+        {/* Top-right CTAs */}
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <button
             onClick={() => navigate("/templates")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-mos-hair rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white hover:bg-mos-cream-dark border border-mos-hair hover:border-mos-ink rounded-sm transition"
           >
-            <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-mos-ink">先看看任務範本</span>
+            <span aria-hidden className="text-mos-orange">✦</span>
+            <span className="text-mos-ink">瀏覽方法論型錄</span>
           </button>
           <button
             onClick={() => setCreateSource("recommended")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-white hover:bg-mos-ink/5 border border-mos-ink rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-mos-orange hover:bg-mos-orange-hover text-white rounded-sm transition"
           >
-            <span aria-hidden style={{ color: "#D4A24C" }}>👑</span>
-            <span className="text-mos-ink font-medium">立即建立任務</span>
+            <span aria-hidden>→</span>
+            <span className="font-medium">立即開新任務</span>
           </button>
         </div>
 
         <div className="max-w-[1280px] mx-auto">
-          <h1 className="text-center font-display text-[2.4rem] leading-[1.1] tracking-[-0.02em] text-mos-ink">
-            你今天要做什麼<span style={{ color: "#5B3CC8" }}>任務</span>呢？
-          </h1>
+          <div className="text-center">
+            <div className="inline-block font-display text-[0.7rem] tracking-[0.32em] uppercase text-mos-orange mb-4">
+              SoWork · Marketing OS
+            </div>
+            <h1 className="font-display text-[2.4rem] leading-[1.1] tracking-[-0.025em] text-mos-ink">
+              今天，把哪一個<span className="text-mos-orange">方法論</span>變成成果？
+            </h1>
+            <p className="mt-3 text-[0.92rem] text-mos-muted max-w-[560px] mx-auto leading-relaxed">
+              100+ 行銷方法論小組，按 6 層策略分工。挑一層、選一個、開工。
+            </p>
+          </div>
 
           {/* Search bar */}
           <div className="mt-7 max-w-[680px] mx-auto">
@@ -309,8 +336,8 @@ export default function MissionsHome() {
                 type="text"
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="搜尋任務範本、任務模板與最近的項目"
-                className="w-full pl-14 pr-5 py-[14px] text-[0.92rem] bg-white rounded-full border border-[#5B3CC8]/30 focus:outline-none focus:border-[#5B3CC8] focus:ring-2 focus:ring-[#5B3CC8]/15 transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+                placeholder="搜尋方法論、任務、最近的工作"
+                className="w-full pl-14 pr-5 py-[14px] text-[0.92rem] bg-white rounded-sm border border-mos-hair focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition"
               />
             </div>
           </div>
@@ -350,35 +377,53 @@ export default function MissionsHome() {
           </div>
         )}
 
-        {/* Featured methodologies — horizontal scroll */}
-        {featured.length > 0 && (
+        {/* Featured methodologies — layer nav + horizontal scroll */}
+        {allSquads.length > 0 && (
           <>
             <SectionHeader
-              title="為你推薦的任務範本"
+              title={
+                selectedLayer === "ALL"
+                  ? "為你推薦的方法論小組"
+                  : `${selectedLayer} · ${LAYER_TOKENS[selectedLayer].label} · ${layerCounts[selectedLayer]} 個方法論`
+              }
               cta="完整型錄 →"
               onCtaClick={() => navigate("/templates")}
             />
-            <div className="-mx-2 mb-12 overflow-x-auto pb-2">
-              <div className="flex gap-4 px-2" style={{ minWidth: "min-content" }}>
-                {featured.map((sq: any) => (
-                  <FeaturedSquadTile
-                    key={sq.id ?? sq.slug}
-                    squad={sq}
-                    busy={creatingTpl === `sq-${sq.slug}`}
-                    disabled={!!creatingTpl}
-                    onClick={() => startFromSquad(sq)}
-                    onPreview={() => navigate(`/templates/${sq.slug}`)}
-                  />
-                ))}
+
+            {/* L1–L6 layer chip nav */}
+            <LayerNav
+              selected={selectedLayer}
+              counts={layerCounts}
+              onSelect={setSelectedLayer}
+            />
+
+            {featured.length > 0 ? (
+              <div className="-mx-2 mb-12 overflow-x-auto pb-2">
+                <div className="flex gap-4 px-2" style={{ minWidth: "min-content" }}>
+                  {featured.map((sq: any) => (
+                    <FeaturedSquadTile
+                      key={sq.id ?? sq.slug}
+                      squad={sq}
+                      busy={creatingTpl === `sq-${sq.slug}`}
+                      disabled={!!creatingTpl}
+                      onClick={() => startFromSquad(sq)}
+                      onPreview={() => navigate(`/templates/${sq.slug}`)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mb-12 border border-dashed border-mos-hair bg-white py-10 px-6 text-center text-[0.84rem] text-mos-muted rounded-sm">
+                這一層暫時沒有方法論小組。試試其他層級。
+              </div>
+            )}
           </>
         )}
 
         {/* Recent missions — header + filter chips */}
         <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">
-            最近的項目
+            最近的任務
           </h2>
           <div className="flex items-center gap-2">
             <FilterChip
@@ -479,6 +524,58 @@ function SectionHeader({
   );
 }
 
+/* ─────────────────────────── Layer nav (L1–L6 chips) ──────────────── */
+
+function LayerNav({
+  selected, counts, onSelect,
+}: {
+  selected: MosLayer | "ALL";
+  counts: Record<string, number>;
+  onSelect: (l: MosLayer | "ALL") => void;
+}) {
+  const layers: Array<MosLayer | "ALL"> = ["ALL", "L1", "L2", "L3", "L4", "L5", "L6"];
+  return (
+    <div className="-mt-2 mb-5 flex items-center gap-1.5 flex-wrap">
+      {layers.map((l) => {
+        const isAll = l === "ALL";
+        const tone = isAll ? null : LAYER_TOKENS[l as MosLayer];
+        const active = selected === l;
+        return (
+          <button
+            key={l}
+            onClick={() => onSelect(l)}
+            className={[
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border transition",
+              "text-[0.74rem]",
+              active
+                ? "bg-mos-ink text-white border-mos-ink"
+                : "bg-white text-mos-ink border-mos-hair hover:border-mos-ink",
+            ].join(" ")}
+          >
+            {!isAll && (
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full"
+                style={{ background: active ? "#fff" : tone!.bg }}
+              />
+            )}
+            <span className="font-display tracking-[0.04em]">
+              {isAll ? "全部" : `${l} · ${tone!.label}`}
+            </span>
+            <span
+              className={[
+                "ml-0.5 text-[0.66rem] tabular-nums",
+                active ? "text-white/70" : "text-mos-muted",
+              ].join(" ")}
+            >
+              {counts[l] ?? 0}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─────────────────────────── Quick-start circle (monochrome) ───────── */
 
 function CircleTile({
@@ -559,21 +656,27 @@ function FeaturedSquadTile({
       : null;
   const stepCount =
     Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
+  const memberCount =
+    Array.isArray(squad.members) ? squad.members.length : 0;
+  const leadName = squad.lead?.name ?? null;
 
   return (
-    <div className="w-[240px] shrink-0 group">
+    <div className="w-[260px] shrink-0 group">
       <button
         onClick={onClick}
         disabled={disabled}
         className={[
-          "relative w-full bg-white border border-mos-hair rounded-xl overflow-hidden",
+          "relative w-full bg-white border border-mos-hair rounded-sm overflow-hidden",
           "transition-all duration-200 text-left",
-          "hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 hover:border-mos-ink/50",
+          "hover:border-mos-ink hover:-translate-y-0.5",
           disabled && !busy ? "opacity-40 pointer-events-none" : "",
         ].join(" ")}
       >
+        {/* Layer color band (top edge, 4px) */}
+        <div className="absolute top-0 inset-x-0 h-1" style={{ background: tone.bg }} />
+
         <div
-          className="relative w-full overflow-hidden"
+          className="relative w-full overflow-hidden border-b border-mos-hair"
           style={{ aspectRatio: "5 / 3" }}
         >
           {squad.heroImageUrl ? (
@@ -582,7 +685,7 @@ function FeaturedSquadTile({
             <div
               className="absolute inset-0 flex items-center justify-center"
               style={{
-                background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}1A 100%)`,
+                background: `linear-gradient(135deg, ${tone.bgTint} 0%, #FAF9F6 100%)`,
               }}
             >
               <MethodologyGlyph
@@ -593,37 +696,45 @@ function FeaturedSquadTile({
             </div>
           )}
           <div
-            className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded"
+            className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded-sm"
             style={{ background: tone.bg }}
           >
             {lk} · {tone.shortLabel}
           </div>
           {busy && (
-            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
               <span className="text-[0.7rem] tracking-[0.16em] uppercase text-mos-ink">建立中…</span>
             </div>
           )}
         </div>
-        <div className="p-3">
-          <div className="text-[0.86rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
+        <div className="p-3.5 bg-mos-cream">
+          <div className="text-[0.88rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
             {squad.name ?? squad.slug}
           </div>
           {author && (
-            <div className="mt-1 text-[0.66rem] text-mos-muted line-clamp-1">
+            <div className="mt-1 text-[0.66rem] text-mos-orange line-clamp-1 tracking-[0.02em]">
               {author}
             </div>
           )}
-          <div className="mt-2 text-[0.62rem] text-mos-soft tracking-[0.06em]">
-            {stepCount} steps
+          {leadName && (
+            <div className="mt-1.5 text-[0.66rem] text-mos-muted line-clamp-1">
+              <span className="text-mos-soft">領隊</span> · {leadName}
+            </div>
+          )}
+          <div className="mt-2 pt-2 border-t border-mos-hair flex items-center gap-3 text-[0.62rem] text-mos-soft tracking-[0.04em]">
+            <span><span className="text-mos-ink font-medium">{stepCount}</span> 步</span>
+            {memberCount > 0 && (
+              <span><span className="text-mos-ink font-medium">{memberCount}</span> 成員</span>
+            )}
           </div>
         </div>
       </button>
       <button
         onClick={onPreview}
         disabled={disabled}
-        className="mt-1.5 w-full text-[0.66rem] text-mos-muted hover:text-mos-ink transition py-1"
+        className="mt-1.5 w-full text-[0.66rem] text-mos-muted hover:text-mos-orange transition py-1"
       >
-        預覽任務範本 →
+        預覽工作流 →
       </button>
     </div>
   );
@@ -633,23 +744,29 @@ function FeaturedSquadTile({
 
 function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
   const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
+  const isLayerKnown = layerStr in LAYER_TOKENS;
+  const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
   const tone = LAYER_TOKENS[lk];
   const updatedTxt = formatRelative(mission.updatedAt);
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsBadge = WORKSPACE_BADGE[ws] ?? null;
+  const stepCount = mission.squadStepCount ?? 0;
 
   return (
     <div className="group relative">
       <button
         onClick={onClick}
-        className="flex flex-col text-left bg-white border border-mos-hair rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 w-full"
+        className="flex flex-col text-left bg-white border border-mos-hair rounded-sm overflow-hidden hover:border-mos-ink hover:-translate-y-0.5 transition-all duration-200 w-full"
       >
+        {/* Layer color band (top edge) */}
+        {isLayerKnown && (
+          <div className="h-1 w-full" style={{ background: tone.bg }} />
+        )}
         <div
-          className="relative w-full overflow-hidden"
+          className="relative w-full overflow-hidden border-b border-mos-hair"
           style={{
             aspectRatio: "5 / 4",
-            background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)`,
+            background: `linear-gradient(135deg, ${tone.bgTint} 0%, #FAF9F6 100%)`,
           }}
         >
           <div className="absolute inset-0 flex items-center justify-center">
@@ -659,20 +776,30 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
               size={70}
             />
           </div>
-          {mission.squadLayer && (
+          {isLayerKnown && (
             <div
-              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded"
+              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded-sm"
               style={{ background: tone.bg }}
             >
-              {lk}
+              {lk} · {tone.shortLabel}
+            </div>
+          )}
+          {stepCount > 0 && (
+            <div className="absolute top-2 right-2 px-1.5 py-[2px] text-[0.56rem] tabular-nums tracking-[0.04em] bg-white/85 text-mos-ink border border-mos-hair rounded-sm">
+              {stepCount} 步
             </div>
           )}
         </div>
-        <div className="p-3">
-          <div className="text-[0.82rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
+        <div className="p-3 bg-mos-cream">
+          <div className="text-[0.84rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
             {mission.title}
           </div>
-          <div className="mt-1.5 flex items-center gap-1.5 text-[0.66rem] text-mos-muted">
+          {mission.squadName && (
+            <div className="mt-1 text-[0.64rem] text-mos-orange truncate tracking-[0.02em]">
+              {mission.squadName}
+            </div>
+          )}
+          <div className="mt-1.5 flex items-center gap-1.5 text-[0.64rem] text-mos-muted">
             {wsBadge && (
               <span
                 className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-white text-[0.5rem] font-bold shrink-0"
