@@ -54,6 +54,21 @@ function pickName(raw: any): string {
   return String(raw);
 }
 
+// Some legacy rows store CJK text mis-encoded as latin1 (e.g. "ä¼ä¸ESG..." for "企業 ESG..."). Detect and fix.
+function fixMojibake(s: string | null | undefined): string {
+  if (!s) return "";
+  const str = String(s);
+  // Cheap heuristic: presence of typical mojibake chars
+  if (!/[ÃÂãâå¯æåäçé]/.test(str)) return str;
+  try {
+    const fixed = Buffer.from(str, "latin1").toString("utf8");
+    // Only return fixed version if it actually contains CJK
+    return /[一-鿿]/.test(fixed) ? fixed : str;
+  } catch {
+    return str;
+  }
+}
+
 function getInitial(name: string): string {
   const trimmed = name.trim();
   return (trimmed.charAt(0) || "?").toUpperCase();
@@ -66,14 +81,20 @@ export interface HomeEntity {
   slug: string;
 
   name: string;
+  /** One-line context shown under the name (kind-specific). */
+  subtitle: string | null;
   description: string | null;
   initial: string;
 
+  /** Layer chip — server-mapped to HeroUI semantic. */
   badge: { label: string; color: HeroUIColor };
 
+  /** Footer stats — up to 3 (value + label) pairs. Empty array if none. */
+  stats: Array<{ value: number | string; label: string }>;
+
   meta: {
-    methodology: string | null;   // "Pearson · 2003" or null
-    summary:     string | null;   // localized description / fallback
+    methodology: string | null;
+    summary:     string | null;
   };
 
   actions: {
@@ -120,29 +141,35 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
     })();
     const methodology: string | null = methodologyRaw?.author
       ? `${methodologyRaw.author}${methodologyRaw.year ? ` · ${methodologyRaw.year}` : ""}`
-      : (methodologyRaw?.summary ?? null);
+      : (methodologyRaw?.summary ? fixMojibake(methodologyRaw.summary) : null);
 
-    const name = pickName(r.name);
+    const name = fixMojibake(pickName(r.name));
+    const description = fixMojibake(r.description) || null;
+    const stepCount   = Array.isArray(steps)   ? steps.length   : 0;
+    const memberCount = Array.isArray(members) ? members.length : 0;
+    const stats = [
+      { value: stepCount,   label: "步驟" },
+      { value: memberCount, label: "成員" },
+    ].filter((s) => Number(s.value) > 0);
 
     return {
       id: Number(r.id),
       kind: "squad" as const,
       slug: String(r.slug),
       name,
-      description: r.description ?? null,
+      subtitle: methodology,                   // e.g. "Pearson · 2003"
+      description,
       initial: getInitial(name),
       badge: { label: `${layer}・${layerTone.label}`, color: layerTone.color },
-      meta: {
-        methodology,
-        summary: r.description ?? null,
-      },
+      stats,
+      meta: { methodology, summary: description },
       actions: {
         primary:   { label: KIND_LABELS.squad.primary },
         secondary: { label: KIND_LABELS.squad.secondary },
       },
       strategyLayer: layer,
-      stepCount:   Array.isArray(steps)   ? steps.length   : 0,
-      memberCount: Array.isArray(members) ? members.length : 0,
+      stepCount,
+      memberCount,
       workspace: safeJsonParse<string[]>(r.workspace, []),
     };
   });
@@ -180,18 +207,22 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
   return rows.map((r) => {
     const layer = AGENT_LAYER_MAP[String(r.layer ?? "").toLowerCase()] ?? "L1";
     const tone = LAYER_TO_HERO[layer]!;
-    const name = String(r.name ?? "");
+    const name = fixMojibake(String(r.name ?? ""));
+    const description = fixMojibake(r.bio ?? r.specialty ?? "") || null;
+    const subtitle = fixMojibake(r.title ?? "") || null;
     return {
       id: Number(r.id),
       kind: "agent" as const,
       slug: String(r.slug ?? `agent-${r.id}`),
       name,
-      description: r.bio ?? r.specialty ?? null,
+      subtitle,
+      description,
       initial: getInitial(name),
       badge: { label: `${layer}・${tone.label}`, color: tone.color },
+      stats: [],
       meta: {
-        methodology: r.title ?? null,
-        summary: r.specialty ?? r.bio ?? null,
+        methodology: subtitle,
+        summary: description,
       },
       actions: {
         primary:   { label: KIND_LABELS.agent.primary },

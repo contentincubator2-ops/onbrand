@@ -1,23 +1,18 @@
 /**
- * SquadEntityCard — pure HeroUI Card, no inline styles, no custom tokens.
- * Layer color comes from LAYER_TOKENS[layer].heroColor (HeroUI semantic).
+ * SquadEntityCard — HeroUI "Card with Divider" pattern.
+ *
+ * No avatar by design (per CJ): squads are abstract methodology teams,
+ * not people. The header carries name + layer chip; body holds the
+ * description; footer shows step / member counts.
+ *
+ * The whole card is pressable — clicking anywhere triggers preview.
  */
 import { LAYER_TOKENS, resolveLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import {
-  Avatar, Button, Card, CardBody, CardFooter, CardHeader, Chip,
+  Card, CardHeader, CardBody, CardFooter, Chip, Divider,
 } from "@heroui/react";
-
-function EyeIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
 
 interface SquadEntityCardProps {
   squad: any;
@@ -34,121 +29,85 @@ export function SquadEntityCard({
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
 
-  const formatSlug = (s: string) =>
-    s.replace(/[-_]+/g, " ")
-     .split(" ").filter(Boolean)
-     .map((w) => /^[a-z]/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w)
-     .join(" ");
-  const taglineText = (() => {
+  // Prefer server-pre-computed shape (entity.listForHome) but fall back to raw squad.
+  const name: string = squad.name && typeof squad.name === "string"
+    ? squad.name
+    : (pickLocaleText(squad.name, lang) || String(squad.slug ?? "?"));
+
+  const subtitle: string | null = squad.subtitle ?? (() => {
     if (squad.methodology?.author) {
       const yr = squad.methodology?.year ? ` · ${squad.methodology.year}` : "";
       return `${squad.methodology.author}${yr}`;
     }
-    const summary = squad.methodology?.summary;
-    if (typeof summary === "string" && summary.trim()) return formatSlug(summary.trim());
-    return "";
+    return null;
   })();
 
-  const stepCount = Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
-  const memberCount = Array.isArray(squad.members) ? squad.members.length : 0;
-  const philosophyText = (() => {
+  const description: string | null = (() => {
+    if (typeof squad.description === "string" && squad.description.trim()) return squad.description;
     const localized = safeLocalizedText(squad.description, lang);
     if (localized) return localized;
-    const parts: string[] = [];
-    if (squad.lead?.name) parts.push(lang === "en" ? `Led by ${squad.lead.name}` : `由 ${squad.lead.name} 領隊`);
-    if (stepCount)  parts.push(lang === "en" ? `${stepCount} workflow steps` : `${stepCount} 個工作步驟`);
-    if (memberCount) parts.push(lang === "en" ? `${memberCount} specialists`  : `${memberCount} 位成員`);
-    return parts.join(lang === "en" ? " · " : "、");
+    return null;
   })();
 
-  const nameStr = pickLocaleText(squad.name, lang) || String(squad.slug ?? "?");
-  const initial = nameStr.charAt(0).toUpperCase();
-  const labels = lang === "en"
-    ? { tagline: "Methodology", content: "Description", positioning: "Launch Squad", report: "Preview Workflow" }
-    : { tagline: "方法論",       content: "描述",        positioning: "啟動小組",     report: "預覽工作流" };
+  const stats: Array<{ value: number | string; label: string }> = Array.isArray(squad.stats)
+    ? squad.stats
+    : (() => {
+        const stepCount = Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
+        const memberCount = Array.isArray(squad.members) ? squad.members.length : 0;
+        return [
+          { value: stepCount,   label: "步驟" },
+          { value: memberCount, label: "成員" },
+        ].filter((s) => Number(s.value) > 0);
+      })();
 
   return (
     <Card
-      shadow="sm"
+      isPressable
       isHoverable
+      onPress={busy || disabled ? undefined : onPreview}
       isDisabled={disabled && !busy}
-      className="overflow-hidden"
+      shadow="sm"
+      className="w-full"
     >
-      <CardHeader className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Avatar
-            name={initial}
-            color={tone.heroColor}
-            radius="full"
-            size="md"
-            classNames={{ name: "font-bold text-base" }}
-          />
-          <div className="min-w-0">
-            <h3 className="font-semibold text-medium leading-tight line-clamp-1">
-              {nameStr}
-            </h3>
-            <Chip size="sm" color={tone.heroColor} variant="flat" className="mt-1">
-              {lk}・{tone.label}
-            </Chip>
-          </div>
-        </div>
-
-        <Button
-          isIconOnly
-          size="sm"
-          variant="light"
-          onPress={onPreview}
-          isDisabled={disabled}
-          aria-label={lang === "en" ? "Preview workflow" : "預覽工作流"}
-        >
-          <EyeIcon className="h-4 w-4" />
-        </Button>
+      <CardHeader className="flex items-center justify-between gap-3">
+        <h3 className="text-medium font-semibold leading-tight line-clamp-1">
+          {name}
+        </h3>
+        <Chip size="sm" color={tone.heroColor} variant="flat" className="shrink-0">
+          {lk}・{tone.label}
+        </Chip>
       </CardHeader>
 
-      <CardBody className="gap-3 pt-0">
-        <Card shadow="none" className="bg-default-100">
-          <CardBody className="py-2 px-3">
-            <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">
-              {labels.tagline}
-            </p>
-            <p className="text-small line-clamp-1">
-              {taglineText || (lang === "en" ? "Not set" : "尚未設定")}
-            </p>
-          </CardBody>
-        </Card>
+      <Divider />
 
-        <Card shadow="none" className="bg-default-100">
-          <CardBody className="py-2 px-3">
-            <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">
-              {labels.content}
-            </p>
-            <p className="text-small line-clamp-3 leading-snug">
-              {philosophyText || (lang === "en" ? "Not set" : "尚未設定")}
-            </p>
-          </CardBody>
-        </Card>
+      <CardBody className="gap-1.5">
+        {subtitle && (
+          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">
+            {subtitle}
+          </p>
+        )}
+        <p className="text-small text-default-700 line-clamp-3 leading-snug">
+          {description || (lang === "en" ? "No description yet." : "尚無描述。")}
+        </p>
       </CardBody>
 
-      <CardFooter className="gap-2">
-        <Button
-          color={tone.heroColor}
-          fullWidth
-          isLoading={busy}
-          isDisabled={disabled || busy}
-          onPress={onClick}
-        >
-          {busy ? (lang === "en" ? "Starting…" : "建立中…") : labels.positioning}
-        </Button>
-        <Button
-          color={tone.heroColor}
-          variant="bordered"
-          fullWidth
-          isDisabled={disabled}
-          onPress={onPreview}
-        >
-          {labels.report}
-        </Button>
-      </CardFooter>
+      {stats.length > 0 && (
+        <>
+          <Divider />
+          <CardFooter className="gap-4 text-tiny text-default-500">
+            {stats.map((s, i) => (
+              <span key={i}>
+                <b className="text-default-700">{s.value}</b> {s.label}
+              </span>
+            ))}
+            {busy && (
+              <span className="ml-auto text-tiny text-primary">
+                {lang === "en" ? "Starting…" : "啟動中…"}
+              </span>
+            )}
+          </CardFooter>
+        </>
+      )}
     </Card>
   );
 }
