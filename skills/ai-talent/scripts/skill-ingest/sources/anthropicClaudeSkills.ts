@@ -10,7 +10,7 @@
 import { scan } from "../securityCheck";
 import type { NormalizedSkill, SourceFetcher } from "../types";
 
-const REPO = "anthropics/claude-skills";
+const REPO = "anthropics/skills";
 const BRANCH = "main";
 
 interface GhTreeEntry {
