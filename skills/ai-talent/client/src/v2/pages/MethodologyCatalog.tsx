@@ -22,7 +22,7 @@ import CreateMethodologyModal from "../components/methodology/CreateMethodologyM
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
-  Avatar, Button, Card, CardBody, CardFooter, CardHeader, Chip, Divider,
+  Button, Card, CardBody, Chip,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Input, Skeleton, Tooltip,
 } from "@heroui/react";
@@ -31,7 +31,7 @@ import {
   faMagnifyingGlass, faChevronDown, faChevronLeft, faChevronRight,
   faPlus, faWandMagicSparkles, faCrown, faUsers, faRobot, faCubes, faCircleInfo,
   faBullseye, faMessage, faChartLine, faPalette, faRocket, faBriefcase,
-  faVideo, faShareNodes, faStar, faArrowRight,
+  faVideo, faShareNodes, faStar, faArrowRight, faEllipsis, faPlay,
 } from "@fortawesome/free-solid-svg-icons";
 
 type Kind = "squad" | "agent" | "skill";
@@ -230,12 +230,12 @@ export default function MethodologyCatalog() {
       >
         {curatedSquads.map((e: any) => (
           <div key={`sq-${e.id}`} className="shrink-0 w-[280px]">
-            <EntityCard entity={e} onPreview={() => onPreview(e.slug)} />
+            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} size="sm" aspect="5/4" />
           </div>
         ))}
       </ScrollSection>
 
-      {/* ─── Agents ─────────────────────────────────────────────── */}
+      {/* ─── Agents (portrait 3:4 cards — Canva avatar feel) ───── */}
       <ScrollSection
         title="精選 Agents"
         subtitle="個別 AI 專家角色，可放進你的 squad"
@@ -244,8 +244,8 @@ export default function MethodologyCatalog() {
         loading={entityQuery.isLoading}
       >
         {topAgents.map((e: any) => (
-          <div key={`ag-${e.id}`} className="shrink-0 w-[240px]">
-            <EntityCard entity={e} onPreview={() => onPreview(e.slug)} />
+          <div key={`ag-${e.id}`} className="shrink-0 w-[200px]">
+            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} size="sm" aspect="3/4" />
           </div>
         ))}
       </ScrollSection>
@@ -260,7 +260,7 @@ export default function MethodologyCatalog() {
       >
         {topSkills.map((e: any) => (
           <div key={`sk-${e.id}`} className="shrink-0 w-[260px]">
-            <EntityCard entity={e} onPreview={() => onPreview(e.slug)} />
+            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} size="sm" aspect="16/9" />
           </div>
         ))}
       </ScrollSection>
@@ -439,11 +439,23 @@ function ScrollSection({
  *     as a giant glyph. When Path B image-gen runs, image slots in here.
  * ─────────────────────────────────────────────────────────────────── */
 
-function LandscapeCard({ entity, onPreview }: { entity: any; onPreview: () => void }) {
+function LandscapeCard({
+  entity, onPreview, aspect = "16/9", size = "md",
+}: {
+  entity: any;
+  onPreview: () => void;
+  aspect?: string;
+  size?: "sm" | "md" | "lg";
+}) {
   const layerKey = (entity.strategyLayer ?? "L1") as MosLayer;
   const tone = LAYER_TOKENS[layerKey];
   const heroColor = tone?.heroColor ?? "default";
   const coverImageUrl: string | undefined = entity.coverImageUrl ?? entity.heroImageUrl;
+  const kindLabel = entity.kind === "squad" ? "小組" : entity.kind === "agent" ? "Agent" : "技能";
+  const ctaLabel  = entity.kind === "squad" ? "啟動小組" : entity.kind === "agent" ? "套用 Agent" : "套用技能";
+  const titleSize = size === "sm" ? "text-small" : size === "lg" ? "text-large" : "text-medium";
+  const subtitleSize = size === "sm" ? "text-tiny" : "text-tiny";
+  const glyphSize = size === "sm" ? 80 : size === "lg" ? 160 : 120;
 
   return (
     <Card
@@ -451,119 +463,91 @@ function LandscapeCard({ entity, onPreview }: { entity: any; onPreview: () => vo
       isHoverable
       onPress={onPreview}
       shadow="sm"
-      className="w-full overflow-hidden group"
+      radius="lg"
+      className="w-full h-full overflow-hidden group"
     >
       {/* Visual area — image if available, else gradient + glyph */}
-      <div
-        className={`relative w-full bg-${heroColor}-100`}
-        style={{ aspectRatio: "16/9" }}
-      >
+      <div className={`relative w-full bg-${heroColor}-100 overflow-hidden`} style={{ aspectRatio: aspect }}>
         {coverImageUrl ? (
           <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <MethodologyGlyph seed={entity.slug ?? entity.id} layer={layerKey} size={120} />
+            <MethodologyGlyph seed={entity.slug ?? entity.id} layer={layerKey} size={glyphSize} />
           </div>
         )}
 
-        {/* Top-left chip */}
+        {/* Top-left layer chip — always visible */}
         <Chip
           size="sm"
           color={heroColor}
           variant="solid"
-          className="absolute top-3 left-3 shadow-sm"
+          className="absolute top-2.5 left-2.5 shadow-sm pointer-events-none"
         >
           {layerKey}・{tone?.label}
         </Chip>
 
-        {/* Top-right kind badge */}
+        {/* Top-right kind chip — hides on hover so action buttons can take its spot */}
         <Chip
           size="sm"
           variant="flat"
-          className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md capitalize"
+          className="absolute top-2.5 right-2.5 bg-content1/80 backdrop-blur-md transition-opacity duration-150 group-hover:opacity-0 pointer-events-none"
         >
-          {entity.kind}
+          {kindLabel}
         </Chip>
+
+        {/* Hover overlay (dark gradient + actions) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          {/* Center primary action — Canva pattern */}
+          <Button
+            color="primary"
+            radius="full"
+            size={size === "sm" ? "sm" : "md"}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto shadow-lg"
+            startContent={<FontAwesomeIcon icon={faPlay} />}
+            onPress={(ev: any) => { ev?.stopPropagation?.(); onPreview(); }}
+          >
+            {ctaLabel}
+          </Button>
+
+          {/* Top-right star (favourite) + more menu */}
+          <div className="absolute top-2.5 right-2.5 flex gap-1.5 pointer-events-auto">
+            <Tooltip content="收藏" placement="bottom">
+              <Button
+                isIconOnly
+                size="sm"
+                radius="full"
+                variant="flat"
+                className="bg-content1/90 backdrop-blur-md"
+                aria-label="收藏"
+                onClick={(e) => { e.stopPropagation(); /* TODO: bookmark */ }}
+              >
+                <FontAwesomeIcon icon={faStar} />
+              </Button>
+            </Tooltip>
+            <Tooltip content="更多" placement="bottom">
+              <Button
+                isIconOnly
+                size="sm"
+                radius="full"
+                variant="flat"
+                className="bg-content1/90 backdrop-blur-md"
+                aria-label="更多"
+                onClick={(e) => { e.stopPropagation(); /* TODO: more menu */ }}
+              >
+                <FontAwesomeIcon icon={faEllipsis} />
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
       </div>
 
-      <CardBody className="px-4 py-3 gap-1">
-        <p className="text-medium font-semibold leading-tight line-clamp-1">{entity.name}</p>
+      <CardBody className="px-3 py-2.5 gap-0.5">
+        <p className={`${titleSize} font-semibold leading-tight line-clamp-1`}>{entity.name}</p>
         {entity.subtitle && (
-          <p className="text-tiny text-default-500 line-clamp-1">{entity.subtitle}</p>
+          <p className={`${subtitleSize} text-default-500 line-clamp-1`}>{entity.subtitle}</p>
         )}
       </CardBody>
     </Card>
   );
 }
 
-/* ─────────────────────────── EntityCard (3 layouts) ──────────────────── */
-
-function EntityCard({ entity, onPreview }: { entity: any; onPreview: () => void }) {
-  const layerKey = entity.strategyLayer as MosLayer;
-  const tone = LAYER_TOKENS[layerKey];
-
-  if (entity.kind === "squad") {
-    return (
-      <Card isPressable isHoverable onPress={onPreview} shadow="sm" className="w-full h-full">
-        <CardHeader className="flex items-center justify-between gap-3">
-          <h3 className="text-medium font-semibold leading-tight line-clamp-1">{entity.name}</h3>
-          <Chip size="sm" color={tone?.heroColor ?? "default"} variant="flat" className="shrink-0">
-            {layerKey}
-          </Chip>
-        </CardHeader>
-        <Divider />
-        <CardBody className="gap-1.5">
-          {entity.subtitle && (
-            <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">{entity.subtitle}</p>
-          )}
-          <p className="text-small text-default-700 line-clamp-3 leading-snug">
-            {entity.description || "尚無描述。"}
-          </p>
-        </CardBody>
-        {Array.isArray(entity.stats) && entity.stats.length > 0 && (
-          <>
-            <Divider />
-            <CardFooter className="gap-3 text-tiny text-default-500">
-              {entity.stats.map((s: any, i: number) => (
-                <span key={i}><b className="text-default-700">{s.value}</b> {s.label}</span>
-              ))}
-            </CardFooter>
-          </>
-        )}
-      </Card>
-    );
-  }
-
-  if (entity.kind === "agent") {
-    return (
-      <Card isPressable isHoverable onPress={onPreview} shadow="sm" className="w-full h-full">
-        <CardBody className="items-center text-center gap-2 pt-6">
-          <Avatar name={entity.initial} color={tone?.heroColor ?? "default"} size="lg" radius="full" className="mb-2" />
-          <h3 className="text-medium font-semibold leading-tight line-clamp-1">{entity.name}</h3>
-          {entity.subtitle && <p className="text-tiny text-default-500 line-clamp-1">{entity.subtitle}</p>}
-          <Chip size="sm" color={tone?.heroColor ?? "default"} variant="flat" className="mt-1">
-            {layerKey}・{tone?.label}
-          </Chip>
-        </CardBody>
-        <Divider />
-        <CardFooter className="text-tiny text-default-500">
-          <p className="line-clamp-2 leading-snug">{entity.description || "—"}</p>
-        </CardFooter>
-      </Card>
-    );
-  }
-
-  // skill
-  return (
-    <Card isPressable isHoverable onPress={onPreview} shadow="sm" className="w-full h-full">
-      <CardBody className="gap-1">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-small font-semibold leading-tight line-clamp-2">{entity.name}</h3>
-          <Chip size="sm" color={tone?.heroColor ?? "default"} variant="flat" className="shrink-0">{layerKey}</Chip>
-        </div>
-        {entity.subtitle && <p className="text-tiny text-default-400">{entity.subtitle}</p>}
-        <p className="text-tiny text-default-500 line-clamp-2 mt-1 leading-snug">{entity.description || "—"}</p>
-      </CardBody>
-    </Card>
-  );
-}
