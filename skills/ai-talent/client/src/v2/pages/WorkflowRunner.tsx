@@ -50,6 +50,15 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
     : { data: [], refetch: () => {} };
 
   const stepExecute = (trpc.squad as any).stepExecute.useMutation();
+  const stepUndo = (trpc.squad as any).stepUndo?.useMutation
+    ? (trpc.squad as any).stepUndo.useMutation()
+    : { mutateAsync: async () => ({ ok: false }), isPending: false };
+
+  // Autosave indicator: pulse "✓ 已儲存" briefly after every successful mutation.
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (stepExecute.isSuccess || stepUndo.isSuccess) setSavedAt(Date.now());
+  }, [stepExecute.isSuccess, stepUndo.isSuccess]);
 
   // Build a quick lookup: stepOrder → progress row
   const byOrder = useMemo(() => {
@@ -144,6 +153,13 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
     progressQuery.refetch?.();
   };
 
+  const handleUndo = async () => {
+    if (!viewStep) return;
+    const ord = Number(viewStep.order ?? viewOrder) || viewOrder;
+    const res = await stepUndo.mutateAsync({ missionId, stepOrder: ord });
+    if ((res as any)?.ok) progressQuery.refetch?.();
+  };
+
   const isStepUnlocked = (ord: number): boolean => {
     if (ord === 1) return true;
     // unlocked if previous step is confirmed
@@ -164,8 +180,11 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
             {viewStep ? (pickLocaleText(viewStep.name, lang) || `Step ${viewOrder}`) : "—"}
           </div>
         </div>
-        <div className="text-[0.72rem] text-mos-muted shrink-0">
-          {viewOrder} / {totalSteps}
+        <div className="flex items-center gap-3 shrink-0">
+          {savedAt && <SavedBadge ts={savedAt} />}
+          <div className="text-[0.72rem] text-mos-muted">
+            {viewOrder} / {totalSteps}
+          </div>
         </div>
       </div>
 
@@ -181,10 +200,12 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
             inputDraft={inputDraft}
             setInputDraft={setInputDraft}
             isPending={stepExecute.isPending}
+            isUndoing={stepUndo.isPending}
             unlocked={isStepUnlocked(viewOrder)}
             onAnswerAndRun={handleAnswerAndRun}
             onConfirm={handleConfirm}
             onRegenerate={handleRegenerate}
+            onUndo={handleUndo}
           />
         )}
       </div>
@@ -240,11 +261,34 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
   );
 }
 
+/* ─────────────────────────── SavedBadge ─────────────────────────── */
+// Tiny "已自動儲存 N 秒前" indicator that pulses after every successful
+// stepExecute / stepUndo. Mirrors Notion's autosave UX.
+
+function SavedBadge({ ts }: { ts: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
+  const sec = Math.max(0, Math.floor((now - ts) / 1000));
+  const label = sec < 5 ? "剛剛已儲存" : sec < 60 ? `${sec} 秒前已儲存` : `${Math.floor(sec / 60)} 分前已儲存`;
+  return (
+    <span className="inline-flex items-center gap-1 text-[0.68rem] text-emerald-600">
+      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 13l4 4L19 7" />
+      </svg>
+      {label}
+    </span>
+  );
+}
+
 /* ─────────────────────────── StepCanvas ─────────────────────────── */
 
 function StepCanvas({
   step, progress, tone, inputDraft, setInputDraft,
-  isPending, unlocked, onAnswerAndRun, onConfirm, onRegenerate,
+  isPending, isUndoing, unlocked,
+  onAnswerAndRun, onConfirm, onRegenerate, onUndo,
 }: {
   step: any;
   progress: any | undefined;
@@ -252,14 +296,17 @@ function StepCanvas({
   inputDraft: string;
   setInputDraft: (s: string) => void;
   isPending: boolean;
+  isUndoing: boolean;
   unlocked: boolean;
   onAnswerAndRun: () => void;
   onConfirm: () => void;
   onRegenerate: () => void;
+  onUndo: () => void;
 }) {
   const status: StepStatus = progress?.status ?? "pending";
   const agentName = progress?.agentName ?? step.assignedAgentName ?? "AI 專員";
   const out = progress?.agentOutput ?? "";
+  const historyCount: number = Number(progress?.historyCount ?? 0);
 
   if (!unlocked) {
     return (
@@ -342,6 +389,20 @@ function StepCanvas({
             className="w-full px-4 py-2.5 text-[0.84rem] bg-white border border-mos-hair rounded-lg focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition resize-none"
           />
           <div className="flex gap-2">
+            {historyCount > 0 && (
+              <button
+                onClick={onUndo}
+                disabled={isPending || isUndoing}
+                title={`回到上一版（共 ${historyCount} 個歷史版本）`}
+                className="shrink-0 px-3 py-2.5 text-[0.86rem] text-mos-muted hover:text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7v6h6" />
+                  <path d="M3 13a9 9 0 1 0 3-7L3 9" />
+                </svg>
+                <span>上一版</span>
+              </button>
+            )}
             <button
               onClick={onRegenerate}
               disabled={isPending}

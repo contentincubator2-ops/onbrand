@@ -26,6 +26,7 @@ import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitiv
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import WorkflowRunner from "./WorkflowRunner";
+import BrandSwitcher from "../app/shell/BrandSwitcher";
 
 /* ─────────────────────────── Icon rail ─────────────────────────── */
 //
@@ -241,6 +242,66 @@ export default function PickerWorkspace() {
     initialMissionId ? Number(initialMissionId) : null,
   );
 
+  // ── Brand context (D) ───────────────────────────────────────────────
+  // Picker lives outside ShellLayout so it doesn't get the shared context.
+  // We mirror the same localStorage key the shell uses, and fetch the
+  // user's brand list directly to populate the in-header BrandSwitcher.
+  const brandsQuery = (trpc as any).brand?.listByMember?.useQuery
+    ? (trpc as any).brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const brands: any[] = (brandsQuery.data as any[]) ?? [];
+  const [brandId, setBrandIdState] = useState<number | null>(() => {
+    try { return Number(localStorage.getItem("sowork.selectedBrandId")) || null; }
+    catch { return null; }
+  });
+  const setBrandId = (id: number | null) => {
+    setBrandIdState(id);
+    try {
+      if (id) localStorage.setItem("sowork.selectedBrandId", String(id));
+      else localStorage.removeItem("sowork.selectedBrandId");
+    } catch {}
+  };
+  // Auto-pick first brand once list loads.
+  useEffect(() => {
+    if (!brandId && brands.length > 0) setBrandId(brands[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brands.length]);
+
+  // ── Canva-style floating middle column ──────────────────────────────
+  // Middle panel can be collapsed so the canvas reclaims that 380px.
+  // Persisted across sessions.
+  const [middleCollapsed, setMiddleCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem("sowork.picker.middleCollapsed") === "1"; }
+    catch { return false; }
+  });
+  const toggleMiddle = () => {
+    setMiddleCollapsed((v) => {
+      const nv = !v;
+      try { localStorage.setItem("sowork.picker.middleCollapsed", nv ? "1" : "0"); } catch {}
+      return nv;
+    });
+  };
+
+  // ── Fullscreen mode (E) ─────────────────────────────────────────────
+  // Hide rail + middle entirely; canvas takes the whole stage. Toggled
+  // by a button on the header and by the F / Esc keys.
+  const [fullscreen, setFullscreen] = useState<boolean>(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore when user is typing
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        setFullscreen((v) => !v);
+      } else if (e.key === "Escape" && fullscreen) {
+        setFullscreen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
+
   // Rail always starts on "templates" — that's the primary browsing mode.
   // The rail key here tracks WHICH rail item is active. When kind=global
   // and key=templates, the middle column shows the squad list. When
@@ -388,6 +449,8 @@ export default function PickerWorkspace() {
         description: safeLocalizedText(sq.description, lang) ?? undefined,
         squadSlug: sq.slug,
         workspace: ws,
+        brandId: brandId ?? undefined,
+        brandName: brands.find((b: any) => b.id === brandId)?.name,
       });
       if (!res?.id) throw new Error("後端沒有回傳 mission id");
       // In-place launch — swap right pane to WorkflowRunner. Persist
@@ -479,7 +542,8 @@ export default function PickerWorkspace() {
   return (
     <div className="fixed inset-0 flex flex-col bg-mos-cream">
       {/* ── Top header ───────────────────────────────────────────────── */}
-      <header className="h-12 flex items-center justify-between px-3 border-b border-mos-hair bg-white">
+      {!fullscreen && (
+      <header className="h-12 flex items-center justify-between px-3 border-b border-mos-hair bg-white shrink-0">
         <button
           onClick={() => { if (window.history.length > 1) window.history.back(); else window.close(); }}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[0.78rem] text-mos-ink hover:bg-mos-ink/5 rounded transition"
@@ -492,15 +556,37 @@ export default function PickerWorkspace() {
         <div className="font-display text-[0.92rem] text-mos-ink truncate px-4">
           {headerTitle}
         </div>
-        <div className="w-[60px]" />
+        <div className="flex items-center gap-2">
+          <BrandSwitcher
+            brands={brands}
+            selectedId={brandId}
+            onSelect={setBrandId}
+          />
+          <button
+            onClick={() => setFullscreen(true)}
+            title="進入專注模式 (F)"
+            className="w-8 h-8 flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-ink/5 rounded transition"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+            </svg>
+          </button>
+        </div>
       </header>
+      )}
 
-      {/* ── Body: 3-column ───────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 flex">
+      {/* ── Body: Canva-style floating layout ─────────────────────────
+          The canvas (right pane) is the only **fixed** layout child —
+          it always occupies the full body width minus the rail. The
+          middle column is **absolutely positioned** on top of it and
+          can be slide-collapsed to give the canvas all the space.
+          Fullscreen mode hides BOTH rail and middle. */}
+      <div className="flex-1 min-h-0 relative">
         {/* Icon rail — layer-aware. Top "範本" + layer-specific middle band
             (varies per active squad's strategy_layer) + bottom global tools.
             A thin separator between bands so the user can see the structure. */}
-        <aside className="w-[68px] border-r border-mos-hair bg-white flex flex-col items-stretch py-2">
+        {!fullscreen && (
+        <aside className="absolute left-0 top-0 bottom-0 w-[68px] z-30 border-r border-mos-hair bg-white flex flex-col items-stretch py-2">
           {railItems.map((it, i) => {
             const active = activeRailKey === it.key;
             // Insert separators between bands (after top, before bottom)
@@ -534,11 +620,32 @@ export default function PickerWorkspace() {
             );
           })}
         </aside>
+        )}
 
         {/* Middle column — squad list (default) OR asset drawer when a
             layer-specific rail item is active. Drawers ship as placeholders
-            until the underlying asset tables land in later sprints. */}
-        <section className="w-[380px] border-r border-mos-hair bg-white flex flex-col min-h-0">
+            until the underlying asset tables land in later sprints.
+            FLOATING (Canva-style): absolute positioned over the canvas,
+            slide-collapses to expose the canvas underneath. */}
+        {!fullscreen && (
+        <section
+          className={[
+            "absolute top-0 bottom-0 z-20 border-r border-mos-hair bg-white flex flex-col min-h-0 shadow-[2px_0_8px_rgba(0,0,0,0.04)] transition-transform duration-200",
+            middleCollapsed ? "-translate-x-full" : "translate-x-0",
+          ].join(" ")}
+          style={{ left: 68, width: 380 }}
+        >
+          {/* Collapse handle on the right edge — Canva-style */}
+          <button
+            onClick={toggleMiddle}
+            title={middleCollapsed ? "展開（顯示方法論清單）" : "收合（讓出畫布空間）"}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-6 h-12 bg-white border border-mos-hair rounded-r-md shadow flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-paper transition"
+            style={{ boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d={middleCollapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
+            </svg>
+          </button>
           {activeRailItem?.kind === "layer" ? (
             <LayerAssetDrawer
               item={activeRailItem}
@@ -731,9 +838,28 @@ export default function PickerWorkspace() {
           </>
           )}
         </section>
+        )}
 
-        {/* Right pane — canvas / detail / runner */}
-        <section className="flex-1 min-w-0 bg-mos-cream flex flex-col min-h-0">
+        {/* Right pane — canvas / detail / runner.
+            Always full-width from rail to right edge; the middle column
+            floats over the left edge of this. In fullscreen, it covers
+            the whole body. */}
+        <section
+          className="absolute top-0 right-0 bottom-0 z-10 bg-mos-cream flex flex-col min-h-0"
+          style={{ left: fullscreen ? 0 : 68 }}
+        >
+          {/* Fullscreen exit + collapsed-middle restore handle (only when no header) */}
+          {fullscreen && (
+            <button
+              onClick={() => setFullscreen(false)}
+              title="退出專注模式 (Esc / F)"
+              className="absolute top-3 right-3 z-40 w-9 h-9 flex items-center justify-center bg-white border border-mos-hair rounded-full shadow text-mos-muted hover:text-mos-ink hover:bg-mos-paper transition"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+              </svg>
+            </button>
+          )}
           {activeMissionId && selectedSquad ? (
             <div className="flex-1 min-h-0 flex flex-col">
               <div className="px-4 py-1.5 border-b border-mos-hair bg-white/50 flex items-center justify-between">
@@ -782,6 +908,21 @@ export default function PickerWorkspace() {
             </div>
           )}
         </section>
+
+        {/* "Reopen middle" tab — surfaces when middle is collapsed but
+            we're not in fullscreen, so the user can pop the panel back. */}
+        {!fullscreen && middleCollapsed && (
+          <button
+            onClick={toggleMiddle}
+            title="展開方法論清單"
+            className="absolute z-30 top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-mos-hair rounded-r-md shadow flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-paper transition"
+            style={{ left: 68, boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

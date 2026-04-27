@@ -1282,11 +1282,25 @@ ${agentCtx.systemPromptPrefix}`;
           agent_output MEDIUMTEXT,
           agent_id     INT,
           agent_name   VARCHAR(120),
+          history      JSON          NULL,
           updated_at   DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
                                      ON UPDATE CURRENT_TIMESTAMP(3),
           UNIQUE KEY uniq_step (mission_id, step_order)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+      // Idempotent: add `history` column to existing tables (Sprint 1, E.undo).
+      await db.execute(sql`
+        SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'mission_step_progress'
+           AND COLUMN_NAME = 'history'
+      `).then(async (res: any) => {
+        const rows = Array.isArray(res) ? res[0] : res?.rows ?? res;
+        const c = Number((rows as any[])?.[0]?.c ?? 0);
+        if (c === 0) {
+          await db.execute(sql`ALTER TABLE mission_step_progress ADD COLUMN history JSON NULL`);
+        }
+      }).catch(() => { /* already added or alter not allowed; ignore */ });
 
       // Load squad row + steps + agents (localPool — same shape as listByBrand)
       const [sqRows] = await localPool.execute(
@@ -1341,13 +1355,35 @@ ${agentCtx.systemPromptPrefix}`;
 
       // Mission context
       const [mRows] = await db.execute(sql`
-        SELECT title, description, objective, audience FROM missions
+        SELECT title, description, objective, audience, brandId FROM missions
          WHERE id = ${input.missionId} AND userId = ${ctx.user.id} LIMIT 1
       `) as any[];
       const mission = (mRows as any[])?.[0];
       const missionContext = mission
         ? `任務：${mission.title}${mission.description ? ` · ${mission.description}` : ""}`
         : "";
+
+      // Brand context — auto-injected so every step inherits brand voice.
+      // Pulled from the mission's bound brand (mission.create captures
+      // brandId from the picker's brand switcher).
+      let brandContext = "";
+      if (mission?.brandId) {
+        const [bRows] = await db.execute(sql`
+          SELECT name, industry, description, positioningSummary
+            FROM brands WHERE id = ${mission.brandId} LIMIT 1
+        `) as any[];
+        const brand = (bRows as any[])?.[0];
+        if (brand) {
+          const parts: string[] = [];
+          parts.push(`【品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}`);
+          if (brand.positioningSummary) {
+            parts.push(`定位：${String(brand.positioningSummary).slice(0, 600)}`);
+          } else if (brand.description) {
+            parts.push(`描述：${String(brand.description).slice(0, 400)}`);
+          }
+          brandContext = parts.join("\n");
+        }
+      }
 
       const stepName = step.name ?? step.title ?? `Step ${input.stepOrder}`;
       const stepDesc = step.description ?? "";
@@ -1359,6 +1395,7 @@ ${agentCtx.systemPromptPrefix}`;
 你即將執行「${stepName}」這個步驟。先用使用者聽得懂的話，提出 1–3 個最關鍵的問題，幫你完成這一步。
 語氣專業但溫暖，像真正帶過品牌的行銷顧問。用繁體中文。控制在 200 字內。`;
         const userPrompt = `${missionContext}
+${brandContext}
 方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
 此步驟說明：${stepDesc || "(無)"}
 預期產出：${outputType || "(未指定)"}
@@ -1399,12 +1436,13 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
 用繁體中文。重點清楚、可條列。長度依產出類型：${outputType || "適中"}。`;
 
       const userPrompt = `${missionContext}
+${brandContext}
 方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
 此步驟說明：${stepDesc || stepName}
 預期產出類型：${outputType || "(未指定)"}
 ${prevOutputs ? `\n上游步驟成果（請接續使用）：\n${prevOutputs}` : ""}
 ${input.userInput ? `\n使用者本步補充：\n${input.userInput}` : ""}
-請直接交付本步驟的成果。`;
+請直接交付本步驟的成果，務必用品牌的口吻、扣住品牌的定位。`;
 
       const llm = await invokeLLM({
         messages: [
@@ -1414,19 +1452,37 @@ ${input.userInput ? `\n使用者本步補充：\n${input.userInput}` : ""}
       });
       const output = String(llm.choices?.[0]?.message?.content ?? "");
 
+      // Push the previous draft (if any) into history so the user can undo.
+      // history is a JSON array of { output, userInput, ts }.
+      const [existRows] = await db.execute(sql`
+        SELECT agent_output, user_input, history FROM mission_step_progress
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder} LIMIT 1
+      `) as any[];
+      const exist = (existRows as any[])?.[0];
+      let nextHistory: any[] = [];
+      if (exist?.agent_output) {
+        const prevHist = safeJsonParse<any[]>(exist.history, []);
+        nextHistory = [
+          ...prevHist,
+          { output: exist.agent_output, userInput: exist.user_input, ts: new Date().toISOString() },
+        ].slice(-10); // cap at last 10 versions
+      }
+
       await db.execute(sql`
         INSERT INTO mission_step_progress
-          (mission_id, step_order, status, user_input, agent_output, agent_id, agent_name)
+          (mission_id, step_order, status, user_input, agent_output, agent_id, agent_name, history)
         VALUES
           (${input.missionId}, ${input.stepOrder}, 'drafted',
            ${input.userInput || null}, ${output},
-           ${assignedId ?? null}, ${agentName})
+           ${assignedId ?? null}, ${agentName},
+           ${JSON.stringify(nextHistory)})
         ON DUPLICATE KEY UPDATE
           status = 'drafted',
           user_input = VALUES(user_input),
           agent_output = VALUES(agent_output),
           agent_id = VALUES(agent_id),
-          agent_name = VALUES(agent_name)
+          agent_name = VALUES(agent_name),
+          history = VALUES(history)
       `);
 
       return {
@@ -1448,22 +1504,63 @@ ${input.userInput ? `\n使用者本步補充：\n${input.userInput}` : ""}
       if (!db) return [];
       try {
         const [rows] = await db.execute(sql`
-          SELECT step_order, status, user_input, agent_output, agent_name, updated_at
+          SELECT step_order, status, user_input, agent_output, agent_name, history, updated_at
             FROM mission_step_progress
            WHERE mission_id = ${input.missionId}
            ORDER BY step_order ASC
         `) as any[];
-        return (rows as any[]).map((r: any) => ({
-          stepOrder:   Number(r.step_order),
-          status:      String(r.status) as "asking" | "drafted" | "confirmed" | "pending",
-          userInput:   r.user_input ?? "",
-          agentOutput: r.agent_output ?? "",
-          agentName:   r.agent_name ?? "",
-          updatedAt:   r.updated_at,
-        }));
+        return (rows as any[]).map((r: any) => {
+          const hist = safeJsonParse<any[]>(r.history, []);
+          return {
+            stepOrder:   Number(r.step_order),
+            status:      String(r.status) as "asking" | "drafted" | "confirmed" | "pending",
+            userInput:   r.user_input ?? "",
+            agentOutput: r.agent_output ?? "",
+            agentName:   r.agent_name ?? "",
+            historyCount: Array.isArray(hist) ? hist.length : 0,
+            updatedAt:   r.updated_at,
+          };
+        });
       } catch {
         return []; // table may not exist yet
       }
+    }),
+
+  // ── stepUndo ─────────────────────────────────────────────────────────────────
+  // Pop the last history entry back into agent_output. Powers the "↶ 上一版"
+  // button. No-op (return ok:false) if history is empty.
+  stepUndo: protectedProcedure
+    .input(z.object({
+      missionId: z.number(),
+      stepOrder: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      const [rows] = await db.execute(sql`
+        SELECT agent_output, user_input, history FROM mission_step_progress
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder} LIMIT 1
+      `) as any[];
+      const row = (rows as any[])?.[0];
+      if (!row) return { ok: false, reason: "no-row" as const };
+
+      const hist = safeJsonParse<any[]>(row.history, []);
+      if (!Array.isArray(hist) || hist.length === 0) {
+        return { ok: false, reason: "no-history" as const };
+      }
+      const last = hist[hist.length - 1];
+      const remaining = hist.slice(0, -1);
+
+      await db.execute(sql`
+        UPDATE mission_step_progress
+           SET agent_output = ${last.output ?? ""},
+               user_input   = ${last.userInput ?? null},
+               history      = ${JSON.stringify(remaining)},
+               status       = 'drafted'
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+      `);
+      return { ok: true, output: String(last.output ?? "") };
     }),
 
   // ── logUsage ─────────────────────────────────────────────────────────────────
