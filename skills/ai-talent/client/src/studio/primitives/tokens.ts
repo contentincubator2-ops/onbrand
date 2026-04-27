@@ -90,28 +90,30 @@ export function clipForIndex(i: number): string {
 
 export type MosLayer = "L1" | "L2" | "L3" | "L4" | "L5" | "L6";
 
+export type HeroUIColor = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
+
 export interface LayerTokens {
-  /** Solid accent color for hero shapes, chips, glyph stroke. */
+  /** Solid accent color (legacy — for SVG glyphs that can't take HeroUI tokens). */
   bg: string;
-  /** Darker tone for hover, text on tinted bg, footer accents. */
   bgInk: string;
-  /** Tinted background for hairline blocks (≈ 8% saturation of bg). */
   bgTint: string;
-  /** Chinese label for the layer. */
   label: string;
-  /** Eyebrow short label (e.g. "BRAND") — kept short, all-caps. */
   shortLabel: string;
-  /** Layer index 0-5 — used to pick glyph variants. */
   index: number;
+  /** HeroUI semantic color for Chip/Button — the canonical value going forward. */
+  heroColor: HeroUIColor;
 }
 
+// L1–L6 mapped to HeroUI semantic colors so Chip/Button can use stock props
+// instead of inline styles. Legacy bg/bgInk/bgTint are kept ONLY for the SVG
+// MethodologyGlyph which needs raw hex strings.
 export const LAYER_TOKENS: Record<MosLayer, LayerTokens> = {
-  L1: { bg: "#5B3CC8", bgInk: "#3A2487", bgTint: "#EFE9FB", label: "品牌策略",   shortLabel: "BRAND",     index: 0 },
-  L2: { bg: "#C8322E", bgInk: "#8B1F1C", bgTint: "#FBE9E8", label: "產品策略",   shortLabel: "PRODUCT",   index: 1 },
-  L3: { bg: "#E07B0F", bgInk: "#9C5208", bgTint: "#FCEFD9", label: "受眾策略",   shortLabel: "AUDIENCE",  index: 2 },
-  L4: { bg: "#1E7FD4", bgInk: "#14558F", bgTint: "#E2F0FB", label: "通路策略",   shortLabel: "CHANNEL",   index: 3 },
-  L5: { bg: "#1A9B8E", bgInk: "#0E6B62", bgTint: "#DEF1EE", label: "活動策略",   shortLabel: "CAMPAIGN",  index: 4 },
-  L6: { bg: "#525866", bgInk: "#2D323C", bgTint: "#E8EAEE", label: "驗證校準",   shortLabel: "VALIDATE",  index: 5 },
+  L1: { bg: "#5B3CC8", bgInk: "#3A2487", bgTint: "#EFE9FB", label: "品牌策略", shortLabel: "BRAND",    index: 0, heroColor: "primary"   },
+  L2: { bg: "#C8322E", bgInk: "#8B1F1C", bgTint: "#FBE9E8", label: "產品策略", shortLabel: "PRODUCT",  index: 1, heroColor: "danger"    },
+  L3: { bg: "#E07B0F", bgInk: "#9C5208", bgTint: "#FCEFD9", label: "受眾策略", shortLabel: "AUDIENCE", index: 2, heroColor: "warning"   },
+  L4: { bg: "#1E7FD4", bgInk: "#14558F", bgTint: "#E2F0FB", label: "通路策略", shortLabel: "CHANNEL",  index: 3, heroColor: "secondary" },
+  L5: { bg: "#1A9B8E", bgInk: "#0E6B62", bgTint: "#DEF1EE", label: "活動策略", shortLabel: "CAMPAIGN", index: 4, heroColor: "success"   },
+  L6: { bg: "#525866", bgInk: "#2D323C", bgTint: "#E8EAEE", label: "驗證校準", shortLabel: "VALIDATE", index: 5, heroColor: "default"   },
 };
 
 export const LAYER_ORDER: MosLayer[] = ["L1", "L2", "L3", "L4", "L5", "L6"];

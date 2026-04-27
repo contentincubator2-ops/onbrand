@@ -26,7 +26,7 @@ import { SquadEntityCard } from "../components/SquadEntityCard";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
-import { Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
+import { Avatar, Badge, Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Skeleton } from "@heroui/react";
 
 interface MissionRow {
   id: number;
@@ -336,14 +336,8 @@ export default function MissionsHome() {
 
   return (
     <main>
-      {/* ─── Cream hero (SoWork Monocle palette) ──────────────────── */}
-      <section
-        className="relative px-8 pt-16 pb-12 border-b border-mos-hair"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 0%, #FFF7ED 0%, #FAF9F6 45%, #F5F1E8 100%)",
-        }}
-      >
+      {/* ─── Hero (HeroUI content1 background) ──────────────────── */}
+      <section className="relative px-8 pt-16 pb-12 border-b border-divider bg-content1">
         {/* Top-right CTAs */}
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <Button
@@ -366,13 +360,13 @@ export default function MissionsHome() {
 
         <div className="max-w-[1280px] mx-auto">
           <div className="text-center">
-            <div className="inline-block font-display text-[0.7rem] tracking-[0.32em] uppercase text-mos-orange mb-4">
+            <Chip variant="flat" color="warning" size="sm" className="mb-4">
               SoWork · Marketing OS
-            </div>
-            <h1 className="font-display text-[2.4rem] leading-[1.1] tracking-[-0.025em] text-mos-ink">
-              今天，把哪一個<span className="text-mos-orange">方法論</span>變成成果？
+            </Chip>
+            <h1 className="text-4xl leading-tight tracking-tight font-bold">
+              今天，把哪一個<span className="text-warning">方法論</span>變成成果？
             </h1>
-            <p className="mt-3 text-[0.92rem] text-mos-muted max-w-[560px] mx-auto leading-relaxed">
+            <p className="mt-3 text-medium text-default-500 max-w-[560px] mx-auto leading-relaxed">
               100+ 行銷方法論小組，按 6 層策略分工。挑一層、選一個、開工。
             </p>
           </div>
@@ -472,10 +466,8 @@ export default function MissionsHome() {
           />
         )}
         {error && !showCustom && (
-          <Card shadow="none" radius="md" className="mb-6 bg-danger-50 border border-danger-200">
-            <CardBody className="px-4 py-3 text-[0.82rem] text-danger-700">
-              {error}
-            </CardBody>
+          <Card shadow="none" className="mb-6 border border-danger">
+            <CardBody className="text-small text-danger">{error}</CardBody>
           </Card>
         )}
 
@@ -515,20 +507,20 @@ export default function MissionsHome() {
                 ))}
               </div>
             ) : (
-              <div className="mb-12 border border-dashed border-mos-hair bg-white py-10 px-6 text-center text-[0.84rem] text-mos-muted rounded-sm">
-                {searchQ.trim()
-                  ? `沒有找到符合「${searchQ.trim()}」的方法論小組。試試其他關鍵字或清除篩選。`
-                  : "這一層暫時沒有方法論小組。試試其他層級。"}
-              </div>
+              <Card shadow="none" className="mb-12 border-2 border-dashed border-divider">
+                <CardBody className="py-10 text-center text-small text-default-500">
+                  {searchQ.trim()
+                    ? `沒有找到符合「${searchQ.trim()}」的方法論小組。試試其他關鍵字或清除篩選。`
+                    : "這一層暫時沒有方法論小組。試試其他層級。"}
+                </CardBody>
+              </Card>
             )}
           </>
         )}
 
         {/* Recent missions — header + filter chips */}
         <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-          <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">
-            最近的任務
-          </h2>
+          <h2 className="text-xl font-semibold">最近的任務</h2>
           <div className="flex items-center gap-2">
             <FilterChip
               label={ownerFilter === "mine" ? "擁有者" : "全部"}
@@ -576,9 +568,11 @@ export default function MissionsHome() {
             {Array.from({ length: 6 }).map((_, i) => <ThumbSkeleton key={i} />)}
           </div>
         ) : filteredRows.length === 0 ? (
-          <div className="border border-dashed border-mos-hair bg-white py-12 px-10 text-center text-[0.86rem] text-mos-muted rounded-lg">
-            {searchQ ? `沒有找到「${searchQ}」相關的項目。` : "還沒有任務 — 從上方挑一個快速開始。"}
-          </div>
+          <Card shadow="none" className="border-2 border-dashed border-divider">
+            <CardBody className="py-12 text-center text-small text-default-500">
+              {searchQ ? `沒有找到「${searchQ}」相關的項目。` : "還沒有任務 — 從上方挑一個快速開始。"}
+            </CardBody>
+          </Card>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {filteredRows.map((m) => (
@@ -586,11 +580,13 @@ export default function MissionsHome() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col divide-y divide-mos-hair border border-mos-hair rounded-lg overflow-hidden bg-white">
-            {filteredRows.map((m) => (
-              <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
-            ))}
-          </div>
+          <Card shadow="none" className="border border-divider overflow-hidden">
+            <div className="flex flex-col divide-y divide-divider">
+              {filteredRows.map((m) => (
+                <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
+              ))}
+            </div>
+          </Card>
         )}
       </section>
 
@@ -615,7 +611,7 @@ function SectionHeader({
 }: { title: string; cta?: string; onCtaClick?: () => void }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">{title}</h2>
+      <h2 className="text-xl font-semibold">{title}</h2>
       {cta && (
         <Button size="sm" variant="light" onPress={onCtaClick}>
           {cta}
@@ -646,16 +642,8 @@ function LayerNav({
             key={l}
             size="sm"
             variant={active ? "solid" : "bordered"}
-            color={active ? "primary" : "default"}
+            color={isAll ? "default" : tone!.heroColor}
             onPress={() => onSelect(l)}
-            startContent={
-              !isAll ? (
-                <span
-                  className="inline-block w-1.5 h-1.5 rounded-full"
-                  style={{ background: active ? "#fff" : tone!.bg }}
-                />
-              ) : undefined
-            }
             endContent={
               <span className="text-tiny tabular-nums opacity-70">
                 {counts[l] ?? 0}
@@ -686,217 +674,29 @@ function CircleTile({
       onPress={onClick}
       isDisabled={disabled}
       variant="light"
-      radius="lg"
-      disableRipple
-      className={[
-        "group relative flex flex-col items-center gap-2 h-auto",
-        "w-[78px] py-2 px-1 min-w-0",
-        disabled && !busy ? "opacity-40 pointer-events-none" : "",
-      ].join(" ")}
+      isLoading={busy}
+      className="flex flex-col items-center gap-2 h-auto w-[78px] py-2 px-1 min-w-0"
     >
-      <div className="relative">
-        <div
-          className={[
-            "w-[52px] h-[52px] rounded-full flex items-center justify-center",
-            "bg-white border border-mos-hair text-mos-ink",
-            "transition-all duration-200",
-            "group-hover:border-mos-ink group-hover:scale-105 group-hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]",
-            busy ? "ring-2 ring-mos-ink ring-offset-2" : "",
-          ].join(" ")}
-          style={{
-            // hover tint via inline so we can use layer color subtly
-            ["--hoverBg" as any]: tone ? tone.bgTint : "#F4F4F4",
-          }}
-        >
-          <span
-            className="font-display text-[0.95rem] tracking-[-0.02em]"
-            style={{
-              fontFeatureSettings: '"ss01"',
-              letterSpacing: tile.glyph.length > 1 ? "0.02em" : "0",
-            }}
-          >
-            {tile.glyph}
-          </span>
-        </div>
-        {tile.badge && (
-          <Chip
-            size="sm"
-            radius="full"
-            color="primary"
-            className="absolute -top-1 -right-1 h-auto px-1.5 py-[1px] text-[0.5rem] tracking-[0.04em] text-white"
-          >
-            {tile.badge}
-          </Chip>
-        )}
-      </div>
-      <span className="text-[0.7rem] text-mos-ink leading-tight text-center">
+      <Badge
+        content={tile.badge}
+        color="primary"
+        isInvisible={!tile.badge}
+        placement="top-right"
+        size="sm"
+      >
+        <Avatar
+          name={tile.glyph}
+          color={tone?.heroColor ?? "default"}
+          variant="bordered"
+          radius="full"
+          size="md"
+          classNames={{ name: "text-medium" }}
+        />
+      </Badge>
+      <span className="text-tiny leading-tight text-center text-foreground">
         {tile.label}
       </span>
     </Button>
-  );
-}
-
-/* ─────────────────────────── Featured squad tile (DEPRECATED) ─────────
- * Replaced by SquadEntityCard. Kept commented-out below in case of revert.
- * ──────────────────────────────────────────────────────────────────── */
-// @ts-ignore - dead code, kept for reference
-function _UnusedFeaturedSquadTile({
-  squad, busy, disabled, onClick, onPreview,
-}: {
-  squad: any;
-  busy: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  onPreview: () => void;
-}) {
-  const { lang } = useLang();
-  const lk = resolveLayer(squad.strategyLayer);
-  const tone = LAYER_TOKENS[lk];
-
-  // Block 1: 方法論 — graceful fallback chain (no "尚未設定")
-  //   1. methodology.author (best — explicit author from JSON)
-  //   2. format methodology slug as Title Case ("obviously-awesome" → "Obviously Awesome")
-  //   3. lead 名稱 as last resort
-  const formatSlug = (s: string) =>
-    s.replace(/[-_]+/g, " ")
-     .split(" ")
-     .filter(Boolean)
-     .map((w) => /^[a-z]/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w)
-     .join(" ");
-  const methodologyText = (() => {
-    if (squad.methodology?.author) {
-      const yr = squad.methodology?.year ? ` · ${squad.methodology.year}` : "";
-      return `${squad.methodology.author}${yr}`;
-    }
-    const summary = squad.methodology?.summary;
-    if (typeof summary === "string" && summary.trim()) {
-      return formatSlug(summary.trim());
-    }
-    if (squad.lead?.name) {
-      return lang === "en" ? `Lead · ${squad.lead.name}` : `領隊 · ${squad.lead.name}`;
-    }
-    return null;
-  })();
-
-  // Block 2: 描述 — locale-aware DB content + heuristic fallback
-  //   1. description (could be plain string or JSON locale-map)
-  //   2. if zh-TW UI but description looks English → fall back to derived summary
-  //   3. derived: "{N} 個工作步驟、{M} 位成員"
-  const stepCount =
-    Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
-  const memberCount =
-    Array.isArray(squad.members) ? squad.members.length : 0;
-  const descriptionText = (() => {
-    const localized = safeLocalizedText(squad.description, lang);
-    if (localized) return localized;
-    const parts: string[] = [];
-    if (lang === "en") {
-      if (stepCount) parts.push(`${stepCount} workflow steps`);
-      if (memberCount) parts.push(`${memberCount} members`);
-    } else {
-      if (stepCount) parts.push(`${stepCount} 個工作步驟`);
-      if (memberCount) parts.push(`${memberCount} 位成員`);
-    }
-    return parts.length ? parts.join(lang === "en" ? " · " : "、") : null;
-  })();
-
-  // Localized squad name (DB usually English; future may store JSON map)
-  const nameStr =
-    pickLocaleText(squad.name, lang) ||
-    String(squad.slug ?? "?");
-  const initial = nameStr.charAt(0).toUpperCase();
-
-  return (
-    <div className="w-[300px] shrink-0">
-      <div
-        onClick={disabled ? undefined : onClick}
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) onClick(); }}
-        className={[
-          "relative overflow-hidden rounded-lg bg-white cursor-pointer",
-          "border-2 hover:shadow-lg transition-shadow",
-          disabled && !busy ? "opacity-40 pointer-events-none" : "",
-        ].join(" ")}
-        style={{ borderColor: "#1A1A1A" }}
-      >
-        {/* 卡片頂部 */}
-        <div className="p-5 pb-4">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* 實體圖標 */}
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0"
-                style={{ background: tone.bg }}
-              >
-                {initial}
-              </div>
-
-              {/* 實體名稱 + 層級 badge */}
-              <div className="min-w-0">
-                <h3 className="font-semibold text-base leading-tight line-clamp-1 text-mos-ink">
-                  {nameStr}
-                </h3>
-                <span
-                  className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-[0.62rem] font-semibold tracking-[0.06em] text-white"
-                  style={{ background: tone.bg }}
-                >
-                  {lk}・{tone.label}
-                </span>
-              </div>
-            </div>
-
-            {/* 預覽按鈕（v2 原本是刪除位） */}
-            <button
-              onClick={(e) => { e.stopPropagation(); onPreview(); }}
-              disabled={disabled}
-              aria-label="預覽工作流"
-              className="text-gray-400 hover:text-mos-orange p-1 -mr-1 -mt-1 shrink-0 inline-flex items-center justify-center rounded hover:bg-gray-50 transition"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-            </button>
-          </div>
-
-          {/* 內容區塊（v2 風：白底 + 細黑邊） */}
-          <div className="space-y-3">
-            {/* 方法論 */}
-            <div
-              className="p-3 rounded-md bg-white"
-              style={{ border: "1.5px solid #1A1A1A" }}
-            >
-              <div className="text-[0.72rem] font-semibold text-mos-muted mb-1">
-                {lang === "en" ? "Methodology" : "方法論"}
-              </div>
-              <div className="text-sm text-mos-ink line-clamp-1">
-                {methodologyText ?? "—"}
-              </div>
-            </div>
-
-            {/* 描述 */}
-            <div
-              className="p-3 rounded-md bg-white"
-              style={{ border: "1.5px solid #1A1A1A" }}
-            >
-              <div className="text-[0.72rem] font-semibold text-mos-muted mb-1">
-                {lang === "en" ? "Description" : "描述"}
-              </div>
-              <div className="text-sm text-mos-ink line-clamp-3 leading-snug">
-                {descriptionText ?? "—"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {busy && (
-          <div className="absolute inset-0 bg-white/85 flex items-center justify-center pointer-events-none">
-            <span className="text-[0.7rem] tracking-[0.16em] uppercase text-mos-ink">建立中…</span>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -916,21 +716,14 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
     <div className="group relative">
       <Card
         isPressable
+        isHoverable
         onPress={onClick}
-        shadow="none"
-        radius="sm"
-        className="flex flex-col text-left bg-white border border-mos-hair overflow-hidden data-[hover=true]:border-mos-ink data-[hover=true]:-translate-y-0.5 transition-all duration-200 w-full"
+        shadow="sm"
+        className="flex flex-col text-left overflow-hidden w-full"
       >
-        {/* Layer color band (top edge) */}
-        {isLayerKnown && (
-          <div className="h-1 w-full" style={{ background: tone.bg }} />
-        )}
         <div
-          className="relative w-full overflow-hidden border-b border-mos-hair"
-          style={{
-            aspectRatio: "5 / 4",
-            background: `linear-gradient(135deg, ${tone.bgTint} 0%, #FAF9F6 100%)`,
-          }}
+          className="relative w-full overflow-hidden bg-default-100"
+          style={{ aspectRatio: "5 / 4" }}
         >
           <div className="absolute inset-0 flex items-center justify-center">
             <MethodologyGlyph
@@ -940,41 +733,42 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
             />
           </div>
           {isLayerKnown && (
-            <div
-              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.6rem] tracking-[0.06em] font-display text-white rounded-sm"
-              style={{ background: tone.bg }}
+            <Chip
+              size="sm"
+              color={tone.heroColor}
+              variant="solid"
+              className="absolute top-2 left-2"
             >
               {lk}・{tone.label}
-            </div>
+            </Chip>
           )}
           {stepCount > 0 && (
-            <div className="absolute top-2 right-2 px-1.5 py-[2px] text-[0.56rem] tabular-nums tracking-[0.04em] bg-white/85 text-mos-ink border border-mos-hair rounded-sm">
+            <Chip size="sm" variant="flat" className="absolute top-2 right-2">
               {stepCount} 步
-            </div>
+            </Chip>
           )}
         </div>
-        <div className="p-3 bg-mos-cream">
-          <div className="text-[0.84rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
+        <CardBody className="p-3 gap-1">
+          <p className="text-small font-medium leading-snug line-clamp-2 min-h-[2.4em]">
             {mission.title}
-          </div>
+          </p>
           {mission.squadName && (
-            <div className="mt-1 text-[0.64rem] text-mos-orange truncate tracking-[0.02em]">
+            <p className="text-tiny text-warning truncate">
               {mission.squadName}
-            </div>
+            </p>
           )}
-          <div className="mt-1.5 flex items-center gap-1.5 text-[0.64rem] text-mos-muted">
+          <div className="flex items-center gap-1.5 text-tiny text-default-500">
             {wsBadge && (
-              <span
-                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-white text-[0.5rem] font-bold shrink-0"
-                style={{ background: wsBadge.color }}
-                aria-label={ws}
-              >
-                {wsBadge.glyph}
-              </span>
+              <Avatar
+                name={wsBadge.glyph}
+                size="sm"
+                className="w-4 h-4 text-tiny shrink-0"
+                style={{ background: wsBadge.color, color: "white" }}
+              />
             )}
             <span className="truncate">{updatedTxt}</span>
           </div>
-        </div>
+        </CardBody>
       </Card>
       {/* Hover action — bookmark + ⋯ menu (Canva pattern) */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
@@ -1026,35 +820,27 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
       onPress={onClick}
       shadow="none"
       radius="none"
-      className="flex flex-row items-center gap-4 px-4 py-3 bg-transparent data-[hover=true]:bg-mos-ink/[0.02] transition text-left w-full"
+      className="flex flex-row items-center gap-4 px-4 py-3 bg-transparent data-[hover=true]:bg-default-100 transition text-left w-full"
     >
-      <div
-        className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)` }}
-      >
+      <div className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-default-100">
         <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={36} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[0.88rem] text-mos-ink font-medium truncate">{mission.title}</div>
-        <div className="mt-0.5 flex items-center gap-2 text-[0.7rem] text-mos-muted">
-          <span className="font-display tracking-[0.12em] uppercase">{lk}</span>
-          {wsBadge && (
-            <>
-              <span className="text-mos-soft">·</span>
-              <span className="capitalize">{ws}</span>
-            </>
-          )}
-          <span className="text-mos-soft">·</span>
+        <p className="text-small font-medium truncate">{mission.title}</p>
+        <div className="mt-0.5 flex items-center gap-2 text-tiny text-default-500">
+          <Chip size="sm" color={tone.heroColor} variant="flat">{lk}</Chip>
+          {wsBadge && <span className="capitalize">{ws}</span>}
+          <span>·</span>
           <span>{formatRelative(mission.updatedAt)}</span>
         </div>
       </div>
       {wsBadge && (
-        <span
-          className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-[0.6rem] font-bold"
-          style={{ background: wsBadge.color }}
-        >
-          {wsBadge.glyph}
-        </span>
+        <Avatar
+          name={wsBadge.glyph}
+          size="sm"
+          className="shrink-0 w-5 h-5 text-tiny"
+          style={{ background: wsBadge.color, color: "white" }}
+        />
       )}
     </Card>
   );
@@ -1148,13 +934,13 @@ function formatRelative(iso?: string | null): string {
 
 function ThumbSkeleton() {
   return (
-    <div className="bg-white border border-mos-hair rounded-xl overflow-hidden animate-pulse">
-      <div className="w-full bg-mos-hair/40" style={{ aspectRatio: "4 / 3" }} />
-      <div className="p-3 space-y-1.5">
-        <div className="h-3 w-4/5 bg-mos-hair/50 rounded" />
-        <div className="h-2 w-2/5 bg-mos-hair/40 rounded" />
-      </div>
-    </div>
+    <Card shadow="none" className="overflow-hidden">
+      <Skeleton className="w-full" style={{ aspectRatio: "4 / 3" }} />
+      <CardBody className="p-3 gap-1.5">
+        <Skeleton className="h-3 w-4/5 rounded" />
+        <Skeleton className="h-2 w-2/5 rounded" />
+      </CardBody>
+    </Card>
   );
 }
 

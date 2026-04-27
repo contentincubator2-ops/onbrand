@@ -22,7 +22,7 @@ import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import BrandSwitcher from "./BrandSwitcher";
-import { Button, Tooltip } from "@heroui/react";
+import { Avatar, Button, Tooltip } from "@heroui/react";
 
 export default function ShellLayout() {
   const navigate = useNavigate();
@@ -65,7 +65,7 @@ export default function ShellLayout() {
   const sidebarWidth = collapsed ? 64 : 200;
 
   return (
-    <div className="min-h-screen bg-mos-paper">
+    <div className="min-h-screen bg-background">
       {/* ─── Left sidebar (fixed) ─────────────────────────────────── */}
       <Sidebar
         width={sidebarWidth}
@@ -77,7 +77,7 @@ export default function ShellLayout() {
 
       {/* ─── Right column (top bar + outlet) ──────────────────────── */}
       <div style={{ paddingLeft: sidebarWidth }} className="transition-[padding] duration-200">
-        <header className="border-b border-mos-hair bg-white sticky top-0 z-30">
+        <header className="border-b border-divider bg-content1 sticky top-0 z-30">
           <div className="px-6 h-14 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Tooltip content="切換側邊欄">
@@ -240,14 +240,12 @@ function Sidebar({
 }) {
   return (
     <aside
-      className="fixed left-0 top-0 bottom-0 z-40 bg-white border-r border-mos-hair flex flex-col transition-[width] duration-200"
+      className="fixed left-0 top-0 bottom-0 z-40 bg-content1 border-r border-divider flex flex-col transition-[width] duration-200"
       style={{ width }}
     >
       {/* Top: logo monogram + collapse toggle */}
-      <div className="h-14 px-3 flex items-center justify-between border-b border-mos-hair shrink-0">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-mos-ink text-white font-display text-[0.84rem] tracking-[0.04em]">
-          SO
-        </div>
+      <div className="h-14 px-3 flex items-center justify-between border-b border-divider shrink-0">
+        <Avatar name="SO" size="sm" radius="md" color="primary" classNames={{ name: "font-bold" }} />
         {!collapsed && (
           <Tooltip content="收合側邊欄" placement="right">
             <Button
@@ -343,7 +341,7 @@ function Sidebar({
 
       {/* Bottom: collapse toggle when collapsed */}
       {collapsed && (
-        <div className="p-2 border-t border-mos-hair shrink-0">
+        <div className="p-2 border-t border-divider shrink-0">
           <Tooltip content="展開側邊欄" placement="right">
             <Button
               isIconOnly
