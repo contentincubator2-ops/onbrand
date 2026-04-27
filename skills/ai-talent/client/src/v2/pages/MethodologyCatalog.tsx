@@ -22,9 +22,9 @@ import CreateMethodologyModal from "../components/methodology/CreateMethodologyM
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
-  Button, Card, CardBody, Chip,
+  Button, Card, CardBody, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Input, Skeleton, Tooltip,
+  Input, Modal, ModalBody, ModalContent, Skeleton, Tooltip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -32,6 +32,7 @@ import {
   faPlus, faWandMagicSparkles, faCrown, faUsers, faRobot, faCubes, faCircleInfo,
   faBullseye, faMessage, faChartLine, faPalette, faRocket, faBriefcase,
   faVideo, faShareNodes, faStar, faArrowRight, faEllipsis, faPlay,
+  faXmark, faShare, faFlag,
 } from "@fortawesome/free-solid-svg-icons";
 
 type Kind = "squad" | "agent" | "skill";
@@ -89,6 +90,7 @@ export default function MethodologyCatalog() {
   const [searchQ, setSearchQ] = useState("");
   const [layerFilter, setLayerFilter] = useState<string>("ALL");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
 
   const entityQuery = (trpc as any).entity?.listForHome?.useQuery
     ? (trpc as any).entity.listForHome.useQuery(
@@ -139,7 +141,10 @@ export default function MethodologyCatalog() {
 
   const layerLabel = LAYER_OPTIONS.find((o) => o.value === layerFilter)?.label ?? "全部層級";
 
-  const onPreview = (slug: string) => navigate(`/templates/${slug}`);
+  // Click a card → open Canva-style detail modal (instead of navigate).
+  // The entity object from list query has all the basic fields we need;
+  // squad steps come from a follow-up fetch inside the modal if applicable.
+  const onPreview = (entity: any) => setSelectedEntity(entity);
 
   const applyExploreTile = (t: ExploreTile) => {
     if (t.filter.layer) setLayerFilter(t.filter.layer);
@@ -230,7 +235,7 @@ export default function MethodologyCatalog() {
       >
         {curatedSquads.map((e: any) => (
           <div key={`sq-${e.id}`} className="shrink-0 w-[280px]">
-            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} size="sm" aspect="5/4" />
+            <LandscapeCard entity={e} onPreview={() => onPreview(e)} size="sm" aspect="5/4" />
           </div>
         ))}
       </ScrollSection>
@@ -245,7 +250,7 @@ export default function MethodologyCatalog() {
       >
         {topAgents.map((e: any) => (
           <div key={`ag-${e.id}`} className="shrink-0 w-[200px]">
-            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} size="sm" aspect="3/4" />
+            <LandscapeCard entity={e} onPreview={() => onPreview(e)} size="sm" aspect="3/4" />
           </div>
         ))}
       </ScrollSection>
@@ -260,7 +265,7 @@ export default function MethodologyCatalog() {
       >
         {topSkills.map((e: any) => (
           <div key={`sk-${e.id}`} className="shrink-0 w-[260px]">
-            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} size="sm" aspect="16/9" />
+            <LandscapeCard entity={e} onPreview={() => onPreview(e)} size="sm" aspect="16/9" />
           </div>
         ))}
       </ScrollSection>
@@ -273,7 +278,7 @@ export default function MethodologyCatalog() {
       >
         {recentInspiration.map((e: any) => (
           <div key={`in-${e.kind}-${e.id}`} className="shrink-0 w-[440px]">
-            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} />
+            <LandscapeCard entity={e} onPreview={() => onPreview(e)} />
           </div>
         ))}
       </ScrollSection>
@@ -359,7 +364,7 @@ export default function MethodologyCatalog() {
         {!entityQuery.isLoading && gridFiltered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {gridFiltered.map((e: any) => (
-              <LandscapeCard key={`${e.kind}-${e.id ?? e.slug}`} entity={e} onPreview={() => onPreview(e.slug)} />
+              <LandscapeCard key={`${e.kind}-${e.id ?? e.slug}`} entity={e} onPreview={() => onPreview(e)} />
             ))}
           </div>
         )}
@@ -370,6 +375,21 @@ export default function MethodologyCatalog() {
         initialSource="recommended"
         onClose={() => setDrawerOpen(false)}
         onCreated={(slug) => { setDrawerOpen(false); navigate(`/templates/${slug}`); }}
+      />
+
+      <EntityDetailModal
+        entity={selectedEntity}
+        relatedEntities={
+          selectedEntity
+            ? allEntities
+                .filter((e) => e.kind === selectedEntity.kind && e.id !== selectedEntity.id)
+                .filter((e) => e.strategyLayer === selectedEntity.strategyLayer)
+                .slice(0, 6)
+            : []
+        }
+        onClose={() => setSelectedEntity(null)}
+        onLaunch={(slug) => { setSelectedEntity(null); navigate(`/templates/${slug}`); }}
+        onSelectRelated={(e) => setSelectedEntity(e)}
       />
     </main>
   );
@@ -443,7 +463,7 @@ function LandscapeCard({
   entity, onPreview, aspect = "16/9", size = "md",
 }: {
   entity: any;
-  onPreview: () => void;
+  onPreview: (e: any) => void;
   aspect?: string;
   size?: "sm" | "md" | "lg";
 }) {
@@ -461,7 +481,7 @@ function LandscapeCard({
     <Card
       isPressable
       isHoverable
-      onPress={onPreview}
+      onPress={() => onPreview(entity)}
       shadow="sm"
       radius="lg"
       className="w-full h-full overflow-hidden group"
@@ -504,7 +524,7 @@ function LandscapeCard({
             size={size === "sm" ? "sm" : "md"}
             className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto shadow-lg"
             startContent={<FontAwesomeIcon icon={faPlay} />}
-            onPress={(ev: any) => { ev?.stopPropagation?.(); onPreview(); }}
+            onPress={(ev: any) => { ev?.stopPropagation?.(); onPreview(entity); }}
           >
             {ctaLabel}
           </Button>
@@ -548,6 +568,202 @@ function LandscapeCard({
         )}
       </CardBody>
     </Card>
+  );
+}
+
+/* ─────────────────────────── EntityDetailModal (Canva-style) ─────────
+ * Two-column modal:
+ *   Left  (3/5):  large preview area with glyph + chip overlays,
+ *                 then "更多類似的方法論" related-entity strip
+ *   Right (2/5):  layer chip + kind chip, title, subtitle, description,
+ *                 recommended_models stats (from classifier),
+ *                 primary CTA + ⭐ + ⋯
+ *
+ * Pure HeroUI: Modal + ModalContent + ModalBody. The modal opens over
+ * the catalog (catalog stays mounted, no route change), matching Canva.
+ * ─────────────────────────────────────────────────────────────────── */
+
+function EntityDetailModal({
+  entity, relatedEntities, onClose, onLaunch, onSelectRelated,
+}: {
+  entity: any | null;
+  relatedEntities: any[];
+  onClose: () => void;
+  onLaunch: (slug: string) => void;
+  onSelectRelated: (e: any) => void;
+}) {
+  const open = !!entity;
+  const layerKey = (entity?.strategyLayer ?? "L1") as MosLayer;
+  const tone = entity ? LAYER_TOKENS[layerKey] : null;
+  const heroColor = tone?.heroColor ?? "default";
+  const coverImageUrl: string | undefined = entity?.coverImageUrl ?? entity?.heroImageUrl;
+  const kindLabel = entity?.kind === "squad" ? "方法論小組"
+                  : entity?.kind === "agent" ? "Agent"
+                  : entity?.kind === "skill" ? "技能" : "";
+  const ctaLabel  = entity?.kind === "squad" ? "啟動此小組"
+                  : entity?.kind === "agent" ? "套用此 Agent"
+                  : entity?.kind === "skill" ? "套用此技能" : "使用此範本";
+  const recommendedModels: string[] = (() => {
+    const stats = entity?.stats;
+    if (Array.isArray(stats)) return stats.map((s: any) => s.label).filter(Boolean);
+    return [];
+  })();
+
+  return (
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      size="5xl"
+      scrollBehavior="inside"
+      hideCloseButton={false}
+      classNames={{
+        base: "max-w-[1100px] max-h-[88vh]",
+        backdrop: "bg-foreground/40 backdrop-blur-sm",
+      }}
+    >
+      <ModalContent>
+        {entity && (
+          <ModalBody className="p-0 grid grid-cols-1 md:grid-cols-12 gap-0">
+            {/* ─── Left: large preview + related ──────────────────────── */}
+            <div className="md:col-span-7 p-6 md:p-8 border-b md:border-b-0 md:border-r border-divider overflow-y-auto">
+              {/* Big visual */}
+              <div
+                className={`relative w-full bg-${heroColor}-100 rounded-large overflow-hidden`}
+                style={{ aspectRatio: "4/3" }}
+              >
+                {coverImageUrl ? (
+                  <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <MethodologyGlyph seed={entity.slug ?? entity.id} layer={layerKey} size={240} />
+                  </div>
+                )}
+                <Chip size="sm" color={heroColor} variant="solid" className="absolute top-3 left-3 shadow-sm">
+                  {layerKey}・{tone?.label}
+                </Chip>
+                <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md">
+                  {kindLabel}
+                </Chip>
+              </div>
+
+              {/* Related (更多類似的方法論) */}
+              {relatedEntities.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-medium font-semibold mb-3">
+                    更多類似的{kindLabel}
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {relatedEntities.map((r) => {
+                      const rTone = LAYER_TOKENS[(r.strategyLayer ?? "L1") as MosLayer];
+                      const rColor = rTone?.heroColor ?? "default";
+                      return (
+                        <Card
+                          key={`rel-${r.kind}-${r.id}`}
+                          isPressable
+                          isHoverable
+                          onPress={() => onSelectRelated(r)}
+                          shadow="none"
+                          radius="md"
+                          className="overflow-hidden border border-divider"
+                        >
+                          <div className={`relative w-full bg-${rColor}-100`} style={{ aspectRatio: "4/3" }}>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <MethodologyGlyph seed={r.slug ?? r.id} layer={(r.strategyLayer ?? "L1") as MosLayer} size={64} />
+                            </div>
+                          </div>
+                          <CardBody className="p-2">
+                            <p className="text-tiny font-medium leading-tight line-clamp-2">{r.name}</p>
+                          </CardBody>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ─── Right: title + meta + CTA ───────────────────────────── */}
+            <div className="md:col-span-5 p-6 md:p-8 flex flex-col gap-4 overflow-y-auto">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Chip size="sm" color={heroColor} variant="flat">
+                  {layerKey}・{tone?.label}
+                </Chip>
+                <Chip size="sm" variant="flat">{kindLabel}</Chip>
+                {entity.kind === "squad" && (
+                  <Chip size="sm" color="warning" variant="flat" startContent={<FontAwesomeIcon icon={faCrown} className="ml-1 text-tiny" />}>
+                    精選
+                  </Chip>
+                )}
+              </div>
+
+              <div>
+                <h2 className="text-3xl font-semibold tracking-tight leading-tight">{entity.name}</h2>
+                {entity.subtitle && (
+                  <p className="mt-2 text-small text-default-500">{entity.subtitle}</p>
+                )}
+              </div>
+
+              {entity.description && (
+                <p className="text-small text-foreground leading-relaxed whitespace-pre-wrap">
+                  {entity.description}
+                </p>
+              )}
+
+              <Divider />
+
+              {/* Recommended models from classifier */}
+              {recommendedModels.length > 0 && (
+                <div>
+                  <p className="text-tiny font-semibold uppercase tracking-wider text-default-500 mb-2">
+                    建議搭配的 AI 模型
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {recommendedModels.map((m, i) => (
+                      <Chip key={i} size="sm" variant="flat" color={i === 0 ? "primary" : "default"} className="capitalize">
+                        {i === 0 && "★ "}{m}
+                      </Chip>
+                    ))}
+                  </div>
+                  <p className="text-tiny text-default-400 mt-1.5">
+                    執行時可隨意切換 model；★ 為 LLM 評分後最匹配的選擇
+                  </p>
+                </div>
+              )}
+
+              {/* Footer CTA row */}
+              <div className="mt-auto flex items-center gap-2 pt-2">
+                <Button
+                  color="primary"
+                  radius="full"
+                  size="lg"
+                  fullWidth
+                  startContent={<FontAwesomeIcon icon={faRocket} />}
+                  onPress={() => onLaunch(entity.slug)}
+                >
+                  {ctaLabel}
+                </Button>
+                <Tooltip content="收藏">
+                  <Button isIconOnly radius="full" variant="bordered" size="lg" aria-label="收藏">
+                    <FontAwesomeIcon icon={faStar} />
+                  </Button>
+                </Tooltip>
+                <Dropdown placement="top-end">
+                  <DropdownTrigger>
+                    <Button isIconOnly radius="full" variant="bordered" size="lg" aria-label="更多">
+                      <FontAwesomeIcon icon={faEllipsis} />
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownMenu aria-label="更多操作">
+                    <DropdownItem key="share" startContent={<FontAwesomeIcon icon={faShare} />}>分享</DropdownItem>
+                    <DropdownItem key="report" startContent={<FontAwesomeIcon icon={faFlag} />} className="text-danger" color="danger">檢舉</DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              </div>
+            </div>
+          </ModalBody>
+        )}
+      </ModalContent>
+    </Modal>
   );
 }
 
