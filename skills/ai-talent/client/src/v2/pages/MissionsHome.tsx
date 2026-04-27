@@ -124,9 +124,15 @@ export default function MissionsHome() {
     { enabled: !allQuery && !!brandId, refetchOnWindowFocus: false }
   );
 
-  // Featured methodologies — fetched via squadTemplate.listByBrand and
-  // truncated. Falls back gracefully if no brandId.
-  const squadsQuery = (trpc.squad as any).listByBrand?.useQuery
+  // Featured entities (squad + agent + skill) via the unified endpoint.
+  // Falls back to the legacy squad endpoint if entity router isn't deployed yet.
+  const entityQuery = (trpc as any).entity?.listForHome?.useQuery
+    ? (trpc as any).entity.listForHome.useQuery(
+        { brandId: brandId ?? null },
+        { refetchOnWindowFocus: false }
+      )
+    : null;
+  const squadsQuery = !entityQuery && (trpc.squad as any).listByBrand?.useQuery
     ? (trpc.squad as any).listByBrand.useQuery(
         { brandId: brandId ?? 0 },
         { enabled: !!brandId, refetchOnWindowFocus: false }
@@ -142,23 +148,41 @@ export default function MissionsHome() {
 
   const isLoading = allQuery?.isLoading ?? fallbackQuery.isLoading;
 
-  // ── Layer filter for featured strip
+  // ── Filters
   const [selectedLayer, setSelectedLayer] = useState<MosLayer | "ALL">("ALL");
+  // 類型 (entity kind): squad / agent / skill — drives the dropdown
+  const [kindFilter, setKindFilter] = useState<"all" | "squad" | "agent" | "skill">("all");
 
-  const allSquads = useMemo(
-    () => ((squadsQuery.data as any[]) ?? []).filter((s) => Array.isArray(s.steps) && s.steps.length > 0),
-    [squadsQuery.data],
-  );
+  // Unified entity list (preferred path) — already comes pre-shaped from server.
+  // Legacy squad list (fallback) — coerce to a near-compatible shape.
+  const allEntities = useMemo<any[]>(() => {
+    if (entityQuery?.data) return entityQuery.data as any[];
+    const legacy = (squadsQuery.data as any[]) ?? [];
+    return legacy
+      .filter((s) => Array.isArray(s.steps) && s.steps.length > 0)
+      .map((s) => ({ ...s, kind: "squad" }));
+  }, [entityQuery?.data, squadsQuery.data]);
 
-  // Count squads per layer (for nav badges)
+  // Counts per layer (drives LayerNav badges)
   const layerCounts = useMemo(() => {
-    const c: Record<string, number> = { ALL: allSquads.length, L1: 0, L2: 0, L3: 0, L4: 0, L5: 0, L6: 0 };
-    for (const s of allSquads) {
+    const filtered = kindFilter === "all" ? allEntities : allEntities.filter((s) => s.kind === kindFilter);
+    const c: Record<string, number> = { ALL: filtered.length, L1: 0, L2: 0, L3: 0, L4: 0, L5: 0, L6: 0 };
+    for (const s of filtered) {
       const k = (s.strategyLayer ?? "").toString().slice(0, 2);
       if (k in c) c[k]++;
     }
     return c;
-  }, [allSquads]);
+  }, [allEntities, kindFilter]);
+
+  // Counts per kind (drives 類型 dropdown labels)
+  const kindCounts = useMemo(() => {
+    const c = { squad: 0, agent: 0, skill: 0 } as Record<string, number>;
+    for (const e of allEntities) {
+      const k = String(e.kind ?? "squad");
+      if (k in c) c[k]++;
+    }
+    return c;
+  }, [allEntities]);
 
   const [searchQ, setSearchQ] = useState("");
 
@@ -219,7 +243,8 @@ export default function MissionsHome() {
       const terms = expandTerms(q);
       return terms.some((t) => haystack.includes(t));
     };
-    const filtered = allSquads
+    const filtered = allEntities
+      .filter((s) => kindFilter === "all" ? true : s.kind === kindFilter)
       .filter((s) =>
         selectedLayer === "ALL"
           ? true
@@ -233,9 +258,8 @@ export default function MissionsHome() {
         return layerOrder.indexOf(la) - layerOrder.indexOf(lb);
       })
       .slice(0, q ? 24 : (selectedLayer === "ALL" ? 12 : 24));
-  }, [allSquads, selectedLayer, searchQ]);
+  }, [allEntities, kindFilter, selectedLayer, searchQ]);
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sortDesc, setSortDesc] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
@@ -250,23 +274,27 @@ export default function MissionsHome() {
         (m.workspace ?? "").toLowerCase().includes(q)
       );
     }
-    if (typeFilter !== "all") {
-      r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
-    }
     r = [...r].sort((a, b) => {
       const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return sortDesc ? tb - ta : ta - tb;
     });
     return r;
-  }, [rows, searchQ, typeFilter, sortDesc]);
+  }, [rows, searchQ, sortDesc]);
 
-  // Build the type filter dropdown options from actual data
-  const typeOptions = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((m) => { if (m.workspace) set.add(m.workspace.toLowerCase()); });
-    return ["all", ...Array.from(set).sort()];
-  }, [rows]);
+  // Type (kind) dropdown options
+  const kindOptions = useMemo(() => ([
+    { value: "all",   label: `任何類型 (${allEntities.length})` },
+    { value: "squad", label: `小組 (${kindCounts.squad ?? 0})` },
+    { value: "agent", label: `Agent (${kindCounts.agent ?? 0})` },
+    { value: "skill", label: `純技能 (${kindCounts.skill ?? 0})` },
+  ]), [allEntities.length, kindCounts]);
+  const kindLabelMap: Record<string, string> = {
+    all:   "類型",
+    squad: "小組",
+    agent: "Agent",
+    skill: "純技能",
+  };
 
   const goToMission = (m: MissionRow) => {
     const ws = m.workspace || "_";
@@ -393,12 +421,9 @@ export default function MissionsHome() {
             {/* Filter pills under search bar — Canva style */}
             <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
               <FilterChip
-                label={typeFilter === "all" ? "類型" : typeFilter}
-                options={typeOptions.map((t) => ({
-                  value: t,
-                  label: t === "all" ? "任何類型" : t,
-                }))}
-                onSelect={(v) => setTypeFilter(v)}
+                label={kindLabelMap[kindFilter] ?? "類型"}
+                options={kindOptions}
+                onSelect={(v) => setKindFilter(v as typeof kindFilter)}
               />
               <FilterChip
                 label={
@@ -472,7 +497,7 @@ export default function MissionsHome() {
         )}
 
         {/* Featured methodologies — layer nav + horizontal scroll */}
-        {allSquads.length > 0 && (
+        {allEntities.length > 0 && (
           <>
             <SectionHeader
               title={
@@ -527,12 +552,9 @@ export default function MissionsHome() {
               onClick={() => setOwnerFilter((v) => (v === "mine" ? "all" : "mine"))}
             />
             <FilterChip
-              label={typeFilter === "all" ? "任何類型" : typeFilter}
-              options={typeOptions.map((t) => ({
-                value: t,
-                label: t === "all" ? "任何類型" : t,
-              }))}
-              onSelect={(v) => setTypeFilter(v)}
+              label={kindLabelMap[kindFilter] ?? "類型"}
+              options={kindOptions}
+              onSelect={(v) => setKindFilter(v as typeof kindFilter)}
             />
             <IconButton
               title={sortDesc ? "新→舊" : "舊→新"}
