@@ -311,32 +311,33 @@ function Sidebar({
         })}
 
         {/* Show-more */}
-        <Button
-          variant="light"
-          fullWidth
-          aria-label="顯示更多"
-          className={collapsed ? "mt-1 flex-col gap-1 h-auto py-2" : "mt-1 justify-start"}
-          startContent={
-            !collapsed ? (
-              <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="currentColor">
-                <circle cx="5" cy="12" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="19" cy="12" r="1.6" />
-              </svg>
-            ) : undefined
-          }
-        >
-          {collapsed ? (
-            <>
+        {collapsed ? (
+          <Tooltip content="顯示更多" placement="right">
+            <Button isIconOnly variant="light" aria-label="顯示更多" className="mt-1">
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
                 <circle cx="5" cy="12" r="1.6" />
                 <circle cx="12" cy="12" r="1.6" />
                 <circle cx="19" cy="12" r="1.6" />
               </svg>
-              <span className="text-tiny">更多</span>
-            </>
-          ) : "顯示更多"}
-        </Button>
+            </Button>
+          </Tooltip>
+        ) : (
+          <Button
+            variant="light"
+            fullWidth
+            aria-label="顯示更多"
+            className="mt-1 justify-start"
+            startContent={
+              <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="currentColor">
+                <circle cx="5" cy="12" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="19" cy="12" r="1.6" />
+              </svg>
+            }
+          >
+            顯示更多
+          </Button>
+        )}
       </nav>
 
       {/* Bottom: collapse toggle when collapsed */}
@@ -370,30 +371,32 @@ function SidebarNavLink({
   collapsed: boolean;
   onClick: () => void;
 }) {
-  const inner = (
+  const inner = collapsed ? (
+    <Button
+      isIconOnly
+      onPress={onClick}
+      variant={active ? "flat" : "light"}
+      color={active ? "primary" : "default"}
+      aria-label={item.label}
+      className="mt-1 [&>svg]:w-5 [&>svg]:h-5"
+    >
+      {item.icon}
+    </Button>
+  ) : (
     <Button
       onPress={onClick}
       variant={active ? "flat" : "light"}
       color={active ? "primary" : "default"}
       fullWidth
       aria-label={item.label}
-      className={collapsed ? "mt-1 flex-col gap-1 h-auto py-2" : "mt-1 justify-start"}
+      className="mt-1 justify-start"
       startContent={
-        !collapsed ? (
-          <span className="shrink-0 [&>svg]:w-5 [&>svg]:h-5">
-            {item.icon}
-          </span>
-        ) : undefined
+        <span className="shrink-0 [&>svg]:w-5 [&>svg]:h-5">
+          {item.icon}
+        </span>
       }
     >
-      {collapsed ? (
-        <>
-          <span className="[&>svg]:w-5 [&>svg]:h-5">
-            {item.icon}
-          </span>
-          <span className="text-tiny">{item.label}</span>
-        </>
-      ) : item.label}
+      {item.label}
     </Button>
   );
 
