@@ -651,108 +651,90 @@ function FeaturedSquadTile({
   const lk = ((squad.strategyLayer ?? "L1").toString().slice(0, 2)) as MosLayer;
   const tone = LAYER_TOKENS[lk in LAYER_TOKENS ? lk : "L1"];
   const author = squad.methodology?.author ?? null;
-  const year = squad.methodology?.year ?? null;
-  const authorLine = author
-    ? `${author}${year ? " · " + year : ""}`
-    : null;
-  const stepCount =
-    Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
-  const memberCount =
-    Array.isArray(squad.members) ? squad.members.length : 0;
-  const leadName = squad.lead?.name ?? null;
+  const description = squad.description ?? null;
   const nameStr = (squad.name ?? squad.slug ?? "?").toString();
   const initial = nameStr.charAt(0).toUpperCase();
 
   return (
-    <div className="w-[280px] shrink-0 group">
-      <button
-        onClick={onClick}
-        disabled={disabled}
+    <div className="w-[300px] shrink-0">
+      <div
+        onClick={disabled ? undefined : onClick}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) onClick(); }}
         className={[
-          "relative w-full bg-mos-cream border-2 border-mos-ink rounded-sm overflow-hidden",
-          "transition-all duration-200 text-left",
-          "hover:shadow-lift hover:-translate-y-0.5",
+          "relative overflow-hidden border-2 hover:shadow-lg transition-shadow rounded-lg bg-white cursor-pointer",
           disabled && !busy ? "opacity-40 pointer-events-none" : "",
         ].join(" ")}
       >
-        {/* Layer color band (top edge, 4px) */}
-        <div className="absolute top-0 inset-x-0 h-1" style={{ background: tone.bg }} />
-
-        <div className="px-5 pt-6 pb-4">
-          {/* Header: initial circle + name + layer badge */}
-          <div className="flex items-start gap-3 mb-4">
-            <div
-              className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl font-display"
-              style={{ background: tone.bg }}
-            >
-              {initial}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-[0.95rem] text-mos-ink leading-snug line-clamp-2">
-                {nameStr}
-              </h3>
+        {/* 卡片頂部 */}
+        <div className="p-6 pb-4">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* 實體圖標 */}
               <div
-                className="mt-1.5 inline-flex items-center px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded-sm"
+                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0"
                 style={{ background: tone.bg }}
               >
-                {lk} · {tone.shortLabel}
+                {initial}
+              </div>
+
+              {/* 實體名稱和層級 badge */}
+              <div className="min-w-0">
+                <h3 className="font-semibold text-lg leading-tight line-clamp-1">{nameStr}</h3>
+                <span
+                  className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-[0.62rem] font-semibold tracking-[0.12em] uppercase text-white"
+                  style={{ background: tone.bg }}
+                >
+                  {lk} · {tone.shortLabel}
+                </span>
+              </div>
+            </div>
+
+            {/* 預覽按鈕（v2 原本是刪除位） */}
+            <button
+              onClick={(e) => { e.stopPropagation(); onPreview(); }}
+              disabled={disabled}
+              aria-label="預覽工作流"
+              className="text-gray-400 hover:text-mos-orange p-1 -mr-1 -mt-1 shrink-0 inline-flex items-center justify-center rounded hover:bg-gray-50 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
+
+          {/* 內容區塊 */}
+          <div className="space-y-4">
+            {/* 方法論區塊 */}
+            <div className="p-4 rounded-lg border" style={{ background: tone.bgTint }}>
+              <div className="text-xs font-semibold text-gray-500 mb-1 tracking-wide">
+                METHODOLOGY / 方法論
+              </div>
+              <div className="text-sm text-gray-700 line-clamp-1">
+                {author ?? "尚未設定"}
+              </div>
+            </div>
+
+            {/* 描述區塊 */}
+            <div className="p-4 rounded-lg border" style={{ background: tone.bgTint }}>
+              <div className="text-xs font-semibold text-gray-500 mb-1 tracking-wide">
+                DESCRIPTION / 描述
+              </div>
+              <div className="text-sm text-gray-700 line-clamp-3">
+                {description ?? "尚未設定"}
               </div>
             </div>
           </div>
-
-          {/* Methodology info block */}
-          <div
-            className="p-3 rounded border border-mos-hair mb-2.5"
-            style={{ background: tone.bgTint }}
-          >
-            <div className="text-[0.55rem] font-semibold tracking-[0.18em] uppercase text-mos-muted mb-1">
-              METHODOLOGY · 方法論
-            </div>
-            <div className="text-[0.78rem] text-mos-ink line-clamp-1">
-              {authorLine ?? "—"}
-            </div>
-          </div>
-
-          {/* Lead info block */}
-          <div className="p-3 rounded border border-mos-hair bg-mos-paper">
-            <div className="text-[0.55rem] font-semibold tracking-[0.18em] uppercase text-mos-muted mb-1">
-              LEAD · 領隊
-            </div>
-            <div className="text-[0.78rem] text-mos-ink line-clamp-1">
-              {leadName ?? "—"}
-            </div>
-          </div>
-
-          {/* Counts */}
-          <div className="mt-3 pt-3 border-t border-mos-hair flex items-center gap-3 text-[0.62rem] text-mos-soft tracking-[0.04em]">
-            <span><span className="text-mos-ink font-medium">{stepCount}</span> 步</span>
-            {memberCount > 0 && (
-              <span><span className="text-mos-ink font-medium">{memberCount}</span> 成員</span>
-            )}
-          </div>
         </div>
 
-        {/* Pill CTA */}
-        <div className="px-5 pb-5">
-          <div
-            className="w-full text-white font-semibold text-[0.78rem] px-3 py-2 text-center transition-all group-hover:opacity-90 group-hover:-translate-y-0.5"
-            style={{
-              background: "linear-gradient(135deg, #FF6B35, #E55A2B)",
-              borderRadius: "50px",
-              boxShadow: "0 2px 8px rgba(255,107,53,0.25)",
-            }}
-          >
-            {busy ? "建立中…" : "啟動小組"}
+        {busy && (
+          <div className="absolute inset-0 bg-white/85 flex items-center justify-center pointer-events-none">
+            <span className="text-[0.7rem] tracking-[0.16em] uppercase text-mos-ink">建立中…</span>
           </div>
-        </div>
-      </button>
-      <button
-        onClick={onPreview}
-        disabled={disabled}
-        className="mt-1.5 w-full text-[0.66rem] text-mos-muted hover:text-mos-orange transition py-1"
-      >
-        預覽工作流 →
-      </button>
+        )}
+      </div>
     </div>
   );
 }

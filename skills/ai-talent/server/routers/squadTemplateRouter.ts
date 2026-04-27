@@ -142,7 +142,7 @@ export const squadTemplateRouter = router({
       const [rows] = await localPool.execute(
         `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
                 s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
-                s.hero_image_url
+                s.hero_image_url, s.source, s.ingest_source_url
            FROM squads s
           WHERE s.is_active = 1
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
@@ -261,6 +261,8 @@ export const squadTemplateRouter = router({
           tier: r.tier ?? null,
           strategyLayer: r.strategy_layer ?? null,
           heroImageUrl: r.hero_image_url ?? null,
+          source: (r.source ?? "seeded") as "seeded" | "ingested" | "forked",
+          ingestSourceUrl: r.ingest_source_url ?? null,
           methodology,
           lead,
           members,
