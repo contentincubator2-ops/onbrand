@@ -881,6 +881,16 @@ export default function PickerWorkspace() {
                   missionId={activeMissionId}
                   squad={selectedSquad}
                   lang={lang}
+                  onMissionDeleted={() => {
+                    setActiveMissionId(null);
+                    try { localStorage.removeItem("sowork.picker.activeMissionId"); } catch {}
+                    recentMissionsQuery.refetch?.();
+                  }}
+                  onMissionDuplicated={(newId: number) => {
+                    setActiveMissionId(newId);
+                    try { localStorage.setItem("sowork.picker.activeMissionId", String(newId)); } catch {}
+                    recentMissionsQuery.refetch?.();
+                  }}
                 />
               </div>
             </div>

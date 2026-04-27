@@ -1563,6 +1563,112 @@ ${input.userInput ? `\n使用者本步補充：\n${input.userInput}` : ""}
       return { ok: true, output: String(last.output ?? "") };
     }),
 
+  // ── askMary ──────────────────────────────────────────────────────────────────
+  // Floating "問 Mary Allen" helper. Mary is the brand-strategy spokesperson
+  // — given the mission's full step progress + brand context, she answers a
+  // freeform user question about the run (e.g. "this step seems weak, why?",
+  // "summarize what we have so far", "should we pivot the angle?").
+  // Stateless: each call rebuilds context from DB. No history persisted yet
+  // (drawer keeps it in client memory until refresh).
+  askMary: protectedProcedure
+    .input(z.object({
+      missionId: z.number(),
+      question:  z.string().min(1).max(2000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      // Mission + brand
+      const [mRows] = await db.execute(sql`
+        SELECT id, title, description, brandId, methodology FROM missions
+         WHERE id = ${input.missionId} AND userId = ${ctx.user.id} LIMIT 1
+      `) as any[];
+      const mission = (mRows as any[])?.[0];
+      if (!mission) throw new TRPCError({ code: "NOT_FOUND", message: "mission not found" });
+
+      let brandLine = "";
+      if (mission.brandId) {
+        const [bRows] = await db.execute(sql`
+          SELECT name, industry, positioningSummary FROM brands WHERE id = ${mission.brandId} LIMIT 1
+        `) as any[];
+        const b = (bRows as any[])?.[0];
+        if (b) brandLine = `品牌：${b.name}${b.industry ? `（${b.industry}）` : ""}${b.positioningSummary ? ` · ${String(b.positioningSummary).slice(0, 300)}` : ""}`;
+      }
+
+      // Step progress
+      const [pRows] = await db.execute(sql`
+        SELECT step_order, status, agent_name, agent_output FROM mission_step_progress
+         WHERE mission_id = ${input.missionId}
+         ORDER BY step_order ASC
+      `) as any[];
+      const progress = (pRows as any[]) ?? [];
+      const progressLines = progress.map((r: any) => {
+        const o = String(r.agent_output ?? "").slice(0, 600);
+        return `[Step ${r.step_order} · ${r.status} · ${r.agent_name ?? ""}]\n${o}`;
+      }).join("\n\n");
+
+      const systemPrompt = `你是 Mary Allen，SoWork 的品牌策略召集人。語氣專業、誠實、不繞圈。
+你正在陪一個團隊跑一個 marketing mission。使用者會問你關於這個任務的事 ——
+你要根據目前的進度與品牌資訊作答，不要憑空編造。
+回答用繁體中文，控制在 250 字內。如果答案需要看更多資料，明確說「我需要先看 Step X」。`;
+      const userPrompt = `${brandLine}
+任務：${mission.title}${mission.description ? ` · ${mission.description}` : ""}
+方法論：${mission.methodology ?? "(未指定)"}
+
+目前進度：
+${progressLines || "(還沒有任何步驟產出)"}
+
+使用者的問題：
+${input.question}`;
+
+      const llm = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const answer = String(llm.choices?.[0]?.message?.content ?? "");
+      return { ok: true, answer };
+    }),
+
+  // ── missionAnalytics ─────────────────────────────────────────────────────────
+  // Per-mission analytics for the Canva-style 分析 dropdown. Reports
+  // step-level timings, agent assignments, status counts. Token tracking
+  // would slot in here later (we don't yet record token usage per call).
+  missionAnalytics: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      try {
+        const [rows] = await db.execute(sql`
+          SELECT step_order, status, agent_name, LENGTH(agent_output) AS output_len, updated_at
+            FROM mission_step_progress
+           WHERE mission_id = ${input.missionId}
+           ORDER BY step_order ASC
+        `) as any[];
+        const arr = (rows as any[]) ?? [];
+        const counts = arr.reduce((acc: any, r: any) => {
+          acc[r.status] = (acc[r.status] ?? 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        return {
+          totalSteps: arr.length,
+          counts,
+          steps: arr.map((r: any) => ({
+            stepOrder: Number(r.step_order),
+            status:    String(r.status),
+            agentName: r.agent_name ?? "",
+            outputLen: Number(r.output_len ?? 0),
+            updatedAt: r.updated_at,
+          })),
+        };
+      } catch {
+        return { totalSteps: 0, counts: {}, steps: [] };
+      }
+    }),
+
   // ── logUsage ─────────────────────────────────────────────────────────────────
   // Write a squad_usage_log row when the user starts a squad session.
   logUsage: protectedProcedure

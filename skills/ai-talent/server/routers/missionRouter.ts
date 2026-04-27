@@ -185,6 +185,39 @@ export const missionRouter = router({
       return { success: true };
     }),
 
+  // ── Duplicate a mission (Canva 檔案 → 複製為新任務) ────────────────────────
+  // Copies the mission row + all mission_step_progress rows. The new mission
+  // starts with the same drafts/confirmations so the user can fork an
+  // experimental variant without losing the original.
+  duplicate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const [orig] = await db.select().from(missions)
+        .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)))
+        .limit(1);
+      if (!orig) throw new Error("Mission not found");
+      const { id: _drop, createdAt: _c, updatedAt: _u, ...rest } = orig as any;
+      const [ins] = await db.insert(missions).values({
+        ...rest,
+        userId: ctx.user.id,
+        title: `${orig.title}（副本）`,
+        status: "active",
+      });
+      const newId = (ins as any).insertId as number;
+      // Best-effort copy of step progress (table may not exist yet)
+      try {
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, user_input, agent_output, agent_id, agent_name, history)
+          SELECT ${newId}, step_order, status, user_input, agent_output, agent_id, agent_name, history
+            FROM mission_step_progress WHERE mission_id = ${input.id}
+        `);
+      } catch { /* table not created or column missing — ignore */ }
+      return { id: newId };
+    }),
+
   // Add a task unit to a mission
   addTaskUnit: protectedProcedure
     .input(z.object({
@@ -254,12 +287,21 @@ export const missionRouter = router({
       return { ...mission, taskUnits: units };
     }),
 
-  // Delete a mission
+  // Delete a mission — hard delete including all step progress + task units.
+  // Frontend MUST confirm() before calling this; backend does not double-ask.
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error('DB not available');
+      // Verify ownership before any deletes
+      const [orig] = await db.select().from(missions)
+        .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)))
+        .limit(1);
+      if (!orig) throw new Error('Mission not found');
+      await db.delete(missionTaskUnits).where(eq(missionTaskUnits.missionId, input.id));
+      try { await db.execute(sql`DELETE FROM mission_step_progress WHERE mission_id = ${input.id}`); }
+      catch { /* table may not exist yet */ }
       await db.delete(missions)
         .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)));
       return { success: true };
