@@ -26,6 +26,7 @@ import { SquadEntityCard } from "../components/SquadEntityCard";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import { Button, Input, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
 
 interface MissionRow {
   id: number;
@@ -345,20 +346,26 @@ export default function MissionsHome() {
       >
         {/* Top-right CTAs */}
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <button
-            onClick={() => navigate("/templates")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white hover:bg-mos-cream-dark border border-mos-hair hover:border-mos-ink rounded-sm transition"
+          <Button
+            size="sm"
+            radius="md"
+            variant="bordered"
+            onPress={() => navigate("/templates")}
+            startContent={<span aria-hidden className="text-primary">✦</span>}
+            className="text-[0.78rem]"
           >
-            <span aria-hidden className="text-mos-orange">✦</span>
-            <span className="text-mos-ink">瀏覽方法論型錄</span>
-          </button>
-          <button
-            onClick={() => setCreateSource("recommended")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-mos-orange hover:bg-mos-orange-hover text-white rounded-sm transition"
+            瀏覽方法論型錄
+          </Button>
+          <Button
+            size="sm"
+            radius="md"
+            color="primary"
+            onPress={() => setCreateSource("recommended")}
+            startContent={<span aria-hidden>→</span>}
+            className="text-[0.78rem] font-medium"
           >
-            <span aria-hidden>→</span>
-            <span className="font-medium">立即開新任務</span>
-          </button>
+            立即開新任務
+          </Button>
         </div>
 
         <div className="max-w-[1280px] mx-auto">
@@ -376,35 +383,23 @@ export default function MissionsHome() {
 
           {/* Search bar */}
           <div className="mt-7 max-w-[680px] mx-auto">
-            <div className="relative">
-              <svg
-                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-mos-muted pointer-events-none"
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-                strokeLinecap="round" strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="7.5" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                type="text"
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="搜尋方法論、任務、最近的工作"
-                className="w-full pl-14 pr-12 py-[14px] text-[0.92rem] bg-white rounded-sm border border-mos-hair focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition"
-              />
-              {searchQ && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQ("")}
-                  aria-label="清除搜尋"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-7 h-7 inline-flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-ink/5 rounded-full transition"
-                >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            <Input
+              size="lg"
+              radius="full"
+              variant="bordered"
+              value={searchQ}
+              onValueChange={setSearchQ}
+              isClearable
+              onClear={() => setSearchQ("")}
+              placeholder="搜尋方法論、任務、最近的工作"
+              startContent={
+                <svg className="w-5 h-5 text-default-400 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7.5" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
+              }
+              classNames={{ inputWrapper: "bg-content1 shadow-small h-14", input: "text-[0.92rem]" }}
+            />
 
             {/* Filter pills under search bar — Canva style */}
             <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
@@ -1082,51 +1077,36 @@ function FilterChip({
   onClick?: () => void;
   onSelect?: (v: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const isDropdown = !!options;
+  const chevron = (
+    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
 
-  if (!isDropdown) {
+  if (!options) {
     return (
-      <button
-        onClick={onClick}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition"
-      >
+      <Button size="sm" radius="full" variant="bordered" onPress={onClick} endContent={chevron} className="text-[0.74rem]">
         {label}
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-mos-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+      </Button>
     );
   }
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition capitalize"
+    <Dropdown placement="bottom-end" radius="sm">
+      <DropdownTrigger>
+        <Button size="sm" radius="full" variant="bordered" endContent={chevron} className="text-[0.74rem] capitalize">
+          {label}
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu
+        aria-label={label}
+        onAction={(key) => onSelect?.(String(key))}
       >
-        {label}
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-mos-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full mt-1.5 right-0 z-20 min-w-[160px] bg-white border border-mos-hair rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1">
-            {options!.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => { onSelect?.(o.value); setOpen(false); }}
-                className="w-full text-left px-3 py-1.5 text-[0.78rem] text-mos-ink hover:bg-mos-ink/5 transition capitalize"
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+        {options.map((o) => (
+          <DropdownItem key={o.value} className="capitalize">{o.label}</DropdownItem>
+        ))}
+      </DropdownMenu>
+    </Dropdown>
   );
 }
 
@@ -1134,13 +1114,11 @@ function IconButton({
   title, onClick, children,
 }: { title: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      title={title}
-      onClick={onClick}
-      className="w-9 h-9 inline-flex items-center justify-center bg-white border border-mos-hair hover:border-mos-ink text-mos-ink rounded-full transition"
-    >
-      {children}
-    </button>
+    <Tooltip content={title} radius="sm">
+      <Button isIconOnly size="sm" radius="full" variant="bordered" onPress={onClick} aria-label={title}>
+        {children}
+      </Button>
+    </Tooltip>
   );
 }
 

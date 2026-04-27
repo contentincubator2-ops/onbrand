@@ -21,6 +21,7 @@
 import { LAYER_TOKENS, resolveLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
+import { Card, Button, Chip } from "@heroui/react";
 
 // ── Eye icon (replaces v2's Trash2) ────────────────────────────────────────
 function EyeIcon({ className = "h-4 w-4" }: { className?: string }) {
@@ -100,78 +101,75 @@ export function SquadEntityCard({
     ? { taglineEn: "METHODOLOGY", tagline: "Methodology", contentEn: "DESCRIPTION", content: "Description", positioning: "Launch Squad", report: "Preview Workflow" }
     : { taglineEn: "METHODOLOGY", tagline: "方法論",       contentEn: "DESCRIPTION", content: "描述",       positioning: "啟動小組",     report: "預覽工作流" };
 
-  // ── v2 markup, near-verbatim ────────────────────────────────────────────
   return (
-    <div
+    <Card
+      shadow="sm"
+      radius="lg"
       className={[
-        "relative overflow-hidden border-2 hover:shadow-lg transition-shadow rounded-lg bg-white",
+        "relative overflow-hidden border-2 border-foreground hover:shadow-medium transition-shadow bg-content1",
         disabled && !busy ? "opacity-40 pointer-events-none" : "",
       ].join(" ")}
-      style={{ borderColor: "#1A1A1A" }}
     >
       {/* 卡片頂部 */}
       <div className="p-6 pb-4">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 min-w-0">
-            {/* 實體圖標 */}
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0"
               style={{ background: tone.bg }}
             >
               {getInitial(nameStr)}
             </div>
-
-            {/* 實體名稱和狀態 */}
             <div className="min-w-0">
-              <h3 className="font-semibold text-lg leading-tight line-clamp-1">
+              <h3 className="font-semibold text-lg leading-tight line-clamp-1 text-foreground">
                 {nameStr}
               </h3>
-              {/* v2 status badge → layer badge */}
-              <span
-                className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-[0.7rem] font-semibold text-white"
+              <Chip
+                size="sm"
+                radius="sm"
+                variant="solid"
+                className="mt-1 h-5 text-[0.7rem] font-semibold text-white"
                 style={{ background: tone.bg }}
               >
                 {lk}・{tone.label}
-              </span>
+              </Chip>
             </div>
           </div>
 
-          {/* 預覽按鈕（v2 原本是 Trash2 刪除位） */}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onPreview(); }}
-            disabled={disabled}
+          <Button
+            isIconOnly
+            size="sm"
+            variant="light"
+            radius="sm"
+            onPress={onPreview}
+            isDisabled={disabled}
             aria-label={lang === "en" ? "Preview workflow" : "預覽工作流"}
-            className="text-gray-400 hover:text-mos-orange h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-gray-100 transition shrink-0"
           >
             <EyeIcon className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
-        {/* 內容區塊 */}
         <div className="space-y-4">
-          {/* 標語區塊 */}
           <div
-            className="p-4 rounded-lg"
-            style={{ background: tone.bgTint, border: "1.5px solid #1A1A1A" }}
+            className="p-4 rounded-medium border-2 border-foreground"
+            style={{ background: tone.bgTint }}
           >
-            <div className="text-xs font-semibold text-gray-500 mb-1">
+            <div className="text-xs font-semibold text-default-500 mb-1">
               {labels.taglineEn} / {labels.tagline}
             </div>
-            <div className="text-sm text-gray-700 line-clamp-1">
+            <div className="text-sm text-foreground/80 line-clamp-1">
               {taglineText || (lang === "en" ? "Not set" : "尚未設定")}
             </div>
           </div>
 
-          {/* 哲學/價值主張區塊 */}
           <div
-            className="p-4 rounded-lg"
-            style={{ background: tone.bgTint, border: "1.5px solid #1A1A1A" }}
+            className="p-4 rounded-medium border-2 border-foreground"
+            style={{ background: tone.bgTint }}
           >
-            <div className="text-xs font-semibold text-gray-500 mb-1">
+            <div className="text-xs font-semibold text-default-500 mb-1">
               {labels.contentEn} / {labels.content}
             </div>
-            <div className="text-sm text-gray-700 line-clamp-3 leading-snug">
+            <div className="text-sm text-foreground/80 line-clamp-3 leading-snug">
               {philosophyText || (lang === "en" ? "Not set" : "尚未設定")}
             </div>
           </div>
@@ -180,33 +178,29 @@ export function SquadEntityCard({
 
       {/* 操作按鈕區 */}
       <div className="px-6 pb-6 flex gap-2">
-        {/* 啟動按鈕（gradient orange, v2 主 CTA） */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onClick(); }}
-          disabled={disabled || busy}
-          className="flex-1 text-white font-semibold text-sm px-3 py-2 transition-all hover:opacity-90 hover:-translate-y-0.5 disabled:opacity-50"
-          style={{
-            background: "linear-gradient(135deg, #EA580C, #F97316)",
-            borderRadius: "50px",
-            border: "none",
-            boxShadow: "0 2px 8px rgba(234,88,12,0.25)",
-          }}
+        <Button
+          color="primary"
+          radius="full"
+          fullWidth
+          isLoading={busy}
+          isDisabled={disabled || busy}
+          onPress={onClick}
+          className="flex-1 font-semibold text-sm"
         >
           {busy ? (lang === "en" ? "Starting…" : "建立中…") : labels.positioning}
-        </button>
-
-        {/* 預覽按鈕（outline orange, v2 次 CTA） */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onPreview(); }}
-          disabled={disabled}
-          className="flex-1 font-semibold text-sm px-3 py-2 transition hover:bg-orange-50 disabled:opacity-50"
-          style={{ borderRadius: "50px", border: "1.5px solid #EA580C", color: "#EA580C", background: "white" }}
+        </Button>
+        <Button
+          color="primary"
+          variant="bordered"
+          radius="full"
+          fullWidth
+          isDisabled={disabled}
+          onPress={onPreview}
+          className="flex-1 font-semibold text-sm"
         >
           {labels.report}
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }
