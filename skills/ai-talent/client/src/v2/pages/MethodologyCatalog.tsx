@@ -19,12 +19,12 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
-import { EntityStats } from "../components/EntityStats";
+import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Avatar, Button, Card, CardBody, CardFooter, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Input, Skeleton, Tab, Tabs, Tooltip,
+  Input, Skeleton, Tooltip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -152,8 +152,14 @@ export default function MethodologyCatalog() {
 
   return (
     <main className="pb-16">
-      {/* ─── Hero (pastel gradient) ─────────────────────────────── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-success-100 via-secondary-100 to-danger-100">
+      {/* ─── Hero (very light pastel — Canva-faithful) ──────────── */}
+      <section
+        className="relative overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(210 60% 96%) 0%, hsl(280 50% 96%) 50%, hsl(340 60% 96%) 100%)",
+        }}
+      >
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <Button variant="bordered" radius="full" startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />} onPress={() => setDrawerOpen(true)}>
             先睹為快
@@ -163,10 +169,10 @@ export default function MethodologyCatalog() {
           </Button>
         </div>
 
-        <div className="max-w-[1280px] mx-auto px-8 pt-20 pb-14">
+        <div className="max-w-[1280px] mx-auto px-6 pt-14 pb-10">
           <h1 className="text-center text-5xl md:text-6xl font-semibold tracking-tight text-foreground">範本</h1>
 
-          <div className="mt-8 max-w-[680px] mx-auto">
+          <div className="mt-6 max-w-[720px] mx-auto">
             <Input
               size="lg"
               radius="full"
@@ -187,11 +193,6 @@ export default function MethodologyCatalog() {
             <Chip variant="flat" startContent={<FontAwesomeIcon icon={faShareNodes} className="ml-1" />} size="lg" className="cursor-pointer hover:scale-105 transition" onClick={() => applyExploreTile({ key: "soc", label: "", hint: "", icon: null, color: "default", filter: { query: "social" } })}>社交媒體</Chip>
           </div>
         </div>
-      </section>
-
-      {/* ─── Live entity stats banner ───────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 mt-8">
-        <EntityStats variant="row" />
       </section>
 
       {/* ─── 探索範本 — pastel category tiles ───────────────────── */}
@@ -264,23 +265,23 @@ export default function MethodologyCatalog() {
         ))}
       </ScrollSection>
 
-      {/* ─── 受你啟發的方法論 (random shuffle for discovery) ──── */}
+      {/* ─── 受你啟發的方法論 — Canva-style large landscape cards ── */}
       <ScrollSection
         title="受你的設計啟發"
         subtitle="隨機探索 — 可能找到沒想過的組合"
         loading={entityQuery.isLoading}
       >
         {recentInspiration.map((e: any) => (
-          <div key={`in-${e.kind}-${e.id}`} className="shrink-0 w-[280px]">
-            <EntityCard entity={e} onPreview={() => onPreview(e.slug)} />
+          <div key={`in-${e.kind}-${e.id}`} className="shrink-0 w-[440px]">
+            <LandscapeCard entity={e} onPreview={() => onPreview(e.slug)} />
           </div>
         ))}
       </ScrollSection>
 
       {/* ─── 熱門精選 banners (3 promotional cards) ─────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 mt-12">
-        <h2 className="text-2xl font-semibold tracking-tight mb-4">熱門精選</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="px-6 mt-10">
+        <h2 className="text-xl font-semibold tracking-tight mb-3">熱門精選</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {FEATURED_BANNERS.map((b) => (
             <Card
               key={b.key}
@@ -288,7 +289,7 @@ export default function MethodologyCatalog() {
               isHoverable
               onPress={() => setDrawerOpen(true)}
               shadow="sm"
-              className={`${b.bgClass} h-[120px]`}
+              className={`${b.bgClass} h-[90px]`}
             >
               <CardBody className="flex flex-row items-center justify-between gap-3 px-6">
                 <div className="min-w-0">
@@ -304,58 +305,43 @@ export default function MethodologyCatalog() {
         </div>
       </section>
 
-      {/* ─── 為你提供更多範本 (Tabs + Grid) ──────────────────── */}
-      <section id="more-templates-section" className="max-w-[1280px] mx-auto px-8 mt-12">
+      {/* ─── 為你提供更多範本 (Canva-style 3-col landscape grid, no tabs) ── */}
+      <section id="more-templates-section" className="px-6 mt-10">
         <div className="flex items-end justify-between gap-4 flex-wrap mb-4">
-          <h2 className="text-2xl font-semibold tracking-tight">為你提供更多範本</h2>
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger>
-              <Button size="sm" variant="bordered" radius="full" endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny" />}>
-                {layerLabel}
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu aria-label="層級篩選" selectionMode="single" selectedKeys={new Set([layerFilter])} onAction={(k) => setLayerFilter(String(k))}>
-              {LAYER_OPTIONS.map((o) => <DropdownItem key={o.value}>{o.label}</DropdownItem>)}
-            </DropdownMenu>
-          </Dropdown>
+          <h2 className="text-xl font-semibold tracking-tight">為你提供更多範本</h2>
+          <div className="flex items-center gap-2">
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger>
+                <Button size="sm" variant="bordered" radius="full" endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny" />}>
+                  類型・{KIND_TABS.find((t) => t.id === activeKind)?.label}
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                aria-label="類型篩選"
+                selectionMode="single"
+                selectedKeys={new Set([activeKind])}
+                onAction={(k) => setActiveKind(k as Kind)}
+              >
+                {KIND_TABS.map((t) => <DropdownItem key={t.id}>{t.label} ({counts[t.id] ?? 0})</DropdownItem>)}
+              </DropdownMenu>
+            </Dropdown>
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger>
+                <Button size="sm" variant="bordered" radius="full" endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny" />}>
+                  {layerLabel}
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="層級篩選" selectionMode="single" selectedKeys={new Set([layerFilter])} onAction={(k) => setLayerFilter(String(k))}>
+                {LAYER_OPTIONS.map((o) => <DropdownItem key={o.value}>{o.label}</DropdownItem>)}
+              </DropdownMenu>
+            </Dropdown>
+          </div>
         </div>
 
-        <Tabs
-          aria-label="實體類型"
-          color="primary"
-          variant="underlined"
-          selectedKey={activeKind}
-          onSelectionChange={(k) => setActiveKind(k as Kind)}
-          classNames={{ tabList: "gap-6 px-0" }}
-        >
-          {KIND_TABS.map((t) => (
-            <Tab
-              key={t.id}
-              title={
-                <div className="flex items-center gap-2">
-                  <FontAwesomeIcon icon={t.icon} />
-                  <span>{t.label}</span>
-                  <Chip size="sm" variant="flat" className="h-5 min-h-5">{counts[t.id] ?? 0}</Chip>
-                </div>
-              }
-            />
-          ))}
-        </Tabs>
-
-        <p className="text-tiny text-default-500 mb-5 mt-2">
-          {KIND_TABS.find((t) => t.id === activeKind)?.description}
-        </p>
-
         {entityQuery.isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i} shadow="sm">
-                <CardBody className="gap-2">
-                  <Skeleton className="h-6 w-3/5 rounded" />
-                  <Skeleton className="h-3 w-2/5 rounded" />
-                  <Skeleton className="h-12 w-full rounded mt-2" />
-                </CardBody>
-              </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="rounded-large w-full" style={{ aspectRatio: "16/9" }} />
             ))}
           </div>
         )}
@@ -371,9 +357,9 @@ export default function MethodologyCatalog() {
         )}
 
         {!entityQuery.isLoading && gridFiltered.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {gridFiltered.map((e: any) => (
-              <EntityCard key={`${e.kind}-${e.id ?? e.slug}`} entity={e} onPreview={() => onPreview(e.slug)} />
+              <LandscapeCard key={`${e.kind}-${e.id ?? e.slug}`} entity={e} onPreview={() => onPreview(e.slug)} />
             ))}
           </div>
         )}
@@ -405,11 +391,11 @@ function ScrollSection({
   const scroll = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * 700, behavior: "smooth" });
 
   return (
-    <section className="max-w-[1280px] mx-auto px-8 mt-12">
-      <div className="flex items-end justify-between gap-3 mb-4">
+    <section className="mt-8">
+      <div className="px-6 flex items-end justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-          {subtitle && <p className="text-small text-default-500 mt-1">{subtitle}</p>}
+          <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+          {subtitle && <p className="text-small text-default-500 mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {cta && (
@@ -429,17 +415,84 @@ function ScrollSection({
       </div>
 
       {loading ? (
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="flex gap-3 overflow-x-auto px-6 pb-2">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="shrink-0 w-[260px] h-[160px] rounded-large" />
           ))}
         </div>
       ) : (
-        <div ref={ref} className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x" style={{ scrollSnapType: "x mandatory" }}>
+        <div ref={ref} className="flex gap-3 overflow-x-auto px-6 pb-2 snap-x" style={{ scrollSnapType: "x mandatory" }}>
           {children}
         </div>
       )}
     </section>
+  );
+}
+
+/* ─────────────────────────── LandscapeCard (Canva-style cover) ─────────
+ *
+ * Used in the bottom 3-col grid. Mirrors Canva's "為你提供更多範本":
+ *   - 16:9 visual area dominates the card
+ *   - Layer chip overlay top-left
+ *   - Hover reveals "使用此範本" CTA + ⭐ favourite (planned for batch 2)
+ *   - For now the visual area is a tinted gradient + the entity initial
+ *     as a giant glyph. When Path B image-gen runs, image slots in here.
+ * ─────────────────────────────────────────────────────────────────── */
+
+function LandscapeCard({ entity, onPreview }: { entity: any; onPreview: () => void }) {
+  const layerKey = (entity.strategyLayer ?? "L1") as MosLayer;
+  const tone = LAYER_TOKENS[layerKey];
+  const heroColor = tone?.heroColor ?? "default";
+  const coverImageUrl: string | undefined = entity.coverImageUrl ?? entity.heroImageUrl;
+
+  return (
+    <Card
+      isPressable
+      isHoverable
+      onPress={onPreview}
+      shadow="sm"
+      className="w-full overflow-hidden group"
+    >
+      {/* Visual area — image if available, else gradient + glyph */}
+      <div
+        className={`relative w-full bg-${heroColor}-100`}
+        style={{ aspectRatio: "16/9" }}
+      >
+        {coverImageUrl ? (
+          <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <MethodologyGlyph seed={entity.slug ?? entity.id} layer={layerKey} size={120} />
+          </div>
+        )}
+
+        {/* Top-left chip */}
+        <Chip
+          size="sm"
+          color={heroColor}
+          variant="solid"
+          className="absolute top-3 left-3 shadow-sm"
+        >
+          {layerKey}・{tone?.label}
+        </Chip>
+
+        {/* Top-right kind badge */}
+        <Chip
+          size="sm"
+          variant="flat"
+          className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md capitalize"
+        >
+          {entity.kind}
+        </Chip>
+      </div>
+
+      <CardBody className="px-4 py-3 gap-1">
+        <p className="text-medium font-semibold leading-tight line-clamp-1">{entity.name}</p>
+        {entity.subtitle && (
+          <p className="text-tiny text-default-500 line-clamp-1">{entity.subtitle}</p>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
