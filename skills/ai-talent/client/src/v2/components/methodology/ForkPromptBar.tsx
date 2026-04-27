@@ -30,7 +30,7 @@ export default function ForkPromptBar({
   return (
     <div className="fixed inset-x-0 bottom-0 z-30">
       <div className="max-w-[1280px] mx-auto px-8 pb-5">
-        <div className="bg-mos-ink text-white shadow-lift flex items-center gap-4 px-6 py-4">
+        <div className="bg-foreground text-white shadow-lift flex items-center gap-4 px-6 py-4">
           <div className="flex-1 min-w-0">
             <div className="text-[0.62rem] tracking-[0.28em] uppercase text-white/60">
               METHODOLOGY DIRTY
@@ -50,7 +50,7 @@ export default function ForkPromptBar({
               </button>
               <button
                 onClick={() => setEditing(true)}
-                className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase bg-white text-mos-ink hover:bg-white/90"
+                className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase bg-white text-foreground hover:bg-white/90"
               >
                 存成新任務範本 →
               </button>
@@ -63,7 +63,7 @@ export default function ForkPromptBar({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="新任務範本名稱"
-                className="bg-mos-body border border-white/30 text-white px-3 py-2 text-[0.86rem] focus:outline-none focus:border-white w-[280px]"
+                className="bg-foreground/90 border border-white/30 text-white px-3 py-2 text-[0.86rem] focus:outline-none focus:border-white w-[280px]"
                 disabled={busy}
               />
               <button
@@ -74,7 +74,7 @@ export default function ForkPromptBar({
                   finally { setBusy(false); setEditing(false); }
                 }}
                 disabled={busy || !name.trim()}
-                className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase bg-white text-mos-ink disabled:opacity-50"
+                className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase bg-white text-foreground disabled:opacity-50"
               >
                 {busy ? "儲存中…" : "確認"}
               </button>

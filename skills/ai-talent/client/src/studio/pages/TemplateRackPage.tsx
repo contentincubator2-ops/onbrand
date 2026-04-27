@@ -71,7 +71,7 @@ export default function TemplateRackPage() {
           <div className="mos-eyebrow mb-3">No recommendations yet</div>
           <Link
             to={`/studio/${brandId}/triage`}
-            className="mos-display text-[1.5rem] text-mos-ink underline underline-offset-4 decoration-1"
+            className="mos-display text-[1.5rem] text-foreground underline underline-offset-4 decoration-1"
           >
             Start diagnosis →
           </Link>
@@ -85,7 +85,7 @@ export default function TemplateRackPage() {
       back={{ to: `/studio/${brandId}/triage`, label: "Back" }}
       title="Recommended Methodologies"
       actions={
-        <div className="text-meta uppercase tracking-[0.16em] text-mos-muted">
+        <div className="text-meta uppercase tracking-[0.16em] text-default-500">
           {state?.trigger && `${state.trigger.replace(/-/g, " ")} `}
           {state?.stage && `· ${state.stage}`}
         </div>
@@ -139,7 +139,7 @@ export default function TemplateRackPage() {
                       },
                     })
                   }
-                  className="w-full py-3 border border-mos-ink text-mos-ink text-[0.78rem] uppercase tracking-[0.2em] hover:bg-mos-ink hover:text-white transition"
+                  className="w-full py-3 border border-foreground text-foreground text-[0.78rem] uppercase tracking-[0.2em] hover:bg-foreground hover:text-white transition"
                 >
                   Select
                 </button>
@@ -149,13 +149,13 @@ export default function TemplateRackPage() {
         })}
       </div>
 
-      <div className="mt-16 border-t border-mos-hair pt-6 flex items-center justify-between">
-        <div className="text-meta uppercase tracking-[0.16em] text-mos-muted">
+      <div className="mt-16 border-t border-divider pt-6 flex items-center justify-between">
+        <div className="text-meta uppercase tracking-[0.16em] text-default-500">
           Or choose from your saved templates
         </div>
         <Link
           to={`/studio/${brandId}/library`}
-          className="text-meta uppercase tracking-[0.16em] text-mos-ink hover:underline underline-offset-4"
+          className="text-meta uppercase tracking-[0.16em] text-foreground hover:underline underline-offset-4"
         >
           Open my library →
         </Link>

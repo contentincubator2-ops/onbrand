@@ -65,7 +65,7 @@ export default function CalendarPage() {
       title="Content Calendar"
       actions={
         <>
-          <button onClick={prev} className="px-3 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink">
+          <button onClick={prev} className="px-3 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground">
             ←
           </button>
           <button
@@ -73,29 +73,29 @@ export default function CalendarPage() {
               setYear(now.getFullYear());
               setMonth(now.getMonth() + 1);
             }}
-            className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink"
+            className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground"
           >
             Today
           </button>
-          <button onClick={next} className="px-3 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink">
+          <button onClick={next} className="px-3 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground">
             →
           </button>
         </>
       }
     >
       <div className="flex items-center justify-between mb-4">
-        <div className="mos-display text-[1.4rem] text-mos-ink">{monthLabel}</div>
-        <div className="text-meta uppercase tracking-[0.16em] text-mos-muted">
+        <div className="mos-display text-[1.4rem] text-foreground">{monthLabel}</div>
+        <div className="text-meta uppercase tracking-[0.16em] text-default-500">
           {Object.keys(byDay).length} days with content
         </div>
       </div>
 
       {/* Week header */}
-      <div className="grid grid-cols-7 gap-px bg-mos-hair border border-mos-hair">
+      <div className="grid grid-cols-7 gap-px bg-divider border border-divider">
         {WEEK.map((w) => (
           <div
             key={w}
-            className="bg-white py-2 text-center text-meta uppercase tracking-[0.18em] text-mos-muted"
+            className="bg-white py-2 text-center text-meta uppercase tracking-[0.18em] text-default-500"
           >
             {w}
           </div>
@@ -111,11 +111,11 @@ export default function CalendarPage() {
               style={isToday ? { boxShadow: "inset 0 0 0 2px #0A0A0A" } : {}}
             >
               <div className="flex items-center justify-between mb-1">
-                <div className="text-meta text-mos-muted">
+                <div className="text-meta text-default-500">
                   {cell.d ? String(cell.d).padStart(2, "0") : ""}
                 </div>
                 {isToday && (
-                  <div className="text-[0.62rem] uppercase tracking-[0.2em] text-mos-ink">
+                  <div className="text-[0.62rem] uppercase tracking-[0.2em] text-foreground">
                     Today
                   </div>
                 )}
@@ -134,16 +134,16 @@ export default function CalendarPage() {
                           : "#1A9B8E",
                     }}
                   >
-                    <span className="text-mos-body truncate uppercase tracking-wide">
+                    <span className="text-foreground truncate uppercase tracking-wide">
                       {it.channel} {it.published ? "live" : it.scheduled ? "sched" : "draft"}
                     </span>
                     {typeof it.auditScore === "number" && (
-                      <span className="text-mos-muted">{it.auditScore}</span>
+                      <span className="text-default-500">{it.auditScore}</span>
                     )}
                   </div>
                 ))}
                 {items.length > 3 && (
-                  <div className="text-meta text-mos-muted">+{items.length - 3} more</div>
+                  <div className="text-meta text-default-500">+{items.length - 3} more</div>
                 )}
               </div>
             </div>
@@ -151,12 +151,12 @@ export default function CalendarPage() {
         })}
       </div>
 
-      <div className="mt-6 flex items-center gap-6 text-meta uppercase tracking-[0.16em] text-mos-muted">
+      <div className="mt-6 flex items-center gap-6 text-meta uppercase tracking-[0.16em] text-default-500">
         <span className="flex items-center gap-2">
-          <span className="w-2 h-2 bg-mos-blue inline-block" /> FB
+          <span className="w-2 h-2 bg-secondary inline-block" /> FB
         </span>
         <span className="flex items-center gap-2">
-          <span className="w-2 h-2 bg-mos-red inline-block" /> IG
+          <span className="w-2 h-2 bg-danger inline-block" /> IG
         </span>
         <span>live · published</span>
         <span>sched · scheduled</span>

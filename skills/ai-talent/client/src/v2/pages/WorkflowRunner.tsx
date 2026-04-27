@@ -343,11 +343,11 @@ export default function WorkflowRunner({
   const squadName = pickLocaleText(squad.name, lang) || squad.slug;
 
   return (
-    <div className="h-full flex flex-col bg-mos-cream">
+    <div className="h-full flex flex-col bg-content2">
       {/* Header bar */}
-      <div className="px-6 py-3 border-b border-mos-hair bg-white flex items-center justify-between gap-4">
+      <div className="px-6 py-3 border-b border-divider bg-white flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="text-[0.72rem] text-mos-muted truncate flex items-center gap-2">
+          <div className="text-[0.72rem] text-default-500 truncate flex items-center gap-2">
             <span className="truncate">{missionTitle ? `${missionTitle} · ` : `Mission #${missionId} · `}{squadName}</span>
             {/* Brand chip — shows mission's bound brand. Click to rebind to the
                 currently-selected brand from the picker. Critical fix for old
@@ -378,12 +378,12 @@ export default function WorkflowRunner({
                 </Chip>
               </Tooltip>
             ) : (
-              <Chip size="sm" variant="flat" className="bg-mos-paper text-mos-body border border-mos-hair">
+              <Chip size="sm" variant="flat" className="bg-background text-foreground border border-divider">
                 為品牌：{missionBrandName || "（未綁定）"}
               </Chip>
             )}
           </div>
-          <div className="font-display text-[1.0rem] text-mos-ink truncate">
+          <div className="font-semibold text-[1.0rem] text-foreground truncate">
             {viewMode === "doc" ? "📄 文件視圖（所有步驟結論）" : (viewStep ? (pickLocaleText(viewStep.name, lang) || `Step ${viewOrder}`) : "—")}
           </div>
         </div>
@@ -415,8 +415,8 @@ export default function WorkflowRunner({
                     <path d="M14 2v6h6" />
                   </svg>
                 }
-                endContent={<span className="text-mos-muted text-[0.68rem]">▾</span>}
-                className="text-[0.74rem] text-mos-ink"
+                endContent={<span className="text-default-500 text-[0.68rem]">▾</span>}
+                className="text-[0.74rem] text-foreground"
               >
                 檔案
               </Button>
@@ -445,7 +445,7 @@ export default function WorkflowRunner({
                   <path d="M7 14l4-4 4 4 5-6" />
                 </svg>
               }
-              className="text-[0.74rem] text-mos-ink"
+              className="text-[0.74rem] text-foreground"
             >
               分析
             </Button>
@@ -470,7 +470,7 @@ export default function WorkflowRunner({
             </Button>
           </Tooltip>
 
-          <div className="text-[0.72rem] text-mos-muted">
+          <div className="text-[0.72rem] text-default-500">
             {viewOrder} / {totalSteps}
           </div>
         </div>
@@ -479,7 +479,7 @@ export default function WorkflowRunner({
       {/* Main canvas */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
         {!viewStep ? (
-          <div className="text-mos-muted text-center py-10">這個小組沒有可執行的步驟。</div>
+          <div className="text-default-500 text-center py-10">這個小組沒有可執行的步驟。</div>
         ) : viewMode === "doc" ? (
           <DocCanvas
             steps={steps}
@@ -511,7 +511,7 @@ export default function WorkflowRunner({
       </div>
 
       {/* Bottom timeline */}
-      <div className="px-6 py-3 border-t border-mos-hair bg-white flex items-center gap-2 overflow-x-auto">
+      <div className="px-6 py-3 border-t border-divider bg-white flex items-center gap-2 overflow-x-auto">
         {steps.map((s: any, i: number) => {
           const ord = Number(s.order ?? 0) || (i + 1);
           const p = byOrder.get(ord);
@@ -532,12 +532,12 @@ export default function WorkflowRunner({
               className={[
                 "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.72rem] border transition max-w-[180px]",
                 isActive
-                  ? "bg-mos-ink text-white border-mos-ink"
+                  ? "bg-foreground text-white border-foreground"
                   : status === "confirmed"
-                    ? "bg-white text-mos-ink border-mos-ink/40 hover:border-mos-ink"
+                    ? "bg-white text-foreground border-foreground/40 hover:border-foreground"
                     : reachable
-                      ? "bg-white text-mos-ink border-mos-hair hover:border-mos-ink"
-                      : "bg-white text-mos-muted border-mos-hair opacity-50 cursor-not-allowed",
+                      ? "bg-white text-foreground border-divider hover:border-foreground"
+                      : "bg-white text-default-500 border-divider opacity-50 cursor-not-allowed",
               ].join(" ")}
             >
               <span className="font-mono shrink-0">{dot}</span>
@@ -557,7 +557,7 @@ export default function WorkflowRunner({
                       <div className="text-[0.74rem] leading-relaxed whitespace-pre-wrap line-clamp-6">{previewText}</div>
                     </div>
                   }
-                  classNames={{ content: "bg-mos-ink text-white" }}
+                  classNames={{ content: "bg-foreground text-white" }}
                 >
                   {pillBtn}
                 </Tooltip>
@@ -572,7 +572,7 @@ export default function WorkflowRunner({
           <button
             disabled
             title="即將推出：PDF / Notion / Slides"
-            className="shrink-0 px-3 py-1.5 text-[0.78rem] bg-mos-orange text-white rounded-full hover:bg-mos-orange-hover transition disabled:opacity-60"
+            className="shrink-0 px-3 py-1.5 text-[0.78rem] bg-warning text-white rounded-full hover:bg-warning-hover transition disabled:opacity-60"
           >
             匯出全部成果
           </button>
@@ -631,8 +631,8 @@ function FileMenuItem({
     <button
       onClick={onClick}
       className={[
-        "w-full text-left px-3 py-2 text-[0.78rem] hover:bg-mos-paper transition flex items-center",
-        danger ? "text-red-600 hover:bg-red-50" : "text-mos-body",
+        "w-full text-left px-3 py-2 text-[0.78rem] hover:bg-background transition flex items-center",
+        danger ? "text-red-600 hover:bg-red-50" : "text-foreground",
       ].join(" ")}
     >
       {children}
@@ -679,16 +679,16 @@ function MaryDrawer({
         </DrawerHeader>
         <DrawerBody className="p-4 space-y-4">
           {history.length === 0 && (
-            <div className="text-center text-mos-muted text-[0.84rem] py-8">
+            <div className="text-center text-default-500 text-[0.84rem] py-8">
               <div className="text-[2rem] mb-2">M</div>
-              <div className="font-medium mb-1 text-mos-ink">嗨，我是 Mary。</div>
+              <div className="font-medium mb-1 text-foreground">嗨，我是 Mary。</div>
               <div className="leading-relaxed">關於這個任務，你可以問我任何事 — 「這一步為什麼這樣寫」「幫我重點摘要目前進度」「下一步該怎麼接」。</div>
             </div>
           )}
           {history.map((m, i) => (
             <div key={i} className="space-y-2">
-              <div className="bg-mos-paper rounded-lg px-3 py-2 text-[0.84rem] text-mos-ink">{m.q}</div>
-              <div className="text-[0.86rem] text-mos-body whitespace-pre-wrap leading-relaxed">{m.a}</div>
+              <div className="bg-background rounded-lg px-3 py-2 text-[0.84rem] text-foreground">{m.q}</div>
+              <div className="text-[0.86rem] text-foreground whitespace-pre-wrap leading-relaxed">{m.a}</div>
             </div>
           ))}
         </DrawerBody>
@@ -705,7 +705,7 @@ function MaryDrawer({
             placeholder="問 Mary…（⌘ + Enter 送出）"
             minRows={3}
             radius="md"
-            classNames={{ inputWrapper: "bg-mos-cream" }}
+            classNames={{ inputWrapper: "bg-content2" }}
           />
           <Button
             onPress={onAsk}
@@ -733,19 +733,19 @@ function AnalyticsModal({ isOpen, data, onClose }: { isOpen: boolean; data: any;
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="2xl" scrollBehavior="inside" radius="md">
       <ModalContent>
-        <ModalHeader className="font-display text-[1.0rem] text-mos-ink">任務分析</ModalHeader>
+        <ModalHeader className="font-semibold text-[1.0rem] text-foreground">任務分析</ModalHeader>
         <ModalBody>
-          <div className="grid grid-cols-3 gap-3 pb-4 border-b border-mos-hair">
+          <div className="grid grid-cols-3 gap-3 pb-4 border-b border-divider">
             <Stat label="步驟總數" value={String(totalSteps)} />
             <Stat label="已確認" value={String(counts.confirmed ?? 0)} />
             <Stat label="累計字數" value={totalChars > 0 ? `${(totalChars / 1000).toFixed(1)}k` : "0"} />
           </div>
-          <div className="text-[0.76rem] text-mos-muted mb-2 mt-4 tracking-[0.12em] uppercase">每步詳情</div>
+          <div className="text-[0.76rem] text-default-500 mb-2 mt-4 tracking-[0.12em] uppercase">每步詳情</div>
           {steps.length === 0 ? (
-            <div className="text-mos-muted text-[0.84rem] text-center py-8">還沒有任何步驟產出。</div>
+            <div className="text-default-500 text-[0.84rem] text-center py-8">還沒有任何步驟產出。</div>
           ) : (
             <table className="w-full text-[0.82rem]">
-              <thead className="text-[0.7rem] text-mos-muted uppercase tracking-wider">
+              <thead className="text-[0.7rem] text-default-500 uppercase tracking-wider">
                 <tr>
                   <th className="text-left py-1.5">#</th>
                   <th className="text-left py-1.5">狀態</th>
@@ -754,14 +754,14 @@ function AnalyticsModal({ isOpen, data, onClose }: { isOpen: boolean; data: any;
                   <th className="text-right py-1.5">最後更新</th>
                 </tr>
               </thead>
-              <tbody className="text-mos-body">
+              <tbody className="text-foreground">
                 {steps.map((s) => (
-                  <tr key={s.stepOrder} className="border-t border-mos-hair">
+                  <tr key={s.stepOrder} className="border-t border-divider">
                     <td className="py-2">{s.stepOrder}</td>
                     <td className="py-2">{statusBadge(s.status)}</td>
                     <td className="py-2 truncate max-w-[160px]">{s.agentName || "—"}</td>
                     <td className="py-2 text-right">{s.outputLen}</td>
-                    <td className="py-2 text-right text-mos-muted text-[0.72rem]">
+                    <td className="py-2 text-right text-default-500 text-[0.72rem]">
                       {s.updatedAt ? new Date(s.updatedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
                     </td>
                   </tr>
@@ -771,7 +771,7 @@ function AnalyticsModal({ isOpen, data, onClose }: { isOpen: boolean; data: any;
           )}
         </ModalBody>
         <ModalFooter>
-          <div className="text-[0.7rem] text-mos-muted mr-auto">Token 計費 / 各 step 耗時統計即將推出。</div>
+          <div className="text-[0.7rem] text-default-500 mr-auto">Token 計費 / 各 step 耗時統計即將推出。</div>
           <Button size="sm" variant="flat" onPress={onClose}>關閉</Button>
         </ModalFooter>
       </ModalContent>
@@ -781,21 +781,21 @@ function AnalyticsModal({ isOpen, data, onClose }: { isOpen: boolean; data: any;
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-mos-paper rounded p-3 text-center">
-      <div className="font-display text-[1.4rem] text-mos-ink">{value}</div>
-      <div className="text-[0.7rem] text-mos-muted mt-0.5">{label}</div>
+    <div className="bg-background rounded p-3 text-center">
+      <div className="font-semibold text-[1.4rem] text-foreground">{value}</div>
+      <div className="text-[0.7rem] text-default-500 mt-0.5">{label}</div>
     </div>
   );
 }
 
 function statusBadge(s: string) {
   const map: Record<string, { label: string; cls: string }> = {
-    pending:   { label: "待執行", cls: "bg-mos-paper text-mos-muted" },
+    pending:   { label: "待執行", cls: "bg-background text-default-500" },
     asking:    { label: "提問中", cls: "bg-amber-100 text-amber-700" },
     drafted:   { label: "草稿",   cls: "bg-blue-100 text-blue-700" },
     confirmed: { label: "已確認", cls: "bg-emerald-100 text-emerald-700" },
   };
-  const m = map[s] ?? { label: s, cls: "bg-mos-paper text-mos-muted" };
+  const m = map[s] ?? { label: s, cls: "bg-background text-default-500" };
   return <span className={`inline-block px-2 py-0.5 rounded text-[0.7rem] ${m.cls}`}>{m.label}</span>;
 }
 
@@ -812,7 +812,7 @@ function PresentationOverlay({
 }) {
   const slide = slides[Math.min(index, slides.length - 1)];
   return (
-    <div className="absolute inset-0 z-50 bg-mos-ink text-white flex flex-col">
+    <div className="absolute inset-0 z-50 bg-foreground text-white flex flex-col">
       {/* Top bar */}
       <div className="px-6 py-3 flex items-center justify-between border-b border-white/10">
         <div className="text-[0.74rem] tracking-[0.18em] uppercase text-white/60">{missionTitle}</div>
@@ -831,7 +831,7 @@ function PresentationOverlay({
         <div className="text-[0.82rem] tracking-[0.18em] uppercase text-white/50 mb-3">
           Step {slide.ord} · {slide.agentName}
         </div>
-        <h1 className="font-display text-[2.2rem] leading-tight mb-6">
+        <h1 className="font-semibold text-[2.2rem] leading-tight mb-6">
           {slide.name}
         </h1>
         <div className="text-[1.05rem] leading-[1.85] whitespace-pre-wrap text-white/90">
@@ -923,7 +923,7 @@ function StepCanvas({
 
   if (!unlocked) {
     return (
-      <div className="border border-dashed border-mos-hair rounded-lg p-8 text-center text-mos-muted bg-white">
+      <div className="border border-dashed border-divider rounded-lg p-8 text-center text-default-500 bg-white">
         <div className="text-[2rem] mb-2">○</div>
         <div className="text-[0.92rem]">先完成上一步驟才能開始這一步。</div>
       </div>
@@ -941,8 +941,8 @@ function StepCanvas({
           {(agentName.charAt(0) || "A").toUpperCase()}
         </div>
         <div className="min-w-0">
-          <div className="text-[0.92rem] font-semibold text-mos-ink">{agentName}</div>
-          <div className="text-[0.7rem] text-mos-muted">
+          <div className="text-[0.92rem] font-semibold text-foreground">{agentName}</div>
+          <div className="text-[0.7rem] text-default-500">
             {step.outputType ? `產出：${step.outputType}` : ""}
             {step.tools?.length ? ` · 工具：${step.tools.slice(0, 2).join(", ")}` : ""}
           </div>
@@ -952,13 +952,13 @@ function StepCanvas({
       {/* Content area driven by status */}
       {status === "pending" && (
         <div className="space-y-3">
-          <div className="bg-white border border-mos-hair rounded-lg p-6 text-mos-muted text-[0.86rem]">
+          <div className="bg-white border border-divider rounded-lg p-6 text-default-500 text-[0.86rem]">
             {isPending ? "正在準備這一步…" : "等待下一個指令…"}
           </div>
           <button
             onClick={onSkip}
             disabled={isPending}
-            className="text-[0.78rem] text-mos-muted hover:text-mos-ink underline-offset-2 hover:underline transition"
+            className="text-[0.78rem] text-default-500 hover:text-foreground underline-offset-2 hover:underline transition"
             title="不需要這一步？跳過後續步驟仍可繼續。"
           >
             跳過這一步 →
@@ -968,14 +968,14 @@ function StepCanvas({
 
       {status === "skipped" && (
         <div className="space-y-3">
-          <div className="bg-mos-paper border border-dashed border-mos-hair rounded-lg p-6 text-mos-muted text-[0.86rem] text-center">
+          <div className="bg-background border border-dashed border-divider rounded-lg p-6 text-default-500 text-[0.86rem] text-center">
             <div className="text-[1.4rem] mb-1">⤼</div>
             <div className="mb-1">已跳過這一步</div>
             <div className="text-[0.74rem]">這一步的內容不會被送進後續步驟的上下文。</div>
           </div>
           <button
             onClick={onUnskip}
-            className="w-full py-2 text-[0.82rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition"
+            className="w-full py-2 text-[0.82rem] text-foreground bg-white border border-divider hover:border-foreground rounded-full transition"
           >
             取消跳過，重新執行這一步
           </button>
@@ -985,7 +985,7 @@ function StepCanvas({
       {status === "asking" && (
         <div className="space-y-3">
           {/* Agent question bubble */}
-          <div className="bg-white border border-mos-hair rounded-lg p-4 text-[0.92rem] text-mos-body whitespace-pre-wrap leading-relaxed">
+          <div className="bg-white border border-divider rounded-lg p-4 text-[0.92rem] text-foreground whitespace-pre-wrap leading-relaxed">
             {progress?.agentOutput || "..."}
           </div>
           {/* User answer textarea */}
@@ -994,7 +994,7 @@ function StepCanvas({
             onChange={(e) => setInputDraft(e.target.value)}
             placeholder="輸入你的回答…（可以是品牌背景、目標受眾、想達成的結果，越具體越好）"
             rows={4}
-            className="w-full px-4 py-3 text-[0.86rem] bg-white border border-mos-hair rounded-lg focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition resize-none"
+            className="w-full px-4 py-3 text-[0.86rem] bg-white border border-divider rounded-lg focus:outline-none focus:border-warning focus:ring-2 focus:ring-warning/20 transition resize-none"
           />
           <button
             onClick={onAnswerAndRun}
@@ -1010,12 +1010,12 @@ function StepCanvas({
       {status === "drafted" && (
         <div className="space-y-3">
           {/* Output card */}
-          <div className="bg-white border border-mos-hair rounded-lg p-5">
-            <div className="text-[0.7rem] text-mos-muted mb-2 inline-flex items-center gap-1.5">
+          <div className="bg-white border border-divider rounded-lg p-5">
+            <div className="text-[0.7rem] text-default-500 mb-2 inline-flex items-center gap-1.5">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
               草稿 · 待確認
             </div>
-            <div className="text-[0.9rem] text-mos-body whitespace-pre-wrap leading-relaxed">
+            <div className="text-[0.9rem] text-foreground whitespace-pre-wrap leading-relaxed">
               {out}
             </div>
           </div>
@@ -1025,7 +1025,7 @@ function StepCanvas({
             onChange={(e) => setInputDraft(e.target.value)}
             placeholder="想調整方向？輸入備註後按「重新生成」（留空直接確認也可以）"
             rows={2}
-            className="w-full px-4 py-2.5 text-[0.84rem] bg-white border border-mos-hair rounded-lg focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition resize-none"
+            className="w-full px-4 py-2.5 text-[0.84rem] bg-white border border-divider rounded-lg focus:outline-none focus:border-warning focus:ring-2 focus:ring-warning/20 transition resize-none"
           />
           <div className="flex gap-2">
             {historyCount > 0 && (
@@ -1033,7 +1033,7 @@ function StepCanvas({
                 onClick={onUndo}
                 disabled={isPending || isUndoing}
                 title={`回到上一版（共 ${historyCount} 個歷史版本）`}
-                className="shrink-0 px-3 py-2.5 text-[0.86rem] text-mos-muted hover:text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                className="shrink-0 px-3 py-2.5 text-[0.86rem] text-default-500 hover:text-foreground bg-white border border-divider hover:border-foreground rounded-full transition disabled:opacity-50 inline-flex items-center gap-1.5"
               >
                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7v6h6" />
@@ -1045,7 +1045,7 @@ function StepCanvas({
             <button
               onClick={onRegenerate}
               disabled={isPending}
-              className="flex-1 py-2.5 text-[0.86rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition disabled:opacity-50"
+              className="flex-1 py-2.5 text-[0.86rem] text-foreground bg-white border border-divider hover:border-foreground rounded-full transition disabled:opacity-50"
             >
               {isPending ? "生成中…" : "重新生成"}
             </button>
@@ -1068,14 +1068,14 @@ function StepCanvas({
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
               已確認
             </div>
-            <div className="text-[0.9rem] text-mos-body whitespace-pre-wrap leading-relaxed">
+            <div className="text-[0.9rem] text-foreground whitespace-pre-wrap leading-relaxed">
               {out}
             </div>
           </div>
           <button
             onClick={onRegenerate}
             disabled={isPending}
-            className="w-full py-2 text-[0.82rem] text-mos-muted bg-white border border-mos-hair hover:border-mos-ink hover:text-mos-ink rounded-full transition disabled:opacity-50"
+            className="w-full py-2 text-[0.82rem] text-default-500 bg-white border border-divider hover:border-foreground hover:text-foreground rounded-full transition disabled:opacity-50"
           >
             重新生成這一步
           </button>
@@ -1120,16 +1120,16 @@ function DocCanvas({
   return (
     <div className="max-w-[760px] mx-auto pb-12">
       {/* Document header */}
-      <div className="border-b border-mos-hair pb-4 mb-6">
-        <div className="text-[0.7rem] tracking-[0.2em] uppercase text-mos-muted mb-1">提案文件 · 即時累積</div>
-        <h1 className="font-display text-[1.6rem] text-mos-ink leading-tight">{missionTitle}</h1>
+      <div className="border-b border-divider pb-4 mb-6">
+        <div className="text-[0.7rem] tracking-[0.2em] uppercase text-default-500 mb-1">提案文件 · 即時累積</div>
+        <h1 className="font-semibold text-[1.6rem] text-foreground leading-tight">{missionTitle}</h1>
         {brandName && (
-          <div className="text-[0.84rem] text-mos-muted mt-1">為品牌：{brandName}</div>
+          <div className="text-[0.84rem] text-default-500 mt-1">為品牌：{brandName}</div>
         )}
       </div>
 
       {!hasAny && (
-        <div className="bg-white border border-dashed border-mos-hair rounded-lg p-10 text-center text-mos-muted text-[0.86rem]">
+        <div className="bg-white border border-dashed border-divider rounded-lg p-10 text-center text-default-500 text-[0.86rem]">
           還沒有任何步驟產出。回到「逐步」模式完成第一步，這份文件就會開始累積。
         </div>
       )}
@@ -1139,17 +1139,17 @@ function DocCanvas({
           if (s.status === "pending") {
             return (
               <section key={s.ord} className="opacity-50">
-                <div className="text-[0.74rem] text-mos-muted mb-1">Step {s.ord}</div>
-                <h2 className="font-display text-[1.1rem] text-mos-ink mb-2">{s.name}</h2>
-                <div className="text-[0.82rem] text-mos-muted italic">尚未執行</div>
+                <div className="text-[0.74rem] text-default-500 mb-1">Step {s.ord}</div>
+                <h2 className="font-semibold text-[1.1rem] text-foreground mb-2">{s.name}</h2>
+                <div className="text-[0.82rem] text-default-500 italic">尚未執行</div>
               </section>
             );
           }
           if (s.status === "skipped") {
             return (
               <section key={s.ord} className="opacity-60">
-                <div className="text-[0.74rem] text-mos-muted mb-1">Step {s.ord} · ⤼ 已跳過</div>
-                <h2 className="font-display text-[1.1rem] text-mos-ink mb-1">{s.name}</h2>
+                <div className="text-[0.74rem] text-default-500 mb-1">Step {s.ord} · ⤼ 已跳過</div>
+                <h2 className="font-semibold text-[1.1rem] text-foreground mb-1">{s.name}</h2>
               </section>
             );
           }
@@ -1158,10 +1158,10 @@ function DocCanvas({
             <section key={s.ord} className="group">
               <button
                 onClick={() => onJumpToStep(s.ord)}
-                className="text-left w-full hover:bg-mos-paper/60 rounded-md -mx-2 px-2 py-1 transition"
+                className="text-left w-full hover:bg-background/60 rounded-md -mx-2 px-2 py-1 transition"
                 title="回到逐步模式編輯"
               >
-                <div className="flex items-center gap-2 text-[0.74rem] text-mos-muted mb-1">
+                <div className="flex items-center gap-2 text-[0.74rem] text-default-500 mb-1">
                   <span>Step {s.ord}</span>
                   {s.agentName && <span>· {s.agentName}</span>}
                   {s.outputType && <span>· {s.outputType}</span>}
@@ -1170,13 +1170,13 @@ function DocCanvas({
                   ) : (
                     <span className="text-amber-600">· ● 草稿</span>
                   )}
-                  <span className="opacity-0 group-hover:opacity-100 transition text-mos-orange ml-auto">編輯 →</span>
+                  <span className="opacity-0 group-hover:opacity-100 transition text-warning ml-auto">編輯 →</span>
                 </div>
-                <h2 className="font-display text-[1.2rem] text-mos-ink leading-tight" style={{ borderLeft: `3px solid ${tone.bg}`, paddingLeft: "0.7rem" }}>
+                <h2 className="font-semibold text-[1.2rem] text-foreground leading-tight" style={{ borderLeft: `3px solid ${tone.bg}`, paddingLeft: "0.7rem" }}>
                   {s.name}
                 </h2>
               </button>
-              <div className="mt-3 text-[0.92rem] text-mos-body whitespace-pre-wrap leading-relaxed pl-3">
+              <div className="mt-3 text-[0.92rem] text-foreground whitespace-pre-wrap leading-relaxed pl-3">
                 {s.output}
               </div>
             </section>

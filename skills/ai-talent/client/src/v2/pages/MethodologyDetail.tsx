@@ -57,13 +57,13 @@ export default function MethodologyDetail() {
   const s: any = squadQuery.data;
 
   if (squadQuery.isLoading) {
-    return <div className="max-w-[1280px] mx-auto px-8 py-10 text-mos-muted">載入中…</div>;
+    return <div className="max-w-[1280px] mx-auto px-8 py-10 text-default-500">載入中…</div>;
   }
   if (!s) {
     return (
       <div className="max-w-[1280px] mx-auto px-8 py-10">
-        <div className="text-mos-muted">找不到任務範本「{slug}」。</div>
-        <Link to="/templates" className="mt-4 inline-block text-mos-ink underline underline-offset-4">
+        <div className="text-default-500">找不到任務範本「{slug}」。</div>
+        <Link to="/templates" className="mt-4 inline-block text-foreground underline underline-offset-4">
           ← 回任務範本型錄
         </Link>
       </div>
@@ -77,50 +77,50 @@ export default function MethodologyDetail() {
     <main className="max-w-[1280px] mx-auto px-8 py-10">
       <button
         onClick={() => navigate(-1)}
-        className="text-[0.7rem] tracking-[0.18em] uppercase text-mos-muted hover:text-mos-ink mb-6"
+        className="text-[0.7rem] tracking-[0.18em] uppercase text-default-500 hover:text-foreground mb-6"
       >
         ← 回型錄
       </button>
 
       <div className="grid grid-cols-12 gap-6">
         <section className="col-span-7 space-y-4">
-          <div className="text-[0.66rem] tracking-[0.28em] uppercase text-mos-soft">
+          <div className="text-[0.66rem] tracking-[0.28em] uppercase text-default-400">
             METHODOLOGY · {(s.source ?? "seeded").toUpperCase()}
           </div>
-          <h1 className="font-display text-[2.6rem] leading-[1.04] text-mos-ink tracking-[-0.02em]">
+          <h1 className="font-semibold text-[2.6rem] leading-[1.04] text-foreground tracking-[-0.02em]">
             {s.name ?? s.slug}
           </h1>
           {s.methodology?.author && (
-            <div className="text-[0.86rem] text-mos-muted">
+            <div className="text-[0.86rem] text-default-500">
               {s.methodology.author}{s.methodology.year ? ` · ${s.methodology.year}` : ""}
             </div>
           )}
           {s.description && (
-            <p className="text-[0.95rem] leading-relaxed text-mos-body whitespace-pre-wrap">
+            <p className="text-[0.95rem] leading-relaxed text-foreground whitespace-pre-wrap">
               {s.description}
             </p>
           )}
 
-          <div className="border-t border-mos-hair pt-5">
-            <div className="text-[0.66rem] tracking-[0.22em] uppercase text-mos-soft mb-3">
+          <div className="border-t border-divider pt-5">
+            <div className="text-[0.66rem] tracking-[0.22em] uppercase text-default-400 mb-3">
               工作流 · {stepObjs.length} steps
             </div>
             <ol className="space-y-3">
               {stepObjs.map((st: any, i: number) => (
-                <li key={i} className="flex gap-3 border border-mos-hair bg-white p-4">
+                <li key={i} className="flex gap-3 border border-divider bg-white p-4">
                   <span
-                    className="w-8 h-8 rounded-full text-white text-[0.7rem] font-display flex items-center justify-center shrink-0"
+                    className="w-8 h-8 rounded-full text-white text-[0.7rem] font-semibold flex items-center justify-center shrink-0"
                     style={{ background: accent === "teal" ? "#1A9B8E" : accent === "red" ? "#C8322E" : "#1E7FD4" }}
                   >
                     0{i + 1}
                   </span>
                   <div className="flex-1">
-                    <div className="font-display text-[1rem] text-mos-ink">{st.name}</div>
+                    <div className="font-semibold text-[1rem] text-foreground">{st.name}</div>
                     {st.requiredSkill && (
-                      <div className="text-[0.74rem] text-mos-muted">技能 · {st.requiredSkill}</div>
+                      <div className="text-[0.74rem] text-default-500">技能 · {st.requiredSkill}</div>
                     )}
                     {st.outputType && (
-                      <div className="text-[0.74rem] text-mos-muted">產出 · {st.outputType}</div>
+                      <div className="text-[0.74rem] text-default-500">產出 · {st.outputType}</div>
                     )}
                   </div>
                 </li>
@@ -131,7 +131,7 @@ export default function MethodologyDetail() {
           <button
             onClick={() => applyToNewMission(s)}
             disabled={busy}
-            className="mt-6 px-6 py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-40 disabled:cursor-wait"
+            className="mt-6 px-6 py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-foreground text-white hover:bg-foreground/90 transition disabled:opacity-40 disabled:cursor-wait"
           >
             {busy ? "建立中…" : "套用到新任務 →"}
           </button>

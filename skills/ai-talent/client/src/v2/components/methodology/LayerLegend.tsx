@@ -80,8 +80,8 @@ function Chip({
       disabled={!interactive}
       className={[
         "flex items-center gap-2 px-3 py-1.5 border transition",
-        interactive ? "cursor-pointer hover:border-mos-ink" : "cursor-default",
-        isActive ? "border-mos-ink" : "border-mos-hair",
+        interactive ? "cursor-pointer hover:border-foreground" : "cursor-default",
+        isActive ? "border-foreground" : "border-divider",
       ].join(" ")}
       style={{
         background: isActive ? tint : "#fff",
@@ -92,10 +92,10 @@ function Chip({
         style={{ background: tone }}
         aria-hidden
       />
-      <span className="font-display text-[0.66rem] tracking-[0.22em] uppercase text-mos-ink">
+      <span className="font-semibold text-[0.66rem] tracking-[0.22em] uppercase text-foreground">
         {label}
       </span>
-      <span className="text-[0.7rem] text-mos-muted">{subLabel}</span>
+      <span className="text-[0.7rem] text-default-500">{subLabel}</span>
     </button>
   );
 }

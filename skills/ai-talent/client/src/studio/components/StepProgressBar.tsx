@@ -20,7 +20,7 @@ export default function StepProgressBar({ steps, accent, onJump }: StepProgressB
               : s.status === "active"
               ? tone.bg
               : "#E4E4E4";
-          const text = s.status === "pending" ? "text-mos-muted" : "text-mos-ink";
+          const text = s.status === "pending" ? "text-default-500" : "text-foreground";
           return (
             <React.Fragment key={i}>
               <button

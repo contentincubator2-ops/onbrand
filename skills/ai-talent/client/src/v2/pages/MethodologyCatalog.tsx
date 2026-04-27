@@ -123,10 +123,10 @@ export default function MethodologyCatalog() {
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-mos-hair rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-divider rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
           >
             <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-mos-ink">先睹為快</span>
+            <span className="text-foreground">先睹為快</span>
           </button>
           <button
             onClick={() => setDrawerOpen(true)}
@@ -140,7 +140,7 @@ export default function MethodologyCatalog() {
 
         <div className="max-w-[1280px] mx-auto px-8 pt-20 pb-14">
           {/* Big title */}
-          <h1 className="text-center font-display text-[3.2rem] leading-[1.05] text-mos-ink tracking-[-0.02em]">
+          <h1 className="text-center font-semibold text-[3.2rem] leading-[1.05] text-foreground tracking-[-0.02em]">
             任務範本
           </h1>
 
@@ -149,7 +149,7 @@ export default function MethodologyCatalog() {
             <div className="relative">
               <svg
                 viewBox="0 0 24 24"
-                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-mos-muted"
+                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-default-500"
                 fill="none" stroke="currentColor" strokeWidth="1.6"
                 strokeLinecap="round" strokeLinejoin="round"
               >
@@ -177,8 +177,8 @@ export default function MethodologyCatalog() {
                   className={[
                     "inline-flex items-center gap-2 px-4 py-2 rounded-full transition border",
                     active
-                      ? "bg-mos-ink text-white border-mos-ink shadow-[0_2px_6px_rgba(0,0,0,0.10)]"
-                      : "bg-white/95 hover:bg-white text-mos-ink border-white/0 hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)]",
+                      ? "bg-foreground text-white border-foreground shadow-[0_2px_6px_rgba(0,0,0,0.10)]"
+                      : "bg-white/95 hover:bg-white text-foreground border-white/0 hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)]",
                   ].join(" ")}
                 >
                   <span
@@ -199,20 +199,20 @@ export default function MethodologyCatalog() {
       {/* ─── EXPLORE — pastel category cards ────────────────────────────── */}
       <section className="max-w-[1280px] mx-auto px-8 mt-12">
         <div className="flex items-end justify-between mb-4">
-          <h2 className="font-display text-[1.5rem] text-mos-ink tracking-[-0.015em]">
+          <h2 className="font-semibold text-[1.5rem] text-foreground tracking-[-0.015em]">
             探索任務範本
           </h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => onScrollExplore(-1)}
-              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-mos-hair bg-white hover:border-mos-ink transition"
+              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-divider bg-white hover:border-foreground transition"
               aria-label="向左捲動"
             >
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             </button>
             <button
               onClick={() => onScrollExplore(1)}
-              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-mos-hair bg-white hover:border-mos-ink transition"
+              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-divider bg-white hover:border-foreground transition"
               aria-label="向右捲動"
             >
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -235,19 +235,19 @@ export default function MethodologyCatalog() {
                   "shrink-0 snap-start relative rounded-2xl text-left transition overflow-hidden",
                   "w-[260px] h-[120px] flex items-center justify-between px-5 py-4",
                   active
-                    ? "ring-2 ring-mos-ink shadow-[0_4px_14px_rgba(0,0,0,0.08)]"
+                    ? "ring-2 ring-foreground shadow-[0_4px_14px_rgba(0,0,0,0.08)]"
                     : "hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]",
                 ].join(" ")}
                 style={{ background: c.bg }}
               >
                 <div>
-                  <div className="text-[0.58rem] tracking-[0.28em] uppercase text-mos-soft">
+                  <div className="text-[0.58rem] tracking-[0.28em] uppercase text-default-400">
                     {c.layer}
                   </div>
-                  <div className="mt-1 font-display text-[1.1rem] text-mos-ink tracking-[-0.01em]">
+                  <div className="mt-1 font-semibold text-[1.1rem] text-foreground tracking-[-0.01em]">
                     {c.label}
                   </div>
-                  <div className="mt-1 text-[0.7rem] text-mos-muted">
+                  <div className="mt-1 text-[0.7rem] text-default-500">
                     {c.hint}
                   </div>
                 </div>
@@ -268,12 +268,12 @@ export default function MethodologyCatalog() {
       <section id="recommended-section" className="max-w-[1280px] mx-auto px-8 mt-14">
         <div className="flex items-end justify-between mb-5">
           <div>
-            <h2 className="font-display text-[1.5rem] text-mos-ink tracking-[-0.015em]">
+            <h2 className="font-semibold text-[1.5rem] text-foreground tracking-[-0.015em]">
               {layerFilter
                 ? `${LAYER_CARDS.find((c) => c.layer === layerFilter)?.label} · 任務範本`
                 : "為你推薦的任務範本"}
             </h2>
-            <div className="mt-1 text-[0.78rem] text-mos-muted">
+            <div className="mt-1 text-[0.78rem] text-default-500">
               每張卡片都是已配好 squad、可立即套用的任務範本。
             </div>
           </div>
@@ -298,7 +298,7 @@ export default function MethodologyCatalog() {
             {layerFilter && (
               <button
                 onClick={() => setLayerFilter(null)}
-                className="ml-1 px-3 py-1.5 text-[0.7rem] tracking-[0.16em] uppercase text-mos-muted hover:text-mos-ink"
+                className="ml-1 px-3 py-1.5 text-[0.7rem] tracking-[0.16em] uppercase text-default-500 hover:text-foreground"
               >
                 清除分類 ✕
               </button>
@@ -307,14 +307,14 @@ export default function MethodologyCatalog() {
         </div>
 
         {squadsQuery.isLoading && sourceFilter !== "mine" && (
-          <div className="text-[0.82rem] text-mos-muted py-10">載入任務範本中…</div>
+          <div className="text-[0.82rem] text-default-500 py-10">載入任務範本中…</div>
         )}
         {sourceFilter === "mine" && mineQuery.isLoading && (
-          <div className="text-[0.82rem] text-mos-muted py-10">載入我的任務範本中…</div>
+          <div className="text-[0.82rem] text-default-500 py-10">載入我的任務範本中…</div>
         )}
 
         {!squadsQuery.isLoading && filtered.length === 0 && (
-          <div className="text-[0.82rem] text-mos-muted py-10">沒有符合的任務範本。</div>
+          <div className="text-[0.82rem] text-default-500 py-10">沒有符合的任務範本。</div>
         )}
 
         <div className="flex flex-wrap gap-6">
@@ -378,8 +378,8 @@ function FilterChip({
       className={[
         "px-3 py-1.5 text-[0.7rem] tracking-[0.18em] uppercase rounded-full transition",
         active
-          ? "bg-mos-ink text-white"
-          : "border border-mos-hair text-mos-muted hover:text-mos-ink hover:border-mos-ink bg-white",
+          ? "bg-foreground text-white"
+          : "border border-divider text-default-500 hover:text-foreground hover:border-foreground bg-white",
       ].join(" ")}
     >
       {children}

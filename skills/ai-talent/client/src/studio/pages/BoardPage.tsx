@@ -31,14 +31,14 @@ export default function BoardPage() {
 
   return (
     <StudioLayout title="Task Board">
-      <div className="grid grid-cols-4 gap-px bg-mos-hair border border-mos-hair min-h-[640px]">
+      <div className="grid grid-cols-4 gap-px bg-divider border border-divider min-h-[640px]">
         {COLS.map((c) => {
           const rows: any[] = data[c.key] ?? [];
           return (
-            <div key={c.key} className="bg-mos-paper flex flex-col">
-              <div className="px-5 py-4 border-b border-mos-hair flex items-center justify-between bg-white">
+            <div key={c.key} className="bg-background flex flex-col">
+              <div className="px-5 py-4 border-b border-divider flex items-center justify-between bg-white">
                 <div className="mos-eyebrow">{c.label}</div>
-                <div className="text-meta text-mos-muted">{rows.length}</div>
+                <div className="text-meta text-default-500">{rows.length}</div>
               </div>
               <div className="p-3 space-y-3 overflow-y-auto">
                 {rows.map((r: any, i: number) => {
@@ -48,22 +48,22 @@ export default function BoardPage() {
                     <button
                       key={r.id}
                       onClick={() => navigate(`/studio/${brandId}/session/${r.squadId ?? "new"}`)}
-                      className="group w-full bg-white border border-mos-hair text-left"
+                      className="group w-full bg-white border border-divider text-left"
                     >
                       <div className="h-1" style={{ background: tone.bg }} />
                       <div className="p-3">
                         <div className="mos-eyebrow mb-1">{r.decisionType}</div>
-                        <div className="text-[0.92rem] text-mos-ink leading-snug mb-2">
+                        <div className="text-[0.92rem] text-foreground leading-snug mb-2">
                           {r.title ?? r.squadName ?? "Untitled"}
                         </div>
-                        <div className="flex items-center justify-between text-meta text-mos-muted">
+                        <div className="flex items-center justify-between text-meta text-default-500">
                           <span>{r.squadName ?? "—"}</span>
                           {typeof r.auditScore === "number" && (
                             <span>Audit {r.auditScore}</span>
                           )}
                         </div>
                         {r.mentionCount > 0 && (
-                          <div className="mt-2 text-meta uppercase tracking-[0.14em] text-mos-ink">
+                          <div className="mt-2 text-meta uppercase tracking-[0.14em] text-foreground">
                             Waiting on {r.mentionCount} mention{r.mentionCount > 1 ? "s" : ""}
                           </div>
                         )}
@@ -72,7 +72,7 @@ export default function BoardPage() {
                   );
                 })}
                 {!rows.length && (
-                  <div className="text-meta text-mos-muted text-center py-8">—</div>
+                  <div className="text-meta text-default-500 text-center py-8">—</div>
                 )}
               </div>
             </div>

@@ -207,10 +207,10 @@ export default function QuickTasksPage() {
         <div className="max-w-[1280px] mx-auto px-8 pt-16 pb-10">
           <div className="flex items-center justify-between gap-6 flex-wrap">
             <div>
-              <div className="font-display text-[0.6rem] tracking-[0.32em] uppercase" style={{ color: "#888" }}>
+              <div className="font-semibold text-[0.6rem] tracking-[0.32em] uppercase" style={{ color: "#888" }}>
                 QUICK · 30s DELIVERY
               </div>
-              <h1 className="mt-3 font-display text-[3.2rem] leading-[1.02] tracking-[-0.025em]">
+              <h1 className="mt-3 font-semibold text-[3.2rem] leading-[1.02] tracking-[-0.025em]">
                 30 秒產出
               </h1>
             </div>
@@ -270,7 +270,7 @@ export default function QuickTasksPage() {
       ) : (
         <section className="max-w-[1280px] mx-auto px-8 mt-14">
           <div className="flex items-end justify-between mb-6">
-            <h2 className="font-display text-[1.5rem] tracking-[-0.015em]">所有 Squads</h2>
+            <h2 className="font-semibold text-[1.5rem] tracking-[-0.015em]">所有 Squads</h2>
             <span className="text-[0.72rem] tracking-[0.2em] uppercase" style={{ color: "#888" }}>
               {tasks.length} SQUADS · 全部 &lt; 30s
             </span>
@@ -290,7 +290,7 @@ export default function QuickTasksPage() {
                   className="group text-left bg-white p-6 hover:bg-[#FAFAFA] transition relative"
                 >
                   <div className="flex items-start justify-between">
-                    <div className="font-display text-[2rem] tracking-[-0.02em]" style={{ color: ACCENT }}>
+                    <div className="font-semibold text-[2rem] tracking-[-0.02em]" style={{ color: ACCENT }}>
                       {String(i + 1).padStart(2, "0")}
                     </div>
                     <div className="text-[0.66rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>
@@ -532,7 +532,7 @@ function RunPanel({
                   </span>
                 )}
               </div>
-              <div className="font-display text-[1.4rem] tracking-[-0.015em] mt-0.5">{task.squadName}</div>
+              <div className="font-semibold text-[1.4rem] tracking-[-0.015em] mt-0.5">{task.squadName}</div>
               <div className="text-[0.78rem]" style={{ color: "#666" }}>{task.squadTagline}</div>
             </div>
           </div>
@@ -569,7 +569,7 @@ function RunPanel({
             <ol className="space-y-2 text-[0.78rem]">
               {task.stages.map((s, i) => (
                 <li key={s.id} className="flex items-start gap-2">
-                  <span className="font-display tabular-nums shrink-0" style={{ color: s.isOrchestrator ? INK : "#999" }}>
+                  <span className="font-semibold tabular-nums shrink-0" style={{ color: s.isOrchestrator ? INK : "#999" }}>
                     0{i + 1}
                   </span>
                   <div>
@@ -595,7 +595,7 @@ function RunPanel({
               <div className="h-full min-h-[460px] flex items-center justify-center text-center">
                 <div>
                   <div className="text-[0.7rem] tracking-[0.22em] uppercase" style={{ color: "#888" }}>READY</div>
-                  <div className="mt-3 font-display text-[1.5rem] tracking-[-0.015em]">
+                  <div className="mt-3 font-semibold text-[1.5rem] tracking-[-0.015em]">
                     {task.stages.length} 階段管線已就位
                   </div>
                   <div className="mt-2 text-[0.85rem]" style={{ color: "#666", maxWidth: 420 }}>
@@ -661,7 +661,7 @@ function StageBlock({
       <header className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div
-            className="font-display text-[1.6rem] tabular-nums tracking-tight"
+            className="font-semibold text-[1.6rem] tabular-nums tracking-tight"
             style={{ color: isOrch ? "white" : ACCENT }}
           >
             0{stageIdx + 1}
@@ -670,7 +670,7 @@ function StageBlock({
             <div className="text-[0.62rem] tracking-[0.24em] uppercase opacity-70">
               {isOrch ? "ORCHESTRATOR · 收尾" : `STAGE ${stageIdx + 1} · 並行`}
             </div>
-            <div className="font-display text-[1.15rem] tracking-[-0.01em]">{stage.label}</div>
+            <div className="font-semibold text-[1.15rem] tracking-[-0.01em]">{stage.label}</div>
           </div>
         </div>
         <div className="text-[0.72rem] opacity-70">{stage.description}</div>
@@ -915,7 +915,7 @@ function FinalDeliverable({
             <div className="text-[0.62rem] tracking-[0.28em] uppercase" style={{ color: ACCENT }}>
               FINAL DELIVERABLE · 交付完成
             </div>
-            <div className="font-display text-[1.25rem] tracking-[-0.015em]">
+            <div className="font-semibold text-[1.25rem] tracking-[-0.015em]">
               {result.agentName} · {result.agentRole}
             </div>
           </div>
@@ -1005,12 +1005,12 @@ function PersonaCard({ data }: { data: any }) {
   const initials = String(data.name ?? "?").trim().slice(0, 2);
   return (
     <div className="grid grid-cols-[88px_1fr] gap-5">
-      <div className="w-[88px] h-[88px] flex items-center justify-center font-display text-[1.6rem] tracking-tight"
+      <div className="w-[88px] h-[88px] flex items-center justify-center font-semibold text-[1.6rem] tracking-tight"
         style={{ background: ACCENT, color: "white" }}>
         {initials}
       </div>
       <div>
-        <div className="font-display text-[1.3rem] tracking-[-0.015em]">{data.name}</div>
+        <div className="font-semibold text-[1.3rem] tracking-[-0.015em]">{data.name}</div>
         <div className="text-[0.85rem] mt-1 italic" style={{ color: "#666" }}>"{data.tagline}"</div>
         {data.demographics && (
           <div className="mt-3 text-[0.78rem] flex flex-wrap gap-x-3 gap-y-1" style={{ color: "#444" }}>
@@ -1073,7 +1073,7 @@ function NameCards({ data }: { data: any[] }) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {data.map((n, i) => (
         <div key={i} className="p-3" style={{ border: `1px solid ${HAIR}` }}>
-          <div className="font-display text-[1.3rem] tracking-[-0.015em]">{n.chinese}</div>
+          <div className="font-semibold text-[1.3rem] tracking-[-0.015em]">{n.chinese}</div>
           <div className="text-[0.84rem] font-mono" style={{ color: ACCENT }}>{n.english}</div>
           <div className="mt-1 text-[0.78rem]" style={{ color: "#666" }}>{n.meaning}</div>
         </div>

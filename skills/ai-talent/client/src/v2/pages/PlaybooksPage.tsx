@@ -69,10 +69,10 @@ export default function PlaybooksPage() {
         >
           PLAYBOOKS · 成長方案
         </div>
-        <h1 className="font-display text-[2.4rem] leading-tight text-mos-ink mb-3">
+        <h1 className="font-semibold text-[2.4rem] leading-tight text-foreground mb-3">
           挑一個劇本，90 天讓品牌變成下一個案例
         </h1>
-        <p className="text-mos-muted text-[0.95rem] max-w-[640px] leading-relaxed">
+        <p className="text-default-500 text-[0.95rem] max-w-[640px] leading-relaxed">
           每個方案都是 SoWork 策展團隊把 squad（任務範本）、顧問團、媒體通路、
           KPI 串好的「可賣包」。背後是真實案例與可驗證的階段方法。
           選一個，按下「套用」，剩下交給流程。
@@ -94,7 +94,7 @@ export default function PlaybooksPage() {
           ? Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="aspect-[5/6] rounded-2xl border border-mos-hair bg-white animate-pulse"
+                className="aspect-[5/6] rounded-2xl border border-divider bg-white animate-pulse"
               />
             ))
           : playbooks.map((p) => (
@@ -138,7 +138,7 @@ function PlaybookCard({
   return (
     <button
       onClick={onClick}
-      className="group relative aspect-[5/6] rounded-2xl border border-mos-hair bg-white overflow-hidden text-left hover:shadow-lg hover:-translate-y-0.5 transition-all"
+      className="group relative aspect-[5/6] rounded-2xl border border-divider bg-white overflow-hidden text-left hover:shadow-lg hover:-translate-y-0.5 transition-all"
     >
       {/* Top color band */}
       <div
@@ -157,21 +157,21 @@ function PlaybookCard({
 
       {/* Body */}
       <div className="p-5 flex flex-col h-[calc(100%-128px)]">
-        <div className="font-display text-[1.05rem] text-mos-ink mb-1 leading-snug">
+        <div className="font-semibold text-[1.05rem] text-foreground mb-1 leading-snug">
           {playbook.title}
         </div>
-        <div className="text-[0.78rem] text-mos-muted leading-relaxed line-clamp-2 mb-3">
+        <div className="text-[0.78rem] text-default-500 leading-relaxed line-clamp-2 mb-3">
           {playbook.hook}
         </div>
 
         {/* Stats row */}
         <div className="mt-auto space-y-2">
-          <div className="flex items-center gap-2 text-[0.7rem] text-mos-muted">
+          <div className="flex items-center gap-2 text-[0.7rem] text-default-500">
             <Stat label="期間" value={playbook.duration} />
             <span className="opacity-30">·</span>
             <Stat label="預算" value={playbook.budget} />
           </div>
-          <div className="flex items-center gap-3 text-[0.66rem] text-mos-muted pt-2 border-t border-mos-hair">
+          <div className="flex items-center gap-3 text-[0.66rem] text-default-500 pt-2 border-t border-divider">
             <span>📋 {playbook.squadCount} squad</span>
             <span>👔 {playbook.personaCount} 顧問</span>
             <span>📡 {playbook.channelCount} 通路</span>
@@ -199,7 +199,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       <span className="text-[0.6rem] uppercase tracking-wider opacity-60">
         {label}
       </span>
-      <span className="text-mos-ink font-medium">{value}</span>
+      <span className="text-foreground font-medium">{value}</span>
     </span>
   );
 }
@@ -260,7 +260,7 @@ function PlaybookDetail({
       {/* Drawer */}
       <div className="w-full max-w-[640px] bg-white shadow-2xl overflow-y-auto">
         {detailQuery.isLoading || !data ? (
-          <div className="p-10 text-mos-muted text-sm">載入中…</div>
+          <div className="p-10 text-default-500 text-sm">載入中…</div>
         ) : (
           <div>
             {/* Header */}
@@ -272,7 +272,7 @@ function PlaybookDetail({
             >
               <button
                 onClick={onClose}
-                className="absolute top-5 right-5 w-8 h-8 rounded-full hover:bg-mos-ink/[0.06] flex items-center justify-center text-mos-muted"
+                className="absolute top-5 right-5 w-8 h-8 rounded-full hover:bg-foreground/[0.06] flex items-center justify-center text-default-500"
                 title="關閉"
               >
                 <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -289,10 +289,10 @@ function PlaybookDetail({
                   >
                     {BADGE_COPY[data.badge] ?? data.badge} · 成長方案
                   </div>
-                  <h2 className="font-display text-[1.6rem] leading-tight text-mos-ink mb-2">
+                  <h2 className="font-semibold text-[1.6rem] leading-tight text-foreground mb-2">
                     {data.title}
                   </h2>
-                  <p className="text-mos-muted text-[0.88rem] leading-relaxed">
+                  <p className="text-default-500 text-[0.88rem] leading-relaxed">
                     {data.hook}
                   </p>
                 </div>
@@ -308,7 +308,7 @@ function PlaybookDetail({
             <div className="px-8 py-6 space-y-7">
               {/* Problem */}
               <Section title="這個方案在解什麼痛">
-                <p className="text-mos-ink text-[0.9rem] leading-relaxed whitespace-pre-line">
+                <p className="text-foreground text-[0.9rem] leading-relaxed whitespace-pre-line">
                   {data.problem}
                 </p>
               </Section>
@@ -346,7 +346,7 @@ function PlaybookDetail({
                   {data.phases.map((ph: any, idx: number) => (
                     <div
                       key={idx}
-                      className="border border-mos-hair rounded-xl p-4"
+                      className="border border-divider rounded-xl p-4"
                     >
                       <div className="flex items-baseline gap-3 mb-2">
                         <span
@@ -358,11 +358,11 @@ function PlaybookDetail({
                         >
                           {ph.week}
                         </span>
-                        <span className="font-display text-[0.95rem] text-mos-ink">
+                        <span className="font-semibold text-[0.95rem] text-foreground">
                           {ph.name}
                         </span>
                       </div>
-                      <ul className="text-[0.82rem] text-mos-ink space-y-1 mb-2 ml-1">
+                      <ul className="text-[0.82rem] text-foreground space-y-1 mb-2 ml-1">
                         {ph.tasks.map((t: string, i: number) => (
                           <li key={i} className="flex gap-2">
                             <span style={{ color: data.color }}>·</span>
@@ -370,7 +370,7 @@ function PlaybookDetail({
                           </li>
                         ))}
                       </ul>
-                      <div className="text-[0.7rem] text-mos-muted mt-2 pt-2 border-t border-mos-hair">
+                      <div className="text-[0.7rem] text-default-500 mt-2 pt-2 border-t border-divider">
                         產出：{ph.deliverables.join(" / ")}
                       </div>
                     </div>
@@ -387,26 +387,26 @@ function PlaybookDetail({
                     borderColor: `${data.color}30`,
                   }}
                 >
-                  <div className="text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted mb-1">
+                  <div className="text-[0.66rem] tracking-[0.18em] uppercase text-default-500 mb-1">
                     {data.successCase.industry} · {data.successCase.scope}
                   </div>
                   <div
-                    className="font-display text-[1rem] mb-3"
+                    className="font-semibold text-[1rem] mb-3"
                     style={{ color: data.color }}
                   >
                     {data.successCase.brand}
                   </div>
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div>
-                      <div className="text-[0.62rem] uppercase tracking-wider text-mos-muted mb-1">
+                      <div className="text-[0.62rem] uppercase tracking-wider text-default-500 mb-1">
                         Before
                       </div>
-                      <div className="text-[0.82rem] text-mos-ink leading-relaxed">
+                      <div className="text-[0.82rem] text-foreground leading-relaxed">
                         {data.successCase.before}
                       </div>
                     </div>
                     <div>
-                      <div className="text-[0.62rem] uppercase tracking-wider text-mos-muted mb-1">
+                      <div className="text-[0.62rem] uppercase tracking-wider text-default-500 mb-1">
                         After
                       </div>
                       <div
@@ -417,10 +417,10 @@ function PlaybookDetail({
                       </div>
                     </div>
                   </div>
-                  <div className="text-[0.7rem] uppercase tracking-wider text-mos-muted mb-2">
+                  <div className="text-[0.7rem] uppercase tracking-wider text-default-500 mb-2">
                     關鍵動作
                   </div>
-                  <ul className="text-[0.82rem] text-mos-ink space-y-1.5 mb-3">
+                  <ul className="text-[0.82rem] text-foreground space-y-1.5 mb-3">
                     {data.successCase.keyMoves.map((m: string, i: number) => (
                       <li key={i} className="flex gap-2">
                         <span style={{ color: data.color }}>▸</span>
@@ -428,7 +428,7 @@ function PlaybookDetail({
                       </li>
                     ))}
                   </ul>
-                  <div className="text-[0.78rem] font-medium text-mos-ink mt-3 pt-3 border-t border-mos-hair">
+                  <div className="text-[0.78rem] font-medium text-foreground mt-3 pt-3 border-t border-divider">
                     {data.successCase.outcome}
                   </div>
                 </div>
@@ -454,7 +454,7 @@ function PlaybookDetail({
             </div>
 
             {/* Sticky CTA */}
-            <div className="sticky bottom-0 bg-white border-t border-mos-hair px-8 py-4">
+            <div className="sticky bottom-0 bg-white border-t border-divider px-8 py-4">
               {applyError && (
                 <div className="text-[0.78rem] text-red-600 mb-2">
                   {applyError}
@@ -472,7 +472,7 @@ function PlaybookDetail({
                   ? `套用此方案到 ${brandName} →`
                   : "套用此方案 →"}
               </button>
-              <div className="text-[0.7rem] text-mos-muted text-center mt-2">
+              <div className="text-[0.7rem] text-default-500 text-center mt-2">
                 套用後會建立任務、自動推薦 squad、預先呼叫顧問團
               </div>
             </div>
@@ -493,7 +493,7 @@ function Section({
   return (
     <div>
       <h3
-        className="text-[0.66rem] tracking-[0.22em] uppercase text-mos-muted mb-3"
+        className="text-[0.66rem] tracking-[0.22em] uppercase text-default-500 mb-3"
       >
         {title}
       </h3>
@@ -513,11 +513,11 @@ function Meta({
 }) {
   return (
     <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2.5 border border-white/60">
-      <div className="text-[0.6rem] uppercase tracking-wider text-mos-muted mb-1">
+      <div className="text-[0.6rem] uppercase tracking-wider text-default-500 mb-1">
         {label}
       </div>
       <div
-        className={`text-mos-ink font-medium ${
+        className={`text-foreground font-medium ${
           small ? "text-[0.72rem] leading-snug" : "text-[0.84rem]"
         }`}
       >
@@ -537,14 +537,14 @@ function BundleStat({
   detail: string;
 }) {
   return (
-    <div className="border border-mos-hair rounded-lg p-3">
-      <div className="text-[0.6rem] uppercase tracking-wider text-mos-muted mb-1">
+    <div className="border border-divider rounded-lg p-3">
+      <div className="text-[0.6rem] uppercase tracking-wider text-default-500 mb-1">
         {label}
       </div>
-      <div className="font-display text-[1.4rem] text-mos-ink leading-none mb-1">
+      <div className="font-semibold text-[1.4rem] text-foreground leading-none mb-1">
         {count}
       </div>
-      <div className="text-[0.66rem] text-mos-muted line-clamp-2 leading-snug">
+      <div className="text-[0.66rem] text-default-500 line-clamp-2 leading-snug">
         {detail}
       </div>
     </div>

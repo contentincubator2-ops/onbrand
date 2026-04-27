@@ -200,25 +200,25 @@ export default function ProjectsPage() {
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <button
             onClick={() => navigate("/templates")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-mos-hair rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-divider rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
           >
             <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-mos-ink">先看看任務範本</span>
+            <span className="text-foreground">先看看任務範本</span>
           </button>
           <button
             onClick={() => setCreateSource("recommended")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-white hover:bg-mos-ink/5 border border-mos-ink rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-white hover:bg-foreground/5 border border-foreground rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
           >
             <span aria-hidden style={{ color: "#D4A24C" }}>👑</span>
-            <span className="text-mos-ink font-medium">開始建立</span>
+            <span className="text-foreground font-medium">開始建立</span>
           </button>
         </div>
 
         <div className="max-w-[1280px] mx-auto">
-          <div className="font-display text-[0.66rem] tracking-[0.28em] uppercase text-mos-soft">
+          <div className="font-semibold text-[0.66rem] tracking-[0.28em] uppercase text-default-400">
             PROJECTS
           </div>
-          <h1 className="mt-1 font-display text-[2.4rem] leading-[1.05] text-mos-ink tracking-[-0.02em]">
+          <h1 className="mt-1 font-semibold text-[2.4rem] leading-[1.05] text-foreground tracking-[-0.02em]">
             所有專案
           </h1>
 
@@ -226,7 +226,7 @@ export default function ProjectsPage() {
           <div className="mt-6 max-w-[720px]">
             <div className="relative">
               <svg
-                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-mos-muted pointer-events-none"
+                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-default-500 pointer-events-none"
                 viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
                 strokeLinecap="round" strokeLinejoin="round"
               >
@@ -246,7 +246,7 @@ export default function ProjectsPage() {
       </section>
 
       {/* ─── Filter row ──────────────────────────────────────────── */}
-      <section className="border-b border-mos-hair bg-white">
+      <section className="border-b border-divider bg-white">
         <div className="max-w-[1280px] mx-auto px-8 py-3 flex items-center gap-2 flex-wrap">
           <FilterChip
             label={typeFilter === "all" ? "類型" : `類型：${typeFilter}`}
@@ -272,7 +272,7 @@ export default function ProjectsPage() {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => setSortDesc((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink hover:bg-mos-ink/5 rounded-full transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-foreground hover:bg-foreground/5 rounded-full transition"
               title="切換排序"
             >
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -282,13 +282,13 @@ export default function ProjectsPage() {
               {sortDesc ? "新到舊" : "舊到新"}
             </button>
 
-            <div className="flex items-center bg-white border border-mos-hair rounded-full overflow-hidden">
+            <div className="flex items-center bg-white border border-divider rounded-full overflow-hidden">
               <button
                 onClick={() => setViewMode("grid")}
                 title="格狀檢視"
                 className={[
                   "w-9 h-8 inline-flex items-center justify-center transition",
-                  viewMode === "grid" ? "bg-mos-ink text-white" : "text-mos-muted hover:text-mos-ink",
+                  viewMode === "grid" ? "bg-foreground text-white" : "text-default-500 hover:text-foreground",
                 ].join(" ")}
               >
                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
@@ -298,7 +298,7 @@ export default function ProjectsPage() {
                 title="清單檢視"
                 className={[
                   "w-9 h-8 inline-flex items-center justify-center transition",
-                  viewMode === "list" ? "bg-mos-ink text-white" : "text-mos-muted hover:text-mos-ink",
+                  viewMode === "list" ? "bg-foreground text-white" : "text-default-500 hover:text-foreground",
                 ].join(" ")}
               >
                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
@@ -328,20 +328,20 @@ export default function ProjectsPage() {
                 className={[
                   "w-full text-left px-3 py-2 rounded-lg text-[0.86rem] flex items-center gap-2.5 transition",
                   subNav === n.id
-                    ? "bg-mos-ink/[0.06] text-mos-ink font-medium"
-                    : "text-mos-muted hover:bg-mos-ink/[0.03] hover:text-mos-ink",
+                    ? "bg-foreground/[0.06] text-foreground font-medium"
+                    : "text-default-500 hover:bg-foreground/[0.03] hover:text-foreground",
                 ].join(" ")}
               >
-                <span className="w-5 text-center text-[0.95rem] text-mos-soft">{n.glyph}</span>
+                <span className="w-5 text-center text-[0.95rem] text-default-400">{n.glyph}</span>
                 {n.label}
               </button>
             ))}
           </nav>
 
           {/* Star tip card */}
-          <div className="mt-6 p-4 rounded-2xl border border-mos-hair bg-gradient-to-br from-[#FFF8E7] to-[#FFE9D6]">
+          <div className="mt-6 p-4 rounded-2xl border border-divider bg-gradient-to-br from-[#FFF8E7] to-[#FFE9D6]">
             <div className="text-[1.4rem]">⭐</div>
-            <div className="mt-1.5 text-[0.78rem] text-mos-ink leading-snug">
+            <div className="mt-1.5 text-[0.78rem] text-foreground leading-snug">
               點擊任一專案的星號圖示，即可從這裡輕鬆找到。
             </div>
           </div>
@@ -350,19 +350,19 @@ export default function ProjectsPage() {
         {/* Main column */}
         <div className="flex-1 min-w-0">
           {isLoading && (
-            <div className="text-[0.82rem] text-mos-muted">載入專案中…</div>
+            <div className="text-[0.82rem] text-default-500">載入專案中…</div>
           )}
 
           {!isLoading && all.length === 0 && (
             <div className="py-16 text-center">
               <div className="text-[2.4rem] mb-3">📁</div>
-              <div className="text-[0.92rem] text-mos-ink font-medium">還沒有專案</div>
-              <div className="mt-1 text-[0.78rem] text-mos-muted">
+              <div className="text-[0.92rem] text-foreground font-medium">還沒有專案</div>
+              <div className="mt-1 text-[0.78rem] text-default-500">
                 從首頁選個任務範本，或從網路萃取一個全新的任務範本開始。
               </div>
               <button
                 onClick={() => setCreateSource("recommended")}
-                className="mt-5 inline-flex items-center gap-2 px-4 py-2 text-[0.78rem] bg-mos-ink text-white hover:bg-mos-ink/90 rounded-full transition"
+                className="mt-5 inline-flex items-center gap-2 px-4 py-2 text-[0.78rem] bg-foreground text-white hover:bg-foreground/90 rounded-full transition"
               >
                 建立第一個專案
               </button>
@@ -405,7 +405,7 @@ export default function ProjectsPage() {
                   ))}
                 </div>
               ) : (
-                <div className="border border-mos-hair rounded-xl bg-white divide-y divide-mos-hair overflow-hidden">
+                <div className="border border-divider rounded-xl bg-white divide-y divide-divider overflow-hidden">
                   {all.map((m) => (
                     <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
                   ))}
@@ -444,10 +444,10 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   return (
     <div className="flex items-baseline justify-between mb-3">
       <div className="flex items-baseline gap-2">
-        <h2 className="font-display text-[1.05rem] text-mos-ink tracking-[-0.01em]">{title}</h2>
-        {subtitle && <span className="text-[0.7rem] text-mos-soft">{subtitle}</span>}
+        <h2 className="font-semibold text-[1.05rem] text-foreground tracking-[-0.01em]">{title}</h2>
+        {subtitle && <span className="text-[0.7rem] text-default-400">{subtitle}</span>}
       </div>
-      <button className="text-[0.72rem] text-mos-muted hover:text-mos-ink transition">查看全部 →</button>
+      <button className="text-[0.72rem] text-default-500 hover:text-foreground transition">查看全部 →</button>
     </div>
   );
 }
@@ -456,7 +456,7 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
 
 function FolderTile({ glyph, label, hint }: { glyph: string; label: string; hint: string }) {
   return (
-    <button className="group flex flex-col text-left bg-white border border-mos-hair rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
+    <button className="group flex flex-col text-left bg-white border border-divider rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
       <div
         className="relative w-full flex items-center justify-center"
         style={{
@@ -464,11 +464,11 @@ function FolderTile({ glyph, label, hint }: { glyph: string; label: string; hint
           background: "linear-gradient(135deg, #F4F1FA 0%, #EFE9FB 100%)",
         }}
       >
-        <div className="text-[2rem] text-mos-ink/70 group-hover:text-mos-ink transition">{glyph}</div>
+        <div className="text-[2rem] text-foreground/70 group-hover:text-foreground transition">{glyph}</div>
       </div>
       <div className="p-3">
-        <div className="text-[0.86rem] text-mos-ink font-medium leading-snug">{label}</div>
-        <div className="mt-0.5 text-[0.66rem] text-mos-muted">{hint}</div>
+        <div className="text-[0.86rem] text-foreground font-medium leading-snug">{label}</div>
+        <div className="mt-0.5 text-[0.66rem] text-default-500">{hint}</div>
       </div>
     </button>
   );
@@ -486,7 +486,7 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
     <div className="group relative">
       <button
         onClick={onClick}
-        className="flex flex-col text-left bg-white border border-mos-hair rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 w-full"
+        className="flex flex-col text-left bg-white border border-divider rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 w-full"
       >
         <div
           className="relative w-full overflow-hidden"
@@ -504,7 +504,7 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
           </div>
           {mission.squadLayer && (
             <div
-              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded"
+              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-semibold text-white rounded"
               style={{ background: tone.bg }}
             >
               {lk}
@@ -512,10 +512,10 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
           )}
         </div>
         <div className="p-3">
-          <div className="text-[0.82rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
+          <div className="text-[0.82rem] text-foreground font-medium leading-snug line-clamp-2 min-h-[2.4em]">
             {mission.title}
           </div>
-          <div className="mt-1.5 text-[0.66rem] text-mos-muted truncate">{updatedTxt}</div>
+          <div className="mt-1.5 text-[0.66rem] text-default-500 truncate">{updatedTxt}</div>
         </div>
       </button>
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
@@ -543,7 +543,7 @@ function ThumbAction({
     <button
       title={title}
       onClick={onClick}
-      className="w-7 h-7 flex items-center justify-center bg-white/95 border border-mos-hair text-mos-ink hover:bg-white hover:border-mos-ink rounded-full shadow-sm transition"
+      className="w-7 h-7 flex items-center justify-center bg-white/95 border border-divider text-foreground hover:bg-white hover:border-foreground rounded-full shadow-sm transition"
     >
       {children}
     </button>
@@ -558,7 +558,7 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-4 px-4 py-3 hover:bg-mos-ink/[0.02] transition text-left"
+      className="w-full flex items-center gap-4 px-4 py-3 hover:bg-foreground/[0.02] transition text-left"
     >
       <div
         className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
@@ -567,11 +567,11 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
         <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={36} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[0.88rem] text-mos-ink font-medium truncate">{mission.title}</div>
-        <div className="mt-0.5 flex items-center gap-2 text-[0.7rem] text-mos-muted">
-          <span className="font-display tracking-[0.12em] uppercase">{lk}</span>
-          {ws && (<><span className="text-mos-soft">·</span><span className="capitalize">{ws}</span></>)}
-          <span className="text-mos-soft">·</span>
+        <div className="text-[0.88rem] text-foreground font-medium truncate">{mission.title}</div>
+        <div className="mt-0.5 flex items-center gap-2 text-[0.7rem] text-default-500">
+          <span className="font-semibold tracking-[0.12em] uppercase">{lk}</span>
+          {ws && (<><span className="text-default-400">·</span><span className="capitalize">{ws}</span></>)}
+          <span className="text-default-400">·</span>
           <span>{formatRelative(mission.updatedAt)}</span>
         </div>
       </div>
@@ -593,22 +593,22 @@ function FilterChip({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-foreground bg-white border border-divider hover:border-foreground rounded-full transition"
       >
         {label}
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-mos-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 24 24" className="w-3 h-3 text-default-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full mt-1.5 left-0 z-20 min-w-[180px] bg-white border border-mos-hair rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1">
+          <div className="absolute top-full mt-1.5 left-0 z-20 min-w-[180px] bg-white border border-divider rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1">
             {options.map((o) => (
               <button
                 key={o.value}
                 onClick={() => { onSelect(o.value); setOpen(false); }}
-                className="w-full text-left px-3 py-1.5 text-[0.78rem] text-mos-ink hover:bg-mos-ink/5 transition"
+                className="w-full text-left px-3 py-1.5 text-[0.78rem] text-foreground hover:bg-foreground/5 transition"
               >
                 {o.label}
               </button>
@@ -650,7 +650,7 @@ function CreateMenu({
       <button
         onClick={() => setOpen((v) => !v)}
         title="新增項目"
-        className="w-9 h-9 inline-flex items-center justify-center bg-mos-ink text-white hover:bg-mos-ink/90 rounded-full transition"
+        className="w-9 h-9 inline-flex items-center justify-center bg-foreground text-white hover:bg-foreground/90 rounded-full transition"
       >
         <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
@@ -658,8 +658,8 @@ function CreateMenu({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={close} />
-          <div className="absolute top-full mt-2 right-0 z-40 w-[260px] bg-white border border-mos-hair rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.10)] py-2">
-            <div className="px-4 pt-1 pb-2 text-[0.62rem] tracking-[0.18em] uppercase text-mos-soft">
+          <div className="absolute top-full mt-2 right-0 z-40 w-[260px] bg-white border border-divider rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.10)] py-2">
+            <div className="px-4 pt-1 pb-2 text-[0.62rem] tracking-[0.18em] uppercase text-default-400">
               新增項目
             </div>
 
@@ -676,7 +676,7 @@ function CreateMenu({
               onClick={() => { close(); onNewMission(); }}
             />
 
-            <div className="my-1.5 mx-3 h-px bg-mos-hair" />
+            <div className="my-1.5 mx-3 h-px bg-divider" />
 
             <MenuItem
               glyph={<UploadIcon />}
@@ -691,23 +691,23 @@ function CreateMenu({
               onClick={() => { close(); onUploadFolder(); }}
             />
 
-            <div className="my-1.5 mx-3 h-px bg-mos-hair" />
+            <div className="my-1.5 mx-3 h-px bg-divider" />
 
             {/* Cloud / web sync submenu */}
             <button
               onClick={() => setSyncOpen((v) => !v)}
-              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-mos-ink/[0.04] transition text-left"
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-foreground/[0.04] transition text-left"
             >
-              <span className="w-5 h-5 inline-flex items-center justify-center text-mos-ink/70"><CloudSyncIcon /></span>
+              <span className="w-5 h-5 inline-flex items-center justify-center text-foreground/70"><CloudSyncIcon /></span>
               <span className="flex-1 min-w-0">
-                <div className="text-[0.84rem] text-mos-ink">從雲端 / 網路同步</div>
-                <div className="text-[0.66rem] text-mos-muted truncate">FB、IG、YT、官網、雲端硬碟</div>
+                <div className="text-[0.84rem] text-foreground">從雲端 / 網路同步</div>
+                <div className="text-[0.66rem] text-default-500 truncate">FB、IG、YT、官網、雲端硬碟</div>
               </span>
-              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-mos-soft transition-transform ${syncOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-default-400 transition-transform ${syncOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>
             </button>
 
             {syncOpen && (
-              <div className="mx-3 mt-1 mb-1 rounded-lg bg-mos-ink/[0.03] py-1">
+              <div className="mx-3 mt-1 mb-1 rounded-lg bg-foreground/[0.03] py-1">
                 {SYNC_SOURCES.map((s) => (
                   <button
                     key={s.id}
@@ -722,8 +722,8 @@ function CreateMenu({
                       {s.glyph}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <div className="text-[0.78rem] text-mos-ink truncate">{s.label}</div>
-                      <div className="text-[0.62rem] text-mos-muted truncate">{s.hint}</div>
+                      <div className="text-[0.78rem] text-foreground truncate">{s.label}</div>
+                      <div className="text-[0.62rem] text-default-500 truncate">{s.hint}</div>
                     </span>
                   </button>
                 ))}
@@ -744,12 +744,12 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-mos-ink/[0.04] transition text-left"
+      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-foreground/[0.04] transition text-left"
     >
-      <span className="w-5 h-5 inline-flex items-center justify-center text-mos-ink/70">{glyph}</span>
+      <span className="w-5 h-5 inline-flex items-center justify-center text-foreground/70">{glyph}</span>
       <span className="flex-1 min-w-0">
-        <div className="text-[0.84rem] text-mos-ink">{label}</div>
-        {hint && <div className="text-[0.66rem] text-mos-muted truncate">{hint}</div>}
+        <div className="text-[0.84rem] text-foreground">{label}</div>
+        {hint && <div className="text-[0.66rem] text-default-500 truncate">{hint}</div>}
       </span>
     </button>
   );

@@ -152,12 +152,12 @@ export default function MediaHubPage() {
           <div className="flex items-start justify-between gap-6 flex-wrap">
             <div>
               <div
-                className="font-display text-[0.6rem] tracking-[0.32em] uppercase"
+                className="font-semibold text-[0.6rem] tracking-[0.32em] uppercase"
                 style={{ color: "#888" }}
               >
                 MEDIA HUB · 派發中心
               </div>
-              <h1 className="mt-3 font-display text-[3.2rem] leading-[1.02] tracking-[-0.025em]">
+              <h1 className="mt-3 font-semibold text-[3.2rem] leading-[1.02] tracking-[-0.025em]">
                 媒體中心
               </h1>
               <p
@@ -304,7 +304,7 @@ function Step1PickAsset({
     <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-8">
       {/* Brand library */}
       <div>
-        <h2 className="font-display text-[1.4rem] tracking-[-0.015em] mb-4">
+        <h2 className="font-semibold text-[1.4rem] tracking-[-0.015em] mb-4">
           從 {currentBrandName ?? "品牌"} 大腦挑一份素材
         </h2>
         {brandAssets.length === 0 ? (
@@ -353,7 +353,7 @@ function Step1PickAsset({
       {/* Manual paste */}
       <div>
         <h3
-          className="font-display text-[1.1rem] tracking-[-0.01em] mb-3"
+          className="font-semibold text-[1.1rem] tracking-[-0.01em] mb-3"
           style={{ color: "#444" }}
         >
           或手動貼一份
@@ -411,7 +411,7 @@ function Step2PickChannel({
     <div>
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h2 className="font-display text-[1.4rem] tracking-[-0.015em]">
+          <h2 className="font-semibold text-[1.4rem] tracking-[-0.015em]">
             把這份素材推到哪個通路？
           </h2>
           <div
@@ -461,7 +461,7 @@ function Step2PickChannel({
               >
                 <div className="flex items-start justify-between">
                   <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center font-display text-[1.4rem]"
+                    className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-[1.4rem]"
                     style={{ background: c.color, color: "white" }}
                   >
                     {c.logo}
@@ -537,7 +537,7 @@ function Step3Configure({
       {/* Config column */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-[1.2rem] tracking-[-0.01em]">
+          <h2 className="font-semibold text-[1.2rem] tracking-[-0.01em]">
             設定投放
           </h2>
           <button
@@ -555,7 +555,7 @@ function Step3Configure({
         >
           <div className="flex items-center gap-3">
             <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white font-display"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white"
               style={{ background: channel.color }}
             >
               {channel.logo}
@@ -671,7 +671,7 @@ function Step3Configure({
               >
                 READY TO PRINT
               </div>
-              <div className="mt-2 font-display text-[1.3rem] tracking-[-0.015em]">
+              <div className="mt-2 font-semibold text-[1.3rem] tracking-[-0.015em]">
                 按右邊「出稿」開始生成
               </div>
               <div
@@ -773,7 +773,7 @@ function ResultPanel({
           >
             DELIVERED · 出稿完成
           </div>
-          <div className="font-display text-[1.3rem] tracking-[-0.015em] mt-0.5">
+          <div className="font-semibold text-[1.3rem] tracking-[-0.015em] mt-0.5">
             {channel.name} · {assetTitle}
           </div>
           <div className="text-[0.72rem]" style={{ color: "#888" }}>
@@ -853,7 +853,7 @@ function MetaAdsPreview({ payload, channel }: { payload: any; channel: Channel }
               style={{ background: channel.color, color: "white" }}
             >
               <div className="flex items-center gap-2">
-                <span className="font-display text-[0.78rem]">
+                <span className="font-semibold text-[0.78rem]">
                   {channel.logo}
                 </span>
                 <span className="text-[0.7rem] tracking-[0.18em] uppercase opacity-90">
@@ -958,7 +958,7 @@ function IgSchedulePreview({ payload }: { payload: any }) {
             >
               DAY
             </div>
-            <div className="font-display text-[1.1rem] leading-none">
+            <div className="font-semibold text-[1.1rem] leading-none">
               {s.day}
             </div>
           </div>

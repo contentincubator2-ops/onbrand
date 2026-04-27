@@ -175,7 +175,7 @@ export default function BrandsPage() {
               style={{ background: "#0A0A0A" }}
               aria-hidden
             />
-            <h1 className="font-display text-[2.6rem] leading-[1.05] text-mos-ink tracking-[-0.02em]">
+            <h1 className="font-semibold text-[2.6rem] leading-[1.05] text-foreground tracking-[-0.02em]">
               {brandName} 品牌工具組
             </h1>
           </div>
@@ -189,10 +189,10 @@ export default function BrandsPage() {
           style={{ background: "#E1E5FB" }}
         >
           <div className="max-w-[480px]">
-            <h2 className="font-display text-[1.25rem] text-mos-ink tracking-[-0.01em]">
+            <h2 className="font-semibold text-[1.25rem] text-foreground tracking-[-0.01em]">
               讓你的品牌在不同設計間都生動無比
             </h2>
-            <p className="mt-2 text-[0.84rem] text-mos-body leading-relaxed">
+            <p className="mt-2 text-[0.84rem] text-foreground leading-relaxed">
               在品牌工具組內即可備妥你的品牌資產與準則。Marketing OS 會自動把它們餵給每位 agent，維持一致的品牌形象。
             </p>
             <button
@@ -213,7 +213,7 @@ export default function BrandsPage() {
                   "linear-gradient(135deg, #1FB8B3 0%, #5B3CC8 50%, #E94F7A 100%)",
               }}
             >
-              <span className="font-display text-[5rem] text-white tracking-[-0.04em] leading-none">Aa</span>
+              <span className="font-semibold text-[5rem] text-white tracking-[-0.04em] leading-none">Aa</span>
             </div>
             <div className="absolute -bottom-4 left-6 flex gap-1">
               <span className="w-10 h-3 rounded-sm" style={{ background: "#1F4FD9" }} />
@@ -228,8 +228,8 @@ export default function BrandsPage() {
       {/* ─── BODY: left rail + grid ─────────────────────────────────────── */}
       <section className="max-w-[1280px] mx-auto px-8 mt-10 grid grid-cols-[240px_1fr] gap-8">
         {/* Left rail */}
-        <aside className="border-r border-mos-hair pr-6">
-          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft mb-2">
+        <aside className="border-r border-divider pr-6">
+          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400 mb-2">
             品牌
           </div>
 
@@ -237,34 +237,34 @@ export default function BrandsPage() {
           <div className="relative mb-5">
             <button
               onClick={() => setSwitcherOpen((v) => !v)}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-white border border-mos-hair rounded-lg hover:border-mos-ink transition"
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-white border border-divider rounded-lg hover:border-foreground transition"
             >
               <span className="flex items-center gap-2 min-w-0">
-                <span className="w-5 h-4 rounded-sm bg-mos-ink shrink-0" aria-hidden />
-                <span className="text-[0.86rem] text-mos-ink truncate">{brandName}</span>
+                <span className="w-5 h-4 rounded-sm bg-foreground shrink-0" aria-hidden />
+                <span className="text-[0.86rem] text-foreground truncate">{brandName}</span>
               </span>
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-mos-muted shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-default-500 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
 
             {switcherOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setSwitcherOpen(false)} />
-                <div className="absolute z-40 top-full left-0 right-0 mt-1 bg-white border border-mos-hair rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1 max-h-[280px] overflow-y-auto">
+                <div className="absolute z-40 top-full left-0 right-0 mt-1 bg-white border border-divider rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1 max-h-[280px] overflow-y-auto">
                   {brands.map((b: any) => (
                     <button
                       key={b.id}
                       onClick={() => { setBrandId(b.id); setSwitcherOpen(false); }}
                       className={[
-                        "w-full text-left flex items-center gap-2 px-3 py-2 text-[0.84rem] hover:bg-mos-paper",
-                        b.id === brandId ? "text-mos-ink font-medium" : "text-mos-body",
+                        "w-full text-left flex items-center gap-2 px-3 py-2 text-[0.84rem] hover:bg-background",
+                        b.id === brandId ? "text-foreground font-medium" : "text-foreground",
                       ].join(" ")}
                     >
-                      <span className="w-4 h-3 rounded-sm bg-mos-ink/80" aria-hidden />
+                      <span className="w-4 h-3 rounded-sm bg-foreground/80" aria-hidden />
                       <span className="truncate">{b.name}</span>
                     </button>
                   ))}
                   {brands.length === 0 && (
-                    <div className="px-3 py-2 text-[0.78rem] text-mos-muted">尚無品牌</div>
+                    <div className="px-3 py-2 text-[0.78rem] text-default-500">尚無品牌</div>
                   )}
                 </div>
               </>
@@ -282,8 +282,8 @@ export default function BrandsPage() {
                   className={[
                     "flex items-center justify-between px-3 py-2 rounded-lg text-[0.86rem] transition",
                     active
-                      ? "bg-mos-ink text-white"
-                      : "text-mos-body hover:bg-mos-paper hover:text-mos-ink",
+                      ? "bg-foreground text-white"
+                      : "text-foreground hover:bg-background hover:text-foreground",
                   ].join(" ")}
                 >
                   <span>{s.label}</span>
@@ -306,12 +306,12 @@ export default function BrandsPage() {
         {/* Asset grid */}
         <div>
           <div className="flex items-end justify-between mb-5">
-            <h2 className="font-display text-[1.4rem] text-mos-ink tracking-[-0.015em]">
+            <h2 className="font-semibold text-[1.4rem] text-foreground tracking-[-0.015em]">
               {section === "all"
                 ? "所有資產"
                 : SUBNAV.find((s) => s.id === section)?.label}
             </h2>
-            <div className="text-[0.78rem] text-mos-muted">
+            <div className="text-[0.78rem] text-default-500">
               {section === "all" ? `${TILES.length} 個類別` : "1 個類別"}
             </div>
           </div>
@@ -329,18 +329,18 @@ export default function BrandsPage() {
                 >
                   {t.art}
                   {!t.ready && (
-                    <span className="absolute top-2 right-2 text-[0.58rem] tracking-[0.18em] uppercase bg-white/90 text-mos-muted px-2 py-0.5 rounded-full">
+                    <span className="absolute top-2 right-2 text-[0.58rem] tracking-[0.18em] uppercase bg-white/90 text-default-500 px-2 py-0.5 rounded-full">
                       即將推出
                     </span>
                   )}
                   {typeof t.count === "number" && t.count > 0 && (
-                    <span className="absolute top-2 left-2 text-[0.6rem] tracking-[0.16em] uppercase bg-white/95 text-mos-ink px-2 py-0.5 rounded-full">
+                    <span className="absolute top-2 left-2 text-[0.6rem] tracking-[0.16em] uppercase bg-white/95 text-foreground px-2 py-0.5 rounded-full">
                       {t.count} 筆
                     </span>
                   )}
                 </div>
                 <div className="px-1 pt-3 pb-1 flex items-center justify-between">
-                  <span className="text-[0.92rem] text-mos-ink font-medium">
+                  <span className="text-[0.92rem] text-foreground font-medium">
                     {t.label}
                   </span>
                   <span aria-hidden className="text-[0.78rem]" style={{ color: "#5B3CC8" }}>👑</span>
@@ -350,7 +350,7 @@ export default function BrandsPage() {
           </div>
 
           {visibleTiles.length === 0 && (
-            <div className="text-[0.82rem] text-mos-muted py-10">沒有資產。</div>
+            <div className="text-[0.82rem] text-default-500 py-10">沒有資產。</div>
           )}
         </div>
       </section>

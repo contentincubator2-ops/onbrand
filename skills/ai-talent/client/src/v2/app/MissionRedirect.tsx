@@ -28,7 +28,7 @@ export default function MissionRedirect() {
   if (!idNum) return <Navigate to="/" replace />;
   if (missionQuery.isLoading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-mos-cream text-mos-muted text-[0.86rem]">
+      <div className="fixed inset-0 flex items-center justify-center bg-content2 text-default-500 text-[0.86rem]">
         正在帶你到工作區…
       </div>
     );

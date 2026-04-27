@@ -396,22 +396,22 @@ export default function CreateMethodologyModal({
       hideCloseButton={false}
       classNames={{
         base: "max-w-[1200px] max-h-[88vh]",
-        backdrop: "bg-mos-ink/30 backdrop-blur-sm",
+        backdrop: "bg-foreground/30 backdrop-blur-sm",
       }}
     >
       <ModalContent>
-        <ModalHeader className="px-8 py-5 border-b border-mos-hair">
-          <h2 className="font-display text-[1.6rem] text-mos-ink tracking-[-0.015em]">
+        <ModalHeader className="px-8 py-5 border-b border-divider">
+          <h2 className="font-semibold text-[1.6rem] text-foreground tracking-[-0.015em]">
             新增任務範本
           </h2>
         </ModalHeader>
         <ModalBody className="p-0 flex flex-row min-h-0">
           {/* Left nav */}
-          <aside className="w-[260px] shrink-0 border-r border-mos-hair overflow-y-auto py-4">
+          <aside className="w-[260px] shrink-0 border-r border-divider overflow-y-auto py-4">
             {GROUPED_SOURCES.map((g) => (
               <div key={g.key} className="mb-3">
                 {GROUP_LABELS[g.key] && (
-                  <div className="px-6 py-1.5 text-[0.6rem] tracking-[0.24em] uppercase text-mos-soft">
+                  <div className="px-6 py-1.5 text-[0.6rem] tracking-[0.24em] uppercase text-default-400">
                     {GROUP_LABELS[g.key]}
                   </div>
                 )}
@@ -426,14 +426,14 @@ export default function CreateMethodologyModal({
                     className={[
                       "h-auto justify-start gap-3 px-6 py-2.5 min-w-0",
                       activeId === s.id
-                        ? "bg-mos-ink/[0.06] text-mos-ink"
-                        : "text-mos-body data-[hover=true]:bg-mos-ink/[0.03] data-[hover=true]:text-mos-ink",
+                        ? "bg-foreground/[0.06] text-foreground"
+                        : "text-foreground data-[hover=true]:bg-foreground/[0.03] data-[hover=true]:text-foreground",
                     ].join(" ")}
                   >
                     <span
                       className={[
                         "w-7 h-7 rounded-md flex items-center justify-center text-[0.82rem] shrink-0",
-                        activeId === s.id ? "bg-white border border-mos-ink" : "bg-mos-paper",
+                        activeId === s.id ? "bg-white border border-foreground" : "bg-background",
                       ].join(" ")}
                     >
                       {s.glyph}
@@ -444,7 +444,7 @@ export default function CreateMethodologyModal({
                         size="sm"
                         radius="sm"
                         variant="bordered"
-                        className="ml-auto text-[0.6rem] tracking-[0.12em] uppercase text-mos-soft border-mos-hair"
+                        className="ml-auto text-[0.6rem] tracking-[0.12em] uppercase text-default-400 border-divider"
                       >
                         Beta
                       </Chip>
@@ -459,13 +459,13 @@ export default function CreateMethodologyModal({
           <section className="flex-1 overflow-y-auto p-8">
             {/* Header for active source */}
             <div className="mb-6">
-              <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft">
+              <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400">
                 {GROUP_LABELS[active.group] || "INGEST"}
               </div>
-              <h3 className="mt-1 font-display text-[1.4rem] text-mos-ink tracking-[-0.015em]">
+              <h3 className="mt-1 font-semibold text-[1.4rem] text-foreground tracking-[-0.015em]">
                 {active.label}
               </h3>
-              <p className="mt-2 text-[0.86rem] text-mos-body max-w-[640px]">
+              <p className="mt-2 text-[0.86rem] text-foreground max-w-[640px]">
                 {active.blurb}
               </p>
             </div>
@@ -500,7 +500,7 @@ export default function CreateMethodologyModal({
             )}
 
             {phase === "saving" && (
-              <div className="text-[0.86rem] text-mos-muted py-12 text-center">
+              <div className="text-[0.86rem] text-default-500 py-12 text-center">
                 寫入資料庫中…
               </div>
             )}
@@ -589,7 +589,7 @@ function SourcePane({
   if (source.id === "blank") {
     return (
       <div className="max-w-[640px] space-y-4">
-        <div className="text-[0.86rem] text-mos-body">
+        <div className="text-[0.86rem] text-foreground">
           先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。
         </div>
         <Button
@@ -640,12 +640,12 @@ function SourcePane({
           onDrop={onFileDrop}
           className={[
             "border-2 border-dashed transition rounded-lg px-6 py-16 text-center",
-            isDragging ? "border-mos-ink bg-mos-paper" : "border-mos-hair bg-white hover:border-mos-ink/50",
+            isDragging ? "border-foreground bg-background" : "border-divider bg-white hover:border-foreground/50",
           ].join(" ")}
         >
           <div className="text-[2.4rem] leading-none mb-3" aria-hidden>☁</div>
-          <div className="text-[1rem] text-mos-ink mb-1">將你的內容拖放至此</div>
-          <div className="text-[0.78rem] text-mos-muted mb-5">或選擇檔案上傳</div>
+          <div className="text-[1rem] text-foreground mb-1">將你的內容拖放至此</div>
+          <div className="text-[0.78rem] text-default-500 mb-5">或選擇檔案上傳</div>
           <label className="inline-block cursor-pointer">
             <input
               type="file"
@@ -661,31 +661,31 @@ function SourcePane({
                 }
               }}
             />
-            <span className="inline-block px-5 py-2.5 text-[0.74rem] tracking-[0.18em] uppercase border border-mos-ink text-mos-ink hover:bg-mos-ink hover:text-white transition rounded">
+            <span className="inline-block px-5 py-2.5 text-[0.74rem] tracking-[0.18em] uppercase border border-foreground text-foreground hover:bg-foreground hover:text-white transition rounded">
               上傳檔案
             </span>
           </label>
         </div>
         {pickedFile && (
-          <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded">
-            <div className="text-[0.7rem] tracking-[0.18em] uppercase text-mos-soft">已選取</div>
-            <div className="text-[0.86rem] text-mos-ink mt-0.5">
+          <div className="border border-divider bg-background px-4 py-3 rounded">
+            <div className="text-[0.7rem] tracking-[0.18em] uppercase text-default-400">已選取</div>
+            <div className="text-[0.86rem] text-foreground mt-0.5">
               {pickedFile.name}{" "}
-              <span className="text-mos-muted text-[0.78rem]">({Math.round(pickedFile.size / 1024)} KB)</span>
+              <span className="text-default-500 text-[0.78rem]">({Math.round(pickedFile.size / 1024)} KB)</span>
             </div>
             {filePreview && (
-              <pre className="mt-2 text-[0.72rem] text-mos-muted whitespace-pre-wrap max-h-24 overflow-hidden">
+              <pre className="mt-2 text-[0.72rem] text-default-500 whitespace-pre-wrap max-h-24 overflow-hidden">
                 {filePreview}
               </pre>
             )}
           </div>
         )}
         {!source.ready && (
-          <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded text-[0.78rem] text-mos-muted">
+          <div className="border border-divider bg-background px-4 py-3 rounded text-[0.78rem] text-default-500">
             💡 檔案上傳的後端萃取將於下一輪上線。在這之前，請改用{" "}
-            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-mos-ink">GitHub</Button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
             {" "}或{" "}
-            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-mos-ink">網頁</Button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">網頁</Button>
             {" "}模式建立任務範本。
           </div>
         )}
@@ -709,11 +709,11 @@ function SourcePane({
           <p className="text-small text-default-500">{source.hint}</p>
         )}
         {!source.ready && (
-          <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded text-[0.78rem] text-mos-muted">
+          <div className="border border-divider bg-background px-4 py-3 rounded text-[0.78rem] text-default-500">
             💡 文字貼上的後端萃取將於下一輪上線。先用{" "}
-            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-mos-ink">GitHub</Button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
             {" "}或{" "}
-            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-mos-ink">網頁</Button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">網頁</Button>
             {" "}抽取相同內容。
           </div>
         )}
@@ -734,11 +734,11 @@ function RecoTile({ label, desc, onClick }: { label: string; desc: string; onCli
       onPress={onClick}
       shadow="none"
       radius="lg"
-      className="w-full border border-mos-hair data-[hover=true]:border-mos-ink bg-white"
+      className="w-full border border-divider data-[hover=true]:border-foreground bg-white"
     >
       <CardBody className="px-5 py-4 text-left">
-        <div className="text-[0.92rem] text-mos-ink">{label}</div>
-        <div className="mt-1 text-[0.78rem] text-mos-muted">{desc}</div>
+        <div className="text-[0.92rem] text-foreground">{label}</div>
+        <div className="mt-1 text-[0.78rem] text-default-500">{desc}</div>
       </CardBody>
     </Card>
   );
@@ -908,39 +908,39 @@ function ExtractingFeed({ source, url }: { source: SourceDef; url: string }) {
   return (
     <div className="max-w-[720px] space-y-4">
       {/* Header strip — current agent + status */}
-      <div className="border border-mos-hair bg-white p-5 rounded-lg flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-mos-paper flex items-center justify-center text-[1.2rem]">
+      <div className="border border-divider bg-white p-5 rounded-lg flex items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-[1.2rem]">
           {AGENT_GLYPH[activeAgent]}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft">
+          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400">
             ACTIVE AGENT
           </div>
-          <div className="font-display text-[1.05rem] text-mos-ink truncate">
+          <div className="font-semibold text-[1.05rem] text-foreground truncate">
             {activeAgent}
           </div>
-          <div className="text-[0.74rem] text-mos-muted truncate">
+          <div className="text-[0.74rem] text-default-500 truncate">
             正在分析 {host}…
           </div>
         </div>
         <div className="flex gap-1 shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "0ms" }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "200ms" }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "400ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-foreground animate-pulse" style={{ animationDelay: "0ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-foreground animate-pulse" style={{ animationDelay: "200ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-foreground animate-pulse" style={{ animationDelay: "400ms" }} />
         </div>
       </div>
 
       {/* Activity feed */}
-      <div className="border border-mos-hair bg-mos-paper rounded-lg overflow-hidden">
-        <div className="px-4 py-2 border-b border-mos-hair text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft bg-white">
+      <div className="border border-divider bg-background rounded-lg overflow-hidden">
+        <div className="px-4 py-2 border-b border-divider text-[0.6rem] tracking-[0.28em] uppercase text-default-400 bg-white">
           ACTIVITY
         </div>
         <div className="px-4 py-3 max-h-[340px] overflow-y-auto font-mono space-y-1.5">
           {events.map((e, i) => (
             <FeedRow key={i} event={e} fading={i < events.length - 6} />
           ))}
-          <div className="text-[0.78rem] text-mos-soft flex items-center gap-2">
-            <span className="inline-block w-1.5 h-3 bg-mos-ink animate-pulse" />
+          <div className="text-[0.78rem] text-default-400 flex items-center gap-2">
+            <span className="inline-block w-1.5 h-3 bg-foreground animate-pulse" />
             <span>working…</span>
           </div>
         </div>
@@ -958,8 +958,8 @@ function FeedRow({ event, fading }: { event: FeedEvent; fading: boolean }) {
       ].join(" ")}
     >
       <span className="w-4 shrink-0 text-center" aria-hidden>{KIND_GLYPH[event.kind]}</span>
-      <span className="text-mos-soft tracking-[0.04em] w-[88px] shrink-0">{KIND_LABEL[event.kind]}:</span>
-      <span className="text-mos-ink truncate">{event.arg}</span>
+      <span className="text-default-400 tracking-[0.04em] w-[88px] shrink-0">{KIND_LABEL[event.kind]}:</span>
+      <span className="text-foreground truncate">{event.arg}</span>
     </div>
   );
 }

@@ -559,7 +559,7 @@ export default function PickerWorkspace() {
         >
           返回
         </Button>
-        <div className="font-display text-[0.92rem] text-foreground truncate px-4">
+        <div className="font-semibold text-[0.92rem] text-foreground truncate px-4">
           {headerTitle}
         </div>
         <div className="flex items-center gap-2">
@@ -924,7 +924,7 @@ export default function PickerWorkspace() {
             <div className="h-full flex items-center justify-center p-10">
               <div className="text-center max-w-[420px]">
                 <div className="text-[3rem] mb-4 text-default-400">▣</div>
-                <h2 className="font-display text-[1.4rem] text-foreground mb-2">
+                <h2 className="font-semibold text-[1.4rem] text-foreground mb-2">
                   從左側挑一個方法論小組來開始
                 </h2>
                 <p className="text-[0.86rem] text-default-500 leading-relaxed">
@@ -967,8 +967,8 @@ function RailPill({
       className={[
         "inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] rounded-full border transition",
         active
-          ? "bg-mos-ink text-white border-mos-ink"
-          : "bg-white text-mos-ink border-mos-hair hover:border-mos-ink",
+          ? "bg-foreground text-white border-foreground"
+          : "bg-white text-foreground border-divider hover:border-foreground",
       ].join(" ")}
     >
       {dot && <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: active ? "#fff" : dot }} />}
@@ -1106,7 +1106,7 @@ function SquadDetailPanel({
   return (
     <div className="max-w-[820px] mx-auto px-8 py-8">
       {/* Title block (Canva-style) */}
-      <h1 className="font-display text-[1.6rem] leading-tight text-foreground tracking-[-0.01em]">
+      <h1 className="font-semibold text-[1.6rem] leading-tight text-foreground tracking-[-0.01em]">
         {name}
       </h1>
       <div className="mt-2 text-[0.84rem] text-default-500">
@@ -1159,7 +1159,7 @@ function SquadDetailPanel({
       {/* Step grid (Canva's "16 pages" preview) */}
       {steps.length > 0 && (
         <div className="mt-8">
-          <h2 className="font-display text-[1.0rem] text-foreground mb-3">工作步驟預覽</h2>
+          <h2 className="font-semibold text-[1.0rem] text-foreground mb-3">工作步驟預覽</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {steps.map((step: any, idx: number) => (
               <StepCard key={idx} step={step} idx={idx + 1} tone={tone} />
@@ -1281,7 +1281,7 @@ function LayerAssetDrawer({
       <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
         <div className="min-w-0">
           <div className="text-[0.72rem] text-default-500">資產 / Assets</div>
-          <div className="font-display text-[1.0rem] text-foreground truncate">{meta.title}</div>
+          <div className="font-semibold text-[1.0rem] text-foreground truncate">{meta.title}</div>
         </div>
         <Button
           size="sm"
