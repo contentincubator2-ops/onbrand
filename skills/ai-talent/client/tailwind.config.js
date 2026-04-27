@@ -40,66 +40,9 @@ export default {
     },
   },
   plugins: [
-    // SoWork HeroUI theme — light only, mapped to mos-cream / mos-ink / mos-orange.
-    // Decision (2026-04-27): single-mode product, no dark. Radii dialed back from
-    // HeroUI default (12px) to 8px to feel closer to Canva than iOS.
-    heroui({
-      themes: {
-        light: {
-          colors: {
-            background: "#FAF9F6",   // mos-cream
-            foreground: "#0A0A0A",   // mos-ink
-            content1: "#FFFFFF",
-            content2: "#FAFAF7",     // mos-paper
-            content3: "#F5F1E8",     // mos-cream-dark
-            content4: "#E4E4E4",     // mos-hair
-            divider: "#E4E4E4",
-            focus: "#FF6B35",        // mos-orange
-            default: {
-              50:  "#FAFAF7",
-              100: "#F5F1E8",
-              200: "#E4E4E4",
-              300: "#9B9B9B",
-              400: "#6B6B6B",
-              500: "#1E1E1E",
-              600: "#0A0A0A",
-              700: "#0A0A0A",
-              800: "#000000",
-              900: "#000000",
-              foreground: "#FFFFFF",
-              DEFAULT: "#0A0A0A",
-            },
-            primary: {
-              50:  "#FFF7ED",
-              100: "#FFEDD5",
-              200: "#FED7AA",
-              300: "#FDBA74",
-              400: "#FB923C",
-              500: "#FF6B35",        // mos-orange
-              600: "#E55A2B",        // mos-orange-hover
-              700: "#C2410C",
-              800: "#9A3412",
-              900: "#7C2D12",
-              foreground: "#FFFFFF",
-              DEFAULT: "#FF6B35",
-            },
-            success: { DEFAULT: "#1A9B8E", foreground: "#FFFFFF" },
-            warning: { DEFAULT: "#F59E0B", foreground: "#FFFFFF" },
-            danger:  { DEFAULT: "#C8322E", foreground: "#FFFFFF" },
-          },
-        },
-      },
-      layout: {
-        // Canva-faithful sharp-but-not-square radii. HeroUI default is 12px.
-        radius: { small: "4px", medium: "6px", large: "8px" },
-        // Calmer shadows than HeroUI's default.
-        boxShadow: {
-          small:  "0 1px 2px rgba(10,10,10,0.06)",
-          medium: "0 2px 6px rgba(10,10,10,0.08)",
-          large:  "0 8px 24px -8px rgba(10,10,10,0.12)",
-        },
-      },
-    }),
+    // Pure HeroUI theme — no SoWork brand overrides. Stock primary (blue),
+    // success (green), danger (red), warning (yellow), secondary (purple).
+    heroui(),
     function ({ addUtilities }) {
       // Geometric clip-paths matching the roll-up banner reference image.
       // Each variant gives a slightly different asymmetric cut so the teal/red/blue

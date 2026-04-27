@@ -380,7 +380,7 @@ function SidebarNavLink({
       className={collapsed ? "mt-1 flex-col gap-1 h-auto py-2" : "mt-1 justify-start"}
       startContent={
         !collapsed ? (
-          <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+          <span className="shrink-0 [&>svg]:w-5 [&>svg]:h-5">
             {item.icon}
           </span>
         ) : undefined
@@ -388,7 +388,7 @@ function SidebarNavLink({
     >
       {collapsed ? (
         <>
-          <span className="w-5 h-5 flex items-center justify-center">
+          <span className="[&>svg]:w-5 [&>svg]:h-5">
             {item.icon}
           </span>
           <span className="text-tiny">{item.label}</span>
