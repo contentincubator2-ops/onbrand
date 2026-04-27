@@ -397,7 +397,6 @@ export default function WorkflowRunner({
             selectedKey={viewMode}
             onSelectionChange={(key) => setViewMode(key as "step" | "doc")}
             aria-label="檢視模式"
-            classNames={{ tabList: "p-0.5" }}
           >
             <Tab key="step" title="逐步" />
             <Tab key="doc" title="文件" />

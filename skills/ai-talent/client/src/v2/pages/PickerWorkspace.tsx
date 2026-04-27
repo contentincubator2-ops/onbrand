@@ -27,6 +27,7 @@ import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import WorkflowRunner from "./WorkflowRunner";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
+import { Button, Input, Tooltip, Chip, Card, CardBody } from "@heroui/react";
 
 /* ─────────────────────────── Icon rail ─────────────────────────── */
 //
@@ -540,20 +541,25 @@ export default function PickerWorkspace() {
   }, [railItems, activeRailKey]);
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-mos-cream">
+    <div className="fixed inset-0 flex flex-col bg-background">
       {/* ── Top header ───────────────────────────────────────────────── */}
       {!fullscreen && (
-      <header className="h-12 flex items-center justify-between px-3 border-b border-mos-hair bg-white shrink-0">
-        <button
-          onClick={() => { if (window.history.length > 1) window.history.back(); else window.close(); }}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[0.78rem] text-mos-ink hover:bg-mos-ink/5 rounded transition"
+      <header className="h-12 flex items-center justify-between px-3 border-b border-divider bg-content1 shrink-0">
+        <Button
+          size="sm"
+          variant="light"
+          radius="sm"
+          onPress={() => { if (window.history.length > 1) window.history.back(); else window.close(); }}
+          startContent={
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          }
+          className="text-[0.78rem]"
         >
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          <span>返回</span>
-        </button>
-        <div className="font-display text-[0.92rem] text-mos-ink truncate px-4">
+          返回
+        </Button>
+        <div className="font-display text-[0.92rem] text-foreground truncate px-4">
           {headerTitle}
         </div>
         <div className="flex items-center gap-2">
@@ -562,15 +568,20 @@ export default function PickerWorkspace() {
             selectedId={brandId}
             onSelect={setBrandId}
           />
-          <button
-            onClick={() => setFullscreen(true)}
-            title="進入專注模式 (F)"
-            className="w-8 h-8 flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-ink/5 rounded transition"
-          >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-            </svg>
-          </button>
+          <Tooltip content="進入專注模式 (F)" placement="bottom" radius="sm">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              radius="sm"
+              onPress={() => setFullscreen(true)}
+              aria-label="進入專注模式"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+              </svg>
+            </Button>
+          </Tooltip>
         </div>
       </header>
       )}
@@ -586,36 +597,31 @@ export default function PickerWorkspace() {
             (varies per active squad's strategy_layer) + bottom global tools.
             A thin separator between bands so the user can see the structure. */}
         {!fullscreen && (
-        <aside className="absolute left-0 top-0 bottom-0 w-[68px] z-30 border-r border-mos-hair bg-white flex flex-col items-stretch py-2">
+        <aside className="absolute left-0 top-0 bottom-0 w-[68px] z-30 border-r border-divider bg-content1 flex flex-col items-stretch py-2">
           {railItems.map((it, i) => {
             const active = activeRailKey === it.key;
-            // Insert separators between bands (after top, before bottom)
             const prev = railItems[i - 1];
             const showSeparatorAbove = !!prev && prev.kind !== it.kind;
             return (
               <React.Fragment key={it.key}>
                 {showSeparatorAbove && (
-                  <div className="mx-3 my-1 border-t border-mos-hair/60" />
+                  <div className="mx-3 my-1 border-t border-divider/60" />
                 )}
-                <button
-                  onClick={() => {
-                    setActiveRailKey(it.key);
-                    if (it.key === "templates") {
-                      // Returning to templates clears any locked filters that
-                      // weren't from URL params, so the user sees the full
-                      // catalog again. Channel/layer badges are dismissable
-                      // separately via the locked-filter UI in the search row.
-                    }
-                  }}
-                  title={it.label}
-                  className={[
-                    "h-14 mx-1 my-0.5 rounded flex flex-col items-center justify-center gap-0.5 transition",
-                    active ? "bg-mos-ink text-white" : "text-mos-ink hover:bg-mos-ink/5",
-                  ].join(" ")}
-                >
-                  <span className="text-[1.05rem] leading-none">{it.glyph}</span>
-                  <span className="text-[0.62rem] tracking-[0.06em]">{it.label}</span>
-                </button>
+                <Tooltip content={it.label} placement="right" radius="sm" delay={150}>
+                  <button
+                    onClick={() => setActiveRailKey(it.key)}
+                    aria-label={it.label}
+                    className={[
+                      "h-14 mx-1 my-0.5 rounded-medium flex flex-col items-center justify-center gap-0.5 transition",
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground hover:bg-default-100",
+                    ].join(" ")}
+                  >
+                    <span className="text-[1.05rem] leading-none">{it.glyph}</span>
+                    <span className="text-[0.62rem] tracking-[0.06em]">{it.label}</span>
+                  </button>
+                </Tooltip>
               </React.Fragment>
             );
           })}
@@ -630,22 +636,24 @@ export default function PickerWorkspace() {
         {!fullscreen && (
         <section
           className={[
-            "absolute top-0 bottom-0 z-20 border-r border-mos-hair bg-white flex flex-col min-h-0 shadow-[2px_0_8px_rgba(0,0,0,0.04)] transition-transform duration-200",
+            "absolute top-0 bottom-0 z-20 border-r border-divider bg-content1 flex flex-col min-h-0 shadow-[2px_0_8px_rgba(0,0,0,0.04)] transition-transform duration-200",
             middleCollapsed ? "-translate-x-full" : "translate-x-0",
           ].join(" ")}
           style={{ left: 68, width: 380 }}
         >
           {/* Collapse handle on the right edge — Canva-style */}
-          <button
-            onClick={toggleMiddle}
-            title={middleCollapsed ? "展開（顯示方法論清單）" : "收合（讓出畫布空間）"}
-            className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-6 h-12 bg-white border border-mos-hair rounded-r-md shadow flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-paper transition"
-            style={{ boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d={middleCollapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
-            </svg>
-          </button>
+          <Tooltip content={middleCollapsed ? "展開（顯示方法論清單）" : "收合（讓出畫布空間）"} placement="right" radius="sm">
+            <button
+              onClick={toggleMiddle}
+              aria-label={middleCollapsed ? "展開" : "收合"}
+              className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-6 h-12 bg-content1 border border-divider rounded-r-medium shadow flex items-center justify-center text-default-500 hover:text-foreground hover:bg-content2 transition"
+              style={{ boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={middleCollapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
+              </svg>
+            </button>
+          </Tooltip>
           {activeRailItem?.kind === "layer" ? (
             <LayerAssetDrawer
               item={activeRailItem}
@@ -654,46 +662,50 @@ export default function PickerWorkspace() {
           ) : (
           <>
           {/* Search + AI generate */}
-          <div className="p-3 border-b border-mos-hair">
-            <div className="relative">
-              <input
-                type="text"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={
-                  channelFilter !== "all"
-                    ? `描述你的 ${CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label ?? ""} 詳細需求…`
-                    : layerFilter !== "ALL"
-                      ? `描述你的 ${LAYER_TOKENS[layerFilter].label} 詳細需求…`
-                      : "描述你的行銷需求或搜尋方法論…"
-                }
-                className="w-full pl-9 pr-9 py-2.5 text-[0.84rem] bg-mos-cream border border-mos-hair rounded-full focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition"
-              />
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mos-muted pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" />
-              </svg>
-              {q && (
-                <button onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center text-mos-muted hover:text-mos-ink rounded-full hover:bg-mos-ink/5">
-                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
+          <div className="p-3 border-b border-divider">
+            <Input
+              size="sm"
+              radius="full"
+              variant="bordered"
+              value={q}
+              onValueChange={setQ}
+              isClearable
+              onClear={() => setQ("")}
+              placeholder={
+                channelFilter !== "all"
+                  ? `描述你的 ${CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label ?? ""} 詳細需求…`
+                  : layerFilter !== "ALL"
+                    ? `描述你的 ${LAYER_TOKENS[layerFilter].label} 詳細需求…`
+                    : "描述你的行銷需求或搜尋方法論…"
+              }
+              startContent={
+                <svg className="w-4 h-4 text-default-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+              }
+              classNames={{ inputWrapper: "bg-content2", input: "text-[0.84rem]" }}
+            />
             <div className="grid grid-cols-2 gap-2 mt-2">
-              <button
-                disabled
-                title="AI 推薦方法論（即將推出）"
-                className="px-3 py-2 text-[0.78rem] bg-white border border-mos-hair text-mos-ink rounded-full hover:border-mos-ink transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-              >
-                <span className="text-mos-orange">✦</span> 生成
-              </button>
-              <button
-                onClick={() => { /* search runs live; this just blurs focus */ (document.activeElement as HTMLElement)?.blur(); }}
-                className="px-3 py-2 text-[0.78rem] bg-mos-orange hover:bg-mos-orange-hover text-white rounded-full transition"
+              <Tooltip content="AI 推薦方法論（即將推出）" radius="sm">
+                <Button
+                  size="sm"
+                  radius="full"
+                  variant="bordered"
+                  isDisabled
+                  startContent={<span className="text-primary">✦</span>}
+                >
+                  生成
+                </Button>
+              </Tooltip>
+              <Button
+                size="sm"
+                radius="full"
+                color="primary"
+                onPress={() => { (document.activeElement as HTMLElement)?.blur(); }}
               >
                 搜尋
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -706,36 +718,27 @@ export default function PickerWorkspace() {
           {(channelFilter !== "all" || layerFilter !== "ALL") && (
             <div className="px-3 pt-2 pb-1 flex items-center flex-wrap gap-1.5">
               {channelFilter !== "all" && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] bg-mos-ink text-white rounded-full">
-                  {CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label
-                    ?? channelFilter}
-                  <button
-                    onClick={() => setChannelFilter("all")}
-                    aria-label="清除通路篩選"
-                    className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full hover:bg-white/20"
-                  >
-                    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </span>
+                <Chip
+                  size="sm"
+                  radius="full"
+                  variant="solid"
+                  color="default"
+                  onClose={() => setChannelFilter("all")}
+                  classNames={{ base: "bg-foreground text-background" }}
+                >
+                  {CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label ?? channelFilter}
+                </Chip>
               )}
               {layerFilter !== "ALL" && (
-                <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] text-white rounded-full"
-                  style={{ background: LAYER_TOKENS[layerFilter].bg }}
+                <Chip
+                  size="sm"
+                  radius="full"
+                  variant="solid"
+                  onClose={() => setLayerFilter("ALL")}
+                  style={{ background: LAYER_TOKENS[layerFilter].bg, color: "#fff" }}
                 >
                   {layerFilter}・{LAYER_TOKENS[layerFilter].label}
-                  <button
-                    onClick={() => setLayerFilter("ALL")}
-                    aria-label="清除圖層篩選"
-                    className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full hover:bg-white/20"
-                  >
-                    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </span>
+                </Chip>
               )}
             </div>
           )}
@@ -746,7 +749,7 @@ export default function PickerWorkspace() {
               "所有結果" list. */}
           <div className="flex-1 min-h-0 overflow-y-auto p-3">
             {squadsQuery.isLoading ? (
-              <div className="text-[0.84rem] text-mos-muted py-6 text-center">載入中…</div>
+              <div className="text-[0.84rem] text-default-500 py-6 text-center">載入中…</div>
             ) : (
               <>
                 {/* ── 1. 最近使用的方法論 (hidden while searching) ── */}
@@ -792,19 +795,21 @@ export default function PickerWorkspace() {
                           ))}
                         </div>
                       ) : (
-                        <div className="border border-mos-hair rounded-lg p-3 flex items-start gap-3 bg-white">
-                          <div className="w-12 h-12 shrink-0 border border-mos-hair rounded flex items-center justify-center text-mos-muted text-[1.4rem]">
-                            +
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[0.82rem] font-semibold text-mos-ink">
-                              發佈為品牌範本
+                        <Card shadow="none" radius="lg" className="border border-divider">
+                          <CardBody className="p-3 flex flex-row items-start gap-3">
+                            <div className="w-12 h-12 shrink-0 border border-divider rounded-medium flex items-center justify-center text-default-400 text-[1.4rem]">
+                              +
                             </div>
-                            <div className="text-[0.7rem] text-mos-muted leading-snug mt-0.5">
-                              完成此設計後，你可以將其變成可重複使用的範本。
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[0.82rem] font-semibold text-foreground">
+                                發佈為品牌範本
+                              </div>
+                              <div className="text-[0.7rem] text-default-500 leading-snug mt-0.5">
+                                完成此設計後，你可以將其變成可重複使用的範本。
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          </CardBody>
+                        </Card>
                       )}
                     </ThumbSection>
                   );
@@ -815,7 +820,7 @@ export default function PickerWorkspace() {
                   title={q ? `搜尋結果（${filtered.length}）` : "所有結果"}
                 >
                   {filtered.length === 0 ? (
-                    <div className="text-[0.84rem] text-mos-muted py-6 text-center px-4">
+                    <div className="text-[0.84rem] text-default-500 py-6 text-center px-4">
                       {q ? `沒有找到符合「${q}」的方法論。` : "這個分類目前沒有方法論。"}
                     </div>
                   ) : (
@@ -845,36 +850,45 @@ export default function PickerWorkspace() {
             floats over the left edge of this. In fullscreen, it covers
             the whole body. */}
         <section
-          className="absolute top-0 right-0 bottom-0 z-10 bg-mos-cream flex flex-col min-h-0"
+          className="absolute top-0 right-0 bottom-0 z-10 bg-background flex flex-col min-h-0"
           style={{ left: fullscreen ? 0 : 68 }}
         >
-          {/* Fullscreen exit + collapsed-middle restore handle (only when no header) */}
+          {/* Fullscreen exit */}
           {fullscreen && (
-            <button
-              onClick={() => setFullscreen(false)}
-              title="退出專注模式 (Esc / F)"
-              className="absolute top-3 right-3 z-40 w-9 h-9 flex items-center justify-center bg-white border border-mos-hair rounded-full shadow text-mos-muted hover:text-mos-ink hover:bg-mos-paper transition"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
-              </svg>
-            </button>
+            <Tooltip content="退出專注模式 (Esc / F)" placement="left" radius="sm">
+              <Button
+                isIconOnly
+                size="sm"
+                radius="full"
+                variant="bordered"
+                onPress={() => setFullscreen(false)}
+                className="absolute top-3 right-3 z-40 bg-content1"
+                aria-label="退出專注模式"
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+                </svg>
+              </Button>
+            </Tooltip>
           )}
           {activeMissionId && selectedSquad ? (
             <div className="flex-1 min-h-0 flex flex-col">
-              <div className="px-4 py-1.5 border-b border-mos-hair bg-white/50 flex items-center justify-between">
-                <span className="text-[0.7rem] text-mos-muted">執行中 · 隨時可從左側切換方法論</span>
-                <button
-                  onClick={() => {
+              <div className="px-4 py-1.5 border-b border-divider bg-content1/50 flex items-center justify-between">
+                <span className="text-[0.7rem] text-default-500">執行中 · 隨時可從左側切換方法論</span>
+                <Button
+                  size="sm"
+                  variant="light"
+                  radius="sm"
+                  onPress={() => {
                     setActiveMissionId(null);
                     const next = new URLSearchParams(params);
                     next.delete("mission");
                     setParams(next, { replace: true });
                   }}
-                  className="text-[0.7rem] text-mos-muted hover:text-mos-ink transition"
+                  className="text-[0.7rem] h-6 min-w-0 px-2"
                 >
                   返回預覽
-                </button>
+                </Button>
               </div>
               <div className="flex-1 min-h-0">
                 <WorkflowRunner
@@ -909,11 +923,11 @@ export default function PickerWorkspace() {
           ) : (
             <div className="h-full flex items-center justify-center p-10">
               <div className="text-center max-w-[420px]">
-                <div className="text-[3rem] mb-4 text-mos-muted">▣</div>
-                <h2 className="font-display text-[1.4rem] text-mos-ink mb-2">
+                <div className="text-[3rem] mb-4 text-default-400">▣</div>
+                <h2 className="font-display text-[1.4rem] text-foreground mb-2">
                   從左側挑一個方法論小組來開始
                 </h2>
-                <p className="text-[0.86rem] text-mos-muted leading-relaxed">
+                <p className="text-[0.86rem] text-default-500 leading-relaxed">
                   每個方法論都附帶完整的工作步驟與 AI 專員陣容，點擊 → 預覽 → 啟動。
                 </p>
               </div>
@@ -924,16 +938,18 @@ export default function PickerWorkspace() {
         {/* "Reopen middle" tab — surfaces when middle is collapsed but
             we're not in fullscreen, so the user can pop the panel back. */}
         {!fullscreen && middleCollapsed && (
-          <button
-            onClick={toggleMiddle}
-            title="展開方法論清單"
-            className="absolute z-30 top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-mos-hair rounded-r-md shadow flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-paper transition"
-            style={{ left: 68, boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
+          <Tooltip content="展開方法論清單" placement="right" radius="sm">
+            <button
+              onClick={toggleMiddle}
+              aria-label="展開方法論清單"
+              className="absolute z-30 top-1/2 -translate-y-1/2 w-6 h-12 bg-content1 border border-divider rounded-r-medium shadow flex items-center justify-center text-default-500 hover:text-foreground hover:bg-content2 transition"
+              style={{ left: 68, boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </button>
+          </Tooltip>
         )}
       </div>
     </div>
@@ -974,14 +990,17 @@ function ThumbSection({
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2 px-0.5">
-        <h3 className="text-[0.78rem] font-semibold text-mos-ink">{title}</h3>
+        <h3 className="text-[0.78rem] font-semibold text-foreground">{title}</h3>
         {onCta && ctaLabel && (
-          <button
-            onClick={onCta}
-            className="text-[0.7rem] text-mos-muted hover:text-mos-ink transition"
+          <Button
+            size="sm"
+            variant="light"
+            radius="sm"
+            onPress={onCta}
+            className="text-[0.7rem] h-6 min-w-0 px-2 text-default-500"
           >
             {ctaLabel}
-          </button>
+          </Button>
         )}
       </div>
       {children}
@@ -999,11 +1018,15 @@ function SquadMiniCard({
   const name = pickLocaleText(squad.name, lang) || squad.slug;
 
   return (
-    <button
-      onClick={onClick}
+    <Card
+      isPressable
+      isHoverable
+      shadow="none"
+      radius="md"
+      onPress={onClick}
       className={[
-        "rounded-md overflow-hidden border transition text-left flex flex-col",
-        active ? "border-mos-ink shadow-[0_2px_8px_rgba(0,0,0,0.06)]" : "border-mos-hair hover:border-mos-ink",
+        "border transition overflow-hidden",
+        active ? "border-foreground shadow-medium" : "border-divider",
       ].join(" ")}
     >
       <div
@@ -1012,10 +1035,10 @@ function SquadMiniCard({
       >
         {(name.charAt(0) || "?").toUpperCase()}
       </div>
-      <div className="px-2 py-1.5 bg-white">
-        <div className="text-[0.74rem] text-mos-ink line-clamp-1 leading-snug">{name}</div>
-      </div>
-    </button>
+      <CardBody className="px-2 py-1.5">
+        <div className="text-[0.74rem] text-foreground line-clamp-1 leading-snug">{name}</div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -1031,26 +1054,32 @@ function SquadThumb({
   const author = squad.methodology?.author;
 
   return (
-    <button
-      onClick={onClick}
+    <Card
+      isPressable
+      isHoverable
+      shadow="none"
+      radius="md"
+      onPress={onClick}
       className={[
-        "w-full text-left p-2.5 rounded-md border transition flex items-start gap-2.5",
-        active ? "bg-white border-mos-ink shadow-[0_2px_8px_rgba(0,0,0,0.06)]" : "bg-white border-mos-hair hover:border-mos-ink",
+        "w-full border transition",
+        active ? "border-foreground shadow-medium" : "border-divider",
       ].join(" ")}
     >
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-        style={{ background: tone.bg }}
-      >
-        {(name.charAt(0) || "?").toUpperCase()}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[0.82rem] font-semibold text-mos-ink line-clamp-1">{name}</div>
-        <div className="text-[0.7rem] text-mos-muted line-clamp-1 mt-0.5">
-          {author ? `${author}` : tone.label} · {stepCount} 個步驟
+      <CardBody className="p-2.5 flex flex-row items-start gap-2.5">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+          style={{ background: tone.bg }}
+        >
+          {(name.charAt(0) || "?").toUpperCase()}
         </div>
-      </div>
-    </button>
+        <div className="min-w-0 flex-1 text-left">
+          <div className="text-[0.82rem] font-semibold text-foreground line-clamp-1">{name}</div>
+          <div className="text-[0.7rem] text-default-500 line-clamp-1 mt-0.5">
+            {author ? `${author}` : tone.label} · {stepCount} 個步驟
+          </div>
+        </div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -1077,24 +1106,24 @@ function SquadDetailPanel({
   return (
     <div className="max-w-[820px] mx-auto px-8 py-8">
       {/* Title block (Canva-style) */}
-      <h1 className="font-display text-[1.6rem] leading-tight text-mos-ink tracking-[-0.01em]">
+      <h1 className="font-display text-[1.6rem] leading-tight text-foreground tracking-[-0.01em]">
         {name}
       </h1>
-      <div className="mt-2 text-[0.84rem] text-mos-muted">
+      <div className="mt-2 text-[0.84rem] text-default-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: tone.bg }} />
           {lk}・{tone.label}
         </span>
-        <span className="mx-2 text-mos-hair">|</span>
+        <span className="mx-2 text-divider">|</span>
         <span>{steps.length} 個工作步驟</span>
-        <span className="mx-2 text-mos-hair">|</span>
+        <span className="mx-2 text-divider">|</span>
         <span>{memberCount} 位成員</span>
       </div>
 
       {/* Author byline */}
       {(author || year) && (
-        <div className="mt-3 inline-flex items-center gap-2 text-[0.78rem] text-mos-muted">
-          <span className="w-6 h-6 rounded-full bg-mos-cream-dark inline-flex items-center justify-center text-[0.62rem] font-bold text-mos-ink">
+        <div className="mt-3 inline-flex items-center gap-2 text-[0.78rem] text-default-500">
+          <span className="w-6 h-6 rounded-full bg-content3 inline-flex items-center justify-center text-[0.62rem] font-bold text-foreground">
             {(author?.charAt(0) ?? "·").toUpperCase()}
           </span>
           <span>方法論：{author ?? "—"}{year ? ` · ${year}` : ""}</span>
@@ -1103,28 +1132,26 @@ function SquadDetailPanel({
 
       {/* Description */}
       {description && (
-        <p className="mt-4 text-[0.92rem] text-mos-body leading-relaxed">
+        <p className="mt-4 text-[0.92rem] text-foreground/80 leading-relaxed">
           {description}
         </p>
       )}
 
       {/* Primary CTA — 套用 / 啟動 */}
-      <button
-        onClick={onLaunch}
-        disabled={busy}
-        className="mt-6 w-full py-3 text-white font-semibold text-[0.92rem] transition-all hover:opacity-90 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{
-          background: "linear-gradient(135deg, #EA580C, #F97316)",
-          borderRadius: "50px",
-          border: "none",
-          boxShadow: "0 2px 8px rgba(234,88,12,0.25)",
-        }}
+      <Button
+        onPress={onLaunch}
+        isLoading={busy}
+        color="primary"
+        radius="full"
+        size="lg"
+        fullWidth
+        className="mt-6 font-semibold text-[0.92rem]"
       >
         {busy ? "啟動中…" : `啟動小組（含 ${steps.length} 個工作步驟）`}
-      </button>
+      </Button>
 
       {error && (
-        <div className="mt-3 px-4 py-2.5 bg-red-50 border border-red-200 text-[0.82rem] text-red-700 rounded">
+        <div className="mt-3 px-4 py-2.5 bg-danger-50 border border-danger-200 text-[0.82rem] text-danger-700 rounded-medium">
           {error}
         </div>
       )}
@@ -1132,7 +1159,7 @@ function SquadDetailPanel({
       {/* Step grid (Canva's "16 pages" preview) */}
       {steps.length > 0 && (
         <div className="mt-8">
-          <h2 className="font-display text-[1.0rem] text-mos-ink mb-3">工作步驟預覽</h2>
+          <h2 className="font-display text-[1.0rem] text-foreground mb-3">工作步驟預覽</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {steps.map((step: any, idx: number) => (
               <StepCard key={idx} step={step} idx={idx + 1} tone={tone} />
@@ -1154,8 +1181,8 @@ function StepCard({ step, idx, tone }: { step: any; idx: number; tone: any }) {
   const tool = step.tool ?? "";
 
   return (
-    <div className="bg-white border border-mos-hair rounded-lg p-4 hover:border-mos-ink transition">
-      <div className="flex items-start gap-3">
+    <Card shadow="none" radius="lg" className="border border-divider hover:border-foreground transition">
+      <CardBody className="p-4 flex flex-row items-start gap-3">
         <div
           className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-white text-[0.72rem] font-bold"
           style={{ background: tone.bg }}
@@ -1163,26 +1190,26 @@ function StepCard({ step, idx, tone }: { step: any; idx: number; tone: any }) {
           {idx}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[0.86rem] font-semibold text-mos-ink line-clamp-2">{title}</div>
+          <div className="text-[0.86rem] font-semibold text-foreground line-clamp-2">{title}</div>
           {agent && (
-            <div className="text-[0.72rem] text-mos-muted mt-0.5 line-clamp-1">{agent}</div>
+            <div className="text-[0.72rem] text-default-500 mt-0.5 line-clamp-1">{agent}</div>
           )}
           {(skills.length > 0 || out || tool) && (
             <div className="mt-2 flex flex-wrap gap-1">
               {skills.slice(0, 3).map((sk, i) => (
-                <span key={i} className="px-1.5 py-0.5 text-[0.66rem] bg-mos-cream-dark text-mos-ink rounded">{sk}</span>
+                <Chip key={i} size="sm" radius="sm" variant="flat" className="h-5 text-[0.66rem]">{sk}</Chip>
               ))}
               {out && (
-                <span className="px-1.5 py-0.5 text-[0.66rem] bg-mos-ink text-white rounded">{out}</span>
+                <Chip size="sm" radius="sm" variant="solid" color="default" className="h-5 text-[0.66rem] bg-foreground text-background">{out}</Chip>
               )}
               {tool && (
-                <span className="px-1.5 py-0.5 text-[0.66rem] border border-mos-hair text-mos-muted rounded">{tool}</span>
+                <Chip size="sm" radius="sm" variant="bordered" className="h-5 text-[0.66rem]">{tool}</Chip>
               )}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -1251,47 +1278,44 @@ function LayerAssetDrawer({
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-mos-hair flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
         <div className="min-w-0">
-          <div className="text-[0.72rem] text-mos-muted">資產 / Assets</div>
-          <div className="font-display text-[1.0rem] text-mos-ink truncate">{meta.title}</div>
+          <div className="text-[0.72rem] text-default-500">資產 / Assets</div>
+          <div className="font-display text-[1.0rem] text-foreground truncate">{meta.title}</div>
         </div>
-        <button
-          onClick={onBackToTemplates}
-          className="text-[0.72rem] text-mos-muted hover:text-mos-ink transition shrink-0 ml-2"
+        <Button
+          size="sm"
+          variant="light"
+          radius="sm"
+          onPress={onBackToTemplates}
+          className="text-[0.72rem] h-6 min-w-0 px-2 shrink-0 ml-2"
         >
           ← 範本
-        </button>
+        </Button>
       </div>
 
       {/* Body — placeholder shell */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {meta.blurb && (
-          <p className="text-[0.82rem] text-mos-body leading-relaxed mb-4">{meta.blurb}</p>
+          <p className="text-[0.82rem] text-foreground/80 leading-relaxed mb-4">{meta.blurb}</p>
         )}
 
         {/* Empty-state card with primary action */}
-        <div className="border border-dashed border-mos-hair rounded-lg p-5 text-center bg-mos-cream/40">
-          <div className="text-[2rem] mb-2 text-mos-muted">{item.glyph}</div>
-          <div className="text-[0.86rem] text-mos-ink font-semibold mb-1">尚未有資料</div>
-          <div className="text-[0.74rem] text-mos-muted leading-snug mb-4">
-            這個資產庫即將推出。目前可以先上傳檔案或從範本開始一個 mission。
-          </div>
-          <div className="flex gap-2 justify-center">
-            <button
-              disabled
-              className="px-3 py-1.5 text-[0.78rem] bg-white border border-mos-hair text-mos-muted rounded-full cursor-not-allowed"
-            >
-              新增 +
-            </button>
-            <button
-              onClick={onBackToTemplates}
-              className="px-3 py-1.5 text-[0.78rem] bg-mos-ink text-white rounded-full hover:opacity-90 transition"
-            >
-              從範本開始
-            </button>
-          </div>
-        </div>
+        <Card shadow="none" radius="lg" className="border border-dashed border-divider bg-content2/40">
+          <CardBody className="p-5 text-center">
+            <div className="text-[2rem] mb-2 text-default-400">{item.glyph}</div>
+            <div className="text-[0.86rem] text-foreground font-semibold mb-1">尚未有資料</div>
+            <div className="text-[0.74rem] text-default-500 leading-snug mb-4">
+              這個資產庫即將推出。目前可以先上傳檔案或從範本開始一個 mission。
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button size="sm" radius="full" variant="bordered" isDisabled>新增 +</Button>
+              <Button size="sm" radius="full" color="primary" onPress={onBackToTemplates}>
+                從範本開始
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
 
         {/* Stub list — gives a hint of what this drawer will look like once
             real data lands. Three muted skeleton rows. */}
@@ -1299,12 +1323,12 @@ function LayerAssetDrawer({
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="h-12 rounded border border-mos-hair bg-white/60 px-3 flex items-center gap-3 opacity-50"
+              className="h-12 rounded-medium border border-divider bg-content1/60 px-3 flex items-center gap-3 opacity-50"
             >
-              <div className="w-6 h-6 rounded bg-mos-hair/60" />
+              <div className="w-6 h-6 rounded bg-divider/60" />
               <div className="flex-1">
-                <div className="h-2.5 w-1/2 rounded bg-mos-hair/50 mb-1" />
-                <div className="h-2 w-1/3 rounded bg-mos-hair/40" />
+                <div className="h-2.5 w-1/2 rounded bg-divider/50 mb-1" />
+                <div className="h-2 w-1/3 rounded bg-divider/40" />
               </div>
             </div>
           ))}
