@@ -93,15 +93,20 @@ jobs:
             ls -lh "/tmp/squads-backup-${STAMP}.tar.gz"
             echo "STAMP=${STAMP}" > /tmp/squads-backup-stamp.env
 
-      - name: Fetch tarball from VM
-        uses: appleboy/scp-action@v0.1.7
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          source: "/tmp/squads-backup-*.tar.gz"
-          target: "./backup"
-          strip_components: 1
+          ssh-private-key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+
+      - name: Fetch tarball from VM (scp pull)
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          mkdir -p backup
+          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          scp "${VM_USER}@${VM_HOST}:/tmp/squads-backup-*.tar.gz" backup/
+          ls -lh backup/
 
       - name: Upload as GitHub Artifact
         uses: actions/upload-artifact@v4
