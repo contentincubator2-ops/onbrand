@@ -1264,7 +1264,7 @@ ${agentCtx.systemPromptPrefix}`;
       missionId:  z.number(),
       squadSlug:  z.string(),
       stepOrder:  z.number(),
-      mode:       z.enum(["ask", "run", "confirm"]),
+      mode:       z.enum(["ask", "run", "confirm", "skip", "unskip"]),
       userInput:  z.string().max(4000).optional().default(""),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1338,6 +1338,26 @@ ${agentCtx.systemPromptPrefix}`;
            WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
         `);
         return { ok: true, status: "confirmed" as const };
+      }
+
+      // ── skip: mark step as skipped (no LLM, no chaining) ─────────────────────
+      if (input.mode === "skip") {
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, agent_name, agent_output)
+          VALUES (${input.missionId}, ${input.stepOrder}, 'skipped', '使用者跳過', '')
+          ON DUPLICATE KEY UPDATE status = 'skipped'
+        `);
+        return { ok: true, status: "skipped" as const };
+      }
+      if (input.mode === "unskip") {
+        await db.execute(sql`
+          UPDATE mission_step_progress
+             SET status = 'pending'
+           WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+             AND status = 'skipped'
+        `);
+        return { ok: true, status: "pending" as const };
       }
 
       // ── Load previous step outputs for chaining context ──────────────────────
@@ -1433,16 +1453,17 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
       // ── run: produce the draft for this step ─────────────────────────────────
       const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
 你正在執行「${stepName}」步驟。請依方法論交付這一步的成果，**直接給出可用的產出**，不要寒暄。
-用繁體中文。重點清楚、可條列。長度依產出類型：${outputType || "適中"}。`;
+用繁體中文。重點清楚、可條列。長度依產出類型：${outputType || "適中"}。
+${brandContext ? `\n【強制】這一步是為以下這個具體品牌服務，所有舉例、語氣、產品、受眾都必須緊扣這個品牌，禁止寫通用範本：\n${brandContext}\n如果你產出的內容換到別的品牌也成立，就是失敗。` : `\n【警告】此任務沒有綁定品牌，請提示使用者先到右上角選擇品牌再執行。`}`;
 
       const userPrompt = `${missionContext}
-${brandContext}
+${brandContext ? `\n${brandContext}\n` : ""}
 方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
 此步驟說明：${stepDesc || stepName}
 預期產出類型：${outputType || "(未指定)"}
 ${prevOutputs ? `\n上游步驟成果（請接續使用）：\n${prevOutputs}` : ""}
 ${input.userInput ? `\n使用者本步補充：\n${input.userInput}` : ""}
-請直接交付本步驟的成果，務必用品牌的口吻、扣住品牌的定位。`;
+請直接交付本步驟的成果，**所有舉例必須來自上面這個品牌的真實產品 / 受眾 / 產業情境**，不要給通用模板。`;
 
       const llm = await invokeLLM({
         messages: [

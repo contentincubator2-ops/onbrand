@@ -881,6 +881,8 @@ export default function PickerWorkspace() {
                   missionId={activeMissionId}
                   squad={selectedSquad}
                   lang={lang}
+                  currentBrandId={brandId}
+                  currentBrandName={brands.find((b: any) => b.id === brandId)?.name ?? ""}
                   onMissionDeleted={() => {
                     setActiveMissionId(null);
                     try { localStorage.removeItem("sowork.picker.activeMissionId"); } catch {}

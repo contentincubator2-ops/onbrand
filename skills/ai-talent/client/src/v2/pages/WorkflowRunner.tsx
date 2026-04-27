@@ -27,7 +27,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer } from "../../studio/primitives/tokens";
 import { pickLocaleText } from "../../lib/localizeText";
 
-type StepStatus = "pending" | "asking" | "drafted" | "confirmed";
+type StepStatus = "pending" | "asking" | "drafted" | "confirmed" | "skipped";
 
 interface WorkflowRunnerProps {
   missionId: number;
@@ -38,10 +38,16 @@ interface WorkflowRunnerProps {
   onMissionDeleted?: () => void;
   /** Picker callback after duplicate — switches to the new mission. */
   onMissionDuplicated?: (newMissionId: number) => void;
+  /** Currently-selected brand id (from picker localStorage) — used so the
+   *  workflow can rebind a mission whose brandId is null, or warn when the
+   *  current selection differs from the mission's bound brand. */
+  currentBrandId?: number | null;
+  currentBrandName?: string;
 }
 
 export default function WorkflowRunner({
   missionId, squad, lang, onMissionDeleted, onMissionDuplicated,
+  currentBrandId, currentBrandName,
 }: WorkflowRunnerProps) {
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
@@ -76,6 +82,33 @@ export default function WorkflowRunner({
   const missionUpdate = (trpc as any).mission?.update?.useMutation?.() ?? { mutateAsync: async () => null };
   const missionDuplicate = (trpc as any).mission?.duplicate?.useMutation?.() ?? { mutateAsync: async () => null };
   const missionDelete = (trpc as any).mission?.delete?.useMutation?.() ?? { mutateAsync: async () => null };
+  const missionBindBrand = (trpc as any).mission?.bindBrand?.useMutation?.() ?? { mutateAsync: async () => null };
+
+  // Mission's currently-bound brand (from missionQuery — server returns brandId).
+  const missionBrandId: number | null = (missionQuery.data as any)?.brandId ?? null;
+  const missionBrandName: string = (missionQuery.data as any)?.brandName ?? "";
+  const brandMismatch = !!(missionBrandId && currentBrandId && missionBrandId !== currentBrandId);
+  const brandUnbound = !missionBrandId;
+
+  const handleBindCurrentBrand = async () => {
+    if (!currentBrandId) {
+      window.alert("請先在右上角的「品牌切換器」選擇品牌。");
+      return;
+    }
+    await missionBindBrand.mutateAsync({ missionId, brandId: currentBrandId });
+    missionQuery.refetch?.();
+  };
+
+  // Cumulative document view — right pane mode toggle.
+  // "step" = single-step focus (current default), "doc" = vertically stacked
+  // synthesis of every step's output as a Notion-like scrollable document.
+  const [viewMode, setViewMode] = useState<"step" | "doc">(() => {
+    try { return (localStorage.getItem("sowork.runner.viewMode") as any) || "step"; }
+    catch { return "step"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("sowork.runner.viewMode", viewMode); } catch {}
+  }, [viewMode]);
 
   // ── Mary Allen drawer ─────────────────────────────────────────────────
   const askMary = (trpc.squad as any).askMary?.useMutation
@@ -275,11 +308,25 @@ export default function WorkflowRunner({
     if ((res as any)?.ok) progressQuery.refetch?.();
   };
 
+  const handleSkip = async () => {
+    if (!viewStep) return;
+    const ord = Number(viewStep.order ?? viewOrder) || viewOrder;
+    if (!window.confirm(`確定要跳過「Step ${ord}」？跳過的步驟不會送進後續步驟的上下文，可以隨時取消跳過。`)) return;
+    await stepExecute.mutateAsync({ missionId, squadSlug: squad.slug, stepOrder: ord, mode: "skip" });
+    progressQuery.refetch?.();
+  };
+  const handleUnskip = async () => {
+    if (!viewStep) return;
+    const ord = Number(viewStep.order ?? viewOrder) || viewOrder;
+    await stepExecute.mutateAsync({ missionId, squadSlug: squad.slug, stepOrder: ord, mode: "unskip" });
+    progressQuery.refetch?.();
+  };
+
   const isStepUnlocked = (ord: number): boolean => {
     if (ord === 1) return true;
-    // unlocked if previous step is confirmed
+    // unlocked if previous step is confirmed OR skipped (skipped == done-by-fiat)
     const prev = byOrder.get(ord - 1);
-    return prev?.status === "confirmed";
+    return prev?.status === "confirmed" || prev?.status === "skipped";
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -290,15 +337,65 @@ export default function WorkflowRunner({
       {/* Header bar */}
       <div className="px-6 py-3 border-b border-mos-hair bg-white flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="text-[0.72rem] text-mos-muted truncate">
-            {missionTitle ? `${missionTitle} · ` : `Mission #${missionId} · `}{squadName}
+          <div className="text-[0.72rem] text-mos-muted truncate flex items-center gap-2">
+            <span className="truncate">{missionTitle ? `${missionTitle} · ` : `Mission #${missionId} · `}{squadName}</span>
+            {/* Brand chip — shows mission's bound brand. Click to rebind to the
+                currently-selected brand from the picker. Critical fix for old
+                missions whose brandId is null and were therefore producing
+                generic, brand-agnostic outputs. */}
+            {brandUnbound ? (
+              <button
+                onClick={handleBindCurrentBrand}
+                className="shrink-0 px-2 py-0.5 rounded-full text-[0.68rem] bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition"
+                title="這個任務還沒有綁定品牌，所以產出可能變成通用模板。點此綁定到目前選擇的品牌。"
+              >
+                ⚠ 未綁定品牌 · 點此使用「{currentBrandName || "目前品牌"}」
+              </button>
+            ) : brandMismatch ? (
+              <button
+                onClick={handleBindCurrentBrand}
+                className="shrink-0 px-2 py-0.5 rounded-full text-[0.68rem] bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition"
+                title={`這個任務目前綁定的是「${missionBrandName}」，但畫面上選的是「${currentBrandName}」。點此切換。`}
+              >
+                ⚠ 為品牌：{missionBrandName} · 改用「{currentBrandName}」
+              </button>
+            ) : (
+              <span className="shrink-0 px-2 py-0.5 rounded-full text-[0.68rem] bg-mos-paper text-mos-body border border-mos-hair">
+                為品牌：{missionBrandName || "（未綁定）"}
+              </span>
+            )}
           </div>
           <div className="font-display text-[1.0rem] text-mos-ink truncate">
-            {viewStep ? (pickLocaleText(viewStep.name, lang) || `Step ${viewOrder}`) : "—"}
+            {viewMode === "doc" ? "📄 文件視圖（所有步驟結論）" : (viewStep ? (pickLocaleText(viewStep.name, lang) || `Step ${viewOrder}`) : "—")}
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {savedAt && <SavedBadge ts={savedAt} />}
+
+          {/* View mode toggle — step focus vs cumulative document */}
+          <div className="inline-flex rounded-md border border-mos-hair overflow-hidden">
+            <button
+              onClick={() => setViewMode("step")}
+              title="逐步操作模式"
+              className={[
+                "px-2.5 py-1 text-[0.72rem] transition",
+                viewMode === "step" ? "bg-mos-ink text-white" : "bg-white text-mos-ink hover:bg-mos-ink/5",
+              ].join(" ")}
+            >
+              逐步
+            </button>
+            <button
+              onClick={() => setViewMode("doc")}
+              title="文件視圖：所有已完成步驟的結論依序累積成一份提案文件"
+              className={[
+                "px-2.5 py-1 text-[0.72rem] transition border-l border-mos-hair",
+                viewMode === "doc" ? "bg-mos-ink text-white" : "bg-white text-mos-ink hover:bg-mos-ink/5",
+              ].join(" ")}
+            >
+              文件
+            </button>
+          </div>
+
 
           {/* File menu (Canva 檔案) */}
           <div ref={fileMenuRef} className="relative">
@@ -362,6 +459,16 @@ export default function WorkflowRunner({
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
         {!viewStep ? (
           <div className="text-mos-muted text-center py-10">這個小組沒有可執行的步驟。</div>
+        ) : viewMode === "doc" ? (
+          <DocCanvas
+            steps={steps}
+            byOrder={byOrder}
+            tone={tone}
+            lang={lang}
+            missionTitle={missionTitle || squadName}
+            brandName={missionBrandName}
+            onJumpToStep={(ord: number) => { setViewOrder(ord); setViewMode("step"); }}
+          />
         ) : (
           <StepCanvas
             step={viewStep}
@@ -376,6 +483,8 @@ export default function WorkflowRunner({
             onConfirm={handleConfirm}
             onRegenerate={handleRegenerate}
             onUndo={handleUndo}
+            onSkip={handleSkip}
+            onUnskip={handleUnskip}
           />
         )}
       </div>
@@ -390,6 +499,7 @@ export default function WorkflowRunner({
           const dot = status === "confirmed" ? "✓"
                     : status === "drafted"   ? "●"
                     : status === "asking"    ? "?"
+                    : status === "skipped"   ? "⤼"
                     :                          "○";
           const reachable = isStepUnlocked(ord) || status !== "pending";
           const stepName = pickLocaleText(s.name, lang) || `Step ${ord}`;
@@ -755,7 +865,7 @@ function SavedBadge({ ts }: { ts: number }) {
 function StepCanvas({
   step, progress, tone, inputDraft, setInputDraft,
   isPending, isUndoing, unlocked,
-  onAnswerAndRun, onConfirm, onRegenerate, onUndo,
+  onAnswerAndRun, onConfirm, onRegenerate, onUndo, onSkip, onUnskip,
 }: {
   step: any;
   progress: any | undefined;
@@ -769,6 +879,8 @@ function StepCanvas({
   onConfirm: () => void;
   onRegenerate: () => void;
   onUndo: () => void;
+  onSkip: () => void;
+  onUnskip: () => void;
 }) {
   const status: StepStatus = progress?.status ?? "pending";
   const agentName = progress?.agentName ?? step.assignedAgentName ?? "AI 專員";
@@ -805,8 +917,34 @@ function StepCanvas({
 
       {/* Content area driven by status */}
       {status === "pending" && (
-        <div className="bg-white border border-mos-hair rounded-lg p-6 text-mos-muted text-[0.86rem]">
-          {isPending ? "正在準備這一步…" : "等待下一個指令…"}
+        <div className="space-y-3">
+          <div className="bg-white border border-mos-hair rounded-lg p-6 text-mos-muted text-[0.86rem]">
+            {isPending ? "正在準備這一步…" : "等待下一個指令…"}
+          </div>
+          <button
+            onClick={onSkip}
+            disabled={isPending}
+            className="text-[0.78rem] text-mos-muted hover:text-mos-ink underline-offset-2 hover:underline transition"
+            title="不需要這一步？跳過後續步驟仍可繼續。"
+          >
+            跳過這一步 →
+          </button>
+        </div>
+      )}
+
+      {status === "skipped" && (
+        <div className="space-y-3">
+          <div className="bg-mos-paper border border-dashed border-mos-hair rounded-lg p-6 text-mos-muted text-[0.86rem] text-center">
+            <div className="text-[1.4rem] mb-1">⤼</div>
+            <div className="mb-1">已跳過這一步</div>
+            <div className="text-[0.74rem]">這一步的內容不會被送進後續步驟的上下文。</div>
+          </div>
+          <button
+            onClick={onUnskip}
+            className="w-full py-2 text-[0.82rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition"
+          >
+            取消跳過，重新執行這一步
+          </button>
         </div>
       )}
 
@@ -909,6 +1047,108 @@ function StepCanvas({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────── DocCanvas ─────────────────────────── */
+// Cumulative Notion-style document view. Stacks every step's output
+// into a single scrollable doc so the user gets "見林" — the whole
+// proposal building up — instead of "見樹不見林" one-step-at-a-time.
+// Each section is clickable → jumps back into single-step focus.
+
+function DocCanvas({
+  steps, byOrder, tone, lang, missionTitle, brandName, onJumpToStep,
+}: {
+  steps: any[];
+  byOrder: Map<number, any>;
+  tone: any;
+  lang: "zh-TW" | "en";
+  missionTitle: string;
+  brandName: string;
+  onJumpToStep: (ord: number) => void;
+}) {
+  const completed = steps
+    .map((s: any, i: number) => {
+      const ord = Number(s.order ?? 0) || (i + 1);
+      const p = byOrder.get(ord);
+      return {
+        ord,
+        name: pickLocaleText(s.name, lang) || `Step ${ord}`,
+        outputType: s.outputType ?? "",
+        agentName: p?.agentName ?? s.assignedAgentName ?? "",
+        output: p?.agentOutput ?? "",
+        status: (p?.status ?? "pending") as StepStatus,
+      };
+    });
+  const hasAny = completed.some((s) => s.output && (s.status === "drafted" || s.status === "confirmed"));
+
+  return (
+    <div className="max-w-[760px] mx-auto pb-12">
+      {/* Document header */}
+      <div className="border-b border-mos-hair pb-4 mb-6">
+        <div className="text-[0.7rem] tracking-[0.2em] uppercase text-mos-muted mb-1">提案文件 · 即時累積</div>
+        <h1 className="font-display text-[1.6rem] text-mos-ink leading-tight">{missionTitle}</h1>
+        {brandName && (
+          <div className="text-[0.84rem] text-mos-muted mt-1">為品牌：{brandName}</div>
+        )}
+      </div>
+
+      {!hasAny && (
+        <div className="bg-white border border-dashed border-mos-hair rounded-lg p-10 text-center text-mos-muted text-[0.86rem]">
+          還沒有任何步驟產出。回到「逐步」模式完成第一步，這份文件就會開始累積。
+        </div>
+      )}
+
+      <div className="space-y-8">
+        {completed.map((s) => {
+          if (s.status === "pending") {
+            return (
+              <section key={s.ord} className="opacity-50">
+                <div className="text-[0.74rem] text-mos-muted mb-1">Step {s.ord}</div>
+                <h2 className="font-display text-[1.1rem] text-mos-ink mb-2">{s.name}</h2>
+                <div className="text-[0.82rem] text-mos-muted italic">尚未執行</div>
+              </section>
+            );
+          }
+          if (s.status === "skipped") {
+            return (
+              <section key={s.ord} className="opacity-60">
+                <div className="text-[0.74rem] text-mos-muted mb-1">Step {s.ord} · ⤼ 已跳過</div>
+                <h2 className="font-display text-[1.1rem] text-mos-ink mb-1">{s.name}</h2>
+              </section>
+            );
+          }
+          const isConfirmed = s.status === "confirmed";
+          return (
+            <section key={s.ord} className="group">
+              <button
+                onClick={() => onJumpToStep(s.ord)}
+                className="text-left w-full hover:bg-mos-paper/60 rounded-md -mx-2 px-2 py-1 transition"
+                title="回到逐步模式編輯"
+              >
+                <div className="flex items-center gap-2 text-[0.74rem] text-mos-muted mb-1">
+                  <span>Step {s.ord}</span>
+                  {s.agentName && <span>· {s.agentName}</span>}
+                  {s.outputType && <span>· {s.outputType}</span>}
+                  {isConfirmed ? (
+                    <span className="text-emerald-600">· ✓ 已確認</span>
+                  ) : (
+                    <span className="text-amber-600">· ● 草稿</span>
+                  )}
+                  <span className="opacity-0 group-hover:opacity-100 transition text-mos-orange ml-auto">編輯 →</span>
+                </div>
+                <h2 className="font-display text-[1.2rem] text-mos-ink leading-tight" style={{ borderLeft: `3px solid ${tone.bg}`, paddingLeft: "0.7rem" }}>
+                  {s.name}
+                </h2>
+              </button>
+              <div className="mt-3 text-[0.92rem] text-mos-body whitespace-pre-wrap leading-relaxed pl-3">
+                {s.output}
+              </div>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

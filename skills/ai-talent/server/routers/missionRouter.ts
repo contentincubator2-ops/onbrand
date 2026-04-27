@@ -105,7 +105,16 @@ export const missionRouter = router({
         .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)))
         .limit(1);
       if (!mission) return null;
-      return mission;
+      // Resolve brand name so the runner can show a "為品牌：…" chip without
+      // a second round-trip.
+      let brandName: string | null = null;
+      if ((mission as any).brandId) {
+        const [b] = await db.execute(
+          sql`SELECT name FROM brands WHERE id = ${(mission as any).brandId} LIMIT 1`,
+        ) as any[];
+        brandName = (b as any[])?.[0]?.name ?? null;
+      }
+      return { ...mission, brandName };
     }),
 
   // Create a new mission
@@ -152,6 +161,20 @@ export const missionRouter = router({
         brandName: input.brandName,
       }).catch(console.error);
       return { id: missionId };
+    }),
+
+  // Rebind a mission to a brand. Used when an old mission was created
+  // before the brand picker landed (so brandId is null) or when the user
+  // realises mid-flight that the wrong brand is in context.
+  bindBrand: protectedProcedure
+    .input(z.object({ missionId: z.number(), brandId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      await db.update(missions)
+        .set({ brandId: input.brandId })
+        .where(and(eq(missions.id, input.missionId), eq(missions.userId, ctx.user.id)));
+      return { ok: true };
     }),
 
   // Update mission context
