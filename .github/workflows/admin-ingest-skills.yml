@@ -17,6 +17,8 @@ on:
           - awesome-chatgpt-prompts
           - linexjlin-gpts
           - voltagent-subagents
+          - crewai-examples
+          - letta-personas
       limit:
         description: 'Max skills to fetch (blank = all)'
         required: false

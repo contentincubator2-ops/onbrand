@@ -15,6 +15,8 @@ import { wshobsonAgents } from "./sources/wshobsonAgents";
 import { awesomeChatgptPrompts } from "./sources/awesomeChatgptPrompts";
 import { linexjlinGpts } from "./sources/linexjlinGpts";
 import { voltagentSubagents } from "./sources/voltagentSubagents";
+import { crewaiExamples } from "./sources/crewaiExamples";
+import { lettaPersonas } from "./sources/lettaPersonas";
 import type { SourceFetcher } from "./types";
 
 dotenv.config();
@@ -25,6 +27,8 @@ const REGISTRY: Record<string, SourceFetcher> = {
   [awesomeChatgptPrompts.id]: awesomeChatgptPrompts,
   [linexjlinGpts.id]:         linexjlinGpts,
   [voltagentSubagents.id]:    voltagentSubagents,
+  [crewaiExamples.id]:        crewaiExamples,
+  [lettaPersonas.id]:         lettaPersonas,
 };
 
 function arg(name: string): string | undefined {
