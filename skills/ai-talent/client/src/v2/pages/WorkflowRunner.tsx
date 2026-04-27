@@ -161,7 +161,7 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
         <div className="min-w-0 flex-1">
           <div className="text-[0.72rem] text-mos-muted">Mission #{missionId} · {squadName}</div>
           <div className="font-display text-[1.0rem] text-mos-ink truncate">
-            {viewStep ? (viewStep.name ?? `Step ${viewOrder}`) : "—"}
+            {viewStep ? (pickLocaleText(viewStep.name, lang) || `Step ${viewOrder}`) : "—"}
           </div>
         </div>
         <div className="text-[0.72rem] text-mos-muted shrink-0">
@@ -201,14 +201,15 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
                     : status === "asking"    ? "?"
                     :                          "○";
           const reachable = isStepUnlocked(ord) || status !== "pending";
+          const stepName = pickLocaleText(s.name, lang) || `Step ${ord}`;
           return (
             <button
               key={ord}
               disabled={!reachable}
               onClick={() => setViewOrder(ord)}
-              title={s.name ?? `Step ${ord}`}
+              title={stepName}
               className={[
-                "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.72rem] border transition",
+                "shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.72rem] border transition max-w-[180px]",
                 isActive
                   ? "bg-mos-ink text-white border-mos-ink"
                   : status === "confirmed"
@@ -218,8 +219,9 @@ export default function WorkflowRunner({ missionId, squad, lang }: WorkflowRunne
                       : "bg-white text-mos-muted border-mos-hair opacity-50 cursor-not-allowed",
               ].join(" ")}
             >
-              <span className="font-mono">{dot}</span>
-              <span>{ord}</span>
+              <span className="font-mono shrink-0">{dot}</span>
+              <span className="shrink-0 opacity-70">{ord}</span>
+              <span className="truncate">{stepName}</span>
             </button>
           );
         })}
