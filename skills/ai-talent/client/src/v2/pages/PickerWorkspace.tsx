@@ -28,16 +28,134 @@ import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import WorkflowRunner from "./WorkflowRunner";
 
 /* ─────────────────────────── Icon rail ─────────────────────────── */
+//
+// Layer-aware rail (decision 2026-04-27): the leftmost icon column is split
+// into THREE bands. The middle band swaps based on the active squad's
+// strategy layer (L1–L6) — for L4 it further specialises by channel
+// (FB/IG/LI/YT/PR). Top and bottom bands stay constant so users always
+// have a way back to "範本" and to global tools like 品牌 / 我的 / 上傳.
+//
+//   ┌────┐
+//   │ ▣  │ 範本           ← top band (always present)
+//   ├────┤
+//   │ ✎  │ 訪談稿         ← middle band — varies per layer
+//   │ ⚔  │ 競品比對
+//   │ ◈  │ 原型卡
+//   │ ⊞  │ SWOT
+//   ├────┤
+//   │ ◐  │ 品牌           ← bottom band (always present)
+//   │ ◔  │ 我的
+//   │ ↑  │ 上傳
+//   └────┘
+//
+// Items in the layer band open a typed "asset drawer" in the middle column
+// (replacing the squad list temporarily). Drawers ship as placeholders for
+// now — content gets populated as the underlying tables land in later
+// sprints. Clicking 範本 returns to the squad list.
 
-type RailKey = "templates" | "layers" | "channels" | "recent" | "upload";
+type RailKind = "global" | "layer";
+type RailItem = {
+  key: string;
+  label: string;
+  glyph: string;
+  kind: RailKind;
+  /** When kind="layer", which asset drawer to open in middle column */
+  drawer?: string;
+};
 
-const RAIL_ITEMS: Array<{ key: RailKey; label: string; glyph: string }> = [
-  { key: "templates", label: "範本",   glyph: "▣" },
-  { key: "layers",    label: "圖層",   glyph: "≡" },
-  { key: "channels",  label: "通路",   glyph: "◎" },
-  { key: "recent",    label: "我的",   glyph: "◔" },
-  { key: "upload",    label: "上傳",   glyph: "↑" },
+const RAIL_TOP: RailItem[] = [
+  { key: "templates", label: "範本", glyph: "▣", kind: "global" },
 ];
+
+const RAIL_BOTTOM: RailItem[] = [
+  { key: "brand",  label: "品牌", glyph: "◐", kind: "global" },
+  { key: "recent", label: "我的", glyph: "◔", kind: "global" },
+  { key: "upload", label: "上傳", glyph: "↑", kind: "global" },
+];
+
+/** Per-layer middle-band rail items. Keys for L4 use `L4-${channel}` format. */
+const LAYER_RAIL: Record<string, RailItem[]> = {
+  L1: [
+    { key: "interviews",  label: "訪談稿",  glyph: "✎", kind: "layer", drawer: "interviews" },
+    { key: "competitors", label: "競品",    glyph: "⚔", kind: "layer", drawer: "competitors" },
+    { key: "archetypes",  label: "原型卡",  glyph: "◈", kind: "layer", drawer: "archetypes" },
+    { key: "swot",        label: "SWOT",   glyph: "⊞", kind: "layer", drawer: "swot" },
+  ],
+  L2: [
+    { key: "products",    label: "產品卡",  glyph: "▤", kind: "layer", drawer: "products" },
+    { key: "vp-canvas",   label: "VP",      glyph: "⊕", kind: "layer", drawer: "vp-canvas" },
+    { key: "pricing",     label: "定價",    glyph: "$", kind: "layer", drawer: "pricing" },
+    { key: "fab",         label: "FAB",     glyph: "▦", kind: "layer", drawer: "fab" },
+  ],
+  L3: [
+    { key: "personas",    label: "Persona", glyph: "☺", kind: "layer", drawer: "personas" },
+    { key: "icp",         label: "ICP",     glyph: "◉", kind: "layer", drawer: "icp" },
+    { key: "journey",     label: "旅程圖",  glyph: "↝", kind: "layer", drawer: "journey" },
+    { key: "segments",    label: "區隔",    glyph: "▤", kind: "layer", drawer: "segments" },
+  ],
+  L4: [
+    { key: "calendar",    label: "行事曆",  glyph: "▦", kind: "layer", drawer: "calendar" },
+    { key: "assets",      label: "素材庫",  glyph: "▥", kind: "layer", drawer: "assets" },
+    { key: "history",     label: "歷史",    glyph: "↺", kind: "layer", drawer: "history" },
+  ],
+  "L4-facebook": [
+    { key: "fb-history",  label: "貼文",    glyph: "▦", kind: "layer", drawer: "fb-history" },
+    { key: "fb-assets",   label: "素材庫",  glyph: "▥", kind: "layer", drawer: "fb-assets" },
+    { key: "fb-calendar", label: "行事曆",  glyph: "📅", kind: "layer", drawer: "fb-calendar" },
+    { key: "fb-ads",      label: "廣告組",  glyph: "◍", kind: "layer", drawer: "fb-ads" },
+  ],
+  "L4-instagram": [
+    { key: "ig-reels",    label: "Reels",   glyph: "▶", kind: "layer", drawer: "ig-reels" },
+    { key: "ig-stories",  label: "限動",    glyph: "○", kind: "layer", drawer: "ig-stories" },
+    { key: "ig-tags",     label: "Hashtag", glyph: "#", kind: "layer", drawer: "ig-tags" },
+    { key: "ig-calendar", label: "行事曆",  glyph: "📅", kind: "layer", drawer: "ig-calendar" },
+  ],
+  "L4-linkedin": [
+    { key: "li-history",  label: "貼文",    glyph: "▦", kind: "layer", drawer: "li-history" },
+    { key: "li-personal", label: "個人品牌", glyph: "◐", kind: "layer", drawer: "li-personal" },
+    { key: "li-leads",    label: "Lead 表", glyph: "▤", kind: "layer", drawer: "li-leads" },
+    { key: "li-calendar", label: "行事曆",  glyph: "📅", kind: "layer", drawer: "li-calendar" },
+  ],
+  "L4-youtube": [
+    { key: "yt-videos",   label: "影片庫",  glyph: "▶", kind: "layer", drawer: "yt-videos" },
+    { key: "yt-titles",   label: "標題 A/B", glyph: "Aa", kind: "layer", drawer: "yt-titles" },
+    { key: "yt-thumbs",   label: "縮圖",    glyph: "▥", kind: "layer", drawer: "yt-thumbs" },
+    { key: "yt-captions", label: "字幕",    glyph: "≡", kind: "layer", drawer: "yt-captions" },
+  ],
+  "L4-pr": [
+    { key: "pr-media",    label: "媒體",    glyph: "📰", kind: "layer", drawer: "pr-media" },
+    { key: "pr-press",    label: "新聞稿",  glyph: "✎", kind: "layer", drawer: "pr-press" },
+    { key: "pr-kol",      label: "KOL",     glyph: "☺", kind: "layer", drawer: "pr-kol" },
+    { key: "pr-pitches",  label: "Pitch",   glyph: "▤", kind: "layer", drawer: "pr-pitches" },
+  ],
+  L5: [
+    { key: "kpis",        label: "KPI",     glyph: "◎", kind: "layer", drawer: "kpis" },
+    { key: "budget",      label: "預算",    glyph: "$", kind: "layer", drawer: "budget" },
+    { key: "gantt",       label: "甘特圖",  glyph: "▦", kind: "layer", drawer: "gantt" },
+    { key: "risks",       label: "風險",    glyph: "⚠", kind: "layer", drawer: "risks" },
+  ],
+  L6: [
+    { key: "monitor",     label: "監測",    glyph: "◔", kind: "layer", drawer: "monitor" },
+    { key: "audits",      label: "Audit",   glyph: "✓", kind: "layer", drawer: "audits" },
+    { key: "incidents",   label: "事件",    glyph: "⚠", kind: "layer", drawer: "incidents" },
+    { key: "benchmarks",  label: "對標",    glyph: "≈", kind: "layer", drawer: "benchmarks" },
+  ],
+};
+
+/**
+ * Resolve which rail items to render given the active layer + channel.
+ * Falls back to global-only rail when no layer context is set yet
+ * (e.g. landing on the picker without a squad selected).
+ */
+function resolveRailItems(layer: MosLayer | null, channel: string | null): RailItem[] {
+  let middle: RailItem[] = [];
+  if (layer === "L4" && channel && LAYER_RAIL[`L4-${channel}`]) {
+    middle = LAYER_RAIL[`L4-${channel}`];
+  } else if (layer && LAYER_RAIL[layer]) {
+    middle = LAYER_RAIL[layer];
+  }
+  return [...RAIL_TOP, ...middle, ...RAIL_BOTTOM];
+}
 
 const CHANNEL_OPTIONS = [
   { key: "facebook",  label: "Facebook",  glyph: "f"  },
@@ -124,10 +242,10 @@ export default function PickerWorkspace() {
   );
 
   // Rail always starts on "templates" — that's the primary browsing mode.
-  // A locked channel/layer (from URL params) is shown as a dismissable
-  // badge under the search bar, not as a rail switch. This matches Canva,
-  // where 範本 is always the default active rail item.
-  const [rail, setRail] = useState<RailKey>("templates");
+  // The rail key here tracks WHICH rail item is active. When kind=global
+  // and key=templates, the middle column shows the squad list. When
+  // kind=layer, it shows the asset drawer for that layer item.
+  const [activeRailKey, setActiveRailKey] = useState<string>("templates");
   const [layerFilter, setLayerFilter] = useState<MosLayer | "ALL">(
     initialLayer && LAYER_OPTIONS.includes(initialLayer) ? initialLayer : "ALL",
   );
@@ -308,6 +426,56 @@ export default function PickerWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelFilter, layerFilter]);
 
+  // ── Effective layer/channel for rail (layer-aware design 2026-04-27) ──
+  // Priority for resolving the rail's layer band:
+  //   1. Active squad's strategy_layer (highest — user has committed to one)
+  //   2. layerFilter if locked (URL ?layer=L1 or pill click)
+  //   3. null → rail collapses to global-only (top + bottom bands)
+  // For L4 we additionally need the channel to pick the right sub-rail
+  // (FB vs IG vs LI vs YT vs PR).
+  const effectiveLayer: MosLayer | null = useMemo(() => {
+    if (selectedSquad?.strategyLayer) {
+      const lk = String(selectedSquad.strategyLayer).slice(0, 2) as MosLayer;
+      if (LAYER_OPTIONS.includes(lk)) return lk;
+    }
+    if (layerFilter !== "ALL") return layerFilter;
+    return null;
+  }, [selectedSquad, layerFilter]);
+
+  const effectiveChannel: string | null = useMemo(() => {
+    if (channelFilter !== "all") return channelFilter;
+    // Try to detect from squad's workspace[]
+    if (selectedSquad?.workspace?.length) {
+      for (const [key, aliases] of Object.entries(CHANNEL_ALIASES)) {
+        if (selectedSquad.workspace.some((w: string) =>
+          aliases.some((a) => String(w).toLowerCase().includes(a))
+        )) return key;
+      }
+    }
+    return null;
+  }, [channelFilter, selectedSquad]);
+
+  /** Currently visible rail items (top + layer-specific middle + bottom). */
+  const railItems = useMemo(
+    () => resolveRailItems(effectiveLayer, effectiveChannel),
+    [effectiveLayer, effectiveChannel],
+  );
+
+  /** The rail item the user has clicked into. Drives middle column mode. */
+  const activeRailItem = useMemo(
+    () => railItems.find((it) => it.key === activeRailKey) ?? railItems[0],
+    [railItems, activeRailKey],
+  );
+
+  // If the rail config changes (e.g. squad swap moves us to a different
+  // layer) and the previously active key disappears, snap back to 範本 so
+  // the middle column doesn't render an orphan empty drawer.
+  useEffect(() => {
+    if (!railItems.find((it) => it.key === activeRailKey)) {
+      setActiveRailKey("templates");
+    }
+  }, [railItems, activeRailKey]);
+
   return (
     <div className="fixed inset-0 flex flex-col bg-mos-cream">
       {/* ── Top header ───────────────────────────────────────────────── */}
@@ -329,33 +497,55 @@ export default function PickerWorkspace() {
 
       {/* ── Body: 3-column ───────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 flex">
-        {/* Icon rail */}
+        {/* Icon rail — layer-aware. Top "範本" + layer-specific middle band
+            (varies per active squad's strategy_layer) + bottom global tools.
+            A thin separator between bands so the user can see the structure. */}
         <aside className="w-[68px] border-r border-mos-hair bg-white flex flex-col items-stretch py-2">
-          {RAIL_ITEMS.map((it) => {
-            const active = rail === it.key;
+          {railItems.map((it, i) => {
+            const active = activeRailKey === it.key;
+            // Insert separators between bands (after top, before bottom)
+            const prev = railItems[i - 1];
+            const showSeparatorAbove = !!prev && prev.kind !== it.kind;
             return (
-              <button
-                key={it.key}
-                onClick={() => {
-                  setRail(it.key);
-                  if (it.key === "templates") {
-                    setLayerFilter("ALL"); setChannelFilter("all");
-                  }
-                }}
-                className={[
-                  "h-14 mx-1 my-0.5 rounded flex flex-col items-center justify-center gap-0.5 transition",
-                  active ? "bg-mos-ink text-white" : "text-mos-ink hover:bg-mos-ink/5",
-                ].join(" ")}
-              >
-                <span className="text-[1.05rem] leading-none">{it.glyph}</span>
-                <span className="text-[0.62rem] tracking-[0.06em]">{it.label}</span>
-              </button>
+              <React.Fragment key={it.key}>
+                {showSeparatorAbove && (
+                  <div className="mx-3 my-1 border-t border-mos-hair/60" />
+                )}
+                <button
+                  onClick={() => {
+                    setActiveRailKey(it.key);
+                    if (it.key === "templates") {
+                      // Returning to templates clears any locked filters that
+                      // weren't from URL params, so the user sees the full
+                      // catalog again. Channel/layer badges are dismissable
+                      // separately via the locked-filter UI in the search row.
+                    }
+                  }}
+                  title={it.label}
+                  className={[
+                    "h-14 mx-1 my-0.5 rounded flex flex-col items-center justify-center gap-0.5 transition",
+                    active ? "bg-mos-ink text-white" : "text-mos-ink hover:bg-mos-ink/5",
+                  ].join(" ")}
+                >
+                  <span className="text-[1.05rem] leading-none">{it.glyph}</span>
+                  <span className="text-[0.62rem] tracking-[0.06em]">{it.label}</span>
+                </button>
+              </React.Fragment>
             );
           })}
         </aside>
 
-        {/* Middle column — search + sub-filter + thumbnails */}
+        {/* Middle column — squad list (default) OR asset drawer when a
+            layer-specific rail item is active. Drawers ship as placeholders
+            until the underlying asset tables land in later sprints. */}
         <section className="w-[380px] border-r border-mos-hair bg-white flex flex-col min-h-0">
+          {activeRailItem?.kind === "layer" ? (
+            <LayerAssetDrawer
+              item={activeRailItem}
+              onBackToTemplates={() => setActiveRailKey("templates")}
+            />
+          ) : (
+          <>
           {/* Search + AI generate */}
           <div className="p-3 border-b border-mos-hair">
             <div className="relative">
@@ -561,6 +751,8 @@ export default function PickerWorkspace() {
               </>
             )}
           </div>
+          </>
+          )}
         </section>
 
         {/* Right pane — canvas / detail / runner */}
@@ -858,6 +1050,134 @@ function StepCard({ step, idx, tone }: { step: any; idx: number; tone: any }) {
               )}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Sub: LayerAssetDrawer ─────────────────────────── */
+//
+// Replaces the squad-list in the middle column when a layer-specific rail
+// item is selected. For now this is a structured placeholder — the
+// underlying asset tables (interviews, personas, kpis, ig-reels…) will
+// land in subsequent sprints. The shell is here so layer-aware navigation
+// is testable end-to-end and the user can see what each layer surfaces.
+
+const DRAWER_LABELS: Record<string, { title: string; blurb: string }> = {
+  interviews:  { title: "訪談稿",   blurb: "上傳訪談逐字稿，AI 自動萃取品牌洞察。" },
+  competitors: { title: "競品比對", blurb: "蒐集競品定位、訊息與差異化點。" },
+  archetypes:  { title: "原型卡",   blurb: "12 種品牌原型卡片庫，可拖入 mission。" },
+  swot:        { title: "SWOT",     blurb: "本品牌的 SWOT 工作板。" },
+  products:    { title: "產品卡",   blurb: "所有 SKU / 產品線資料卡。" },
+  "vp-canvas": { title: "VP Canvas", blurb: "Osterwalder 價值主張畫布。" },
+  pricing:     { title: "定價",     blurb: "各產品線定價策略與彈性。" },
+  fab:         { title: "FAB",      blurb: "Features-Advantages-Benefits 拆解。" },
+  personas:    { title: "Persona",  blurb: "目標客群人物誌，含痛點與動機。" },
+  icp:         { title: "ICP",      blurb: "B2B 理想客戶輪廓。" },
+  journey:     { title: "旅程圖",   blurb: "客戶決策歷程與觸點地圖。" },
+  segments:    { title: "區隔表",   blurb: "STP / VALS / 行為區隔。" },
+  calendar:    { title: "行事曆",   blurb: "本通路內容排程。" },
+  assets:      { title: "素材庫",   blurb: "本通路圖文素材彙整。" },
+  history:     { title: "歷史貼文", blurb: "歷史內容表現與分析。" },
+  "fb-history":  { title: "FB 貼文歷史",  blurb: "歷史貼文 + 互動數據。" },
+  "fb-assets":   { title: "FB 素材庫",    blurb: "圖文 / 影片素材。" },
+  "fb-calendar": { title: "FB 行事曆",    blurb: "排程中與已發佈貼文。" },
+  "fb-ads":      { title: "FB 廣告組",    blurb: "廣告素材 / 受眾 / 預算。" },
+  "ig-reels":    { title: "Reels 庫",     blurb: "影音素材 + 表現。" },
+  "ig-stories":  { title: "限時動態",     blurb: "限動企劃與素材。" },
+  "ig-tags":     { title: "Hashtag 策略", blurb: "標籤組合與測試紀錄。" },
+  "ig-calendar": { title: "IG 行事曆",    blurb: "排程中與已發佈內容。" },
+  "li-history":  { title: "LinkedIn 貼文", blurb: "個人 / 公司貼文歷史。" },
+  "li-personal": { title: "個人品牌",     blurb: "個人 LinkedIn 經營資產。" },
+  "li-leads":    { title: "Lead 表",      blurb: "從 LinkedIn 搜集的潛在客戶。" },
+  "li-calendar": { title: "LI 行事曆",    blurb: "排程中與已發佈貼文。" },
+  "yt-videos":   { title: "影片庫",       blurb: "上傳影片 + 表現數據。" },
+  "yt-titles":   { title: "標題 A/B",     blurb: "標題測試紀錄。" },
+  "yt-thumbs":   { title: "縮圖",         blurb: "縮圖庫 + 點閱率。" },
+  "yt-captions": { title: "字幕",         blurb: "字幕檔與多語言版本。" },
+  "pr-media":    { title: "媒體名單",     blurb: "記者與媒體對接資料。" },
+  "pr-press":    { title: "新聞稿",       blurb: "已發 / 草稿新聞稿。" },
+  "pr-kol":      { title: "KOL 名單",     blurb: "KOL 合作池與紀錄。" },
+  "pr-pitches":  { title: "Pitch 紀錄",   blurb: "Pitch 信件與回覆狀態。" },
+  kpis:          { title: "KPI",          blurb: "活動目標與北極星指標。" },
+  budget:        { title: "預算",         blurb: "活動預算分配與實支。" },
+  gantt:         { title: "甘特圖",       blurb: "活動時程與依賴。" },
+  risks:         { title: "風險表",       blurb: "已知風險與緩解計畫。" },
+  monitor:       { title: "監測儀表板",   blurb: "即時品牌健康度。" },
+  audits:        { title: "Audit 紀錄",   blurb: "歷次稽核紀錄與發現。" },
+  incidents:     { title: "異常事件",     blurb: "監測觸發的事件紀錄。" },
+  benchmarks:    { title: "對標",         blurb: "競品與產業基準。" },
+};
+
+function LayerAssetDrawer({
+  item,
+  onBackToTemplates,
+}: {
+  item: RailItem;
+  onBackToTemplates: () => void;
+}) {
+  const meta = (item.drawer && DRAWER_LABELS[item.drawer]) ?? { title: item.label, blurb: "" };
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-mos-hair flex items-center justify-between">
+        <div className="min-w-0">
+          <div className="text-[0.72rem] text-mos-muted">資產 / Assets</div>
+          <div className="font-display text-[1.0rem] text-mos-ink truncate">{meta.title}</div>
+        </div>
+        <button
+          onClick={onBackToTemplates}
+          className="text-[0.72rem] text-mos-muted hover:text-mos-ink transition shrink-0 ml-2"
+        >
+          ← 範本
+        </button>
+      </div>
+
+      {/* Body — placeholder shell */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        {meta.blurb && (
+          <p className="text-[0.82rem] text-mos-body leading-relaxed mb-4">{meta.blurb}</p>
+        )}
+
+        {/* Empty-state card with primary action */}
+        <div className="border border-dashed border-mos-hair rounded-lg p-5 text-center bg-mos-cream/40">
+          <div className="text-[2rem] mb-2 text-mos-muted">{item.glyph}</div>
+          <div className="text-[0.86rem] text-mos-ink font-semibold mb-1">尚未有資料</div>
+          <div className="text-[0.74rem] text-mos-muted leading-snug mb-4">
+            這個資產庫即將推出。目前可以先上傳檔案或從範本開始一個 mission。
+          </div>
+          <div className="flex gap-2 justify-center">
+            <button
+              disabled
+              className="px-3 py-1.5 text-[0.78rem] bg-white border border-mos-hair text-mos-muted rounded-full cursor-not-allowed"
+            >
+              新增 +
+            </button>
+            <button
+              onClick={onBackToTemplates}
+              className="px-3 py-1.5 text-[0.78rem] bg-mos-ink text-white rounded-full hover:opacity-90 transition"
+            >
+              從範本開始
+            </button>
+          </div>
+        </div>
+
+        {/* Stub list — gives a hint of what this drawer will look like once
+            real data lands. Three muted skeleton rows. */}
+        <div className="mt-4 space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-12 rounded border border-mos-hair bg-white/60 px-3 flex items-center gap-3 opacity-50"
+            >
+              <div className="w-6 h-6 rounded bg-mos-hair/60" />
+              <div className="flex-1">
+                <div className="h-2.5 w-1/2 rounded bg-mos-hair/50 mb-1" />
+                <div className="h-2 w-1/3 rounded bg-mos-hair/40" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
