@@ -1,0 +1,60 @@
+name: Admin — Force rebuild frontend
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 900s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "════ Pull latest ════"
+            cd "$APP"
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo ""
+            echo "════ Wipe public/ ════"
+            rm -rf "$AI/public"
+            mkdir -p "$AI/public"
+
+            echo ""
+            echo "════ Client install ════"
+            cd "$AI/client"
+            npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -10
+
+            echo ""
+            echo "════ FULL build (no truncation) ════"
+            npm run build
+
+            echo ""
+            echo "════ Verify ════"
+            HASH_INDEX=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$AI/public/index.html" | head -1)
+            echo "index.html references: $HASH_INDEX"
+            ls -la "$AI/public/assets/" | head -10
+            if [ -f "$AI/public/assets/$HASH_INDEX" ]; then
+              echo "✅ Asset present: $HASH_INDEX"
+            else
+              echo "❌ MISSING: $HASH_INDEX"
+              exit 1
+            fi
+
+            echo ""
+            echo "════ Restart pm2 ════"
+            pm2 restart marketing-os --update-env 2>&1 | tail -5
+            pm2 save
