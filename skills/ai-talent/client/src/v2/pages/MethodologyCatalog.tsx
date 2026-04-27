@@ -1,371 +1,248 @@
 /**
- * MethodologyCatalog — Canva-style 範本 page.
+ * MethodologyCatalog — Pure HeroUI rewrite.
  *
- * Mirrors Canva's templates page layout:
- *   1. Pastel gradient hero (green → purple → pink) with centered title
- *   2. Big rounded search bar
- *   3. 3 quick filter pills (品牌策略 / 內容行銷 / 商業驗證)
- *   4. "探索任務範本" section — horizontal-scroll pastel category cards
- *      (one per strategy layer L1–L6)
- *   5. "為你推薦" section — actual squad grid filtered by category
+ * Three tabs (HeroUI Tabs):
+ *   - 方法論小組 (kind=squad)   → Card with Divider, no avatar
+ *   - Agents (kind=agent)        → Cover Card (avatar / icon prominent)
+ *   - 技能 (kind=skill)          → compact pressable list cards
  *
- * Click a card → /templates/:slug detail page.
+ * Filters (above tabs):
+ *   - search (HeroUI Input)
+ *   - layer dropdown (HeroUI Dropdown — L1..L6)
+ *
+ * Stats banner uses <EntityStats variant="row" />.
+ *
+ * All data flows through entity.listForHome(kinds=[...]) — single source.
  */
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
-import MethodologyCard from "../components/methodology/MethodologyCard";
+import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
 import { EntityStats } from "../components/EntityStats";
-import type { MosLayer } from "../../studio/primitives/tokens";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import {
+  Avatar, Button, Card, CardBody, CardFooter, CardHeader, Chip, Divider,
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
+  Input, Skeleton, Spinner, Tab, Tabs,
+} from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMagnifyingGlass, faChevronDown, faPlus, faSparkles, faCrown,
+  faUsers, faRobot, faCubes, faCircleInfo,
+} from "@fortawesome/free-solid-svg-icons";
 
-type SourceFilter = "all" | "seeded" | "ingested" | "forked" | "mine";
+type Kind = "squad" | "agent" | "skill";
 
-type LayerCard = {
-  layer: MosLayer;
-  label: string;
-  hint: string;
-  bg: string;        // pastel bg
-  glyph: string;     // emoji-like illustration
-  glyphBg: string;   // illustration tile bg
-};
-
-const LAYER_CARDS: LayerCard[] = [
-  { layer: "L1", label: "品牌策略",   hint: "定位、原型、敘事",        bg: "#FCE7DD", glyph: "🎯", glyphBg: "#F5C9B0" },
-  { layer: "L2", label: "產品策略",   hint: "JTBD、價值主張、上市",     bg: "#E4DCF5", glyph: "📦", glyphBg: "#C7B7EA" },
-  { layer: "L3", label: "受眾策略",   hint: "STP、Persona、分眾",       bg: "#DEF1EE", glyph: "👥", glyphBg: "#A8D9D2" },
-  { layer: "L4", label: "通路策略",   hint: "FB / IG / YT / LinkedIn",  bg: "#FCE0EA", glyph: "📣", glyphBg: "#F0B5C8" },
-  { layer: "L5", label: "活動策略",   hint: "上市、Launch、Event",      bg: "#FAF1D9", glyph: "🎪", glyphBg: "#EAD89A" },
-  { layer: "L6", label: "商業驗證",   hint: "監測、稽核、校準",         bg: "#DCEAF7", glyph: "📈", glyphBg: "#A8C8E8" },
+const KIND_TABS: Array<{ id: Kind; label: string; icon: any; description: string }> = [
+  { id: "squad",  label: "方法論小組", icon: faUsers,  description: "預配好的 agent 編組，照工作流跑出產出" },
+  { id: "agent",  label: "Agents",     icon: faRobot,  description: "個別專家角色，可放進你的 squad" },
+  { id: "skill",  label: "技能",       icon: faCubes,  description: "原子能力，可被 agent 套用" },
 ];
 
-type QuickPill = { id: string; label: string; glyph: string; bg: string; layers: MosLayer[] };
-const QUICK_PILLS: QuickPill[] = [
-  { id: "brand",   label: "品牌策略", glyph: "🎯", bg: "#F5C9B0", layers: ["L1"] },
-  { id: "content", label: "內容行銷", glyph: "📣", bg: "#F0B5C8", layers: ["L4", "L5"] },
-  { id: "validate",label: "商業驗證", glyph: "📈", bg: "#A8C8E8", layers: ["L6"] },
+const LAYER_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "ALL", label: "全部層級" },
+  { value: "L1",  label: "L1・品牌策略" },
+  { value: "L2",  label: "L2・產品策略" },
+  { value: "L3",  label: "L3・受眾策略" },
+  { value: "L4",  label: "L4・通路策略" },
+  { value: "L5",  label: "L5・活動策略" },
+  { value: "L6",  label: "L6・驗證校準" },
 ];
 
 export default function MethodologyCatalog() {
   const navigate = useNavigate();
   const { brandId } = useOutletContext<ShellOutletCtx>();
-  const utils = trpc.useUtils?.() ?? (trpc as any).useContext?.();
 
-  const squadsQuery = (trpc.squad as any).listByBrand?.useQuery
-    ? (trpc.squad as any).listByBrand.useQuery(
-        { brandId: brandId ?? 0 },
-        { enabled: !!brandId, refetchOnWindowFocus: false }
-      )
-    : { data: [], isLoading: false, refetch: () => {} };
-
-  const mineQuery = (trpc as any).methodology.listMine.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  });
-
-  const squads: any[] = (squadsQuery.data as any[]) ?? [];
-  const mine: any[] = (mineQuery.data as any[]) ?? [];
-
-  const [layerFilter, setLayerFilter] = useState<MosLayer | null>(null);
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [activeKind, setActiveKind] = useState<Kind>("squad");
   const [searchQ, setSearchQ] = useState("");
+  const [layerFilter, setLayerFilter] = useState<string>("ALL");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const exploreRef = useRef<HTMLDivElement>(null);
+  // Pull all three kinds in parallel from a single endpoint
+  const entityQuery = (trpc as any).entity?.listForHome?.useQuery
+    ? (trpc as any).entity.listForHome.useQuery(
+        { brandId: brandId ?? null },
+        { refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: [], isLoading: false };
 
-  const merged = useMemo(() => {
-    if (sourceFilter === "mine") return mine;
-    let pool = squads;
-    if (sourceFilter !== "all") pool = pool.filter((s) => (s.source ?? "seeded") === sourceFilter);
-    return pool;
-  }, [squads, mine, sourceFilter]);
+  const allEntities: any[] = entityQuery.data ?? [];
 
+  // Filter by active tab + layer + search
   const filtered = useMemo(() => {
-    let pool = merged;
-    if (layerFilter) {
-      pool = pool.filter((s) => {
-        const layerStr = String(s.strategyLayer ?? s.strategy_layer ?? "").toUpperCase();
-        return layerStr.includes(layerFilter);
-      });
-    }
     const q = searchQ.trim().toLowerCase();
-    if (q) {
-      pool = pool.filter((s) => {
-        const hay = `${s.name ?? ""} ${s.slug ?? ""} ${s.description ?? ""} ${s.methodology?.author ?? ""}`.toLowerCase();
+    return allEntities
+      .filter((e) => e.kind === activeKind)
+      .filter((e) => layerFilter === "ALL" ? true : e.strategyLayer === layerFilter)
+      .filter((e) => {
+        if (!q) return true;
+        const hay = `${e.name ?? ""} ${e.subtitle ?? ""} ${e.description ?? ""} ${e.slug ?? ""}`.toLowerCase();
         return hay.includes(q);
       });
-    }
-    return pool;
-  }, [merged, layerFilter, searchQ]);
+  }, [allEntities, activeKind, layerFilter, searchQ]);
 
-  const onPickLayer = (l: MosLayer) => {
-    setLayerFilter((curr) => (curr === l ? null : l));
-    setTimeout(() => {
-      const el = document.getElementById("recommended-section");
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  };
+  // Counts per kind for tab labels
+  const counts = useMemo(() => {
+    const c = { squad: 0, agent: 0, skill: 0 } as Record<Kind, number>;
+    for (const e of allEntities) c[e.kind as Kind] = (c[e.kind as Kind] ?? 0) + 1;
+    return c;
+  }, [allEntities]);
 
-  const onScrollExplore = (dir: 1 | -1) => {
-    exploreRef.current?.scrollBy({ left: dir * 600, behavior: "smooth" });
-  };
+  const layerLabel = LAYER_OPTIONS.find((o) => o.value === layerFilter)?.label ?? "全部層級";
 
   return (
     <main className="pb-16">
-      {/* ─── HERO (Canva-style pastel gradient) ─────────────────────────── */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(135deg, #C8E8DA 0%, #DDD5F2 45%, #F5D5E2 100%)",
-        }}
-      >
-        {/* CTAs top-right */}
+      {/* ─── Hero ────────────────────────────────────────────────── */}
+      <section className="relative bg-content1 border-b border-divider">
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-divider rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          <Button
+            variant="bordered"
+            radius="full"
+            startContent={<FontAwesomeIcon icon={faSparkles} />}
+            onPress={() => setDrawerOpen(true)}
           >
-            <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-foreground">先睹為快</span>
-          </button>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] text-white rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-            style={{ background: "#5B3CC8" }}
+            先睹為快
+          </Button>
+          <Button
+            color="primary"
+            radius="full"
+            startContent={<FontAwesomeIcon icon={faPlus} />}
+            onPress={() => setDrawerOpen(true)}
           >
-            <span aria-hidden>👑</span>
-            <span>+ 從網路新增任務範本</span>
-          </button>
+            從網路新增任務範本
+          </Button>
         </div>
 
-        <div className="max-w-[1280px] mx-auto px-8 pt-20 pb-14">
-          {/* Big title */}
-          <h1 className="text-center font-semibold text-[3.2rem] leading-[1.05] text-foreground tracking-[-0.02em]">
-            任務範本
-          </h1>
+        <div className="max-w-[1280px] mx-auto px-8 pt-20 pb-10">
+          <h1 className="text-center text-5xl font-semibold tracking-tight">任務範本</h1>
+          <p className="mt-3 text-center text-medium text-default-500">
+            預先策劃的方法論小組、AI Agent、可組合技能 — 全部即點即用
+          </p>
 
-          {/* Search bar */}
           <div className="mt-8 max-w-[680px] mx-auto">
-            <div className="relative">
-              <svg
-                viewBox="0 0 24 24"
-                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-default-500"
-                fill="none" stroke="currentColor" strokeWidth="1.6"
-                strokeLinecap="round" strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.5-3.5" />
-              </svg>
-              <input
-                type="text"
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="搜尋數百個任務範本"
-                className="w-full pl-14 pr-5 py-[14px] text-[0.92rem] bg-white rounded-full border border-[#5B3CC8]/30 focus:outline-none focus:border-[#5B3CC8] focus:ring-2 focus:ring-[#5B3CC8]/15 transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-              />
-            </div>
-          </div>
-
-          {/* Quick filter pills */}
-          <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
-            {QUICK_PILLS.map((p) => {
-              const active = p.layers.length === 1 && layerFilter === p.layers[0];
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => onPickLayer(p.layers[0])}
-                  className={[
-                    "inline-flex items-center gap-2 px-4 py-2 rounded-full transition border",
-                    active
-                      ? "bg-foreground text-white border-foreground shadow-[0_2px_6px_rgba(0,0,0,0.10)]"
-                      : "bg-white/95 hover:bg-white text-foreground border-white/0 hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)]",
-                  ].join(" ")}
-                >
-                  <span
-                    aria-hidden
-                    className="inline-flex items-center justify-center w-5 h-5 rounded-md text-[0.7rem]"
-                    style={{ background: p.bg }}
-                  >
-                    {p.glyph}
-                  </span>
-                  <span className="text-[0.84rem]">{p.label}</span>
-                </button>
-              );
-            })}
+            <Input
+              size="lg"
+              radius="full"
+              variant="bordered"
+              value={searchQ}
+              onValueChange={setSearchQ}
+              placeholder="搜尋數百個任務範本"
+              isClearable
+              onClear={() => setSearchQ("")}
+              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+            />
           </div>
         </div>
       </section>
 
-      {/* ─── EXPLORE — pastel category cards ────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 mt-12">
-        <div className="flex items-end justify-between mb-4">
-          <h2 className="font-semibold text-[1.5rem] text-foreground tracking-[-0.015em]">
-            探索任務範本
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onScrollExplore(-1)}
-              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-divider bg-white hover:border-foreground transition"
-              aria-label="向左捲動"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            </button>
-            <button
-              onClick={() => onScrollExplore(1)}
-              className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-divider bg-white hover:border-foreground transition"
-              aria-label="向右捲動"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={exploreRef}
-          className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x scrollbar-thin"
-          style={{ scrollSnapType: "x mandatory" }}
-        >
-          {LAYER_CARDS.map((c) => {
-            const active = layerFilter === c.layer;
-            return (
-              <button
-                key={c.layer}
-                onClick={() => onPickLayer(c.layer)}
-                className={[
-                  "shrink-0 snap-start relative rounded-2xl text-left transition overflow-hidden",
-                  "w-[260px] h-[120px] flex items-center justify-between px-5 py-4",
-                  active
-                    ? "ring-2 ring-foreground shadow-[0_4px_14px_rgba(0,0,0,0.08)]"
-                    : "hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]",
-                ].join(" ")}
-                style={{ background: c.bg }}
-              >
-                <div>
-                  <div className="text-[0.58rem] tracking-[0.28em] uppercase text-default-400">
-                    {c.layer}
-                  </div>
-                  <div className="mt-1 font-semibold text-[1.1rem] text-foreground tracking-[-0.01em]">
-                    {c.label}
-                  </div>
-                  <div className="mt-1 text-[0.7rem] text-default-500">
-                    {c.hint}
-                  </div>
-                </div>
-                <div
-                  className="w-16 h-16 rounded-xl flex items-center justify-center text-[1.8rem]"
-                  style={{ background: c.glyphBg }}
-                  aria-hidden
-                >
-                  {c.glyph}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ─── Live entity stats banner ─────────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 mt-10">
+      {/* ─── Live entity stats banner ───────────────────────────── */}
+      <section className="max-w-[1280px] mx-auto px-8 mt-8">
         <EntityStats variant="row" />
       </section>
 
-      {/* ─── RECOMMENDED grid ───────────────────────────────────────────── */}
-      <section id="recommended-section" className="max-w-[1280px] mx-auto px-8 mt-10">
-        <div className="flex items-end justify-between mb-5">
-          <div>
-            <h2 className="font-semibold text-[1.5rem] text-foreground tracking-[-0.015em]">
-              {layerFilter
-                ? `${LAYER_CARDS.find((c) => c.layer === layerFilter)?.label} · 任務範本`
-                : "為你推薦的任務範本"}
-            </h2>
-            <div className="mt-1 text-[0.78rem] text-default-500">
-              每張卡片都是已配好 squad、可立即套用的任務範本。
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {(
-              [
-                ["all", "全部"],
-                ["seeded", "預設"],
-                ["ingested", "已收錄"],
-                ["forked", "Fork"],
-                ["mine", "我的"],
-              ] as Array<[SourceFilter, string]>
-            ).map(([val, label]) => (
-              <FilterChip
-                key={val}
-                active={sourceFilter === val}
-                onClick={() => setSourceFilter(val)}
-              >
-                {label}
-              </FilterChip>
-            ))}
-            {layerFilter && (
-              <button
-                onClick={() => setLayerFilter(null)}
-                className="ml-1 px-3 py-1.5 text-[0.7rem] tracking-[0.16em] uppercase text-default-500 hover:text-foreground"
-              >
-                清除分類 ✕
-              </button>
-            )}
-          </div>
-        </div>
-
-        {squadsQuery.isLoading && sourceFilter !== "mine" && (
-          <div className="text-[0.82rem] text-default-500 py-10">載入任務範本中…</div>
-        )}
-        {sourceFilter === "mine" && mineQuery.isLoading && (
-          <div className="text-[0.82rem] text-default-500 py-10">載入我的任務範本中…</div>
-        )}
-
-        {!squadsQuery.isLoading && filtered.length === 0 && (
-          <div className="text-[0.82rem] text-default-500 py-10">沒有符合的任務範本。</div>
-        )}
-
-        <div className="flex flex-wrap gap-6">
-          {filtered.map((s, i) => {
-            const lead = s.lead?.name ?? s.leadName ?? "Squad Lead";
-            const stepObjs = Array.isArray(s.steps) ? s.steps : [];
-            const stepRows = stepObjs.slice(0, 4).map((st: any, idx: number) => ({
-              name: st.name ?? `Step ${idx + 1}`,
-              desc: st.requiredSkill ?? st.outputType ?? "",
-              glyph: `0${idx + 1}`,
-            }));
-            const author = s.methodology?.author
-              ? `${s.methodology.author}${s.methodology?.year ? " · " + s.methodology.year : ""}`
-              : s.ingestSourceUrl
-              ? (() => { try { return new URL(s.ingestSourceUrl).hostname; } catch { return null; } })()
-              : null;
-
-            return (
-              <MethodologyCard
-                key={s.id ?? s.slug ?? i}
-                layer={s.strategyLayer ?? s.tier ?? null}
-                seed={s.slug ?? s.id ?? i}
-                heroImageUrl={s.heroImageUrl ?? null}
-                title={s.name ?? s.slug}
-                author={author}
-                source={s.source ?? "seeded"}
-                steps={stepRows}
-                leadName={lead}
-                ctaLabel="套用"
-                onCtaClick={() => navigate(`/templates/${s.slug}`)}
-                onClick={() => navigate(`/templates/${s.slug}`)}
+      {/* ─── Tabs + Filters ─────────────────────────────────────── */}
+      <section className="max-w-[1280px] mx-auto px-8 mt-8">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-1">
+          <Tabs
+            aria-label="實體類型"
+            color="primary"
+            variant="underlined"
+            selectedKey={activeKind}
+            onSelectionChange={(k) => setActiveKind(k as Kind)}
+            classNames={{ tabList: "gap-6 px-0" }}
+          >
+            {KIND_TABS.map((t) => (
+              <Tab
+                key={t.id}
+                title={
+                  <div className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={t.icon} />
+                    <span>{t.label}</span>
+                    <Chip size="sm" variant="flat" className="h-5 min-h-5">
+                      {counts[t.id] ?? 0}
+                    </Chip>
+                  </div>
+                }
               />
-            );
-          })}
+            ))}
+          </Tabs>
+
+          <Dropdown placement="bottom-end">
+            <DropdownTrigger>
+              <Button
+                size="sm"
+                variant="bordered"
+                radius="full"
+                endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny" />}
+              >
+                {layerLabel}
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="層級篩選"
+              selectionMode="single"
+              selectedKeys={new Set([layerFilter])}
+              onAction={(k) => setLayerFilter(String(k))}
+            >
+              {LAYER_OPTIONS.map((o) => <DropdownItem key={o.value}>{o.label}</DropdownItem>)}
+            </DropdownMenu>
+          </Dropdown>
         </div>
+
+        <p className="text-tiny text-default-500 mb-5">
+          {KIND_TABS.find((t) => t.id === activeKind)?.description}
+        </p>
+
+        {/* ─── Loading / Empty / Grid ───────────────────────────── */}
+        {entityQuery.isLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} shadow="sm">
+                <CardBody className="gap-2">
+                  <Skeleton className="h-6 w-3/5 rounded" />
+                  <Skeleton className="h-3 w-2/5 rounded" />
+                  <Skeleton className="h-12 w-full rounded mt-2" />
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {!entityQuery.isLoading && filtered.length === 0 && (
+          <Card shadow="none" className="border-2 border-dashed border-divider">
+            <CardBody className="py-16 items-center text-center gap-3">
+              <FontAwesomeIcon icon={faCircleInfo} className="text-3xl text-default-300" />
+              <p className="text-medium font-medium">沒有符合的{KIND_TABS.find((t) => t.id === activeKind)?.label}</p>
+              <p className="text-small text-default-500">
+                試試其他層級、清除搜尋，或從網路新增一個。
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
+        {!entityQuery.isLoading && filtered.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filtered.map((e: any) => (
+              <EntityCard
+                key={`${e.kind}-${e.id ?? e.slug}`}
+                entity={e}
+                onPreview={() => {
+                  if (e.kind === "squad") navigate(`/templates/${e.slug}`);
+                  else navigate(`/templates/${e.slug}`);  // future: agents/skills detail page
+                }}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* ─── Create methodology modal ───────────────────────────────────── */}
       <CreateMethodologyModal
         open={drawerOpen}
         initialSource="recommended"
         onClose={() => setDrawerOpen(false)}
         onCreated={(slug) => {
-          utils?.methodology?.listMine?.invalidate?.();
-          (squadsQuery as any).refetch?.();
+          setDrawerOpen(false);
           navigate(`/templates/${slug}`);
         }}
       />
@@ -373,22 +250,99 @@ export default function MethodologyCatalog() {
   );
 }
 
-function FilterChip({
-  active, onClick, children,
-}: {
-  active: boolean; onClick: () => void; children: React.ReactNode;
-}) {
+/* ─────────────────────────── EntityCard ──────────────────────────── */
+
+function EntityCard({ entity, onPreview }: { entity: any; onPreview: () => void }) {
+  const layerKey = entity.strategyLayer as MosLayer;
+  const tone = LAYER_TOKENS[layerKey];
+
+  // Three layouts based on kind
+  if (entity.kind === "squad") {
+    return (
+      <Card isPressable isHoverable onPress={onPreview} shadow="sm" className="w-full">
+        <CardHeader className="flex items-center justify-between gap-3">
+          <h3 className="text-medium font-semibold leading-tight line-clamp-1">{entity.name}</h3>
+          <Chip size="sm" color={tone?.heroColor ?? "default"} variant="flat" className="shrink-0">
+            {layerKey}・{tone?.label}
+          </Chip>
+        </CardHeader>
+        <Divider />
+        <CardBody className="gap-1.5">
+          {entity.subtitle && (
+            <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">
+              {entity.subtitle}
+            </p>
+          )}
+          <p className="text-small text-default-700 line-clamp-3 leading-snug">
+            {entity.description || "尚無描述。"}
+          </p>
+        </CardBody>
+        {Array.isArray(entity.stats) && entity.stats.length > 0 && (
+          <>
+            <Divider />
+            <CardFooter className="gap-4 text-tiny text-default-500">
+              {entity.stats.map((s: any, i: number) => (
+                <span key={i}><b className="text-default-700">{s.value}</b> {s.label}</span>
+              ))}
+            </CardFooter>
+          </>
+        )}
+      </Card>
+    );
+  }
+
+  if (entity.kind === "agent") {
+    // Agent: cover-style with prominent avatar
+    return (
+      <Card isPressable isHoverable onPress={onPreview} shadow="sm" className="w-full">
+        <CardBody className="items-center text-center gap-2 pt-6">
+          <Avatar
+            name={entity.initial}
+            color={tone?.heroColor ?? "default"}
+            size="lg"
+            radius="full"
+            className="mb-2"
+          />
+          <h3 className="text-medium font-semibold leading-tight line-clamp-1">{entity.name}</h3>
+          {entity.subtitle && (
+            <p className="text-tiny text-default-500 line-clamp-1">{entity.subtitle}</p>
+          )}
+          <Chip size="sm" color={tone?.heroColor ?? "default"} variant="flat" className="mt-1">
+            {layerKey}・{tone?.label}
+          </Chip>
+        </CardBody>
+        <Divider />
+        <CardFooter className="text-tiny text-default-500">
+          <p className="line-clamp-2 leading-snug">{entity.description || "—"}</p>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // skill: compact list-style card
   return (
-    <button
-      onClick={onClick}
-      className={[
-        "px-3 py-1.5 text-[0.7rem] tracking-[0.18em] uppercase rounded-full transition",
-        active
-          ? "bg-foreground text-white"
-          : "border border-divider text-default-500 hover:text-foreground hover:border-foreground bg-white",
-      ].join(" ")}
-    >
-      {children}
-    </button>
+    <Card isPressable isHoverable onPress={onPreview} shadow="sm" className="w-full">
+      <CardBody className="gap-1">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-small font-semibold leading-tight line-clamp-2">{entity.name}</h3>
+          <Chip size="sm" color={tone?.heroColor ?? "default"} variant="flat" className="shrink-0">
+            {layerKey}
+          </Chip>
+        </div>
+        {entity.subtitle && (
+          <p className="text-tiny text-default-400">{entity.subtitle}</p>
+        )}
+        <p className="text-tiny text-default-500 line-clamp-2 mt-1 leading-snug">
+          {entity.description || "—"}
+        </p>
+        {Array.isArray(entity.stats) && entity.stats.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {entity.stats.map((s: any, i: number) => (
+              <Chip key={i} size="sm" variant="flat" className="text-tiny">{s.label}</Chip>
+            ))}
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }

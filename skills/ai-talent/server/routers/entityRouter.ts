@@ -236,9 +236,90 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
   });
 }
 
-// ── Skill → HomeEntity (placeholder; no data source yet) ───────────────────
+// ── Skill → HomeEntity (from skills table) ─────────────────────────────────
+//
+// Two flavors live in the skills table:
+//   - category="agent-template"  → returned as kind="agent"  (alongside soworkAgents)
+//   - everything else            → returned as kind="skill"
+//
+// Server-side classifier (classifySkills.ts) populates strategy_layer +
+// task_type + recommended_models. We surface those in the unified shape.
+async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limit?: number }): Promise<HomeEntity[]> {
+  const filter = opts.onlyAgentTemplates
+    ? "category = 'agent-template'"
+    : "(category IS NULL OR category != 'agent-template')";
+  const limit = opts.limit ? `LIMIT ${opts.limit}` : "LIMIT 1000";
+
+  let rows: any[] = [];
+  try {
+    const [r]: any = await localPool.execute(
+      `SELECT id, slug, name, description, category, strategy_layer,
+              origin_model, source, task_type, recommended_models,
+              quality_score
+         FROM skills
+        WHERE is_active = 1 AND ${filter}
+        ORDER BY quality_score DESC, id ASC
+        ${limit}`
+    );
+    rows = r;
+  } catch (e: any) {
+    console.warn(`[entity] skills fetch failed: ${e.message}`);
+    return [];
+  }
+
+  return rows.map((r: any) => {
+    const layer = resolveLayerKey(r.strategy_layer);
+    const tone = LAYER_TO_HERO[layer]!;
+    const name = fixMojibake(String(r.name ?? r.slug ?? ""));
+    const description = fixMojibake(r.description ?? "") || null;
+    const kind = opts.onlyAgentTemplates ? "agent" : "skill";
+
+    const recommended = (() => {
+      try {
+        return r.recommended_models
+          ? (typeof r.recommended_models === "object"
+              ? r.recommended_models
+              : JSON.parse(String(r.recommended_models)))
+          : [];
+      } catch { return []; }
+    })();
+
+    // Subtitle: for agent-template show source repo + task_type;
+    // for skill, show task_type + origin_model.
+    const subtitle = opts.onlyAgentTemplates
+      ? [r.source, r.task_type].filter(Boolean).join(" · ")
+      : [r.task_type, r.origin_model].filter(Boolean).join(" · ");
+
+    return {
+      id: Number(r.id),
+      kind: kind as "agent" | "skill",
+      slug: String(r.slug),
+      name,
+      subtitle: subtitle || null,
+      description,
+      initial: getInitial(name),
+      badge: { label: `${layer}・${tone.label}`, color: tone.color },
+      stats: Array.isArray(recommended) && recommended.length > 0
+        ? recommended.slice(0, 3).map((m: string) => ({ value: "✓", label: m }))
+        : [],
+      meta: {
+        methodology: r.source ?? null,
+        summary: description,
+      },
+      actions: {
+        primary:   { label: kind === "agent" ? "啟用 Agent" : "套用技能" },
+        secondary: { label: "查看說明" },
+      },
+      strategyLayer: layer,
+      stepCount: 0,
+      memberCount: kind === "agent" ? 1 : 0,
+      workspace: [],
+    };
+  });
+}
+
 async function fetchSkillEntities(): Promise<HomeEntity[]> {
-  return []; // Standalone skills not yet stored. Reserved for future ingest.
+  return fetchSkillTableEntities({ onlyAgentTemplates: false });
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────
@@ -260,7 +341,11 @@ export const entityRouter = router({
       const wanted = new Set(input.kinds ?? ["squad", "agent", "skill"]);
       const tasks: Promise<HomeEntity[]>[] = [];
       if (wanted.has("squad")) tasks.push(fetchSquadEntities());
-      if (wanted.has("agent")) tasks.push(fetchAgentEntities());
+      if (wanted.has("agent")) {
+        // Native agents (soworkAgents) + agent-template skills, merged.
+        tasks.push(fetchAgentEntities());
+        tasks.push(fetchSkillTableEntities({ onlyAgentTemplates: true }));
+      }
       if (wanted.has("skill")) tasks.push(fetchSkillEntities());
 
       const results = await Promise.all(tasks);
