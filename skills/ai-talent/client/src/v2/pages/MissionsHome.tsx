@@ -650,82 +650,99 @@ function FeaturedSquadTile({
 }) {
   const lk = ((squad.strategyLayer ?? "L1").toString().slice(0, 2)) as MosLayer;
   const tone = LAYER_TOKENS[lk in LAYER_TOKENS ? lk : "L1"];
-  const author =
-    squad.methodology?.author
-      ? `${squad.methodology.author}${squad.methodology?.year ? " · " + squad.methodology.year : ""}`
-      : null;
+  const author = squad.methodology?.author ?? null;
+  const year = squad.methodology?.year ?? null;
+  const authorLine = author
+    ? `${author}${year ? " · " + year : ""}`
+    : null;
   const stepCount =
     Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
   const memberCount =
     Array.isArray(squad.members) ? squad.members.length : 0;
   const leadName = squad.lead?.name ?? null;
+  const nameStr = (squad.name ?? squad.slug ?? "?").toString();
+  const initial = nameStr.charAt(0).toUpperCase();
 
   return (
-    <div className="w-[260px] shrink-0 group">
+    <div className="w-[280px] shrink-0 group">
       <button
         onClick={onClick}
         disabled={disabled}
         className={[
-          "relative w-full bg-white border border-mos-hair rounded-sm overflow-hidden",
+          "relative w-full bg-mos-cream border-2 border-mos-ink rounded-sm overflow-hidden",
           "transition-all duration-200 text-left",
-          "hover:border-mos-ink hover:-translate-y-0.5",
+          "hover:shadow-lift hover:-translate-y-0.5",
           disabled && !busy ? "opacity-40 pointer-events-none" : "",
         ].join(" ")}
       >
         {/* Layer color band (top edge, 4px) */}
         <div className="absolute top-0 inset-x-0 h-1" style={{ background: tone.bg }} />
 
-        <div
-          className="relative w-full overflow-hidden border-b border-mos-hair"
-          style={{ aspectRatio: "5 / 3" }}
-        >
-          {squad.heroImageUrl ? (
-            <img src={squad.heroImageUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
+        <div className="px-5 pt-6 pb-4">
+          {/* Header: initial circle + name + layer badge */}
+          <div className="flex items-start gap-3 mb-4">
             <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                background: `linear-gradient(135deg, ${tone.bgTint} 0%, #FAF9F6 100%)`,
-              }}
+              className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl font-display"
+              style={{ background: tone.bg }}
             >
-              <MethodologyGlyph
-                seed={squad.slug ?? squad.id ?? squad.name}
-                layer={lk}
-                size={92}
-              />
+              {initial}
             </div>
-          )}
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-[0.95rem] text-mos-ink leading-snug line-clamp-2">
+                {nameStr}
+              </h3>
+              <div
+                className="mt-1.5 inline-flex items-center px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded-sm"
+                style={{ background: tone.bg }}
+              >
+                {lk} · {tone.shortLabel}
+              </div>
+            </div>
+          </div>
+
+          {/* Methodology info block */}
           <div
-            className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded-sm"
-            style={{ background: tone.bg }}
+            className="p-3 rounded border border-mos-hair mb-2.5"
+            style={{ background: tone.bgTint }}
           >
-            {lk} · {tone.shortLabel}
+            <div className="text-[0.55rem] font-semibold tracking-[0.18em] uppercase text-mos-muted mb-1">
+              METHODOLOGY · 方法論
+            </div>
+            <div className="text-[0.78rem] text-mos-ink line-clamp-1">
+              {authorLine ?? "—"}
+            </div>
           </div>
-          {busy && (
-            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-              <span className="text-[0.7rem] tracking-[0.16em] uppercase text-mos-ink">建立中…</span>
+
+          {/* Lead info block */}
+          <div className="p-3 rounded border border-mos-hair bg-mos-paper">
+            <div className="text-[0.55rem] font-semibold tracking-[0.18em] uppercase text-mos-muted mb-1">
+              LEAD · 領隊
             </div>
-          )}
-        </div>
-        <div className="p-3.5 bg-mos-cream">
-          <div className="text-[0.88rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
-            {squad.name ?? squad.slug}
+            <div className="text-[0.78rem] text-mos-ink line-clamp-1">
+              {leadName ?? "—"}
+            </div>
           </div>
-          {author && (
-            <div className="mt-1 text-[0.66rem] text-mos-orange line-clamp-1 tracking-[0.02em]">
-              {author}
-            </div>
-          )}
-          {leadName && (
-            <div className="mt-1.5 text-[0.66rem] text-mos-muted line-clamp-1">
-              <span className="text-mos-soft">領隊</span> · {leadName}
-            </div>
-          )}
-          <div className="mt-2 pt-2 border-t border-mos-hair flex items-center gap-3 text-[0.62rem] text-mos-soft tracking-[0.04em]">
+
+          {/* Counts */}
+          <div className="mt-3 pt-3 border-t border-mos-hair flex items-center gap-3 text-[0.62rem] text-mos-soft tracking-[0.04em]">
             <span><span className="text-mos-ink font-medium">{stepCount}</span> 步</span>
             {memberCount > 0 && (
               <span><span className="text-mos-ink font-medium">{memberCount}</span> 成員</span>
             )}
+          </div>
+        </div>
+
+        {/* Pill CTA */}
+        <div className="px-5 pb-5">
+          <div
+            className="w-full text-white font-semibold text-[0.78rem] px-3 py-2 text-center transition-all group-hover:opacity-90 group-hover:-translate-y-0.5"
+            style={{
+              background: "linear-gradient(135deg, #FF6B35, #E55A2B)",
+              borderRadius: "50px",
+              boxShadow: "0 2px 8px rgba(255,107,53,0.25)",
+            }}
+          >
+            {busy ? "建立中…" : "啟動小組"}
           </div>
         </div>
       </button>
