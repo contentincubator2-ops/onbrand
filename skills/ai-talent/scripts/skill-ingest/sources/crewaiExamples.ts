@@ -3,7 +3,7 @@
  * the official CrewAI examples repo.
  *
  * Repo: github.com/crewAIInc/crewAI-examples
- * Files: */agents.yaml across crews/* and integrations/*
+ * Files: agents.yaml across crews/ and integrations/ subdirs
  *
  * One file declares N agents (typically 3–5). We split each top-level
  * key into its own NormalizedSkill (category="agent-template"), so
