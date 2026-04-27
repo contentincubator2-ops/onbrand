@@ -65,10 +65,13 @@ export const wshobsonAgents: SourceFetcher = {
     const tree = await ghJson<{ tree: GhTreeEntry[] }>(
       `https://api.github.com/repos/${REPO}/git/trees/${BRANCH}?recursive=1`
     );
+    // Repo structure: plugins/<plugin>/agents/*.md  +  plugins/<plugin>/skills/*/SKILL.md
     const files = tree.tree.filter(
-      (e) => e.type === "blob" && /^agents\/[^/]+\.md$/.test(e.path)
+      (e) => e.type === "blob" &&
+        (/^plugins\/[^/]+\/agents\/[^/]+\.md$/.test(e.path) ||
+         /^plugins\/[^/]+\/skills\/[^/]+\/SKILL\.md$/i.test(e.path))
     );
-    console.log(`[${this.id}] found ${files.length} agent .md files`);
+    console.log(`[${this.id}] found ${files.length} agent + SKILL.md files in plugins/`);
 
     const out: NormalizedSkill[] = [];
     let i = 0;
@@ -78,8 +81,13 @@ export const wshobsonAgents: SourceFetcher = {
       try {
         const md = await ghRaw(f.path);
         const { name, description, manifest } = parseAgentMd(md);
-        const fileSlug = f.path.replace(/^agents\//, "").replace(/\.md$/, "");
-        const slug = `wshobson-${fileSlug.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`.slice(0, 188);
+        // Slug from plugin path:
+        //   plugins/foo/agents/bar.md           → foo-bar
+        //   plugins/foo/skills/bar/SKILL.md     → foo-bar
+        const m = f.path.match(/^plugins\/([^/]+)\/(?:agents\/([^/]+)\.md|skills\/([^/]+)\/SKILL\.md)$/i);
+        const plugin = m?.[1] ?? "x";
+        const sub = m?.[2] ?? m?.[3] ?? `f${i}`;
+        const slug = `wshobson-${plugin}-${sub}`.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 188);
         const sec = scan(md);
         out.push({
           slug,
