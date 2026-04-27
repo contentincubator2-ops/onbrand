@@ -26,6 +26,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer } from "../../studio/primitives/tokens";
 import { pickLocaleText } from "../../lib/localizeText";
+import {
+  Button,
+  Chip,
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection,
+  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
+  Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter,
+  Tooltip,
+  Tabs, Tab,
+  Input, Textarea,
+} from "@heroui/react";
 
 type StepStatus = "pending" | "asking" | "drafted" | "confirmed" | "skipped";
 
@@ -344,25 +354,33 @@ export default function WorkflowRunner({
                 missions whose brandId is null and were therefore producing
                 generic, brand-agnostic outputs. */}
             {brandUnbound ? (
-              <button
-                onClick={handleBindCurrentBrand}
-                className="shrink-0 px-2 py-0.5 rounded-full text-[0.68rem] bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition"
-                title="這個任務還沒有綁定品牌，所以產出可能變成通用模板。點此綁定到目前選擇的品牌。"
-              >
-                ⚠ 未綁定品牌 · 點此使用「{currentBrandName || "目前品牌"}」
-              </button>
+              <Tooltip content="這個任務還沒有綁定品牌，產出會變成通用模板。點一下綁定到目前選擇的品牌。" placement="bottom">
+                <Chip
+                  size="sm"
+                  color="danger"
+                  variant="flat"
+                  onClick={handleBindCurrentBrand}
+                  className="cursor-pointer"
+                >
+                  ⚠ 未綁定品牌 · 點此使用「{currentBrandName || "目前品牌"}」
+                </Chip>
+              </Tooltip>
             ) : brandMismatch ? (
-              <button
-                onClick={handleBindCurrentBrand}
-                className="shrink-0 px-2 py-0.5 rounded-full text-[0.68rem] bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition"
-                title={`這個任務目前綁定的是「${missionBrandName}」，但畫面上選的是「${currentBrandName}」。點此切換。`}
-              >
-                ⚠ 為品牌：{missionBrandName} · 改用「{currentBrandName}」
-              </button>
+              <Tooltip content={`目前綁定的是「${missionBrandName}」，但畫面上選的是「${currentBrandName}」。點一下切換。`} placement="bottom">
+                <Chip
+                  size="sm"
+                  color="warning"
+                  variant="flat"
+                  onClick={handleBindCurrentBrand}
+                  className="cursor-pointer"
+                >
+                  ⚠ 為品牌：{missionBrandName} · 改用「{currentBrandName}」
+                </Chip>
+              </Tooltip>
             ) : (
-              <span className="shrink-0 px-2 py-0.5 rounded-full text-[0.68rem] bg-mos-paper text-mos-body border border-mos-hair">
+              <Chip size="sm" variant="flat" className="bg-mos-paper text-mos-body border border-mos-hair">
                 為品牌：{missionBrandName || "（未綁定）"}
-              </span>
+              </Chip>
             )}
           </div>
           <div className="font-display text-[1.0rem] text-mos-ink truncate">
@@ -373,81 +391,85 @@ export default function WorkflowRunner({
           {savedAt && <SavedBadge ts={savedAt} />}
 
           {/* View mode toggle — step focus vs cumulative document */}
-          <div className="inline-flex rounded-md border border-mos-hair overflow-hidden">
-            <button
-              onClick={() => setViewMode("step")}
-              title="逐步操作模式"
-              className={[
-                "px-2.5 py-1 text-[0.72rem] transition",
-                viewMode === "step" ? "bg-mos-ink text-white" : "bg-white text-mos-ink hover:bg-mos-ink/5",
-              ].join(" ")}
-            >
-              逐步
-            </button>
-            <button
-              onClick={() => setViewMode("doc")}
-              title="文件視圖：所有已完成步驟的結論依序累積成一份提案文件"
-              className={[
-                "px-2.5 py-1 text-[0.72rem] transition border-l border-mos-hair",
-                viewMode === "doc" ? "bg-mos-ink text-white" : "bg-white text-mos-ink hover:bg-mos-ink/5",
-              ].join(" ")}
-            >
-              文件
-            </button>
-          </div>
+          <Tabs
+            size="sm"
+            radius="sm"
+            selectedKey={viewMode}
+            onSelectionChange={(key) => setViewMode(key as "step" | "doc")}
+            aria-label="檢視模式"
+            classNames={{ tabList: "p-0.5" }}
+          >
+            <Tab key="step" title="逐步" />
+            <Tab key="doc" title="文件" />
+          </Tabs>
 
 
-          {/* File menu (Canva 檔案) */}
-          <div ref={fileMenuRef} className="relative">
-            <button
-              onClick={() => setFileMenuOpen((v) => !v)}
-              title="檔案：重新命名 / 複製 / 匯出 / 刪除"
-              className="px-2.5 py-1 text-[0.74rem] text-mos-ink hover:bg-mos-ink/5 rounded transition inline-flex items-center gap-1"
-            >
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" />
-              </svg>
-              <span>檔案</span>
-              <span className="text-mos-muted text-[0.68rem]">▾</span>
-            </button>
-            {fileMenuOpen && (
-              <div className="absolute right-0 top-[110%] z-40 min-w-[220px] bg-white border border-mos-hair rounded-md shadow-lg py-1">
-                <FileMenuItem onClick={handleRename}>重新命名</FileMenuItem>
-                <FileMenuItem onClick={handleDuplicate}>複製為新任務</FileMenuItem>
-                <FileMenuItem onClick={handleExport}>匯出 PDF<span className="text-mos-muted text-[0.7rem] ml-2">即將推出</span></FileMenuItem>
-                <div className="border-t border-mos-hair my-1" />
-                <FileMenuItem onClick={handleDelete} danger>刪除任務</FileMenuItem>
-              </div>
-            )}
-          </div>
+          {/* File menu (Canva 檔案) — HeroUI Dropdown */}
+          <Dropdown placement="bottom-end" radius="sm">
+            <DropdownTrigger>
+              <Button
+                size="sm"
+                variant="light"
+                startContent={
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <path d="M14 2v6h6" />
+                  </svg>
+                }
+                endContent={<span className="text-mos-muted text-[0.68rem]">▾</span>}
+                className="text-[0.74rem] text-mos-ink"
+              >
+                檔案
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu aria-label="檔案選單" variant="flat">
+              <DropdownSection showDivider>
+                <DropdownItem key="rename" onPress={handleRename}>重新命名</DropdownItem>
+                <DropdownItem key="duplicate" onPress={handleDuplicate}>複製為新任務</DropdownItem>
+                <DropdownItem key="export" onPress={handleExport} description="即將推出">匯出 PDF</DropdownItem>
+              </DropdownSection>
+              <DropdownSection>
+                <DropdownItem key="delete" color="danger" className="text-danger" onPress={handleDelete}>刪除任務</DropdownItem>
+              </DropdownSection>
+            </DropdownMenu>
+          </Dropdown>
 
           {/* Analytics (Canva 分析) */}
-          <button
-            onClick={() => setAnalyticsOpen(true)}
-            title="分析：步驟耗時、AI 用量"
-            className="px-2.5 py-1 text-[0.74rem] text-mos-ink hover:bg-mos-ink/5 rounded transition inline-flex items-center gap-1"
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3v18h18" />
-              <path d="M7 14l4-4 4 4 5-6" />
-            </svg>
-            <span>分析</span>
-          </button>
+          <Tooltip content="分析：步驟耗時、AI 用量" placement="bottom">
+            <Button
+              size="sm"
+              variant="light"
+              onPress={() => setAnalyticsOpen(true)}
+              startContent={
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3v18h18" />
+                  <path d="M7 14l4-4 4 4 5-6" />
+                </svg>
+              }
+              className="text-[0.74rem] text-mos-ink"
+            >
+              分析
+            </Button>
+          </Tooltip>
 
           {/* Presentation mode (Canva 展示簡報) */}
-          <button
-            onClick={() => { setPresentIndex(0); setPresentOpen(true); }}
-            disabled={slides.length === 0}
-            title="進入簡報模式：全螢幕一頁一個 step 結果"
-            className="px-2.5 py-1 text-[0.74rem] text-white rounded transition inline-flex items-center gap-1 disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg, #5B3CC8, #7C4DFF)" }}
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor" stroke="none">
-              <path d="M5 3v18l15-9z" />
-            </svg>
-            <span>簡報</span>
-          </button>
+          <Tooltip content="進入簡報模式：全螢幕一頁一個 step 結果" placement="bottom">
+            <Button
+              size="sm"
+              radius="sm"
+              onPress={() => { setPresentIndex(0); setPresentOpen(true); }}
+              isDisabled={slides.length === 0}
+              startContent={
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor" stroke="none">
+                  <path d="M5 3v18l15-9z" />
+                </svg>
+              }
+              className="text-[0.74rem] text-white"
+              style={{ background: "linear-gradient(135deg, #5B3CC8, #7C4DFF)" }}
+            >
+              簡報
+            </Button>
+          </Tooltip>
 
           <div className="text-[0.72rem] text-mos-muted">
             {viewOrder} / {totalSteps}
@@ -504,34 +526,44 @@ export default function WorkflowRunner({
           const reachable = isStepUnlocked(ord) || status !== "pending";
           const stepName = pickLocaleText(s.name, lang) || `Step ${ord}`;
           const previewText = (p?.agentOutput ?? "").slice(0, 200);
+          const pillBtn = (
+            <button
+              disabled={!reachable}
+              onClick={() => setViewOrder(ord)}
+              className={[
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.72rem] border transition max-w-[180px]",
+                isActive
+                  ? "bg-mos-ink text-white border-mos-ink"
+                  : status === "confirmed"
+                    ? "bg-white text-mos-ink border-mos-ink/40 hover:border-mos-ink"
+                    : reachable
+                      ? "bg-white text-mos-ink border-mos-hair hover:border-mos-ink"
+                      : "bg-white text-mos-muted border-mos-hair opacity-50 cursor-not-allowed",
+              ].join(" ")}
+            >
+              <span className="font-mono shrink-0">{dot}</span>
+              <span className="shrink-0 opacity-70">{ord}</span>
+              <span className="truncate">{stepName}</span>
+            </button>
+          );
           return (
-            <div key={ord} className="relative group shrink-0">
-              <button
-                disabled={!reachable}
-                onClick={() => setViewOrder(ord)}
-                title={stepName}
-                className={[
-                  "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.72rem] border transition max-w-[180px]",
-                  isActive
-                    ? "bg-mos-ink text-white border-mos-ink"
-                    : status === "confirmed"
-                      ? "bg-white text-mos-ink border-mos-ink/40 hover:border-mos-ink"
-                      : reachable
-                        ? "bg-white text-mos-ink border-mos-hair hover:border-mos-ink"
-                        : "bg-white text-mos-muted border-mos-hair opacity-50 cursor-not-allowed",
-                ].join(" ")}
-              >
-                <span className="font-mono shrink-0">{dot}</span>
-                <span className="shrink-0 opacity-70">{ord}</span>
-                <span className="truncate">{stepName}</span>
-              </button>
-              {/* Hover preview — shows the first 200 chars of this step's output */}
-              {previewText && (
-                <div className="invisible group-hover:visible absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-50 w-[280px] p-3 bg-mos-ink text-white rounded-md shadow-xl text-[0.74rem] leading-relaxed whitespace-pre-wrap pointer-events-none">
-                  <div className="text-[0.66rem] text-white/60 mb-1 tracking-wider uppercase">Step {ord} · {stepName}</div>
-                  <div className="line-clamp-6">{previewText}</div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-mos-ink" />
-                </div>
+            <div key={ord} className="shrink-0">
+              {previewText ? (
+                <Tooltip
+                  placement="top"
+                  delay={150}
+                  content={
+                    <div className="max-w-[280px] p-1">
+                      <div className="text-[0.66rem] text-white/60 mb-1 tracking-wider uppercase">Step {ord} · {stepName}</div>
+                      <div className="text-[0.74rem] leading-relaxed whitespace-pre-wrap line-clamp-6">{previewText}</div>
+                    </div>
+                  }
+                  classNames={{ content: "bg-mos-ink text-white" }}
+                >
+                  {pillBtn}
+                </Tooltip>
+              ) : (
+                <Tooltip placement="top" content={stepName}>{pillBtn}</Tooltip>
               )}
             </div>
           );
@@ -560,24 +592,22 @@ export default function WorkflowRunner({
           <span className="text-[0.82rem] font-semibold">問 Mary Allen</span>
         </button>
       )}
-      {maryOpen && (
-        <MaryDrawer
-          history={maryHistory}
-          q={maryQ}
-          setQ={setMaryQ}
-          isPending={askMary.isPending}
-          onClose={() => setMaryOpen(false)}
-          onAsk={handleAskMary}
-        />
-      )}
+      <MaryDrawer
+        isOpen={maryOpen}
+        history={maryHistory}
+        q={maryQ}
+        setQ={setMaryQ}
+        isPending={askMary.isPending}
+        onClose={() => setMaryOpen(false)}
+        onAsk={handleAskMary}
+      />
 
       {/* ── Analytics modal ──────────────────────────────────────────── */}
-      {analyticsOpen && (
-        <AnalyticsModal
-          data={analyticsQuery.data}
-          onClose={() => setAnalyticsOpen(false)}
-        />
-      )}
+      <AnalyticsModal
+        isOpen={analyticsOpen}
+        data={analyticsQuery.data}
+        onClose={() => setAnalyticsOpen(false)}
+      />
 
       {/* ── Presentation mode overlay ────────────────────────────────── */}
       {presentOpen && slides.length > 0 && (
@@ -617,8 +647,9 @@ function FileMenuItem({
 // context fresh on every call via `squad.askMary`.
 
 function MaryDrawer({
-  history, q, setQ, isPending, onClose, onAsk,
+  isOpen, history, q, setQ, isPending, onClose, onAsk,
 }: {
+  isOpen: boolean;
   history: { q: string; a: string }[];
   q: string;
   setQ: (s: string) => void;
@@ -627,87 +658,90 @@ function MaryDrawer({
   onAsk: () => void;
 }) {
   return (
-    <div className="absolute top-0 right-0 bottom-0 z-40 w-[400px] bg-white border-l border-mos-hair shadow-2xl flex flex-col animate-[slideIn_0.2s_ease]">
-      <div className="px-4 py-3 border-b border-mos-hair flex items-center justify-between bg-gradient-to-r from-[#5B3CC8] to-[#EA580C] text-white">
-        <div>
-          <div className="font-semibold text-[0.92rem]">Mary Allen</div>
-          <div className="text-[0.66rem] opacity-80">SoWork 品牌策略召集人</div>
-        </div>
-        <button onClick={onClose} className="w-7 h-7 rounded hover:bg-white/15 transition">
-          <svg viewBox="0 0 24 24" className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {history.length === 0 && (
-          <div className="text-center text-mos-muted text-[0.84rem] py-8">
-            <div className="text-[2rem] mb-2">M</div>
-            <div className="font-medium mb-1 text-mos-ink">嗨，我是 Mary。</div>
-            <div className="leading-relaxed">關於這個任務，你可以問我任何事 — 「這一步為什麼這樣寫」「幫我重點摘要目前進度」「下一步該怎麼接」。</div>
+    <Drawer
+      isOpen={isOpen}
+      onClose={onClose}
+      placement="right"
+      size="md"
+      hideCloseButton
+      classNames={{ base: "max-w-[400px]" }}
+    >
+      <DrawerContent>
+        <DrawerHeader className="px-4 py-3 flex items-center justify-between text-white" style={{ background: "linear-gradient(135deg, #5B3CC8, #EA580C)" }}>
+          <div>
+            <div className="font-semibold text-[0.92rem]">Mary Allen</div>
+            <div className="text-[0.66rem] opacity-80">SoWork 品牌策略召集人</div>
           </div>
-        )}
-        {history.map((m, i) => (
-          <div key={i} className="space-y-2">
-            <div className="bg-mos-paper rounded-lg px-3 py-2 text-[0.84rem] text-mos-ink">{m.q}</div>
-            <div className="text-[0.86rem] text-mos-body whitespace-pre-wrap leading-relaxed">{m.a}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="p-3 border-t border-mos-hair">
-        <textarea
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              onAsk();
-            }
-          }}
-          placeholder="問 Mary…（⌘ + Enter 送出）"
-          rows={3}
-          className="w-full px-3 py-2 text-[0.84rem] bg-mos-cream border border-mos-hair rounded-lg focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 resize-none"
-        />
-        <button
-          onClick={onAsk}
-          disabled={isPending || !q.trim()}
-          className="w-full mt-2 py-2 text-white text-[0.84rem] font-semibold rounded-full disabled:opacity-50 transition hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, #5B3CC8, #EA580C)" }}
-        >
-          {isPending ? "Mary 思考中…" : "問 Mary"}
-        </button>
-      </div>
-    </div>
+          <Button isIconOnly size="sm" variant="light" onPress={onClose} className="text-white data-[hover=true]:bg-white/15 min-w-7 w-7 h-7">
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </Button>
+        </DrawerHeader>
+        <DrawerBody className="p-4 space-y-4">
+          {history.length === 0 && (
+            <div className="text-center text-mos-muted text-[0.84rem] py-8">
+              <div className="text-[2rem] mb-2">M</div>
+              <div className="font-medium mb-1 text-mos-ink">嗨，我是 Mary。</div>
+              <div className="leading-relaxed">關於這個任務，你可以問我任何事 — 「這一步為什麼這樣寫」「幫我重點摘要目前進度」「下一步該怎麼接」。</div>
+            </div>
+          )}
+          {history.map((m, i) => (
+            <div key={i} className="space-y-2">
+              <div className="bg-mos-paper rounded-lg px-3 py-2 text-[0.84rem] text-mos-ink">{m.q}</div>
+              <div className="text-[0.86rem] text-mos-body whitespace-pre-wrap leading-relaxed">{m.a}</div>
+            </div>
+          ))}
+        </DrawerBody>
+        <DrawerFooter className="p-3 flex-col gap-2">
+          <Textarea
+            value={q}
+            onValueChange={setQ}
+            onKeyDown={(e: any) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                onAsk();
+              }
+            }}
+            placeholder="問 Mary…（⌘ + Enter 送出）"
+            minRows={3}
+            radius="md"
+            classNames={{ inputWrapper: "bg-mos-cream" }}
+          />
+          <Button
+            onPress={onAsk}
+            isDisabled={isPending || !q.trim()}
+            isLoading={isPending}
+            radius="full"
+            className="w-full text-white font-semibold"
+            style={{ background: "linear-gradient(135deg, #5B3CC8, #EA580C)" }}
+          >
+            {isPending ? "Mary 思考中…" : "問 Mary"}
+          </Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
 /* ─────────────────────────── AnalyticsModal ─────────────────────────── */
 
-function AnalyticsModal({ data, onClose }: { data: any; onClose: () => void }) {
+function AnalyticsModal({ isOpen, data, onClose }: { isOpen: boolean; data: any; onClose: () => void }) {
   const totalSteps = Number(data?.totalSteps ?? 0);
   const counts = (data?.counts ?? {}) as Record<string, number>;
   const steps = (data?.steps ?? []) as any[];
   const totalChars = steps.reduce((sum, s) => sum + Number(s.outputLen ?? 0), 0);
   return (
-    <div className="absolute inset-0 z-50 bg-black/40 flex items-center justify-center p-6" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl w-full max-w-[640px] max-h-[80vh] flex flex-col">
-        <div className="px-5 py-3 border-b border-mos-hair flex items-center justify-between">
-          <div className="font-display text-[1.0rem] text-mos-ink">任務分析</div>
-          <button onClick={onClose} className="text-mos-muted hover:text-mos-ink">
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-5 grid grid-cols-3 gap-3 border-b border-mos-hair">
-          <Stat label="步驟總數" value={String(totalSteps)} />
-          <Stat label="已確認" value={String(counts.confirmed ?? 0)} />
-          <Stat label="累計字數" value={totalChars > 0 ? `${(totalChars / 1000).toFixed(1)}k` : "0"} />
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="text-[0.76rem] text-mos-muted mb-2 tracking-[0.12em] uppercase">每步詳情</div>
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" scrollBehavior="inside" radius="md">
+      <ModalContent>
+        <ModalHeader className="font-display text-[1.0rem] text-mos-ink">任務分析</ModalHeader>
+        <ModalBody>
+          <div className="grid grid-cols-3 gap-3 pb-4 border-b border-mos-hair">
+            <Stat label="步驟總數" value={String(totalSteps)} />
+            <Stat label="已確認" value={String(counts.confirmed ?? 0)} />
+            <Stat label="累計字數" value={totalChars > 0 ? `${(totalChars / 1000).toFixed(1)}k` : "0"} />
+          </div>
+          <div className="text-[0.76rem] text-mos-muted mb-2 mt-4 tracking-[0.12em] uppercase">每步詳情</div>
           {steps.length === 0 ? (
             <div className="text-mos-muted text-[0.84rem] text-center py-8">還沒有任何步驟產出。</div>
           ) : (
@@ -736,12 +770,13 @@ function AnalyticsModal({ data, onClose }: { data: any; onClose: () => void }) {
               </tbody>
             </table>
           )}
-          <div className="mt-4 text-[0.7rem] text-mos-muted">
-            Token 計費 / 各 step 耗時統計即將推出。
-          </div>
-        </div>
-      </div>
-    </div>
+        </ModalBody>
+        <ModalFooter>
+          <div className="text-[0.7rem] text-mos-muted mr-auto">Token 計費 / 各 step 耗時統計即將推出。</div>
+          <Button size="sm" variant="flat" onPress={onClose}>關閉</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }
 
