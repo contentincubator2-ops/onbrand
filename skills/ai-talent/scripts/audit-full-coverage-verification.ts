@@ -19,7 +19,10 @@ import { getPool, closePool } from "./squad-builder/db.js";
 dotenv.config();
 
 function tokenize(s: string): string[] {
-  return (s || "").toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 3);
+  // CJK-aware: keep CJK chars, latin/digits; min 2 chars (single CJK noun stays)
+  return (s || "").toLowerCase()
+    .split(/[^\u4e00-\u9fa5a-z0-9]+/)
+    .filter((t) => t.length >= 2);
 }
 
 function provFamily(aiModel: string): string {
