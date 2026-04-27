@@ -1,31 +1,13 @@
 /**
- * ProjectsPage — 專案 (v2 D5 — Canva-faithful clone)
+ * ProjectsPage — Pure HeroUI rewrite.
  *
- * Reference study: Canva → Projects ("專案") page.
+ * Components used (HeroUI inventory):
+ *   Button, ButtonGroup, Input, Card, CardBody, CardHeader, Chip, Avatar,
+ *   Tooltip, Divider, Tabs, Tab, Skeleton, Spinner,
+ *   Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem.
  *
- * Layout (top → bottom):
- *   1. Pastel gradient hero, headline "所有專案", with top-right CTAs
- *      (先睹為快 + 開始試用) — same language as MissionsHome.
- *   2. Big purple-bordered pill search bar.
- *   3. Filter chip row: 類型 / 類別 / 擁有者 / 已修改日期 (each a dropdown).
- *      Right-aligned controls: sort (新到舊), grid/list toggle, "+" create.
- *
- * Two-column body:
- *   - Left rail (220px) sub-nav:
- *       · 所有專案 (default)
- *       · 你的專案 (我建立的)
- *       · 與你分享
- *       · 可離線使用
- *     + ⭐ 收藏小卡 (tip card, Canva pattern)
- *
- *   - Main column:
- *       · 最近的項目 — horizontal scroll of MissionThumbs
- *       · 資料夾 — placeholder grid (上傳 folder)
- *       · 設計 — 6-col grid of MissionThumbs (responsive)
- *
- * The page reuses the existing `mission.listAllForUser` tRPC query, so
- * everything the user sees on Home is automatically reflected here, with
- * project-specific filters layered on top.
+ * Behavioral parity with the previous Canva-faithful page; styling is now
+ * stock HeroUI semantic tokens (no hex pins, no inline gradients).
  */
 import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
@@ -35,6 +17,11 @@ import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import ProjectSyncModal, { type SyncSource } from "../components/projects/ProjectSyncModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import {
+  Avatar, Button, ButtonGroup, Card, CardBody, CardHeader, Chip, Divider,
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem,
+  Input, Skeleton, Spinner, Tab, Tabs, Tooltip,
+} from "@heroui/react";
 
 interface MissionRow {
   id: number;
@@ -50,13 +37,23 @@ interface MissionRow {
   updatedAt?: string;
 }
 
-type SubNav = "all" | "mine" | "shared" | "offline";
+type SubNavKey = "all" | "mine" | "shared" | "offline";
 
-const SUB_NAV: Array<{ id: SubNav; label: string; glyph: string }> = [
-  { id: "all",     label: "所有專案",      glyph: "▦" },
-  { id: "mine",    label: "你的專案",      glyph: "◐" },
-  { id: "shared",  label: "與你分享",      glyph: "⇆" },
-  { id: "offline", label: "可離線使用",    glyph: "⤓" },
+const SUB_NAV: Array<{ id: SubNavKey; label: string }> = [
+  { id: "all",     label: "所有專案" },
+  { id: "mine",    label: "你的專案" },
+  { id: "shared",  label: "與你分享" },
+  { id: "offline", label: "可離線使用" },
+];
+
+const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; glyph: string }> = [
+  { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片",   glyph: "f"  },
+  { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",         glyph: "ig" },
+  { id: "youtube",      label: "YouTube 頻道",    hint: "抓影片清單、縮圖",     glyph: "▶"  },
+  { id: "website",      label: "官網 / 部落格",   hint: "抓品牌素材、文章",     glyph: "🌐" },
+  { id: "google-drive", label: "Google Drive",    hint: "同步整個資料夾",       glyph: "G"  },
+  { id: "onedrive",     label: "OneDrive",        hint: "同步整個資料夾",       glyph: "☁"  },
+  { id: "dropbox",      label: "Dropbox",         hint: "同步整個資料夾",       glyph: "▽"  },
 ];
 
 export default function ProjectsPage() {
@@ -80,9 +77,8 @@ export default function ProjectsPage() {
 
   const isLoading = allQuery?.isLoading ?? fallbackQuery.isLoading;
 
-  // ── Filter / sort state
   const [searchQ, setSearchQ] = useState("");
-  const [subNav, setSubNav] = useState<SubNav>("all");
+  const [subNav, setSubNav] = useState<SubNavKey>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
@@ -92,7 +88,6 @@ export default function ProjectsPage() {
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
   const [syncSource, setSyncSource] = useState<SyncSource | null>(null);
 
-  // Type filter options derived from data
   const typeOptions = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((m) => { if (m.workspace) set.add(m.workspace.toLowerCase()); });
@@ -102,7 +97,6 @@ export default function ProjectsPage() {
     ];
   }, [rows]);
 
-  // Category filter — by strategy layer
   const categoryOptions = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((m) => {
@@ -115,7 +109,6 @@ export default function ProjectsPage() {
     ];
   }, [rows]);
 
-  // Owner filter — by brand
   const ownerOptions = useMemo(() => {
     const set = new Map<string, string>();
     rows.forEach((m) => {
@@ -138,7 +131,6 @@ export default function ProjectsPage() {
   const filtered = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     let r = rows;
-
     if (q) {
       r = r.filter((m) =>
         (m.title ?? "").toLowerCase().includes(q) ||
@@ -147,29 +139,17 @@ export default function ProjectsPage() {
         (m.workspace ?? "").toLowerCase().includes(q)
       );
     }
-    if (typeFilter !== "all") {
-      r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
-    }
-    if (categoryFilter !== "all") {
-      r = r.filter((m) => (m.squadLayer ?? "").toString().slice(0, 2) === categoryFilter);
-    }
-    if (ownerFilter !== "all") {
-      r = r.filter((m) => String(m.brandId) === ownerFilter);
-    }
+    if (typeFilter !== "all") r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
+    if (categoryFilter !== "all") r = r.filter((m) => (m.squadLayer ?? "").toString().slice(0, 2) === categoryFilter);
+    if (ownerFilter !== "all") r = r.filter((m) => String(m.brandId) === ownerFilter);
     if (dateFilter !== "all") {
-      const now = Date.now();
-      const cutoff: Record<string, number> = {
-        today: 86_400_000,
-        week:  86_400_000 * 7,
-        month: 86_400_000 * 30,
-        year:  86_400_000 * 365,
-      };
+      const cutoff: Record<string, number> = { today: 86_400_000, week: 86_400_000 * 7, month: 86_400_000 * 30, year: 86_400_000 * 365 };
       const ms = cutoff[dateFilter];
-      if (ms) r = r.filter((m) => m.updatedAt && (now - new Date(m.updatedAt).getTime() <= ms));
+      if (ms) {
+        const now = Date.now();
+        r = r.filter((m) => m.updatedAt && (now - new Date(m.updatedAt).getTime() <= ms));
+      }
     }
-    // sub-nav filters (all/mine/shared/offline are placeholders — same data)
-    // future: filter by ownership when backend exposes it.
-
     return [...r].sort((a, b) => {
       const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
@@ -186,194 +166,195 @@ export default function ProjectsPage() {
     else navigate(`/m/${m.id}`);
   };
 
+  const labelFor = (opts: Array<{ value: string; label: string }>, v: string) =>
+    opts.find((o) => o.value === v)?.label ?? "";
+
   return (
     <main>
-      {/* ─── Pastel hero ─────────────────────────────────────────── */}
-      <section
-        className="relative px-8 pt-14 pb-10"
-        style={{
-          background:
-            "linear-gradient(135deg, #EAF2FF 0%, #EFE9FB 35%, #F8E8FF 70%, #FFE9F1 100%)",
-        }}
-      >
-        {/* Top-right CTAs */}
+      {/* ─── Hero ─────────────────────────────────────────────────── */}
+      <section className="relative px-8 pt-14 pb-10 bg-content1 border-b border-divider">
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <button
-            onClick={() => navigate("/templates")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-divider rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          <Button
+            variant="bordered"
+            radius="full"
+            onPress={() => navigate("/templates")}
+            startContent={<span aria-hidden>✦</span>}
           >
-            <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-foreground">先看看任務範本</span>
-          </button>
-          <button
-            onClick={() => setCreateSource("recommended")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-white hover:bg-foreground/5 border border-foreground rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+            先看看任務範本
+          </Button>
+          <Button
+            color="primary"
+            radius="full"
+            onPress={() => setCreateSource("recommended")}
+            startContent={<span aria-hidden>👑</span>}
           >
-            <span aria-hidden style={{ color: "#D4A24C" }}>👑</span>
-            <span className="text-foreground font-medium">開始建立</span>
-          </button>
+            開始建立
+          </Button>
         </div>
 
         <div className="max-w-[1280px] mx-auto">
-          <div className="font-semibold text-[0.66rem] tracking-[0.28em] uppercase text-default-400">
-            PROJECTS
-          </div>
-          <h1 className="mt-1 font-semibold text-[2.4rem] leading-[1.05] text-foreground tracking-[-0.02em]">
-            所有專案
-          </h1>
+          <Chip variant="flat" size="sm" className="uppercase tracking-wider">PROJECTS</Chip>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight">所有專案</h1>
 
-          {/* Search bar */}
           <div className="mt-6 max-w-[720px]">
-            <div className="relative">
-              <svg
-                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-default-500 pointer-events-none"
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-                strokeLinecap="round" strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="7.5" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                type="text"
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="搜尋你的內容"
-                className="w-full pl-14 pr-5 py-[14px] text-[0.92rem] bg-white rounded-full border border-[#5B3CC8]/30 focus:outline-none focus:border-[#5B3CC8] focus:ring-2 focus:ring-[#5B3CC8]/15 transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-              />
-            </div>
+            <Input
+              size="lg"
+              radius="full"
+              variant="bordered"
+              value={searchQ}
+              onValueChange={setSearchQ}
+              placeholder="搜尋你的內容"
+              isClearable
+              onClear={() => setSearchQ("")}
+              startContent={
+                <svg className="w-5 h-5 text-default-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7.5" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
+              }
+            />
           </div>
         </div>
       </section>
 
       {/* ─── Filter row ──────────────────────────────────────────── */}
-      <section className="border-b border-divider bg-white">
+      <section className="border-b border-divider bg-content1 sticky top-0 z-20">
         <div className="max-w-[1280px] mx-auto px-8 py-3 flex items-center gap-2 flex-wrap">
-          <FilterChip
-            label={typeFilter === "all" ? "類型" : `類型：${typeFilter}`}
+          <FilterDropdown
+            label={typeFilter === "all" ? "類型" : `類型：${labelFor(typeOptions, typeFilter)}`}
             options={typeOptions}
+            value={typeFilter}
             onSelect={setTypeFilter}
           />
-          <FilterChip
-            label={categoryFilter === "all" ? "類別" : `類別：${categoryFilter}`}
+          <FilterDropdown
+            label={categoryFilter === "all" ? "類別" : `類別：${labelFor(categoryOptions, categoryFilter)}`}
             options={categoryOptions}
+            value={categoryFilter}
             onSelect={setCategoryFilter}
           />
-          <FilterChip
-            label={ownerFilter === "all" ? "擁有者" : `擁有者：${ownerOptions.find((o) => o.value === ownerFilter)?.label ?? ""}`}
+          <FilterDropdown
+            label={ownerFilter === "all" ? "擁有者" : `擁有者：${labelFor(ownerOptions, ownerFilter)}`}
             options={ownerOptions}
+            value={ownerFilter}
             onSelect={setOwnerFilter}
           />
-          <FilterChip
-            label={dateFilter === "all" ? "已修改日期" : `修改：${dateOptions.find((o) => o.value === dateFilter)?.label}`}
+          <FilterDropdown
+            label={dateFilter === "all" ? "已修改日期" : `修改：${labelFor(dateOptions, dateFilter)}`}
             options={dateOptions}
+            value={dateFilter}
             onSelect={setDateFilter}
           />
 
           <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setSortDesc((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-foreground hover:bg-foreground/5 rounded-full transition"
-              title="切換排序"
-            >
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 6h13M3 12h9M3 18h5" />
-                <path d={sortDesc ? "M18 15l3 3 3-3M21 6v12" : "M18 9l3-3 3 3M21 18V6"} />
-              </svg>
-              {sortDesc ? "新到舊" : "舊到新"}
-            </button>
+            <Tooltip content={sortDesc ? "新到舊" : "舊到新"}>
+              <Button
+                size="sm"
+                variant="light"
+                radius="full"
+                onPress={() => setSortDesc((v) => !v)}
+                startContent={
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h13M3 12h9M3 18h5" />
+                    <path d={sortDesc ? "M18 15l3 3 3-3M21 6v12" : "M18 9l3-3 3 3M21 18V6"} />
+                  </svg>
+                }
+              >
+                {sortDesc ? "新到舊" : "舊到新"}
+              </Button>
+            </Tooltip>
 
-            <div className="flex items-center bg-white border border-divider rounded-full overflow-hidden">
-              <button
-                onClick={() => setViewMode("grid")}
-                title="格狀檢視"
-                className={[
-                  "w-9 h-8 inline-flex items-center justify-center transition",
-                  viewMode === "grid" ? "bg-foreground text-white" : "text-default-500 hover:text-foreground",
-                ].join(" ")}
-              >
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                title="清單檢視"
-                className={[
-                  "w-9 h-8 inline-flex items-center justify-center transition",
-                  viewMode === "list" ? "bg-foreground text-white" : "text-default-500 hover:text-foreground",
-                ].join(" ")}
-              >
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-              </button>
-            </div>
+            <ButtonGroup variant="flat" size="sm" radius="full">
+              <Tooltip content="格狀檢視">
+                <Button
+                  isIconOnly
+                  color={viewMode === "grid" ? "primary" : "default"}
+                  variant={viewMode === "grid" ? "solid" : "flat"}
+                  onPress={() => setViewMode("grid")}
+                  aria-label="格狀檢視"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                  </svg>
+                </Button>
+              </Tooltip>
+              <Tooltip content="清單檢視">
+                <Button
+                  isIconOnly
+                  color={viewMode === "list" ? "primary" : "default"}
+                  variant={viewMode === "list" ? "solid" : "flat"}
+                  onPress={() => setViewMode("list")}
+                  aria-label="清單檢視"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M3 6h18M3 12h18M3 18h18"/>
+                  </svg>
+                </Button>
+              </Tooltip>
+            </ButtonGroup>
 
             <CreateMenu
-              onNewFolder={() => alert("新增資料夾（即將推出）")}
               onNewMission={() => navigate("/templates")}
-              onUploadFile={() => alert("上傳檔案（即將推出）")}
-              onUploadFolder={() => alert("上傳資料夾（即將推出）")}
               onSyncSource={(s) => setSyncSource(s as SyncSource)}
             />
           </div>
         </div>
       </section>
 
-      {/* ─── Body: left sub-nav + main grid ──────────────────────── */}
+      {/* ─── Body ─────────────────────────────────────────────────── */}
       <section className="max-w-[1280px] mx-auto px-8 py-8 flex gap-8">
-        {/* Left rail */}
+        {/* Left rail — vertical Tabs */}
         <aside className="w-[220px] shrink-0">
-          <nav className="space-y-1">
-            {SUB_NAV.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => setSubNav(n.id)}
-                className={[
-                  "w-full text-left px-3 py-2 rounded-lg text-[0.86rem] flex items-center gap-2.5 transition",
-                  subNav === n.id
-                    ? "bg-foreground/[0.06] text-foreground font-medium"
-                    : "text-default-500 hover:bg-foreground/[0.03] hover:text-foreground",
-                ].join(" ")}
-              >
-                <span className="w-5 text-center text-[0.95rem] text-default-400">{n.glyph}</span>
-                {n.label}
-              </button>
-            ))}
-          </nav>
+          <Tabs
+            aria-label="專案分類"
+            isVertical
+            variant="light"
+            color="primary"
+            selectedKey={subNav}
+            onSelectionChange={(k) => setSubNav(k as SubNavKey)}
+            classNames={{ tabList: "gap-1 w-full", tab: "justify-start h-10" }}
+          >
+            {SUB_NAV.map((n) => <Tab key={n.id} title={n.label} />)}
+          </Tabs>
 
-          {/* Star tip card */}
-          <div className="mt-6 p-4 rounded-2xl border border-divider bg-gradient-to-br from-[#FFF8E7] to-[#FFE9D6]">
-            <div className="text-[1.4rem]">⭐</div>
-            <div className="mt-1.5 text-[0.78rem] text-foreground leading-snug">
-              點擊任一專案的星號圖示，即可從這裡輕鬆找到。
-            </div>
-          </div>
+          <Card shadow="sm" className="mt-6">
+            <CardBody className="gap-2">
+              <span className="text-2xl">⭐</span>
+              <p className="text-tiny text-default-500 leading-snug">
+                點擊任一專案的星號圖示，即可從這裡輕鬆找到。
+              </p>
+            </CardBody>
+          </Card>
         </aside>
 
         {/* Main column */}
         <div className="flex-1 min-w-0">
           {isLoading && (
-            <div className="text-[0.82rem] text-default-500">載入專案中…</div>
+            <div className="flex items-center gap-3 text-small text-default-500">
+              <Spinner size="sm" /> 載入專案中…
+            </div>
           )}
 
           {!isLoading && all.length === 0 && (
-            <div className="py-16 text-center">
-              <div className="text-[2.4rem] mb-3">📁</div>
-              <div className="text-[0.92rem] text-foreground font-medium">還沒有專案</div>
-              <div className="mt-1 text-[0.78rem] text-default-500">
-                從首頁選個任務範本，或從網路萃取一個全新的任務範本開始。
-              </div>
-              <button
-                onClick={() => setCreateSource("recommended")}
-                className="mt-5 inline-flex items-center gap-2 px-4 py-2 text-[0.78rem] bg-foreground text-white hover:bg-foreground/90 rounded-full transition"
-              >
-                建立第一個專案
-              </button>
-            </div>
+            <Card shadow="none" className="border-2 border-dashed border-divider">
+              <CardBody className="py-16 items-center text-center gap-3">
+                <span className="text-4xl">📁</span>
+                <p className="text-medium font-medium">還沒有專案</p>
+                <p className="text-small text-default-500">
+                  從首頁選個任務範本，或從網路萃取一個全新的任務範本開始。
+                </p>
+                <Button color="primary" radius="full" className="mt-2" onPress={() => setCreateSource("recommended")}>
+                  建立第一個專案
+                </Button>
+              </CardBody>
+            </Card>
           )}
 
           {/* 最近的項目 */}
           {!isLoading && recent.length > 0 && (
             <div className="mb-10">
               <SectionHeader title="最近的項目" subtitle={`${recent.length} 個`} />
-              <div className="-mx-1 overflow-x-auto scroll-snap-x">
+              <div className="-mx-1 overflow-x-auto">
                 <div className="flex gap-3 px-1 pb-2">
                   {recent.map((m) => (
                     <div key={m.id} className="w-[200px] shrink-0">
@@ -405,18 +386,33 @@ export default function ProjectsPage() {
                   ))}
                 </div>
               ) : (
-                <div className="border border-divider rounded-xl bg-white divide-y divide-divider overflow-hidden">
-                  {all.map((m) => (
-                    <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
-                  ))}
-                </div>
+                <Card shadow="none" className="border border-divider overflow-hidden">
+                  <div className="flex flex-col divide-y divide-divider">
+                    {all.map((m) => (
+                      <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
+                    ))}
+                  </div>
+                </Card>
               )}
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mt-6">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <Card key={i} shadow="none" className="overflow-hidden">
+                  <Skeleton className="w-full" style={{ aspectRatio: "5 / 4" }} />
+                  <CardBody className="p-3 gap-1.5">
+                    <Skeleton className="h-3 w-4/5 rounded" />
+                    <Skeleton className="h-2 w-2/5 rounded" />
+                  </CardBody>
+                </Card>
+              ))}
             </div>
           )}
         </div>
       </section>
 
-      {/* Project sync modal (Pipedream-driven) */}
       <ProjectSyncModal
         open={syncSource !== null}
         source={syncSource}
@@ -424,7 +420,6 @@ export default function ProjectsPage() {
         onClose={() => setSyncSource(null)}
       />
 
-      {/* Create modal */}
       <CreateMethodologyModal
         open={createSource !== null}
         initialSource={createSource ?? "recommended"}
@@ -444,109 +439,88 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   return (
     <div className="flex items-baseline justify-between mb-3">
       <div className="flex items-baseline gap-2">
-        <h2 className="font-semibold text-[1.05rem] text-foreground tracking-[-0.01em]">{title}</h2>
-        {subtitle && <span className="text-[0.7rem] text-default-400">{subtitle}</span>}
+        <h2 className="text-large font-semibold tracking-tight">{title}</h2>
+        {subtitle && <span className="text-tiny text-default-400">{subtitle}</span>}
       </div>
-      <button className="text-[0.72rem] text-default-500 hover:text-foreground transition">查看全部 →</button>
+      <Button size="sm" variant="light">查看全部 →</Button>
     </div>
   );
 }
 
-/* ─────────────────────────── Folder tile ────────────────────────────── */
+/* ─────────────────────────── Folder tile ─────────────────────────── */
 
 function FolderTile({ glyph, label, hint }: { glyph: string; label: string; hint: string }) {
   return (
-    <button className="group flex flex-col text-left bg-white border border-divider rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
+    <Card isPressable isHoverable shadow="sm" className="overflow-hidden">
       <div
-        className="relative w-full flex items-center justify-center"
-        style={{
-          aspectRatio: "5 / 3",
-          background: "linear-gradient(135deg, #F4F1FA 0%, #EFE9FB 100%)",
-        }}
+        className="relative w-full flex items-center justify-center bg-default-100"
+        style={{ aspectRatio: "5 / 3" }}
       >
-        <div className="text-[2rem] text-foreground/70 group-hover:text-foreground transition">{glyph}</div>
+        <span className="text-4xl text-default-500">{glyph}</span>
       </div>
-      <div className="p-3">
-        <div className="text-[0.86rem] text-foreground font-medium leading-snug">{label}</div>
-        <div className="mt-0.5 text-[0.66rem] text-default-500">{hint}</div>
-      </div>
-    </button>
+      <CardBody className="p-3 gap-0.5">
+        <p className="text-small font-medium leading-snug">{label}</p>
+        <p className="text-tiny text-default-400">{hint}</p>
+      </CardBody>
+    </Card>
   );
 }
 
-/* ─────────────────────────── Mission thumb (duplicated from Home) ─── */
+/* ─────────────────────────── Mission thumb ─────────────────────────── */
 
 function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
   const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
+  const isLayerKnown = layerStr in LAYER_TOKENS;
+  const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
   const tone = LAYER_TOKENS[lk];
   const updatedTxt = formatRelative(mission.updatedAt);
 
   return (
     <div className="group relative">
-      <button
-        onClick={onClick}
-        className="flex flex-col text-left bg-white border border-divider rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 w-full"
+      <Card
+        isPressable
+        isHoverable
+        onPress={onClick}
+        shadow="sm"
+        className="overflow-hidden w-full"
       >
-        <div
-          className="relative w-full overflow-hidden"
-          style={{
-            aspectRatio: "5 / 4",
-            background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)`,
-          }}
-        >
+        <div className="relative w-full overflow-hidden bg-default-100" style={{ aspectRatio: "5 / 4" }}>
           <div className="absolute inset-0 flex items-center justify-center">
-            <MethodologyGlyph
-              seed={mission.squadSlug ?? mission.id}
-              layer={lk}
-              size={70}
-            />
+            <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={70} />
           </div>
-          {mission.squadLayer && (
-            <div
-              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-semibold text-white rounded"
-              style={{ background: tone.bg }}
-            >
+          {isLayerKnown && (
+            <Chip size="sm" color={tone.heroColor} variant="solid" className="absolute top-2 left-2">
               {lk}
-            </div>
+            </Chip>
           )}
         </div>
-        <div className="p-3">
-          <div className="text-[0.82rem] text-foreground font-medium leading-snug line-clamp-2 min-h-[2.4em]">
+        <CardBody className="p-3 gap-1">
+          <p className="text-small font-medium leading-snug line-clamp-2 min-h-[2.4em]">
             {mission.title}
-          </div>
-          <div className="mt-1.5 text-[0.66rem] text-default-500 truncate">{updatedTxt}</div>
-        </div>
-      </button>
+          </p>
+          <p className="text-tiny text-default-500 truncate">{updatedTxt}</p>
+        </CardBody>
+      </Card>
+
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-        <ThumbAction title="收藏" onClick={(e) => { e.stopPropagation(); }}>
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-          </svg>
-        </ThumbAction>
-        <ThumbAction title="更多" onClick={(e) => { e.stopPropagation(); }}>
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-            <circle cx="5" cy="12" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="19" cy="12" r="1.6" />
-          </svg>
-        </ThumbAction>
+        <Tooltip content="收藏">
+          <Button isIconOnly size="sm" radius="full" variant="flat" aria-label="收藏" onClick={(e) => e.stopPropagation()}>
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+          </Button>
+        </Tooltip>
+        <Tooltip content="更多">
+          <Button isIconOnly size="sm" radius="full" variant="flat" aria-label="更多" onClick={(e) => e.stopPropagation()}>
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+              <circle cx="5" cy="12" r="1.6" />
+              <circle cx="12" cy="12" r="1.6" />
+              <circle cx="19" cy="12" r="1.6" />
+            </svg>
+          </Button>
+        </Tooltip>
       </div>
     </div>
-  );
-}
-
-function ThumbAction({
-  title, onClick, children,
-}: { title: string; onClick: (e: React.MouseEvent) => void; children: React.ReactNode }) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      className="w-7 h-7 flex items-center justify-center bg-white/95 border border-divider text-foreground hover:bg-white hover:border-foreground rounded-full shadow-sm transition"
-    >
-      {children}
-    </button>
   );
 }
 
@@ -556,219 +530,136 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
   const tone = LAYER_TOKENS[lk];
   const ws = (mission.workspace ?? "").toLowerCase();
   return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-4 px-4 py-3 hover:bg-foreground/[0.02] transition text-left"
+    <Card
+      isPressable
+      onPress={onClick}
+      shadow="none"
+      radius="none"
+      className="flex flex-row items-center gap-4 px-4 py-3 bg-transparent data-[hover=true]:bg-default-100 transition text-left w-full"
     >
-      <div
-        className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)` }}
-      >
+      <div className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-default-100">
         <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={36} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[0.88rem] text-foreground font-medium truncate">{mission.title}</div>
-        <div className="mt-0.5 flex items-center gap-2 text-[0.7rem] text-default-500">
-          <span className="font-semibold tracking-[0.12em] uppercase">{lk}</span>
-          {ws && (<><span className="text-default-400">·</span><span className="capitalize">{ws}</span></>)}
-          <span className="text-default-400">·</span>
+        <p className="text-small font-medium truncate">{mission.title}</p>
+        <div className="mt-0.5 flex items-center gap-2 text-tiny text-default-500">
+          <Chip size="sm" color={tone.heroColor} variant="flat">{lk}</Chip>
+          {ws && <span className="capitalize">{ws}</span>}
+          <span>·</span>
           <span>{formatRelative(mission.updatedAt)}</span>
         </div>
       </div>
-    </button>
+    </Card>
   );
 }
 
-/* ─────────────────────────── Filter chip ────────────────────────────── */
+/* ─────────────────────────── Filter dropdown ───────────────────────── */
 
-function FilterChip({
-  label, options, onSelect,
+function FilterDropdown({
+  label, options, value, onSelect,
 }: {
   label: string;
   options: Array<{ value: string; label: string }>;
+  value: string;
   onSelect: (v: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const chevron = (
+    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-foreground bg-white border border-divider hover:border-foreground rounded-full transition"
+    <Dropdown placement="bottom-start">
+      <DropdownTrigger>
+        <Button size="sm" radius="full" variant="bordered" endContent={chevron}>
+          {label}
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu
+        aria-label={label}
+        selectionMode="single"
+        selectedKeys={new Set([value])}
+        onAction={(k) => onSelect(String(k))}
       >
-        {label}
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-default-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full mt-1.5 left-0 z-20 min-w-[180px] bg-white border border-divider rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1">
-            {options.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => { onSelect(o.value); setOpen(false); }}
-                className="w-full text-left px-3 py-1.5 text-[0.78rem] text-foreground hover:bg-foreground/5 transition"
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+        {options.map((o) => (
+          <DropdownItem key={o.value}>{o.label}</DropdownItem>
+        ))}
+      </DropdownMenu>
+    </Dropdown>
   );
 }
 
-/* ─────────────────────────── Create menu (Canva "+" dropdown) ─────── */
-
-const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; glyph: string; color: string }> = [
-  { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片",   glyph: "f",  color: "#1877F2" },
-  { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",         glyph: "ig", color: "#E4405F" },
-  { id: "youtube",      label: "YouTube 頻道",    hint: "抓影片清單、縮圖",     glyph: "▶",  color: "#FF0000" },
-  { id: "website",      label: "官網 / 部落格",   hint: "抓品牌素材、文章",     glyph: "🌐", color: "#525866" },
-  { id: "google-drive", label: "Google Drive",    hint: "同步整個資料夾",       glyph: "G",  color: "#1A73E8" },
-  { id: "onedrive",     label: "OneDrive",        hint: "同步整個資料夾",       glyph: "☁",  color: "#0078D4" },
-  { id: "dropbox",      label: "Dropbox",         hint: "同步整個資料夾",       glyph: "▽",  color: "#0061FF" },
-];
+/* ─────────────────────────── Create menu ───────────────────────────── */
 
 function CreateMenu({
-  onNewFolder, onNewMission, onUploadFile, onUploadFolder, onSyncSource,
+  onNewMission, onSyncSource,
 }: {
-  onNewFolder: () => void;
   onNewMission: () => void;
-  onUploadFile: () => void;
-  onUploadFolder: () => void;
   onSyncSource: (s: SyncSource) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [syncOpen, setSyncOpen] = useState(false);
-  const close = () => { setOpen(false); setSyncOpen(false); };
-
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="新增項目"
-        className="w-9 h-9 inline-flex items-center justify-center bg-foreground text-white hover:bg-foreground/90 rounded-full transition"
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button isIconOnly color="primary" radius="full" aria-label="新增項目">
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu
+        aria-label="新增項目"
+        onAction={(key) => {
+          const k = String(key);
+          if (k === "new-mission") onNewMission();
+          else if (k.startsWith("sync:")) onSyncSource(k.replace("sync:", "") as SyncSource);
+        }}
       >
-        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
+        <DropdownSection title="新增項目">
+          <DropdownItem
+            key="new-folder"
+            description="把任務分類（如客戶、季度）"
+            isDisabled
+          >
+            新增資料夾（即將推出）
+          </DropdownItem>
+          <DropdownItem
+            key="new-mission"
+            description="從任務範本型錄建立任務"
+          >
+            新任務
+          </DropdownItem>
+        </DropdownSection>
 
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={close} />
-          <div className="absolute top-full mt-2 right-0 z-40 w-[260px] bg-white border border-divider rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.10)] py-2">
-            <div className="px-4 pt-1 pb-2 text-[0.62rem] tracking-[0.18em] uppercase text-default-400">
-              新增項目
-            </div>
+        <DropdownSection title="上傳">
+          <DropdownItem key="upload-file" description="品牌素材、參考檔、簡報、圖片" isDisabled>
+            上傳檔案（即將推出）
+          </DropdownItem>
+          <DropdownItem key="upload-folder" description="批次上傳整個資料夾" isDisabled>
+            上傳資料夾（即將推出）
+          </DropdownItem>
+        </DropdownSection>
 
-            <MenuItem
-              glyph={<FolderIcon />}
-              label="新增資料夾"
-              hint="把任務分類（如客戶、季度）"
-              onClick={() => { close(); onNewFolder(); }}
-            />
-            <MenuItem
-              glyph={<GridIcon />}
-              label="新任務"
-              hint="從任務範本型錄建立任務"
-              onClick={() => { close(); onNewMission(); }}
-            />
-
-            <div className="my-1.5 mx-3 h-px bg-divider" />
-
-            <MenuItem
-              glyph={<UploadIcon />}
-              label="上傳檔案"
-              hint="品牌素材、參考檔、簡報、圖片"
-              onClick={() => { close(); onUploadFile(); }}
-            />
-            <MenuItem
-              glyph={<FolderUploadIcon />}
-              label="上傳資料夾"
-              hint="批次上傳整個資料夾"
-              onClick={() => { close(); onUploadFolder(); }}
-            />
-
-            <div className="my-1.5 mx-3 h-px bg-divider" />
-
-            {/* Cloud / web sync submenu */}
-            <button
-              onClick={() => setSyncOpen((v) => !v)}
-              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-foreground/[0.04] transition text-left"
+        <DropdownSection title="從雲端 / 網路同步">
+          {SYNC_SOURCES.map((s) => (
+            <DropdownItem
+              key={`sync:${s.id}`}
+              description={s.hint}
+              startContent={
+                <Avatar
+                  name={s.glyph}
+                  size="sm"
+                  className="w-6 h-6 text-tiny"
+                  classNames={{ name: "text-tiny font-bold" }}
+                />
+              }
             >
-              <span className="w-5 h-5 inline-flex items-center justify-center text-foreground/70"><CloudSyncIcon /></span>
-              <span className="flex-1 min-w-0">
-                <div className="text-[0.84rem] text-foreground">從雲端 / 網路同步</div>
-                <div className="text-[0.66rem] text-default-500 truncate">FB、IG、YT、官網、雲端硬碟</div>
-              </span>
-              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-default-400 transition-transform ${syncOpen ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-            </button>
-
-            {syncOpen && (
-              <div className="mx-3 mt-1 mb-1 rounded-lg bg-foreground/[0.03] py-1">
-                {SYNC_SOURCES.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => { close(); onSyncSource(s.id); }}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-white rounded-md transition text-left"
-                  >
-                    <span
-                      className="w-5 h-5 inline-flex items-center justify-center text-white text-[0.6rem] font-bold rounded shrink-0"
-                      style={{ background: s.color }}
-                      aria-hidden
-                    >
-                      {s.glyph}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <div className="text-[0.78rem] text-foreground truncate">{s.label}</div>
-                      <div className="text-[0.62rem] text-default-500 truncate">{s.hint}</div>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+              {s.label}
+            </DropdownItem>
+          ))}
+        </DropdownSection>
+      </DropdownMenu>
+    </Dropdown>
   );
-}
-
-function MenuItem({
-  glyph, label, hint, onClick,
-}: {
-  glyph: React.ReactNode; label: string; hint?: string; onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-foreground/[0.04] transition text-left"
-    >
-      <span className="w-5 h-5 inline-flex items-center justify-center text-foreground/70">{glyph}</span>
-      <span className="flex-1 min-w-0">
-        <div className="text-[0.84rem] text-foreground">{label}</div>
-        {hint && <div className="text-[0.66rem] text-default-500 truncate">{hint}</div>}
-      </span>
-    </button>
-  );
-}
-
-function FolderIcon() {
-  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>;
-}
-function GridIcon() {
-  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
-}
-function UploadIcon() {
-  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>;
-}
-function CloudSyncIcon() {
-  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 18a4 4 0 0 0 0-8 5 5 0 0 0-9.6-1A4 4 0 0 0 7 18"/><path d="M12 12v6M9 15l3 3 3-3"/></svg>;
-}
-function FolderUploadIcon() {
-  return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v6M9 14l3-3 3 3"/></svg>;
 }
 
 /* ─────────────────────────── Helpers ────────────────────────────────── */
