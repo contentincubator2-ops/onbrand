@@ -10,30 +10,8 @@ export default {
   ],
   theme: {
     extend: {
-      colors: {
-        // Decision AI palette — teal / red / blue rack, mono text
-        mos: {
-          teal:   "#1A9B8E",
-          "teal-ink": "#0E6B62",
-          red:    "#C8322E",
-          "red-ink": "#8B1F1C",
-          blue:   "#1E7FD4",
-          "blue-ink": "#14558F",
-          ink:    "#0A0A0A",
-          body:   "#1E1E1E",
-          muted:  "#6B6B6B",
-          soft:   "#9B9B9B",
-          hair:   "#E4E4E4",
-          paper:  "#FAFAF7",
-          white:  "#FFFFFF",
-          // SoWork brand accents (per sowork-ai-v2 Monocle system)
-          cream:  "#FAF9F6",
-          "cream-dark": "#F5F1E8",
-          orange: "#FF6B35",
-          "orange-hover": "#E55A2B",
-          "orange-light": "#FFF7ED",
-        },
-      },
+      // Color palette is owned by the HeroUI theme below — no custom mos-* tokens.
+      // Use bg-primary / text-foreground / border-divider / etc. instead.
       fontFamily: {
         display: ["'Inter Tight'", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         sans:    ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
