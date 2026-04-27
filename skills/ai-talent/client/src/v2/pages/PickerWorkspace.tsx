@@ -142,31 +142,64 @@ export default function PickerWorkspace() {
     [squadsQuery.data],
   );
 
+  // Recent missions — drives the 最近使用的方法論 section.
+  const recentMissionsQuery = (trpc as any).mission?.listAllForUser?.useQuery
+    ? (trpc as any).mission.listAllForUser.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+
+  /** Build "recently used" squad list from the user's mission history. */
+  const recentSquads: any[] = useMemo(() => {
+    const missions = (recentMissionsQuery.data as any[]) ?? [];
+    const slugOrder: string[] = [];
+    const seen = new Set<string>();
+    for (const m of missions) {
+      const slug = m.squadSlug;
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      slugOrder.push(slug);
+    }
+    const bySlug = new Map(allSquads.map((s) => [s.slug, s]));
+    return slugOrder
+      .map((sl) => bySlug.get(sl))
+      .filter(Boolean);
+  }, [recentMissionsQuery.data, allSquads]);
+
+  /** Brand-saved / user-ingested squads — the 品牌範本 section.
+   *  source: "ingested" or "forked" → user-created; "seeded" → built-in. */
+  const brandTemplates: any[] = useMemo(
+    () => allSquads.filter((s) => s.source && s.source !== "seeded"),
+    [allSquads],
+  );
+
   // ── Filter pipeline ─────────────────────────────────────────────────
+  // Predicate: keeps a squad if it passes the active layer + channel
+  // filters. Reused for "all results", "recently used", and
+  // "brand templates" so each section honors the same scope.
+  const passesFacets = (s: any): boolean => {
+    if (layerFilter !== "ALL") {
+      const lk = (s.strategyLayer ?? "").toString().slice(0, 2);
+      if (lk !== layerFilter) return false;
+    }
+    if (channelFilter !== "all") {
+      const aliases = CHANNEL_ALIASES[channelFilter] ?? [channelFilter];
+      const wsArr = Array.isArray(s.workspace) ? s.workspace : (s.workspace ? [s.workspace] : []);
+      const tagArr = Array.isArray(s.tags) ? s.tags : [];
+      const channelHaystack = [
+        ...wsArr,
+        ...tagArr,
+        s.slug,
+        pickLocaleText(s.name, "en"),
+        pickLocaleText(s.name, "zh-TW"),
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (!aliases.some((a) => channelHaystack.includes(a))) return false;
+    }
+    return true;
+  };
+
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     return allSquads.filter((s) => {
-      // Layer filter
-      if (layerFilter !== "ALL") {
-        const lk = (s.strategyLayer ?? "").toString().slice(0, 2);
-        if (lk !== layerFilter) return false;
-      }
-      // Channel filter (workspace) — match against any of:
-      //   workspace[] · tags[] · slug · name (zh+en)
-      // using alias list so "fb" / "facebook" / "FB" / "FB-Ads" all match.
-      if (channelFilter !== "all") {
-        const aliases = CHANNEL_ALIASES[channelFilter] ?? [channelFilter];
-        const wsArr = Array.isArray(s.workspace) ? s.workspace : (s.workspace ? [s.workspace] : []);
-        const tagArr = Array.isArray(s.tags) ? s.tags : [];
-        const channelHaystack = [
-          ...wsArr,
-          ...tagArr,
-          s.slug,
-          pickLocaleText(s.name, "en"),
-          pickLocaleText(s.name, "zh-TW"),
-        ].filter(Boolean).join(" ").toLowerCase();
-        if (!aliases.some((a) => channelHaystack.includes(a))) return false;
-      }
+      if (!passesFacets(s)) return false;
       // Text search — match if ANY synonym hits the expanded haystack.
       if (ql) {
         const stepText = Array.isArray(s.steps)
@@ -418,24 +451,99 @@ export default function PickerWorkspace() {
             </div>
           )}
 
-          {/* Thumbnails */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+          {/* Sectioned thumbnails — Canva pattern: 最近使用 / 品牌範本 / 所有結果.
+              Recently-used and brand-templates sections hide while a search
+              query is active so the user sees a single relevance-ranked
+              "所有結果" list. */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-3">
             {squadsQuery.isLoading ? (
               <div className="text-[0.84rem] text-mos-muted py-6 text-center">載入中…</div>
-            ) : filtered.length === 0 ? (
-              <div className="text-[0.84rem] text-mos-muted py-6 text-center px-4">
-                {q ? `沒有找到符合「${q}」的方法論。` : "這個分類目前沒有方法論。"}
-              </div>
             ) : (
-              filtered.map((sq) => (
-                <SquadThumb
-                  key={sq.id ?? sq.slug}
-                  squad={sq}
-                  active={selectedSlug === sq.slug}
-                  onClick={() => setSelectedSlug(sq.slug)}
-                  lang={lang}
-                />
-              ))
+              <>
+                {/* ── 1. 最近使用的方法論 (hidden while searching) ── */}
+                {!q && (() => {
+                  const items = recentSquads.filter(passesFacets).slice(0, 4);
+                  if (items.length === 0) return null;
+                  return (
+                    <ThumbSection
+                      title="最近使用的方法論"
+                      onCta={() => navigate("/")}
+                      ctaLabel="查看全部"
+                    >
+                      <div className="grid grid-cols-2 gap-2">
+                        {items.map((sq) => (
+                          <SquadMiniCard
+                            key={`recent-${sq.id ?? sq.slug}`}
+                            squad={sq}
+                            active={selectedSlug === sq.slug}
+                            onClick={() => setSelectedSlug(sq.slug)}
+                            lang={lang}
+                          />
+                        ))}
+                      </div>
+                    </ThumbSection>
+                  );
+                })()}
+
+                {/* ── 2. 品牌範本 (hidden while searching) ── */}
+                {!q && (() => {
+                  const items = brandTemplates.filter(passesFacets);
+                  return (
+                    <ThumbSection title="品牌範本">
+                      {items.length > 0 ? (
+                        <div className="space-y-2">
+                          {items.slice(0, 3).map((sq) => (
+                            <SquadThumb
+                              key={`brand-${sq.id ?? sq.slug}`}
+                              squad={sq}
+                              active={selectedSlug === sq.slug}
+                              onClick={() => setSelectedSlug(sq.slug)}
+                              lang={lang}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="border border-mos-hair rounded-lg p-3 flex items-start gap-3 bg-white">
+                          <div className="w-12 h-12 shrink-0 border border-mos-hair rounded flex items-center justify-center text-mos-muted text-[1.4rem]">
+                            +
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[0.82rem] font-semibold text-mos-ink">
+                              發佈為品牌範本
+                            </div>
+                            <div className="text-[0.7rem] text-mos-muted leading-snug mt-0.5">
+                              完成此設計後，你可以將其變成可重複使用的範本。
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </ThumbSection>
+                  );
+                })()}
+
+                {/* ── 3. 所有結果 ── */}
+                <ThumbSection
+                  title={q ? `搜尋結果（${filtered.length}）` : "所有結果"}
+                >
+                  {filtered.length === 0 ? (
+                    <div className="text-[0.84rem] text-mos-muted py-6 text-center px-4">
+                      {q ? `沒有找到符合「${q}」的方法論。` : "這個分類目前沒有方法論。"}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filtered.map((sq) => (
+                        <SquadThumb
+                          key={sq.id ?? sq.slug}
+                          squad={sq}
+                          active={selectedSlug === sq.slug}
+                          onClick={() => setSelectedSlug(sq.slug)}
+                          lang={lang}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </ThumbSection>
+              </>
             )}
           </div>
         </section>
@@ -486,6 +594,64 @@ function RailPill({
     >
       {dot && <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: active ? "#fff" : dot }} />}
       {children}
+    </button>
+  );
+}
+
+/* ─────────────────────────── Sub: ThumbSection ─────────────────────────── */
+
+function ThumbSection({
+  title, children, onCta, ctaLabel,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onCta?: () => void;
+  ctaLabel?: string;
+}) {
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2 px-0.5">
+        <h3 className="text-[0.78rem] font-semibold text-mos-ink">{title}</h3>
+        {onCta && ctaLabel && (
+          <button
+            onClick={onCta}
+            className="text-[0.7rem] text-mos-muted hover:text-mos-ink transition"
+          >
+            {ctaLabel}
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ─────────────────────────── Sub: SquadMiniCard (recent grid) ─────────────────────────── */
+
+function SquadMiniCard({
+  squad, active, onClick, lang,
+}: { squad: any; active: boolean; onClick: () => void; lang: "zh-TW" | "en" }) {
+  const lk = resolveLayer(squad.strategyLayer);
+  const tone = LAYER_TOKENS[lk];
+  const name = pickLocaleText(squad.name, lang) || squad.slug;
+
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "rounded-md overflow-hidden border transition text-left flex flex-col",
+        active ? "border-mos-ink shadow-[0_2px_8px_rgba(0,0,0,0.06)]" : "border-mos-hair hover:border-mos-ink",
+      ].join(" ")}
+    >
+      <div
+        className="aspect-[16/10] flex items-center justify-center text-white font-bold text-[1.6rem]"
+        style={{ background: tone.bg }}
+      >
+        {(name.charAt(0) || "?").toUpperCase()}
+      </div>
+      <div className="px-2 py-1.5 bg-white">
+        <div className="text-[0.74rem] text-mos-ink line-clamp-1 leading-snug">{name}</div>
+      </div>
     </button>
   );
 }
