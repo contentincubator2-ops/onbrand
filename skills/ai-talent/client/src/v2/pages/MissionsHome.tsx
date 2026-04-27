@@ -496,53 +496,6 @@ export default function MissionsHome() {
           </Card>
         )}
 
-        {/* Featured methodologies — layer nav + horizontal scroll */}
-        {allEntities.length > 0 && (
-          <>
-            <SectionHeader
-              title={
-                searchQ.trim()
-                  ? `搜尋「${searchQ.trim()}」・${featured.length} 個方法論小組`
-                  : selectedLayer === "ALL"
-                    ? "為你推薦的方法論小組"
-                    : `${selectedLayer} · ${LAYER_TOKENS[selectedLayer].label} · ${layerCounts[selectedLayer]} 個方法論`
-              }
-              cta="完整型錄 →"
-              onCtaClick={() => navigate("/templates")}
-            />
-
-            {/* L1–L6 layer chip nav */}
-            <LayerNav
-              selected={selectedLayer}
-              counts={layerCounts}
-              onSelect={setSelectedLayer}
-            />
-
-            {featured.length > 0 ? (
-              <div className="mb-12 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {featured.map((sq: any) => (
-                  <SquadEntityCard
-                    key={sq.id ?? sq.slug}
-                    squad={sq}
-                    busy={creatingTpl === `sq-${sq.slug}`}
-                    disabled={!!creatingTpl}
-                    onClick={() => startFromSquad(sq)}
-                    onPreview={() => navigate(`/templates/${sq.slug}`)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <Card shadow="none" className="mb-12 border-2 border-dashed border-divider">
-                <CardBody className="py-10 text-center text-small text-default-500">
-                  {searchQ.trim()
-                    ? `沒有找到符合「${searchQ.trim()}」的方法論小組。試試其他關鍵字或清除篩選。`
-                    : "這一層暫時沒有方法論小組。試試其他層級。"}
-                </CardBody>
-              </Card>
-            )}
-          </>
-        )}
-
         {/* Recent missions — header + filter chips */}
         <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <h2 className="text-xl font-semibold">最近的任務</h2>
