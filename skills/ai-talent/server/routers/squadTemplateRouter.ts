@@ -142,7 +142,8 @@ export const squadTemplateRouter = router({
       const [rows] = await localPool.execute(
         `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
                 s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
-                s.hero_image_url, s.source, s.ingest_source_url, s.workspace, s.tags
+                s.hero_image_url, s.source, s.ingest_source_url, s.workspace, s.tags,
+                s.use_cases, s.output_formats
            FROM squads s
           WHERE s.is_active = 1
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
@@ -263,9 +264,12 @@ export const squadTemplateRouter = router({
           heroImageUrl: r.hero_image_url ?? null,
           source: (r.source ?? "seeded") as "seeded" | "ingested" | "forked",
           ingestSourceUrl: r.ingest_source_url ?? null,
-          // workspace + tags for client-side channel filtering (Picker)
+          // workspace + tags + use_cases + output_formats for client-side
+          // channel filtering and richer keyword search in the Picker.
           workspace: safeJsonParse<string[]>(r.workspace, []),
           tags: safeJsonParse<string[]>(r.tags, []),
+          useCases: safeJsonParse<string[]>(r.use_cases, []),
+          outputFormats: safeJsonParse<string[]>(r.output_formats, []),
           methodology,
           lead,
           members,

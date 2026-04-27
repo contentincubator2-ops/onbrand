@@ -165,8 +165,36 @@ export default function MissionsHome() {
   const featured = useMemo(() => {
     const layerOrder = ["L1", "L2", "L3", "L4", "L5", "L6"];
     const q = searchQ.trim().toLowerCase();
+    const synonymGroups: Array<string[]> = [
+      ["貼文", "po文", "post", "posts", "content", "social-media", "social media"],
+      ["文案", "copy", "copywriting", "ad copy"],
+      ["廣告", "ad", "ads", "advertising", "paid", "paid-ads"],
+      ["影片", "短影音", "video", "reels", "shorts", "tiktok"],
+      ["品牌", "brand", "branding"],
+      ["定位", "positioning"],
+      ["上市", "發表", "launch", "go-to-market", "gtm"],
+      ["受眾", "客群", "audience", "persona", "icp"],
+      ["公關", "媒體", "pr", "press", "media-relations"],
+      ["電子報", "edm", "email", "newsletter"],
+      ["故事", "敘事", "story", "storytelling", "narrative"],
+      ["策略", "strategy"],
+      ["活動", "campaign", "event"],
+      ["創意", "creative"],
+    ];
+    const expandTerms = (ql: string): string[] => {
+      const out = new Set<string>([ql]);
+      for (const g of synonymGroups) {
+        if (g.some((t) => ql.includes(t.toLowerCase()) || t.toLowerCase().includes(ql))) {
+          for (const t of g) out.add(t.toLowerCase());
+        }
+      }
+      return [...out];
+    };
     const matchesQ = (s: any) => {
       if (!q) return true;
+      const stepText = Array.isArray(s.steps)
+        ? s.steps.map((st: any) => `${st.name ?? ""} ${st.outputType ?? ""}`).join(" ")
+        : "";
       const haystack = [
         pickLocaleText(s.name, "zh-TW"),
         pickLocaleText(s.name, "en"),
@@ -177,12 +205,18 @@ export default function MissionsHome() {
         s.methodology?.summary,
         typeof s.methodology === "string" ? s.methodology : "",
         Array.isArray(s.workspace) ? s.workspace.join(" ") : (s.workspace ?? ""),
+        Array.isArray(s.tags) ? s.tags.join(" ") : "",
+        Array.isArray(s.useCases) ? s.useCases.join(" ") : "",
+        Array.isArray(s.outputFormats) ? s.outputFormats.join(" ") : "",
+        stepText,
         s.lead?.name,
+        s.lead?.primarySkill,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-      return haystack.includes(q);
+      const terms = expandTerms(q);
+      return terms.some((t) => haystack.includes(t));
     };
     const filtered = allSquads
       .filter((s) =>

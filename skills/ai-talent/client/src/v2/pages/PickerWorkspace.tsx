@@ -62,6 +62,47 @@ const CHANNEL_ALIASES: Record<string, string[]> = {
 
 const LAYER_OPTIONS: MosLayer[] = ["L1", "L2", "L3", "L4", "L5", "L6"];
 
+/**
+ * Lightweight zh↔en synonym expander for the picker search bar.
+ *
+ * The squad corpus mixes Chinese names with English seed metadata
+ * (methodology author, tags, outputFormats). A user typing "貼文"
+ * should also match "post", "content", "social-media"; "廣告" should
+ * match "ad", "ads", "advertising"; etc. We do this by looking up the
+ * raw query term in a small alias map and OR-ing the expansions.
+ */
+const SEARCH_SYNONYMS: Array<string[]> = [
+  ["貼文", "po文", "post", "posts", "content", "social-media", "social media"],
+  ["文案", "copy", "copywriting", "copywrite", "ad copy"],
+  ["廣告", "ad", "ads", "advertising", "paid", "paid-ads", "campaign-ads"],
+  ["影片", "短影音", "影音", "video", "reels", "shorts", "tiktok"],
+  ["品牌", "brand", "branding", "brand-positioning"],
+  ["定位", "positioning"],
+  ["上市", "發表", "上線", "發佈", "launch", "launching", "go-to-market", "gtm"],
+  ["受眾", "客群", "audience", "persona", "icp", "segmentation"],
+  ["公關", "媒體", "pr", "public-relations", "press", "media-relations"],
+  ["電子報", "edm", "email", "newsletter", "mailer"],
+  ["互動", "engagement", "engage"],
+  ["故事", "說故事", "敘事", "story", "storytelling", "narrative"],
+  ["分析", "research", "analysis", "audit"],
+  ["策略", "strategy", "strategic"],
+  ["活動", "campaign", "event"],
+  ["驗證", "validation", "audit", "scorecard", "monitor"],
+  ["創意", "創作", "creative"],
+];
+
+function expandSynonyms(q: string): string[] {
+  const ql = q.trim().toLowerCase();
+  if (!ql) return [];
+  const out = new Set<string>([ql]);
+  for (const group of SEARCH_SYNONYMS) {
+    if (group.some((g) => ql.includes(g.toLowerCase()) || g.toLowerCase().includes(ql))) {
+      for (const g of group) out.add(g.toLowerCase());
+    }
+  }
+  return [...out];
+}
+
 /* ─────────────────────────── Page ─────────────────────────── */
 
 export default function PickerWorkspace() {
@@ -124,8 +165,14 @@ export default function PickerWorkspace() {
         ].filter(Boolean).join(" ").toLowerCase();
         if (!aliases.some((a) => channelHaystack.includes(a))) return false;
       }
-      // Text search
+      // Text search — match if ANY synonym hits the expanded haystack.
       if (ql) {
+        const stepText = Array.isArray(s.steps)
+          ? s.steps.map((st: any) => `${st.name ?? ""} ${st.description ?? ""} ${st.outputType ?? ""}`).join(" ")
+          : "";
+        const memberNames = Array.isArray(s.members)
+          ? s.members.map((m: any) => `${m.name ?? ""} ${m.role ?? ""} ${m.primarySkill ?? ""}`).join(" ")
+          : "";
         const haystack = [
           pickLocaleText(s.name, "zh-TW"),
           pickLocaleText(s.name, "en"),
@@ -135,8 +182,17 @@ export default function PickerWorkspace() {
           s.methodology?.author,
           s.methodology?.summary,
           typeof s.methodology === "string" ? s.methodology : "",
+          (s.tags ?? []).join(" "),
+          (s.useCases ?? []).join(" "),
+          (s.outputFormats ?? []).join(" "),
+          (s.workspace ?? []).join(" "),
+          stepText,
+          memberNames,
+          s.lead?.name,
+          s.lead?.primarySkill,
         ].filter(Boolean).join(" ").toLowerCase();
-        if (!haystack.includes(ql)) return false;
+        const terms = expandSynonyms(ql);
+        if (!terms.some((t) => haystack.includes(t))) return false;
       }
       return true;
     });
