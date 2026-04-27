@@ -159,23 +159,46 @@ export default function MissionsHome() {
     return c;
   }, [allSquads]);
 
-  // Featured: filter by selected layer, then sort, then slice
+  const [searchQ, setSearchQ] = useState("");
+
+  // Featured: filter by selected layer + searchQ, then sort, then slice
   const featured = useMemo(() => {
     const layerOrder = ["L1", "L2", "L3", "L4", "L5", "L6"];
-    const filtered =
-      selectedLayer === "ALL"
-        ? allSquads
-        : allSquads.filter((s) => (s.strategyLayer ?? "").toString().slice(0, 2) === selectedLayer);
+    const q = searchQ.trim().toLowerCase();
+    const matchesQ = (s: any) => {
+      if (!q) return true;
+      const haystack = [
+        pickLocaleText(s.name, "zh-TW"),
+        pickLocaleText(s.name, "en"),
+        pickLocaleText(s.description, "zh-TW"),
+        pickLocaleText(s.description, "en"),
+        s.slug,
+        s.methodology?.author,
+        s.methodology?.summary,
+        typeof s.methodology === "string" ? s.methodology : "",
+        Array.isArray(s.workspace) ? s.workspace.join(" ") : (s.workspace ?? ""),
+        s.lead?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    };
+    const filtered = allSquads
+      .filter((s) =>
+        selectedLayer === "ALL"
+          ? true
+          : (s.strategyLayer ?? "").toString().slice(0, 2) === selectedLayer
+      )
+      .filter(matchesQ);
     return [...filtered]
       .sort((a, b) => {
         const la = (a.strategyLayer ?? "L9").slice(0, 2);
         const lb = (b.strategyLayer ?? "L9").slice(0, 2);
         return layerOrder.indexOf(la) - layerOrder.indexOf(lb);
       })
-      .slice(0, selectedLayer === "ALL" ? 12 : 24);
-  }, [allSquads, selectedLayer]);
-
-  const [searchQ, setSearchQ] = useState("");
+      .slice(0, q ? 24 : (selectedLayer === "ALL" ? 12 : 24));
+  }, [allSquads, selectedLayer, searchQ]);
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sortDesc, setSortDesc] = useState(true);
@@ -340,7 +363,64 @@ export default function MissionsHome() {
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 placeholder="搜尋方法論、任務、最近的工作"
-                className="w-full pl-14 pr-5 py-[14px] text-[0.92rem] bg-white rounded-sm border border-mos-hair focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition"
+                className="w-full pl-14 pr-12 py-[14px] text-[0.92rem] bg-white rounded-sm border border-mos-hair focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition"
+              />
+              {searchQ && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQ("")}
+                  aria-label="清除搜尋"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-7 h-7 inline-flex items-center justify-center text-mos-muted hover:text-mos-ink hover:bg-mos-ink/5 rounded-full transition"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Filter pills under search bar — Canva style */}
+            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+              <FilterChip
+                label={typeFilter === "all" ? "類型" : typeFilter}
+                options={typeOptions.map((t) => ({
+                  value: t,
+                  label: t === "all" ? "任何類型" : t,
+                }))}
+                onSelect={(v) => setTypeFilter(v)}
+              />
+              <FilterChip
+                label={
+                  selectedLayer === "ALL"
+                    ? "類別"
+                    : `${selectedLayer}・${LAYER_TOKENS[selectedLayer].label}`
+                }
+                options={[
+                  { value: "ALL", label: "全部層級" },
+                  { value: "L1", label: "L1・品牌策略" },
+                  { value: "L2", label: "L2・產品策略" },
+                  { value: "L3", label: "L3・受眾策略" },
+                  { value: "L4", label: "L4・通路策略" },
+                  { value: "L5", label: "L5・活動策略" },
+                  { value: "L6", label: "L6・驗證校準" },
+                ]}
+                onSelect={(v) => setSelectedLayer(v as MosLayer | "ALL")}
+              />
+              <FilterChip
+                label={ownerFilter === "mine" ? "擁有者・我的" : "擁有者・全部"}
+                options={[
+                  { value: "mine", label: "我的" },
+                  { value: "all", label: "全部" },
+                ]}
+                onSelect={(v) => setOwnerFilter(v as "mine" | "all")}
+              />
+              <FilterChip
+                label={sortDesc ? "已修改日期・新→舊" : "已修改日期・舊→新"}
+                options={[
+                  { value: "desc", label: "新→舊" },
+                  { value: "asc", label: "舊→新" },
+                ]}
+                onSelect={(v) => setSortDesc(v === "desc")}
               />
             </div>
           </div>
@@ -385,9 +465,11 @@ export default function MissionsHome() {
           <>
             <SectionHeader
               title={
-                selectedLayer === "ALL"
-                  ? "為你推薦的方法論小組"
-                  : `${selectedLayer} · ${LAYER_TOKENS[selectedLayer].label} · ${layerCounts[selectedLayer]} 個方法論`
+                searchQ.trim()
+                  ? `搜尋「${searchQ.trim()}」・${featured.length} 個方法論小組`
+                  : selectedLayer === "ALL"
+                    ? "為你推薦的方法論小組"
+                    : `${selectedLayer} · ${LAYER_TOKENS[selectedLayer].label} · ${layerCounts[selectedLayer]} 個方法論`
               }
               cta="完整型錄 →"
               onCtaClick={() => navigate("/templates")}
@@ -415,7 +497,9 @@ export default function MissionsHome() {
               </div>
             ) : (
               <div className="mb-12 border border-dashed border-mos-hair bg-white py-10 px-6 text-center text-[0.84rem] text-mos-muted rounded-sm">
-                這一層暫時沒有方法論小組。試試其他層級。
+                {searchQ.trim()
+                  ? `沒有找到符合「${searchQ.trim()}」的方法論小組。試試其他關鍵字或清除篩選。`
+                  : "這一層暫時沒有方法論小組。試試其他層級。"}
               </div>
             )}
           </>
