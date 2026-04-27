@@ -115,9 +115,11 @@ export default function PickerWorkspace() {
   const seedTitle = params.get("title") ?? "";
   const initialSlug = params.get("slug");
 
-  const [rail, setRail] = useState<RailKey>(
-    initialLayer ? "layers" : initialWorkspace ? "channels" : "templates",
-  );
+  // Rail always starts on "templates" — that's the primary browsing mode.
+  // A locked channel/layer (from URL params) is shown as a dismissable
+  // badge under the search bar, not as a rail switch. This matches Canva,
+  // where 範本 is always the default active rail item.
+  const [rail, setRail] = useState<RailKey>("templates");
   const [layerFilter, setLayerFilter] = useState<MosLayer | "ALL">(
     initialLayer && LAYER_OPTIONS.includes(initialLayer) ? initialLayer : "ALL",
   );
@@ -377,21 +379,42 @@ export default function PickerWorkspace() {
               ))}
             </div>
           )}
-          {/* When channel is locked, show a single dismissable badge */}
-          {channelFilter !== "all" && (
-            <div className="px-3 pt-2 pb-1 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] bg-mos-ink text-white rounded-full">
-                {CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label}
-                <button
-                  onClick={() => setChannelFilter("all")}
-                  aria-label="清除通路篩選"
-                  className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full hover:bg-white/20"
+          {/* Locked-filter badges (channel and/or layer). Each is
+              dismissable so user can broaden the picker scope. */}
+          {(channelFilter !== "all" || layerFilter !== "ALL") && (
+            <div className="px-3 pt-2 pb-1 flex items-center flex-wrap gap-1.5">
+              {channelFilter !== "all" && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] bg-mos-ink text-white rounded-full">
+                  {CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label
+                    ?? channelFilter}
+                  <button
+                    onClick={() => setChannelFilter("all")}
+                    aria-label="清除通路篩選"
+                    className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full hover:bg-white/20"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {layerFilter !== "ALL" && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] text-white rounded-full"
+                  style={{ background: LAYER_TOKENS[layerFilter].bg }}
                 >
-                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
+                  {layerFilter}・{LAYER_TOKENS[layerFilter].label}
+                  <button
+                    onClick={() => setLayerFilter("ALL")}
+                    aria-label="清除圖層篩選"
+                    className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full hover:bg-white/20"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
             </div>
           )}
 
