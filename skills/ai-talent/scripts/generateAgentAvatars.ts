@@ -52,23 +52,15 @@ const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/marketing-os/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
 mkdirSync(COVERS_DIR, { recursive: true });
 
-// ── 10-axis variable system (≈ 56M combinations) ─────────────────────────────
-const FACE_SHAPES = ["oval", "round", "square", "heart", "long", "diamond"];
-const SKIN_TONES = ["fair beige", "honey", "warm tan", "deep brown", "olive", "rosy", "stylised pale blue"];
-const HAIR_STYLES = ["short crop", "shoulder-length wavy", "high ponytail", "top knot", "curly afro", "long straight", "braided", "buzz cut", "bob cut", "dreadlocks"];
-const HAIR_COLORS = ["jet black", "warm brown", "honey blonde", "auburn red", "silver grey", "pastel lavender", "mint green", "rose pink"];
-const EYEWEAR = ["no glasses", "round glasses", "square glasses", "sunglasses", "thin wire frames"];
-const EXPRESSIONS = ["soft smile", "confident gaze", "serious focus", "thoughtful look", "warm welcoming smile", "calm composure"];
-const OUTFITS = ["tailored blazer", "casual t-shirt", "turtleneck", "designer hoodie", "creative jumpsuit", "utility shirt", "academic cardigan"];
-const BG_COLORS = ["soft cream", "muted blue", "sage green", "blush pink", "warm peach", "lavender mist", "buttery yellow", "neutral grey"];
-const ANGLES = ["front-facing", "three-quarter left", "three-quarter right", "soft profile"];
-const ART_STYLES = [
-  "flat illustration, clean vector art",
-  "fine line art with soft watercolor wash",
-  "modern editorial illustration, gouache",
-  "minimal 3D render, matte clay finish",
-  "bold geometric flat illustration",
-];
+// ── Variable system for B&W line-art portraits ───────────────────────────
+// Style is FIXED (white bg + black line). Variety comes from facial features,
+// hair, accessories, pose. 6 × 10 × 5 × 6 × 7 × 4 = 50,400 combinations.
+const FACE_SHAPES   = ["oval", "round", "square", "heart-shaped", "long", "diamond"];
+const HAIR_STYLES   = ["short crop", "shoulder-length wavy", "high ponytail", "top knot", "curly afro", "long straight", "braided", "buzz cut", "bob cut", "dreadlocks"];
+const EYEWEAR       = ["no glasses", "round wire glasses", "square frames", "thin oval glasses", "minimal half-rim glasses"];
+const EXPRESSIONS   = ["subtle smile", "confident neutral", "calm focused", "thoughtful", "warm welcoming", "serene"];
+const OUTFITS       = ["collared shirt with simple tie", "open-collar shirt", "turtleneck sweater", "casual hoodie", "blazer over t-shirt", "minimal jumpsuit", "polo shirt"];
+const ANGLES        = ["front-facing", "three-quarter left turn", "three-quarter right turn", "subtle profile"];
 
 // Deterministic hash → axis indexes
 function pickByHash(seed: string, axes: string[][]): string[] {
@@ -81,22 +73,25 @@ function pickByHash(seed: string, axes: string[][]): string[] {
 
 function buildAvatarPrompt(agent: { id: number; slug: string; name: string; title: string | null; specialty: string | null }): string {
   const seed = `${agent.id}-${agent.slug}`;
-  const [face, skin, hairStyle, hairColor, eyewear, expression, outfit, bg, angle, art] =
-    pickByHash(seed, [FACE_SHAPES, SKIN_TONES, HAIR_STYLES, HAIR_COLORS, EYEWEAR, EXPRESSIONS, OUTFITS, BG_COLORS, ANGLES, ART_STYLES]);
-
-  const role = agent.title ?? agent.specialty ?? "professional";
+  const [face, hairStyle, eyewear, expression, outfit, angle] =
+    pickByHash(seed, [FACE_SHAPES, HAIR_STYLES, EYEWEAR, EXPRESSIONS, OUTFITS, ANGLES]);
 
   return [
-    "portrait avatar, illustrated, NOT a real photograph",
-    art,
-    `${angle} portrait of a person who works as a ${role}`,
-    `${face} face shape, ${skin} skin tone`,
-    `${hairStyle}, ${hairColor} hair`,
+    // STYLE — fixed: black ink line drawing on pure white background
+    "single-line minimalist portrait illustration",
+    "pure black ink lines on solid pure white background",
+    "no color, no shading, no fills, no gradients, no halftones",
+    "thin clean continuous lines, vector-like quality",
+    "minimalist editorial portrait, gallery line art aesthetic",
+    // SUBJECT — variable
+    `${angle} head-and-shoulders portrait of a person`,
+    `${face} face`,
+    `${hairStyle} hair`,
     eyewear === "no glasses" ? "" : eyewear,
-    expression,
+    `${expression} expression`,
     `wearing ${outfit}`,
-    `${bg} solid background, no text, no logos`,
-    "centered composition, head and shoulders, friendly approachable, premium illustration aesthetic",
+    // CONSTRAINTS
+    "centered composition, balanced negative space, no text, no logos, no watermarks",
   ].filter(Boolean).join(", ").slice(0, 800);
 }
 
