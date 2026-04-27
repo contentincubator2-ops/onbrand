@@ -152,6 +152,14 @@ function manifestSnippet(m: any): string {
   } catch { return String(m).slice(0, 300); }
 }
 
+// Endpoint can be either format:
+//   Foundry router:  https://*.services.ai.azure.com  (uses /openai/v1/chat/completions, model in body)
+//   Azure OpenAI:    https://*.openai.azure.com       (uses /openai/deployments/{name}/chat/completions?api-version=...)
+const IS_AZURE_OPENAI = AZURE_ENDPOINT.includes("openai.azure.com");
+const URL_PATH = IS_AZURE_OPENAI
+  ? `/openai/deployments/${AZURE_DEPLOYMENT}/chat/completions?api-version=2024-10-01-preview`
+  : `/openai/v1/chat/completions`;
+
 async function callAzure(skills: SkillRow[]): Promise<Classification[]> {
   const userMsg = skills.map((s) => ({
     id: s.id,
@@ -161,9 +169,8 @@ async function callAzure(skills: SkillRow[]): Promise<Classification[]> {
     manifest_snippet: manifestSnippet(s.manifest),
   }));
 
-  const url = `${AZURE_ENDPOINT}/openai/v1/chat/completions`;
-  const body = {
-    model: AZURE_DEPLOYMENT,
+  const url = `${AZURE_ENDPOINT}${URL_PATH}`;
+  const body: any = {
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: `Classify these ${skills.length} skills:\n${JSON.stringify(userMsg)}` },
@@ -172,6 +179,8 @@ async function callAzure(skills: SkillRow[]): Promise<Classification[]> {
     temperature: 0.1,
     response_format: { type: "json_object" },
   };
+  // Foundry router needs `model` in body; Azure OpenAI deployments don't (deployment is in URL).
+  if (!IS_AZURE_OPENAI) body.model = AZURE_DEPLOYMENT;
 
   const resp = await fetch(url, {
     method: "POST",
@@ -202,7 +211,10 @@ async function main() {
   const pool = getPool();
 
   console.log(`===== classifySkills =====`);
-  console.log(`endpoint:   ${AZURE_ENDPOINT}`);
+  // Print only host (no path), no key — the GHA log redacts it as ***
+  console.log(`endpoint:   ${AZURE_ENDPOINT.replace(/^(https?:\/\/[^/]+).*/, "$1")}`);
+  console.log(`format:     ${IS_AZURE_OPENAI ? "Azure OpenAI (deployment-in-url)" : "Foundry router (model-in-body)"}`);
+  console.log(`url path:   ${URL_PATH}`);
   console.log(`deployment: ${AZURE_DEPLOYMENT}`);
   console.log(`batch size: ${BATCH}`);
   console.log(`limit:      ${LIMIT || "none"}`);
