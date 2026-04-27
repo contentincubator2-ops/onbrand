@@ -108,7 +108,7 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
 
   return (rows as any[]).map((r) => {
     const layer = resolveLayerKey(r.strategy_layer);
-    const layerTone = LAYER_TO_HERO[layer];
+    const layerTone = LAYER_TO_HERO[layer]!;
 
     const members = safeJsonParse<any[]>(r.agents, []);
     const steps   = safeJsonParse<any[]>(r.steps, []);
@@ -179,7 +179,7 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
 
   return rows.map((r) => {
     const layer = AGENT_LAYER_MAP[String(r.layer ?? "").toLowerCase()] ?? "L1";
-    const tone = LAYER_TO_HERO[layer];
+    const tone = LAYER_TO_HERO[layer]!;
     const name = String(r.name ?? "");
     return {
       id: Number(r.id),
