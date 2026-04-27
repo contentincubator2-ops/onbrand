@@ -34,13 +34,15 @@ jobs:
           REUSE: ${{ github.event.inputs.reuse }}
           LIMIT: ${{ github.event.inputs.limit }}
           SLUG:  ${{ github.event.inputs.slug }}
-          FAL_AI_API_KEY_1: ${{ secrets.FAL_AI_API_KEY_1 }}
+          AZURE_IMAGE_API_KEY:  ${{ secrets.GPT }}
+          AZURE_IMAGE_ENDPOINT: "https://proj-claude-sweden-resource.cognitiveservices.azure.com"
+          AZURE_IMAGE_DEPLOYMENT: "gpt-image-2"
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 1800s
-          envs: GH_TOKEN,DRY,REUSE,LIMIT,SLUG,FAL_AI_API_KEY_1
+          envs: GH_TOKEN,DRY,REUSE,LIMIT,SLUG,AZURE_IMAGE_API_KEY,AZURE_IMAGE_ENDPOINT,AZURE_IMAGE_DEPLOYMENT
           script: |
             set -e
             APP=/opt/marketing-os/app
@@ -51,6 +53,10 @@ jobs:
             ENV_FILE=$APP/skills/ai-talent/.env
             set -a; source "$ENV_FILE"; set +a
             cd $APP/skills/ai-talent
+
+            # Persistent dir for cover images (survives git reset --hard during deploys)
+            sudo mkdir -p /opt/marketing-os/covers || mkdir -p /opt/marketing-os/covers
+            sudo chown -R $(whoami):$(whoami) /opt/marketing-os/covers 2>/dev/null || true
 
             ARGS=""
             [ "$DRY" = "true" ]   && ARGS="$ARGS --dry-run"
