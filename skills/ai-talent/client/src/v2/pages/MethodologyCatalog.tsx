@@ -29,7 +29,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMagnifyingGlass, faChevronDown, faChevronLeft, faChevronRight,
-  faPlus, faSparkles, faCrown, faUsers, faRobot, faCubes, faCircleInfo,
+  faPlus, faWandMagicSparkles, faCrown, faUsers, faRobot, faCubes, faCircleInfo,
   faBullseye, faMessage, faChartLine, faPalette, faRocket, faBriefcase,
   faVideo, faShareNodes, faStar, faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
@@ -155,7 +155,7 @@ export default function MethodologyCatalog() {
       {/* ─── Hero (pastel gradient) ─────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-success-100 via-secondary-100 to-danger-100">
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <Button variant="bordered" radius="full" startContent={<FontAwesomeIcon icon={faSparkles} />} onPress={() => setDrawerOpen(true)}>
+          <Button variant="bordered" radius="full" startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />} onPress={() => setDrawerOpen(true)}>
             先睹為快
           </Button>
           <Button color="primary" radius="full" startContent={<FontAwesomeIcon icon={faCrown} />} onPress={() => setDrawerOpen(true)}>
