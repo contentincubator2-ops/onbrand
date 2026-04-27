@@ -709,9 +709,9 @@ function CircleTile({
         <Avatar
           name={tile.glyph}
           color={tone?.heroColor ?? "default"}
-          variant="bordered"
           radius="full"
           size="md"
+          isBordered
           classNames={{ name: "text-medium" }}
         />
       </Badge>
