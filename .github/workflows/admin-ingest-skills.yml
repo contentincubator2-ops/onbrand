@@ -1,0 +1,59 @@
+name: Admin — Ingest skills (per source)
+
+# Phase 4 — runs scripts/skill-ingest/run.ts against one source.
+# Each invocation pulls one source's skills, scans for security issues,
+# upserts into the skills table.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Source id'
+        required: true
+        type: choice
+        options:
+          - anthropic-claude-skills
+      limit:
+        description: 'Max skills to fetch (blank = all)'
+        required: false
+      dry_run:
+        description: 'Type "true" to skip DB write'
+        required: false
+        default: 'false'
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run ingest on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC: ${{ github.event.inputs.source }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          DRY: ${{ github.event.inputs.dry_run }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 1800s
+          envs: GH_TOKEN,SRC,LIMIT,DRY
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main && git reset --hard origin/main
+
+            ENV_FILE=$APP/skills/ai-talent/.env
+            set -a; source "$ENV_FILE"; set +a
+            export GITHUB_TOKEN="$GH_TOKEN"
+
+            cd $APP/skills/ai-talent
+
+            ARGS="--source $SRC"
+            [ -n "$LIMIT" ] && ARGS="$ARGS --limit $LIMIT"
+            [ "$DRY" = "true" ] && ARGS="$ARGS --dry-run"
+
+            echo "===== tsx scripts/skill-ingest/run.ts $ARGS ====="
+            ./node_modules/.bin/tsx scripts/skill-ingest/run.ts $ARGS
