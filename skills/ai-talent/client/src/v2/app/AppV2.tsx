@@ -31,7 +31,9 @@ import OnboardingWizard from "../../pages/OnboardingWizard";
 import RequireAuthV2 from "./RequireAuthV2";
 import ShellLayout from "./shell/ShellLayout";
 import MissionsHome from "../pages/MissionsHome";
-import MissionDetail from "../pages/MissionDetail";
+// MissionDetail retired 2026-04-27 (C1) — replaced by in-picker WorkflowRunner.
+// /m/:missionId now redirects to /picker?mission=:id.
+import MissionRedirect from "./MissionRedirect";
 import MethodologyCatalog from "../pages/MethodologyCatalog";
 import MethodologyDetail from "../pages/MethodologyDetail";
 import PickerWorkspace from "../pages/PickerWorkspace";
@@ -89,8 +91,8 @@ export default function AppV2() {
           <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/media" element={<MediaHubPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
-          <Route path="/m/:missionId" element={<MissionDetail />} />
-          <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionDetail />} />
+          <Route path="/m/:missionId" element={<MissionRedirect />} />
+          <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
           <Route path="/templates" element={<MethodologyCatalog />} />
           <Route path="/templates/:slug" element={<MethodologyDetail />} />
         </Route>

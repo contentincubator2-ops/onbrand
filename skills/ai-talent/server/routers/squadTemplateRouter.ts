@@ -1244,6 +1244,228 @@ ${agentCtx.systemPromptPrefix}`;
       }
     }),
 
+  // ── stepExecute ──────────────────────────────────────────────────────────────
+  // Run ONE workflow step against the assigned agent, persist the draft to
+  // mission_step_progress, return the output text. Powers the in-place
+  // WorkflowRunner in PickerWorkspace (post-launch right pane).
+  //
+  // Behavior (B3 hybrid):
+  //   - mode="ask": agent asks the user a clarifying question for this step
+  //                  (used on step 1 to gather requirements). Returns a
+  //                  question string; no draft persisted.
+  //   - mode="run": agent generates the draft for this step using prev step
+  //                  outputs + user's most recent input. Persists `output`
+  //                  with status="drafted".
+  //   - mode="confirm": user accepted the draft → status="confirmed".
+  //
+  // Storage: one row per (missionId, stepOrder) in mission_step_progress.
+  stepExecute: protectedProcedure
+    .input(z.object({
+      missionId:  z.number(),
+      squadSlug:  z.string(),
+      stepOrder:  z.number(),
+      mode:       z.enum(["ask", "run", "confirm"]),
+      userInput:  z.string().max(4000).optional().default(""),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      // Auto-create progress table on first use
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS mission_step_progress (
+          id           INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          mission_id   INT           NOT NULL,
+          step_order   INT           NOT NULL,
+          status       VARCHAR(20)   NOT NULL DEFAULT 'pending',
+          user_input   TEXT,
+          agent_output MEDIUMTEXT,
+          agent_id     INT,
+          agent_name   VARCHAR(120),
+          updated_at   DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                     ON UPDATE CURRENT_TIMESTAMP(3),
+          UNIQUE KEY uniq_step (mission_id, step_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // Load squad row + steps + agents (localPool — same shape as listByBrand)
+      const [sqRows] = await localPool.execute(
+        `SELECT id, slug, name, agents, steps, methodology
+           FROM squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
+        [input.squadSlug],
+      ) as any[];
+      const squad = (sqRows as any[])?.[0];
+      if (!squad) throw new TRPCError({ code: "NOT_FOUND", message: `squad slug ${input.squadSlug} not found` });
+
+      const stepsRaw = safeJsonParse<any[]>(squad.steps, []);
+      const step = stepsRaw.find((s: any) => Number(s.order ?? s.step) === input.stepOrder)
+                ?? stepsRaw[input.stepOrder - 1];
+      if (!step) throw new TRPCError({ code: "NOT_FOUND", message: `step ${input.stepOrder} not found` });
+
+      // Resolve assigned agent
+      const assignedId = step.assignedAgentId ? Number(step.assignedAgentId) : null;
+      let agentRow: any = null;
+      if (assignedId) {
+        const [aRows] = await localPool.execute(
+          `SELECT id, name, title, primarySkill, aiModel, specialty FROM agents WHERE id = ? LIMIT 1`,
+          [assignedId],
+        ) as any[];
+        agentRow = (aRows as any[])?.[0] ?? null;
+      }
+      const agentName = agentRow?.name ?? step.assignedAgentName ?? "AI 專員";
+      const agentTitle = agentRow?.title ?? "";
+      const agentSkill = agentRow?.primarySkill ?? step.requiredSkill ?? "";
+
+      // ── confirm: just flip status, no LLM ────────────────────────────────────
+      if (input.mode === "confirm") {
+        await db.execute(sql`
+          UPDATE mission_step_progress
+             SET status = 'confirmed'
+           WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+        `);
+        return { ok: true, status: "confirmed" as const };
+      }
+
+      // ── Load previous step outputs for chaining context ──────────────────────
+      const [prevRows] = await db.execute(sql`
+        SELECT step_order, agent_output
+          FROM mission_step_progress
+         WHERE mission_id = ${input.missionId}
+           AND step_order < ${input.stepOrder}
+           AND status IN ('drafted', 'confirmed')
+         ORDER BY step_order ASC
+      `) as any[];
+      const prevOutputs = (prevRows as any[]).map((r: any) =>
+        `【Step ${r.step_order} 結果】\n${(r.agent_output ?? "").slice(0, 1500)}`
+      ).join("\n\n");
+
+      // Mission context
+      const [mRows] = await db.execute(sql`
+        SELECT title, description, objective, audience FROM missions
+         WHERE id = ${input.missionId} AND userId = ${ctx.user.id} LIMIT 1
+      `) as any[];
+      const mission = (mRows as any[])?.[0];
+      const missionContext = mission
+        ? `任務：${mission.title}${mission.description ? ` · ${mission.description}` : ""}`
+        : "";
+
+      const stepName = step.name ?? step.title ?? `Step ${input.stepOrder}`;
+      const stepDesc = step.description ?? "";
+      const outputType = step.outputType ?? step.output ?? "";
+
+      // ── ask: agent asks 1–3 clarifying questions for this step ───────────────
+      if (input.mode === "ask") {
+        const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
+你即將執行「${stepName}」這個步驟。先用使用者聽得懂的話，提出 1–3 個最關鍵的問題，幫你完成這一步。
+語氣專業但溫暖，像真正帶過品牌的行銷顧問。用繁體中文。控制在 200 字內。`;
+        const userPrompt = `${missionContext}
+方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
+此步驟說明：${stepDesc || "(無)"}
+預期產出：${outputType || "(未指定)"}
+${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
+請只輸出問題本身，不要前言、不要編號以外的客套話。`;
+
+        const llm = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        });
+        const reply = String(llm.choices?.[0]?.message?.content ?? "");
+
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, agent_id, agent_name, agent_output)
+          VALUES
+            (${input.missionId}, ${input.stepOrder}, 'asking',
+             ${assignedId ?? null}, ${agentName}, ${reply})
+          ON DUPLICATE KEY UPDATE
+            status = 'asking', agent_output = VALUES(agent_output),
+            agent_id = VALUES(agent_id), agent_name = VALUES(agent_name)
+        `);
+
+        return {
+          ok: true,
+          status: "asking" as const,
+          agentName, agentTitle, agentSkill,
+          stepName, stepDesc, outputType,
+          message: reply,
+        };
+      }
+
+      // ── run: produce the draft for this step ─────────────────────────────────
+      const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
+你正在執行「${stepName}」步驟。請依方法論交付這一步的成果，**直接給出可用的產出**，不要寒暄。
+用繁體中文。重點清楚、可條列。長度依產出類型：${outputType || "適中"}。`;
+
+      const userPrompt = `${missionContext}
+方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
+此步驟說明：${stepDesc || stepName}
+預期產出類型：${outputType || "(未指定)"}
+${prevOutputs ? `\n上游步驟成果（請接續使用）：\n${prevOutputs}` : ""}
+${input.userInput ? `\n使用者本步補充：\n${input.userInput}` : ""}
+請直接交付本步驟的成果。`;
+
+      const llm = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const output = String(llm.choices?.[0]?.message?.content ?? "");
+
+      await db.execute(sql`
+        INSERT INTO mission_step_progress
+          (mission_id, step_order, status, user_input, agent_output, agent_id, agent_name)
+        VALUES
+          (${input.missionId}, ${input.stepOrder}, 'drafted',
+           ${input.userInput || null}, ${output},
+           ${assignedId ?? null}, ${agentName})
+        ON DUPLICATE KEY UPDATE
+          status = 'drafted',
+          user_input = VALUES(user_input),
+          agent_output = VALUES(agent_output),
+          agent_id = VALUES(agent_id),
+          agent_name = VALUES(agent_name)
+      `);
+
+      return {
+        ok: true,
+        status: "drafted" as const,
+        agentName, agentTitle, agentSkill,
+        stepName, stepDesc, outputType,
+        output,
+      };
+    }),
+
+  // ── stepGetProgress ──────────────────────────────────────────────────────────
+  // Read all step rows for a mission. Powers the WorkflowRunner timeline so
+  // it can re-hydrate state on page reload (e.g. user shares /picker?mission=).
+  stepGetProgress: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      try {
+        const [rows] = await db.execute(sql`
+          SELECT step_order, status, user_input, agent_output, agent_name, updated_at
+            FROM mission_step_progress
+           WHERE mission_id = ${input.missionId}
+           ORDER BY step_order ASC
+        `) as any[];
+        return (rows as any[]).map((r: any) => ({
+          stepOrder:   Number(r.step_order),
+          status:      String(r.status) as "asking" | "drafted" | "confirmed" | "pending",
+          userInput:   r.user_input ?? "",
+          agentOutput: r.agent_output ?? "",
+          agentName:   r.agent_name ?? "",
+          updatedAt:   r.updated_at,
+        }));
+      } catch {
+        return []; // table may not exist yet
+      }
+    }),
+
   // ── logUsage ─────────────────────────────────────────────────────────────────
   // Write a squad_usage_log row when the user starts a squad session.
   logUsage: protectedProcedure

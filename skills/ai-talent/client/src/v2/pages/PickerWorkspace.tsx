@@ -25,6 +25,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
+import WorkflowRunner from "./WorkflowRunner";
 
 /* ─────────────────────────── Icon rail ─────────────────────────── */
 
@@ -114,6 +115,13 @@ export default function PickerWorkspace() {
   const initialLayer = params.get("layer") as MosLayer | null;
   const seedTitle = params.get("title") ?? "";
   const initialSlug = params.get("slug");
+  const initialMissionId = params.get("mission");
+
+  // Active mission — when set, right pane shows WorkflowRunner instead of
+  // SquadDetailPanel. Set on launch (or rehydrated from /picker?mission=).
+  const [activeMissionId, setActiveMissionId] = useState<number | null>(
+    initialMissionId ? Number(initialMissionId) : null,
+  );
 
   // Rail always starts on "templates" — that's the primary browsing mode.
   // A locked channel/layer (from URL params) is shown as a dismissable
@@ -264,8 +272,15 @@ export default function PickerWorkspace() {
         workspace: ws,
       });
       if (!res?.id) throw new Error("後端沒有回傳 mission id");
-      // Same tab navigation since we're already in a popped tab
-      window.location.href = `/m/${res.id}`;
+      // In-place launch — swap right pane to WorkflowRunner. Persist
+      // mission id in URL so refresh / share-link rehydrates the runner.
+      const missionId = Number(res.id);
+      setActiveMissionId(missionId);
+      const next = new URLSearchParams(params);
+      next.set("mission", String(missionId));
+      next.set("slug", sq.slug);
+      setParams(next, { replace: true });
+      setBusy(false);
     } catch (e: any) {
       setError(`啟動失敗：${e?.message ?? String(e)}`);
       setBusy(false);
@@ -548,9 +563,34 @@ export default function PickerWorkspace() {
           </div>
         </section>
 
-        {/* Right pane — canvas / detail */}
-        <section className="flex-1 min-w-0 bg-mos-cream overflow-y-auto">
-          {selectedSquad ? (
+        {/* Right pane — canvas / detail / runner */}
+        <section className="flex-1 min-w-0 bg-mos-cream flex flex-col min-h-0">
+          {activeMissionId && selectedSquad ? (
+            <div className="flex-1 min-h-0 flex flex-col">
+              <div className="px-4 py-1.5 border-b border-mos-hair bg-white/50 flex items-center justify-between">
+                <span className="text-[0.7rem] text-mos-muted">執行中 · 隨時可從左側切換方法論</span>
+                <button
+                  onClick={() => {
+                    setActiveMissionId(null);
+                    const next = new URLSearchParams(params);
+                    next.delete("mission");
+                    setParams(next, { replace: true });
+                  }}
+                  className="text-[0.7rem] text-mos-muted hover:text-mos-ink transition"
+                >
+                  返回預覽
+                </button>
+              </div>
+              <div className="flex-1 min-h-0">
+                <WorkflowRunner
+                  missionId={activeMissionId}
+                  squad={selectedSquad}
+                  lang={lang}
+                />
+              </div>
+            </div>
+          ) : selectedSquad ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
             <SquadDetailPanel
               squad={selectedSquad}
               busy={busy}
@@ -558,6 +598,7 @@ export default function PickerWorkspace() {
               onLaunch={() => launchSquad(selectedSquad)}
               lang={lang}
             />
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center p-10">
               <div className="text-center max-w-[420px]">
