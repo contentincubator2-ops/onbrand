@@ -20,6 +20,8 @@ import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
+import { useLang } from "../../lib/i18n";
+import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -648,6 +650,7 @@ function FeaturedSquadTile({
   onClick: () => void;
   onPreview: () => void;
 }) {
+  const { lang } = useLang();
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
 
@@ -668,27 +671,40 @@ function FeaturedSquadTile({
     }
     const summary = squad.methodology?.summary;
     if (typeof summary === "string" && summary.trim()) {
-      // summary is usually the slug (e.g. "obviously-awesome")
       return formatSlug(summary.trim());
     }
-    if (squad.lead?.name) return `領隊 · ${squad.lead.name}`;
+    if (squad.lead?.name) {
+      return lang === "en" ? `Lead · ${squad.lead.name}` : `領隊 · ${squad.lead.name}`;
+    }
     return null;
   })();
 
-  // Block 2: 描述 — squad.description, or fallback to step count + member count
+  // Block 2: 描述 — locale-aware DB content + heuristic fallback
+  //   1. description (could be plain string or JSON locale-map)
+  //   2. if zh-TW UI but description looks English → fall back to derived summary
+  //   3. derived: "{N} 個工作步驟、{M} 位成員"
   const stepCount =
     Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
   const memberCount =
     Array.isArray(squad.members) ? squad.members.length : 0;
   const descriptionText = (() => {
-    if (squad.description && String(squad.description).trim()) return squad.description;
+    const localized = safeLocalizedText(squad.description, lang);
+    if (localized) return localized;
     const parts: string[] = [];
-    if (stepCount) parts.push(`${stepCount} 個工作步驟`);
-    if (memberCount) parts.push(`${memberCount} 位成員`);
-    return parts.length ? parts.join("、") : null;
+    if (lang === "en") {
+      if (stepCount) parts.push(`${stepCount} workflow steps`);
+      if (memberCount) parts.push(`${memberCount} members`);
+    } else {
+      if (stepCount) parts.push(`${stepCount} 個工作步驟`);
+      if (memberCount) parts.push(`${memberCount} 位成員`);
+    }
+    return parts.length ? parts.join(lang === "en" ? " · " : "、") : null;
   })();
 
-  const nameStr = (squad.name ?? squad.slug ?? "?").toString();
+  // Localized squad name (DB usually English; future may store JSON map)
+  const nameStr =
+    pickLocaleText(squad.name, lang) ||
+    String(squad.slug ?? "?");
   const initial = nameStr.charAt(0).toUpperCase();
 
   return (
@@ -700,9 +716,10 @@ function FeaturedSquadTile({
         onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) onClick(); }}
         className={[
           "relative overflow-hidden rounded-lg bg-white cursor-pointer",
-          "border border-mos-ink hover:shadow-lg transition-shadow",
+          "border-2 hover:shadow-lg transition-shadow",
           disabled && !busy ? "opacity-40 pointer-events-none" : "",
         ].join(" ")}
+        style={{ borderColor: "#1A1A1A" }}
       >
         {/* 卡片頂部 */}
         <div className="p-5 pb-4">
@@ -747,9 +764,12 @@ function FeaturedSquadTile({
           {/* 內容區塊（v2 風：白底 + 細黑邊） */}
           <div className="space-y-3">
             {/* 方法論 */}
-            <div className="p-3 rounded-md border border-mos-ink bg-white">
-              <div className="text-[0.7rem] font-semibold text-mos-muted mb-1">
-                方法論
+            <div
+              className="p-3 rounded-md bg-white"
+              style={{ border: "1.5px solid #1A1A1A" }}
+            >
+              <div className="text-[0.72rem] font-semibold text-mos-muted mb-1">
+                {lang === "en" ? "Methodology" : "方法論"}
               </div>
               <div className="text-sm text-mos-ink line-clamp-1">
                 {methodologyText ?? "—"}
@@ -757,9 +777,12 @@ function FeaturedSquadTile({
             </div>
 
             {/* 描述 */}
-            <div className="p-3 rounded-md border border-mos-ink bg-white">
-              <div className="text-[0.7rem] font-semibold text-mos-muted mb-1">
-                描述
+            <div
+              className="p-3 rounded-md bg-white"
+              style={{ border: "1.5px solid #1A1A1A" }}
+            >
+              <div className="text-[0.72rem] font-semibold text-mos-muted mb-1">
+                {lang === "en" ? "Description" : "描述"}
               </div>
               <div className="text-sm text-mos-ink line-clamp-3 leading-snug">
                 {descriptionText ?? "—"}
