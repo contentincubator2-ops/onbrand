@@ -590,33 +590,10 @@ export default function PickerWorkspace() {
             </div>
           </div>
 
-          {/* Sub-filter row (varies by rail).
-              When a channel is locked (came in via a channel quick tile),
-              suppress the cross-layer pill row — Canva keeps the picker
-              focused on the chosen category. */}
-          {rail === "channels" && channelFilter === "all" && (
-            <div className="px-3 pt-2 pb-1 flex flex-wrap gap-1.5">
-              <RailPill active={channelFilter === "all"} onClick={() => setChannelFilter("all")}>全部</RailPill>
-              {CHANNEL_OPTIONS.map((c) => (
-                <RailPill key={c.key} active={(channelFilter as string) === c.key} onClick={() => setChannelFilter(c.key)}>{c.label}</RailPill>
-              ))}
-            </div>
-          )}
-          {rail === "layers" && channelFilter === "all" && (
-            <div className="px-3 pt-2 pb-1 flex flex-wrap gap-1.5">
-              <RailPill active={layerFilter === "ALL"} onClick={() => setLayerFilter("ALL")}>全部</RailPill>
-              {LAYER_OPTIONS.map((l) => (
-                <RailPill
-                  key={l}
-                  active={layerFilter === l}
-                  onClick={() => setLayerFilter(l)}
-                  dot={LAYER_TOKENS[l].bg}
-                >
-                  {l}・{LAYER_TOKENS[l].label}
-                </RailPill>
-              ))}
-            </div>
-          )}
+          {/* Sub-filter pill rows are now driven by URL params + locked-filter
+              badges below — the layer-aware left rail (2026-04-27) replaced
+              the old "channels" / "layers" rail items, so these inline
+              RailPill rows were removed. */}
           {/* Locked-filter badges (channel and/or layer). Each is
               dismissable so user can broaden the picker scope. */}
           {(channelFilter !== "all" || layerFilter !== "ALL") && (
@@ -1117,7 +1094,7 @@ function LayerAssetDrawer({
   item: RailItem;
   onBackToTemplates: () => void;
 }) {
-  const meta = (item.drawer && DRAWER_LABELS[item.drawer]) ?? { title: item.label, blurb: "" };
+  const meta = (item.drawer ? DRAWER_LABELS[item.drawer] : undefined) ?? { title: item.label, blurb: "" };
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Header */}
