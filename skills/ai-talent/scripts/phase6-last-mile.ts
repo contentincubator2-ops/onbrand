@@ -135,14 +135,11 @@ async function main() {
     FROM squads s WHERE s.is_active = 1 AND s.lead_agent_id IS NOT NULL`);
   let leadFixed = 0;
   for (const s of squadsLead) {
-    const tags = parseJson(s.tagsJson) || [];
-    const useCases = parseJson(s.useCasesJson) || [];
+    // Use SAME token source as audit: methodology + strategy_layer + slug only
     const tokens = new Set([
       ...tokenize(s.methodology || ""),
       ...tokenize(s.strategy_layer || ""),
       ...tokenize(s.slug || ""),
-      ...(Array.isArray(tags) ? tags.flatMap((t: any) => tokenize(String(t))) : []),
-      ...(Array.isArray(useCases) ? useCases.flatMap((u: any) => tokenize(String(u))) : []),
     ]);
     if (tokens.size === 0) continue;
 
