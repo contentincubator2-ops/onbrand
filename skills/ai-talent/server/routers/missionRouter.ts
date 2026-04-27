@@ -35,19 +35,22 @@ export const missionRouter = router({
     .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
+      // NOTE: missions + brands tables use camelCase column names (Drizzle
+      // schema), squads table uses snake_case (created via raw SQL).
+      // Don't "normalize" these — mixing is intentional and matches the DB.
       const rows = await db.execute(sql`
         SELECT m.id, m.title, m.description, m.workspace, m.methodology,
-               m.squad_slug AS squadSlug, m.brand_id AS brandId,
-               m.status, m.updated_at AS updatedAt,
+               m.squadSlug AS squadSlug, m.brandId AS brandId,
+               m.status, m.updatedAt AS updatedAt,
                b.name AS brandName,
                s.name AS squadName,
                s.strategy_layer AS squadLayer,
                s.steps AS squadSteps
           FROM missions m
-          LEFT JOIN brands b ON b.id = m.brand_id
-          LEFT JOIN squads s ON s.slug = m.squad_slug
-         WHERE m.user_id = ${ctx.user.id}
-         ORDER BY m.updated_at DESC
+          LEFT JOIN brands b ON b.id = m.brandId
+          LEFT JOIN squads s ON s.slug = m.squadSlug
+         WHERE m.userId = ${ctx.user.id}
+         ORDER BY m.updatedAt DESC
          LIMIT 60
       `);
       // drizzle returns [rows, fields] for raw execute on mysql2
