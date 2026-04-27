@@ -11,12 +11,16 @@ import * as dotenv from "dotenv";
 import { getPool, closePool } from "../squad-builder/db.js";
 import { upsertSkills } from "./upsert";
 import { anthropicClaudeSkills } from "./sources/anthropicClaudeSkills";
+import { wshobsonAgents } from "./sources/wshobsonAgents";
+import { awesomeChatgptPrompts } from "./sources/awesomeChatgptPrompts";
 import type { SourceFetcher } from "./types";
 
 dotenv.config();
 
 const REGISTRY: Record<string, SourceFetcher> = {
   [anthropicClaudeSkills.id]: anthropicClaudeSkills,
+  [wshobsonAgents.id]:        wshobsonAgents,
+  [awesomeChatgptPrompts.id]: awesomeChatgptPrompts,
 };
 
 function arg(name: string): string | undefined {

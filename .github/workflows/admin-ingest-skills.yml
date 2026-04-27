@@ -13,6 +13,8 @@ on:
         type: choice
         options:
           - anthropic-claude-skills
+          - wshobson-agents
+          - awesome-chatgpt-prompts
       limit:
         description: 'Max skills to fetch (blank = all)'
         required: false
