@@ -16,6 +16,7 @@ on:
           - wshobson-agents
           - awesome-chatgpt-prompts
           - linexjlin-gpts
+          - voltagent-subagents
       limit:
         description: 'Max skills to fetch (blank = all)'
         required: false
