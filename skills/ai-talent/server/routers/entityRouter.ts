@@ -294,4 +294,90 @@ export const entityRouter = router({
         total: squads.length + agents.length + skills.length,
       };
     }),
+
+  /**
+   * stats — single source of truth for entity counts across the UI.
+   *
+   * Use this anywhere a dashboard / hero / sidebar needs to show
+   * "N squads / M skills / K agents". Re-queried live from MySQL on
+   * each call (no caching) so the moment a new ingest finishes, the UI
+   * reflects it.
+   *
+   * Shape is flat enough that <Stat label value /> components can
+   * destructure directly.
+   */
+  stats: protectedProcedure
+    .query(async () => {
+      const db = await getSoworkDb();
+
+      // ── Squads (raw SQL on localPool MySQL) ────────────────────────
+      const [squadTotal]: any   = await localPool.execute("SELECT COUNT(*) AS n FROM squads WHERE is_active = 1");
+      const [squadCurated]: any = await localPool.execute("SELECT COUNT(*) AS n FROM squads WHERE is_active = 1 AND is_curated = 1");
+      const [squadByLayer]: any = await localPool.execute(
+        `SELECT LEFT(strategy_layer, 2) AS layer, COUNT(*) AS n
+           FROM squads WHERE is_active = 1
+          GROUP BY LEFT(strategy_layer, 2)`
+      );
+      const layerMap: Record<string, number> = { L1: 0, L2: 0, L3: 0, L4: 0, L5: 0, L6: 0 };
+      for (const r of squadByLayer as any[]) {
+        const k = String(r.layer ?? "").toUpperCase();
+        if (k in layerMap) layerMap[k] = Number(r.n);
+      }
+
+      // ── Skills (also localPool — skills table is on the same DB) ───
+      let skillTotal = 0;
+      const skillByOrigin: Record<string, number> = {};
+      const skillByLayer: Record<string, number> = { L1: 0, L2: 0, L3: 0, L4: 0, L5: 0, L6: 0 };
+      try {
+        const [t]: any = await localPool.execute("SELECT COUNT(*) AS n FROM skills WHERE is_active = 1");
+        skillTotal = Number(t[0]?.n ?? 0);
+        const [bo]: any = await localPool.execute(
+          "SELECT origin_model, COUNT(*) AS n FROM skills WHERE is_active = 1 GROUP BY origin_model"
+        );
+        for (const r of bo as any[]) skillByOrigin[String(r.origin_model)] = Number(r.n);
+        const [bl]: any = await localPool.execute(
+          "SELECT strategy_layer, COUNT(*) AS n FROM skills WHERE is_active = 1 AND strategy_layer IS NOT NULL GROUP BY strategy_layer"
+        );
+        for (const r of bl as any[]) {
+          const k = String(r.strategy_layer ?? "").toUpperCase();
+          if (k in skillByLayer) skillByLayer[k] = Number(r.n);
+        }
+      } catch (e: any) {
+        console.warn("[entity.stats] skills table not available:", e.message);
+      }
+
+      // ── Agents (Drizzle on soworkAgents) ───────────────────────────
+      let agentTotal = 0, agentAvailable = 0;
+      const agentByTier: Record<string, number> = { strategy: 0, execution: 0, training: 0 };
+      if (db) {
+        const allRows = await db
+          .select({ layer: soworkAgents.layer, isAvailable: soworkAgents.isAvailable })
+          .from(soworkAgents);
+        agentTotal = allRows.length;
+        for (const r of allRows) {
+          if (r.isAvailable) agentAvailable++;
+          const t = String(r.layer ?? "").toLowerCase();
+          if (t in agentByTier) agentByTier[t] = (agentByTier[t] ?? 0) + 1;
+        }
+      }
+
+      return {
+        squad: {
+          total:   Number(squadTotal[0]?.n ?? 0),
+          curated: Number(squadCurated[0]?.n ?? 0),
+          byLayer: layerMap,
+        },
+        skill: {
+          total:    skillTotal,
+          byOrigin: skillByOrigin,
+          byLayer:  skillByLayer,
+        },
+        agent: {
+          total:     agentTotal,
+          available: agentAvailable,
+          byTier:    agentByTier,
+        },
+        generatedAt: new Date().toISOString(),
+      };
+    }),
 });

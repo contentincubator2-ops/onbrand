@@ -16,6 +16,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import MethodologyCard from "../components/methodology/MethodologyCard";
 import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
+import { EntityStats } from "../components/EntityStats";
 import type { MosLayer } from "../../studio/primitives/tokens";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
@@ -264,8 +265,13 @@ export default function MethodologyCatalog() {
         </div>
       </section>
 
+      {/* ─── Live entity stats banner ─────────────────────────────────── */}
+      <section className="max-w-[1280px] mx-auto px-8 mt-10">
+        <EntityStats variant="row" />
+      </section>
+
       {/* ─── RECOMMENDED grid ───────────────────────────────────────────── */}
-      <section id="recommended-section" className="max-w-[1280px] mx-auto px-8 mt-14">
+      <section id="recommended-section" className="max-w-[1280px] mx-auto px-8 mt-10">
         <div className="flex items-end justify-between mb-5">
           <div>
             <h2 className="font-semibold text-[1.5rem] text-foreground tracking-[-0.015em]">

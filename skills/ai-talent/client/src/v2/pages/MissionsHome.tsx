@@ -23,6 +23,7 @@ import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitiv
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { SquadEntityCard } from "../components/SquadEntityCard";
+import { EntityStats } from "../components/EntityStats";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -399,9 +400,9 @@ export default function MissionsHome() {
             <h1 className="text-4xl leading-tight tracking-tight font-bold">
               今天，把哪一個<span className="text-warning">方法論</span>變成成果？
             </h1>
-            <p className="mt-3 text-medium text-default-500 max-w-[560px] mx-auto leading-relaxed">
-              100+ 行銷方法論小組，按 6 層策略分工。挑一層、選一個、開工。
-            </p>
+            <div className="mt-3 max-w-[560px] mx-auto leading-relaxed">
+              <EntityStats variant="inline" />
+            </div>
           </div>
 
           {/* Search bar */}
