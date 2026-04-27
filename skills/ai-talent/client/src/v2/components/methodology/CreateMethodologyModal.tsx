@@ -33,6 +33,10 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import {
+  Modal, ModalContent, ModalHeader, ModalBody,
+  Button, Input, Textarea, Card, CardBody, Chip,
+} from "@heroui/react";
 
 // ─────────────────────────────────────────────────────────────────────
 // Source registry
@@ -379,30 +383,29 @@ export default function CreateMethodologyModal({
     }
   };
 
-  if (!open) return null;
+  const isBusy = phase === "extract" || phase === "saving";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-mos-ink/30 backdrop-blur-sm p-6">
-      <div className="bg-white w-full max-w-[1200px] max-h-[88vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-mos-hair">
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      size="5xl"
+      radius="lg"
+      scrollBehavior="inside"
+      isDismissable={!isBusy}
+      hideCloseButton={false}
+      classNames={{
+        base: "max-w-[1200px] max-h-[88vh]",
+        backdrop: "bg-mos-ink/30 backdrop-blur-sm",
+      }}
+    >
+      <ModalContent>
+        <ModalHeader className="px-8 py-5 border-b border-mos-hair">
           <h2 className="font-display text-[1.6rem] text-mos-ink tracking-[-0.015em]">
             新增任務範本
           </h2>
-          <button
-            onClick={onClose}
-            disabled={phase === "extract" || phase === "saving"}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-mos-muted hover:bg-mos-paper hover:text-mos-ink disabled:opacity-40 transition"
-            title="關閉"
-          >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 6l12 12M18 6l-12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body: left nav + right pane */}
-        <div className="flex-1 flex min-h-0">
+        </ModalHeader>
+        <ModalBody className="p-0 flex flex-row min-h-0">
           {/* Left nav */}
           <aside className="w-[260px] shrink-0 border-r border-mos-hair overflow-y-auto py-4">
             {GROUPED_SOURCES.map((g) => (
@@ -413,14 +416,18 @@ export default function CreateMethodologyModal({
                   </div>
                 )}
                 {g.items.map((s) => (
-                  <button
+                  <Button
                     key={s.id}
-                    onClick={() => setActiveId(s.id)}
+                    onPress={() => setActiveId(s.id)}
+                    variant="light"
+                    radius="none"
+                    fullWidth
+                    disableRipple
                     className={[
-                      "w-full flex items-center gap-3 px-6 py-2.5 text-left transition",
+                      "h-auto justify-start gap-3 px-6 py-2.5 min-w-0",
                       activeId === s.id
                         ? "bg-mos-ink/[0.06] text-mos-ink"
-                        : "text-mos-body hover:bg-mos-ink/[0.03] hover:text-mos-ink",
+                        : "text-mos-body data-[hover=true]:bg-mos-ink/[0.03] data-[hover=true]:text-mos-ink",
                     ].join(" ")}
                   >
                     <span
@@ -433,11 +440,16 @@ export default function CreateMethodologyModal({
                     </span>
                     <span className="text-[0.86rem]">{s.label}</span>
                     {!s.ready && (
-                      <span className="ml-auto text-[0.6rem] tracking-[0.12em] uppercase text-mos-soft border border-mos-hair px-1.5 py-0.5 rounded">
+                      <Chip
+                        size="sm"
+                        radius="sm"
+                        variant="bordered"
+                        className="ml-auto text-[0.6rem] tracking-[0.12em] uppercase text-mos-soft border-mos-hair"
+                      >
                         Beta
-                      </span>
+                      </Chip>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             ))}
@@ -494,23 +506,27 @@ export default function CreateMethodologyModal({
             )}
 
             {phase === "error" && (
-              <div className="border border-mos-red bg-white p-5 max-w-[640px]">
-                <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-red">
-                  ERROR
-                </div>
-                <div className="mt-1 text-[0.86rem] text-mos-body">{error}</div>
-                <button
-                  onClick={() => { setPhase("input"); setError(null); setJobId(null); }}
-                  className="mt-4 px-4 py-2 text-[0.7rem] tracking-[0.18em] uppercase border border-mos-ink text-mos-ink hover:bg-mos-ink hover:text-white transition"
-                >
-                  重試
-                </button>
-              </div>
+              <Card shadow="none" radius="md" className="border border-danger bg-white max-w-[640px]">
+                <CardBody className="p-5">
+                  <div className="text-[0.62rem] tracking-[0.28em] uppercase text-danger">
+                    ERROR
+                  </div>
+                  <div className="mt-1 text-[0.86rem] text-mos-body">{error}</div>
+                  <Button
+                    variant="bordered"
+                    radius="sm"
+                    onPress={() => { setPhase("input"); setError(null); setJobId(null); }}
+                    className="mt-4 px-4 text-[0.7rem] tracking-[0.18em] uppercase border-mos-ink text-mos-ink data-[hover=true]:bg-mos-ink data-[hover=true]:text-white"
+                  >
+                    重試
+                  </Button>
+                </CardBody>
+              </Card>
             )}
           </section>
-        </div>
-      </div>
-    </div>
+        </ModalBody>
+      </ModalContent>
+    </Modal>
   );
 }
 
@@ -576,12 +592,13 @@ function SourcePane({
         <div className="text-[0.86rem] text-mos-body">
           先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。
         </div>
-        <button
-          onClick={() => { onClose(); window.location.assign("/templates?new=blank"); }}
-          className="px-5 py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition"
+        <Button
+          radius="sm"
+          onPress={() => { onClose(); window.location.assign("/templates?new=blank"); }}
+          className="px-5 py-3 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
         >
           建立空白任務範本 →
-        </button>
+        </Button>
       </div>
     );
   }
@@ -590,23 +607,27 @@ function SourcePane({
   if (source.inputType === "url") {
     return (
       <div className="max-w-[640px] space-y-4">
-        <input
+        <Input
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onValueChange={setUrl}
           onKeyDown={(e) => { if (e.key === "Enter") onSubmitUrl(); }}
           placeholder={source.placeholder}
-          className="w-full bg-white border border-mos-hair px-4 py-3 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded"
+          radius="sm"
+          variant="bordered"
+          classNames={{ input: "text-[0.92rem] text-mos-ink", inputWrapper: "bg-white border-mos-hair" }}
         />
         {source.hint && (
           <div className="text-[0.74rem] text-mos-muted">{source.hint}</div>
         )}
-        <button
-          onClick={onSubmitUrl}
-          disabled={!url.trim()}
-          className="w-full py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-50 rounded"
+        <Button
+          radius="sm"
+          fullWidth
+          onPress={onSubmitUrl}
+          isDisabled={!url.trim()}
+          className="py-3 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
         >
           開始抽取 →
-        </button>
+        </Button>
       </div>
     );
   }
@@ -664,9 +685,9 @@ function SourcePane({
         {!source.ready && (
           <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded text-[0.78rem] text-mos-muted">
             💡 檔案上傳的後端萃取將於下一輪上線。在這之前，請改用{" "}
-            <button onClick={() => onSwitchSource("github")} className="underline text-mos-ink">GitHub</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-mos-ink">GitHub</Button>
             {" "}或{" "}
-            <button onClick={() => onSwitchSource("web")} className="underline text-mos-ink">網頁</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-mos-ink">網頁</Button>
             {" "}模式建立任務範本。
           </div>
         )}
@@ -678,12 +699,14 @@ function SourcePane({
   if (source.inputType === "text") {
     return (
       <div className="max-w-[720px] space-y-4">
-        <textarea
+        <Textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onValueChange={setText}
           placeholder={source.placeholder}
-          rows={14}
-          className="w-full bg-white border border-mos-hair px-4 py-3 text-[0.86rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded font-mono"
+          minRows={14}
+          radius="sm"
+          variant="bordered"
+          classNames={{ input: "text-[0.86rem] text-mos-ink font-mono", inputWrapper: "bg-white border-mos-hair" }}
         />
         {source.hint && (
           <div className="text-[0.74rem] text-mos-muted">{source.hint}</div>
@@ -691,18 +714,20 @@ function SourcePane({
         {!source.ready && (
           <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded text-[0.78rem] text-mos-muted">
             💡 文字貼上的後端萃取將於下一輪上線。先用{" "}
-            <button onClick={() => onSwitchSource("github")} className="underline text-mos-ink">GitHub</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-mos-ink">GitHub</Button>
             {" "}或{" "}
-            <button onClick={() => onSwitchSource("web")} className="underline text-mos-ink">網頁</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-mos-ink">網頁</Button>
             {" "}抽取相同內容。
           </div>
         )}
-        <button
-          disabled
-          className="w-full py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink/40 text-white rounded cursor-not-allowed"
+        <Button
+          radius="sm"
+          fullWidth
+          isDisabled
+          className="py-3 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink/40 text-white"
         >
           開始抽取（敬請期待）
-        </button>
+        </Button>
       </div>
     );
   }
@@ -712,13 +737,18 @@ function SourcePane({
 
 function RecoTile({ label, desc, onClick }: { label: string; desc: string; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-5 py-4 border border-mos-hair hover:border-mos-ink rounded-lg transition group bg-white"
+    <Card
+      isPressable
+      onPress={onClick}
+      shadow="none"
+      radius="lg"
+      className="w-full border border-mos-hair data-[hover=true]:border-mos-ink bg-white"
     >
-      <div className="text-[0.92rem] text-mos-ink group-hover:text-mos-teal-ink">{label}</div>
-      <div className="mt-1 text-[0.78rem] text-mos-muted">{desc}</div>
-    </button>
+      <CardBody className="px-5 py-4 text-left">
+        <div className="text-[0.92rem] text-mos-ink">{label}</div>
+        <div className="mt-1 text-[0.78rem] text-mos-muted">{desc}</div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -954,92 +984,101 @@ function ReviewPane({
   onBack: () => void;
   onCommit: () => void;
 }) {
+  const inputCommon = {
+    radius: "sm" as const,
+    variant: "bordered" as const,
+  };
+  const updateStep = (i: number, patch: Partial<ExtractedMethodology["steps"][number]>) => {
+    const next = [...draft.steps];
+    next[i] = { ...next[i], ...patch };
+    setDraft({ ...draft, steps: next });
+  };
   return (
     <div className="max-w-[720px] space-y-4">
       <DraftField label="名稱" required>
-        <input
+        <Input
+          {...inputCommon}
           value={draft.name}
-          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded"
+          onValueChange={(v) => setDraft({ ...draft, name: v })}
+          classNames={{ input: "text-[0.92rem] text-mos-ink", inputWrapper: "bg-white border-mos-hair" }}
         />
       </DraftField>
       <div className="grid grid-cols-2 gap-3">
         <DraftField label="作者">
-          <input
+          <Input
+            {...inputCommon}
             value={draft.author ?? ""}
-            onChange={(e) => setDraft({ ...draft, author: e.target.value })}
-            className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.86rem] focus:outline-none focus:border-mos-ink rounded"
+            onValueChange={(v) => setDraft({ ...draft, author: v })}
+            classNames={{ input: "text-[0.86rem]", inputWrapper: "bg-white border-mos-hair" }}
           />
         </DraftField>
         <DraftField label="年份">
-          <input
+          <Input
+            {...inputCommon}
             value={draft.year ?? ""}
-            onChange={(e) => setDraft({ ...draft, year: e.target.value })}
-            className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.86rem] focus:outline-none focus:border-mos-ink rounded"
+            onValueChange={(v) => setDraft({ ...draft, year: v })}
+            classNames={{ input: "text-[0.86rem]", inputWrapper: "bg-white border-mos-hair" }}
           />
         </DraftField>
       </div>
       <DraftField label="說明">
-        <textarea
+        <Textarea
+          {...inputCommon}
           value={draft.description ?? ""}
-          onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-          rows={3}
-          className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.86rem] text-mos-body focus:outline-none focus:border-mos-ink rounded"
+          onValueChange={(v) => setDraft({ ...draft, description: v })}
+          minRows={3}
+          classNames={{ input: "text-[0.86rem] text-mos-body", inputWrapper: "bg-white border-mos-hair" }}
         />
       </DraftField>
       <DraftField label={`步驟 (${draft.steps.length})`}>
         <div className="space-y-2">
           {draft.steps.map((s, i) => (
-            <div key={i} className="border border-mos-hair bg-white p-3 rounded">
-              <input
-                value={s.name}
-                onChange={(e) => {
-                  const next = [...draft.steps];
-                  next[i] = { ...next[i], name: e.target.value };
-                  setDraft({ ...draft, steps: next });
-                }}
-                className="w-full text-[0.88rem] font-display text-mos-ink focus:outline-none"
-              />
-              <div className="mt-1 grid grid-cols-2 gap-2">
-                <input
-                  placeholder="所需技能"
-                  value={s.requiredSkill ?? ""}
-                  onChange={(e) => {
-                    const next = [...draft.steps];
-                    next[i] = { ...next[i], requiredSkill: e.target.value };
-                    setDraft({ ...draft, steps: next });
-                  }}
-                  className="text-[0.78rem] text-mos-muted border-b border-mos-hair focus:outline-none focus:border-mos-ink"
+            <Card key={i} shadow="none" radius="sm" className="border border-mos-hair bg-white">
+              <CardBody className="p-3 gap-1">
+                <Input
+                  {...inputCommon}
+                  value={s.name}
+                  onValueChange={(v) => updateStep(i, { name: v })}
+                  classNames={{ input: "text-[0.88rem] font-display text-mos-ink", inputWrapper: "bg-white border-mos-hair" }}
                 />
-                <input
-                  placeholder="產出"
-                  value={s.outputType ?? ""}
-                  onChange={(e) => {
-                    const next = [...draft.steps];
-                    next[i] = { ...next[i], outputType: e.target.value };
-                    setDraft({ ...draft, steps: next });
-                  }}
-                  className="text-[0.78rem] text-mos-muted border-b border-mos-hair focus:outline-none focus:border-mos-ink"
-                />
-              </div>
-            </div>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <Input
+                    {...inputCommon}
+                    placeholder="所需技能"
+                    value={s.requiredSkill ?? ""}
+                    onValueChange={(v) => updateStep(i, { requiredSkill: v })}
+                    classNames={{ input: "text-[0.78rem] text-mos-muted", inputWrapper: "bg-white border-mos-hair" }}
+                  />
+                  <Input
+                    {...inputCommon}
+                    placeholder="產出"
+                    value={s.outputType ?? ""}
+                    onValueChange={(v) => updateStep(i, { outputType: v })}
+                    classNames={{ input: "text-[0.78rem] text-mos-muted", inputWrapper: "bg-white border-mos-hair" }}
+                  />
+                </div>
+              </CardBody>
+            </Card>
           ))}
         </div>
       </DraftField>
 
       <div className="flex items-center gap-3 pt-4 border-t border-mos-hair">
-        <button
-          onClick={onBack}
-          className="px-4 py-2.5 text-[0.7rem] tracking-[0.18em] uppercase border border-mos-hair text-mos-muted hover:text-mos-ink hover:border-mos-ink transition rounded"
+        <Button
+          variant="bordered"
+          radius="sm"
+          onPress={onBack}
+          className="px-4 py-2.5 h-auto text-[0.7rem] tracking-[0.18em] uppercase border-mos-hair text-mos-muted data-[hover=true]:text-mos-ink data-[hover=true]:border-mos-ink"
         >
           ← 換來源
-        </button>
-        <button
-          onClick={onCommit}
-          className="flex-1 py-2.5 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition rounded"
+        </Button>
+        <Button
+          radius="sm"
+          onPress={onCommit}
+          className="flex-1 py-2.5 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
         >
           確認新增任務範本 →
-        </button>
+        </Button>
       </div>
     </div>
   );

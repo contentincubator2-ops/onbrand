@@ -22,6 +22,7 @@ import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import BrandSwitcher from "./BrandSwitcher";
+import { Button, Tooltip } from "@heroui/react";
 
 export default function ShellLayout() {
   const navigate = useNavigate();
@@ -79,21 +80,30 @@ export default function ShellLayout() {
         <header className="border-b border-mos-hair bg-white sticky top-0 z-30">
           <div className="px-6 h-14 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button
-                onClick={toggleCollapsed}
-                className="lg:hidden p-1.5 text-mos-muted hover:text-mos-ink rounded transition"
-                title="切換側邊欄"
-              >
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18M3 12h18M3 18h18" />
-                </svg>
-              </button>
-              <button
-                onClick={() => navigate("/")}
-                className="font-display text-[0.7rem] tracking-[0.24em] uppercase text-mos-ink hover:text-mos-teal-ink transition"
+              <Tooltip content="切換側邊欄" radius="sm" size="sm">
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="light"
+                  radius="sm"
+                  onPress={toggleCollapsed}
+                  aria-label="切換側邊欄"
+                  className="lg:hidden text-mos-muted data-[hover=true]:text-mos-ink"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18M3 12h18M3 18h18" />
+                  </svg>
+                </Button>
+              </Tooltip>
+              <Button
+                size="sm"
+                variant="light"
+                radius="sm"
+                onPress={() => navigate("/")}
+                className="font-display text-[0.7rem] tracking-[0.24em] uppercase text-mos-ink data-[hover=true]:text-mos-teal-ink"
               >
                 SOWORK · Marketing OS
-              </button>
+              </Button>
             </div>
 
             <div className="flex items-center gap-3">
@@ -102,16 +112,19 @@ export default function ShellLayout() {
                 selectedId={brandId}
                 onSelect={setBrandId}
               />
-              <button
-                onClick={async () => {
+              <Button
+                size="sm"
+                variant="light"
+                radius="sm"
+                onPress={async () => {
                   try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); }
                   catch {}
                   window.location.href = "/auth/login";
                 }}
-                className="text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted hover:text-mos-ink"
+                className="text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted data-[hover=true]:text-mos-ink"
               >
                 登出
-              </button>
+              </Button>
             </div>
           </div>
         </header>
@@ -241,34 +254,53 @@ function Sidebar({
           SO
         </div>
         {!collapsed && (
-          <button
-            onClick={onToggle}
-            className="p-1.5 text-mos-muted hover:text-mos-ink rounded transition"
-            title="收合側邊欄"
-          >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </button>
+          <Tooltip content="收合側邊欄" radius="sm" size="sm" placement="right">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              radius="sm"
+              onPress={onToggle}
+              aria-label="收合側邊欄"
+              className="text-mos-muted data-[hover=true]:text-mos-ink"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </Button>
+          </Tooltip>
         )}
       </div>
 
       {/* Primary CTA: + 建立 */}
       <div className="p-3 shrink-0">
-        <button
-          onClick={() => onNavigate("/")}
+        <Button
+          color="primary"
+          radius="lg"
+          onPress={() => onNavigate("/")}
+          isIconOnly={collapsed}
+          fullWidth={!collapsed}
           className={[
-            "w-full flex items-center gap-2 rounded-lg transition",
-            "bg-[#5B3CC8] hover:bg-[#4A2FB0] text-white font-medium",
-            collapsed ? "h-10 justify-center px-0" : "h-10 px-3 justify-start",
+            "h-10 font-medium",
+            collapsed ? "" : "justify-start px-3",
           ].join(" ")}
-          title="建立任務"
+          aria-label="建立任務"
+          startContent={
+            !collapsed ? (
+              <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            ) : undefined
+          }
         >
-          <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          {!collapsed && <span className="text-[0.82rem]">建立任務</span>}
-        </button>
+          {collapsed ? (
+            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          ) : (
+            <span className="text-[0.82rem]">建立任務</span>
+          )}
+        </Button>
       </div>
 
       {/* Nav items */}
@@ -292,13 +324,16 @@ function Sidebar({
         })}
 
         {/* Show-more (collapsed shows ⋯, expanded shows full label) */}
-        <button
+        <Button
+          variant="light"
+          radius="lg"
+          fullWidth
+          disableRipple
+          aria-label="顯示更多"
           className={[
-            "w-full flex items-center gap-3 rounded-lg transition mt-1",
-            "text-mos-muted hover:text-mos-ink hover:bg-mos-ink/[0.04]",
-            collapsed ? "h-12 justify-center px-0 flex-col gap-1" : "h-10 px-3",
+            "mt-1 text-mos-muted data-[hover=true]:text-mos-ink data-[hover=true]:bg-mos-ink/[0.04]",
+            collapsed ? "h-12 flex-col gap-1 px-0 min-w-0" : "h-10 justify-start px-3 gap-3",
           ].join(" ")}
-          title="顯示更多"
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="currentColor">
             <circle cx="5" cy="12" r="1.6" />
@@ -310,21 +345,28 @@ function Sidebar({
           ) : (
             <span className="text-[0.82rem]">顯示更多</span>
           )}
-        </button>
+        </Button>
       </nav>
 
       {/* Bottom: collapse toggle when collapsed */}
       {collapsed && (
         <div className="p-2 border-t border-mos-hair shrink-0">
-          <button
-            onClick={onToggle}
-            className="w-full h-9 flex items-center justify-center text-mos-muted hover:text-mos-ink rounded-lg transition"
-            title="展開側邊欄"
-          >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
+          <Tooltip content="展開側邊欄" radius="sm" size="sm" placement="right">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              radius="lg"
+              fullWidth
+              onPress={onToggle}
+              aria-label="展開側邊欄"
+              className="h-9 text-mos-muted data-[hover=true]:text-mos-ink"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </Button>
+          </Tooltip>
         </div>
       )}
     </aside>
@@ -339,22 +381,27 @@ function SidebarNavLink({
   collapsed: boolean;
   onClick: () => void;
 }) {
-  return (
-    <button
-      onClick={onClick}
+  const inner = (
+    <Button
+      onPress={onClick}
+      variant="light"
+      radius="lg"
+      fullWidth
+      disableRipple
+      aria-label={item.label}
       className={[
-        "relative w-full flex rounded-lg transition mt-1",
+        "relative mt-1 min-w-0",
         active
           ? "bg-mos-ink/[0.06] text-mos-ink"
-          : "text-mos-muted hover:text-mos-ink hover:bg-mos-ink/[0.04]",
-        collapsed ? "h-12 flex-col items-center justify-center gap-1 px-0" : "h-10 items-center gap-3 px-3",
+          : "text-mos-muted data-[hover=true]:text-mos-ink data-[hover=true]:bg-mos-ink/[0.04]",
+        collapsed
+          ? "h-12 flex-col gap-1 px-0"
+          : "h-10 justify-start gap-3 px-3",
       ].join(" ")}
-      title={item.label}
     >
       {active && (
         <span
-          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r"
-          style={{ background: "#5B3CC8" }}
+          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-primary"
           aria-hidden
         />
       )}
@@ -366,8 +413,14 @@ function SidebarNavLink({
       ) : (
         <span className="text-[0.82rem]">{item.label}</span>
       )}
-    </button>
+    </Button>
   );
+
+  return collapsed ? (
+    <Tooltip content={item.label} radius="sm" size="sm" placement="right">
+      {inner}
+    </Tooltip>
+  ) : inner;
 }
 
 export interface ShellOutletCtx {

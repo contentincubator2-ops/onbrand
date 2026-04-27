@@ -743,12 +743,14 @@ function CircleTile({
           </span>
         </div>
         {tile.badge && (
-          <span
-            className="absolute -top-1 -right-1 px-1.5 py-[1px] text-[0.5rem] tracking-[0.04em] text-white rounded-full"
-            style={{ background: "#5B3CC8" }}
+          <Chip
+            size="sm"
+            radius="full"
+            color="primary"
+            className="absolute -top-1 -right-1 h-auto px-1.5 py-[1px] text-[0.5rem] tracking-[0.04em] text-white"
           >
             {tile.badge}
-          </span>
+          </Chip>
         )}
       </div>
       <span className="text-[0.7rem] text-mos-ink leading-tight text-center">
