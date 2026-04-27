@@ -109,15 +109,15 @@ export default function MethodologyCard({
                 {lk}
               </span>
             </div>
-            <div className="mt-1 text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted">
-              {tone.shortLabel} · {tone.label}
+            <div className="mt-1 text-[0.7rem] tracking-[0.04em] text-mos-muted">
+              {tone.label}
             </div>
           </div>
           <div
-            className="font-display text-[0.6rem] tracking-[0.32em] uppercase text-mos-soft"
+            className="font-display text-[0.62rem] tracking-[0.04em] text-mos-soft"
             aria-hidden
           >
-            METHOD
+            方法論
           </div>
         </div>
         {/* hairline ribbon under header */}
@@ -229,11 +229,11 @@ export default function MethodologyCard({
       {/* ── FOOTER: dark contact bar ──────────────────────────────── */}
       <footer className="mt-auto bg-mos-ink text-white px-4 py-3 flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-[0.58rem] tracking-[0.28em] uppercase text-white/55">
-            {lk} · {tone.shortLabel} · {sourceLabel}
+          <div className="text-[0.66rem] tracking-[0.04em] text-white/60">
+            {lk}・{tone.label}・{sourceLabel}
           </div>
           <div className="mt-0.5 text-[0.78rem] truncate text-white">
-            {leadName ?? "Squad Lead"}
+            {leadName ?? "領隊待指派"}
           </div>
           {steps.length > 0 && (
             <div className="text-[0.6rem] tracking-[0.1em] text-white/45">

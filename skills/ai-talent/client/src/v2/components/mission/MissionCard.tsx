@@ -144,8 +144,8 @@ export default function MissionCard({
             withBackground
           />
           <div className="flex-1 min-w-0">
-            <div className="text-[0.58rem] tracking-[0.28em] uppercase text-mos-soft">
-              APPLIED · {lk} · {tone.shortLabel}
+            <div className="text-[0.62rem] tracking-[0.04em] text-mos-soft">
+              已套用 ・{lk}・{tone.label}
             </div>
             <div className="mt-0.5 font-display text-[0.96rem] leading-tight text-mos-ink truncate">
               {methodologyName ?? methodologySlug}

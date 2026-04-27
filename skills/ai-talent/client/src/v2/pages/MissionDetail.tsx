@@ -496,11 +496,11 @@ function RecTile({
             style={{ background: tone.bg }}
             aria-hidden
           />
-          <span className="font-display text-[0.58rem] tracking-[0.26em] uppercase text-mos-ink">
+          <span className="font-display text-[0.62rem] tracking-[0.06em] text-mos-ink">
             {lk}
           </span>
-          <span className="text-[0.58rem] tracking-[0.18em] uppercase text-mos-soft">
-            · {tone.shortLabel}
+          <span className="text-[0.62rem] tracking-[0.04em] text-mos-soft">
+            ・{tone.label}
           </span>
         </div>
         <div className="font-display text-[1rem] leading-tight text-mos-ink line-clamp-2">

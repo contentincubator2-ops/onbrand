@@ -19,7 +19,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
-import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
+import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -648,10 +648,46 @@ function FeaturedSquadTile({
   onClick: () => void;
   onPreview: () => void;
 }) {
-  const lk = ((squad.strategyLayer ?? "L1").toString().slice(0, 2)) as MosLayer;
-  const tone = LAYER_TOKENS[lk in LAYER_TOKENS ? lk : "L1"];
-  const author = squad.methodology?.author ?? null;
-  const description = squad.description ?? null;
+  const lk = resolveLayer(squad.strategyLayer);
+  const tone = LAYER_TOKENS[lk];
+
+  // Block 1: 方法論 — graceful fallback chain (no "尚未設定")
+  //   1. methodology.author (best — explicit author from JSON)
+  //   2. format methodology slug as Title Case ("obviously-awesome" → "Obviously Awesome")
+  //   3. lead 名稱 as last resort
+  const formatSlug = (s: string) =>
+    s.replace(/[-_]+/g, " ")
+     .split(" ")
+     .filter(Boolean)
+     .map((w) => /^[a-z]/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w)
+     .join(" ");
+  const methodologyText = (() => {
+    if (squad.methodology?.author) {
+      const yr = squad.methodology?.year ? ` · ${squad.methodology.year}` : "";
+      return `${squad.methodology.author}${yr}`;
+    }
+    const summary = squad.methodology?.summary;
+    if (typeof summary === "string" && summary.trim()) {
+      // summary is usually the slug (e.g. "obviously-awesome")
+      return formatSlug(summary.trim());
+    }
+    if (squad.lead?.name) return `領隊 · ${squad.lead.name}`;
+    return null;
+  })();
+
+  // Block 2: 描述 — squad.description, or fallback to step count + member count
+  const stepCount =
+    Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
+  const memberCount =
+    Array.isArray(squad.members) ? squad.members.length : 0;
+  const descriptionText = (() => {
+    if (squad.description && String(squad.description).trim()) return squad.description;
+    const parts: string[] = [];
+    if (stepCount) parts.push(`${stepCount} 個工作步驟`);
+    if (memberCount) parts.push(`${memberCount} 位成員`);
+    return parts.length ? parts.join("、") : null;
+  })();
+
   const nameStr = (squad.name ?? squad.slug ?? "?").toString();
   const initial = nameStr.charAt(0).toUpperCase();
 
@@ -663,12 +699,13 @@ function FeaturedSquadTile({
         tabIndex={disabled ? -1 : 0}
         onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) onClick(); }}
         className={[
-          "relative overflow-hidden border-2 hover:shadow-lg transition-shadow rounded-lg bg-white cursor-pointer",
+          "relative overflow-hidden rounded-lg bg-white cursor-pointer",
+          "border border-mos-ink hover:shadow-lg transition-shadow",
           disabled && !busy ? "opacity-40 pointer-events-none" : "",
         ].join(" ")}
       >
         {/* 卡片頂部 */}
-        <div className="p-6 pb-4">
+        <div className="p-5 pb-4">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3 min-w-0">
               {/* 實體圖標 */}
@@ -679,14 +716,16 @@ function FeaturedSquadTile({
                 {initial}
               </div>
 
-              {/* 實體名稱和層級 badge */}
+              {/* 實體名稱 + 層級 badge */}
               <div className="min-w-0">
-                <h3 className="font-semibold text-lg leading-tight line-clamp-1">{nameStr}</h3>
+                <h3 className="font-semibold text-base leading-tight line-clamp-1 text-mos-ink">
+                  {nameStr}
+                </h3>
                 <span
-                  className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-[0.62rem] font-semibold tracking-[0.12em] uppercase text-white"
+                  className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-[0.62rem] font-semibold tracking-[0.06em] text-white"
                   style={{ background: tone.bg }}
                 >
-                  {lk} · {tone.shortLabel}
+                  {lk}・{tone.label}
                 </span>
               </div>
             </div>
@@ -705,25 +744,25 @@ function FeaturedSquadTile({
             </button>
           </div>
 
-          {/* 內容區塊 */}
-          <div className="space-y-4">
-            {/* 方法論區塊 */}
-            <div className="p-4 rounded-lg border" style={{ background: tone.bgTint }}>
-              <div className="text-xs font-semibold text-gray-500 mb-1 tracking-wide">
-                METHODOLOGY / 方法論
+          {/* 內容區塊（v2 風：白底 + 細黑邊） */}
+          <div className="space-y-3">
+            {/* 方法論 */}
+            <div className="p-3 rounded-md border border-mos-ink bg-white">
+              <div className="text-[0.7rem] font-semibold text-mos-muted mb-1">
+                方法論
               </div>
-              <div className="text-sm text-gray-700 line-clamp-1">
-                {author ?? "尚未設定"}
+              <div className="text-sm text-mos-ink line-clamp-1">
+                {methodologyText ?? "—"}
               </div>
             </div>
 
-            {/* 描述區塊 */}
-            <div className="p-4 rounded-lg border" style={{ background: tone.bgTint }}>
-              <div className="text-xs font-semibold text-gray-500 mb-1 tracking-wide">
-                DESCRIPTION / 描述
+            {/* 描述 */}
+            <div className="p-3 rounded-md border border-mos-ink bg-white">
+              <div className="text-[0.7rem] font-semibold text-mos-muted mb-1">
+                描述
               </div>
-              <div className="text-sm text-gray-700 line-clamp-3">
-                {description ?? "尚未設定"}
+              <div className="text-sm text-mos-ink line-clamp-3 leading-snug">
+                {descriptionText ?? "—"}
               </div>
             </div>
           </div>
@@ -777,10 +816,10 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
           </div>
           {isLayerKnown && (
             <div
-              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded-sm"
+              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.6rem] tracking-[0.06em] font-display text-white rounded-sm"
               style={{ background: tone.bg }}
             >
-              {lk} · {tone.shortLabel}
+              {lk}・{tone.label}
             </div>
           )}
           {stepCount > 0 && (
