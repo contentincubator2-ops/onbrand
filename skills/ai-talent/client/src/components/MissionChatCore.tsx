@@ -10,7 +10,10 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSpinner } from "@fortawesome/free-solid-svg-icons";
+const Loader2 = ({ size = 16, style, className }: any) =>
+  <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: size, ...style }} className={className} />;
 import { trpc } from "../lib/trpc";
 import TaskProgressTracker, { type TaskStep } from "./mission-chat/TaskProgressTracker";
 import SquadRecommendCards from "./mission-chat/SquadRecommendCards";

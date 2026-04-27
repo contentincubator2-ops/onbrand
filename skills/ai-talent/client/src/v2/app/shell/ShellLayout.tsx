@@ -23,6 +23,12 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import BrandSwitcher from "./BrandSwitcher";
 import { Avatar, Button, Tooltip } from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles,
+  faMicrophone, faBookBookmark, faPhotoFilm, faEllipsis,
+  faChevronLeft, faChevronRight, faPlus, faBars, faRightFromBracket,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function ShellLayout() {
   const navigate = useNavigate();
@@ -89,9 +95,7 @@ export default function ShellLayout() {
                   aria-label="切換側邊欄"
                   className="lg:hidden"
                 >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h18M3 12h18M3 18h18" />
-                  </svg>
+                  <FontAwesomeIcon icon={faBars} />
                 </Button>
               </Tooltip>
               <Button
@@ -112,6 +116,7 @@ export default function ShellLayout() {
               <Button
                 size="sm"
                 variant="light"
+                startContent={<FontAwesomeIcon icon={faRightFromBracket} />}
                 onPress={async () => {
                   try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); }
                   catch {}
@@ -144,89 +149,14 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    to: "/",
-    label: "首頁",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 11l9-8 9 8" />
-        <path d="M5 10v10h14V10" />
-      </svg>
-    ),
-  },
-  {
-    to: "/projects",
-    label: "專案",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-      </svg>
-    ),
-  },
-  {
-    to: "/templates",
-    label: "任務範本",
-    matchPrefix: "/templates",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <path d="M3 9h18" />
-        <path d="M9 14h6" />
-      </svg>
-    ),
-  },
-  {
-    to: "/brands",
-    label: "品牌",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
-      </svg>
-    ),
-  },
-  {
-    to: "/ai",
-    label: "AI 工具",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z" />
-      </svg>
-    ),
-  },
-  {
-    to: "/boardroom",
-    label: "比稿",
-    icon: (
-      // 麥克風 — 邀比稿的舞台符號
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="9" y="3" width="6" height="12" rx="3" />
-        <path d="M5 11a7 7 0 0 0 14 0" />
-        <path d="M12 18v3" />
-        <path d="M8 21h8" />
-      </svg>
-    ),
-  },
-  {
-    to: "/playbooks",
-    label: "成長方案",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 5v14l8-4 8 4V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z" />
-        <path d="M9 9h6" />
-      </svg>
-    ),
-  },
-  {
-    to: "/media",
-    label: "媒體中心",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="6" width="18" height="12" rx="1" />
-        <path d="M7 10v4M11 9v6M15 10v4M19 11v2" />
-      </svg>
-    ),
-  },
+  { to: "/",           label: "首頁",     icon: <FontAwesomeIcon icon={faHouse} /> },
+  { to: "/projects",   label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
+  { to: "/templates",  label: "任務範本", matchPrefix: "/templates", icon: <FontAwesomeIcon icon={faTableCells} /> },
+  { to: "/brands",     label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
+  { to: "/ai",         label: "AI 工具",  icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
+  { to: "/boardroom",  label: "比稿",     icon: <FontAwesomeIcon icon={faMicrophone} /> },
+  { to: "/playbooks",  label: "成長方案", icon: <FontAwesomeIcon icon={faBookBookmark} /> },
+  { to: "/media",      label: "媒體中心", icon: <FontAwesomeIcon icon={faPhotoFilm} /> },
 ];
 
 function Sidebar({
@@ -248,16 +178,8 @@ function Sidebar({
         <Avatar name="SO" size="sm" radius="md" color="primary" classNames={{ name: "font-bold" }} />
         {!collapsed && (
           <Tooltip content="收合側邊欄" placement="right">
-            <Button
-              isIconOnly
-              size="sm"
-              variant="light"
-              onPress={onToggle}
-              aria-label="收合側邊欄"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 6l-6 6 6 6" />
-              </svg>
+            <Button isIconOnly size="sm" variant="light" onPress={onToggle} aria-label="收合側邊欄">
+              <FontAwesomeIcon icon={faChevronLeft} />
             </Button>
           </Tooltip>
         )}
@@ -272,21 +194,9 @@ function Sidebar({
           isIconOnly={collapsed}
           fullWidth={!collapsed}
           aria-label="建立任務"
-          startContent={
-            !collapsed ? (
-              <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            ) : undefined
-          }
+          startContent={!collapsed ? <FontAwesomeIcon icon={faPlus} /> : undefined}
         >
-          {collapsed ? (
-            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          ) : (
-            "建立任務"
-          )}
+          {collapsed ? <FontAwesomeIcon icon={faPlus} /> : "建立任務"}
         </Button>
       </div>
 
@@ -314,11 +224,7 @@ function Sidebar({
         {collapsed ? (
           <Tooltip content="顯示更多" placement="right">
             <Button isIconOnly variant="light" aria-label="顯示更多" className="mt-1">
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
-                <circle cx="5" cy="12" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="19" cy="12" r="1.6" />
-              </svg>
+              <FontAwesomeIcon icon={faEllipsis} />
             </Button>
           </Tooltip>
         ) : (
@@ -327,13 +233,7 @@ function Sidebar({
             fullWidth
             aria-label="顯示更多"
             className="mt-1 justify-start"
-            startContent={
-              <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="currentColor">
-                <circle cx="5" cy="12" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="19" cy="12" r="1.6" />
-              </svg>
-            }
+            startContent={<FontAwesomeIcon icon={faEllipsis} />}
           >
             顯示更多
           </Button>
@@ -344,17 +244,8 @@ function Sidebar({
       {collapsed && (
         <div className="p-2 border-t border-divider shrink-0">
           <Tooltip content="展開側邊欄" placement="right">
-            <Button
-              isIconOnly
-              size="sm"
-              variant="light"
-              fullWidth
-              onPress={onToggle}
-              aria-label="展開側邊欄"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+            <Button isIconOnly size="sm" variant="light" fullWidth onPress={onToggle} aria-label="展開側邊欄">
+              <FontAwesomeIcon icon={faChevronRight} />
             </Button>
           </Tooltip>
         </div>
@@ -378,7 +269,7 @@ function SidebarNavLink({
       variant={active ? "flat" : "light"}
       color={active ? "primary" : "default"}
       aria-label={item.label}
-      className="mt-1 [&>svg]:w-5 [&>svg]:h-5"
+      className="mt-1"
     >
       {item.icon}
     </Button>
@@ -390,11 +281,7 @@ function SidebarNavLink({
       fullWidth
       aria-label={item.label}
       className="mt-1 justify-start"
-      startContent={
-        <span className="shrink-0 [&>svg]:w-5 [&>svg]:h-5">
-          {item.icon}
-        </span>
-      }
+      startContent={item.icon}
     >
       {item.label}
     </Button>

@@ -9,7 +9,10 @@
  */
 
 import { useEffect, useRef } from "react";
-import { UserRound } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUser } from "@fortawesome/free-solid-svg-icons";
+const UserRound = ({ size = 16, style, className }: any) =>
+  <FontAwesomeIcon icon={faUser} style={{ fontSize: size, ...style }} className={className} />;
 
 export interface MentionAgent {
   id: number;

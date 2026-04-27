@@ -22,6 +22,15 @@ import {
   Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem,
   Input, Skeleton, Spinner, Tab, Tabs, Tooltip,
 } from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMagnifyingGlass, faChevronDown, faPlus, faArrowDownWideShort,
+  faArrowUpWideShort, faTableCells, faList, faStar, faEllipsis, faBookmark,
+  faFolder, faCloudArrowUp, faGlobe, faCrown, faWandMagicSparkles, faFolderOpen,
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebook, faInstagram, faYoutube, faGoogleDrive, faMicrosoft, faDropbox,
+} from "@fortawesome/free-brands-svg-icons";
 
 interface MissionRow {
   id: number;
@@ -46,14 +55,14 @@ const SUB_NAV: Array<{ id: SubNavKey; label: string }> = [
   { id: "offline", label: "可離線使用" },
 ];
 
-const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; glyph: string }> = [
-  { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片",   glyph: "f"  },
-  { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",         glyph: "ig" },
-  { id: "youtube",      label: "YouTube 頻道",    hint: "抓影片清單、縮圖",     glyph: "▶"  },
-  { id: "website",      label: "官網 / 部落格",   hint: "抓品牌素材、文章",     glyph: "🌐" },
-  { id: "google-drive", label: "Google Drive",    hint: "同步整個資料夾",       glyph: "G"  },
-  { id: "onedrive",     label: "OneDrive",        hint: "同步整個資料夾",       glyph: "☁"  },
-  { id: "dropbox",      label: "Dropbox",         hint: "同步整個資料夾",       glyph: "▽"  },
+const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; icon: any }> = [
+  { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片",   icon: faFacebook    },
+  { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",         icon: faInstagram   },
+  { id: "youtube",      label: "YouTube 頻道",    hint: "抓影片清單、縮圖",     icon: faYoutube     },
+  { id: "website",      label: "官網 / 部落格",   hint: "抓品牌素材、文章",     icon: faGlobe       },
+  { id: "google-drive", label: "Google Drive",    hint: "同步整個資料夾",       icon: faGoogleDrive },
+  { id: "onedrive",     label: "OneDrive",        hint: "同步整個資料夾",       icon: faMicrosoft   },
+  { id: "dropbox",      label: "Dropbox",         hint: "同步整個資料夾",       icon: faDropbox     },
 ];
 
 export default function ProjectsPage() {
@@ -178,7 +187,7 @@ export default function ProjectsPage() {
             variant="bordered"
             radius="full"
             onPress={() => navigate("/templates")}
-            startContent={<span aria-hidden>✦</span>}
+            startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
           >
             先看看任務範本
           </Button>
@@ -186,7 +195,7 @@ export default function ProjectsPage() {
             color="primary"
             radius="full"
             onPress={() => setCreateSource("recommended")}
-            startContent={<span aria-hidden>👑</span>}
+            startContent={<FontAwesomeIcon icon={faCrown} />}
           >
             開始建立
           </Button>
@@ -206,12 +215,7 @@ export default function ProjectsPage() {
               placeholder="搜尋你的內容"
               isClearable
               onClear={() => setSearchQ("")}
-              startContent={
-                <svg className="w-5 h-5 text-default-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="7.5" />
-                  <path d="M21 21l-4.35-4.35" />
-                </svg>
-              }
+              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
             />
           </div>
         </div>
@@ -252,12 +256,7 @@ export default function ProjectsPage() {
                 variant="light"
                 radius="full"
                 onPress={() => setSortDesc((v) => !v)}
-                startContent={
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h13M3 12h9M3 18h5" />
-                    <path d={sortDesc ? "M18 15l3 3 3-3M21 6v12" : "M18 9l3-3 3 3M21 18V6"} />
-                  </svg>
-                }
+                startContent={<FontAwesomeIcon icon={sortDesc ? faArrowDownWideShort : faArrowUpWideShort} />}
               >
                 {sortDesc ? "新到舊" : "舊到新"}
               </Button>
@@ -272,10 +271,7 @@ export default function ProjectsPage() {
                   onPress={() => setViewMode("grid")}
                   aria-label="格狀檢視"
                 >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-                  </svg>
+                  <FontAwesomeIcon icon={faTableCells} />
                 </Button>
               </Tooltip>
               <Tooltip content="清單檢視">
@@ -286,9 +282,7 @@ export default function ProjectsPage() {
                   onPress={() => setViewMode("list")}
                   aria-label="清單檢視"
                 >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M3 6h18M3 12h18M3 18h18"/>
-                  </svg>
+                  <FontAwesomeIcon icon={faList} />
                 </Button>
               </Tooltip>
             </ButtonGroup>
@@ -319,7 +313,7 @@ export default function ProjectsPage() {
 
           <Card shadow="sm" className="mt-6">
             <CardBody className="gap-2">
-              <span className="text-2xl">⭐</span>
+              <FontAwesomeIcon icon={faStar} className="text-2xl text-warning" />
               <p className="text-tiny text-default-500 leading-snug">
                 點擊任一專案的星號圖示，即可從這裡輕鬆找到。
               </p>
@@ -338,7 +332,7 @@ export default function ProjectsPage() {
           {!isLoading && all.length === 0 && (
             <Card shadow="none" className="border-2 border-dashed border-divider">
               <CardBody className="py-16 items-center text-center gap-3">
-                <span className="text-4xl">📁</span>
+                <FontAwesomeIcon icon={faFolderOpen} className="text-4xl text-default-300" />
                 <p className="text-medium font-medium">還沒有專案</p>
                 <p className="text-small text-default-500">
                   從首頁選個任務範本，或從網路萃取一個全新的任務範本開始。
@@ -370,8 +364,8 @@ export default function ProjectsPage() {
           <div className="mb-10">
             <SectionHeader title="資料夾" subtitle="2 個" />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              <FolderTile glyph="☁" label="上傳" hint="尚未有資料" />
-              <FolderTile glyph="⭐" label="已加星號" hint="尚未有資料" />
+              <FolderTile icon={faCloudArrowUp} label="上傳" hint="尚未有資料" />
+              <FolderTile icon={faStar} label="已加星號" hint="尚未有資料" />
             </div>
           </div>
 
@@ -449,14 +443,14 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
 
 /* ─────────────────────────── Folder tile ─────────────────────────── */
 
-function FolderTile({ glyph, label, hint }: { glyph: string; label: string; hint: string }) {
+function FolderTile({ icon, label, hint }: { icon: any; label: string; hint: string }) {
   return (
     <Card isPressable isHoverable shadow="sm" className="overflow-hidden">
       <div
         className="relative w-full flex items-center justify-center bg-default-100"
         style={{ aspectRatio: "5 / 3" }}
       >
-        <span className="text-4xl text-default-500">{glyph}</span>
+        <FontAwesomeIcon icon={icon} className="text-4xl text-default-500" />
       </div>
       <CardBody className="p-3 gap-0.5">
         <p className="text-small font-medium leading-snug">{label}</p>
@@ -505,18 +499,12 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
         <Tooltip content="收藏">
           <Button isIconOnly size="sm" radius="full" variant="flat" aria-label="收藏" onClick={(e) => e.stopPropagation()}>
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
+            <FontAwesomeIcon icon={faBookmark} />
           </Button>
         </Tooltip>
         <Tooltip content="更多">
           <Button isIconOnly size="sm" radius="full" variant="flat" aria-label="更多" onClick={(e) => e.stopPropagation()}>
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-              <circle cx="5" cy="12" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="19" cy="12" r="1.6" />
-            </svg>
+            <FontAwesomeIcon icon={faEllipsis} />
           </Button>
         </Tooltip>
       </div>
@@ -563,11 +551,7 @@ function FilterDropdown({
   value: string;
   onSelect: (v: string) => void;
 }) {
-  const chevron = (
-    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
+  const chevron = <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />;
   return (
     <Dropdown placement="bottom-start">
       <DropdownTrigger>
@@ -601,9 +585,7 @@ function CreateMenu({
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
         <Button isIconOnly color="primary" radius="full" aria-label="新增項目">
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
+          <FontAwesomeIcon icon={faPlus} />
         </Button>
       </DropdownTrigger>
       <DropdownMenu
@@ -644,14 +626,7 @@ function CreateMenu({
             <DropdownItem
               key={`sync:${s.id}`}
               description={s.hint}
-              startContent={
-                <Avatar
-                  name={s.glyph}
-                  size="sm"
-                  className="w-6 h-6 text-tiny"
-                  classNames={{ name: "text-tiny font-bold" }}
-                />
-              }
+              startContent={<FontAwesomeIcon icon={s.icon} className="text-medium w-5" />}
             >
               {s.label}
             </DropdownItem>

@@ -27,6 +27,11 @@ import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Avatar, Badge, Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Skeleton } from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMagnifyingGlass, faChevronDown, faArrowDownWideShort, faArrowUpWideShort,
+  faTableCells, faList, faBookmark, faEllipsis,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface MissionRow {
   id: number;
@@ -410,12 +415,7 @@ export default function MissionsHome() {
               isClearable
               onClear={() => setSearchQ("")}
               placeholder="搜尋方法論、任務、最近的工作"
-              startContent={
-                <svg className="w-5 h-5 text-default-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="7.5" />
-                  <path d="M21 21l-4.35-4.35" />
-                </svg>
-              }
+              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
             />
 
             {/* Filter pills under search bar — Canva style */}
@@ -513,27 +513,13 @@ export default function MissionsHome() {
               title={sortDesc ? "新→舊" : "舊→新"}
               onClick={() => setSortDesc((v) => !v)}
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 4v16M7 4l-3 3M7 4l3 3" />
-                <path d="M17 20V4M17 20l-3-3M17 20l3-3" style={{ opacity: sortDesc ? 1 : 0.4 }} />
-              </svg>
+              <FontAwesomeIcon icon={sortDesc ? faArrowDownWideShort : faArrowUpWideShort} />
             </IconButton>
             <IconButton
               title={viewMode === "grid" ? "切換為列表" : "切換為網格"}
               onClick={() => setViewMode((v) => (v === "grid" ? "list" : "grid"))}
             >
-              {viewMode === "grid" ? (
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-                  <rect x="4" y="4" width="7" height="7" rx="1" />
-                  <rect x="13" y="4" width="7" height="7" rx="1" />
-                  <rect x="4" y="13" width="7" height="7" rx="1" />
-                  <rect x="13" y="13" width="7" height="7" rx="1" />
-                </svg>
-              )}
+              <FontAwesomeIcon icon={viewMode === "grid" ? faList : faTableCells} />
             </IconButton>
           </div>
         </div>
@@ -748,16 +734,10 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
       {/* Hover action — bookmark + ⋯ menu (Canva pattern) */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
         <ThumbAction title="收藏" onClick={(e) => { e.stopPropagation(); /* TODO: bookmark */ }}>
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-          </svg>
+          <FontAwesomeIcon icon={faBookmark} />
         </ThumbAction>
         <ThumbAction title="更多" onClick={(e) => { e.stopPropagation(); /* TODO: menu */ }}>
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-            <circle cx="5" cy="12" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="19" cy="12" r="1.6" />
-          </svg>
+          <FontAwesomeIcon icon={faEllipsis} />
         </ThumbAction>
       </div>
     </div>
@@ -843,11 +823,7 @@ function FilterChip({
   onClick?: () => void;
   onSelect?: (v: string) => void;
 }) {
-  const chevron = (
-    <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
+  const chevron = <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />;
 
   if (!options) {
     return (
