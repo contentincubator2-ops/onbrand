@@ -39,13 +39,26 @@ const RAIL_ITEMS: Array<{ key: RailKey; label: string; glyph: string }> = [
 ];
 
 const CHANNEL_OPTIONS = [
-  { key: "facebook",  label: "Facebook",  glyph: "f" },
+  { key: "facebook",  label: "Facebook",  glyph: "f"  },
   { key: "instagram", label: "Instagram", glyph: "IG" },
   { key: "linkedin",  label: "LinkedIn",  glyph: "in" },
-  { key: "youtube",   label: "YouTube",   glyph: "▶" },
+  { key: "youtube",   label: "YouTube",   glyph: "▶"  },
   { key: "pr",        label: "公關",      glyph: "PR" },
-  { key: "email",     label: "電子報",    glyph: "✉" },
+  { key: "email",     label: "電子報",    glyph: "✉"  },
 ];
+
+/**
+ * Channel match aliases — squads tag themselves with various spellings.
+ * Tests against squad.workspace[] (string[]), squad.tags[], slug, and name.
+ */
+const CHANNEL_ALIASES: Record<string, string[]> = {
+  facebook:  ["facebook", "fb", "meta-fb", "fb-page", "fb-ads"],
+  instagram: ["instagram", "ig", "ig-reels", "ig-feed"],
+  linkedin:  ["linkedin", "li", "linkedin-post"],
+  youtube:   ["youtube", "yt", "shorts", "yt-shorts"],
+  pr:        ["pr", "public-relations", "media-relations", "press"],
+  email:     ["email", "edm", "newsletter", "mailer"],
+};
 
 const LAYER_OPTIONS: MosLayer[] = ["L1", "L2", "L3", "L4", "L5", "L6"];
 
@@ -95,10 +108,21 @@ export default function PickerWorkspace() {
         const lk = (s.strategyLayer ?? "").toString().slice(0, 2);
         if (lk !== layerFilter) return false;
       }
-      // Channel filter (workspace)
+      // Channel filter (workspace) — match against any of:
+      //   workspace[] · tags[] · slug · name (zh+en)
+      // using alias list so "fb" / "facebook" / "FB" / "FB-Ads" all match.
       if (channelFilter !== "all") {
-        const ws = Array.isArray(s.workspace) ? s.workspace : [s.workspace];
-        if (!ws.some((w: string) => (w ?? "").toLowerCase() === channelFilter)) return false;
+        const aliases = CHANNEL_ALIASES[channelFilter] ?? [channelFilter];
+        const wsArr = Array.isArray(s.workspace) ? s.workspace : (s.workspace ? [s.workspace] : []);
+        const tagArr = Array.isArray(s.tags) ? s.tags : [];
+        const channelHaystack = [
+          ...wsArr,
+          ...tagArr,
+          s.slug,
+          pickLocaleText(s.name, "en"),
+          pickLocaleText(s.name, "zh-TW"),
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!aliases.some((a) => channelHaystack.includes(a))) return false;
       }
       // Text search
       if (ql) {
@@ -233,7 +257,13 @@ export default function PickerWorkspace() {
                 type="text"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="描述你的行銷需求或搜尋方法論…"
+                placeholder={
+                  channelFilter !== "all"
+                    ? `描述你的 ${CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label ?? ""} 詳細需求…`
+                    : layerFilter !== "ALL"
+                      ? `描述你的 ${LAYER_TOKENS[layerFilter].label} 詳細需求…`
+                      : "描述你的行銷需求或搜尋方法論…"
+                }
                 className="w-full pl-9 pr-9 py-2.5 text-[0.84rem] bg-mos-cream border border-mos-hair rounded-full focus:outline-none focus:border-mos-orange focus:ring-2 focus:ring-mos-orange/20 transition"
               />
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mos-muted pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -264,16 +294,19 @@ export default function PickerWorkspace() {
             </div>
           </div>
 
-          {/* Sub-filter row (varies by rail) */}
-          {rail === "channels" && (
+          {/* Sub-filter row (varies by rail).
+              When a channel is locked (came in via a channel quick tile),
+              suppress the cross-layer pill row — Canva keeps the picker
+              focused on the chosen category. */}
+          {rail === "channels" && channelFilter === "all" && (
             <div className="px-3 pt-2 pb-1 flex flex-wrap gap-1.5">
               <RailPill active={channelFilter === "all"} onClick={() => setChannelFilter("all")}>全部</RailPill>
               {CHANNEL_OPTIONS.map((c) => (
-                <RailPill key={c.key} active={channelFilter === c.key} onClick={() => setChannelFilter(c.key)}>{c.label}</RailPill>
+                <RailPill key={c.key} active={(channelFilter as string) === c.key} onClick={() => setChannelFilter(c.key)}>{c.label}</RailPill>
               ))}
             </div>
           )}
-          {rail === "layers" && (
+          {rail === "layers" && channelFilter === "all" && (
             <div className="px-3 pt-2 pb-1 flex flex-wrap gap-1.5">
               <RailPill active={layerFilter === "ALL"} onClick={() => setLayerFilter("ALL")}>全部</RailPill>
               {LAYER_OPTIONS.map((l) => (
@@ -286,6 +319,23 @@ export default function PickerWorkspace() {
                   {l}・{LAYER_TOKENS[l].label}
                 </RailPill>
               ))}
+            </div>
+          )}
+          {/* When channel is locked, show a single dismissable badge */}
+          {channelFilter !== "all" && (
+            <div className="px-3 pt-2 pb-1 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] bg-mos-ink text-white rounded-full">
+                {CHANNEL_OPTIONS.find((c) => c.key === channelFilter)?.label}
+                <button
+                  onClick={() => setChannelFilter("all")}
+                  aria-label="清除通路篩選"
+                  className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full hover:bg-white/20"
+                >
+                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
             </div>
           )}
 
