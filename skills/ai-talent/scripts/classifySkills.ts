@@ -32,12 +32,17 @@ const batchArg = process.argv.find((a) => a.startsWith("--batch="));
 const BATCH = Math.min(50, batchArg ? parseInt(batchArg.split("=")[1] ?? "25", 10) : 25);
 const SAMPLE = process.argv.includes("--sample");
 
-// ── Azure Foundry (gpt-4o-mini) ────────────────────────────────────────────
-const AZURE_KEY = process.env.AZURE_AI_API_KEY ?? "";
-const AZURE_ENDPOINT = (process.env.AZURE_AI_ENDPOINT ?? "https://sowork-foundry-claw-api-router.services.ai.azure.com").replace(/\/+$/, "");
-const AZURE_DEPLOYMENT = "gpt-4o-mini";
+// ── Azure Foundry (single source: VM .env AZURE_FOUNDRY_*) ────────────────
+// Falls back to legacy AZURE_AI_* for back-compat. Prefer the FOUNDRY ones.
+const AZURE_KEY = process.env.AZURE_FOUNDRY_API_KEY ?? process.env.AZURE_AI_API_KEY ?? "";
+const AZURE_ENDPOINT = (
+  process.env.AZURE_FOUNDRY_PROJECT_ENDPOINT ??
+  process.env.AZURE_AI_ENDPOINT ??
+  "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law"
+).replace(/\/+$/, "");
+const AZURE_DEPLOYMENT = process.env.AZURE_FOUNDRY_MODEL ?? "gpt-4o-mini";
 
-if (!AZURE_KEY) { console.error("Missing AZURE_AI_API_KEY"); process.exit(2); }
+if (!AZURE_KEY) { console.error("Missing AZURE_FOUNDRY_API_KEY (or legacy AZURE_AI_API_KEY)"); process.exit(2); }
 
 // ── Model pool — what the user actually has access to. ────────────────────
 //

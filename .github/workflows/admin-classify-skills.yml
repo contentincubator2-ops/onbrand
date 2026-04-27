@@ -40,14 +40,12 @@ jobs:
           LIMIT:  ${{ github.event.inputs.limit }}
           BATCH:  ${{ github.event.inputs.batch }}
           RECLS:  ${{ github.event.inputs.reclassify }}
-          AZURE_AI_API_KEY:  ${{ secrets.AZURE_AI_API_KEY }}
-          AZURE_AI_ENDPOINT: ${{ secrets.AZURE_AI_ENDPOINT }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 1800s
-          envs: GH_TOKEN,SAMPLE,LIMIT,BATCH,RECLS,AZURE_AI_API_KEY,AZURE_AI_ENDPOINT
+          envs: GH_TOKEN,SAMPLE,LIMIT,BATCH,RECLS
           script: |
             set -e
             APP=/opt/marketing-os/app
