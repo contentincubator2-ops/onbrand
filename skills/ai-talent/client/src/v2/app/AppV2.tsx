@@ -34,6 +34,7 @@ import MissionsHome from "../pages/MissionsHome";
 import MissionDetail from "../pages/MissionDetail";
 import MethodologyCatalog from "../pages/MethodologyCatalog";
 import MethodologyDetail from "../pages/MethodologyDetail";
+import PickerWorkspace from "../pages/PickerWorkspace";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
@@ -59,6 +60,16 @@ export default function AppV2() {
           element={
             <RequireAuthV2>
               <OnboardingWizard onComplete={() => (window.location.href = "/")} />
+            </RequireAuthV2>
+          }
+        />
+
+        {/* Picker — full-screen workspace, no shell chrome (Canva-style new tab) */}
+        <Route
+          path="/picker"
+          element={
+            <RequireAuthV2>
+              <PickerWorkspace />
             </RequireAuthV2>
           }
         />

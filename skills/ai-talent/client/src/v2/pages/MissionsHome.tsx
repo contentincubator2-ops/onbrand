@@ -251,23 +251,16 @@ export default function MissionsHome() {
     if (t.isMore) { navigate("/templates"); return; }
     if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
     if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-    setError(null);
-    setCreatingTpl(t.label);
-    try {
-      const res = await createMission.mutateAsync({
-        title: t.missionTitle,
-        description: t.missionDesc || undefined,
-        squadSlug: t.squadSlug,
-        workspace: t.workspace ?? "",
-        brandId: brandId ?? undefined,
-      });
-      if (!res?.id) throw new Error("後端沒有回傳 mission id");
-      const ws = t.workspace || "_";
-      navigate(brandId ? `/b/${brandId}/${ws}/m/${res.id}` : `/m/${res.id}`);
-    } catch (e: any) {
-      setError(`建立任務失敗：${e?.message ?? String(e)}`);
-      setCreatingTpl(null);
-    }
+    // ── Canva-style: open Picker workspace in a new tab.
+    // The picker is pre-filtered by workspace (channel) or layer, lets the
+    // user browse methodology squads + preview steps, then click 啟動 to
+    // create the mission and land in /m/:id.
+    const qs = new URLSearchParams();
+    if (t.workspace) qs.set("workspace", t.workspace);
+    if (t.layer) qs.set("layer", t.layer);
+    qs.set("title", t.missionTitle);
+    if (t.squadSlug) qs.set("slug", t.squadSlug);
+    window.open(`/picker?${qs.toString()}`, "_blank", "noopener");
   };
 
   const submitCustom = async () => {
