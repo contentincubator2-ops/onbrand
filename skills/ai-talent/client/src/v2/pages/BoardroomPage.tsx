@@ -113,8 +113,9 @@ function parsePitch(md: string): { problem: string; steps: string; deliverables:
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function BoardroomPage() {
-  const { currentBrand } = useOutletContext<ShellOutletCtx>() ?? ({} as ShellOutletCtx);
-  const brandId = currentBrand?.id;
+  const ctx = useOutletContext<ShellOutletCtx>() ?? ({} as ShellOutletCtx);
+  const brandId = ctx.brandId ?? undefined;
+  const currentBrand = (ctx.brands || []).find((b: any) => b?.id === ctx.brandId);
   const brandName = currentBrand?.name || "未指定品牌";
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
