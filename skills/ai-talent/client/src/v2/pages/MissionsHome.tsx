@@ -26,7 +26,7 @@ import { SquadEntityCard } from "../components/SquadEntityCard";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
-import { Button, Input, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
+import { Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
 
 interface MissionRow {
   id: number;
@@ -477,9 +477,11 @@ export default function MissionsHome() {
           />
         )}
         {error && !showCustom && (
-          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 text-[0.82rem] text-red-700 rounded">
-            {error}
-          </div>
+          <Card shadow="none" radius="md" className="mb-6 bg-danger-50 border border-danger-200">
+            <CardBody className="px-4 py-3 text-[0.82rem] text-danger-700">
+              {error}
+            </CardBody>
+          </Card>
         )}
 
         {/* Featured methodologies — layer nav + horizontal scroll */}
@@ -620,12 +622,15 @@ function SectionHeader({
     <div className="flex items-center justify-between mb-4">
       <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">{title}</h2>
       {cta && (
-        <button
-          onClick={onCtaClick}
-          className="text-[0.74rem] tracking-[0.06em] text-mos-muted hover:text-mos-ink transition"
+        <Button
+          size="sm"
+          variant="light"
+          radius="sm"
+          onPress={onCtaClick}
+          className="text-[0.74rem] tracking-[0.06em] text-mos-muted data-[hover=true]:text-mos-ink"
         >
           {cta}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -648,35 +653,41 @@ function LayerNav({
         const tone = isAll ? null : LAYER_TOKENS[l as MosLayer];
         const active = selected === l;
         return (
-          <button
+          <Button
             key={l}
-            onClick={() => onSelect(l)}
+            size="sm"
+            radius="sm"
+            variant={active ? "solid" : "bordered"}
+            onPress={() => onSelect(l)}
             className={[
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border transition",
-              "text-[0.74rem]",
+              "h-8 min-w-0 px-3 text-[0.74rem]",
               active
-                ? "bg-mos-ink text-white border-mos-ink"
-                : "bg-white text-mos-ink border-mos-hair hover:border-mos-ink",
+                ? "bg-mos-ink text-white"
+                : "bg-white text-mos-ink border-mos-hair data-[hover=true]:border-mos-ink",
             ].join(" ")}
-          >
-            {!isAll && (
+            startContent={
+              !isAll ? (
+                <span
+                  className="inline-block w-1.5 h-1.5 rounded-full"
+                  style={{ background: active ? "#fff" : tone!.bg }}
+                />
+              ) : undefined
+            }
+            endContent={
               <span
-                className="inline-block w-1.5 h-1.5 rounded-full"
-                style={{ background: active ? "#fff" : tone!.bg }}
-              />
-            )}
+                className={[
+                  "text-[0.66rem] tabular-nums",
+                  active ? "text-white/70" : "text-mos-muted",
+                ].join(" ")}
+              >
+                {counts[l] ?? 0}
+              </span>
+            }
+          >
             <span className="font-display tracking-[0.04em]">
               {isAll ? "全部" : `${l} · ${tone!.label}`}
             </span>
-            <span
-              className={[
-                "ml-0.5 text-[0.66rem] tabular-nums",
-                active ? "text-white/70" : "text-mos-muted",
-              ].join(" ")}
-            >
-              {counts[l] ?? 0}
-            </span>
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -695,12 +706,15 @@ function CircleTile({
 }) {
   const tone = tile.layer ? LAYER_TOKENS[tile.layer] : null;
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
+    <Button
+      onPress={onClick}
+      isDisabled={disabled}
+      variant="light"
+      radius="lg"
+      disableRipple
       className={[
-        "group relative flex flex-col items-center gap-2",
-        "w-[78px] py-2 px-1 rounded-lg transition",
+        "group relative flex flex-col items-center gap-2 h-auto",
+        "w-[78px] py-2 px-1 min-w-0",
         disabled && !busy ? "opacity-40 pointer-events-none" : "",
       ].join(" ")}
     >
@@ -740,13 +754,15 @@ function CircleTile({
       <span className="text-[0.7rem] text-mos-ink leading-tight text-center">
         {tile.label}
       </span>
-    </button>
+    </Button>
   );
 }
 
-/* ─────────────────────────── Featured squad tile ───────────────────── */
-
-function FeaturedSquadTile({
+/* ─────────────────────────── Featured squad tile (DEPRECATED) ─────────
+ * Replaced by SquadEntityCard. Kept commented-out below in case of revert.
+ * ──────────────────────────────────────────────────────────────────── */
+// @ts-ignore - dead code, kept for reference
+function _UnusedFeaturedSquadTile({
   squad, busy, disabled, onClick, onPreview,
 }: {
   squad: any;
@@ -920,9 +936,12 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
 
   return (
     <div className="group relative">
-      <button
-        onClick={onClick}
-        className="flex flex-col text-left bg-white border border-mos-hair rounded-sm overflow-hidden hover:border-mos-ink hover:-translate-y-0.5 transition-all duration-200 w-full"
+      <Card
+        isPressable
+        onPress={onClick}
+        shadow="none"
+        radius="sm"
+        className="flex flex-col text-left bg-white border border-mos-hair overflow-hidden data-[hover=true]:border-mos-ink data-[hover=true]:-translate-y-0.5 transition-all duration-200 w-full"
       >
         {/* Layer color band (top edge) */}
         {isLayerKnown && (
@@ -978,7 +997,7 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
             <span className="truncate">{updatedTxt}</span>
           </div>
         </div>
-      </button>
+      </Card>
       {/* Hover action — bookmark + ⋯ menu (Canva pattern) */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
         <ThumbAction title="收藏" onClick={(e) => { e.stopPropagation(); /* TODO: bookmark */ }}>
@@ -1002,13 +1021,19 @@ function ThumbAction({
   title, onClick, children,
 }: { title: string; onClick: (e: React.MouseEvent) => void; children: React.ReactNode }) {
   return (
-    <button
-      title={title}
-      onClick={onClick}
-      className="w-7 h-7 flex items-center justify-center bg-white/95 border border-mos-hair text-mos-ink hover:bg-white hover:border-mos-ink rounded-full shadow-sm transition"
-    >
-      {children}
-    </button>
+    <Tooltip content={title} radius="sm" size="sm">
+      <Button
+        isIconOnly
+        size="sm"
+        radius="full"
+        variant="bordered"
+        onClick={onClick}
+        aria-label={title}
+        className="w-7 h-7 min-w-0 bg-white/95 border-mos-hair text-mos-ink data-[hover=true]:border-mos-ink shadow-sm"
+      >
+        {children}
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -1019,9 +1044,12 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsBadge = WORKSPACE_BADGE[ws] ?? null;
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-4 px-4 py-3 hover:bg-mos-ink/[0.02] transition text-left"
+    <Card
+      isPressable
+      onPress={onClick}
+      shadow="none"
+      radius="none"
+      className="flex flex-row items-center gap-4 px-4 py-3 bg-transparent data-[hover=true]:bg-mos-ink/[0.02] transition text-left w-full"
     >
       <div
         className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
@@ -1051,7 +1079,7 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
           {wsBadge.glyph}
         </span>
       )}
-    </button>
+    </Card>
   );
 }
 
@@ -1166,50 +1194,65 @@ function CustomMissionForm({
   error: string | null;
 }) {
   return (
-    <div className="mb-8 border border-mos-ink bg-white p-6 rounded-xl shadow-card">
-      <div className="font-display text-[0.66rem] tracking-[0.28em] uppercase text-mos-soft mb-3">
-        CUSTOM MISSION · 自訂任務
-      </div>
-      <label className="block">
-        <span className="text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted">任務標題</span>
-        <input
+    <Card shadow="sm" radius="lg" className="mb-8 border border-mos-ink bg-white">
+      <CardBody className="p-6">
+        <div className="font-display text-[0.66rem] tracking-[0.28em] uppercase text-mos-soft mb-3">
+          CUSTOM MISSION · 自訂任務
+        </div>
+        <Input
           autoFocus
+          label="任務標題"
+          labelPlacement="outside"
           value={title}
-          onChange={(e) => onTitleChange(e.target.value)}
+          onValueChange={onTitleChange}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit(); }}
           placeholder="例如：4 月 SoWork 自有 FB 經營"
-          className="mt-2 w-full border border-mos-hair bg-white px-3 py-2.5 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded-lg"
+          radius="lg"
+          variant="bordered"
+          classNames={{
+            label: "text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted",
+            input: "text-[0.92rem] text-mos-ink",
+          }}
         />
-      </label>
-      <label className="block mt-4">
-        <span className="text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted">任務說明（選填）</span>
-        <textarea
+        <Textarea
+          label="任務說明（選填）"
+          labelPlacement="outside"
           value={desc}
-          onChange={(e) => onDescChange(e.target.value)}
-          rows={3}
+          onValueChange={onDescChange}
+          minRows={3}
           placeholder="說一下這個任務想達成什麼、給誰看、限制是什麼。"
-          className="mt-2 w-full border border-mos-hair bg-white px-3 py-2.5 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded-lg"
+          radius="lg"
+          variant="bordered"
+          className="mt-4"
+          classNames={{
+            label: "text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted",
+            input: "text-[0.92rem] text-mos-ink",
+          }}
         />
-      </label>
-      {error && (
-        <div className="mt-3 text-[0.78rem] text-red-600 whitespace-pre-wrap">{error}</div>
-      )}
-      <div className="mt-5 flex gap-3 justify-end">
-        <button
-          onClick={onCancel}
-          disabled={busy}
-          className="px-5 py-2.5 text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted hover:text-mos-ink transition disabled:opacity-40"
-        >
-          取消
-        </button>
-        <button
-          onClick={onSubmit}
-          disabled={busy || !title.trim()}
-          className="px-5 py-2.5 text-[0.72rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
-        >
-          {busy ? "建立中…" : "建立任務 →"}
-        </button>
-      </div>
-    </div>
+        {error && (
+          <div className="mt-3 text-[0.78rem] text-danger-600 whitespace-pre-wrap">{error}</div>
+        )}
+        <div className="mt-5 flex gap-3 justify-end">
+          <Button
+            variant="light"
+            radius="lg"
+            onPress={onCancel}
+            isDisabled={busy}
+            className="px-5 text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted data-[hover=true]:text-mos-ink"
+          >
+            取消
+          </Button>
+          <Button
+            radius="lg"
+            onPress={onSubmit}
+            isDisabled={busy || !title.trim()}
+            isLoading={busy}
+            className="px-5 text-[0.72rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
+          >
+            {busy ? "建立中…" : "建立任務 →"}
+          </Button>
+        </div>
+      </CardBody>
+    </Card>
   );
 }

@@ -21,7 +21,7 @@
 import { LAYER_TOKENS, resolveLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
-import { Card, Button, Chip } from "@heroui/react";
+import { Button, Card, CardBody, CardFooter, Chip } from "@heroui/react";
 
 // ── Eye icon (replaces v2's Trash2) ────────────────────────────────────────
 function EyeIcon({ className = "h-4 w-4" }: { className?: string }) {
@@ -111,7 +111,7 @@ export function SquadEntityCard({
       ].join(" ")}
     >
       {/* 卡片頂部 */}
-      <div className="p-6 pb-4">
+      <CardBody className="p-6 pb-4">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 min-w-0">
             <div
@@ -174,10 +174,10 @@ export function SquadEntityCard({
             </div>
           </div>
         </div>
-      </div>
+      </CardBody>
 
       {/* 操作按鈕區 */}
-      <div className="px-6 pb-6 flex gap-2">
+      <CardFooter className="px-6 pb-6 flex gap-2">
         <Button
           color="primary"
           radius="full"
@@ -200,7 +200,7 @@ export function SquadEntityCard({
         >
           {labels.report}
         </Button>
-      </div>
+      </CardFooter>
     </Card>
   );
 }
