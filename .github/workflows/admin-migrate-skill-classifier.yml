@@ -1,0 +1,63 @@
+name: Admin — Migrate skill classifier columns
+
+# Adds:
+#   skills.task_type           VARCHAR(32) — text|image|audio|video|search|code|multimodal|embedding
+#   skills.recommended_models  JSON         — primary picks per LLM judge
+#   skills.alternative_models  JSON         — also workable
+#   skills.unsuitable_models   JSON         — explicitly bad fit
+#   skills.classified_at       TIMESTAMP    — when classifier last ran on this row
+#
+# tested_models stays as the legacy / static-ingest-default informational
+# field. recommended_models will be the canonical "what should run this".
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            set -a; source "$ENV_FILE"; set +a
+            DB_HOST="${DB_HOST:-127.0.0.1}"; DB_USER="${DB_USER:-root}"; DB_NAME="${DB_NAME:-mos_db}"
+
+            run_sql() { MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$1"; }
+            has_col() {
+              MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='$DB_NAME' AND table_name='$1' AND column_name='$2'" "$DB_NAME"
+            }
+
+            for COL_AND_DEF in \
+              "task_type|VARCHAR(32) DEFAULT NULL" \
+              "recommended_models|JSON DEFAULT NULL" \
+              "alternative_models|JSON DEFAULT NULL" \
+              "unsuitable_models|JSON DEFAULT NULL" \
+              "classified_at|TIMESTAMP NULL DEFAULT NULL"
+            do
+              COL=$(echo "$COL_AND_DEF" | cut -d'|' -f1)
+              DEF=$(echo "$COL_AND_DEF" | cut -d'|' -f2)
+              if [ "$(has_col skills $COL)" = "0" ]; then
+                run_sql "ALTER TABLE skills ADD COLUMN $COL $DEF;"
+                echo "  + added $COL"
+              else
+                echo "  = $COL exists"
+              fi
+            done
+
+            # Index on task_type for filter queries
+            HAS_IDX=$(MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+              "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='$DB_NAME' AND table_name='skills' AND index_name='idx_skills_task_type'" "$DB_NAME")
+            if [ "$HAS_IDX" = "0" ]; then
+              run_sql "ALTER TABLE skills ADD INDEX idx_skills_task_type (task_type);"
+              echo "  + added idx_skills_task_type"
+            fi
+
+            run_sql "DESCRIBE skills" | grep -E "task_type|recommended_models|alternative_models|unsuitable_models|classified_at"
