@@ -80,15 +80,14 @@ export default function ShellLayout() {
         <header className="border-b border-mos-hair bg-white sticky top-0 z-30">
           <div className="px-6 h-14 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Tooltip content="切換側邊欄" radius="sm" size="sm">
+              <Tooltip content="切換側邊欄">
                 <Button
                   isIconOnly
                   size="sm"
                   variant="light"
-                  radius="sm"
                   onPress={toggleCollapsed}
                   aria-label="切換側邊欄"
-                  className="lg:hidden text-mos-muted data-[hover=true]:text-mos-ink"
+                  className="lg:hidden"
                 >
                   <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18M3 12h18M3 18h18" />
@@ -98,9 +97,7 @@ export default function ShellLayout() {
               <Button
                 size="sm"
                 variant="light"
-                radius="sm"
                 onPress={() => navigate("/")}
-                className="font-display text-[0.7rem] tracking-[0.24em] uppercase text-mos-ink data-[hover=true]:text-mos-teal-ink"
               >
                 SOWORK · Marketing OS
               </Button>
@@ -115,13 +112,11 @@ export default function ShellLayout() {
               <Button
                 size="sm"
                 variant="light"
-                radius="sm"
                 onPress={async () => {
                   try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); }
                   catch {}
                   window.location.href = "/auth/login";
                 }}
-                className="text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted data-[hover=true]:text-mos-ink"
               >
                 登出
               </Button>
@@ -254,15 +249,13 @@ function Sidebar({
           SO
         </div>
         {!collapsed && (
-          <Tooltip content="收合側邊欄" radius="sm" size="sm" placement="right">
+          <Tooltip content="收合側邊欄" placement="right">
             <Button
               isIconOnly
               size="sm"
               variant="light"
-              radius="sm"
               onPress={onToggle}
               aria-label="收合側邊欄"
-              className="text-mos-muted data-[hover=true]:text-mos-ink"
             >
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 6l-6 6 6 6" />
@@ -276,14 +269,10 @@ function Sidebar({
       <div className="p-3 shrink-0">
         <Button
           color="primary"
-          radius="lg"
+          variant="solid"
           onPress={() => onNavigate("/")}
           isIconOnly={collapsed}
           fullWidth={!collapsed}
-          className={[
-            "h-10 font-medium",
-            collapsed ? "" : "justify-start px-3",
-          ].join(" ")}
           aria-label="建立任務"
           startContent={
             !collapsed ? (
@@ -298,7 +287,7 @@ function Sidebar({
               <path d="M12 5v14M5 12h14" />
             </svg>
           ) : (
-            <span className="text-[0.82rem]">建立任務</span>
+            "建立任務"
           )}
         </Button>
       </div>
@@ -323,44 +312,46 @@ function Sidebar({
           );
         })}
 
-        {/* Show-more (collapsed shows ⋯, expanded shows full label) */}
+        {/* Show-more */}
         <Button
           variant="light"
-          radius="lg"
           fullWidth
-          disableRipple
           aria-label="顯示更多"
-          className={[
-            "mt-1 text-mos-muted data-[hover=true]:text-mos-ink data-[hover=true]:bg-mos-ink/[0.04]",
-            collapsed ? "h-12 flex-col gap-1 px-0 min-w-0" : "h-10 justify-start px-3 gap-3",
-          ].join(" ")}
+          className={collapsed ? "mt-1 flex-col gap-1 h-auto py-2" : "mt-1 justify-start"}
+          startContent={
+            !collapsed ? (
+              <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="currentColor">
+                <circle cx="5" cy="12" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="19" cy="12" r="1.6" />
+              </svg>
+            ) : undefined
+          }
         >
-          <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="currentColor">
-            <circle cx="5" cy="12" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="19" cy="12" r="1.6" />
-          </svg>
           {collapsed ? (
-            <span className="text-[0.58rem] leading-none">更多</span>
-          ) : (
-            <span className="text-[0.82rem]">顯示更多</span>
-          )}
+            <>
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+                <circle cx="5" cy="12" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="19" cy="12" r="1.6" />
+              </svg>
+              <span className="text-tiny">更多</span>
+            </>
+          ) : "顯示更多"}
         </Button>
       </nav>
 
       {/* Bottom: collapse toggle when collapsed */}
       {collapsed && (
         <div className="p-2 border-t border-mos-hair shrink-0">
-          <Tooltip content="展開側邊欄" radius="sm" size="sm" placement="right">
+          <Tooltip content="展開側邊欄" placement="right">
             <Button
               isIconOnly
               size="sm"
               variant="light"
-              radius="lg"
               fullWidth
               onPress={onToggle}
               aria-label="展開側邊欄"
-              className="h-9 text-mos-muted data-[hover=true]:text-mos-ink"
             >
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 6l6 6-6 6" />
@@ -384,40 +375,32 @@ function SidebarNavLink({
   const inner = (
     <Button
       onPress={onClick}
-      variant="light"
-      radius="lg"
+      variant={active ? "flat" : "light"}
+      color={active ? "primary" : "default"}
       fullWidth
-      disableRipple
       aria-label={item.label}
-      className={[
-        "relative mt-1 min-w-0",
-        active
-          ? "bg-mos-ink/[0.06] text-mos-ink"
-          : "text-mos-muted data-[hover=true]:text-mos-ink data-[hover=true]:bg-mos-ink/[0.04]",
-        collapsed
-          ? "h-12 flex-col gap-1 px-0"
-          : "h-10 justify-start gap-3 px-3",
-      ].join(" ")}
+      className={collapsed ? "mt-1 flex-col gap-1 h-auto py-2" : "mt-1 justify-start"}
+      startContent={
+        !collapsed ? (
+          <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+            {item.icon}
+          </span>
+        ) : undefined
+      }
     >
-      {active && (
-        <span
-          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-primary"
-          aria-hidden
-        />
-      )}
-      <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-        {item.icon}
-      </span>
       {collapsed ? (
-        <span className="text-[0.58rem] leading-none">{item.label}</span>
-      ) : (
-        <span className="text-[0.82rem]">{item.label}</span>
-      )}
+        <>
+          <span className="w-5 h-5 flex items-center justify-center">
+            {item.icon}
+          </span>
+          <span className="text-tiny">{item.label}</span>
+        </>
+      ) : item.label}
     </Button>
   );
 
   return collapsed ? (
-    <Tooltip content={item.label} radius="sm" size="sm" placement="right">
+    <Tooltip content={item.label} placement="right">
       {inner}
     </Tooltip>
   ) : inner;

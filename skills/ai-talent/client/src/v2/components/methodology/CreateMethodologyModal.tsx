@@ -506,17 +506,17 @@ export default function CreateMethodologyModal({
             )}
 
             {phase === "error" && (
-              <Card shadow="none" radius="md" className="border border-danger bg-white max-w-[640px]">
-                <CardBody className="p-5">
-                  <div className="text-[0.62rem] tracking-[0.28em] uppercase text-danger">
-                    ERROR
-                  </div>
-                  <div className="mt-1 text-[0.86rem] text-mos-body">{error}</div>
+              <Card shadow="none" className="border border-danger max-w-[640px]">
+                <CardBody className="p-5 gap-2">
+                  <h4 className="text-small font-semibold uppercase tracking-wider text-danger">
+                    Error
+                  </h4>
+                  <p className="text-small">{error}</p>
                   <Button
-                    variant="bordered"
-                    radius="sm"
+                    color="danger"
+                    variant="flat"
                     onPress={() => { setPhase("input"); setError(null); setJobId(null); }}
-                    className="mt-4 px-4 text-[0.7rem] tracking-[0.18em] uppercase border-mos-ink text-mos-ink data-[hover=true]:bg-mos-ink data-[hover=true]:text-white"
+                    className="mt-2 self-start"
                   >
                     重試
                   </Button>
@@ -593,11 +593,11 @@ function SourcePane({
           先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。
         </div>
         <Button
-          radius="sm"
+          color="primary"
           onPress={() => { onClose(); window.location.assign("/templates?new=blank"); }}
-          className="px-5 py-3 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
+          endContent={<span aria-hidden>→</span>}
         >
-          建立空白任務範本 →
+          建立空白任務範本
         </Button>
       </div>
     );
@@ -612,21 +612,19 @@ function SourcePane({
           onValueChange={setUrl}
           onKeyDown={(e) => { if (e.key === "Enter") onSubmitUrl(); }}
           placeholder={source.placeholder}
-          radius="sm"
           variant="bordered"
-          classNames={{ input: "text-[0.92rem] text-mos-ink", inputWrapper: "bg-white border-mos-hair" }}
         />
         {source.hint && (
-          <div className="text-[0.74rem] text-mos-muted">{source.hint}</div>
+          <p className="text-small text-default-500">{source.hint}</p>
         )}
         <Button
-          radius="sm"
+          color="primary"
           fullWidth
           onPress={onSubmitUrl}
           isDisabled={!url.trim()}
-          className="py-3 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
+          endContent={<span aria-hidden>→</span>}
         >
-          開始抽取 →
+          開始抽取
         </Button>
       </div>
     );
@@ -704,12 +702,11 @@ function SourcePane({
           onValueChange={setText}
           placeholder={source.placeholder}
           minRows={14}
-          radius="sm"
           variant="bordered"
-          classNames={{ input: "text-[0.86rem] text-mos-ink font-mono", inputWrapper: "bg-white border-mos-hair" }}
+          classNames={{ input: "font-mono" }}
         />
         {source.hint && (
-          <div className="text-[0.74rem] text-mos-muted">{source.hint}</div>
+          <p className="text-small text-default-500">{source.hint}</p>
         )}
         {!source.ready && (
           <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded text-[0.78rem] text-mos-muted">
@@ -720,12 +717,7 @@ function SourcePane({
             {" "}抽取相同內容。
           </div>
         )}
-        <Button
-          radius="sm"
-          fullWidth
-          isDisabled
-          className="py-3 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink/40 text-white"
-        >
+        <Button color="primary" fullWidth isDisabled>
           開始抽取（敬請期待）
         </Button>
       </div>
@@ -984,10 +976,6 @@ function ReviewPane({
   onBack: () => void;
   onCommit: () => void;
 }) {
-  const inputCommon = {
-    radius: "sm" as const,
-    variant: "bordered" as const,
-  };
   const updateStep = (i: number, patch: Partial<ExtractedMethodology["steps"][number]>) => {
     const next = [...draft.steps];
     next[i] = { ...next[i], ...patch };
@@ -995,106 +983,80 @@ function ReviewPane({
   };
   return (
     <div className="max-w-[720px] space-y-4">
-      <DraftField label="名稱" required>
-        <Input
-          {...inputCommon}
-          value={draft.name}
-          onValueChange={(v) => setDraft({ ...draft, name: v })}
-          classNames={{ input: "text-[0.92rem] text-mos-ink", inputWrapper: "bg-white border-mos-hair" }}
-        />
-      </DraftField>
+      <Input
+        label="名稱"
+        labelPlacement="outside"
+        isRequired
+        variant="bordered"
+        value={draft.name}
+        onValueChange={(v) => setDraft({ ...draft, name: v })}
+      />
       <div className="grid grid-cols-2 gap-3">
-        <DraftField label="作者">
-          <Input
-            {...inputCommon}
-            value={draft.author ?? ""}
-            onValueChange={(v) => setDraft({ ...draft, author: v })}
-            classNames={{ input: "text-[0.86rem]", inputWrapper: "bg-white border-mos-hair" }}
-          />
-        </DraftField>
-        <DraftField label="年份">
-          <Input
-            {...inputCommon}
-            value={draft.year ?? ""}
-            onValueChange={(v) => setDraft({ ...draft, year: v })}
-            classNames={{ input: "text-[0.86rem]", inputWrapper: "bg-white border-mos-hair" }}
-          />
-        </DraftField>
-      </div>
-      <DraftField label="說明">
-        <Textarea
-          {...inputCommon}
-          value={draft.description ?? ""}
-          onValueChange={(v) => setDraft({ ...draft, description: v })}
-          minRows={3}
-          classNames={{ input: "text-[0.86rem] text-mos-body", inputWrapper: "bg-white border-mos-hair" }}
+        <Input
+          label="作者"
+          labelPlacement="outside"
+          variant="bordered"
+          value={draft.author ?? ""}
+          onValueChange={(v) => setDraft({ ...draft, author: v })}
         />
-      </DraftField>
-      <DraftField label={`步驟 (${draft.steps.length})`}>
+        <Input
+          label="年份"
+          labelPlacement="outside"
+          variant="bordered"
+          value={draft.year ?? ""}
+          onValueChange={(v) => setDraft({ ...draft, year: v })}
+        />
+      </div>
+      <Textarea
+        label="說明"
+        labelPlacement="outside"
+        variant="bordered"
+        value={draft.description ?? ""}
+        onValueChange={(v) => setDraft({ ...draft, description: v })}
+        minRows={3}
+      />
+      <div>
+        <p className="text-small font-medium mb-2">步驟 ({draft.steps.length})</p>
         <div className="space-y-2">
           {draft.steps.map((s, i) => (
-            <Card key={i} shadow="none" radius="sm" className="border border-mos-hair bg-white">
-              <CardBody className="p-3 gap-1">
+            <Card key={i} shadow="none" className="border border-divider">
+              <CardBody className="p-3 gap-2">
                 <Input
-                  {...inputCommon}
+                  variant="bordered"
                   value={s.name}
                   onValueChange={(v) => updateStep(i, { name: v })}
-                  classNames={{ input: "text-[0.88rem] font-display text-mos-ink", inputWrapper: "bg-white border-mos-hair" }}
                 />
-                <div className="mt-1 grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Input
-                    {...inputCommon}
+                    variant="bordered"
+                    size="sm"
                     placeholder="所需技能"
                     value={s.requiredSkill ?? ""}
                     onValueChange={(v) => updateStep(i, { requiredSkill: v })}
-                    classNames={{ input: "text-[0.78rem] text-mos-muted", inputWrapper: "bg-white border-mos-hair" }}
                   />
                   <Input
-                    {...inputCommon}
+                    variant="bordered"
+                    size="sm"
                     placeholder="產出"
                     value={s.outputType ?? ""}
                     onValueChange={(v) => updateStep(i, { outputType: v })}
-                    classNames={{ input: "text-[0.78rem] text-mos-muted", inputWrapper: "bg-white border-mos-hair" }}
                   />
                 </div>
               </CardBody>
             </Card>
           ))}
         </div>
-      </DraftField>
+      </div>
 
-      <div className="flex items-center gap-3 pt-4 border-t border-mos-hair">
-        <Button
-          variant="bordered"
-          radius="sm"
-          onPress={onBack}
-          className="px-4 py-2.5 h-auto text-[0.7rem] tracking-[0.18em] uppercase border-mos-hair text-mos-muted data-[hover=true]:text-mos-ink data-[hover=true]:border-mos-ink"
-        >
-          ← 換來源
+      <div className="flex items-center gap-3 pt-4 border-t border-divider">
+        <Button variant="bordered" onPress={onBack} startContent={<span aria-hidden>←</span>}>
+          換來源
         </Button>
-        <Button
-          radius="sm"
-          onPress={onCommit}
-          className="flex-1 py-2.5 h-auto text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
-        >
-          確認新增任務範本 →
+        <Button color="primary" onPress={onCommit} fullWidth endContent={<span aria-hidden>→</span>}>
+          確認新增任務範本
         </Button>
       </div>
     </div>
   );
 }
 
-function DraftField({
-  label, children, required,
-}: {
-  label: string; children: React.ReactNode; required?: boolean;
-}) {
-  return (
-    <label className="block">
-      <div className="text-[0.62rem] tracking-[0.22em] uppercase text-mos-soft mb-1">
-        {label}{required && <span className="text-mos-red ml-1">*</span>}
-      </div>
-      {children}
-    </label>
-  );
-}

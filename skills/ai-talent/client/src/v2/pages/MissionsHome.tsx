@@ -348,21 +348,17 @@ export default function MissionsHome() {
         <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
           <Button
             size="sm"
-            radius="md"
             variant="bordered"
             onPress={() => navigate("/templates")}
-            startContent={<span aria-hidden className="text-primary">✦</span>}
-            className="text-[0.78rem]"
+            startContent={<span aria-hidden>✦</span>}
           >
             瀏覽方法論型錄
           </Button>
           <Button
             size="sm"
-            radius="md"
             color="primary"
             onPress={() => setCreateSource("recommended")}
-            startContent={<span aria-hidden>→</span>}
-            className="text-[0.78rem] font-medium"
+            endContent={<span aria-hidden>→</span>}
           >
             立即開新任務
           </Button>
@@ -393,12 +389,11 @@ export default function MissionsHome() {
               onClear={() => setSearchQ("")}
               placeholder="搜尋方法論、任務、最近的工作"
               startContent={
-                <svg className="w-5 h-5 text-default-400 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-5 h-5 text-default-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="7.5" />
                   <path d="M21 21l-4.35-4.35" />
                 </svg>
               }
-              classNames={{ inputWrapper: "bg-content1 shadow-small h-14", input: "text-[0.92rem]" }}
             />
 
             {/* Filter pills under search bar — Canva style */}
@@ -622,13 +617,7 @@ function SectionHeader({
     <div className="flex items-center justify-between mb-4">
       <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">{title}</h2>
       {cta && (
-        <Button
-          size="sm"
-          variant="light"
-          radius="sm"
-          onPress={onCtaClick}
-          className="text-[0.74rem] tracking-[0.06em] text-mos-muted data-[hover=true]:text-mos-ink"
-        >
+        <Button size="sm" variant="light" onPress={onCtaClick}>
           {cta}
         </Button>
       )}
@@ -656,15 +645,9 @@ function LayerNav({
           <Button
             key={l}
             size="sm"
-            radius="sm"
             variant={active ? "solid" : "bordered"}
+            color={active ? "primary" : "default"}
             onPress={() => onSelect(l)}
-            className={[
-              "h-8 min-w-0 px-3 text-[0.74rem]",
-              active
-                ? "bg-mos-ink text-white"
-                : "bg-white text-mos-ink border-mos-hair data-[hover=true]:border-mos-ink",
-            ].join(" ")}
             startContent={
               !isAll ? (
                 <span
@@ -674,19 +657,12 @@ function LayerNav({
               ) : undefined
             }
             endContent={
-              <span
-                className={[
-                  "text-[0.66rem] tabular-nums",
-                  active ? "text-white/70" : "text-mos-muted",
-                ].join(" ")}
-              >
+              <span className="text-tiny tabular-nums opacity-70">
                 {counts[l] ?? 0}
               </span>
             }
           >
-            <span className="font-display tracking-[0.04em]">
-              {isAll ? "全部" : `${l} · ${tone!.label}`}
-            </span>
+            {isAll ? "全部" : `${l} · ${tone!.label}`}
           </Button>
         );
       })}
@@ -1023,15 +999,14 @@ function ThumbAction({
   title, onClick, children,
 }: { title: string; onClick: (e: React.MouseEvent) => void; children: React.ReactNode }) {
   return (
-    <Tooltip content={title} radius="sm" size="sm">
+    <Tooltip content={title}>
       <Button
         isIconOnly
         size="sm"
         radius="full"
-        variant="bordered"
+        variant="flat"
         onClick={onClick}
         aria-label={title}
-        className="w-7 h-7 min-w-0 bg-white/95 border-mos-hair text-mos-ink data-[hover=true]:border-mos-ink shadow-sm"
       >
         {children}
       </Button>
@@ -1115,16 +1090,16 @@ function FilterChip({
 
   if (!options) {
     return (
-      <Button size="sm" radius="full" variant="bordered" onPress={onClick} endContent={chevron} className="text-[0.74rem]">
+      <Button size="sm" radius="full" variant="bordered" onPress={onClick} endContent={chevron}>
         {label}
       </Button>
     );
   }
 
   return (
-    <Dropdown placement="bottom-end" radius="sm">
+    <Dropdown placement="bottom-end">
       <DropdownTrigger>
-        <Button size="sm" radius="full" variant="bordered" endContent={chevron} className="text-[0.74rem] capitalize">
+        <Button size="sm" radius="full" variant="bordered" endContent={chevron} className="capitalize">
           {label}
         </Button>
       </DropdownTrigger>
@@ -1144,7 +1119,7 @@ function IconButton({
   title, onClick, children,
 }: { title: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <Tooltip content={title} radius="sm">
+    <Tooltip content={title}>
       <Button isIconOnly size="sm" radius="full" variant="bordered" onPress={onClick} aria-label={title}>
         {children}
       </Button>
@@ -1196,11 +1171,11 @@ function CustomMissionForm({
   error: string | null;
 }) {
   return (
-    <Card shadow="sm" radius="lg" className="mb-8 border border-mos-ink bg-white">
-      <CardBody className="p-6">
-        <div className="font-display text-[0.66rem] tracking-[0.28em] uppercase text-mos-soft mb-3">
-          CUSTOM MISSION · 自訂任務
-        </div>
+    <Card shadow="sm" className="mb-8">
+      <CardBody className="p-6 gap-4">
+        <h3 className="text-small font-semibold text-default-500 uppercase tracking-wider">
+          自訂任務
+        </h3>
         <Input
           autoFocus
           label="任務標題"
@@ -1209,12 +1184,7 @@ function CustomMissionForm({
           onValueChange={onTitleChange}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit(); }}
           placeholder="例如：4 月 SoWork 自有 FB 經營"
-          radius="lg"
           variant="bordered"
-          classNames={{
-            label: "text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted",
-            input: "text-[0.92rem] text-mos-ink",
-          }}
         />
         <Textarea
           label="任務說明（選填）"
@@ -1223,35 +1193,22 @@ function CustomMissionForm({
           onValueChange={onDescChange}
           minRows={3}
           placeholder="說一下這個任務想達成什麼、給誰看、限制是什麼。"
-          radius="lg"
           variant="bordered"
-          className="mt-4"
-          classNames={{
-            label: "text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted",
-            input: "text-[0.92rem] text-mos-ink",
-          }}
         />
         {error && (
-          <div className="mt-3 text-[0.78rem] text-danger-600 whitespace-pre-wrap">{error}</div>
+          <p className="text-small text-danger whitespace-pre-wrap">{error}</p>
         )}
-        <div className="mt-5 flex gap-3 justify-end">
-          <Button
-            variant="light"
-            radius="lg"
-            onPress={onCancel}
-            isDisabled={busy}
-            className="px-5 text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted data-[hover=true]:text-mos-ink"
-          >
+        <div className="flex gap-3 justify-end">
+          <Button variant="light" onPress={onCancel} isDisabled={busy}>
             取消
           </Button>
           <Button
-            radius="lg"
+            color="primary"
             onPress={onSubmit}
             isDisabled={busy || !title.trim()}
             isLoading={busy}
-            className="px-5 text-[0.72rem] tracking-[0.18em] uppercase bg-mos-ink text-white data-[hover=true]:bg-mos-body"
           >
-            {busy ? "建立中…" : "建立任務 →"}
+            {busy ? "建立中…" : "建立任務"}
           </Button>
         </div>
       </CardBody>
