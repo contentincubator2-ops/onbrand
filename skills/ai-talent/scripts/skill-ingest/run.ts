@@ -13,6 +13,7 @@ import { upsertSkills } from "./upsert";
 import { anthropicClaudeSkills } from "./sources/anthropicClaudeSkills";
 import { wshobsonAgents } from "./sources/wshobsonAgents";
 import { awesomeChatgptPrompts } from "./sources/awesomeChatgptPrompts";
+import { linexjlinGpts } from "./sources/linexjlinGpts";
 import type { SourceFetcher } from "./types";
 
 dotenv.config();
@@ -21,6 +22,7 @@ const REGISTRY: Record<string, SourceFetcher> = {
   [anthropicClaudeSkills.id]: anthropicClaudeSkills,
   [wshobsonAgents.id]:        wshobsonAgents,
   [awesomeChatgptPrompts.id]: awesomeChatgptPrompts,
+  [linexjlinGpts.id]:         linexjlinGpts,
 };
 
 function arg(name: string): string | undefined {

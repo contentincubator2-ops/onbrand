@@ -15,6 +15,7 @@ on:
           - anthropic-claude-skills
           - wshobson-agents
           - awesome-chatgpt-prompts
+          - linexjlin-gpts
       limit:
         description: 'Max skills to fetch (blank = all)'
         required: false
