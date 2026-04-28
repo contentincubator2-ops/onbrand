@@ -1233,7 +1233,7 @@ function SquadDetailPanel({
           </Chip>
           {wsMeta && (
             <Chip
-              size="sm" variant="flat" color="secondary"
+              size="sm" variant="flat" color="default"
               startContent={<FontAwesomeIcon icon={wsMeta.icon} className="text-tiny ml-1" />}
             >
               {wsMeta.label}
@@ -1288,7 +1288,7 @@ function SquadDetailPanel({
 
         {brandName && (
           <Chip
-            size="md" variant="flat" color="secondary" radius="md"
+            size="md" variant="flat" color="default" radius="md"
             className="w-full h-auto py-1.5 px-2"
             startContent={<FontAwesomeIcon icon={faBrain} className="ml-1" />}
             classNames={{ content: "flex items-center gap-1.5" }}
@@ -1320,7 +1320,7 @@ function SquadDetailPanel({
         {platformVariants.length > 1 && (
           <div className="sticky top-0 z-10 bg-default-50/90 backdrop-blur-sm border-b border-divider px-4 py-2 flex items-center justify-between gap-2">
             <Tabs
-              size="sm" radius="full" variant="solid" color="secondary"
+              size="sm" radius="full" variant="solid" color="default"
               selectedKey={previewFormatKey}
               onSelectionChange={(k) => setPreviewFormatKey(String(k))}
               aria-label="預覽格式"
@@ -1333,7 +1333,7 @@ function SquadDetailPanel({
             {previewFormatKey !== mockupVariant.format && (
               <Tooltip content={`系統推薦：${mockupVariant.label}`}>
                 <Chip
-                  size="sm" variant="flat" color="warning"
+                  size="sm" variant="flat" color="default"
                   className="cursor-pointer"
                   onClick={() => setPreviewFormatKey(mockupVariant.format)}
                 >
@@ -1440,7 +1440,7 @@ function SquadDetailPanel({
                 已寫 {Object.values(agentNotes).filter((n) => n.trim()).length} 則備註
               </p>
             )}
-            <Progress size="sm" value={0} color="secondary" aria-label="pipeline progress" />
+            <Progress size="sm" value={0} color="default" aria-label="pipeline progress" />
             <p className="text-tiny text-default-500 text-center">
               點擊上方派出 → agent 會逐段填入中央預覽
             </p>
@@ -1668,7 +1668,7 @@ function AgentQueueCard({
             </Chip>
             {hasNote && (
               <Chip
-                size="sm" variant="flat" color="secondary"
+                size="sm" variant="flat" color="default"
                 startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny ml-1" />}
                 classNames={{ content: "text-tiny pr-1" }}
               >
@@ -1793,7 +1793,7 @@ function AgentLiveCard({
               {statusMeta.label}
             </Chip>
             {hasNote && (
-              <Chip size="sm" variant="flat" color="secondary"
+              <Chip size="sm" variant="flat" color="default"
                 startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny ml-1" />}
                 classNames={{ content: "text-tiny pr-1" }}>
                 有備註
@@ -1968,7 +1968,7 @@ function AgentDetailModal({
               <Chip key={i} size="sm" variant="flat">{sk}</Chip>
             ))}
             {out && <Chip size="sm" variant="bordered">輸出：{out}</Chip>}
-            {tool && <Chip size="sm" variant="flat" color="secondary">工具：{tool}</Chip>}
+            {tool && <Chip size="sm" variant="flat" color="default">工具：{tool}</Chip>}
           </div>
 
           <Divider />
