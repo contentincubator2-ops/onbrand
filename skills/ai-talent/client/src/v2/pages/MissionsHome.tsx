@@ -591,7 +591,7 @@ function CircleTile({
       isDisabled={disabled}
       variant="light"
       isLoading={busy}
-      className="flex flex-col items-center gap-2 h-auto w-[78px] py-2 px-1 min-w-0"
+      className="flex flex-col items-center gap-2 h-auto w-[112px] py-2 px-1 min-w-0"
     >
       <Badge
         content={tile.badge}
@@ -609,8 +609,8 @@ function CircleTile({
           classNames={{ name: "text-medium" }}
         />
       </Badge>
-      <span className="text-tiny leading-tight text-center text-foreground">
-        {tile.label}
+      <span className="text-tiny leading-tight text-center text-foreground line-clamp-2">
+        {tile.missionTitle || tile.label}
       </span>
     </Button>
   );
