@@ -143,7 +143,9 @@ export const squadTemplateRouter = router({
         `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
                 s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
                 s.hero_image_url, s.source, s.ingest_source_url, s.workspace, s.tags,
-                s.use_cases, s.output_formats
+                s.use_cases, s.output_formats,
+                s.task_label_zh, s.task_label_en,
+                s.mockup_platform, s.mockup_format, s.output_kind
            FROM squads s
           WHERE s.is_active = 1
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
@@ -270,6 +272,13 @@ export const squadTemplateRouter = router({
           tags: safeJsonParse<string[]>(r.tags, []),
           useCases: safeJsonParse<string[]>(r.use_cases, []),
           outputFormats: safeJsonParse<string[]>(r.output_formats, []),
+          // PR6 / Q2 — explicit task label + mockup variant from LLM classifier
+          taskLabel: r.task_label_zh ?? null,
+          taskLabelEn: r.task_label_en ?? null,
+          outputKind: r.output_kind ?? null,
+          mockup: (r.mockup_platform && r.mockup_format)
+            ? { platform: r.mockup_platform, format: r.mockup_format }
+            : undefined,
           methodology,
           lead,
           members,

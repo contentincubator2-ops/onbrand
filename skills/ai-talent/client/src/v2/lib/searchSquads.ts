@@ -179,6 +179,8 @@ export function scoreSquad(
 
   // Field weights
   const weights: Array<{ field: string; value: any; weight: number; cap?: number }> = [
+    // PR6 / Q2 — explicit LLM-classified task label is the highest-signal field
+    { field: "taskLabel",     value: (squad.taskLabel ?? squad.task_label_zh ?? "") + " " + (squad.taskLabelEn ?? squad.task_label_en ?? ""), weight: 30, cap: 60 },
     { field: "outputFormats", value: Array.isArray(squad.outputFormats) ? squad.outputFormats.join(" ") : "", weight: 18, cap: 36 },
     { field: "name_zh",       value: pickLocaleText(squad.name, "zh-TW"),                                     weight: 16, cap: 32 },
     { field: "name_en",       value: pickLocaleText(squad.name, "en"),                                        weight: 12, cap: 24 },

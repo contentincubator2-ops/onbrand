@@ -108,6 +108,13 @@ export interface HomeEntity {
 
   /** workspace tag(s), used for secondary filtering / icon mapping. */
   workspace: string[];
+
+  /** PR6 / Q2 — explicit task label from LLM classifier (e.g. "Facebook 月度行事曆"). */
+  taskLabel?: string | null;
+  taskLabelEn?: string | null;
+  outputKind?: "strategic" | "content" | null;
+  /** Mockup variant override — bypasses heuristic inference when set. */
+  mockup?: { platform: string; format: string };
 }
 
 const KIND_LABELS = {
@@ -120,7 +127,8 @@ const KIND_LABELS = {
 async function fetchSquadEntities(): Promise<HomeEntity[]> {
   const [rows] = await localPool.execute(
     `SELECT id, slug, name, description, agents, steps,
-            strategy_layer, methodology, workspace
+            strategy_layer, methodology, workspace,
+            task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind
        FROM squads
       WHERE is_active = 1
       ORDER BY COALESCE(tier, 99) ASC, id ASC
@@ -171,6 +179,12 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
       stepCount,
       memberCount,
       workspace: safeJsonParse<string[]>(r.workspace, []),
+      taskLabel: r.task_label_zh ?? null,
+      taskLabelEn: r.task_label_en ?? null,
+      outputKind: (r.output_kind as "strategic" | "content" | null) ?? null,
+      mockup: (r.mockup_platform && r.mockup_format)
+        ? { platform: String(r.mockup_platform), format: String(r.mockup_format) }
+        : undefined,
     };
   });
 }

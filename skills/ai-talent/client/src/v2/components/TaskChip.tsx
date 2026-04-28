@@ -51,30 +51,24 @@ export function TaskChip({
     if (variant) return variant;
     if (kind === "agent")  return inferMockupVariantFromAgent(entity);
     if (kind === "skill")  return inferMockupVariantFromSkill(entity);
-    // squad / mission / fallback
+    // squad / mission / fallback — inferMockupVariant honors entity.mockup if present
     return inferMockupVariant(entity);
   }, [entity, variant, kind]);
 
-  // Skip rendering for generic — caller decides what to do
-  if (v.platform === "generic") {
-    return (
-      <Chip size={size} variant="flat" className={className}
-        startContent={<FontAwesomeIcon icon={faNewspaper} className="text-tiny ml-1" />}
-      >
-        通用任務
-      </Chip>
-    );
-  }
+  // Prefer explicit LLM-classified task label when present
+  const explicitLabel: string | null = entity?.taskLabel ?? entity?.task_label_zh ?? null;
+  const displayLabel = explicitLabel?.trim() || v.label;
+  const isGeneric = v.platform === "generic";
 
   return (
     <Chip
       size={size}
       variant="flat"
-      color="secondary"
+      color={isGeneric ? "default" : "secondary"}
       className={className}
       startContent={<FontAwesomeIcon icon={PLATFORM_ICON[v.platform]} className="text-tiny ml-1" />}
     >
-      {v.label}
+      {displayLabel}
     </Chip>
   );
 }
