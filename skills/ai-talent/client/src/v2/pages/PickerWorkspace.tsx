@@ -25,7 +25,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
-import { inferMockupVariant, getVariantsForPlatform, inferStepKind, type MockupVariant } from "../lib/inferMockup";
+import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMockupFields, type MockupVariant } from "../lib/inferMockup";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
@@ -1381,6 +1381,7 @@ function SquadDetailPanel({
               }
               // content step: fall through to platform mockup
             }
+            const live = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
             return (
               <PlatformMockup
                 variant={previewVariant}
@@ -1388,6 +1389,13 @@ function SquadDetailPanel({
                 brief={missionBrief || (description ?? "")}
                 brandName={brandName}
                 steps={steps}
+                liveCaption={live.caption}
+                liveHashtags={live.hashtags}
+                liveTitle={live.title}
+                liveDescription={live.description}
+                liveImageDesc={live.imageDesc}
+                liveVideoDesc={live.videoDesc}
+                liveCta={live.cta}
               />
             );
           })()}

@@ -20,7 +20,7 @@ import { type MockupFields, MockupHeader, dicebear } from "./shared";
 
 /* ─────────────── FB Feed ─────────────── */
 
-export function FBFeed({ title, brandName, variantLabel }: MockupFields) {
+export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageDesc }: MockupFields) {
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -38,14 +38,20 @@ export function FBFeed({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="px-4 py-2 space-y-2">
           <p className="text-small">{title}</p>
-          <Skeleton className="h-2.5 w-[88%] rounded" />
-          <Skeleton className="h-2.5 w-[75%] rounded" />
+          {liveCaption ? (
+            <p className="text-small whitespace-pre-wrap line-clamp-6">{liveCaption}</p>
+          ) : (
+            <>
+              <Skeleton className="h-2.5 w-[88%] rounded" />
+              <Skeleton className="h-2.5 w-[75%] rounded" />
+            </>
+          )}
         </div>
         <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
           <Skeleton className="absolute inset-0" />
-          <div className="text-center relative z-10">
+          <div className="text-center relative z-10 p-4">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">主圖 · 等待 craft agent</p>
+            <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
           </div>
         </div>
         <div className="px-4 py-2 border-t border-divider flex items-center justify-between text-default-500 text-tiny">

@@ -292,6 +292,85 @@ const STRATEGIC_KEYWORDS = [
   "規劃", "盤點", "稽核",
 ];
 
+/**
+ * Aggregated content fields produced by content-classified squad steps.
+ * Each variant of PlatformMockup picks up whichever fields are
+ * relevant and renders them in place of skeletons.
+ */
+export interface AggregatedMockupFields {
+  caption?: string;
+  hashtags?: string[];
+  title?: string;
+  description?: string;
+  imageDesc?: string;
+  videoDesc?: string;
+  cta?: string;
+}
+
+const FIELD_ROUTES: Array<{ test: RegExp; field: keyof AggregatedMockupFields }> = [
+  { test: /title|headline|標題/i,                         field: "title" },
+  { test: /hashtag|tag\b|tags|主題標籤/i,                 field: "hashtags" },
+  { test: /caption|copy|post|hook|文案|貼文|內文|腳本/i,  field: "caption" },
+  { test: /description|desc|簡介|說明/i,                  field: "description" },
+  { test: /thumbnail|cover|封面/i,                         field: "imageDesc" },
+  { test: /image|visual|carousel|圖|視覺/i,               field: "imageDesc" },
+  { test: /video|reel|short|影片|短片/i,                   field: "videoDesc" },
+  { test: /cta|call.to.action|action|行動呼籲/i,          field: "cta" },
+];
+
+function parseHashtags(body: string): string[] {
+  // Pull out tokens that start with # — keep the # for display
+  const tokens = body.match(/#[\p{L}\p{N}_]+/gu);
+  if (tokens && tokens.length) return Array.from(new Set(tokens));
+  // Fallback: split on whitespace, prefix with #
+  return body
+    .split(/[\s,;、，]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && t.length < 30)
+    .slice(0, 12)
+    .map((t) => (t.startsWith("#") ? t : `#${t}`));
+}
+
+/**
+ * Aggregate content-step outputs into structured mockup fields.
+ * Unrecognized outputs fall through to caption (most universal).
+ */
+export function aggregateMockupFields(
+  steps: any[],
+  progressByOrd: Map<number, any>,
+): AggregatedMockupFields {
+  const out: AggregatedMockupFields = {};
+  if (!Array.isArray(steps)) return out;
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const ord = i + 1;
+    const p = progressByOrd.get(ord);
+    const body: string = (p?.agentOutput ?? p?.agent_output ?? "").toString().trim();
+    if (!body) continue;
+    if (inferStepKind(step) !== "content") continue;
+
+    const haystack = [step.outputType, step.output, step.name, step.title]
+      .filter(Boolean).join(" ").toLowerCase();
+
+    let routed = false;
+    for (const r of FIELD_ROUTES) {
+      if (r.test.test(haystack)) {
+        if (r.field === "hashtags") {
+          out.hashtags = parseHashtags(body);
+        } else if (!out[r.field]) {
+          (out as any)[r.field] = body;
+        }
+        routed = true;
+        break;
+      }
+    }
+    // Fallback: stash as caption if not yet set
+    if (!routed && !out.caption) out.caption = body;
+  }
+  return out;
+}
+
 export function inferStepKind(step: any): StepKind {
   if (!step) return "content";
   const haystack = [

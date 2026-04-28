@@ -20,6 +20,15 @@ export interface MockupFields {
   variantLabel?: string;
   /** Squad steps — only consumed by UnsupportedVariantPlaceholder */
   steps?: Array<{ name?: string; outputType?: string; assignedAgentName?: string }>;
+  /** Live content fields aggregated from content-step outputs (PR4.3).
+   *  When present, variants render real content instead of skeletons. */
+  liveCaption?: string;
+  liveHashtags?: string[];
+  liveTitle?: string;
+  liveDescription?: string;
+  liveImageDesc?: string;
+  liveVideoDesc?: string;
+  liveCta?: string;
 }
 
 export const dicebear = (name: string) =>

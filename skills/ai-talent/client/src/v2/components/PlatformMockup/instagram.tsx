@@ -30,7 +30,7 @@ import {
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
-export function IGFeed({ title, brandName, variantLabel }: MockupFields) {
+export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc }: MockupFields) {
   const handle = handleOf(brandName);
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -54,10 +54,10 @@ export function IGFeed({ title, brandName, variantLabel }: MockupFields) {
 
         <div className="relative aspect-square bg-default-100">
           <Skeleton className="absolute inset-0" />
-          <div className="absolute inset-0 flex items-center justify-center text-default-400">
+          <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
             <div className="text-center">
               <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-              <p className="text-tiny">主圖 · 等待 craft agent</p>
+              <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
             </div>
           </div>
         </div>
@@ -89,13 +89,23 @@ export function IGFeed({ title, brandName, variantLabel }: MockupFields) {
         <div className="px-3 pb-1 text-[0.82rem] leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
           <span className="text-foreground">{title}</span>
-          <div className="mt-1.5 space-y-1">
-            <Skeleton className="h-2.5 w-[94%] rounded" />
-            <Skeleton className="h-2.5 w-[78%] rounded" />
-          </div>
-          <p className="mt-1.5 text-secondary text-[0.78rem]">
-            #等寫手 #等寫手 #等寫手 <span className="text-default-500">…更多</span>
-          </p>
+          {liveCaption ? (
+            <p className="mt-1.5 whitespace-pre-wrap line-clamp-6 text-foreground">{liveCaption}</p>
+          ) : (
+            <div className="mt-1.5 space-y-1">
+              <Skeleton className="h-2.5 w-[94%] rounded" />
+              <Skeleton className="h-2.5 w-[78%] rounded" />
+            </div>
+          )}
+          {liveHashtags && liveHashtags.length > 0 ? (
+            <p className="mt-1.5 text-secondary text-[0.78rem]">
+              {liveHashtags.slice(0, 8).join(" ")}{liveHashtags.length > 8 && <span className="text-default-500"> …更多</span>}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-secondary text-[0.78rem]">
+              #等寫手 #等寫手 #等寫手 <span className="text-default-500">…更多</span>
+            </p>
+          )}
         </div>
 
         <p className="px-3 pb-1 text-[0.78rem] text-default-500">
@@ -109,7 +119,7 @@ export function IGFeed({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── IG Carousel ─────────────── */
 
-export function IGCarousel({ title, brandName, variantLabel }: MockupFields) {
+export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc }: MockupFields) {
   const handle = handleOf(brandName);
   const carouselCount = 9;
   return (
@@ -134,10 +144,10 @@ export function IGCarousel({ title, brandName, variantLabel }: MockupFields) {
 
         <div className="relative aspect-square bg-default-100">
           <Skeleton className="absolute inset-0" />
-          <div className="absolute inset-0 flex items-center justify-center text-default-400">
+          <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
             <div className="text-center">
               <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-              <p className="text-tiny">輪播 1 / {carouselCount} · 等待 craft agent</p>
+              <p className="text-tiny line-clamp-3">{liveImageDesc ?? `輪播 1 / ${carouselCount} · 等待 craft agent`}</p>
             </div>
           </div>
           <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-[0.66rem] font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
@@ -163,10 +173,19 @@ export function IGCarousel({ title, brandName, variantLabel }: MockupFields) {
         <div className="px-3 pb-1 text-[0.82rem] leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
           <span className="text-foreground">{title}</span>
-          <div className="mt-1.5 space-y-1">
-            <Skeleton className="h-2.5 w-[94%] rounded" />
-            <Skeleton className="h-2.5 w-[78%] rounded" />
-          </div>
+          {liveCaption ? (
+            <p className="mt-1.5 whitespace-pre-wrap line-clamp-5 text-foreground">{liveCaption}</p>
+          ) : (
+            <div className="mt-1.5 space-y-1">
+              <Skeleton className="h-2.5 w-[94%] rounded" />
+              <Skeleton className="h-2.5 w-[78%] rounded" />
+            </div>
+          )}
+          {liveHashtags && liveHashtags.length > 0 && (
+            <p className="mt-1.5 text-secondary text-[0.78rem]">
+              {liveHashtags.slice(0, 8).join(" ")}
+            </p>
+          )}
         </div>
 
         <p className="px-3 pb-3 text-[0.66rem] text-default-400 uppercase tracking-wider">5 分鐘前</p>
@@ -177,7 +196,7 @@ export function IGCarousel({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── IG Reels (9:16 + side action rail) ─────────────── */
 
-export function IGReels({ title, brandName, variantLabel }: MockupFields) {
+export function IGReels({ title, brandName, variantLabel, liveCaption, liveVideoDesc }: MockupFields) {
   const handle = handleOf(brandName);
   return (
     <div className="w-full max-w-[280px] mx-auto">
@@ -192,9 +211,9 @@ export function IGReels({ title, brandName, variantLabel }: MockupFields) {
         {/* Video placeholder */}
         <div className="absolute inset-0 flex items-center justify-center">
           <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
+          <div className="relative z-10 text-center text-white/60 p-4">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">9:16 影片 · 等待 craft agent</p>
+            <p className="text-tiny line-clamp-3">{liveVideoDesc ?? "9:16 影片 · 等待 craft agent"}</p>
           </div>
         </div>
 
@@ -214,7 +233,7 @@ export function IGReels({ title, brandName, variantLabel }: MockupFields) {
             <span className="text-[0.82rem] font-semibold">{handle}</span>
             <Button size="sm" radius="sm" variant="bordered" className="h-6 min-w-0 px-2 text-tiny border-white text-white">追蹤</Button>
           </div>
-          <p className="text-[0.78rem] line-clamp-2">{title}</p>
+          <p className="text-[0.78rem] line-clamp-3 whitespace-pre-wrap">{liveCaption ?? title}</p>
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
             <span>原創音訊 · {handle}</span>
