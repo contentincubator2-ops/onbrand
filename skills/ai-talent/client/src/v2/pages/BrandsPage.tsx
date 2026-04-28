@@ -95,6 +95,13 @@ export default function BrandsPage() {
         { enabled: scopeMode === "event" && !!scope?.eventId, refetchOnWindowFocus: false }
       )
     : { data: null };
+  // scope.options is the canonical brand list (filtered by userId, same
+  // as ScopeBar). Legacy `brands` from listByMember can lag — use this
+  // when resolving the active brand name.
+  const scopeOptionsQuery = (trpc as any).scope?.options?.useQuery
+    ? (trpc as any).scope.options.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: null };
+  const scopeBrands = ((scopeOptionsQuery.data as any)?.brands as any[]) ?? brands;
 
   // Build sub-nav from positioning schema + brand-only asset list.
   // Each segment becomes its own sub-nav entry (id = "seg:<segmentId>"),
@@ -133,8 +140,8 @@ export default function BrandsPage() {
   }, [scopeMode]);
 
   const currentBrand = useMemo(
-    () => brands.find((b: any) => b.id === (scope?.brandId ?? brandId)) ?? brands[0] ?? null,
-    [brands, scope?.brandId, brandId]
+    () => scopeBrands.find((b: any) => b.id === (scope?.brandId ?? brandId)) ?? null,
+    [scopeBrands, scope?.brandId, brandId]
   );
   const scopeName =
     scopeMode === "product" ? ((productQuery.data as any)?.name ?? "（請於右上選擇產品）")

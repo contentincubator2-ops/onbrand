@@ -15,7 +15,8 @@ import {
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button, Chip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronDown, faTrademark, faBox, faCalendarDay } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faTrademark, faBox, faCalendarDay, faPlus } from "@fortawesome/free-solid-svg-icons";
+import CreateScopeModal, { type CreateScopeKind } from "./CreateScopeModal";
 
 export interface ScopeState {
   brandId: number | null;
@@ -82,6 +83,8 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
     if (which === "event")   setScope({ brandId: null, productId: null, eventId: id });
   };
 
+  const [createKind, setCreateKind] = React.useState<CreateScopeKind | null>(null);
+
   return (
     <div className="flex items-center gap-2">
       <ScopePicker
@@ -90,6 +93,7 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
         current={brand?.name ?? null}
         items={brands.map((b: any) => ({ id: b.id, name: b.name }))}
         onPick={(id) => pick("brand", id)}
+        onCreate={() => setCreateKind("brand")}
         emptyHint="尚未建立品牌"
       />
       <ScopePicker
@@ -98,6 +102,7 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
         current={product?.name ?? null}
         items={products.map((p: any) => ({ id: p.id, name: p.name }))}
         onPick={(id) => pick("product", id)}
+        onCreate={() => setCreateKind("product")}
         emptyHint="尚未建立產品"
       />
       <ScopePicker
@@ -106,20 +111,28 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
         current={event?.name ?? null}
         items={events.map((e: any) => ({ id: e.id, name: e.name }))}
         onPick={(id) => pick("event", id)}
+        onCreate={() => setCreateKind("event")}
         emptyHint="尚未建立活動"
+      />
+      <CreateScopeModal
+        kind={createKind}
+        brandId={scope.brandId}
+        onClose={() => setCreateKind(null)}
+        onCreated={(kind, id) => pick(kind, id)}
       />
     </div>
   );
 }
 
 function ScopePicker({
-  icon, label, current, items, onPick, emptyHint,
+  icon, label, current, items, onPick, onCreate, emptyHint,
 }: {
   icon: any;
   label: string;
   current: string | null;
   items: Array<{ id: number; name: string }>;
   onPick: (id: number | null) => void;
+  onCreate: () => void;
   emptyHint: string;
 }) {
   return (
@@ -150,6 +163,14 @@ function ScopePicker({
         }
       >
         <>
+          <DropdownItem
+            key="__create__"
+            onPress={onCreate}
+            startContent={<FontAwesomeIcon icon={faPlus} className="text-tiny" />}
+            className="text-primary"
+          >
+            新增{label}
+          </DropdownItem>
           <DropdownItem
             key="__clear__"
             onPress={() => onPick(null)}
