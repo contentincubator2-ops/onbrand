@@ -1,77 +1,82 @@
 /**
- * PlaybooksPage — 成長方案 / Growth Playbooks (HeroUI v2 migration)
+ * PlaybooksPage — 成長方案 sourced from squads with named methodology.
  *
- * Canva Brand Hub parity: tiles → Card+Image, badges → Chip, drawer → Drawer,
- * phase roadmap → Accordion, KPI pills → Chip(bordered), pitch/outcome → Snippet,
- * apply CTA → Button(isLoading), error → Alert, scroll body → ScrollShadow,
- * filter → Tabs, loading → Skeleton/Spinner, separators → Divider.
+ * Per CJ request: drop the 6 hardcoded curated playbooks and surface
+ * every squad whose methodology has a named author (= "has 成功案例").
+ * Each card carries: 任務名 (taskLabel), squad 名, squad 描述,
+ * agent 人數, 方法論作者 (acts as 成功案例 byline).
  *
- * Hex `data.color` is kept ONLY for the cover hero gradient artwork; all other
- * states use HeroUI semantic tokens via `colorOf(badge)`.
+ * Backend: trpc.playbook.listFromSquads (added 2026-04-28).
+ * Card click → drawer with description, member list, step roadmap,
+ * methodology byline.
  */
 import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
-  Accordion, AccordionItem, Alert, Breadcrumbs, BreadcrumbItem,
-  Button, Card, CardBody, CardFooter, Chip, Divider, Drawer, DrawerBody,
-  DrawerContent, DrawerFooter, DrawerHeader, Dropdown, DropdownItem,
-  DropdownMenu, DropdownTrigger, Input, ScrollShadow, Skeleton,
-  Snippet, Spinner, Tab, Tabs, Tooltip,
+  Alert, Avatar, AvatarGroup, Breadcrumbs, BreadcrumbItem, Button, Card,
+  CardBody, CardFooter, Chip, Divider, Drawer, DrawerBody, DrawerContent,
+  DrawerFooter, DrawerHeader, Dropdown, DropdownItem, DropdownMenu,
+  DropdownTrigger, Input, ScrollShadow, Skeleton, Snippet, Spinner, Tab,
+  Tabs, Tooltip, User,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faArrowUpRightFromSquare, faCheck, faUsers, faBroadcastTower,
-  faBullseye, faClock, faSackDollar, faPeopleGroup, faXmark,
-  faMagnifyingGlass, faArrowUpWideShort, faFolderOpen, faChevronDown,
+  faArrowUpRightFromSquare, faCheck, faUsers, faBookOpen, faClock,
+  faXmark, faMagnifyingGlass, faArrowUpWideShort, faFolderOpen,
+  faChevronDown, faRocket, faLayerGroup,
 } from "@fortawesome/free-solid-svg-icons";
+import { AgentAvatar } from "../components/AgentAvatar";
+import { TaskChip } from "../components/TaskChip";
 
-type PlaybookSummary = {
+interface MemberPreview {
+  id: number | null;
+  name: string | null;
+  role: string | null;
+  primarySkill: string | null;
+}
+
+interface SquadPlaybook {
   id: string;
-  title: string;
-  badge: string;
-  hook: string;
-  problem: string;
-  audience: string;
-  duration: string;
-  budget: string;
-  color: string;
-  emoji: string;
-  pitch: string;
-  phaseCount: number;
-  squadCount: number;
-  personaCount: number;
-  channelCount: number;
+  slug: string;
+  taskLabel: string | null;
+  taskLabelEn: string | null;
+  name: string;
+  description: string | null;
+  memberCount: number;
+  stepCount: number;
+  strategyLayer: string | null;
+  methodology: {
+    slug: string | null;
+    author: string | null;
+    year: number | null;
+    summary: string | null;
+  } | null;
+  workspace: string[];
+  tags: string[];
+  mockup?: { platform: string; format: string };
+  memberPreview: MemberPreview[];
+}
+
+const LAYER_LABEL: Record<string, string> = {
+  L1: "策略", L2: "產品", L3: "受眾",
+  L4: "通路", L5: "規劃", L6: "監測",
 };
 
-const BADGE_COPY: Record<string, string> = {
-  GROWTH: "成長", BRAND: "品牌", REVIVAL: "復活",
-  B2B: "B2B", CRISIS: "危機", VIRAL: "病毒",
+const LAYER_COLOR: Record<string, "primary" | "secondary" | "success" | "warning" | "danger" | "default"> = {
+  L1: "primary",
+  L2: "warning",
+  L3: "secondary",
+  L4: "success",
+  L5: "danger",
+  L6: "default",
 };
 
-type ChipColor = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
-const colorOf = (badge: string): ChipColor => {
-  switch (badge) {
-    case "GROWTH":  return "success";
-    case "BRAND":   return "secondary";
-    case "REVIVAL": return "warning";
-    case "B2B":     return "primary";
-    case "CRISIS":  return "danger";
-    case "VIRAL":   return "secondary";
-    default:        return "default";
-  }
+const layerKey = (raw: string | null): string => {
+  if (!raw) return "L1";
+  return raw.slice(0, 2);
 };
-
-const FILTERS: Array<{ id: string; label: string }> = [
-  { id: "all",     label: "全部"   },
-  { id: "GROWTH",  label: "成長"   },
-  { id: "BRAND",   label: "品牌"   },
-  { id: "REVIVAL", label: "復活"   },
-  { id: "B2B",     label: "B2B"    },
-  { id: "CRISIS",  label: "危機"   },
-  { id: "VIRAL",   label: "病毒"   },
-];
 
 export default function PlaybooksPage() {
   const navigate = useNavigate();
@@ -81,50 +86,61 @@ export default function PlaybooksPage() {
     [brands, brandId]
   );
 
-  const listQuery = (trpc as any).playbook.list.useQuery();
-  const playbooks: PlaybookSummary[] = listQuery.data ?? [];
+  const listQuery = (trpc as any).playbook.listFromSquads.useQuery();
+  const playbooks: SquadPlaybook[] = listQuery.data ?? [];
 
-  const [filter, setFilter] = useState<string>("all");
+  const [layerFilter, setLayerFilter] = useState<string>("all");
   const [searchQ, setSearchQ] = useState<string>("");
-  const [sort, setSort] = useState<"recommended" | "duration" | "budget">("recommended");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sort, setSort] = useState<"recommended" | "members" | "steps">("recommended");
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
-  // Counts per badge for tab labels
   const counts = useMemo(() => {
     const m: Record<string, number> = { all: playbooks.length };
-    for (const p of playbooks) m[p.badge] = (m[p.badge] ?? 0) + 1;
+    for (const p of playbooks) {
+      const l = layerKey(p.strategyLayer);
+      m[l] = (m[l] ?? 0) + 1;
+    }
     return m;
   }, [playbooks]);
 
   const filtered = useMemo(() => {
-    let r = filter === "all" ? playbooks : playbooks.filter((p) => p.badge === filter);
+    let r = layerFilter === "all" ? playbooks : playbooks.filter((p) => layerKey(p.strategyLayer) === layerFilter);
     const q = searchQ.trim().toLowerCase();
     if (q) {
       r = r.filter((p) =>
-        (p.title ?? "").toLowerCase().includes(q) ||
-        (p.hook ?? "").toLowerCase().includes(q) ||
-        (p.problem ?? "").toLowerCase().includes(q) ||
-        (p.audience ?? "").toLowerCase().includes(q)
+        (p.name ?? "").toLowerCase().includes(q) ||
+        (p.taskLabel ?? "").toLowerCase().includes(q) ||
+        (p.description ?? "").toLowerCase().includes(q) ||
+        (p.methodology?.author ?? "").toLowerCase().includes(q)
       );
     }
-    if (sort === "duration") {
-      r = [...r].sort((a, b) => (a.phaseCount ?? 0) - (b.phaseCount ?? 0));
-    } else if (sort === "budget") {
-      // Lexicographic on budget string is good enough — schema is consistent (e.g. "10–30 萬").
-      r = [...r].sort((a, b) => (a.budget ?? "").localeCompare(b.budget ?? ""));
+    if (sort === "members") {
+      r = [...r].sort((a, b) => b.memberCount - a.memberCount);
+    } else if (sort === "steps") {
+      r = [...r].sort((a, b) => b.stepCount - a.stepCount);
     }
     return r;
-  }, [playbooks, filter, searchQ, sort]);
+  }, [playbooks, layerFilter, searchQ, sort]);
 
   const SORT_LABEL: Record<typeof sort, string> = {
     recommended: "推薦排序",
-    duration: "依期間",
-    budget: "依預算",
+    members: "依顧問人數",
+    steps: "依步驟數",
   };
+
+  const FILTERS: Array<{ id: string; label: string }> = [
+    { id: "all", label: "全部" },
+    { id: "L1",  label: "L1 策略" },
+    { id: "L2",  label: "L2 產品" },
+    { id: "L3",  label: "L3 受眾" },
+    { id: "L4",  label: "L4 通路" },
+    { id: "L5",  label: "L5 規劃" },
+    { id: "L6",  label: "L6 監測" },
+  ];
 
   return (
     <div className="px-8 py-10 max-w-[1280px] mx-auto">
-      {/* ── Hero ───────────────────────────────────────────── */}
+      {/* ── Hero ──────────────────────────────────────────── */}
       <div className="mb-6">
         <Breadcrumbs size="sm" className="mb-3">
           <BreadcrumbItem href="/">首頁</BreadcrumbItem>
@@ -135,24 +151,23 @@ export default function PlaybooksPage() {
           PLAYBOOKS · 成長方案
         </Chip>
         <h1 className="font-semibold text-3xl leading-tight text-foreground mb-3">
-          挑一個劇本，90 天讓品牌變成下一個案例
+          挑一個有真實案例的方法論，套用到品牌
         </h1>
         <p className="text-default-500 text-small max-w-[640px] leading-relaxed">
-          每個方案都是 SoWork 策展團隊把 squad（任務範本）、顧問團、媒體通路、
-          KPI 串好的「可賣包」。背後是真實案例與可驗證的階段方法。
-          選一個，按下「套用」，剩下交給流程。
+          每個方案都對應一個有作者背景的方法論小組（squad），由真實顧問
+          + 多階段工作流組成。選一個 → 直接派出。
           {currentBrand && (
             <> — 將套用到 <Chip size="sm" variant="flat" color="secondary">{currentBrand.name}</Chip></>
           )}
         </p>
       </div>
 
-      {/* ── Filter row: tabs (with counts) + search + sort ─────── */}
+      {/* ── Filter row ─────────────────────────────────────── */}
       <div className="mb-6 flex items-center gap-3 flex-wrap">
         <Tabs
-          aria-label="方案類別"
-          selectedKey={filter}
-          onSelectionChange={(k) => setFilter(String(k))}
+          aria-label="策略層"
+          selectedKey={layerFilter}
+          onSelectionChange={(k) => setLayerFilter(String(k))}
           variant="underlined"
           color="primary"
         >
@@ -174,14 +189,9 @@ export default function PlaybooksPage() {
         </Tabs>
         <div className="ml-auto flex items-center gap-2">
           <Input
-            size="sm"
-            radius="full"
-            variant="bordered"
-            value={searchQ}
-            onValueChange={setSearchQ}
-            placeholder="搜尋方案…"
-            isClearable
-            onClear={() => setSearchQ("")}
+            size="sm" radius="full" variant="bordered"
+            value={searchQ} onValueChange={setSearchQ}
+            placeholder="搜尋方法論…" isClearable onClear={() => setSearchQ("")}
             startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 text-tiny" />}
             className="w-[220px]"
           />
@@ -202,23 +212,24 @@ export default function PlaybooksPage() {
               onAction={(k) => setSort(String(k) as typeof sort)}
             >
               <DropdownItem key="recommended">推薦排序</DropdownItem>
-              <DropdownItem key="duration">依期間</DropdownItem>
-              <DropdownItem key="budget">依預算</DropdownItem>
+              <DropdownItem key="members">依顧問人數</DropdownItem>
+              <DropdownItem key="steps">依步驟數</DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>
       </div>
 
-      {/* ── Grid ──────────────────────────────────────────── */}
+      {/* ── Grid / states ──────────────────────────────────── */}
       {listQuery.isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} shadow="sm" radius="lg" className="aspect-[5/6]">
-              <Skeleton className="h-32 w-full rounded-none" />
-              <CardBody className="gap-2">
-                <Skeleton className="h-4 w-4/5 rounded" />
+          {Array.from({ length: 9 }).map((_, i) => (
+            <Card key={i} shadow="sm" radius="lg">
+              <CardBody className="gap-2 p-5">
+                <Skeleton className="h-4 w-3/5 rounded" />
+                <Skeleton className="h-5 w-4/5 rounded" />
                 <Skeleton className="h-3 w-full rounded" />
-                <Skeleton className="h-3 w-3/5 rounded" />
+                <Skeleton className="h-3 w-[88%] rounded" />
+                <Skeleton className="h-8 w-32 rounded mt-2" />
               </CardBody>
             </Card>
           ))}
@@ -228,14 +239,11 @@ export default function PlaybooksPage() {
           <CardBody className="py-16 items-center text-center gap-3">
             <FontAwesomeIcon icon={faFolderOpen} className="text-4xl text-default-300" />
             <p className="text-medium font-medium">
-              {searchQ ? `沒有找到符合「${searchQ}」的方案` : "這個分類目前沒有方案"}
+              {searchQ ? `沒有找到符合「${searchQ}」的方法論` : "這個策略層目前沒有方案"}
             </p>
             <p className="text-small text-default-500">換個關鍵字、或選擇其他類別</p>
-            {(searchQ || filter !== "all") && (
-              <Button
-                size="sm" variant="light"
-                onPress={() => { setSearchQ(""); setFilter("all"); }}
-              >
+            {(searchQ || layerFilter !== "all") && (
+              <Button size="sm" variant="light" onPress={() => { setSearchQ(""); setLayerFilter("all"); }}>
                 清除篩選
               </Button>
             )}
@@ -244,140 +252,174 @@ export default function PlaybooksPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map((p) => (
-            <PlaybookCard key={p.id} playbook={p} onClick={() => setSelectedId(p.id)} />
+            <PlaybookCard key={p.id} playbook={p} onClick={() => setSelectedSlug(p.slug)} />
           ))}
         </div>
       )}
 
-      {/* ── Detail drawer ─────────────────────────────────── */}
+      {/* ── Detail drawer ──────────────────────────────────── */}
       <PlaybookDetail
-        id={selectedId}
-        onClose={() => setSelectedId(null)}
+        squad={filtered.find((p) => p.slug === selectedSlug) ?? playbooks.find((p) => p.slug === selectedSlug) ?? null}
+        onClose={() => setSelectedSlug(null)}
         brandId={brandId}
         brandName={currentBrand?.name ?? null}
-        onApplied={(_missionId, nextSteps) => {
-          setSelectedId(null);
-          if (nextSteps?.[0]?.href) navigate(nextSteps[0].href);
+        onLaunched={(missionId) => {
+          setSelectedSlug(null);
+          navigate(`/picker?mission=${missionId}`);
         }}
       />
     </div>
   );
 }
 
-// ──────────────────────────────────────────────────────────
-// PlaybookCard — HeroUI Card+Chip
-// ──────────────────────────────────────────────────────────
+/* ─────────────────────────── PlaybookCard ─────────────────────────── */
 
-function PlaybookCard({
-  playbook, onClick,
-}: { playbook: PlaybookSummary; onClick: () => void }) {
-  const cc = colorOf(playbook.badge);
+function PlaybookCard({ playbook: p, onClick }: { playbook: SquadPlaybook; onClick: () => void }) {
+  const lk = layerKey(p.strategyLayer);
+  const lkColor = LAYER_COLOR[lk] ?? "default";
+
   return (
     <Card
-      isPressable
-      isHoverable
-      onPress={onClick}
-      shadow="sm"
-      radius="lg"
-      className="aspect-[5/6] overflow-hidden group"
+      isPressable isHoverable onPress={onClick}
+      shadow="sm" radius="lg"
+      className="overflow-hidden group"
     >
-      {/* Hero band — keeps brand color gradient as artwork */}
-      <div
-        className="h-32 relative shrink-0"
-        style={{ background: `linear-gradient(135deg, ${playbook.color} 0%, ${playbook.color}CC 100%)` }}
-      >
-        <Chip
-          size="sm"
-          variant="solid"
-          className="absolute top-3 left-3 bg-black/25 text-white uppercase tracking-wider"
-        >
-          {BADGE_COPY[playbook.badge] ?? playbook.badge}
-        </Chip>
-        <div className="absolute right-4 bottom-2 text-5xl leading-none drop-shadow-md">
-          {playbook.emoji}
+      <CardBody className="gap-3 px-5 pt-5 pb-3">
+        {/* Top row: layer + workspace + task */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Chip
+            size="sm" variant="flat" color={lkColor}
+            startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}
+          >
+            {lk} · {LAYER_LABEL[lk] ?? "策略"}
+          </Chip>
+          {p.taskLabel && (
+            <TaskChip
+              entity={{ taskLabel: p.taskLabel, mockup: p.mockup, workspace: p.workspace, name: p.name }}
+              kind="squad" size="sm"
+            />
+          )}
+          {/* Hover quick-preview */}
+          <span
+            aria-hidden
+            className="ml-auto w-7 h-7 rounded-full bg-default-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition pointer-events-none"
+          >
+            <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-tiny text-default-500" />
+          </span>
         </div>
-        {/* Hover quick-preview — appears on card hover (group). pointer-events-none
-            so the parent isPressable still receives the click. */}
-        <span
-          aria-hidden
-          className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/95 flex items-center justify-center opacity-0 group-hover:opacity-100 transition pointer-events-none shadow-sm"
-        >
-          <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-tiny" style={{ color: playbook.color }} />
-        </span>
-      </div>
 
-      <CardBody className="gap-2 px-5 pt-4 pb-2">
-        <p className="font-semibold text-medium leading-snug">{playbook.title}</p>
-        <p className="text-tiny text-default-500 leading-relaxed line-clamp-2">{playbook.hook}</p>
+        {/* Squad name (most prominent) */}
+        <p className="font-semibold text-medium leading-snug line-clamp-2 min-h-[2.4em]">
+          {p.name}
+        </p>
+
+        {/* Squad description */}
+        {p.description && (
+          <p className="text-tiny text-default-500 leading-relaxed line-clamp-3 min-h-[3.6em]">
+            {p.description}
+          </p>
+        )}
       </CardBody>
 
-      <CardFooter className="px-5 pt-2 pb-4 flex-col items-start gap-2">
-        <div className="flex items-center gap-2 text-tiny text-default-500">
-          <FontAwesomeIcon icon={faClock} className="opacity-60" />
-          <span>{playbook.duration}</span>
-          <Divider orientation="vertical" className="h-3" />
-          <FontAwesomeIcon icon={faSackDollar} className="opacity-60" />
-          <span>{playbook.budget}</span>
-        </div>
+      <CardFooter className="px-5 pt-2 pb-4 flex-col items-start gap-2.5">
+        {/* Methodology byline (the "成功案例") */}
+        {p.methodology?.author && (
+          <div className="flex items-center gap-2 text-tiny text-default-700 w-full">
+            <FontAwesomeIcon icon={faBookOpen} className="text-default-400 shrink-0" />
+            <span className="font-medium truncate">
+              {p.methodology.author}
+              {p.methodology.year && (
+                <span className="text-default-400 font-normal"> · {p.methodology.year}</span>
+              )}
+            </span>
+          </div>
+        )}
+
         <Divider />
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Chip size="sm" variant="flat" color={cc} startContent={<FontAwesomeIcon icon={faPeopleGroup} className="text-tiny ml-1" />}>
-            {playbook.squadCount} squad
-          </Chip>
-          <Chip size="sm" variant="flat" startContent={<FontAwesomeIcon icon={faUsers} className="text-tiny ml-1" />}>
-            {playbook.personaCount} 顧問
-          </Chip>
-          <Chip size="sm" variant="flat" startContent={<FontAwesomeIcon icon={faBroadcastTower} className="text-tiny ml-1" />}>
-            {playbook.channelCount} 通路
-          </Chip>
+
+        {/* Members + steps row */}
+        <div className="flex items-center justify-between w-full gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {p.memberPreview.length > 0 ? (
+              <>
+                <div className="flex items-center -space-x-2">
+                  {p.memberPreview.slice(0, 4).map((m, i) => (
+                    <span key={m.id ?? i} className="ring-2 ring-content1 rounded-full">
+                      <AgentAvatar
+                        seed={m.id ?? m.name ?? `m${i}`}
+                        size={28}
+                        className="rounded-full"
+                      />
+                    </span>
+                  ))}
+                </div>
+                <span className="text-tiny text-default-500 ml-1">{p.memberCount} 位顧問</span>
+              </>
+            ) : (
+              <Chip size="sm" variant="flat"
+                startContent={<FontAwesomeIcon icon={faUsers} className="text-tiny ml-1" />}>
+                {p.memberCount} 位顧問
+              </Chip>
+            )}
+          </div>
+          {p.stepCount > 0 && (
+            <Chip size="sm" variant="flat"
+              startContent={<FontAwesomeIcon icon={faCheck} className="text-tiny ml-1" />}>
+              {p.stepCount} 步驟
+            </Chip>
+          )}
         </div>
       </CardFooter>
     </Card>
   );
 }
 
-// ──────────────────────────────────────────────────────────
-// PlaybookDetail — HeroUI Drawer
-// ──────────────────────────────────────────────────────────
+/* ─────────────────────────── PlaybookDetail ─────────────────────────── */
 
 function PlaybookDetail({
-  id, onClose, brandId, brandName, onApplied,
+  squad, onClose, brandId, brandName, onLaunched,
 }: {
-  id: string | null;
+  squad: SquadPlaybook | null;
   onClose: () => void;
   brandId: number | null;
   brandName: string | null;
-  onApplied: (missionId: number | null, nextSteps: any[]) => void;
+  onLaunched: (missionId: number) => void;
 }) {
-  const detailQuery = (trpc as any).playbook.get.useQuery(
-    { id: id ?? "" },
-    { enabled: !!id }
-  );
-  const applyMut = (trpc as any).playbook.activate.useMutation();
-  const data = detailQuery.data;
-
+  const createMission = (trpc as any).mission?.create?.useMutation?.() ?? { mutateAsync: async () => null };
+  const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
-  const applying = applyMut.isPending ?? applyMut.isLoading ?? false;
 
-  const handleApply = async () => {
-    if (!brandId || !id) {
-      setApplyError("請先在右上角選擇品牌");
+  const onLaunch = async () => {
+    if (!squad || !brandId) {
+      setApplyError("請先選擇品牌");
       return;
     }
+    setApplying(true);
     setApplyError(null);
     try {
-      const r = await applyMut.mutateAsync({ playbookId: id, brandId });
-      onApplied(r.missionId ?? null, r.nextSteps ?? []);
+      const res = await createMission.mutateAsync({
+        title: squad.taskLabel || squad.name,
+        description: squad.description ?? "",
+        squadSlug: squad.slug,
+        workspace: squad.workspace?.[0] ?? "",
+        brandId,
+        brandName,
+      });
+      if (!res?.id) throw new Error("後端沒有回傳 mission id");
+      onLaunched(Number(res.id));
     } catch (e: any) {
-      setApplyError(String(e?.message ?? e));
+      setApplyError(`啟動失敗：${e?.message ?? e}`);
+    } finally {
+      setApplying(false);
     }
   };
 
-  const cc = data ? colorOf(data.badge) : "default";
+  const lk = squad ? layerKey(squad.strategyLayer) : "L1";
+  const lkColor = LAYER_COLOR[lk] ?? "default";
 
   return (
     <Drawer
-      isOpen={!!id}
+      isOpen={!!squad}
       onClose={onClose}
       size="2xl"
       placement="right"
@@ -385,23 +427,16 @@ function PlaybookDetail({
       hideCloseButton
     >
       <DrawerContent>
-        {detailQuery.isLoading || !data ? (
+        {!squad ? (
           <DrawerBody className="items-center justify-center">
             <Spinner label="載入方案中…" />
           </DrawerBody>
         ) : (
           <>
-            <DrawerHeader
-              className="flex flex-col gap-3 px-8 pt-6 pb-5 relative"
-              style={{ background: `linear-gradient(135deg, ${data.color}18 0%, ${data.color}06 100%)` }}
-            >
+            <DrawerHeader className="flex flex-col gap-3 px-8 pt-6 pb-5 relative bg-default-50">
               <Button
-                isIconOnly
-                size="sm"
-                variant="light"
-                radius="full"
-                onPress={onClose}
-                aria-label="關閉"
+                isIconOnly size="sm" variant="light" radius="full"
+                onPress={onClose} aria-label="關閉"
                 className="absolute top-4 right-4"
               >
                 <FontAwesomeIcon icon={faXmark} />
@@ -410,25 +445,26 @@ function PlaybookDetail({
               <Breadcrumbs size="sm">
                 <BreadcrumbItem href="/">首頁</BreadcrumbItem>
                 <BreadcrumbItem onPress={onClose}>成長方案</BreadcrumbItem>
-                <BreadcrumbItem>{data.title}</BreadcrumbItem>
+                <BreadcrumbItem>{squad.name}</BreadcrumbItem>
               </Breadcrumbs>
 
-              <div className="flex items-start gap-4">
-                <div className="text-5xl leading-none">{data.emoji}</div>
-                <div className="flex-1 min-w-0">
-                  <Chip size="sm" color={cc} variant="flat" className="uppercase tracking-wider mb-1">
-                    {BADGE_COPY[data.badge] ?? data.badge} · 成長方案
-                  </Chip>
-                  <h2 className="font-semibold text-2xl leading-tight mb-2">{data.title}</h2>
-                  <p className="text-default-600 text-small leading-relaxed">{data.hook}</p>
-                </div>
+              <div className="flex items-start gap-2 flex-wrap">
+                <Chip size="sm" color={lkColor} variant="flat"
+                  startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}>
+                  {lk} · {LAYER_LABEL[lk] ?? "策略"}
+                </Chip>
+                {squad.taskLabel && (
+                  <TaskChip
+                    entity={{ taskLabel: squad.taskLabel, mockup: squad.mockup, workspace: squad.workspace, name: squad.name }}
+                    kind="squad" size="sm"
+                  />
+                )}
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mt-2">
-                <MetaCard icon={faClock}     label="期間" value={data.duration} />
-                <MetaCard icon={faSackDollar} label="預算" value={data.budget} />
-                <MetaCard icon={faBullseye}   label="適合" value={data.audience} small />
-              </div>
+              <h2 className="font-semibold text-2xl leading-tight tracking-tight">{squad.name}</h2>
+              {squad.description && (
+                <p className="text-default-600 text-small leading-relaxed">{squad.description}</p>
+              )}
             </DrawerHeader>
 
             <DrawerBody className="p-0">
@@ -442,129 +478,107 @@ function PlaybookDetail({
                   panel: "p-0 h-full overflow-hidden",
                 }}
               >
-                {/* ── Tab 1: Overview ───────────────────────────────── */}
                 <Tab key="overview" title="總覽">
                   <ScrollShadow className="h-full">
-                    <div className="px-8 py-6 space-y-7">
-                      <Section title="這個方案在解什麼痛">
-                        <p className="text-foreground text-small leading-relaxed whitespace-pre-line">
-                          {data.problem}
-                        </p>
-                      </Section>
+                    <div className="px-8 py-6 space-y-6">
+                      {/* 成功案例 = methodology byline */}
+                      {squad.methodology?.author && (
+                        <Section title="成功案例 / 方法論起源">
+                          <Card shadow="none" className="border border-divider">
+                            <CardBody className="gap-2 p-5">
+                              <div className="flex items-center gap-3">
+                                <span className="w-12 h-12 rounded-medium bg-secondary-100 flex items-center justify-center">
+                                  <FontAwesomeIcon icon={faBookOpen} className="text-large text-secondary" />
+                                </span>
+                                <div>
+                                  <p className="text-tiny tracking-wider uppercase text-default-500">METHODOLOGY</p>
+                                  <p className="text-medium font-bold">{squad.methodology.author}</p>
+                                  {squad.methodology.year && (
+                                    <p className="text-tiny text-default-500">{squad.methodology.year}</p>
+                                  )}
+                                </div>
+                              </div>
+                              {squad.methodology.summary && (
+                                <Snippet
+                                  hideSymbol variant="flat" color="secondary"
+                                  className="w-full mt-1"
+                                  classNames={{ pre: "whitespace-pre-wrap text-small" }}
+                                >
+                                  {squad.methodology.summary}
+                                </Snippet>
+                              )}
+                            </CardBody>
+                          </Card>
+                        </Section>
+                      )}
 
-                      <Section title="方案組合">
-                        <Snippet
-                          hideSymbol
-                          variant="flat"
-                          color={cc}
-                          className="mb-4 w-full"
-                          classNames={{ pre: "whitespace-pre-wrap text-small" }}
-                        >
-                          {data.pitch}
-                        </Snippet>
-                        <div className="grid grid-cols-3 gap-3">
-                          <BundleCard label="任務範本" count={data.bundle.squadSlugs.length} detail={data.bundle.squadSlugs.join(" · ")} />
-                          <BundleCard label="顧問"     count={data.bundle.personaIds.length} detail={data.bundle.personaIds.join(" · ")} />
-                          <BundleCard label="媒體通路" count={data.bundle.channelIds.length} detail={data.bundle.channelIds.join(" · ")} />
-                        </div>
-                      </Section>
-                    </div>
-                  </ScrollShadow>
-                </Tab>
-
-                {/* ── Tab 2: Roadmap ────────────────────────────────── */}
-                <Tab key="roadmap" title={`Roadmap · ${data.phases.length}`}>
-                  <ScrollShadow className="h-full">
-                    <div className="px-8 py-6">
-                      <Accordion
-                        variant="bordered"
-                        selectionMode="multiple"
-                        defaultExpandedKeys={data.phases.length ? ["0"] : []}
-                      >
-                        {data.phases.map((ph: any, idx: number) => (
-                          <AccordionItem
-                            key={String(idx)}
-                            aria-label={ph.name}
-                            startContent={<Chip size="sm" color={cc} variant="flat">{ph.week}</Chip>}
-                            title={<span className="font-semibold text-small">{ph.name}</span>}
-                            subtitle={<span className="text-tiny text-default-500">{ph.tasks.length} 項任務 · {ph.deliverables.length} 項產出</span>}
-                          >
-                            <ul className="text-small space-y-1.5 mb-3 pl-1">
-                              {ph.tasks.map((t: string, i: number) => (
-                                <li key={i} className="flex gap-2">
-                                  <FontAwesomeIcon icon={faCheck} className="text-tiny mt-1 text-success" />
-                                  <span className="flex-1">{t}</span>
-                                </li>
-                              ))}
-                            </ul>
-                            <Divider className="my-2" />
-                            <div className="text-tiny text-default-500">
-                              <span className="font-medium text-default-600">產出：</span>
-                              {ph.deliverables.map((d: string, i: number) => (
-                                <Chip key={i} size="sm" variant="flat" className="ml-1 my-0.5">{d}</Chip>
-                              ))}
-                            </div>
-                          </AccordionItem>
-                        ))}
-                      </Accordion>
-                    </div>
-                  </ScrollShadow>
-                </Tab>
-
-                {/* ── Tab 3: Case ───────────────────────────────────── */}
-                <Tab key="case" title="成功案例">
-                  <ScrollShadow className="h-full">
-                    <div className="px-8 py-6">
-                      <Card shadow="none" className="border border-divider" style={{ background: `${data.color}08` }}>
-                        <CardBody className="gap-3 p-5">
-                          <div className="flex items-center gap-2">
-                            <Chip size="sm" variant="flat">{data.successCase.industry}</Chip>
-                            <Chip size="sm" variant="flat">{data.successCase.scope}</Chip>
-                          </div>
-                          <p className="font-semibold text-medium" style={{ color: data.color }}>
-                            {data.successCase.brand}
-                          </p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <BeforeAfter label="Before" text={data.successCase.before} />
-                            <BeforeAfter label="After"  text={data.successCase.after} highlight={data.color} />
-                          </div>
-                          <Divider />
-                          <p className="text-tiny uppercase tracking-wider text-default-500">關鍵動作</p>
-                          <ul className="text-small space-y-1.5">
-                            {data.successCase.keyMoves.map((m: string, i: number) => (
-                              <li key={i} className="flex gap-2">
-                                <FontAwesomeIcon icon={faCheck} className="text-tiny mt-1" style={{ color: data.color }} />
-                                <span className="flex-1">{m}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <Divider />
-                          <Snippet
-                            hideSymbol
-                            variant="flat"
-                            color={cc}
-                            classNames={{ pre: "whitespace-pre-wrap text-small font-medium" }}
-                          >
-                            {data.successCase.outcome}
-                          </Snippet>
-                        </CardBody>
-                      </Card>
-                    </div>
-                  </ScrollShadow>
-                </Tab>
-
-                {/* ── Tab 4: KPIs ───────────────────────────────────── */}
-                <Tab key="kpis" title={`預期 KPI · ${data.kpis.length}`}>
-                  <ScrollShadow className="h-full">
-                    <div className="px-8 py-6">
-                      <p className="text-tiny tracking-wider uppercase text-default-500 mb-3">
-                        90 天內可驗證的成效指標
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {data.kpis.map((k: string, i: number) => (
-                          <Chip key={i} size="md" variant="bordered" color={cc}>{k}</Chip>
-                        ))}
+                      <div className="grid grid-cols-3 gap-3">
+                        <StatCard label="顧問" count={squad.memberCount} icon={faUsers} />
+                        <StatCard label="工作步驟" count={squad.stepCount} icon={faCheck} />
+                        <StatCard label="通路" count={squad.workspace.length} icon={faLayerGroup} />
                       </div>
+                    </div>
+                  </ScrollShadow>
+                </Tab>
+
+                <Tab key="agents" title={`顧問 · ${squad.memberCount}`}>
+                  <ScrollShadow className="h-full">
+                    <div className="px-8 py-6 space-y-3">
+                      {squad.memberPreview.length === 0 ? (
+                        <p className="text-small text-default-500">此方案尚未配置 agent。</p>
+                      ) : (
+                        squad.memberPreview.map((m, i) => (
+                          <Card key={m.id ?? i} shadow="none" className="border border-divider">
+                            <CardBody className="p-3">
+                              <div className="flex items-center gap-3">
+                                <AgentAvatar
+                                  seed={m.id ?? m.name ?? `m${i}`}
+                                  size={48}
+                                  className="rounded-full ring-2 ring-default-200 shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-small font-bold truncate">{m.name ?? "—"}</p>
+                                  {m.role && <p className="text-tiny text-default-500 truncate">{m.role}</p>}
+                                  {m.primarySkill && (
+                                    <Chip size="sm" variant="flat" className="mt-1">{m.primarySkill}</Chip>
+                                  )}
+                                </div>
+                              </div>
+                            </CardBody>
+                          </Card>
+                        ))
+                      )}
+                      {squad.memberPreview.length < squad.memberCount && (
+                        <p className="text-tiny text-default-500 text-center">
+                          + 還有 {squad.memberCount - squad.memberPreview.length} 位 ·
+                          完整名單於啟動後查看
+                        </p>
+                      )}
+                    </div>
+                  </ScrollShadow>
+                </Tab>
+
+                <Tab key="meta" title="標籤">
+                  <ScrollShadow className="h-full">
+                    <div className="px-8 py-6 space-y-4">
+                      {squad.workspace.length > 0 && (
+                        <Section title="適用通路">
+                          <div className="flex flex-wrap gap-1.5">
+                            {squad.workspace.map((w, i) => (
+                              <Chip key={i} size="sm" variant="flat">{w}</Chip>
+                            ))}
+                          </div>
+                        </Section>
+                      )}
+                      {squad.tags.length > 0 && (
+                        <Section title="標籤">
+                          <div className="flex flex-wrap gap-1.5">
+                            {squad.tags.map((t, i) => (
+                              <Chip key={i} size="sm" variant="bordered">{t}</Chip>
+                            ))}
+                          </div>
+                        </Section>
+                      )}
                     </div>
                   </ScrollShadow>
                 </Tab>
@@ -580,25 +594,19 @@ function PlaybookDetail({
               )}
               <Tooltip content={!brandId ? "請先選擇品牌" : ""} isDisabled={!!brandId}>
                 <Button
-                  color="primary"
-                  size="lg"
-                  radius="lg"
+                  color="primary" size="lg" radius="lg"
                   className="w-full font-medium"
                   isLoading={applying}
                   isDisabled={!brandId}
-                  onPress={handleApply}
+                  onPress={onLaunch}
+                  startContent={!applying && <FontAwesomeIcon icon={faRocket} />}
                   endContent={!applying && <FontAwesomeIcon icon={faArrowUpRightFromSquare} />}
-                  style={{ background: brandId ? data.color : undefined }}
                 >
-                  {applying
-                    ? "套用中…"
-                    : brandName
-                    ? `套用此方案到 ${brandName}`
-                    : "套用此方案"}
+                  {applying ? "啟動中…" : `派出方案 · ${squad.memberCount} 位顧問接力`}
                 </Button>
               </Tooltip>
               <p className="text-tiny text-default-500 text-center">
-                套用後會建立任務、自動推薦 squad、預先呼叫顧問團
+                派出後跳到 picker 工作台 · 顧問逐段交付完整成品
               </p>
             </DrawerFooter>
           </>
@@ -607,10 +615,6 @@ function PlaybookDetail({
     </Drawer>
   );
 }
-
-// ──────────────────────────────────────────────────────────
-// Subcomponents
-// ──────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -623,50 +627,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function MetaCard({
-  icon, label, value, small = false,
-}: { icon: any; label: string; value: string; small?: boolean }) {
+function StatCard({
+  label, count, icon,
+}: { label: string; count: number; icon: any }) {
   return (
-    <Card shadow="none" className="border border-divider/60 bg-content1/60 backdrop-blur-sm">
-      <CardBody className="p-2.5 gap-1">
-        <div className="flex items-center gap-1.5 text-tiny uppercase tracking-wider text-default-500">
+    <Card shadow="none" className="border border-divider">
+      <CardBody className="p-4 gap-1">
+        <div className="flex items-center gap-1.5 text-tiny tracking-wider uppercase text-default-500">
           <FontAwesomeIcon icon={icon} />
           <span>{label}</span>
         </div>
-        <p className={small ? "text-tiny font-medium leading-snug" : "text-small font-medium"}>
-          {value}
-        </p>
+        <p className="font-semibold text-2xl tabular-nums leading-none">{count}</p>
       </CardBody>
     </Card>
-  );
-}
-
-function BundleCard({
-  label, count, detail,
-}: { label: string; count: number; detail: string }) {
-  return (
-    <Card shadow="none" className="border border-divider">
-      <CardBody className="p-3 gap-1">
-        <p className="text-tiny uppercase tracking-wider text-default-500">{label}</p>
-        <p className="font-semibold text-2xl leading-none">{count}</p>
-        <p className="text-tiny text-default-500 line-clamp-2 leading-snug">{detail}</p>
-      </CardBody>
-    </Card>
-  );
-}
-
-function BeforeAfter({
-  label, text, highlight,
-}: { label: string; text: string; highlight?: string }) {
-  return (
-    <div>
-      <p className="text-tiny uppercase tracking-wider text-default-500 mb-1">{label}</p>
-      <p
-        className="text-small leading-relaxed"
-        style={highlight ? { color: highlight, fontWeight: 500 } : undefined}
-      >
-        {text}
-      </p>
-    </div>
   );
 }
