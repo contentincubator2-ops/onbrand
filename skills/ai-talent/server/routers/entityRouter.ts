@@ -74,17 +74,10 @@ function getInitial(name: string): string {
   return (trimmed.charAt(0) || "?").toUpperCase();
 }
 
-/**
- * Canonical agent avatar URL — DiceBear avataaars style, deterministic by name.
- * Matches the cartoon-portrait look already used on QuickTasks / Picker /
- * Boardroom. Single source of truth so Templates / Boardroom / Picker /
- * QuickTasks render identical avatars for the same agent.
- *
- * Per design system: agent → cartoon portrait; squad/skill → Notion line art.
- */
-function agentAvatarUrl(name: string): string {
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
-}
+// Agent avatars use generated B&W line-art portraits stored in
+// agents.avatarUrl (see scripts/generateAgentAvatars.ts). DiceBear cartoon
+// avatars were tried but rejected — too cartoony. Real photos rejected
+// too — face-collision risk. Line-art portrait is the chosen middle ground.
 
 // ── Unified entity shape (matches HeroUI Card slots) ───────────────────────
 export interface HomeEntity {
@@ -269,9 +262,8 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
       stepCount: 0,
       memberCount: 1,
       workspace: r.workspace ? [String(r.workspace)] : [],
-      // Always use DiceBear avataaars for agents (cartoon portrait per design
-      // system). Ignore agents.avatarUrl (legacy line-art from gpt-image-2).
-      coverImageUrl: agentAvatarUrl(name),
+      // Use generated B&W half-body line-art portrait stored in avatarUrl.
+      coverImageUrl: (r as any).avatarUrl ?? null,
     };
   });
 }
@@ -354,11 +346,10 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
       stepCount: 0,
       memberCount: kind === "agent" ? 1 : 0,
       workspace: [],
-      // Agent-template skills are rendered as agents → DiceBear cartoon portrait.
-      // Plain skills use the generated cover image (Notion line art).
-      coverImageUrl: kind === "agent"
-        ? agentAvatarUrl(name)
-        : (r.cover_image_url ?? null),
+      // Agent-template skills currently fall back to cover_image_url; native
+      // agents use line-art portrait from soworkAgents.avatarUrl. Mixing the
+      // two is acceptable until we generate portraits for agent-templates too.
+      coverImageUrl: r.cover_image_url ?? null,
     };
   });
 }

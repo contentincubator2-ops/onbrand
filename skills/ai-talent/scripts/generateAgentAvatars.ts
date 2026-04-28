@@ -83,13 +83,15 @@ function buildAvatarPrompt(agent: { id: number; slug: string; name: string; titl
     "no color, no shading, no fills, no gradients, no halftones",
     "thin clean continuous lines, vector-like quality",
     "minimalist editorial portrait, gallery line art aesthetic",
-    // SUBJECT — variable
-    `${angle} head-and-shoulders portrait of a person`,
+    // SUBJECT — variable. Half-body framing (waist-up, hands visible if natural)
+    // so the same image works as round avatar AND as larger card portrait.
+    `${angle} half-body portrait of a person, waist-up framing showing head, shoulders, and upper torso`,
     `${face} face`,
     `${hairStyle} hair`,
     eyewear === "no glasses" ? "" : eyewear,
     `${expression} expression`,
     `wearing ${outfit}`,
+    "subject centered with generous space above head and below shoulders for safe cropping",
     // CONSTRAINTS
     "centered composition, balanced negative space, no text, no logos, no watermarks",
   ].filter(Boolean).join(", ").slice(0, 800);
