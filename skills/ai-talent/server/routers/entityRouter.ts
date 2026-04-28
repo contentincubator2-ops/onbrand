@@ -74,6 +74,18 @@ function getInitial(name: string): string {
   return (trimmed.charAt(0) || "?").toUpperCase();
 }
 
+/**
+ * Canonical agent avatar URL — DiceBear avataaars style, deterministic by name.
+ * Matches the cartoon-portrait look already used on QuickTasks / Picker /
+ * Boardroom. Single source of truth so Templates / Boardroom / Picker /
+ * QuickTasks render identical avatars for the same agent.
+ *
+ * Per design system: agent → cartoon portrait; squad/skill → Notion line art.
+ */
+function agentAvatarUrl(name: string): string {
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
+}
+
 // ── Unified entity shape (matches HeroUI Card slots) ───────────────────────
 export interface HomeEntity {
   id: number;
@@ -257,7 +269,9 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
       stepCount: 0,
       memberCount: 1,
       workspace: r.workspace ? [String(r.workspace)] : [],
-      coverImageUrl: (r as any).avatarUrl ?? null,
+      // Always use DiceBear avataaars for agents (cartoon portrait per design
+      // system). Ignore agents.avatarUrl (legacy line-art from gpt-image-2).
+      coverImageUrl: agentAvatarUrl(name),
     };
   });
 }
@@ -340,7 +354,11 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
       stepCount: 0,
       memberCount: kind === "agent" ? 1 : 0,
       workspace: [],
-      coverImageUrl: r.cover_image_url ?? null,
+      // Agent-template skills are rendered as agents → DiceBear cartoon portrait.
+      // Plain skills use the generated cover image (Notion line art).
+      coverImageUrl: kind === "agent"
+        ? agentAvatarUrl(name)
+        : (r.cover_image_url ?? null),
     };
   });
 }
