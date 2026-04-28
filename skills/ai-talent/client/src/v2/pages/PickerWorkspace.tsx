@@ -26,6 +26,7 @@ import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitiv
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMockupFields, type MockupVariant } from "../lib/inferMockup";
+import { searchAndRankSquads } from "../lib/searchSquads";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import { TaskChip } from "../components/TaskChip";
@@ -425,42 +426,23 @@ export default function PickerWorkspace() {
     return true;
   };
 
+  // PR6 — score-based ranking using shared search lib.
+  // When query is non-empty, results are score-ranked (best match first).
+  // When query is empty, fall back to facet-only filter (original order).
+  const searchResult = useMemo(() => searchAndRankSquads(allSquads, q), [allSquads, q]);
+  const bestMatchSlugs = useMemo(
+    () => new Set(searchResult.hits.filter((h) => h.isBestMatch).map((h) => h.squad.slug)),
+    [searchResult],
+  );
   const filtered = useMemo(() => {
-    const ql = q.trim().toLowerCase();
-    return allSquads.filter((s) => {
-      if (!passesFacets(s)) return false;
-      // Text search — match if ANY synonym hits the expanded haystack.
-      if (ql) {
-        const stepText = Array.isArray(s.steps)
-          ? s.steps.map((st: any) => `${st.name ?? ""} ${st.description ?? ""} ${st.outputType ?? ""}`).join(" ")
-          : "";
-        const memberNames = Array.isArray(s.members)
-          ? s.members.map((m: any) => `${m.name ?? ""} ${m.role ?? ""} ${m.primarySkill ?? ""}`).join(" ")
-          : "";
-        const haystack = [
-          pickLocaleText(s.name, "zh-TW"),
-          pickLocaleText(s.name, "en"),
-          pickLocaleText(s.description, "zh-TW"),
-          pickLocaleText(s.description, "en"),
-          s.slug,
-          s.methodology?.author,
-          s.methodology?.summary,
-          typeof s.methodology === "string" ? s.methodology : "",
-          (s.tags ?? []).join(" "),
-          (s.useCases ?? []).join(" "),
-          (s.outputFormats ?? []).join(" "),
-          (s.workspace ?? []).join(" "),
-          stepText,
-          memberNames,
-          s.lead?.name,
-          s.lead?.primarySkill,
-        ].filter(Boolean).join(" ").toLowerCase();
-        const terms = expandSynonyms(ql);
-        if (!terms.some((t) => haystack.includes(t))) return false;
-      }
-      return true;
-    });
-  }, [allSquads, layerFilter, channelFilter, q]);
+    const ql = q.trim();
+    if (ql) {
+      // Score-ranked path — facets still apply but ranking trumps order
+      return searchResult.hits.map((h) => h.squad).filter(passesFacets);
+    }
+    // No query — original facet-only filter, original order
+    return allSquads.filter(passesFacets);
+  }, [allSquads, q, searchResult, layerFilter, channelFilter]);
 
   const selectedSquad = useMemo(
     () => filtered.find((s) => s.slug === selectedSlug)

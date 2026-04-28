@@ -22,6 +22,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
+import { searchAndRankSquads } from "../lib/searchSquads";
 import { SquadEntityCard } from "../components/SquadEntityCard";
 import { EntityStats } from "../components/EntityStats";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
@@ -194,77 +195,29 @@ export default function MissionsHome() {
   const [searchQ, setSearchQ] = useState("");
 
   // Featured: filter by selected layer + searchQ, then sort, then slice
+  // PR6 — uses shared searchAndRankSquads for score-based ranking.
   const featured = useMemo(() => {
     const layerOrder = ["L1", "L2", "L3", "L4", "L5", "L6"];
-    const q = searchQ.trim().toLowerCase();
-    const synonymGroups: Array<string[]> = [
-      ["貼文", "po文", "post", "posts", "content", "social-media", "social media"],
-      ["文案", "copy", "copywriting", "ad copy"],
-      ["廣告", "ad", "ads", "advertising", "paid", "paid-ads"],
-      ["影片", "短影音", "video", "reels", "shorts", "tiktok"],
-      ["品牌", "brand", "branding"],
-      ["定位", "positioning"],
-      ["上市", "發表", "launch", "go-to-market", "gtm"],
-      ["受眾", "客群", "audience", "persona", "icp"],
-      ["公關", "媒體", "pr", "press", "media-relations"],
-      ["電子報", "edm", "email", "newsletter"],
-      ["故事", "敘事", "story", "storytelling", "narrative"],
-      ["策略", "strategy"],
-      ["活動", "campaign", "event"],
-      ["創意", "creative"],
-    ];
-    const expandTerms = (ql: string): string[] => {
-      const out = new Set<string>([ql]);
-      for (const g of synonymGroups) {
-        if (g.some((t) => ql.includes(t.toLowerCase()) || t.toLowerCase().includes(ql))) {
-          for (const t of g) out.add(t.toLowerCase());
-        }
-      }
-      return [...out];
-    };
-    const matchesQ = (s: any) => {
-      if (!q) return true;
-      const stepText = Array.isArray(s.steps)
-        ? s.steps.map((st: any) => `${st.name ?? ""} ${st.outputType ?? ""}`).join(" ")
-        : "";
-      const haystack = [
-        pickLocaleText(s.name, "zh-TW"),
-        pickLocaleText(s.name, "en"),
-        pickLocaleText(s.description, "zh-TW"),
-        pickLocaleText(s.description, "en"),
-        s.slug,
-        s.methodology?.author,
-        s.methodology?.summary,
-        typeof s.methodology === "string" ? s.methodology : "",
-        Array.isArray(s.workspace) ? s.workspace.join(" ") : (s.workspace ?? ""),
-        Array.isArray(s.tags) ? s.tags.join(" ") : "",
-        Array.isArray(s.useCases) ? s.useCases.join(" ") : "",
-        Array.isArray(s.outputFormats) ? s.outputFormats.join(" ") : "",
-        stepText,
-        s.lead?.name,
-        s.lead?.primarySkill,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const terms = expandTerms(q);
-      return terms.some((t) => haystack.includes(t));
-    };
-    const filtered = allEntities
-      .filter((s) => kindFilter === "all" ? true : s.kind === kindFilter)
-      .filter((s) =>
-        selectedLayer === "ALL"
-          ? true
-          : (s.strategyLayer ?? "").toString().slice(0, 2) === selectedLayer
-      )
-      .filter(matchesQ);
+    const q = searchQ.trim();
+    const passesFacets = (s: any) =>
+      (kindFilter === "all" || s.kind === kindFilter) &&
+      (selectedLayer === "ALL" || (s.strategyLayer ?? "").toString().slice(0, 2) === selectedLayer);
+
+    if (q) {
+      // Score-ranked: best matches first
+      const result = searchAndRankSquads(allEntities, q);
+      const ranked = result.hits.map((h) => h.squad).filter(passesFacets);
+      return ranked.slice(0, 24);
+    }
+    // No query — facet-only filter, sorted by layer
+    const filtered = allEntities.filter(passesFacets);
     return [...filtered]
       .sort((a, b) => {
         const la = (a.strategyLayer ?? "L9").slice(0, 2);
         const lb = (b.strategyLayer ?? "L9").slice(0, 2);
         return layerOrder.indexOf(la) - layerOrder.indexOf(lb);
       })
-      .slice(0, q ? 24 : (selectedLayer === "ALL" ? 12 : 24));
+      .slice(0, selectedLayer === "ALL" ? 12 : 24);
   }, [allEntities, kindFilter, selectedLayer, searchQ]);
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
   const [sortDesc, setSortDesc] = useState(true);
