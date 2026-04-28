@@ -637,15 +637,20 @@ export const playbookRouter = router({
    * a squad backed by a real methodology / "success case".
    */
   listFromSquads: protectedProcedure.query(async () => {
+    // Only squads with a real success case — relies on the existing
+    // `showcases` JSON column. squad-builder auto-fills 1 baseline
+    // showcase per squad ("由 X 主導，運用 Y 方法論"); curator-added
+    // real cases push the array to 2+, which is what we filter for.
     const [rows] = (await localPool.execute(`
       SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
              s.strategy_layer, s.methodology, s.workspace, s.tags,
              s.task_label_zh, s.task_label_en,
              s.mockup_platform, s.mockup_format,
-             s.case_study
+             s.showcases
         FROM squads s
        WHERE s.is_active = 1
-         AND s.case_study IS NOT NULL
+         AND s.showcases IS NOT NULL
+         AND JSON_LENGTH(s.showcases) >= 2
        ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
     `)) as any;
 
@@ -658,7 +663,7 @@ export const playbookRouter = router({
     return (rows as any[])
       .map((r) => {
         const methodology = safe(r.methodology) ?? (typeof r.methodology === "string" ? { summary: r.methodology } : null);
-        const caseStudy = safe(r.case_study);
+        const showcases = (safe(r.showcases) ?? []) as Array<{ title?: string; description?: string; result?: string }>;
         const members  = safe(r.agents)  ?? [];
         const steps    = safe(r.steps)   ?? [];
         const workspace= safe(r.workspace) ?? [];
@@ -684,10 +689,10 @@ export const playbookRouter = router({
             year:   typeof methodology === "object" ? methodology.year   ?? null : null,
             summary: typeof methodology === "object" ? methodology.summary ?? null : null,
           } : null,
-          // The actual track-record proof — when populated this squad
-          // shows on /playbooks. Shape: {brand, industry, scope, before,
-          // after, key_moves[], outcome, source_note}.
-          caseStudy: caseStudy ?? null,
+          // Track-record proof — uses existing `showcases` column.
+          // Each item: { title, description, result }. SQL filter
+          // ensures length >= 2 (1 baseline auto-fill + curator-added).
+          showcases,
           workspace: Array.isArray(workspace) ? workspace : [],
           tags: Array.isArray(tags) ? tags : [],
           mockup: (r.mockup_platform && r.mockup_format)

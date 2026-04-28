@@ -37,15 +37,10 @@ interface MemberPreview {
   primarySkill: string | null;
 }
 
-interface CaseStudy {
-  brand: string;
-  industry?: string;
-  scope?: string;
-  before?: string;
-  after?: string;
-  key_moves?: string[];
-  outcome: string;
-  source_note?: string;
+interface Showcase {
+  title?: string;
+  description?: string;
+  result?: string;
 }
 
 interface SquadPlaybook {
@@ -64,7 +59,7 @@ interface SquadPlaybook {
     year: number | null;
     summary: string | null;
   } | null;
-  caseStudy: CaseStudy | null;
+  showcases: Showcase[];
   workspace: string[];
   tags: string[];
   mockup?: { platform: string; format: string };
@@ -259,7 +254,7 @@ export default function PlaybooksPage() {
             </p>
             <p className="text-small text-default-500 max-w-[480px]">
               {playbooks.length === 0
-                ? "這個頁面只展示有真實成功案例的 squad（如 HubSpot 12mo +400%）。為 squad 補上 case_study 後就會出現在這裡。"
+                ? "這個頁面只展示有真實成功案例的 squad。為 squad 的 showcases JSON 加上第 2 筆以上的真實案例（baseline 自動填的不算），就會出現在這裡。"
                 : "換個關鍵字、或選擇其他類別"}
             </p>
             {(searchQ || layerFilter !== "all") && playbooks.length > 0 && (
@@ -342,21 +337,32 @@ function PlaybookCard({ playbook: p, onClick }: { playbook: SquadPlaybook; onCli
       </CardBody>
 
       <CardFooter className="px-5 pt-2 pb-4 flex-col items-start gap-2.5">
-        {/* Case study — the actual proof. Always present (SQL filtered). */}
-        {p.caseStudy && (
-          <div className="w-full bg-success-50 border border-success-200 rounded-medium px-3 py-2 space-y-1">
-            <div className="flex items-center gap-1.5 text-tiny font-bold text-success-700">
-              <FontAwesomeIcon icon={faTrophy} className="text-tiny" />
-              <span>{p.caseStudy.brand}</span>
-              {p.caseStudy.industry && (
-                <span className="text-default-500 font-normal">· {p.caseStudy.industry}</span>
+        {/* Lead showcase — the curator-added real case (skip baseline at idx 0
+            when there are 2+; otherwise show whatever exists). */}
+        {p.showcases.length > 0 && (() => {
+          const lead = p.showcases.length >= 2 ? p.showcases[1] : p.showcases[0];
+          return (
+            <div className="w-full bg-success-50 border border-success-200 rounded-medium px-3 py-2 space-y-1">
+              <div className="flex items-center gap-1.5 text-tiny font-bold text-success-700">
+                <FontAwesomeIcon icon={faTrophy} className="text-tiny" />
+                <span className="truncate">{lead.title ?? "成功案例"}</span>
+                {p.showcases.length > 2 && (
+                  <span className="text-default-500 font-normal ml-auto">+{p.showcases.length - 2}</span>
+                )}
+              </div>
+              {lead.result && (
+                <p className="text-tiny text-success-700 font-medium leading-snug line-clamp-1">
+                  {lead.result}
+                </p>
+              )}
+              {lead.description && (
+                <p className="text-tiny text-default-600 leading-snug line-clamp-2">
+                  {lead.description}
+                </p>
               )}
             </div>
-            <p className="text-tiny text-default-700 leading-snug line-clamp-2">
-              {p.caseStudy.outcome}
-            </p>
-          </div>
-        )}
+          );
+        })()}
 
         <Divider />
 
@@ -504,73 +510,49 @@ function PlaybookDetail({
                 <Tab key="overview" title="總覽">
                   <ScrollShadow className="h-full">
                     <div className="px-8 py-6 space-y-6">
-                      {/* 真實成功案例 — the actual proof */}
-                      {squad.caseStudy && (
-                        <Section title="成功案例">
-                          <Card shadow="none" className="border border-success-200 bg-success-50">
-                            <CardBody className="gap-3 p-5">
-                              <div className="flex items-center gap-3">
-                                <span className="w-12 h-12 rounded-medium bg-success text-white flex items-center justify-center">
-                                  <FontAwesomeIcon icon={faTrophy} className="text-large" />
-                                </span>
-                                <div>
-                                  <p className="text-tiny tracking-wider uppercase text-success-700 font-medium">CASE STUDY</p>
-                                  <p className="text-medium font-bold">{squad.caseStudy.brand}</p>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    {squad.caseStudy.industry && <Chip size="sm" variant="flat">{squad.caseStudy.industry}</Chip>}
-                                    {squad.caseStudy.scope && <Chip size="sm" variant="flat">{squad.caseStudy.scope}</Chip>}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {(squad.caseStudy.before || squad.caseStudy.after) && (
-                                <div className="grid grid-cols-2 gap-3">
-                                  {squad.caseStudy.before && (
-                                    <div>
-                                      <p className="text-tiny tracking-wider uppercase text-default-500 mb-1">Before</p>
-                                      <p className="text-small leading-relaxed">{squad.caseStudy.before}</p>
+                      {/* Real showcases — skip baseline (idx 0) if there are >= 2 */}
+                      {squad.showcases.length > 0 && (() => {
+                        const realCases = squad.showcases.length >= 2
+                          ? squad.showcases.slice(1)
+                          : squad.showcases;
+                        return (
+                          <Section title={`成功案例 · ${realCases.length}`}>
+                            <div className="space-y-3">
+                              {realCases.map((sc, i) => (
+                                <Card key={i} shadow="none" className="border border-success-200 bg-success-50">
+                                  <CardBody className="gap-3 p-5">
+                                    <div className="flex items-start gap-3">
+                                      <span className="w-12 h-12 rounded-medium bg-success text-white flex items-center justify-center shrink-0">
+                                        <FontAwesomeIcon icon={faTrophy} className="text-large" />
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-tiny tracking-wider uppercase text-success-700 font-medium">CASE STUDY</p>
+                                        <p className="text-medium font-bold leading-snug">{sc.title ?? "成功案例"}</p>
+                                      </div>
                                     </div>
-                                  )}
-                                  {squad.caseStudy.after && (
-                                    <div>
-                                      <p className="text-tiny tracking-wider uppercase text-success-700 mb-1">After</p>
-                                      <p className="text-small leading-relaxed font-medium text-success-700">{squad.caseStudy.after}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
 
-                              {squad.caseStudy.key_moves && squad.caseStudy.key_moves.length > 0 && (
-                                <>
-                                  <Divider />
-                                  <p className="text-tiny tracking-wider uppercase text-default-500">關鍵動作</p>
-                                  <ul className="text-small space-y-1.5">
-                                    {squad.caseStudy.key_moves.map((m, i) => (
-                                      <li key={i} className="flex gap-2">
-                                        <FontAwesomeIcon icon={faCheck} className="text-tiny mt-1 text-success" />
-                                        <span className="flex-1">{m}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </>
-                              )}
+                                    {sc.description && (
+                                      <p className="text-small text-default-700 leading-relaxed whitespace-pre-line">
+                                        {sc.description}
+                                      </p>
+                                    )}
 
-                              <Divider />
-                              <Snippet
-                                hideSymbol variant="flat" color="success"
-                                className="w-full"
-                                classNames={{ pre: "whitespace-pre-wrap text-small font-medium" }}
-                              >
-                                {squad.caseStudy.outcome}
-                              </Snippet>
-
-                              {squad.caseStudy.source_note && (
-                                <p className="text-tiny text-default-500">資料來源：{squad.caseStudy.source_note}</p>
-                              )}
-                            </CardBody>
-                          </Card>
-                        </Section>
-                      )}
+                                    {sc.result && (
+                                      <Snippet
+                                        hideSymbol variant="flat" color="success"
+                                        className="w-full"
+                                        classNames={{ pre: "whitespace-pre-wrap text-small font-medium" }}
+                                      >
+                                        {sc.result}
+                                      </Snippet>
+                                    )}
+                                  </CardBody>
+                                </Card>
+                              ))}
+                            </div>
+                          </Section>
+                        );
+                      })()}
 
                       {/* 方法論作者 (secondary context) */}
                       {squad.methodology?.author && (
