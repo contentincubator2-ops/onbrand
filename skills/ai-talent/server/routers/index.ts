@@ -39,6 +39,7 @@ import { boardroomRouter } from "./boardroomRouter";
 import { mediaHubRouter } from "./mediaHubRouter";
 import { playbookRouter } from "./playbookRouter";
 import { entityRouter } from "./entityRouter";
+import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -81,6 +82,9 @@ export const appRouter = router({
   mediaHub:      mediaHubRouter,
   playbook:      playbookRouter,
   entity:        entityRouter,
+  product:       productRouter,
+  event:         eventRouter,
+  scope:         scopeRouter,
 });
 
 export type AppRouter = typeof appRouter;
