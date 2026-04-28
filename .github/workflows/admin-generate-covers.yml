@@ -41,7 +41,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 1800s
+          command_timeout: 5400s
           envs: GH_TOKEN,DRY,REUSE,LIMIT,SLUG,AZURE_IMAGE_API_KEY,AZURE_IMAGE_ENDPOINT,AZURE_IMAGE_DEPLOYMENT
           script: |
             set -e

@@ -90,30 +90,45 @@ function buildPrompt(squad: { name: string; layer: string; methodology: any; des
 }
 
 // ── Azure gpt-image-2 call (returns base64 PNG) ────────────────────────────
+// Retries on 429 EngineOverloaded with exponential backoff (Azure image
+// deployment is shared and gets bursty under load — retry instead of fail).
 async function generateImage(prompt: string): Promise<Buffer> {
   const url = `${AZ_ENDPOINT}/openai/deployments/${AZ_DEPLOYMENT}/images/generations?api-version=${AZ_API_VERSION}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${AZ_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      prompt,
-      size: "1024x1024",
-      quality: QUALITY,
-      output_format: "png",
-      n: 1,
-    }),
-  });
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`Azure ${resp.status}: ${t.slice(0, 300)}`);
+  const MAX_RETRIES = 5;
+  let lastErr = "";
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${AZ_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt,
+        size: "1024x1024",
+        quality: QUALITY,
+        output_format: "png",
+        n: 1,
+      }),
+    });
+    if (resp.status === 429 || resp.status === 503) {
+      const t = await resp.text();
+      lastErr = `Azure ${resp.status}: ${t.slice(0, 200)}`;
+      const wait = 15000 * (attempt + 1);
+      process.stdout.write(`(429, retry in ${wait/1000}s) `);
+      await new Promise((r) => setTimeout(r, wait));
+      continue;
+    }
+    if (!resp.ok) {
+      const t = await resp.text();
+      throw new Error(`Azure ${resp.status}: ${t.slice(0, 300)}`);
+    }
+    const data: any = await resp.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) throw new Error(`Azure no image in response: ${JSON.stringify(data).slice(0, 200)}`);
+    return Buffer.from(b64, "base64");
   }
-  const data: any = await resp.json();
-  const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) throw new Error(`Azure no image in response: ${JSON.stringify(data).slice(0, 200)}`);
-  return Buffer.from(b64, "base64");
+  throw new Error(`Azure 429 after ${MAX_RETRIES} retries: ${lastErr}`);
 }
 
 async function main() {
