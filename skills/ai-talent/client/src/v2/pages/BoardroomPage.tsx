@@ -18,7 +18,7 @@
  * instead of waiting for the whole batch.
  */
 import React, { useEffect, useMemo, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
@@ -32,7 +32,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRight, faBookOpen, faBrain, faCheck, faCircleCheck, faComments,
   faGavel, faMagnifyingGlass, faPaperPlane, faPenToSquare, faRotateRight,
-  faTriangleExclamation, faUserGroup, faWandMagicSparkles,
+  faTriangleExclamation, faUserGroup, faWandMagicSparkles, faChartSimple,
+  faRocket,
 } from "@fortawesome/free-solid-svg-icons";
 
 type Candidate = {
@@ -44,6 +45,7 @@ type Candidate = {
   aiModel: string;
   providerBucket: string;
   squadId: number | null;
+  squadSlug: string | null;
   squadName: string | null;
   squadMethodology: string | null;
   squadStrategyLayer: string | null;
@@ -91,6 +93,7 @@ const dicebear = (name: string) =>
 /* ─── Page ─────────────────────────────────────────────────────────── */
 
 export default function BoardroomPage() {
+  const navigate = useNavigate();
   const ctx = useOutletContext<ShellOutletCtx>() ?? ({} as ShellOutletCtx);
   const brandId = ctx.brandId ?? undefined;
   const currentBrand = (ctx.brands || []).find((b: any) => b?.id === ctx.brandId);
@@ -101,11 +104,38 @@ export default function BoardroomPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [pitchStates, setPitchStates] = useState<Map<number, PitchState>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [hiringId, setHiringId] = useState<number | null>(null);
 
   const recommendQuery = (trpc as any).boardroom.recommendAgents.useQuery(
     { brandId, query, limit: 12 }, { enabled: false }
   );
   const pitchMut = (trpc as any).boardroom.pitch.useMutation();
+  const createMission = (trpc as any).mission?.create?.useMutation?.() ?? { mutateAsync: async () => null };
+
+  const onHire = async (c: Candidate) => {
+    if (!c.squadSlug) {
+      setError(`${c.name} 沒有對應的 squad（無法直接派出，可能是個人顧問）`);
+      return;
+    }
+    setHiringId(c.agentId);
+    setError(null);
+    try {
+      const res = await createMission.mutateAsync({
+        title: `${c.squadName ?? c.name} · ${query.slice(0, 40)}`,
+        description: query,
+        squadSlug: c.squadSlug,
+        workspace: "",
+        brandId: brandId ?? undefined,
+        brandName: currentBrand?.name,
+      });
+      if (!res?.id) throw new Error("後端沒有回傳 mission id");
+      // Jump into picker workspace with mission active — orchestra produces deliverable
+      navigate(`/picker?mission=${res.id}&slug=${encodeURIComponent(c.squadSlug)}`);
+    } catch (e: any) {
+      setError(`派出 ${c.name} 失敗：${e?.message ?? e}`);
+      setHiringId(null);
+    }
+  };
 
   const recommending = recommendQuery.isFetching;
   const anyPitchInFlight = useMemo(
@@ -304,7 +334,15 @@ export default function BoardroomPage() {
               {Array.from(pitchStates.entries()).map(([agentId, state]) => {
                 const c = candidates.find((x) => x.agentId === agentId);
                 if (!c) return null;
-                return <PitchCard key={agentId} candidate={c} state={state} />;
+                return (
+                  <PitchCard
+                    key={agentId}
+                    candidate={c}
+                    state={state}
+                    onHire={() => onHire(c)}
+                    isHiring={hiringId === c.agentId}
+                  />
+                );
               })}
             </div>
           )}
@@ -494,8 +532,12 @@ function CandidateCard({
           <div className="flex items-center gap-1">
             {statusChip}
             <Tooltip content={`匹配分數：${c.matchScore}`}>
-              <Chip size="sm" variant="bordered" classNames={{ content: "text-tiny tabular-nums" }}>
-                ⌬ {c.matchScore}
+              <Chip
+                size="sm" variant="bordered"
+                startContent={<FontAwesomeIcon icon={faChartSimple} className="text-tiny ml-1" />}
+                classNames={{ content: "text-tiny tabular-nums" }}
+              >
+                {c.matchScore}
               </Chip>
             </Tooltip>
           </div>
@@ -507,7 +549,14 @@ function CandidateCard({
 
 /* ─── Sub: PitchCard (center) ─────────────────────────────────────── */
 
-function PitchCard({ candidate: c, state }: { candidate: Candidate; state: PitchState }) {
+function PitchCard({
+  candidate: c, state, onHire, isHiring,
+}: {
+  candidate: Candidate;
+  state: PitchState;
+  onHire: () => void;
+  isHiring: boolean;
+}) {
   const [chatInput, setChatInput] = useState("");
   const isWorking = state.status === "queued" || state.status === "working";
   const isFailed = state.status === "failed";
@@ -604,13 +653,39 @@ function PitchCard({ candidate: c, state }: { candidate: Candidate; state: Pitch
         )}
       </CardBody>
 
-      {/* Chat affordance — placeholder, future PR wires actual mutation */}
-      {state.status === "delivered" && (
+      {/* Decision footer — hire this consultant + chat affordance */}
+      {state.status === "delivered" && p && !p.error && (
         <>
           <Divider />
-          <CardBody className="px-6 py-3 gap-2 bg-default-50/50">
+          <CardBody className="px-6 py-4 gap-3 bg-default-50/50">
+            {/* Primary action — hire this consultant → picker orchestra */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0 flex-1">
+                <p className="text-small font-medium leading-tight">
+                  喜歡這個方向？讓 {c.name} 開始產出
+                </p>
+                <p className="text-tiny text-default-500 mt-0.5">
+                  將跳到 picker · {c.squadName ?? "顧問 squad"} 會逐步交付完整成品
+                </p>
+              </div>
+              <Tooltip content={!c.squadSlug ? "此顧問沒有對應 squad" : ""} isDisabled={!!c.squadSlug}>
+                <Button
+                  color="primary" size="md" radius="full"
+                  className="font-medium shrink-0"
+                  isDisabled={!c.squadSlug}
+                  isLoading={isHiring}
+                  onPress={onHire}
+                  startContent={!isHiring && <FontAwesomeIcon icon={faRocket} />}
+                  endContent={!isHiring && <FontAwesomeIcon icon={faArrowRight} />}
+                >
+                  {isHiring ? "派出中…" : "選這位 · 開始產出"}
+                </Button>
+              </Tooltip>
+            </div>
+            <Divider />
+            {/* Secondary — chat (placeholder) */}
             <div className="flex items-center gap-2 text-tiny text-default-500">
-              <FontAwesomeIcon icon={faComments} /> 想再討論細節？對 {c.name} 留言
+              <FontAwesomeIcon icon={faComments} /> 想先討論細節？對 {c.name} 留言（即將推出）
             </div>
             <div className="flex gap-2">
               <Input
@@ -621,11 +696,10 @@ function PitchCard({ candidate: c, state }: { candidate: Candidate; state: Pitch
                 isDisabled
                 startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny text-default-400" />}
               />
-              <Button isIconOnly size="sm" color="primary" radius="lg" isDisabled aria-label="送出">
+              <Button isIconOnly size="sm" color="default" radius="lg" isDisabled aria-label="送出">
                 <FontAwesomeIcon icon={faPaperPlane} />
               </Button>
             </div>
-            <p className="text-tiny text-default-400">對話功能即將推出</p>
           </CardBody>
         </>
       )}

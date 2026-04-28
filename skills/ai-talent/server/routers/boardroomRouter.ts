@@ -45,6 +45,7 @@ export type CandidateAgent = {
   providerBucket: ModelProvider;
   /** Squad they lead (preferred) or are a member of, if any. */
   squadId: number | null;
+  squadSlug: string | null;
   squadName: string | null;
   squadMethodology: string | null;
   squadStrategyLayer: string | null;
@@ -96,6 +97,7 @@ async function recommendAgents(
              COALESCE(a.primarySkill,'') AS primarySkill,
              COALESCE(a.aiModel,'')      AS aiModel,
              s.id   AS squadId,
+             s.slug AS squadSlug,
              s.name AS squadName,
              s.methodology    AS squadMethodology,
              s.strategy_layer AS squadStrategyLayer
@@ -130,6 +132,7 @@ async function recommendAgents(
            COALESCE(a.primarySkill,'') AS primarySkill,
            COALESCE(a.aiModel,'')      AS aiModel,
            s.id   AS squadId,
+           s.slug AS squadSlug,
            s.name AS squadName,
            s.methodology    AS squadMethodology,
            s.strategy_layer AS squadStrategyLayer,
@@ -187,6 +190,7 @@ function buildCandidate(r: any, keywords: string[], _query: string): CandidateAg
     aiModel: String(r.aiModel || ""),
     providerBucket: mapAiModelToProvider(r.aiModel),
     squadId: r.squadId ? Number(r.squadId) : null,
+    squadSlug: r.squadSlug ? String(r.squadSlug) : null,
     squadName: r.squadName ? String(r.squadName) : null,
     squadMethodology: r.squadMethodology ? String(r.squadMethodology) : null,
     squadStrategyLayer: r.squadStrategyLayer ? String(r.squadStrategyLayer) : null,
@@ -318,6 +322,7 @@ export const boardroomRouter = router({
                  COALESCE(a.primarySkill,'') AS primarySkill,
                  COALESCE(a.aiModel,'')      AS aiModel,
                  s.id   AS squadId,
+                 s.slug AS squadSlug,
                  s.name AS squadName,
                  s.methodology    AS squadMethodology,
                  s.strategy_layer AS squadStrategyLayer
