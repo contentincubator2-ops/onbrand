@@ -25,6 +25,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
+import { inferMockupVariant, type MockupVariant } from "../lib/inferMockup";
 import WorkflowRunner from "./WorkflowRunner";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
 import {
@@ -1153,6 +1154,12 @@ function SquadDetailPanel({
   const wsKey = workspace ?? (Array.isArray(squad.workspace) ? squad.workspace[0] : squad.workspace) ?? null;
   const wsMeta = wsKey ? WORKSPACE_META[wsKey] : null;
 
+  // Inferred mockup variant — drives middle preview & badge
+  const mockupVariant: MockupVariant = useMemo(
+    () => inferMockupVariant(squad),
+    [squad],
+  );
+
   return (
     <div className="h-full grid grid-cols-1 lg:grid-cols-[300px_1fr_360px] divide-x divide-divider">
 
@@ -1257,7 +1264,8 @@ function SquadDetailPanel({
       {/* ─── MIDDLE: PREVIEW ─────────────────────────────────────────── */}
       <section className="overflow-y-auto bg-default-50 flex items-start justify-center p-6 lg:p-10">
         <PlatformMockupPlaceholder
-          mockup={wsMeta?.mockup ?? "generic"}
+          mockup={mockupVariant.platform === "tiktok" ? "generic" : (mockupVariant.platform === "generic" ? (wsMeta?.mockup ?? "generic") : mockupVariant.platform)}
+          variantLabel={mockupVariant.label}
           title={missionTitle || name}
           brief={missionBrief || (description ?? "")}
           brandName={brandName}
@@ -1429,25 +1437,26 @@ function AgentQueueCard({
 /* ─────────────── Sub: PlatformMockupPlaceholder (PR1: empty frames) ─────── */
 
 function PlatformMockupPlaceholder({
-  mockup, title, brief, brandName,
+  mockup, variantLabel, title, brief, brandName,
 }: {
   mockup: "instagram" | "facebook" | "linkedin" | "youtube" | "generic";
+  variantLabel?: string;
   title: string;
   brief: string;
   brandName: string | null;
 }) {
   if (mockup === "instagram")
-    return <IGMockup title={title} brief={brief} brandName={brandName} />;
+    return <IGMockup title={title} brief={brief} brandName={brandName} variantLabel={variantLabel} />;
   if (mockup === "facebook")
-    return <FBMockup title={title} brief={brief} brandName={brandName} />;
+    return <FBMockup title={title} brief={brief} brandName={brandName} variantLabel={variantLabel} />;
   if (mockup === "linkedin")
-    return <LIMockup title={title} brief={brief} brandName={brandName} />;
+    return <LIMockup title={title} brief={brief} brandName={brandName} variantLabel={variantLabel} />;
   if (mockup === "youtube")
-    return <YTMockup title={title} brief={brief} brandName={brandName} />;
-  return <GenericMockup title={title} brief={brief} />;
+    return <YTMockup title={title} brief={brief} brandName={brandName} variantLabel={variantLabel} />;
+  return <GenericMockup title={title} brief={brief} variantLabel={variantLabel} />;
 }
 
-function MockupHeader({ icon, label }: { icon: any; label: string }) {
+function MockupHeader({ icon, label, variantLabel }: { icon: any; label: string; variantLabel?: string }) {
   return (
     <div className="text-center mb-4">
       <Chip
@@ -1455,7 +1464,7 @@ function MockupHeader({ icon, label }: { icon: any; label: string }) {
         startContent={<FontAwesomeIcon icon={icon} className="ml-1" />}
         className="uppercase tracking-wider"
       >
-        {label} 預覽
+        {variantLabel ?? `${label} 預覽`}
       </Chip>
       <p className="text-tiny text-default-500 mt-2">
         agent 完成各階段後，內容會逐欄淡入填到下方
@@ -1464,12 +1473,12 @@ function MockupHeader({ icon, label }: { icon: any; label: string }) {
   );
 }
 
-function IGMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+function IGMockup({ title, brandName, variantLabel }: { title: string; brief: string; brandName: string | null; variantLabel?: string }) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const carouselCount = 9;
   return (
     <div className="w-full max-w-[420px] mx-auto">
-      <MockupHeader icon={faInstagram} label="Instagram" />
+      <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
       {/* IG post frame — structurally faithful to mobile feed */}
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         {/* ── HEADER: story-ring avatar + handle + location + ⋯ ── */}
@@ -1583,10 +1592,10 @@ function IGMockup({ title, brandName }: { title: string; brief: string; brandNam
   );
 }
 
-function FBMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+function FBMockup({ title, brandName, variantLabel }: { title: string; brief: string; brandName: string | null; variantLabel?: string }) {
   return (
     <div className="w-full max-w-[520px] mx-auto">
-      <MockupHeader icon={faFacebook} label="Facebook" />
+      <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
         <CardHeader className="px-4 py-3 gap-3">
           <User
@@ -1615,10 +1624,10 @@ function FBMockup({ title, brandName }: { title: string; brief: string; brandNam
   );
 }
 
-function LIMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+function LIMockup({ title, brandName, variantLabel }: { title: string; brief: string; brandName: string | null; variantLabel?: string }) {
   return (
     <div className="w-full max-w-[560px] mx-auto">
-      <MockupHeader icon={faLinkedin} label="LinkedIn" />
+      <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
       <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
         <CardHeader className="px-5 py-4">
           <User
@@ -1648,10 +1657,10 @@ function LIMockup({ title, brandName }: { title: string; brief: string; brandNam
   );
 }
 
-function YTMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+function YTMockup({ title, brandName, variantLabel }: { title: string; brief: string; brandName: string | null; variantLabel?: string }) {
   return (
     <div className="w-full max-w-[640px] mx-auto">
-      <MockupHeader icon={faYoutube} label="YouTube" />
+      <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
         <div className="relative aspect-video bg-default-100 flex items-center justify-center">
           <div className="text-center text-default-400">
@@ -1688,10 +1697,10 @@ function YTMockup({ title, brandName }: { title: string; brief: string; brandNam
   );
 }
 
-function GenericMockup({ title, brief }: { title: string; brief: string }) {
+function GenericMockup({ title, brief, variantLabel }: { title: string; brief: string; variantLabel?: string }) {
   return (
     <div className="w-full max-w-[520px] mx-auto">
-      <MockupHeader icon={faNewspaper} label="輸出" />
+      <MockupHeader icon={faNewspaper} label="輸出" variantLabel={variantLabel} />
       <Card shadow="lg" radius="lg" className="border border-divider">
         <CardBody className="p-6 gap-3">
           <h2 className="text-medium font-semibold">{title}</h2>
