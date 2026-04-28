@@ -124,24 +124,6 @@ export default function BrandsPage() {
         <p className="text-small text-default-500 mt-1">
           切換品牌請使用左側 sidebar
         </p>
-        {/* legacy switcher kept hidden — single source of truth is ShellLayout sidebar */}
-        <Dropdown placement="bottom" classNames={{ base: "hidden" }}>
-          <DropdownTrigger>
-            <Button isIconOnly size="sm" variant="light" radius="full" aria-label="切換品牌" className="hidden">
-              <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />
-            </Button>
-          </DropdownTrigger>
-          <DropdownMenu
-            aria-label="切換品牌"
-            selectionMode="single"
-            selectedKeys={brandId != null ? new Set([String(brandId)]) : new Set()}
-            onAction={(k) => setBrandId(Number(k))}
-          >
-            {brands.map((b: any) => (
-              <DropdownItem key={String(b.id)}>{b.name}</DropdownItem>
-            ))}
-          </DropdownMenu>
-        </Dropdown>
       </header>
 
       {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
