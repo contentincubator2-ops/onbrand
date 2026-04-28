@@ -61,32 +61,29 @@ const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
 
 mkdirSync(COVERS_DIR, { recursive: true });
 
-// ── Layer-aware prompt (Notion-discipline: monochrome line illustration) ──
-// Per design system project_design_system.md: color is functional only,
-// never decorative. Squad hero illustrations must be monochrome line art
-// so they don't fight the chip / button accent tokens on the card.
-const LAYER_METAPHOR: Record<string, string> = {
-  L1: "a bullseye target, a north-star compass, or a planted flag — brand identity metaphor",
-  L2: "modular building blocks, a craftsman toolkit, or a double-diamond shape — product design metaphor",
-  L3: "a small group of human silhouettes arranged in concentric circles — audience persona metaphor",
-  L4: "a broadcast tower with multidirectional arrows or a funnel mouth — distribution channel metaphor",
-  L5: "a launching rocket, a countdown clock, or a megaphone with motion lines — campaign launch metaphor",
-  L6: "a microscope, a clipboard with checkmarks, or a simple line chart — measurement and validation metaphor",
+// ── Layer-aware prompt (editorial cover style — per CJ preference 2026-04-28) ──
+// Earlier Notion-discipline monochrome prompts produced cluttered illustrations;
+// CJ prefers the original editorial-magazine look. Each layer gets its own mood.
+const LAYER_PROMPT: Record<string, string> = {
+  L1: "minimalist editorial brand mood, abstract geometric shapes, neutral muted color palette with one accent color, premium magazine cover, soft shadows",
+  L2: "clean product launch hero, abstract product silhouette, studio lighting, gradient backdrop, premium minimal aesthetic",
+  L3: "diverse abstract human figures rendered as soft silhouettes, pastel gradient background, ethereal, persona portraits, audience research mood",
+  L4: "vibrant social media mood collage, colorful overlapping abstract panels, dynamic composition, channel marketing aesthetic",
+  L5: "dynamic launch energy, bold abstract strokes, motion blur, dramatic lighting, campaign poster mood",
+  L6: "data visualization aesthetic, abstract charts and dashboards rendered as art, navy + cyan + warm accent palette, analytics editorial",
 };
 
 function buildPrompt(squad: { name: string; layer: string; methodology: any; description: string | null }): string {
-  const metaphor = LAYER_METAPHOR[squad.layer] ?? LAYER_METAPHOR.L1!;
-  const themeHint = (squad.description ?? "").slice(0, 100);
+  const layerStyle = LAYER_PROMPT[squad.layer] ?? LAYER_PROMPT.L1!;
+  const author = squad.methodology?.author ?? "";
+  const themeHint = (squad.description ?? "").slice(0, 120);
+  const subject = author ? `${squad.name} (${author} methodology)` : squad.name;
   return [
-    "Notion-style minimalist line illustration",
-    `subject: ${metaphor}`,
-    themeHint && `concept hint: ${themeHint}`,
-    "monochrome black ink on off-white background",
-    "soft hand-drawn strokes, isometric perspective",
-    "single subtle gray accent, generous negative space",
-    "flat 2D, no gradients, no shadows, no color fills",
+    layerStyle,
+    `editorial cover for "${subject}"`,
+    themeHint,
     "no text, no letters, no logos, no watermarks",
-    "square 1:1 composition, editorial illustration aesthetic",
+    "high quality, magazine cover composition, professional design aesthetic",
   ].filter(Boolean).join(", ").slice(0, 800);
 }
 
