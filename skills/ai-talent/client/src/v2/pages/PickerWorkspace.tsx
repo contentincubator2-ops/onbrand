@@ -44,6 +44,16 @@ import {
   faPenNib, faPalette, faBolt, faCircleCheck, faCircle, faLayerGroup,
   faMobileScreen, faImages, faNewspaper, faVideo, faPodcast, faBookOpen,
   faHeart, faComment, faShareNodes, faBookmark, faPlay,
+  // Rail / channel / SVG-replacement icons (PR5b)
+  faTableCells, faTableCellsLarge, faClockRotateLeft, faUpload,
+  faMicrophone, faChessKnight, faMasksTheater, faBox,
+  faMoneyBillWave, faGrip, faUser, faRoute, faObjectGroup, faTableColumns,
+  faCalendarDays, faFolderOpen, faBullhorn, faCircleNodes, faHashtag,
+  faUserTie, faAddressBook, faHeading, faImage, faClosedCaptioning,
+  faEnvelopeOpenText, faChartLine, faDiagramProject, faTriangleExclamation,
+  faChartArea, faClipboardCheck, faBell, faRankingStar,
+  faArrowLeft, faExpand, faCompress, faChevronLeft, faChevronRight,
+  faEnvelope,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faInstagram, faFacebook, faLinkedin, faYoutube,
@@ -79,88 +89,91 @@ type RailKind = "global" | "layer";
 type RailItem = {
   key: string;
   label: string;
-  glyph: string;
+  icon: any;       // FA icon
   kind: RailKind;
   /** When kind="layer", which asset drawer to open in middle column */
   drawer?: string;
 };
 
+// Note: FA icons imported below in a single block, used as `icon` field
+// (was previously hand-typed unicode glyphs — replaced 2026-04-28).
+
 const RAIL_TOP: RailItem[] = [
-  { key: "templates", label: "範本", glyph: "▣", kind: "global" },
+  { key: "templates", label: "範本", icon: faTableCells, kind: "global" },
 ];
 
 const RAIL_BOTTOM: RailItem[] = [
-  { key: "brand",  label: "品牌", glyph: "◐", kind: "global" },
-  { key: "recent", label: "我的", glyph: "◔", kind: "global" },
-  { key: "upload", label: "上傳", glyph: "↑", kind: "global" },
+  { key: "brand",  label: "品牌", icon: faPalette,        kind: "global" },
+  { key: "recent", label: "我的", icon: faClockRotateLeft, kind: "global" },
+  { key: "upload", label: "上傳", icon: faUpload,         kind: "global" },
 ];
 
 /** Per-layer middle-band rail items. Keys for L4 use `L4-${channel}` format. */
 const LAYER_RAIL: Record<string, RailItem[]> = {
   L1: [
-    { key: "interviews",  label: "訪談稿",  glyph: "✎", kind: "layer", drawer: "interviews" },
-    { key: "competitors", label: "競品",    glyph: "⚔", kind: "layer", drawer: "competitors" },
-    { key: "archetypes",  label: "原型卡",  glyph: "◈", kind: "layer", drawer: "archetypes" },
-    { key: "swot",        label: "SWOT",   glyph: "⊞", kind: "layer", drawer: "swot" },
+    { key: "interviews",  label: "訪談稿",  icon: faMicrophone,       kind: "layer", drawer: "interviews" },
+    { key: "competitors", label: "競品",    icon: faChessKnight,      kind: "layer", drawer: "competitors" },
+    { key: "archetypes",  label: "原型卡",  icon: faMasksTheater,     kind: "layer", drawer: "archetypes" },
+    { key: "swot",        label: "SWOT",   icon: faTableCellsLarge,   kind: "layer", drawer: "swot" },
   ],
   L2: [
-    { key: "products",    label: "產品卡",  glyph: "▤", kind: "layer", drawer: "products" },
-    { key: "vp-canvas",   label: "VP",      glyph: "⊕", kind: "layer", drawer: "vp-canvas" },
-    { key: "pricing",     label: "定價",    glyph: "$", kind: "layer", drawer: "pricing" },
-    { key: "fab",         label: "FAB",     glyph: "▦", kind: "layer", drawer: "fab" },
+    { key: "products",    label: "產品卡",  icon: faBox,              kind: "layer", drawer: "products" },
+    { key: "vp-canvas",   label: "VP",      icon: faTableColumns,     kind: "layer", drawer: "vp-canvas" },
+    { key: "pricing",     label: "定價",    icon: faMoneyBillWave,    kind: "layer", drawer: "pricing" },
+    { key: "fab",         label: "FAB",     icon: faGrip,             kind: "layer", drawer: "fab" },
   ],
   L3: [
-    { key: "personas",    label: "Persona", glyph: "☺", kind: "layer", drawer: "personas" },
-    { key: "icp",         label: "ICP",     glyph: "◉", kind: "layer", drawer: "icp" },
-    { key: "journey",     label: "旅程圖",  glyph: "↝", kind: "layer", drawer: "journey" },
-    { key: "segments",    label: "區隔",    glyph: "▤", kind: "layer", drawer: "segments" },
+    { key: "personas",    label: "Persona", icon: faUser,             kind: "layer", drawer: "personas" },
+    { key: "icp",         label: "ICP",     icon: faBullseye,         kind: "layer", drawer: "icp" },
+    { key: "journey",     label: "旅程圖",  icon: faRoute,             kind: "layer", drawer: "journey" },
+    { key: "segments",    label: "區隔",    icon: faObjectGroup,      kind: "layer", drawer: "segments" },
   ],
   L4: [
-    { key: "calendar",    label: "行事曆",  glyph: "▦", kind: "layer", drawer: "calendar" },
-    { key: "assets",      label: "素材庫",  glyph: "▥", kind: "layer", drawer: "assets" },
-    { key: "history",     label: "歷史",    glyph: "↺", kind: "layer", drawer: "history" },
+    { key: "calendar",    label: "行事曆",  icon: faCalendarDays,     kind: "layer", drawer: "calendar" },
+    { key: "assets",      label: "素材庫",  icon: faFolderOpen,       kind: "layer", drawer: "assets" },
+    { key: "history",     label: "歷史",    icon: faClockRotateLeft,  kind: "layer", drawer: "history" },
   ],
   "L4-facebook": [
-    { key: "fb-history",  label: "貼文",    glyph: "▦", kind: "layer", drawer: "fb-history" },
-    { key: "fb-assets",   label: "素材庫",  glyph: "▥", kind: "layer", drawer: "fb-assets" },
-    { key: "fb-calendar", label: "行事曆",  glyph: "📅", kind: "layer", drawer: "fb-calendar" },
-    { key: "fb-ads",      label: "廣告組",  glyph: "◍", kind: "layer", drawer: "fb-ads" },
+    { key: "fb-history",  label: "貼文",    icon: faNewspaper,        kind: "layer", drawer: "fb-history" },
+    { key: "fb-assets",   label: "素材庫",  icon: faImages,           kind: "layer", drawer: "fb-assets" },
+    { key: "fb-calendar", label: "行事曆",  icon: faCalendarDays,     kind: "layer", drawer: "fb-calendar" },
+    { key: "fb-ads",      label: "廣告組",  icon: faBullhorn,         kind: "layer", drawer: "fb-ads" },
   ],
   "L4-instagram": [
-    { key: "ig-reels",    label: "Reels",   glyph: "▶", kind: "layer", drawer: "ig-reels" },
-    { key: "ig-stories",  label: "限動",    glyph: "○", kind: "layer", drawer: "ig-stories" },
-    { key: "ig-tags",     label: "Hashtag", glyph: "#", kind: "layer", drawer: "ig-tags" },
-    { key: "ig-calendar", label: "行事曆",  glyph: "📅", kind: "layer", drawer: "ig-calendar" },
+    { key: "ig-reels",    label: "Reels",   icon: faVideo,            kind: "layer", drawer: "ig-reels" },
+    { key: "ig-stories",  label: "限動",    icon: faCircleNodes,      kind: "layer", drawer: "ig-stories" },
+    { key: "ig-tags",     label: "Hashtag", icon: faHashtag,          kind: "layer", drawer: "ig-tags" },
+    { key: "ig-calendar", label: "行事曆",  icon: faCalendarDays,     kind: "layer", drawer: "ig-calendar" },
   ],
   "L4-linkedin": [
-    { key: "li-history",  label: "貼文",    glyph: "▦", kind: "layer", drawer: "li-history" },
-    { key: "li-personal", label: "個人品牌", glyph: "◐", kind: "layer", drawer: "li-personal" },
-    { key: "li-leads",    label: "Lead 表", glyph: "▤", kind: "layer", drawer: "li-leads" },
-    { key: "li-calendar", label: "行事曆",  glyph: "📅", kind: "layer", drawer: "li-calendar" },
+    { key: "li-history",  label: "貼文",    icon: faNewspaper,        kind: "layer", drawer: "li-history" },
+    { key: "li-personal", label: "個人品牌", icon: faUserTie,         kind: "layer", drawer: "li-personal" },
+    { key: "li-leads",    label: "Lead 表",  icon: faAddressBook,     kind: "layer", drawer: "li-leads" },
+    { key: "li-calendar", label: "行事曆",  icon: faCalendarDays,     kind: "layer", drawer: "li-calendar" },
   ],
   "L4-youtube": [
-    { key: "yt-videos",   label: "影片庫",  glyph: "▶", kind: "layer", drawer: "yt-videos" },
-    { key: "yt-titles",   label: "標題 A/B", glyph: "Aa", kind: "layer", drawer: "yt-titles" },
-    { key: "yt-thumbs",   label: "縮圖",    glyph: "▥", kind: "layer", drawer: "yt-thumbs" },
-    { key: "yt-captions", label: "字幕",    glyph: "≡", kind: "layer", drawer: "yt-captions" },
+    { key: "yt-videos",   label: "影片庫",   icon: faVideo,           kind: "layer", drawer: "yt-videos" },
+    { key: "yt-titles",   label: "標題 A/B", icon: faHeading,         kind: "layer", drawer: "yt-titles" },
+    { key: "yt-thumbs",   label: "縮圖",     icon: faImage,           kind: "layer", drawer: "yt-thumbs" },
+    { key: "yt-captions", label: "字幕",     icon: faClosedCaptioning, kind: "layer", drawer: "yt-captions" },
   ],
   "L4-pr": [
-    { key: "pr-media",    label: "媒體",    glyph: "📰", kind: "layer", drawer: "pr-media" },
-    { key: "pr-press",    label: "新聞稿",  glyph: "✎", kind: "layer", drawer: "pr-press" },
-    { key: "pr-kol",      label: "KOL",     glyph: "☺", kind: "layer", drawer: "pr-kol" },
-    { key: "pr-pitches",  label: "Pitch",   glyph: "▤", kind: "layer", drawer: "pr-pitches" },
+    { key: "pr-media",    label: "媒體",    icon: faNewspaper,        kind: "layer", drawer: "pr-media" },
+    { key: "pr-press",    label: "新聞稿",  icon: faPenToSquare,       kind: "layer", drawer: "pr-press" },
+    { key: "pr-kol",      label: "KOL",     icon: faUserGroup,        kind: "layer", drawer: "pr-kol" },
+    { key: "pr-pitches",  label: "Pitch",   icon: faEnvelopeOpenText, kind: "layer", drawer: "pr-pitches" },
   ],
   L5: [
-    { key: "kpis",        label: "KPI",     glyph: "◎", kind: "layer", drawer: "kpis" },
-    { key: "budget",      label: "預算",    glyph: "$", kind: "layer", drawer: "budget" },
-    { key: "gantt",       label: "甘特圖",  glyph: "▦", kind: "layer", drawer: "gantt" },
-    { key: "risks",       label: "風險",    glyph: "⚠", kind: "layer", drawer: "risks" },
+    { key: "kpis",        label: "KPI",     icon: faChartLine,         kind: "layer", drawer: "kpis" },
+    { key: "budget",      label: "預算",    icon: faMoneyBillWave,    kind: "layer", drawer: "budget" },
+    { key: "gantt",       label: "甘特圖",  icon: faDiagramProject,   kind: "layer", drawer: "gantt" },
+    { key: "risks",       label: "風險",    icon: faTriangleExclamation, kind: "layer", drawer: "risks" },
   ],
   L6: [
-    { key: "monitor",     label: "監測",    glyph: "◔", kind: "layer", drawer: "monitor" },
-    { key: "audits",      label: "Audit",   glyph: "✓", kind: "layer", drawer: "audits" },
-    { key: "incidents",   label: "事件",    glyph: "⚠", kind: "layer", drawer: "incidents" },
-    { key: "benchmarks",  label: "對標",    glyph: "≈", kind: "layer", drawer: "benchmarks" },
+    { key: "monitor",     label: "監測",    icon: faChartArea,         kind: "layer", drawer: "monitor" },
+    { key: "audits",      label: "Audit",   icon: faClipboardCheck,    kind: "layer", drawer: "audits" },
+    { key: "incidents",   label: "事件",    icon: faBell,              kind: "layer", drawer: "incidents" },
+    { key: "benchmarks",  label: "對標",    icon: faRankingStar,       kind: "layer", drawer: "benchmarks" },
   ],
 };
 
@@ -179,13 +192,13 @@ function resolveRailItems(layer: MosLayer | null, channel: string | null): RailI
   return [...RAIL_TOP, ...middle, ...RAIL_BOTTOM];
 }
 
-const CHANNEL_OPTIONS = [
-  { key: "facebook",  label: "Facebook",  glyph: "f"  },
-  { key: "instagram", label: "Instagram", glyph: "IG" },
-  { key: "linkedin",  label: "LinkedIn",  glyph: "in" },
-  { key: "youtube",   label: "YouTube",   glyph: "▶"  },
-  { key: "pr",        label: "公關",      glyph: "PR" },
-  { key: "email",     label: "電子報",    glyph: "✉"  },
+const CHANNEL_OPTIONS: Array<{ key: string; label: string; icon: any }> = [
+  { key: "facebook",  label: "Facebook",  icon: faFacebook    },
+  { key: "instagram", label: "Instagram", icon: faInstagram   },
+  { key: "linkedin",  label: "LinkedIn",  icon: faLinkedin    },
+  { key: "youtube",   label: "YouTube",   icon: faYoutube     },
+  { key: "pr",        label: "公關",      icon: faNewspaper   },
+  { key: "email",     label: "電子報",    icon: faEnvelope    },
 ];
 
 /**
@@ -597,12 +610,8 @@ export default function PickerWorkspace() {
           variant="light"
           radius="sm"
           onPress={() => { if (window.history.length > 1) window.history.back(); else window.close(); }}
-          startContent={
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-          }
-          className="text-[0.78rem]"
+          startContent={<FontAwesomeIcon icon={faArrowLeft} />}
+          className="text-tiny"
         >
           返回
         </Button>
@@ -624,9 +633,7 @@ export default function PickerWorkspace() {
               onPress={() => setFullscreen(true)}
               aria-label="進入專注模式"
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-              </svg>
+              <FontAwesomeIcon icon={faExpand} />
             </Button>
           </Tooltip>
         </div>
@@ -665,7 +672,7 @@ export default function PickerWorkspace() {
                         : "text-foreground hover:bg-default-100",
                     ].join(" ")}
                   >
-                    <span className="text-[1.05rem] leading-none">{it.glyph}</span>
+                    <FontAwesomeIcon icon={it.icon} className="text-medium leading-none" />
                     <span className="text-[0.62rem] tracking-[0.06em]">{it.label}</span>
                   </button>
                 </Tooltip>
@@ -696,9 +703,7 @@ export default function PickerWorkspace() {
               className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-6 h-12 bg-content1 border border-divider rounded-r-medium shadow flex items-center justify-center text-default-500 hover:text-foreground hover:bg-content2 transition"
               style={{ boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
             >
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d={middleCollapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
-              </svg>
+              <FontAwesomeIcon icon={middleCollapsed ? faChevronRight : faChevronLeft} className="text-tiny" />
             </button>
           </Tooltip>
           {activeRailItem?.kind === "layer" ? (
@@ -725,13 +730,8 @@ export default function PickerWorkspace() {
                     ? `描述你的 ${LAYER_TOKENS[layerFilter].label} 詳細需求…`
                     : "描述你的行銷需求或搜尋方法論…"
               }
-              startContent={
-                <svg className="w-4 h-4 text-default-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="M21 21l-4.3-4.3" />
-                </svg>
-              }
-              classNames={{ inputWrapper: "bg-content2", input: "text-[0.84rem]" }}
+              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+              classNames={{ inputWrapper: "bg-content2", input: "text-small" }}
             />
             <div className="grid grid-cols-2 gap-2 mt-2">
               <Tooltip content="AI 推薦方法論（即將推出）" radius="sm">
@@ -912,9 +912,7 @@ export default function PickerWorkspace() {
                 className="absolute top-3 right-3 z-40 bg-content1"
                 aria-label="退出專注模式"
               >
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
-                </svg>
+                <FontAwesomeIcon icon={faCompress} />
               </Button>
             </Tooltip>
           )}
@@ -968,9 +966,7 @@ export default function PickerWorkspace() {
               className="absolute z-30 top-1/2 -translate-y-1/2 w-6 h-12 bg-content1 border border-divider rounded-r-medium shadow flex items-center justify-center text-default-500 hover:text-foreground hover:bg-content2 transition"
               style={{ left: 68, boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
             >
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+              <FontAwesomeIcon icon={faChevronRight} className="text-tiny" />
             </button>
           </Tooltip>
         )}
@@ -2153,7 +2149,7 @@ function LayerAssetDrawer({
         {/* Empty-state card with primary action */}
         <Card shadow="none" radius="lg" className="border border-dashed border-divider bg-content2/40">
           <CardBody className="p-5 text-center">
-            <div className="text-[2rem] mb-2 text-default-400">{item.glyph}</div>
+            <div className="text-3xl mb-2 text-default-400"><FontAwesomeIcon icon={item.icon} /></div>
             <div className="text-[0.86rem] text-foreground font-semibold mb-1">尚未有資料</div>
             <div className="text-[0.74rem] text-default-500 leading-snug mb-4">
               這個資產庫即將推出。目前可以先上傳檔案或從範本開始一個 mission。
