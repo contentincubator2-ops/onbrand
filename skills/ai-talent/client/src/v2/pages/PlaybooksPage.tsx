@@ -1,23 +1,29 @@
 /**
- * PlaybooksPage — 成長方案 / Growth Playbooks
+ * PlaybooksPage — 成長方案 / Growth Playbooks (HeroUI v2 migration)
  *
- * Canva-Growth-Plan 對標：精選 6 個由 SoWork strategist 策劃的「成長劇本」，
- * 把 squad（任務範本）+ 顧問團（boardroom）+ 媒體中心（投放）串成 90 天 / 12 週 /
- * 8 週的可賣方案包，每一個都附真實成功案例。
+ * Canva Brand Hub parity: tiles → Card+Image, badges → Chip, drawer → Drawer,
+ * phase roadmap → Accordion, KPI pills → Chip(bordered), pitch/outcome → Snippet,
+ * apply CTA → Button(isLoading), error → Alert, scroll body → ScrollShadow,
+ * filter → Tabs, loading → Skeleton/Spinner, separators → Divider.
  *
- * UX:
- *   1. 進入頁先看到 6 張「方案卡」grid（Canva 風格 hero card）
- *   2. 點任一卡 → 右側抽屜展開 detail（痛點 / 階段 / 成功案例 / KPI）
- *   3. detail 底部「套用此方案」→ 建 mission + 一鍵跳到顧問團 / 媒體中心
+ * Hex `data.color` is kept ONLY for the cover hero gradient artwork; all other
+ * states use HeroUI semantic tokens via `colorOf(badge)`.
  */
 import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
-
-const ACCENT = "#5B3CC8";
-const HAIR = "#E5E5E5";
-const INK = "#0E0E10";
+import {
+  Accordion, AccordionItem, Alert, Breadcrumbs, BreadcrumbItem,
+  Button, Card, CardBody, CardFooter, Chip, Divider, Drawer, DrawerBody,
+  DrawerContent, DrawerFooter, DrawerHeader, ScrollShadow, Skeleton,
+  Snippet, Spinner, Tab, Tabs, Tooltip,
+} from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faArrowUpRightFromSquare, faChartLine, faUsers, faBroadcastTower,
+  faBullseye, faClock, faSackDollar, faPeopleGroup, faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 
 type PlaybookSummary = {
   id: string;
@@ -38,13 +44,32 @@ type PlaybookSummary = {
 };
 
 const BADGE_COPY: Record<string, string> = {
-  GROWTH: "成長",
-  BRAND: "品牌",
-  REVIVAL: "復活",
-  B2B: "B2B",
-  CRISIS: "危機",
-  VIRAL: "病毒",
+  GROWTH: "成長", BRAND: "品牌", REVIVAL: "復活",
+  B2B: "B2B", CRISIS: "危機", VIRAL: "病毒",
 };
+
+type ChipColor = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
+const colorOf = (badge: string): ChipColor => {
+  switch (badge) {
+    case "GROWTH":  return "success";
+    case "BRAND":   return "secondary";
+    case "REVIVAL": return "warning";
+    case "B2B":     return "primary";
+    case "CRISIS":  return "danger";
+    case "VIRAL":   return "secondary";
+    default:        return "default";
+  }
+};
+
+const FILTERS: Array<{ id: string; label: string }> = [
+  { id: "all",     label: "全部"   },
+  { id: "GROWTH",  label: "成長"   },
+  { id: "BRAND",   label: "品牌"   },
+  { id: "REVIVAL", label: "復活"   },
+  { id: "B2B",     label: "B2B"    },
+  { id: "CRISIS",  label: "危機"   },
+  { id: "VIRAL",   label: "病毒"   },
+];
 
 export default function PlaybooksPage() {
   const navigate = useNavigate();
@@ -57,18 +82,26 @@ export default function PlaybooksPage() {
   const listQuery = (trpc as any).playbook.list.useQuery();
   const playbooks: PlaybookSummary[] = listQuery.data ?? [];
 
+  const [filter, setFilter] = useState<string>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const filtered = useMemo(
+    () => filter === "all" ? playbooks : playbooks.filter((p) => p.badge === filter),
+    [playbooks, filter]
+  );
 
   return (
     <div className="px-8 py-10 max-w-[1280px] mx-auto">
       {/* ── Hero ───────────────────────────────────────────── */}
-      <div className="mb-10">
-        <div
-          className="text-[0.66rem] tracking-[0.24em] uppercase mb-2"
-          style={{ color: ACCENT }}
-        >
+      <div className="mb-6">
+        <Breadcrumbs size="sm" className="mb-3">
+          <BreadcrumbItem href="/">首頁</BreadcrumbItem>
+          <BreadcrumbItem>成長方案</BreadcrumbItem>
+        </Breadcrumbs>
+
+        <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider mb-2">
           PLAYBOOKS · 成長方案
-        </div>
+        </Chip>
         <h1 className="font-semibold text-[2.4rem] leading-tight text-foreground mb-3">
           挑一個劇本，90 天讓品牌變成下一個案例
         </h1>
@@ -77,424 +110,378 @@ export default function PlaybooksPage() {
           KPI 串好的「可賣包」。背後是真實案例與可驗證的階段方法。
           選一個，按下「套用」，剩下交給流程。
           {currentBrand && (
-            <>
-              {" "}
-              — 將套用到{" "}
-              <span className="font-medium" style={{ color: ACCENT }}>
-                {currentBrand.name}
-              </span>
-            </>
+            <> — 將套用到 <Chip size="sm" variant="flat" color="secondary">{currentBrand.name}</Chip></>
           )}
         </p>
       </div>
+
+      {/* ── Filter Tabs ──────────────────────────────────── */}
+      <Tabs
+        aria-label="方案類別"
+        selectedKey={filter}
+        onSelectionChange={(k) => setFilter(String(k))}
+        variant="underlined"
+        color="primary"
+        className="mb-6"
+      >
+        {FILTERS.map((f) => <Tab key={f.id} title={f.label} />)}
+      </Tabs>
 
       {/* ── Grid ──────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {listQuery.isLoading
           ? Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[5/6] rounded-2xl border border-divider bg-white animate-pulse"
-              />
+              <Card key={i} shadow="sm" radius="lg" className="aspect-[5/6]">
+                <Skeleton className="h-32 w-full rounded-none" />
+                <CardBody className="gap-2">
+                  <Skeleton className="h-4 w-4/5 rounded" />
+                  <Skeleton className="h-3 w-full rounded" />
+                  <Skeleton className="h-3 w-3/5 rounded" />
+                </CardBody>
+              </Card>
             ))
-          : playbooks.map((p) => (
-              <PlaybookCard
-                key={p.id}
-                playbook={p}
-                onClick={() => setSelectedId(p.id)}
-              />
+          : filtered.map((p) => (
+              <PlaybookCard key={p.id} playbook={p} onClick={() => setSelectedId(p.id)} />
             ))}
       </div>
 
       {/* ── Detail drawer ─────────────────────────────────── */}
-      {selectedId && (
-        <PlaybookDetail
-          id={selectedId}
-          onClose={() => setSelectedId(null)}
-          brandId={brandId}
-          brandName={currentBrand?.name ?? null}
-          onApplied={(missionId, nextSteps) => {
-            setSelectedId(null);
-            // Pick the first action — usually 顧問團
-            if (nextSteps?.[0]?.href) navigate(nextSteps[0].href);
-          }}
-        />
-      )}
+      <PlaybookDetail
+        id={selectedId}
+        onClose={() => setSelectedId(null)}
+        brandId={brandId}
+        brandName={currentBrand?.name ?? null}
+        onApplied={(_missionId, nextSteps) => {
+          setSelectedId(null);
+          if (nextSteps?.[0]?.href) navigate(nextSteps[0].href);
+        }}
+      />
     </div>
   );
 }
 
 // ──────────────────────────────────────────────────────────
-// PlaybookCard
+// PlaybookCard — HeroUI Card+Chip
 // ──────────────────────────────────────────────────────────
 
 function PlaybookCard({
-  playbook,
-  onClick,
-}: {
-  playbook: PlaybookSummary;
-  onClick: () => void;
-}) {
+  playbook, onClick,
+}: { playbook: PlaybookSummary; onClick: () => void }) {
+  const cc = colorOf(playbook.badge);
   return (
-    <button
-      onClick={onClick}
-      className="group relative aspect-[5/6] rounded-2xl border border-divider bg-white overflow-hidden text-left hover:shadow-lg hover:-translate-y-0.5 transition-all"
+    <Card
+      isPressable
+      isHoverable
+      onPress={onClick}
+      shadow="sm"
+      radius="lg"
+      className="aspect-[5/6] overflow-hidden"
     >
-      {/* Top color band */}
+      {/* Hero band — keeps brand color gradient as artwork */}
       <div
-        className="h-32 relative"
-        style={{
-          background: `linear-gradient(135deg, ${playbook.color} 0%, ${playbook.color}CC 100%)`,
-        }}
+        className="h-32 relative shrink-0"
+        style={{ background: `linear-gradient(135deg, ${playbook.color} 0%, ${playbook.color}CC 100%)` }}
       >
-        <div className="absolute top-3 left-3 text-[0.58rem] tracking-[0.18em] uppercase text-white/90 px-2 py-1 rounded bg-black/20">
+        <Chip
+          size="sm"
+          variant="solid"
+          className="absolute top-3 left-3 bg-black/25 text-white uppercase tracking-wider"
+        >
           {BADGE_COPY[playbook.badge] ?? playbook.badge}
-        </div>
+        </Chip>
         <div className="absolute right-4 bottom-2 text-[3.4rem] leading-none drop-shadow-md">
           {playbook.emoji}
         </div>
+        <Tooltip content="查看詳情" placement="left">
+          <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center opacity-0 hover:opacity-100 transition pointer-events-none">
+            <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-tiny" style={{ color: playbook.color }} />
+          </span>
+        </Tooltip>
       </div>
 
-      {/* Body */}
-      <div className="p-5 flex flex-col h-[calc(100%-128px)]">
-        <div className="font-semibold text-[1.05rem] text-foreground mb-1 leading-snug">
-          {playbook.title}
-        </div>
-        <div className="text-[0.78rem] text-default-500 leading-relaxed line-clamp-2 mb-3">
-          {playbook.hook}
-        </div>
+      <CardBody className="gap-2 px-5 pt-4 pb-2">
+        <p className="font-semibold text-medium leading-snug">{playbook.title}</p>
+        <p className="text-tiny text-default-500 leading-relaxed line-clamp-2">{playbook.hook}</p>
+      </CardBody>
 
-        {/* Stats row */}
-        <div className="mt-auto space-y-2">
-          <div className="flex items-center gap-2 text-[0.7rem] text-default-500">
-            <Stat label="期間" value={playbook.duration} />
-            <span className="opacity-30">·</span>
-            <Stat label="預算" value={playbook.budget} />
-          </div>
-          <div className="flex items-center gap-3 text-[0.66rem] text-default-500 pt-2 border-t border-divider">
-            <span>📋 {playbook.squadCount} squad</span>
-            <span>👔 {playbook.personaCount} 顧問</span>
-            <span>📡 {playbook.channelCount} 通路</span>
-          </div>
+      <CardFooter className="px-5 pt-2 pb-4 flex-col items-start gap-2">
+        <div className="flex items-center gap-2 text-tiny text-default-500">
+          <FontAwesomeIcon icon={faClock} className="opacity-60" />
+          <span>{playbook.duration}</span>
+          <Divider orientation="vertical" className="h-3" />
+          <FontAwesomeIcon icon={faSackDollar} className="opacity-60" />
+          <span>{playbook.budget}</span>
         </div>
-      </div>
-
-      {/* Hover arrow */}
-      <div
-        className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-        style={{ color: playbook.color }}
-      >
-        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7 7h10v10" />
-          <path d="M7 17L17 7" />
-        </svg>
-      </div>
-    </button>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex items-baseline gap-1">
-      <span className="text-[0.6rem] uppercase tracking-wider opacity-60">
-        {label}
-      </span>
-      <span className="text-foreground font-medium">{value}</span>
-    </span>
+        <Divider />
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Chip size="sm" variant="flat" color={cc} startContent={<FontAwesomeIcon icon={faPeopleGroup} className="text-tiny ml-1" />}>
+            {playbook.squadCount} squad
+          </Chip>
+          <Chip size="sm" variant="flat" startContent={<FontAwesomeIcon icon={faUsers} className="text-tiny ml-1" />}>
+            {playbook.personaCount} 顧問
+          </Chip>
+          <Chip size="sm" variant="flat" startContent={<FontAwesomeIcon icon={faBroadcastTower} className="text-tiny ml-1" />}>
+            {playbook.channelCount} 通路
+          </Chip>
+        </div>
+      </CardFooter>
+    </Card>
   );
 }
 
 // ──────────────────────────────────────────────────────────
-// PlaybookDetail (right-side drawer)
+// PlaybookDetail — HeroUI Drawer
 // ──────────────────────────────────────────────────────────
 
 function PlaybookDetail({
-  id,
-  onClose,
-  brandId,
-  brandName,
-  onApplied,
+  id, onClose, brandId, brandName, onApplied,
 }: {
-  id: string;
+  id: string | null;
   onClose: () => void;
   brandId: number | null;
   brandName: string | null;
   onApplied: (missionId: number | null, nextSteps: any[]) => void;
 }) {
-  const detailQuery = (trpc as any).playbook.get.useQuery({ id });
+  const detailQuery = (trpc as any).playbook.get.useQuery(
+    { id: id ?? "" },
+    { enabled: !!id }
+  );
   const applyMut = (trpc as any).playbook.activate.useMutation();
   const data = detailQuery.data;
 
-  const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const applying = applyMut.isPending ?? applyMut.isLoading ?? false;
 
   const handleApply = async () => {
-    if (!brandId) {
+    if (!brandId || !id) {
       setApplyError("請先在右上角選擇品牌");
       return;
     }
-    setApplying(true);
     setApplyError(null);
     try {
-      const r = await applyMut.mutateAsync({
-        playbookId: id,
-        brandId,
-      });
+      const r = await applyMut.mutateAsync({ playbookId: id, brandId });
       onApplied(r.missionId ?? null, r.nextSteps ?? []);
     } catch (e: any) {
       setApplyError(String(e?.message ?? e));
-    } finally {
-      setApplying(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <button
-        onClick={onClose}
-        className="flex-1 bg-black/30 backdrop-blur-sm"
-        aria-label="關閉"
-      />
+  const cc = data ? colorOf(data.badge) : "default";
 
-      {/* Drawer */}
-      <div className="w-full max-w-[640px] bg-white shadow-2xl overflow-y-auto">
+  return (
+    <Drawer
+      isOpen={!!id}
+      onClose={onClose}
+      size="2xl"
+      placement="right"
+      backdrop="blur"
+      hideCloseButton
+    >
+      <DrawerContent>
         {detailQuery.isLoading || !data ? (
-          <div className="p-10 text-default-500 text-sm">載入中…</div>
+          <DrawerBody className="items-center justify-center">
+            <Spinner label="載入方案中…" />
+          </DrawerBody>
         ) : (
-          <div>
-            {/* Header */}
-            <div
-              className="px-8 pt-8 pb-6 relative"
-              style={{
-                background: `linear-gradient(135deg, ${data.color}18 0%, ${data.color}06 100%)`,
-              }}
+          <>
+            <DrawerHeader
+              className="flex flex-col gap-3 px-8 pt-6 pb-5 relative"
+              style={{ background: `linear-gradient(135deg, ${data.color}18 0%, ${data.color}06 100%)` }}
             >
-              <button
-                onClick={onClose}
-                className="absolute top-5 right-5 w-8 h-8 rounded-full hover:bg-foreground/[0.06] flex items-center justify-center text-default-500"
-                title="關閉"
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                radius="full"
+                onPress={onClose}
+                aria-label="關閉"
+                className="absolute top-4 right-4"
               >
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 6l12 12M6 18L18 6" />
-                </svg>
-              </button>
+                <FontAwesomeIcon icon={faXmark} />
+              </Button>
+
+              <Breadcrumbs size="sm">
+                <BreadcrumbItem href="/">首頁</BreadcrumbItem>
+                <BreadcrumbItem onPress={onClose}>成長方案</BreadcrumbItem>
+                <BreadcrumbItem>{data.title}</BreadcrumbItem>
+              </Breadcrumbs>
 
               <div className="flex items-start gap-4">
                 <div className="text-[3.4rem] leading-none">{data.emoji}</div>
                 <div className="flex-1 min-w-0">
-                  <div
-                    className="text-[0.62rem] tracking-[0.22em] uppercase mb-1"
-                    style={{ color: data.color }}
-                  >
+                  <Chip size="sm" color={cc} variant="flat" className="uppercase tracking-wider mb-1">
                     {BADGE_COPY[data.badge] ?? data.badge} · 成長方案
-                  </div>
-                  <h2 className="font-semibold text-[1.6rem] leading-tight text-foreground mb-2">
-                    {data.title}
-                  </h2>
-                  <p className="text-default-500 text-[0.88rem] leading-relaxed">
-                    {data.hook}
-                  </p>
+                  </Chip>
+                  <h2 className="font-semibold text-2xl leading-tight mb-2">{data.title}</h2>
+                  <p className="text-default-600 text-small leading-relaxed">{data.hook}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mt-6">
-                <Meta label="期間" value={data.duration} />
-                <Meta label="預算" value={data.budget} />
-                <Meta label="適合" value={data.audience} small />
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                <MetaCard icon={faClock}     label="期間" value={data.duration} />
+                <MetaCard icon={faSackDollar} label="預算" value={data.budget} />
+                <MetaCard icon={faBullseye}   label="適合" value={data.audience} small />
               </div>
-            </div>
+            </DrawerHeader>
 
-            <div className="px-8 py-6 space-y-7">
-              {/* Problem */}
-              <Section title="這個方案在解什麼痛">
-                <p className="text-foreground text-[0.9rem] leading-relaxed whitespace-pre-line">
-                  {data.problem}
-                </p>
-              </Section>
+            <DrawerBody className="p-0">
+              <ScrollShadow className="h-full">
+                <div className="px-8 py-6 space-y-7">
+                  {/* Problem */}
+                  <Section title="這個方案在解什麼痛">
+                    <p className="text-foreground text-small leading-relaxed whitespace-pre-line">
+                      {data.problem}
+                    </p>
+                  </Section>
 
-              {/* Pitch + Bundle */}
-              <Section title="方案組合">
-                <p
-                  className="text-[0.85rem] mb-4"
-                  style={{ color: data.color }}
-                >
-                  {data.pitch}
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  <BundleStat
-                    label="任務範本"
-                    count={data.bundle.squadSlugs.length}
-                    detail={data.bundle.squadSlugs.join(" · ")}
-                  />
-                  <BundleStat
-                    label="顧問"
-                    count={data.bundle.personaIds.length}
-                    detail={data.bundle.personaIds.join(" · ")}
-                  />
-                  <BundleStat
-                    label="媒體通路"
-                    count={data.bundle.channelIds.length}
-                    detail={data.bundle.channelIds.join(" · ")}
-                  />
-                </div>
-              </Section>
-
-              {/* Phases */}
-              <Section title="階段化 Roadmap">
-                <div className="space-y-3">
-                  {data.phases.map((ph: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="border border-divider rounded-xl p-4"
+                  {/* Pitch + Bundle */}
+                  <Section title="方案組合">
+                    <Snippet
+                      hideSymbol
+                      variant="flat"
+                      color={cc}
+                      className="mb-4 w-full"
+                      classNames={{ pre: "whitespace-pre-wrap text-small" }}
                     >
-                      <div className="flex items-baseline gap-3 mb-2">
-                        <span
-                          className="text-[0.62rem] tracking-[0.18em] uppercase font-medium px-2 py-0.5 rounded"
-                          style={{
-                            background: `${data.color}18`,
-                            color: data.color,
-                          }}
+                      {data.pitch}
+                    </Snippet>
+                    <div className="grid grid-cols-3 gap-3">
+                      <BundleCard label="任務範本" count={data.bundle.squadSlugs.length} detail={data.bundle.squadSlugs.join(" · ")} />
+                      <BundleCard label="顧問"     count={data.bundle.personaIds.length} detail={data.bundle.personaIds.join(" · ")} />
+                      <BundleCard label="媒體通路" count={data.bundle.channelIds.length} detail={data.bundle.channelIds.join(" · ")} />
+                    </div>
+                  </Section>
+
+                  {/* Phases — Accordion */}
+                  <Section title="階段化 Roadmap">
+                    <Accordion
+                      variant="bordered"
+                      selectionMode="multiple"
+                      defaultExpandedKeys={data.phases.length ? ["0"] : []}
+                    >
+                      {data.phases.map((ph: any, idx: number) => (
+                        <AccordionItem
+                          key={String(idx)}
+                          aria-label={ph.name}
+                          startContent={<Chip size="sm" color={cc} variant="flat">{ph.week}</Chip>}
+                          title={<span className="font-semibold text-small">{ph.name}</span>}
+                          subtitle={<span className="text-tiny text-default-500">{ph.tasks.length} 項任務 · {ph.deliverables.length} 項產出</span>}
                         >
-                          {ph.week}
-                        </span>
-                        <span className="font-semibold text-[0.95rem] text-foreground">
-                          {ph.name}
-                        </span>
-                      </div>
-                      <ul className="text-[0.82rem] text-foreground space-y-1 mb-2 ml-1">
-                        {ph.tasks.map((t: string, i: number) => (
-                          <li key={i} className="flex gap-2">
-                            <span style={{ color: data.color }}>·</span>
-                            <span className="flex-1">{t}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="text-[0.7rem] text-default-500 mt-2 pt-2 border-t border-divider">
-                        產出：{ph.deliverables.join(" / ")}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
+                          <ul className="text-small space-y-1.5 mb-3 pl-1">
+                            {ph.tasks.map((t: string, i: number) => (
+                              <li key={i} className="flex gap-2">
+                                <FontAwesomeIcon icon={faChartLine} className="text-tiny mt-1.5 text-default-400" />
+                                <span className="flex-1">{t}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <Divider className="my-2" />
+                          <div className="text-tiny text-default-500">
+                            <span className="font-medium text-default-600">產出：</span>
+                            {ph.deliverables.map((d: string, i: number) => (
+                              <Chip key={i} size="sm" variant="flat" className="ml-1 my-0.5">{d}</Chip>
+                            ))}
+                          </div>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </Section>
 
-              {/* Success case */}
-              <Section title="成功案例">
-                <div
-                  className="rounded-xl p-5 border"
-                  style={{
-                    background: `${data.color}08`,
-                    borderColor: `${data.color}30`,
-                  }}
-                >
-                  <div className="text-[0.66rem] tracking-[0.18em] uppercase text-default-500 mb-1">
-                    {data.successCase.industry} · {data.successCase.scope}
-                  </div>
-                  <div
-                    className="font-semibold text-[1rem] mb-3"
-                    style={{ color: data.color }}
-                  >
-                    {data.successCase.brand}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div>
-                      <div className="text-[0.62rem] uppercase tracking-wider text-default-500 mb-1">
-                        Before
-                      </div>
-                      <div className="text-[0.82rem] text-foreground leading-relaxed">
-                        {data.successCase.before}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[0.62rem] uppercase tracking-wider text-default-500 mb-1">
-                        After
-                      </div>
-                      <div
-                        className="text-[0.82rem] leading-relaxed font-medium"
-                        style={{ color: data.color }}
-                      >
-                        {data.successCase.after}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-[0.7rem] uppercase tracking-wider text-default-500 mb-2">
-                    關鍵動作
-                  </div>
-                  <ul className="text-[0.82rem] text-foreground space-y-1.5 mb-3">
-                    {data.successCase.keyMoves.map((m: string, i: number) => (
-                      <li key={i} className="flex gap-2">
-                        <span style={{ color: data.color }}>▸</span>
-                        <span className="flex-1">{m}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="text-[0.78rem] font-medium text-foreground mt-3 pt-3 border-t border-divider">
-                    {data.successCase.outcome}
-                  </div>
-                </div>
-              </Section>
+                  {/* Success case */}
+                  <Section title="成功案例">
+                    <Card shadow="none" className="border border-divider" style={{ background: `${data.color}08` }}>
+                      <CardBody className="gap-3 p-5">
+                        <div className="flex items-center gap-2">
+                          <Chip size="sm" variant="flat">{data.successCase.industry}</Chip>
+                          <Chip size="sm" variant="flat">{data.successCase.scope}</Chip>
+                        </div>
+                        <p className="font-semibold text-medium" style={{ color: data.color }}>
+                          {data.successCase.brand}
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <BeforeAfter label="Before" text={data.successCase.before} />
+                          <BeforeAfter label="After"  text={data.successCase.after} highlight={data.color} />
+                        </div>
+                        <Divider />
+                        <p className="text-tiny uppercase tracking-wider text-default-500">關鍵動作</p>
+                        <ul className="text-small space-y-1.5">
+                          {data.successCase.keyMoves.map((m: string, i: number) => (
+                            <li key={i} className="flex gap-2">
+                              <FontAwesomeIcon icon={faChartLine} className="text-tiny mt-1.5" style={{ color: data.color }} />
+                              <span className="flex-1">{m}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <Divider />
+                        <Snippet
+                          hideSymbol
+                          variant="flat"
+                          color={cc}
+                          classNames={{ pre: "whitespace-pre-wrap text-small font-medium" }}
+                        >
+                          {data.successCase.outcome}
+                        </Snippet>
+                      </CardBody>
+                    </Card>
+                  </Section>
 
-              {/* KPIs */}
-              <Section title="預期 KPI">
-                <div className="flex flex-wrap gap-2">
-                  {data.kpis.map((k: string, i: number) => (
-                    <span
-                      key={i}
-                      className="text-[0.78rem] px-3 py-1.5 rounded-full border"
-                      style={{
-                        borderColor: `${data.color}40`,
-                        color: data.color,
-                      }}
-                    >
-                      {k}
-                    </span>
-                  ))}
+                  {/* KPIs */}
+                  <Section title="預期 KPI">
+                    <div className="flex flex-wrap gap-2">
+                      {data.kpis.map((k: string, i: number) => (
+                        <Chip key={i} size="md" variant="bordered" color={cc}>{k}</Chip>
+                      ))}
+                    </div>
+                  </Section>
                 </div>
-              </Section>
-            </div>
+              </ScrollShadow>
+            </DrawerBody>
 
-            {/* Sticky CTA */}
-            <div className="sticky bottom-0 bg-white border-t border-divider px-8 py-4">
+            <DrawerFooter className="flex-col items-stretch gap-2 border-t border-divider px-8 py-4">
               {applyError && (
-                <div className="text-[0.78rem] text-red-600 mb-2">
-                  {applyError}
-                </div>
+                <Alert color="danger" variant="flat" title={applyError} onClose={() => setApplyError(null)} />
               )}
-              <button
-                onClick={handleApply}
-                disabled={applying || !brandId}
-                className="w-full h-12 rounded-xl font-medium text-white disabled:opacity-50 transition hover:brightness-110"
-                style={{ background: data.color }}
-              >
-                {applying
-                  ? "套用中…"
-                  : brandName
-                  ? `套用此方案到 ${brandName} →`
-                  : "套用此方案 →"}
-              </button>
-              <div className="text-[0.7rem] text-default-500 text-center mt-2">
+              {!brandId && !applyError && (
+                <Alert color="warning" variant="flat" title="請先在左上角選擇品牌再套用" />
+              )}
+              <Tooltip content={!brandId ? "請先選擇品牌" : ""} isDisabled={!!brandId}>
+                <Button
+                  color="primary"
+                  size="lg"
+                  radius="lg"
+                  className="w-full font-medium"
+                  isLoading={applying}
+                  isDisabled={!brandId}
+                  onPress={handleApply}
+                  endContent={!applying && <FontAwesomeIcon icon={faArrowUpRightFromSquare} />}
+                  style={{ background: brandId ? data.color : undefined }}
+                >
+                  {applying
+                    ? "套用中…"
+                    : brandName
+                    ? `套用此方案到 ${brandName}`
+                    : "套用此方案"}
+                </Button>
+              </Tooltip>
+              <p className="text-tiny text-default-500 text-center">
                 套用後會建立任務、自動推薦 squad、預先呼叫顧問團
-              </div>
-            </div>
-          </div>
+              </p>
+            </DrawerFooter>
+          </>
         )}
-      </div>
-    </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+// ──────────────────────────────────────────────────────────
+// Subcomponents
+// ──────────────────────────────────────────────────────────
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3
-        className="text-[0.66rem] tracking-[0.22em] uppercase text-default-500 mb-3"
-      >
+      <h3 className="text-tiny tracking-wider uppercase text-default-500 mb-3 font-medium">
         {title}
       </h3>
       {children}
@@ -502,51 +489,50 @@ function Section({
   );
 }
 
-function Meta({
-  label,
-  value,
-  small = false,
-}: {
-  label: string;
-  value: string;
-  small?: boolean;
-}) {
+function MetaCard({
+  icon, label, value, small = false,
+}: { icon: any; label: string; value: string; small?: boolean }) {
   return (
-    <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2.5 border border-white/60">
-      <div className="text-[0.6rem] uppercase tracking-wider text-default-500 mb-1">
-        {label}
-      </div>
-      <div
-        className={`text-foreground font-medium ${
-          small ? "text-[0.72rem] leading-snug" : "text-[0.84rem]"
-        }`}
-      >
-        {value}
-      </div>
-    </div>
+    <Card shadow="none" className="border border-divider/60 bg-content1/60 backdrop-blur-sm">
+      <CardBody className="p-2.5 gap-1">
+        <div className="flex items-center gap-1.5 text-tiny uppercase tracking-wider text-default-500">
+          <FontAwesomeIcon icon={icon} />
+          <span>{label}</span>
+        </div>
+        <p className={small ? "text-tiny font-medium leading-snug" : "text-small font-medium"}>
+          {value}
+        </p>
+      </CardBody>
+    </Card>
   );
 }
 
-function BundleStat({
-  label,
-  count,
-  detail,
-}: {
-  label: string;
-  count: number;
-  detail: string;
-}) {
+function BundleCard({
+  label, count, detail,
+}: { label: string; count: number; detail: string }) {
   return (
-    <div className="border border-divider rounded-lg p-3">
-      <div className="text-[0.6rem] uppercase tracking-wider text-default-500 mb-1">
-        {label}
-      </div>
-      <div className="font-semibold text-[1.4rem] text-foreground leading-none mb-1">
-        {count}
-      </div>
-      <div className="text-[0.66rem] text-default-500 line-clamp-2 leading-snug">
-        {detail}
-      </div>
+    <Card shadow="none" className="border border-divider">
+      <CardBody className="p-3 gap-1">
+        <p className="text-tiny uppercase tracking-wider text-default-500">{label}</p>
+        <p className="font-semibold text-2xl leading-none">{count}</p>
+        <p className="text-tiny text-default-500 line-clamp-2 leading-snug">{detail}</p>
+      </CardBody>
+    </Card>
+  );
+}
+
+function BeforeAfter({
+  label, text, highlight,
+}: { label: string; text: string; highlight?: string }) {
+  return (
+    <div>
+      <p className="text-tiny uppercase tracking-wider text-default-500 mb-1">{label}</p>
+      <p
+        className="text-small leading-relaxed"
+        style={highlight ? { color: highlight, fontWeight: 500 } : undefined}
+      >
+        {text}
+      </p>
     </div>
   );
 }
