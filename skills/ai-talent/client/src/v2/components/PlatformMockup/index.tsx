@@ -3,11 +3,27 @@
  *
  * variant resolution:
  *   { platform, format } from inferMockupVariant() →
- *   exact match → fall back to platform default → generic.
+ *   exact match → UnsupportedVariantPlaceholder ("即將推出" with squad
+ *   step list) → generic.
  *
- * PR2.2 implements 21 of 35 variants. Remaining fall-throughs documented
- * inline. See backlog memory item "Mockup tagging" — DB-level mockup
- * field will replace heuristic inference for catalog entries.
+ * PR2.4 design decision (2026-04-28): no more silent fall-through to a
+ * sibling variant. Falling FB Ad → FBFeed mis-rendered the user's
+ * intent. Honest "coming soon" is better than fake polish.
+ *
+ * Variants implemented (21):
+ *   instagram: feed, carousel, reel, story, profile
+ *   facebook:  feed, reel, story, marketplace, event
+ *   linkedin:  feed, article, newsletter, poll, document
+ *   youtube:   video-card, watch, shorts, community
+ *   tiktok:    foryou, profile
+ *   generic:   generic
+ *
+ * Variants honestly placeheld (11):
+ *   instagram: live, ad
+ *   facebook:  ad, carousel
+ *   linkedin:  native-video, ad, event
+ *   youtube:   premiere, live
+ *   tiktok:    carousel, live
  */
 import React from "react";
 import type { MockupVariant } from "../../lib/inferMockup";
@@ -18,6 +34,7 @@ import { LIFeed, LIArticle, LINewsletter, LIPoll, LIDocument } from "./linkedin"
 import { YTVideoCard, YTShorts, YTWatch, YTCommunity } from "./youtube";
 import { TTForYou, TTProfile } from "./tiktok";
 import { GenericMockup } from "./generic";
+import { UnsupportedVariantPlaceholder } from "./unsupported";
 
 export interface PlatformMockupProps extends MockupFields {
   variant: MockupVariant;
@@ -28,48 +45,41 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
   const key = `${variant.platform}:${variant.format}`;
 
   switch (key) {
-    // Instagram
+    // Instagram (5 implemented)
     case "instagram:feed":      return <IGFeed     {...f} />;
     case "instagram:carousel":  return <IGCarousel {...f} />;
     case "instagram:reel":      return <IGReels    {...f} />;
     case "instagram:story":     return <IGStories  {...f} />;
     case "instagram:profile":   return <IGProfile  {...f} />;
-    case "instagram:live":
-    case "instagram:ad":        return <IGFeed     {...f} />;
 
-    // Facebook
+    // Facebook (5 implemented)
     case "facebook:feed":       return <FBFeed        {...f} />;
     case "facebook:reel":       return <FBReel        {...f} />;
     case "facebook:story":      return <FBStory       {...f} />;
     case "facebook:marketplace":return <FBMarketplace {...f} />;
     case "facebook:event":      return <FBEvent       {...f} />;
-    case "facebook:ad":
-    case "facebook:carousel":   return <FBFeed        {...f} />;
 
-    // LinkedIn
+    // LinkedIn (5 implemented)
     case "linkedin:feed":       return <LIFeed       {...f} />;
     case "linkedin:article":    return <LIArticle    {...f} />;
     case "linkedin:newsletter": return <LINewsletter {...f} />;
     case "linkedin:poll":       return <LIPoll       {...f} />;
     case "linkedin:document":   return <LIDocument   {...f} />;
-    case "linkedin:native-video":
-    case "linkedin:ad":         return <LIFeed       {...f} />;
-    case "linkedin:event":      return <LIArticle    {...f} />;
 
-    // YouTube
+    // YouTube (4 implemented)
     case "youtube:video-card":  return <YTVideoCard {...f} />;
     case "youtube:watch":       return <YTWatch     {...f} />;
     case "youtube:shorts":      return <YTShorts    {...f} />;
     case "youtube:community":   return <YTCommunity {...f} />;
-    case "youtube:premiere":
-    case "youtube:live":        return <YTVideoCard {...f} />;
 
-    // TikTok
+    // TikTok (2 implemented)
     case "tiktok:foryou":       return <TTForYou {...f} />;
     case "tiktok:profile":      return <TTProfile {...f} />;
-    case "tiktok:carousel":
-    case "tiktok:live":         return <TTForYou {...f} />;
 
-    default:                    return <GenericMockup {...f} />;
+    // Generic
+    case "generic:generic":     return <GenericMockup {...f} />;
+
+    // 11 unsupported → honest placeholder (NOT fall-through)
+    default:                    return <UnsupportedVariantPlaceholder variant={variant} {...f} />;
   }
 }

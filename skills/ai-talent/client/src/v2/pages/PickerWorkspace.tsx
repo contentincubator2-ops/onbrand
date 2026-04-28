@@ -1348,6 +1348,7 @@ function SquadDetailPanel({
             title={missionTitle || name}
             brief={missionBrief || (description ?? "")}
             brandName={brandName}
+            steps={steps}
           />
         </div>
       </section>

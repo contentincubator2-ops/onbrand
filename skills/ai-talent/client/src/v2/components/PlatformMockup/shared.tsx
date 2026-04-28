@@ -18,6 +18,8 @@ export interface MockupFields {
   brandName: string | null;
   /** Variant label for header chip — comes from inferMockupVariant */
   variantLabel?: string;
+  /** Squad steps — only consumed by UnsupportedVariantPlaceholder */
+  steps?: Array<{ name?: string; outputType?: string; assignedAgentName?: string }>;
 }
 
 export const dicebear = (name: string) =>
