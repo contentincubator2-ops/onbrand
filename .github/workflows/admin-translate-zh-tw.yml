@@ -38,7 +38,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 5400s
+          command_timeout: 18000s
           envs: GH_TOKEN,TARGET,APPLY,LIMIT,BATCH
           script: |
             set -e
