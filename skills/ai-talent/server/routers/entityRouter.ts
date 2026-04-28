@@ -115,6 +115,15 @@ export interface HomeEntity {
   outputKind?: "strategic" | "content" | null;
   /** Mockup variant override — bypasses heuristic inference when set. */
   mockup?: { platform: string; format: string };
+
+  /**
+   * Generated cover/portrait image. Populated for all three kinds:
+   *   squad → squads.hero_image_url (Notion-style line illustration)
+   *   agent → agents.avatarUrl       (react-nice-avatar / generated portrait)
+   *   skill → skills.cover_image_url (skill cover from generateSkillCovers)
+   * Client falls back to MethodologyGlyph when null.
+   */
+  coverImageUrl?: string | null;
 }
 
 const KIND_LABELS = {
@@ -128,7 +137,8 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
   const [rows] = await localPool.execute(
     `SELECT id, slug, name, description, agents, steps,
             strategy_layer, methodology, workspace,
-            task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind
+            task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind,
+            hero_image_url
        FROM squads
       WHERE is_active = 1
       ORDER BY COALESCE(tier, 99) ASC, id ASC
@@ -185,29 +195,50 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
       mockup: (r.mockup_platform && r.mockup_format)
         ? { platform: String(r.mockup_platform), format: String(r.mockup_format) }
         : undefined,
+      coverImageUrl: r.hero_image_url ?? null,
     };
   });
 }
 
 // ── Agent → HomeEntity ─────────────────────────────────────────────────────
 async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
+  // Raw SQL on sowork_db.agents — Drizzle schema (soworkAgents) doesn't
+  // declare avatarUrl, but the column exists and is populated by
+  // generateAgentAvatars.ts. Use raw query so we can SELECT it.
   const db = await getSoworkDb();
   if (!db) return [];
-
-  const rows = await db
-    .select({
-      id: soworkAgents.id,
-      slug: soworkAgents.slug,
-      name: soworkAgents.name,
-      title: soworkAgents.title,
-      bio: soworkAgents.bio,
-      specialty: soworkAgents.specialty,
-      layer: soworkAgents.layer,
-      workspace: soworkAgents.workspace,
-    })
-    .from(soworkAgents)
-    .where(eq(soworkAgents.isAvailable, true))
-    .limit(limit);
+  const conn = (db as any).session?.client ?? (db as any)._.session?.client;
+  let rawRows: any[] = [];
+  try {
+    const [r]: any = await ((db as any).execute
+      ? (db as any).execute(
+          `SELECT id, slug, name, title, bio, specialty, layer, workspace, avatarUrl
+             FROM agents
+            WHERE isAvailable = 1
+            LIMIT ${limit}`
+        )
+      : conn.query(
+          `SELECT id, slug, name, title, bio, specialty, layer, workspace, avatarUrl
+             FROM agents
+            WHERE isAvailable = 1
+            LIMIT ${limit}`
+        ));
+    rawRows = Array.isArray(r) ? r : (r?.rows ?? []);
+  } catch (e: any) {
+    console.warn(`[entity] agents raw SELECT failed, falling back to Drizzle: ${e.message}`);
+    const fallback = await db
+      .select({
+        id: soworkAgents.id, slug: soworkAgents.slug, name: soworkAgents.name,
+        title: soworkAgents.title, bio: soworkAgents.bio,
+        specialty: soworkAgents.specialty, layer: soworkAgents.layer,
+        workspace: soworkAgents.workspace,
+      })
+      .from(soworkAgents)
+      .where(eq(soworkAgents.isAvailable, true))
+      .limit(limit);
+    rawRows = fallback as any[];
+  }
+  const rows = rawRows;
 
   // Agents use a 3-tier layer (strategy / execution / training) — map to L1/L4/L6
   // for visual consistency with squads. This is a temporary mapping until
@@ -246,6 +277,7 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
       stepCount: 0,
       memberCount: 1,
       workspace: r.workspace ? [String(r.workspace)] : [],
+      coverImageUrl: (r as any).avatarUrl ?? null,
     };
   });
 }
@@ -269,7 +301,7 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
     const [r]: any = await localPool.execute(
       `SELECT id, slug, name, description, category, strategy_layer,
               origin_model, source, task_type, recommended_models,
-              quality_score
+              quality_score, cover_image_url
          FROM skills
         WHERE is_active = 1 AND ${filter}
         ORDER BY quality_score DESC, id ASC
@@ -328,6 +360,7 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
       stepCount: 0,
       memberCount: kind === "agent" ? 1 : 0,
       workspace: [],
+      coverImageUrl: r.cover_image_url ?? null,
     };
   });
 }
