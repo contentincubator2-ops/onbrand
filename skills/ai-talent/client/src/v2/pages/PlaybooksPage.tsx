@@ -16,13 +16,15 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Accordion, AccordionItem, Alert, Breadcrumbs, BreadcrumbItem,
   Button, Card, CardBody, CardFooter, Chip, Divider, Drawer, DrawerBody,
-  DrawerContent, DrawerFooter, DrawerHeader, ScrollShadow, Skeleton,
+  DrawerContent, DrawerFooter, DrawerHeader, Dropdown, DropdownItem,
+  DropdownMenu, DropdownTrigger, Input, ScrollShadow, Skeleton,
   Snippet, Spinner, Tab, Tabs, Tooltip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faArrowUpRightFromSquare, faChartLine, faUsers, faBroadcastTower,
+  faArrowUpRightFromSquare, faCheck, faUsers, faBroadcastTower,
   faBullseye, faClock, faSackDollar, faPeopleGroup, faXmark,
+  faMagnifyingGlass, faArrowUpWideShort, faFolderOpen, faChevronDown,
 } from "@fortawesome/free-solid-svg-icons";
 
 type PlaybookSummary = {
@@ -83,12 +85,42 @@ export default function PlaybooksPage() {
   const playbooks: PlaybookSummary[] = listQuery.data ?? [];
 
   const [filter, setFilter] = useState<string>("all");
+  const [searchQ, setSearchQ] = useState<string>("");
+  const [sort, setSort] = useState<"recommended" | "duration" | "budget">("recommended");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const filtered = useMemo(
-    () => filter === "all" ? playbooks : playbooks.filter((p) => p.badge === filter),
-    [playbooks, filter]
-  );
+  // Counts per badge for tab labels
+  const counts = useMemo(() => {
+    const m: Record<string, number> = { all: playbooks.length };
+    for (const p of playbooks) m[p.badge] = (m[p.badge] ?? 0) + 1;
+    return m;
+  }, [playbooks]);
+
+  const filtered = useMemo(() => {
+    let r = filter === "all" ? playbooks : playbooks.filter((p) => p.badge === filter);
+    const q = searchQ.trim().toLowerCase();
+    if (q) {
+      r = r.filter((p) =>
+        (p.title ?? "").toLowerCase().includes(q) ||
+        (p.hook ?? "").toLowerCase().includes(q) ||
+        (p.problem ?? "").toLowerCase().includes(q) ||
+        (p.audience ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (sort === "duration") {
+      r = [...r].sort((a, b) => (a.phaseCount ?? 0) - (b.phaseCount ?? 0));
+    } else if (sort === "budget") {
+      // Lexicographic on budget string is good enough — schema is consistent (e.g. "10–30 萬").
+      r = [...r].sort((a, b) => (a.budget ?? "").localeCompare(b.budget ?? ""));
+    }
+    return r;
+  }, [playbooks, filter, searchQ, sort]);
+
+  const SORT_LABEL: Record<typeof sort, string> = {
+    recommended: "推薦排序",
+    duration: "依期間",
+    budget: "依預算",
+  };
 
   return (
     <div className="px-8 py-10 max-w-[1280px] mx-auto">
@@ -115,35 +147,107 @@ export default function PlaybooksPage() {
         </p>
       </div>
 
-      {/* ── Filter Tabs ──────────────────────────────────── */}
-      <Tabs
-        aria-label="方案類別"
-        selectedKey={filter}
-        onSelectionChange={(k) => setFilter(String(k))}
-        variant="underlined"
-        color="primary"
-        className="mb-6"
-      >
-        {FILTERS.map((f) => <Tab key={f.id} title={f.label} />)}
-      </Tabs>
+      {/* ── Filter row: tabs (with counts) + search + sort ─────── */}
+      <div className="mb-6 flex items-center gap-3 flex-wrap">
+        <Tabs
+          aria-label="方案類別"
+          selectedKey={filter}
+          onSelectionChange={(k) => setFilter(String(k))}
+          variant="underlined"
+          color="primary"
+        >
+          {FILTERS.map((f) => (
+            <Tab
+              key={f.id}
+              title={
+                <span className="flex items-center gap-1.5">
+                  {f.label}
+                  {(counts[f.id] ?? 0) > 0 && (
+                    <span className="text-tiny text-default-400 tabular-nums">
+                      {counts[f.id]}
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          ))}
+        </Tabs>
+        <div className="ml-auto flex items-center gap-2">
+          <Input
+            size="sm"
+            radius="full"
+            variant="bordered"
+            value={searchQ}
+            onValueChange={setSearchQ}
+            placeholder="搜尋方案…"
+            isClearable
+            onClear={() => setSearchQ("")}
+            startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 text-tiny" />}
+            className="w-[220px]"
+          />
+          <Dropdown placement="bottom-end">
+            <DropdownTrigger>
+              <Button
+                size="sm" radius="full" variant="bordered"
+                startContent={<FontAwesomeIcon icon={faArrowUpWideShort} className="text-tiny" />}
+                endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny" />}
+              >
+                {SORT_LABEL[sort]}
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="排序"
+              selectionMode="single"
+              selectedKeys={new Set([sort])}
+              onAction={(k) => setSort(String(k) as typeof sort)}
+            >
+              <DropdownItem key="recommended">推薦排序</DropdownItem>
+              <DropdownItem key="duration">依期間</DropdownItem>
+              <DropdownItem key="budget">依預算</DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      </div>
 
       {/* ── Grid ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {listQuery.isLoading
-          ? Array.from({ length: 6 }).map((_, i) => (
-              <Card key={i} shadow="sm" radius="lg" className="aspect-[5/6]">
-                <Skeleton className="h-32 w-full rounded-none" />
-                <CardBody className="gap-2">
-                  <Skeleton className="h-4 w-4/5 rounded" />
-                  <Skeleton className="h-3 w-full rounded" />
-                  <Skeleton className="h-3 w-3/5 rounded" />
-                </CardBody>
-              </Card>
-            ))
-          : filtered.map((p) => (
-              <PlaybookCard key={p.id} playbook={p} onClick={() => setSelectedId(p.id)} />
-            ))}
-      </div>
+      {listQuery.isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} shadow="sm" radius="lg" className="aspect-[5/6]">
+              <Skeleton className="h-32 w-full rounded-none" />
+              <CardBody className="gap-2">
+                <Skeleton className="h-4 w-4/5 rounded" />
+                <Skeleton className="h-3 w-full rounded" />
+                <Skeleton className="h-3 w-3/5 rounded" />
+              </CardBody>
+            </Card>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card shadow="none" className="border-2 border-dashed border-divider">
+          <CardBody className="py-16 items-center text-center gap-3">
+            <FontAwesomeIcon icon={faFolderOpen} className="text-4xl text-default-300" />
+            <p className="text-medium font-medium">
+              {searchQ ? `沒有找到符合「${searchQ}」的方案` : "這個分類目前沒有方案"}
+            </p>
+            <p className="text-small text-default-500">換個關鍵字、或選擇其他類別</p>
+            {(searchQ || filter !== "all") && (
+              <Button
+                size="sm" variant="light"
+                onPress={() => { setSearchQ(""); setFilter("all"); }}
+              >
+                清除篩選
+              </Button>
+            )}
+          </CardBody>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filtered.map((p) => (
+            <PlaybookCard key={p.id} playbook={p} onClick={() => setSelectedId(p.id)} />
+          ))}
+        </div>
+      )}
 
       {/* ── Detail drawer ─────────────────────────────────── */}
       <PlaybookDetail
@@ -175,7 +279,7 @@ function PlaybookCard({
       onPress={onClick}
       shadow="sm"
       radius="lg"
-      className="aspect-[5/6] overflow-hidden"
+      className="aspect-[5/6] overflow-hidden group"
     >
       {/* Hero band — keeps brand color gradient as artwork */}
       <div
@@ -192,11 +296,14 @@ function PlaybookCard({
         <div className="absolute right-4 bottom-2 text-5xl leading-none drop-shadow-md">
           {playbook.emoji}
         </div>
-        <Tooltip content="查看詳情" placement="left">
-          <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center opacity-0 hover:opacity-100 transition pointer-events-none">
-            <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-tiny" style={{ color: playbook.color }} />
-          </span>
-        </Tooltip>
+        {/* Hover quick-preview — appears on card hover (group). pointer-events-none
+            so the parent isPressable still receives the click. */}
+        <span
+          aria-hidden
+          className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/95 flex items-center justify-center opacity-0 group-hover:opacity-100 transition pointer-events-none shadow-sm"
+        >
+          <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-tiny" style={{ color: playbook.color }} />
+        </span>
       </div>
 
       <CardBody className="gap-2 px-5 pt-4 pb-2">
@@ -325,116 +432,143 @@ function PlaybookDetail({
             </DrawerHeader>
 
             <DrawerBody className="p-0">
-              <ScrollShadow className="h-full">
-                <div className="px-8 py-6 space-y-7">
-                  {/* Problem */}
-                  <Section title="這個方案在解什麼痛">
-                    <p className="text-foreground text-small leading-relaxed whitespace-pre-line">
-                      {data.problem}
-                    </p>
-                  </Section>
-
-                  {/* Pitch + Bundle */}
-                  <Section title="方案組合">
-                    <Snippet
-                      hideSymbol
-                      variant="flat"
-                      color={cc}
-                      className="mb-4 w-full"
-                      classNames={{ pre: "whitespace-pre-wrap text-small" }}
-                    >
-                      {data.pitch}
-                    </Snippet>
-                    <div className="grid grid-cols-3 gap-3">
-                      <BundleCard label="任務範本" count={data.bundle.squadSlugs.length} detail={data.bundle.squadSlugs.join(" · ")} />
-                      <BundleCard label="顧問"     count={data.bundle.personaIds.length} detail={data.bundle.personaIds.join(" · ")} />
-                      <BundleCard label="媒體通路" count={data.bundle.channelIds.length} detail={data.bundle.channelIds.join(" · ")} />
-                    </div>
-                  </Section>
-
-                  {/* Phases — Accordion */}
-                  <Section title="階段化 Roadmap">
-                    <Accordion
-                      variant="bordered"
-                      selectionMode="multiple"
-                      defaultExpandedKeys={data.phases.length ? ["0"] : []}
-                    >
-                      {data.phases.map((ph: any, idx: number) => (
-                        <AccordionItem
-                          key={String(idx)}
-                          aria-label={ph.name}
-                          startContent={<Chip size="sm" color={cc} variant="flat">{ph.week}</Chip>}
-                          title={<span className="font-semibold text-small">{ph.name}</span>}
-                          subtitle={<span className="text-tiny text-default-500">{ph.tasks.length} 項任務 · {ph.deliverables.length} 項產出</span>}
-                        >
-                          <ul className="text-small space-y-1.5 mb-3 pl-1">
-                            {ph.tasks.map((t: string, i: number) => (
-                              <li key={i} className="flex gap-2">
-                                <FontAwesomeIcon icon={faChartLine} className="text-tiny mt-1.5 text-default-400" />
-                                <span className="flex-1">{t}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <Divider className="my-2" />
-                          <div className="text-tiny text-default-500">
-                            <span className="font-medium text-default-600">產出：</span>
-                            {ph.deliverables.map((d: string, i: number) => (
-                              <Chip key={i} size="sm" variant="flat" className="ml-1 my-0.5">{d}</Chip>
-                            ))}
-                          </div>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </Section>
-
-                  {/* Success case */}
-                  <Section title="成功案例">
-                    <Card shadow="none" className="border border-divider" style={{ background: `${data.color}08` }}>
-                      <CardBody className="gap-3 p-5">
-                        <div className="flex items-center gap-2">
-                          <Chip size="sm" variant="flat">{data.successCase.industry}</Chip>
-                          <Chip size="sm" variant="flat">{data.successCase.scope}</Chip>
-                        </div>
-                        <p className="font-semibold text-medium" style={{ color: data.color }}>
-                          {data.successCase.brand}
+              <Tabs
+                aria-label="方案細節"
+                variant="underlined"
+                color="primary"
+                fullWidth
+                classNames={{
+                  tabList: "px-6 pt-1 border-b border-divider gap-4",
+                  panel: "p-0 h-full overflow-hidden",
+                }}
+              >
+                {/* ── Tab 1: Overview ───────────────────────────────── */}
+                <Tab key="overview" title="總覽">
+                  <ScrollShadow className="h-full">
+                    <div className="px-8 py-6 space-y-7">
+                      <Section title="這個方案在解什麼痛">
+                        <p className="text-foreground text-small leading-relaxed whitespace-pre-line">
+                          {data.problem}
                         </p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <BeforeAfter label="Before" text={data.successCase.before} />
-                          <BeforeAfter label="After"  text={data.successCase.after} highlight={data.color} />
-                        </div>
-                        <Divider />
-                        <p className="text-tiny uppercase tracking-wider text-default-500">關鍵動作</p>
-                        <ul className="text-small space-y-1.5">
-                          {data.successCase.keyMoves.map((m: string, i: number) => (
-                            <li key={i} className="flex gap-2">
-                              <FontAwesomeIcon icon={faChartLine} className="text-tiny mt-1.5" style={{ color: data.color }} />
-                              <span className="flex-1">{m}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <Divider />
+                      </Section>
+
+                      <Section title="方案組合">
                         <Snippet
                           hideSymbol
                           variant="flat"
                           color={cc}
-                          classNames={{ pre: "whitespace-pre-wrap text-small font-medium" }}
+                          className="mb-4 w-full"
+                          classNames={{ pre: "whitespace-pre-wrap text-small" }}
                         >
-                          {data.successCase.outcome}
+                          {data.pitch}
                         </Snippet>
-                      </CardBody>
-                    </Card>
-                  </Section>
-
-                  {/* KPIs */}
-                  <Section title="預期 KPI">
-                    <div className="flex flex-wrap gap-2">
-                      {data.kpis.map((k: string, i: number) => (
-                        <Chip key={i} size="md" variant="bordered" color={cc}>{k}</Chip>
-                      ))}
+                        <div className="grid grid-cols-3 gap-3">
+                          <BundleCard label="任務範本" count={data.bundle.squadSlugs.length} detail={data.bundle.squadSlugs.join(" · ")} />
+                          <BundleCard label="顧問"     count={data.bundle.personaIds.length} detail={data.bundle.personaIds.join(" · ")} />
+                          <BundleCard label="媒體通路" count={data.bundle.channelIds.length} detail={data.bundle.channelIds.join(" · ")} />
+                        </div>
+                      </Section>
                     </div>
-                  </Section>
-                </div>
-              </ScrollShadow>
+                  </ScrollShadow>
+                </Tab>
+
+                {/* ── Tab 2: Roadmap ────────────────────────────────── */}
+                <Tab key="roadmap" title={`Roadmap · ${data.phases.length}`}>
+                  <ScrollShadow className="h-full">
+                    <div className="px-8 py-6">
+                      <Accordion
+                        variant="bordered"
+                        selectionMode="multiple"
+                        defaultExpandedKeys={data.phases.length ? ["0"] : []}
+                      >
+                        {data.phases.map((ph: any, idx: number) => (
+                          <AccordionItem
+                            key={String(idx)}
+                            aria-label={ph.name}
+                            startContent={<Chip size="sm" color={cc} variant="flat">{ph.week}</Chip>}
+                            title={<span className="font-semibold text-small">{ph.name}</span>}
+                            subtitle={<span className="text-tiny text-default-500">{ph.tasks.length} 項任務 · {ph.deliverables.length} 項產出</span>}
+                          >
+                            <ul className="text-small space-y-1.5 mb-3 pl-1">
+                              {ph.tasks.map((t: string, i: number) => (
+                                <li key={i} className="flex gap-2">
+                                  <FontAwesomeIcon icon={faCheck} className="text-tiny mt-1 text-success" />
+                                  <span className="flex-1">{t}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <Divider className="my-2" />
+                            <div className="text-tiny text-default-500">
+                              <span className="font-medium text-default-600">產出：</span>
+                              {ph.deliverables.map((d: string, i: number) => (
+                                <Chip key={i} size="sm" variant="flat" className="ml-1 my-0.5">{d}</Chip>
+                              ))}
+                            </div>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </div>
+                  </ScrollShadow>
+                </Tab>
+
+                {/* ── Tab 3: Case ───────────────────────────────────── */}
+                <Tab key="case" title="成功案例">
+                  <ScrollShadow className="h-full">
+                    <div className="px-8 py-6">
+                      <Card shadow="none" className="border border-divider" style={{ background: `${data.color}08` }}>
+                        <CardBody className="gap-3 p-5">
+                          <div className="flex items-center gap-2">
+                            <Chip size="sm" variant="flat">{data.successCase.industry}</Chip>
+                            <Chip size="sm" variant="flat">{data.successCase.scope}</Chip>
+                          </div>
+                          <p className="font-semibold text-medium" style={{ color: data.color }}>
+                            {data.successCase.brand}
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <BeforeAfter label="Before" text={data.successCase.before} />
+                            <BeforeAfter label="After"  text={data.successCase.after} highlight={data.color} />
+                          </div>
+                          <Divider />
+                          <p className="text-tiny uppercase tracking-wider text-default-500">關鍵動作</p>
+                          <ul className="text-small space-y-1.5">
+                            {data.successCase.keyMoves.map((m: string, i: number) => (
+                              <li key={i} className="flex gap-2">
+                                <FontAwesomeIcon icon={faCheck} className="text-tiny mt-1" style={{ color: data.color }} />
+                                <span className="flex-1">{m}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <Divider />
+                          <Snippet
+                            hideSymbol
+                            variant="flat"
+                            color={cc}
+                            classNames={{ pre: "whitespace-pre-wrap text-small font-medium" }}
+                          >
+                            {data.successCase.outcome}
+                          </Snippet>
+                        </CardBody>
+                      </Card>
+                    </div>
+                  </ScrollShadow>
+                </Tab>
+
+                {/* ── Tab 4: KPIs ───────────────────────────────────── */}
+                <Tab key="kpis" title={`預期 KPI · ${data.kpis.length}`}>
+                  <ScrollShadow className="h-full">
+                    <div className="px-8 py-6">
+                      <p className="text-tiny tracking-wider uppercase text-default-500 mb-3">
+                        90 天內可驗證的成效指標
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {data.kpis.map((k: string, i: number) => (
+                          <Chip key={i} size="md" variant="bordered" color={cc}>{k}</Chip>
+                        ))}
+                      </div>
+                    </div>
+                  </ScrollShadow>
+                </Tab>
+              </Tabs>
             </DrawerBody>
 
             <DrawerFooter className="flex-col items-stretch gap-2 border-t border-divider px-8 py-4">
