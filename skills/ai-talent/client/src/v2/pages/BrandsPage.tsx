@@ -28,17 +28,27 @@ import {
   faPalette, faFont, faQuoteLeft, faBullseye, faUsers,
   faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
   faFolderOpen, faUserPlus, faCrown,
+  faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
 } from "@fortawesome/free-solid-svg-icons";
 
 type SectionId =
   | "all" | "guidelines" | "templates"
   | "logo" | "colors" | "fonts" | "voice"
   | "positioning" | "audience" | "competitor"
-  | "photos" | "images" | "icons" | "charts";
+  | "photos" | "images" | "icons" | "charts"
+  // shared across scopes
+  | "doc" | "card" | "prompts";
 
 interface SubNavItem { id: SectionId; label: string; badge?: string; }
-const SUBNAV: SubNavItem[] = [
+
+// Scope-aware sub-nav: same scaffold, different items per scope.
+// Per CJ direction 2026-04-28: brand assets stay where they are; product
+// and event get a slimmer 3-section view (定位書 / 速查卡 / AI 指令庫).
+const SUBNAV_BRAND: SubNavItem[] = [
   { id: "all",         label: "所有資產" },
+  { id: "doc",         label: "完整定位書" },
+  { id: "card",        label: "速查卡" },
+  { id: "prompts",     label: "AI 指令庫" },
   { id: "guidelines",  label: "準則" },
   { id: "templates",   label: "品牌範本", badge: "最新" },
   { id: "logo",        label: "標誌" },
@@ -53,6 +63,16 @@ const SUBNAV: SubNavItem[] = [
   { id: "icons",       label: "圖示" },
   { id: "charts",      label: "圖表" },
 ];
+const SUBNAV_PRODUCT: SubNavItem[] = [
+  { id: "doc",      label: "完整定位書" },
+  { id: "card",     label: "速查卡" },
+  { id: "prompts",  label: "AI 指令庫" },
+];
+const SUBNAV_EVENT: SubNavItem[] = [
+  { id: "doc",      label: "完整定位書" },
+  { id: "card",     label: "速查卡" },
+  { id: "prompts",  label: "AI 指令庫" },
+];
 
 // Tile colors (HeroUI semantic-100 backgrounds + matching tone)
 type Tone = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
@@ -66,13 +86,56 @@ interface Tile {
 }
 
 export default function BrandsPage() {
-  const { brandId, setBrandId, brands } = useOutletContext<ShellOutletCtx>();
-  const [section, setSection] = useState<SectionId>("all");
+  const { brandId, setBrandId, brands, scope } = useOutletContext<ShellOutletCtx>();
+
+  // Resolve scope mode — choose-one rule from ScopeBar.
+  const scopeMode: "brand" | "product" | "event" | "none" =
+    scope?.eventId ? "event"
+    : scope?.productId ? "product"
+    : scope?.brandId ? "brand"
+    : (brandId ? "brand" : "none"); // legacy fallback
+
+  // Pull product/event details when those scopes are active
+  const productQuery = (trpc as any).product?.get?.useQuery
+    ? (trpc as any).product.get.useQuery(
+        { id: scope?.productId ?? 0 },
+        { enabled: scopeMode === "product" && !!scope?.productId, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+  const eventQuery = (trpc as any).event?.get?.useQuery
+    ? (trpc as any).event.get.useQuery(
+        { id: scope?.eventId ?? 0 },
+        { enabled: scopeMode === "event" && !!scope?.eventId, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+
+  const SUBNAV: SubNavItem[] =
+    scopeMode === "product" ? SUBNAV_PRODUCT
+    : scopeMode === "event" ? SUBNAV_EVENT
+    : SUBNAV_BRAND;
+  const defaultSection: SectionId = scopeMode === "brand" ? "all" : "doc";
+  const [section, setSection] = useState<SectionId>(defaultSection);
+  // Reset section when scope mode changes (avoid stale "logo" while on product)
+  React.useEffect(() => {
+    setSection(scopeMode === "brand" ? "all" : "doc");
+  }, [scopeMode]);
 
   const currentBrand = useMemo(
-    () => brands.find((b: any) => b.id === brandId) ?? brands[0] ?? null,
-    [brands, brandId]
+    () => brands.find((b: any) => b.id === (scope?.brandId ?? brandId)) ?? brands[0] ?? null,
+    [brands, scope?.brandId, brandId]
   );
+  const scopeName =
+    scopeMode === "product" ? ((productQuery.data as any)?.name ?? "（請於右上選擇產品）")
+    : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? "（請於右上選擇活動）")
+    : (currentBrand?.name ?? "（請於右上選擇品牌）");
+  const scopeIcon =
+    scopeMode === "product" ? faBox
+    : scopeMode === "event" ? faCalendarDay
+    : faTrademark;
+  const scopeEyebrow =
+    scopeMode === "product" ? "PRODUCT"
+    : scopeMode === "event" ? "EVENT"
+    : "BRAND";
   const brandName = currentBrand?.name ?? "我的品牌";
   const brandInitial = brandName.charAt(0).toUpperCase();
 
@@ -109,20 +172,20 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Top header — design-system canonical pattern ─────────── */}
+      {/* ─── Top header — scope-aware (brand / product / event) ─────── */}
       <header className="px-8 py-10 border-b border-divider bg-content1">
         <Chip
           color="default"
           variant="flat"
           size="sm"
           className="uppercase tracking-wider mb-2"
-          startContent={<FontAwesomeIcon icon={faFolderOpen} className="ml-1" />}
+          startContent={<FontAwesomeIcon icon={scopeIcon} className="ml-1" />}
         >
-          品牌工具組
+          {scopeEyebrow}
         </Chip>
-        <h1 className="text-3xl font-semibold tracking-tight">{brandName}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{scopeName}</h1>
         <p className="text-small text-default-500 mt-1">
-          切換品牌請使用左側 sidebar
+          請於右上 ScopeBar 切換 品牌 / 產品 / 活動
         </p>
       </header>
 
@@ -162,39 +225,20 @@ export default function BrandsPage() {
             所有品牌範本
           </Button>
 
-          {/* Brand switcher dropdown — pinned section */}
+          {/* Scope read-only chip (single source of truth = ScopeBar) */}
           <div className="px-3 pt-2 pb-1">
-            <Dropdown placement="bottom-start">
-              <DropdownTrigger>
-                <Button
-                  fullWidth
-                  variant="bordered"
-                  radius="lg"
-                  className="justify-between h-12"
-                  startContent={
-                    <Avatar
-                      name={brandInitial}
-                      size="sm"
-                      radius="md"
-                      classNames={{ base: "shrink-0 bg-default-100 text-default-600", name: "text-tiny font-bold" }}
-                    />
-                  }
-                  endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny text-default-400" />}
-                >
-                  <span className="text-small truncate flex-1 text-left">品牌工具組</span>
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu
-                aria-label="切換品牌"
-                selectionMode="single"
-                selectedKeys={brandId != null ? new Set([String(brandId)]) : new Set()}
-                onAction={(k) => setBrandId(Number(k))}
-              >
-                {brands.map((b: any) => (
-                  <DropdownItem key={String(b.id)}>{b.name}</DropdownItem>
-                ))}
-              </DropdownMenu>
-            </Dropdown>
+            <div className="flex items-center gap-2 px-3 h-12 rounded-lg border border-divider bg-default-50">
+              <Avatar
+                name={(scopeName.charAt(0) || "?").toUpperCase()}
+                size="sm"
+                radius="md"
+                classNames={{ base: "shrink-0 bg-default-100 text-default-600", name: "text-tiny font-bold" }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-tiny text-default-400 uppercase tracking-wider">{scopeEyebrow}</p>
+                <p className="text-small font-medium truncate">{scopeName}</p>
+              </div>
+            </div>
           </div>
 
           {/* Sub-nav */}
@@ -226,9 +270,15 @@ export default function BrandsPage() {
           </nav>
         </aside>
 
-        {/* Right: tile grid — full bleed */}
+        {/* Right: scope-aware content pane */}
         <div className="flex-1 min-w-0 px-6 py-6 overflow-y-auto">
-          {visibleTiles.length === 0 ? (
+          {section === "doc" || section === "card" || section === "prompts" ? (
+            <PositioningPanel
+              section={section}
+              scopeMode={scopeMode}
+              scopeName={scopeName}
+            />
+          ) : visibleTiles.length === 0 ? (
             <Card shadow="none" className="border-2 border-dashed border-divider">
               <CardBody className="py-16 items-center text-center gap-3">
                 <FontAwesomeIcon icon={faShapes} className="text-3xl text-default-300" />
@@ -251,8 +301,8 @@ export default function BrandsPage() {
                   className="border-2 border-dashed border-divider"
                 >
                   <CardBody className="aspect-[4/3] items-center justify-center gap-3 text-center">
-                    <div className="w-14 h-14 rounded-full bg-secondary-100 flex items-center justify-center">
-                      <FontAwesomeIcon icon={faPlus} className="text-2xl text-secondary" />
+                    <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center">
+                      <FontAwesomeIcon icon={faPlus} className="text-2xl text-default-500" />
                     </div>
                     <p className="text-small text-default-500">新增類別</p>
                   </CardBody>
@@ -263,6 +313,68 @@ export default function BrandsPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+/* ─────────────────────────── PositioningPanel ───────────────────────── */
+// Phase 4 placeholder — Phase 5 will fill these with the actual 8/6/3-section
+// forms + speed-card view + AI prompt library.
+
+function PositioningPanel({
+  section, scopeMode, scopeName,
+}: {
+  section: "doc" | "card" | "prompts";
+  scopeMode: "brand" | "product" | "event" | "none";
+  scopeName: string;
+}) {
+  const titleMap = { doc: "完整定位書", card: "速查卡", prompts: "AI 指令庫" } as const;
+  const iconMap = { doc: faBookOpen, card: faTableList, prompts: faRobot } as const;
+  const sectionCount =
+    scopeMode === "brand" ? { doc: 8, card: 3, prompts: 6 }
+    : scopeMode === "product" ? { doc: 6, card: 2, prompts: 6 }
+    : scopeMode === "event" ? { doc: 3, card: 1, prompts: 6 }
+    : { doc: 0, card: 0, prompts: 0 };
+
+  if (scopeMode === "none") {
+    return (
+      <Card shadow="none" className="border-2 border-dashed border-divider">
+        <CardBody className="py-16 items-center text-center gap-3">
+          <FontAwesomeIcon icon={iconMap[section]} className="text-3xl text-default-300" />
+          <p className="text-medium font-medium">{titleMap[section]}</p>
+          <p className="text-small text-default-500 max-w-[320px]">
+            請於右上 ScopeBar 選擇品牌 / 產品 / 活動，才能編輯定位內容。
+          </p>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  return (
+    <Card shadow="none" className="border border-divider">
+      <CardBody className="p-6 gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-default-100 border border-divider flex items-center justify-center">
+            <FontAwesomeIcon icon={iconMap[section]} className="text-default-600" />
+          </div>
+          <div>
+            <p className="text-tiny text-default-500 uppercase tracking-wider">
+              {scopeMode === "product" ? "PRODUCT" : scopeMode === "event" ? "EVENT" : "BRAND"} · {titleMap[section]}
+            </p>
+            <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
+          </div>
+        </div>
+        <Divider />
+        <div className="text-small text-default-500 leading-relaxed space-y-2">
+          <p>
+            這個區塊將呈現 {scopeMode === "brand" ? "品牌" : scopeMode === "product" ? "產品" : "活動"}
+            的 {titleMap[section]}（{sectionCount[section]} 個段落）。
+          </p>
+          <p>
+            每個段落支援：手動填寫 ｜ 由推薦 agent 自動填寫。下一個 phase 會接 form components。
+          </p>
+        </div>
+      </CardBody>
+    </Card>
   );
 }
 
