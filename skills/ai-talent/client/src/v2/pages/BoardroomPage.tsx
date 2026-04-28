@@ -1,28 +1,36 @@
 /**
- * BoardroomPage — 「比稿（邀比稿）」三步流程 (HeroUI v2 migration)
+ * BoardroomPage — 比稿（邀比稿）3-col live orchestra layout.
  *
- *   STEP 1  用戶輸入需求 (concern / brief)
- *   STEP 2  系統推薦 12 位候選 agent，用戶勾選 1–5 位
- *   STEP 3  被選中的 agent 各自比稿（4 段格式）
+ * Replaces the previous 3-step wizard (input → pick → see pitches)
+ * with a single page that mirrors /picker:
  *
- * Full-bleed Canva-style layout, all HeroUI primitives. Uses User /
- * Avatar (with DiceBear src) instead of custom PortraitAvatar to
- * showcase HeroUI's avatar variety.
+ *   ┌── LEFT 320px ──┬── CENTER (flex) ────┬── RIGHT 360px ──┐
+ *   │ Brief column   │ Pitches gallery     │ Candidates list │
+ *   │ • brand chip   │ • empty state, OR   │ • 12 candidate  │
+ *   │ • brief textarea│  each pitch as a   │   cards         │
+ *   │ • find consultant│ Card with 4-col   │ • match score    │
+ *   │ • progress chip │  pitch grid + chat │ • TaskChip       │
+ *   │ • 邀比稿 CTA   │ • streaming live   │ • multi-select   │
+ *   └────────────────┴──────────────────────┴─────────────────┘
+ *
+ * Pitches stream in: each selected agent fires its own pitch mutation
+ * in parallel; cards render as each resolves so user sees progress
+ * instead of waiting for the whole batch.
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
-  Avatar, Badge, Breadcrumbs, BreadcrumbItem, Button, Card, CardBody,
-  CardHeader, Chip, Divider, ScrollShadow, Skeleton, Spinner, Textarea,
-  Tooltip, User,
+  Alert, Avatar, Badge, Breadcrumbs, BreadcrumbItem, Button, Card, CardBody,
+  CardHeader, Chip, Divider, Input, Progress, ScrollShadow, Skeleton, Spinner,
+  Textarea, Tooltip, User,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faArrowLeft, faArrowRight, faBookOpen, faCheck, faGavel,
-  faMagnifyingGlass, faPaperPlane, faRotateRight, faTriangleExclamation,
-  faUserGroup, faWandMagicSparkles,
+  faArrowRight, faBookOpen, faBrain, faCheck, faCircleCheck, faComments,
+  faGavel, faMagnifyingGlass, faPaperPlane, faPenToSquare, faRotateRight,
+  faTriangleExclamation, faUserGroup, faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
 
 type Candidate = {
@@ -48,25 +56,19 @@ type Pitch = Candidate & {
   error: string | null;
 };
 
+type PitchState = { status: "queued" | "working" | "delivered" | "failed"; pitch?: Pitch };
+
 type ChipColor = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
 const PROVIDER_COLOR: Record<string, ChipColor> = {
-  "azure-foundry": "primary",
-  anthropic: "warning",
-  qwen: "default",
-  zhipu: "primary",
-  perplexity: "success",
-  forge: "secondary",
-  openai: "success",
-  gemini: "primary",
-  google: "primary",
-  cohere: "danger",
+  "azure-foundry": "primary", anthropic: "warning", qwen: "default",
+  zhipu: "primary", perplexity: "success", forge: "secondary",
+  openai: "success", gemini: "primary", google: "primary", cohere: "danger",
 };
 
 function ProviderChip({ provider, model }: { provider: string; model: string }) {
   return (
     <Chip
-      size="sm"
-      variant="flat"
+      size="sm" variant="flat"
       color={PROVIDER_COLOR[provider] ?? "default"}
       classNames={{ content: "text-tiny" }}
     >
@@ -78,10 +80,10 @@ function ProviderChip({ provider, model }: { provider: string; model: string }) 
 const dicebear = (name: string) =>
   `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
 
-function parsePitch(md: string): { problem: string; steps: string; deliverables: string; differentiator: string } {
-  if (!md) return { problem: "", steps: "", deliverables: "", differentiator: "" };
-  const sections = md.split(/^##\s+/m).slice(1);
+function parsePitch(md: string) {
   const out = { problem: "", steps: "", deliverables: "", differentiator: "" };
+  if (!md) return out;
+  const sections = md.split(/^##\s+/m).slice(1);
   for (const s of sections) {
     const [head, ...body] = s.split("\n");
     const text = body.join("\n").trim();
@@ -94,7 +96,7 @@ function parsePitch(md: string): { problem: string; steps: string; deliverables:
   return out;
 }
 
-/* ─── Page ──────────────────────────────────────────────────────────── */
+/* ─── Page ─────────────────────────────────────────────────────────── */
 
 export default function BoardroomPage() {
   const ctx = useOutletContext<ShellOutletCtx>() ?? ({} as ShellOutletCtx);
@@ -102,24 +104,37 @@ export default function BoardroomPage() {
   const currentBrand = (ctx.brands || []).find((b: any) => b?.id === ctx.brandId);
   const brandName = currentBrand?.name || "未指定品牌";
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [pitches, setPitches] = useState<Pitch[]>([]);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [pitchStates, setPitchStates] = useState<Map<number, PitchState>>(new Map());
+  const [error, setError] = useState<string | null>(null);
 
-  const recommendMutation = (trpc as any).boardroom.recommendAgents.useQuery(
-    { brandId, query, limit: 12 },
-    { enabled: false }
+  const recommendQuery = (trpc as any).boardroom.recommendAgents.useQuery(
+    { brandId, query, limit: 12 }, { enabled: false }
   );
-  const pitchMutation = (trpc as any).boardroom.pitch.useMutation();
+  const pitchMut = (trpc as any).boardroom.pitch.useMutation();
+
+  const recommending = recommendQuery.isFetching;
+  const anyPitchInFlight = useMemo(
+    () => Array.from(pitchStates.values()).some((p) => p.status === "queued" || p.status === "working"),
+    [pitchStates],
+  );
 
   const onFindAgents = async () => {
     if (query.trim().length < 2) return;
-    const r = await recommendMutation.refetch();
-    setCandidates((r.data?.candidates as Candidate[]) ?? []);
+    setError(null);
+    setCandidates([]);
     setSelected(new Set());
-    setStep(2);
+    setPitchStates(new Map());
+    try {
+      const r = await recommendQuery.refetch();
+      const list = (r.data?.candidates as Candidate[]) ?? [];
+      setCandidates(list);
+      if (list.length === 0) setError("沒有找到匹配的顧問。試著改個說法。");
+    } catch (e: any) {
+      setError(`搜尋失敗：${e?.message ?? e}`);
+    }
   };
 
   const toggle = (id: number) => {
@@ -133,140 +148,102 @@ export default function BoardroomPage() {
 
   const onPitch = async () => {
     if (selected.size === 0) return;
-    const result = await pitchMutation.mutateAsync({
-      brandId, query, agentIds: Array.from(selected),
-    });
-    setPitches((result.pitches as Pitch[]) ?? []);
-    setStep(3);
+    setError(null);
+    // Init pitch states
+    const init = new Map<number, PitchState>();
+    for (const id of selected) init.set(id, { status: "queued" });
+    setPitchStates(init);
+
+    // Fire each in parallel; render as each resolves
+    await Promise.all(Array.from(selected).map(async (id) => {
+      setPitchStates((prev) => {
+        const next = new Map(prev);
+        next.set(id, { status: "working" });
+        return next;
+      });
+      try {
+        const result = await pitchMut.mutateAsync({ brandId, query, agentIds: [id] });
+        const p: Pitch | undefined = (result.pitches as Pitch[])?.[0];
+        setPitchStates((prev) => {
+          const next = new Map(prev);
+          if (p) next.set(id, { status: p.error ? "failed" : "delivered", pitch: p });
+          else next.set(id, { status: "failed" });
+          return next;
+        });
+      } catch (e: any) {
+        setPitchStates((prev) => {
+          const next = new Map(prev);
+          next.set(id, { status: "failed" });
+          return next;
+        });
+      }
+    }));
   };
 
   const reset = () => {
-    setStep(1);
-    setSelected(new Set());
     setCandidates([]);
-    setPitches([]);
+    setSelected(new Set());
+    setPitchStates(new Map());
+    setError(null);
   };
 
+  const deliveredCount = Array.from(pitchStates.values()).filter((p) => p.status === "delivered").length;
+  const totalSelected = pitchStates.size;
+  const progressPct = totalSelected ? (deliveredCount / totalSelected) * 100 : 0;
+
   return (
-    <main className="px-8 py-8 pb-24">
-      {/* Header */}
-      <Breadcrumbs size="sm" className="mb-3">
-        <BreadcrumbItem href="/">首頁</BreadcrumbItem>
-        <BreadcrumbItem>顧問團 Boardroom</BreadcrumbItem>
-      </Breadcrumbs>
+    <main className="h-[calc(100vh-3rem)] grid grid-cols-1 lg:grid-cols-[320px_1fr_360px] divide-x divide-divider">
 
-      <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider mb-2">
-        BOARDROOM · 比稿（邀比稿）
-      </Chip>
-      <h1 className="font-semibold text-3xl tracking-tight mb-1">
-        {brandName} · 邀請顧問為您比稿
-      </h1>
-      <p className="text-small text-default-500">
-        說出您的需求 → 系統推薦候選顧問 → 您勾選 → 顧問各自提案，您當評審
-      </p>
+      {/* ─── LEFT: BRIEF ─────────────────────────────────────────────── */}
+      <aside className="overflow-y-auto p-5 space-y-4 bg-content1">
+        <Breadcrumbs size="sm">
+          <BreadcrumbItem href="/">首頁</BreadcrumbItem>
+          <BreadcrumbItem>Boardroom · 比稿</BreadcrumbItem>
+        </Breadcrumbs>
 
-      <div className="my-8">
-        <StepIndicator step={step} />
-      </div>
+        <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider">
+          BOARDROOM
+        </Chip>
+        <h1 className="font-semibold text-2xl tracking-tight leading-tight">
+          邀請顧問為您比稿
+        </h1>
+        <p className="text-tiny text-default-500">
+          說出需求 → 系統推薦 12 位候選 → 您勾選 → 顧問各自提案
+        </p>
 
-      {step === 1 && (
-        <Step1Input
-          query={query} setQuery={setQuery}
-          onFindAgents={onFindAgents}
-          loading={recommendMutation.isFetching}
-        />
-      )}
-      {step === 2 && (
-        <Step2Candidates
-          candidates={candidates}
-          selected={selected} toggle={toggle}
-          onBack={() => setStep(1)} onPitch={onPitch}
-          pitching={pitchMutation.isPending}
-          loading={recommendMutation.isFetching}
-          query={query}
-        />
-      )}
-      {step === 3 && <Step3Pitches pitches={pitches} onReset={reset} query={query} />}
-    </main>
-  );
-}
+        {currentBrand && (
+          <Chip
+            size="md" variant="flat" color="secondary" radius="md"
+            className="w-full h-auto py-1.5 px-2"
+            startContent={<FontAwesomeIcon icon={faBrain} className="ml-1" />}
+            classNames={{ content: "flex items-center gap-1.5" }}
+          >
+            <span className="font-medium">{brandName}</span>
+            <span className="text-tiny text-default-500">brand brain 自動帶入</span>
+          </Chip>
+        )}
 
-/* ─── Step indicator ─────────────────────────────────────────────────── */
+        <Divider />
 
-function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
-  const steps: Array<{ n: 1 | 2 | 3; label: string; icon: any }> = [
-    { n: 1, label: "輸入需求", icon: faWandMagicSparkles },
-    { n: 2, label: "勾選顧問", icon: faUserGroup },
-    { n: 3, label: "看比稿",   icon: faGavel },
-  ];
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {steps.map((s, i) => {
-        const isActive = s.n === step;
-        const isPast = s.n < step;
-        return (
-          <React.Fragment key={s.n}>
-            <Chip
-              size="md"
-              radius="full"
-              color={isActive ? "secondary" : isPast ? "success" : "default"}
-              variant={isActive || isPast ? "solid" : "flat"}
-              startContent={
-                <span className="ml-1 mr-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/30 text-tiny font-bold tabular-nums">
-                  {isPast ? <FontAwesomeIcon icon={faCheck} className="text-tiny" /> : s.n}
-                </span>
-              }
-              className="font-medium"
-            >
-              <span className="flex items-center gap-1.5">
-                <FontAwesomeIcon icon={s.icon} className="text-tiny" />
-                {s.label}
-              </span>
-            </Chip>
-            {i < steps.length - 1 && (
-              <Divider orientation="horizontal" className="w-8 bg-default-300" />
-            )}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ─── Step 1 ─────────────────────────────────────────────────────────── */
-
-function Step1Input({
-  query, setQuery, onFindAgents, loading,
-}: {
-  query: string;
-  setQuery: (s: string) => void;
-  onFindAgents: () => void;
-  loading: boolean;
-}) {
-  const examples = [
-    "我要做新品上市的 IG 內容企劃",
-    "B2B SaaS 想做 LinkedIn 內容增長",
-    "電商品牌想找新的市場定位",
-    "想做品牌故事重塑，但不知道從哪開始",
-  ];
-  return (
-    <Card shadow="sm" radius="lg" className="border border-divider">
-      <CardBody className="p-8 gap-4">
+        <p className="text-tiny tracking-wider uppercase text-default-500 font-medium flex items-center gap-1.5">
+          <FontAwesomeIcon icon={faPenToSquare} /> 您今天想解決什麼問題
+        </p>
         <Textarea
-          label="您今天想解決什麼問題？"
-          labelPlacement="outside"
-          variant="bordered"
-          radius="md"
+          placeholder="例：我要做新品上市的 IG 內容企劃，預算有限，30 天內要看到效果…"
+          variant="bordered" radius="md"
+          minRows={5} maxRows={10}
           value={query}
           onValueChange={setQuery}
-          placeholder="例：我要做新品上市的 IG 內容企劃，預算有限，想要 30 天內看到效果..."
-          minRows={5}
-          isRequired
+          isDisabled={anyPitchInFlight}
         />
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-tiny text-default-500 mr-1">快速範例：</span>
-          {examples.map((e) => (
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            "新品上市的 IG 內容企劃",
+            "B2B SaaS LinkedIn 內容增長",
+            "電商品牌找新的市場定位",
+            "品牌故事重塑",
+          ].map((e) => (
             <Chip
               key={e} size="sm" variant="bordered"
               className="cursor-pointer hover:bg-default-100"
@@ -278,170 +255,230 @@ function Step1Input({
         </div>
 
         <Button
-          color="primary" size="lg" radius="full"
-          className="self-start mt-2 font-medium"
-          isDisabled={query.trim().length < 2}
-          isLoading={loading}
+          color="primary" size="lg" radius="lg"
+          className="w-full font-medium"
+          isDisabled={query.trim().length < 2 || anyPitchInFlight}
+          isLoading={recommending}
           onPress={onFindAgents}
-          endContent={!loading && <FontAwesomeIcon icon={faArrowRight} />}
+          startContent={!recommending && <FontAwesomeIcon icon={faMagnifyingGlass} />}
         >
-          {loading ? "搜尋中…" : "找候選顧問"}
+          {recommending ? "搜尋中…" : "找候選顧問"}
         </Button>
-      </CardBody>
-    </Card>
+
+        {error && <Alert color="danger" variant="flat" title={error} onClose={() => setError(null)} />}
+
+        {/* Pipeline progress (post-pitch) */}
+        {totalSelected > 0 && (
+          <>
+            <Divider />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-tiny">
+                <span className="text-default-500 uppercase tracking-wider">PIPELINE</span>
+                <span className="tabular-nums text-default-700">
+                  {deliveredCount} / {totalSelected}
+                </span>
+              </div>
+              <Progress
+                size="sm"
+                value={progressPct}
+                color={progressPct === 100 ? "success" : "secondary"}
+                isIndeterminate={anyPitchInFlight && progressPct === 0}
+              />
+              <p className="text-tiny text-default-500">
+                {anyPitchInFlight ? "顧問撰寫中…" : progressPct === 100 ? "✓ 所有提案就緒" : ""}
+              </p>
+            </div>
+            <Button size="sm" variant="light" onPress={reset} className="w-full">
+              <FontAwesomeIcon icon={faRotateRight} className="mr-1.5" /> 重新比稿
+            </Button>
+          </>
+        )}
+      </aside>
+
+      {/* ─── CENTER: PITCHES GALLERY ─────────────────────────────────── */}
+      <section className="overflow-y-auto bg-default-50">
+        <div className="p-6 lg:p-10 max-w-[960px] mx-auto">
+          {pitchStates.size === 0 ? (
+            <EmptyStage candidatesLen={candidates.length} query={query} />
+          ) : (
+            <div className="space-y-5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <FontAwesomeIcon icon={faGavel} className="text-secondary" />
+                <h2 className="text-xl font-semibold tracking-tight">提案就位</h2>
+                <Chip size="sm" variant="flat">
+                  {deliveredCount} / {totalSelected} 已完成
+                </Chip>
+              </div>
+              {Array.from(pitchStates.entries()).map(([agentId, state]) => {
+                const c = candidates.find((x) => x.agentId === agentId);
+                if (!c) return null;
+                return <PitchCard key={agentId} candidate={c} state={state} />;
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ─── RIGHT: CANDIDATES ────────────────────────────────────────── */}
+      <aside className="overflow-y-auto bg-content1 flex flex-col">
+        <div className="p-4 space-y-3 flex-1">
+          <div className="flex items-center justify-between">
+            <p className="text-tiny tracking-wider uppercase text-default-500 font-medium flex items-center gap-1.5">
+              <FontAwesomeIcon icon={faUserGroup} /> CANDIDATES
+            </p>
+            {candidates.length > 0 && (
+              <Chip size="sm" variant="flat">{candidates.length} 位</Chip>
+            )}
+          </div>
+
+          {recommending && (
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} shadow="none" className="border border-divider">
+                  <CardBody className="p-3 gap-2">
+                    <div className="flex gap-2 items-center">
+                      <Skeleton className="w-10 h-10 rounded-full" />
+                      <div className="flex-1 space-y-1">
+                        <Skeleton className="h-3 w-2/3 rounded" />
+                        <Skeleton className="h-2.5 w-4/5 rounded" />
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {!recommending && candidates.length === 0 && (
+            <Card shadow="none" className="border-2 border-dashed border-divider">
+              <CardBody className="py-10 items-center text-center gap-2">
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-3xl text-default-300" />
+                <p className="text-small font-medium">尚未搜尋</p>
+                <p className="text-tiny text-default-500">
+                  在左側輸入需求，按下「找候選顧問」
+                </p>
+              </CardBody>
+            </Card>
+          )}
+
+          {!recommending && candidates.length > 0 && (
+            <div className="space-y-2">
+              {candidates.map((c) => (
+                <CandidateCard
+                  key={c.agentId}
+                  candidate={c}
+                  selected={selected.has(c.agentId)}
+                  disabled={!selected.has(c.agentId) && selected.size >= 5}
+                  pitched={pitchStates.has(c.agentId)}
+                  pitchStatus={pitchStates.get(c.agentId)?.status}
+                  onToggle={() => toggle(c.agentId)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sticky pitch CTA */}
+        {candidates.length > 0 && (
+          <div className="sticky bottom-0 p-3 bg-content1 border-t border-divider">
+            <Button
+              color="secondary" size="lg" radius="lg"
+              className="w-full font-medium"
+              isDisabled={selected.size === 0 || anyPitchInFlight}
+              isLoading={anyPitchInFlight}
+              onPress={onPitch}
+              startContent={!anyPitchInFlight && <FontAwesomeIcon icon={faPaperPlane} />}
+              endContent={!anyPitchInFlight && <FontAwesomeIcon icon={faArrowRight} />}
+            >
+              {anyPitchInFlight
+                ? `撰寫中（${deliveredCount}/${totalSelected}）`
+                : `邀比稿（${selected.size} 位）`}
+            </Button>
+            <p className="text-tiny text-default-400 text-center mt-2">最多選 5 位 · 單筆併行撰寫</p>
+          </div>
+        )}
+      </aside>
+    </main>
   );
 }
 
-/* ─── Step 2 ─────────────────────────────────────────────────────────── */
+/* ─── Sub: Empty stage (pre-pitch) ─────────────────────────────────── */
 
-function Step2Candidates({
-  candidates, selected, toggle, onBack, onPitch, pitching, loading, query,
-}: {
-  candidates: Candidate[];
-  selected: Set<number>;
-  toggle: (id: number) => void;
-  onBack: () => void;
-  onPitch: () => void;
-  pitching: boolean;
-  loading: boolean;
-  query: string;
-}) {
-  if (loading) {
+function EmptyStage({ candidatesLen, query }: { candidatesLen: number; query: string }) {
+  if (candidatesLen === 0) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Card key={i} shadow="sm" className="p-4 gap-3">
-            <div className="flex gap-3">
-              <Skeleton className="w-14 h-14 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-3 w-3/5 rounded" />
-                <Skeleton className="h-2 w-full rounded" />
-              </div>
-            </div>
-            <Skeleton className="h-3 w-2/5 rounded" />
-            <Skeleton className="h-6 w-full rounded" />
-          </Card>
-        ))}
+      <div className="h-full min-h-[480px] flex flex-col items-center justify-center text-center gap-3">
+        <FontAwesomeIcon icon={faWandMagicSparkles} className="text-5xl text-default-300" />
+        <p className="text-medium font-semibold">輸入需求 → 看候選顧問 → 收提案</p>
+        <p className="text-tiny text-default-500 max-w-[420px]">
+          12 位 AI 顧問會看您的需求 + 品牌脈絡，從不同角度提出 4 段式方案：
+          看見的問題 / 我會這樣做 / 第一週交付 / 為什麼選我。
+        </p>
       </div>
     );
   }
-
-  if (candidates.length === 0) {
-    return (
-      <Card shadow="none" className="border-2 border-dashed border-divider">
-        <CardBody className="py-16 items-center text-center gap-3">
-          <FontAwesomeIcon icon={faMagnifyingGlass} className="text-4xl text-default-300" />
-          <p className="text-medium font-medium">沒有找到匹配的顧問</p>
-          <p className="text-small text-default-500">請回到上一步換個說法。</p>
-          <Button
-            variant="bordered" radius="full" className="mt-2"
-            startContent={<FontAwesomeIcon icon={faArrowLeft} />}
-            onPress={onBack}
-          >
-            重新輸入
-          </Button>
-        </CardBody>
-      </Card>
-    );
-  }
-
   return (
-    <div>
-      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <p className="text-tiny text-default-500 mb-1">您的需求</p>
-          <p className="text-small font-medium text-foreground line-clamp-2">「{query}」</p>
-          <p className="text-tiny text-default-500 mt-1">
-            系統推薦 {candidates.length} 位候選顧問，請勾選 1–5 位邀請比稿
-          </p>
-        </div>
-        <Button
-          size="sm" variant="light"
-          startContent={<FontAwesomeIcon icon={faArrowLeft} />}
-          onPress={onBack}
-        >
-          修改需求
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {candidates.map((c) => (
-          <CandidateCard
-            key={c.agentId}
-            candidate={c}
-            selected={selected.has(c.agentId)}
-            disabled={!selected.has(c.agentId) && selected.size >= 5}
-            onToggle={() => toggle(c.agentId)}
-          />
-        ))}
-      </div>
-
-      {/* Sticky CTA */}
-      <div className="sticky bottom-4 mt-8 flex justify-center z-10">
-        <Button
-          color="secondary" size="lg" radius="full"
-          className="shadow-2xl font-medium px-8"
-          isDisabled={selected.size === 0}
-          isLoading={pitching}
-          onPress={onPitch}
-          endContent={!pitching && <FontAwesomeIcon icon={faArrowRight} />}
-          startContent={!pitching && <FontAwesomeIcon icon={faPaperPlane} />}
-        >
-          {pitching
-            ? "顧問撰寫中…"
-            : `邀比稿（已選 ${selected.size} 位）`}
-        </Button>
-      </div>
+    <div className="h-full min-h-[480px] flex flex-col items-center justify-center text-center gap-3">
+      <FontAwesomeIcon icon={faGavel} className="text-5xl text-default-300" />
+      <p className="text-medium font-semibold">候選顧問已備齊</p>
+      <p className="text-tiny text-default-500 max-w-[420px]">
+        在右側勾選 1–5 位顧問，按「邀比稿」開跑。提案會即時填入這個區塊。
+      </p>
+      <p className="text-tiny text-default-500">您的需求：「{query}」</p>
     </div>
   );
 }
 
+/* ─── Sub: CandidateCard ──────────────────────────────────────────── */
+
 function CandidateCard({
-  candidate: c, selected, disabled, onToggle,
+  candidate: c, selected, disabled, pitched, pitchStatus, onToggle,
 }: {
   candidate: Candidate;
   selected: boolean;
   disabled: boolean;
+  pitched: boolean;
+  pitchStatus?: "queued" | "working" | "delivered" | "failed";
   onToggle: () => void;
 }) {
+  const statusChip = (() => {
+    if (!pitched) return null;
+    if (pitchStatus === "working")   return <Chip size="sm" color="secondary" variant="flat" startContent={<Spinner size="sm" classNames={{ wrapper: "w-3 h-3 ml-1" }} />}>撰寫中</Chip>;
+    if (pitchStatus === "delivered") return <Chip size="sm" color="success" variant="flat" startContent={<FontAwesomeIcon icon={faCircleCheck} className="text-tiny ml-1" />}>已交稿</Chip>;
+    if (pitchStatus === "failed")    return <Chip size="sm" color="danger" variant="flat" startContent={<FontAwesomeIcon icon={faTriangleExclamation} className="text-tiny ml-1" />}>失敗</Chip>;
+    return <Chip size="sm" variant="flat">排隊中</Chip>;
+  })();
+
   return (
     <Card
-      isPressable
-      isHoverable
-      isDisabled={disabled}
+      isPressable={!pitched}
+      isHoverable={!pitched}
+      isDisabled={disabled || pitched}
       onPress={onToggle}
-      shadow={selected ? "md" : "sm"}
-      radius="lg"
+      shadow="none" radius="md"
       className={[
-        "border-2 transition relative",
-        selected ? "border-secondary bg-secondary-50" : "border-divider",
+        "border w-full",
+        selected ? "border-secondary bg-secondary-50 ring-2 ring-secondary ring-offset-1 ring-offset-content1" : "border-divider",
       ].join(" ")}
     >
-      {selected && (
-        <Badge
-          content={<FontAwesomeIcon icon={faCheck} className="text-tiny" />}
-          color="secondary" placement="top-right" shape="circle" size="lg"
-          className="absolute -top-1 -right-1"
-        >
-          <span className="w-1 h-1" />
-        </Badge>
-      )}
-      <CardBody className="p-4 gap-3">
+      <CardBody className="p-3 gap-2 relative">
+        {selected && !pitched && (
+          <Badge
+            content={<FontAwesomeIcon icon={faCheck} className="text-tiny" />}
+            color="secondary" placement="top-right" shape="circle"
+            className="absolute -top-1 -right-1"
+          >
+            <span className="w-1 h-1" />
+          </Badge>
+        )}
         <User
-          name={c.name}
-          description={c.title}
+          name={<span className="text-small font-bold">{c.name}</span>}
+          description={<span className="text-tiny line-clamp-2 leading-tight">{c.title}</span>}
           avatarProps={{
-            src: dicebear(c.name),
-            size: "lg",
-            isBordered: true,
+            src: dicebear(c.name), size: "md", isBordered: true,
             color: selected ? "secondary" : "default",
           }}
-          classNames={{
-            name: "text-small font-bold",
-            description: "text-tiny line-clamp-2",
-          }}
         />
-
         {c.squadName && (
           <Chip
             size="sm" variant="flat" color="secondary"
@@ -451,64 +488,39 @@ function CandidateCard({
             {c.squadName}
           </Chip>
         )}
-
         {c.matchReasons.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {c.matchReasons.slice(0, 4).map((r, i) => (
+            {c.matchReasons.slice(0, 3).map((r, i) => (
               <Chip key={i} size="sm" variant="flat" color="warning" classNames={{ content: "text-tiny" }}>
                 {r}
               </Chip>
             ))}
           </div>
         )}
-
-        <Divider />
-
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-1.5">
           <ProviderChip provider={c.providerBucket} model={c.aiModel} />
-          <Tooltip content={`匹配分數：${c.matchScore}`}>
-            <Chip size="sm" variant="bordered" classNames={{ content: "text-tiny tabular-nums" }}>
-              ⌬ {c.matchScore}
-            </Chip>
-          </Tooltip>
+          <div className="flex items-center gap-1">
+            {statusChip}
+            <Tooltip content={`匹配分數：${c.matchScore}`}>
+              <Chip size="sm" variant="bordered" classNames={{ content: "text-tiny tabular-nums" }}>
+                ⌬ {c.matchScore}
+              </Chip>
+            </Tooltip>
+          </div>
         </div>
       </CardBody>
     </Card>
   );
 }
 
-/* ─── Step 3 ─────────────────────────────────────────────────────────── */
+/* ─── Sub: PitchCard (center) ─────────────────────────────────────── */
 
-function Step3Pitches({
-  pitches, onReset, query,
-}: { pitches: Pitch[]; onReset: () => void; query: string }) {
-  return (
-    <div>
-      <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <p className="text-tiny text-default-500 mb-1">客戶需求</p>
-          <p className="text-medium font-medium text-foreground">{query}</p>
-        </div>
-        <Button
-          variant="bordered" radius="full"
-          startContent={<FontAwesomeIcon icon={faRotateRight} />}
-          onPress={onReset}
-        >
-          重新比稿
-        </Button>
-      </div>
-
-      <div className="grid gap-4">
-        {pitches.map((p) => (
-          <PitchCard key={p.agentId} pitch={p} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PitchCard({ pitch }: { pitch: Pitch }) {
-  const parsed = useMemo(() => parsePitch(pitch.proposal || ""), [pitch.proposal]);
+function PitchCard({ candidate: c, state }: { candidate: Candidate; state: PitchState }) {
+  const [chatInput, setChatInput] = useState("");
+  const isWorking = state.status === "queued" || state.status === "working";
+  const isFailed = state.status === "failed";
+  const p = state.pitch;
+  const parsed = useMemo(() => p ? parsePitch(p.proposal || "") : null, [p]);
 
   return (
     <Card shadow="sm" radius="lg" className="border border-divider">
@@ -516,44 +528,67 @@ function PitchCard({ pitch }: { pitch: Pitch }) {
         <User
           name={
             <span className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-medium">{pitch.name}</span>
-              <ProviderChip provider={pitch.provider} model={pitch.model} />
+              <span className="font-bold text-medium">{c.name}</span>
+              {p && <ProviderChip provider={p.provider} model={p.model} />}
             </span>
           }
           description={
             <span className="block">
-              <span className="text-tiny text-default-500">{pitch.title}</span>
-              {pitch.squadName && (
+              <span className="text-tiny text-default-500">{c.title}</span>
+              {c.squadName && (
                 <Chip
                   size="sm" variant="flat" color="secondary"
                   startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
                   className="mt-1.5 max-w-full"
                   classNames={{ content: "truncate" }}
                 >
-                  {pitch.squadName}
-                  {pitch.squadMethodology ? ` · ${pitch.squadMethodology.slice(0, 60)}` : ""}
+                  {c.squadName}
+                  {c.squadMethodology ? ` · ${c.squadMethodology.slice(0, 60)}` : ""}
                 </Chip>
               )}
             </span>
           }
           avatarProps={{
-            src: dicebear(pitch.name),
-            size: "lg",
-            isBordered: true,
-            color: "secondary",
+            src: dicebear(c.name), size: "lg", isBordered: true, color: "secondary",
           }}
         />
+        {state.status === "delivered" && (
+          <Chip size="sm" color="success" variant="flat"
+            startContent={<FontAwesomeIcon icon={faCircleCheck} className="text-tiny ml-1" />}
+          >已交稿</Chip>
+        )}
       </CardHeader>
       <Divider />
+
       <CardBody className="px-6 py-5">
-        {pitch.error ? (
+        {isWorking && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-tiny text-default-500">
+              <Spinner size="sm" /> {c.name} 正在撰寫提案…
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-3 w-1/3 rounded" />
+                  <Skeleton className="h-2.5 w-full rounded" />
+                  <Skeleton className="h-2.5 w-[88%] rounded" />
+                  <Skeleton className="h-2.5 w-[70%] rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isFailed && (
           <Card shadow="none" className="border border-danger-200 bg-danger-50">
             <CardBody className="flex flex-row items-center gap-2 p-4 text-danger">
               <FontAwesomeIcon icon={faTriangleExclamation} />
-              <span className="text-small">提案失敗：{pitch.error}</span>
+              <span className="text-small">提案失敗 · 請從右側重新挑選或改寫需求</span>
             </CardBody>
           </Card>
-        ) : (
+        )}
+
+        {state.status === "delivered" && p && parsed && !p.error && (
           <ScrollShadow className="max-h-[600px]">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <PitchSection title="我看見的問題"   color="danger"    body={parsed.problem} />
@@ -564,6 +599,32 @@ function PitchCard({ pitch }: { pitch: Pitch }) {
           </ScrollShadow>
         )}
       </CardBody>
+
+      {/* Chat affordance — placeholder, future PR wires actual mutation */}
+      {state.status === "delivered" && (
+        <>
+          <Divider />
+          <CardBody className="px-6 py-3 gap-2 bg-default-50/50">
+            <div className="flex items-center gap-2 text-tiny text-default-500">
+              <FontAwesomeIcon icon={faComments} /> 想再討論細節？對 {c.name} 留言
+            </div>
+            <div className="flex gap-2">
+              <Input
+                size="sm" radius="lg" variant="bordered"
+                placeholder={`對 ${c.name} 提問或要求調整…`}
+                value={chatInput}
+                onValueChange={setChatInput}
+                isDisabled
+                startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny text-default-400" />}
+              />
+              <Button isIconOnly size="sm" color="primary" radius="lg" isDisabled aria-label="送出">
+                <FontAwesomeIcon icon={faPaperPlane} />
+              </Button>
+            </div>
+            <p className="text-tiny text-default-400">對話功能即將推出</p>
+          </CardBody>
+        </>
+      )}
     </Card>
   );
 }
