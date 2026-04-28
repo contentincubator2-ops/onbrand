@@ -84,6 +84,24 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     },
   },
   {
+    id: 28, // ← 2.5 (renumbered as 28 to avoid collision)
+    title: "Step 2.5 — 品牌核心價值觀（從信念蒸餾 4 條）",
+    segmentTarget: "seg:values",
+    segmentId: "values",
+    agent: "brand-values-coach",
+    researchBudget: { minUrls: 0, minChars: 0 }, // distillation
+    mockThinking:
+      "從 Step 1 的 5 Whys 信念基礎 + Step 2 的價值元素，蒸餾出 4 條最不可複製的品牌核心價值觀。",
+    mockConclusion: {
+      items: [
+        { label: "（mock）真實",   body: "拒絕過度包裝，展示真實的汗水與掙扎。" },
+        { label: "（mock）歸屬",   body: "兄弟社群 — 找到認同硬漢價值的同類。" },
+        { label: "（mock）賦能",   body: "讓你變得更強的環境與系統。" },
+        { label: "（mock）專業",   body: "教練回歸專業指導，禁止強迫推銷。" },
+      ],
+    },
+  },
+  {
     id: 3,
     title: "Step 3 — 競品識別（直接 / 間接 / 潛在）",
     segmentTarget: "seg:competition",
@@ -192,6 +210,27 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     },
   },
   {
+    id: 105, // 10.5 — score the picked tagline
+    title: "Step 10.5 — 標語評分（6 維度驗證）",
+    segmentTarget: "seg:taglineScore",
+    segmentId: "taglineScore",
+    agent: "brand-tagline-scorer",
+    researchBudget: { minUrls: 0, minChars: 0 }, // internal scoring
+    mockThinking:
+      "對 Step 10 選定的主標語在 6 維度（清晰度/相關性/獨特性/一致性/記憶度/情緒共鳴）打 1-100 分，輸出總分。",
+    mockConclusion: {
+      rows: [
+        { dim: "清晰度",     code: "Clarity",            score: 90, comment: "（mock）直接傳達克服自身不足的價值主張。" },
+        { dim: "相關性",     code: "Relevance",          score: 85, comment: "（mock）緊扣進階健身愛好者的核心痛點。" },
+        { dim: "獨特性",     code: "Uniqueness",         score: 85, comment: "（mock）結合「成吉思汗」征服者形象，難以替換。" },
+        { dim: "一致性",     code: "Consistency",        score: 90, comment: "（mock）與品牌名稱征服意象高度一致。" },
+        { dim: "記憶度",     code: "Memorability",       score: 80, comment: "（mock）簡短有力，口語傳播潛力高。" },
+        { dim: "情緒共鳴",   code: "Emotional Resonance", score: 88, comment: "（mock）激發中壯年男性對生活無力感的反抗。" },
+      ],
+      total: 86,
+    },
+  },
+  {
     id: 11,
     title: "Step 11 — 品牌個性（原型 + 聲音）",
     segmentTarget: "seg:voice",
@@ -212,6 +251,34 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
 ];
 
 /**
+ * Trends step — scans industry / market reports for favorable trends +
+ * risks. Inserted before the final goldenCircle distillation.
+ */
+export const BRAND_PIPELINE_TRENDS: PipelineStepSpec = {
+  id: 115, // 11.5
+  title: "Step 11.5 — 市場趨勢與機會",
+  segmentTarget: "seg:trends",
+  segmentId: "trends",
+  agent: "trend-radar",
+  researchBudget: { minUrls: 4, minChars: 12000 },
+  mockThinking:
+    "搜尋產業近期報告 + 觀察社群論壇 + 分析消費者行為轉變，盤點 3-4 個有利趨勢與 2-3 個需關注的風險。",
+  mockConclusion: {
+    favorable: [
+      { name: "（mock）健身身份認同化",   body: "約 50% 規律健身者把「健身」視為核心身份。" },
+      { name: "（mock）真實性信任危機",   body: "消費者對過度商業包裝品牌信任度持續下滑。" },
+      { name: "（mock）力量訓練主流化",   body: "全球健身場館重訓區域佔比已升至 42%。" },
+      { name: "（mock）市場分眾化",       body: "從大型連鎖轉向更具品牌特色的場域。" },
+    ],
+    risks: [
+      { name: "（mock）IP 依賴風險",     body: "需逐步建立去人格化的品牌資產，降低單點風險。" },
+      { name: "（mock）女性市場開拓",     body: "現有調性以男性為主，擴張時需平衡核心精神。" },
+      { name: "（mock）數位健身替代",     body: "AI 個人化訓練普及，需強化實體社群價值。" },
+    ],
+  },
+};
+
+/**
  * Distillation step — derives goldenCircle (Why/How/What) from the
  * already-collected origin + differentiation + voice. Final write.
  */
@@ -230,4 +297,8 @@ export const BRAND_PIPELINE_FINAL: PipelineStepSpec = {
   },
 };
 
-export const BRAND_FULL_PIPELINE = [...BRAND_PIPELINE, BRAND_PIPELINE_FINAL];
+export const BRAND_FULL_PIPELINE = [
+  ...BRAND_PIPELINE,
+  BRAND_PIPELINE_TRENDS,
+  BRAND_PIPELINE_FINAL,
+];
