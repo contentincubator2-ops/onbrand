@@ -1095,8 +1095,10 @@ function SquadThumb({
  * whole right pane to <WorkflowRunner /> (handled upstream).
  */
 
-const dicebear = (name: string) =>
-  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
+// Avatar src = agents.avatarUrl when present, else undefined → HeroUI Avatar
+// renders the initial-letter fallback (no DiceBear, per design system).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _agentAvatar = (a: { avatarUrl?: string | null }) => a.avatarUrl ?? undefined;
 
 const WORKSPACE_META: Record<string, { label: string; icon: any; brand?: any; mockup: "instagram" | "facebook" | "linkedin" | "youtube" | "generic" }> = {
   instagram: { label: "Instagram", icon: faInstagram, brand: faInstagram, mockup: "instagram" },

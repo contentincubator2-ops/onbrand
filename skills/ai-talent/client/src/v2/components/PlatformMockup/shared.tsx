@@ -31,6 +31,10 @@ export interface MockupFields {
   liveCta?: string;
 }
 
+// Used only inside PlatformMockup/* (simulated FB/IG/LinkedIn posts where
+// the avatar represents a fake post author, not a real SoWork agent). Real
+// agent avatars use agents.avatarUrl per design system; never call dicebear
+// outside the mockup family.
 export const dicebear = (name: string) =>
   `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
 

@@ -97,7 +97,10 @@ const PROVIDER_LABEL: Record<string, string> = {
 
 const ACCENT = "#5B3CC8";
 
-/* ─────────────────── Portrait avatar (DiceBear) ──────────────────────── */
+/* ─────────────────── Portrait avatar (initial fallback) ──────────────── */
+// Page-local fictional agents have no avatarUrl, so we show HeroUI's
+// initial-letter Avatar (per design system — no DiceBear). The tone-color
+// ring is preserved as a functional cue for orchestrate/write/craft/research.
 
 function PortraitAvatar({
   name, tone, size, glow = false, pulse = false, dim = false,
@@ -106,8 +109,8 @@ function PortraitAvatar({
   glow?: boolean; pulse?: boolean; dim?: boolean;
 }) {
   const ringColor = TONE_COLOR[tone];
-  const url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}&radius=50&backgroundColor=ffffff,f5f5f5,fef9e7,e8f5e9`;
   const ringWidth = Math.max(2, Math.round(size * 0.08));
+  const inner = size - ringWidth * 2;
   return (
     <span style={{ position: "relative", display: "inline-block", width: size, height: size, flexShrink: 0, opacity: dim ? 0.5 : 1 }}>
       {pulse && (
@@ -115,12 +118,20 @@ function PortraitAvatar({
           style={{ position: "absolute", inset: 0, borderRadius: "50%", background: ringColor, opacity: 0.4 }} />
       )}
       <span style={{
-        position: "relative", display: "block", width: size, height: size, borderRadius: "50%",
+        position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
+        width: size, height: size, borderRadius: "50%",
         border: `${ringWidth}px solid ${ringColor}`, background: "#F2F2F2", overflow: "hidden",
         boxShadow: glow ? `0 0 0 2px white, 0 0 0 4px ${ACCENT}` : undefined,
       }}>
-        <img src={url} alt={name} width={size - ringWidth * 2} height={size - ringWidth * 2}
-          style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} loading="lazy" />
+        <span style={{
+          width: inner, height: inner, borderRadius: "50%",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "white", color: "#666",
+          fontSize: Math.max(10, Math.round(inner * 0.42)),
+          fontWeight: 600,
+        }}>
+          {(name?.trim()?.charAt(0) || "?").toUpperCase()}
+        </span>
       </span>
     </span>
   );
@@ -299,14 +310,14 @@ function SquadTile({
                 name={a.name}
                 description={`${a.role} · ${TONE_LABEL[a.tone]}`}
                 avatarProps={{
-                  src: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(a.name)}`,
+                  name: a.name,
                   size: "sm",
                   color: a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary",
                 }}
               />
             }>
               <Avatar
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(a.name)}`}
+                name={a.name}
                 size="sm" isBordered
                 color={a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary"}
               />
@@ -519,7 +530,7 @@ function RunPanel({
                 </div>
               }>
                 <Avatar
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(a.name)}`}
+                  name={a.name}
                   size="md" isBordered
                   color={a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary"}
                 />
@@ -897,7 +908,7 @@ function FinalDeliverable({
         <div className="flex items-center gap-3">
           <Badge content="✓" color="default" placement="bottom-right" shape="circle" size="md">
             <Avatar
-              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(result.agentName)}`}
+              name={result.agentName}
               size="lg" isBordered color="default"
             />
           </Badge>

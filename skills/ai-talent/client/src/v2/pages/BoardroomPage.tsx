@@ -82,8 +82,10 @@ function ProviderChip({ provider, model }: { provider: string; model: string }) 
   );
 }
 
-const dicebear = (name: string) =>
-  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
+// Avatar src = agents.avatarUrl when present, else undefined so HeroUI
+// Avatar falls back to initial letter (per design system — no DiceBear).
+const agentAvatar = (a: { avatarUrl?: string | null; name?: string | null }) =>
+  a.avatarUrl ?? undefined;
 
 // parsePitch removed (PR8) — LLM output rarely matches the 4-heading
 // schema we tried to enforce; it was producing **1. ... **2. ...** style
