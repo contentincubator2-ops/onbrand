@@ -641,9 +641,11 @@ export const playbookRouter = router({
       SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
              s.strategy_layer, s.methodology, s.workspace, s.tags,
              s.task_label_zh, s.task_label_en,
-             s.mockup_platform, s.mockup_format
+             s.mockup_platform, s.mockup_format,
+             s.case_study
         FROM squads s
        WHERE s.is_active = 1
+         AND s.case_study IS NOT NULL
        ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
     `)) as any;
 
@@ -656,6 +658,7 @@ export const playbookRouter = router({
     return (rows as any[])
       .map((r) => {
         const methodology = safe(r.methodology) ?? (typeof r.methodology === "string" ? { summary: r.methodology } : null);
+        const caseStudy = safe(r.case_study);
         const members  = safe(r.agents)  ?? [];
         const steps    = safe(r.steps)   ?? [];
         const workspace= safe(r.workspace) ?? [];
@@ -681,6 +684,10 @@ export const playbookRouter = router({
             year:   typeof methodology === "object" ? methodology.year   ?? null : null,
             summary: typeof methodology === "object" ? methodology.summary ?? null : null,
           } : null,
+          // The actual track-record proof — when populated this squad
+          // shows on /playbooks. Shape: {brand, industry, scope, before,
+          // after, key_moves[], outcome, source_note}.
+          caseStudy: caseStudy ?? null,
           workspace: Array.isArray(workspace) ? workspace : [],
           tags: Array.isArray(tags) ? tags : [],
           mockup: (r.mockup_platform && r.mockup_format)
@@ -696,11 +703,8 @@ export const playbookRouter = router({
               }))
             : [],
         };
-      })
-      // "Has success case" filter — show only squads with a named
-      // methodology (author or summary). These are the squads with
-      // real-world heritage / track record.
-      .filter((p) => !!(p.methodology?.author || p.methodology?.summary));
+      });
+    // SQL already filters case_study IS NOT NULL — no extra .filter needed.
   }),
 
   /** Full detail for a single playbook. */

@@ -1,0 +1,34 @@
+name: Admin — Migrate squad case_study column (DDL only)
+
+# Adds case_study + case_study_at columns to squads if absent.
+# No LLM, no data population. Run once.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main && git reset --hard origin/main
+
+            ENV_FILE=$APP/skills/ai-talent/.env
+            set -a; source "$ENV_FILE"; set +a
+            cd $APP/skills/ai-talent
+
+            ./node_modules/.bin/tsx scripts/migrateSquadCaseStudy.ts
