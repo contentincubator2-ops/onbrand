@@ -12,6 +12,16 @@
 
 export type PipelineStatus = "idle" | "running" | "paused" | "done" | "error";
 
+/**
+ * Per-step research budget. OR semantics — runner stops scraping once
+ * EITHER threshold is satisfied. Set both to 0 to skip web research
+ * entirely (purely internal analysis steps like differentiation).
+ */
+export interface ResearchBudget {
+  minUrls: number;
+  minChars: number;
+}
+
 export interface PipelineStepSpec {
   id: number;
   /** Display title shown in the runner control. */
@@ -22,6 +32,12 @@ export interface PipelineStepSpec {
   segmentId: string;
   /** Recommended agent slug (Phase 6 will use this to dispatch). */
   agent: string;
+  /**
+   * Phase 6 runner uses this to scrape web until OR threshold met. All
+   * sources stored under positioning._research[segmentId] scoped to
+   * the active brand/product/event id.
+   */
+  researchBudget: ResearchBudget;
   /** Mock streaming text shown during analysis (Phase 5e only). */
   mockThinking: string;
   /** Mock conclusion written into the segment (Phase 5e only). */
@@ -35,6 +51,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:origin",
     segmentId: "origin",
     agent: "brand-storyteller",
+    researchBudget: { minUrls: 3, minChars: 5000 },
     mockThinking: `讀入品牌描述、產業，準備 5 Whys 推理…
 第一層：為什麼創立？→ 表面動機。
 第二層：問題為何重要？→ 提出問題意識。
@@ -59,6 +76,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:origin", // stays here, internal cache
     segmentId: "_valueElements",
     agent: "value-architect",
+    researchBudget: { minUrls: 0, minChars: 0 }, // internal analysis
     mockThinking: "盤點 Bain 30 個功能價值 + 情緒價值，挑出最相關 5+5。",
     mockConclusion: {
       functionalValues: ["節省時間", "簡化流程", "降低風險", "提供洞察", "可整合"],
@@ -71,6 +89,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:competition",
     segmentId: "competition",
     agent: "competitive-intel",
+    researchBudget: { minUrls: 5, minChars: 15000 },
     mockThinking: `搜尋同產業 3-5 個直接競爭對手…
 分析它們的標語、定位、強項、弱項…
 歸納間接替代方案 + 新興威脅…`,
@@ -91,6 +110,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:competition",
     segmentId: "competition",
     agent: "competitive-intel",
+    researchBudget: { minUrls: 3, minChars: 8000 },
     mockThinking: "對每個競品在 5 功能 + 5 情緒元素打 1-10 分，找出市場空白…",
     mockConclusion: {
       // Appended to existing competition data
@@ -103,6 +123,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:audience",
     segmentId: "audience",
     agent: "persona-architect",
+    researchBudget: { minUrls: 4, minChars: 12000 },
     mockThinking: "從候選族群中聚焦 3 個核心 TA，分析人口/心理/行為…",
     mockConclusion: {
       primary: "（mock）25-44 歲進階健身愛好者，月收 4-8 萬，重視紀律與成果，社群活躍。",
@@ -115,6 +136,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:audience",
     segmentId: "audience",
     agent: "persona-architect",
+    researchBudget: { minUrls: 3, minChars: 10000 },
     mockThinking: "深挖每個 TA 的 painPoints / gainPoints / 5 Whys / 功能需求 / 情緒需求…",
     mockConclusion: {
       // appended; we'll merge — primary text gets stronger detail
@@ -126,6 +148,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:audience",
     segmentId: "audience",
     agent: "audience-emotion-mapper",
+    researchBudget: { minUrls: 0, minChars: 0 }, // internal scoring
     mockThinking: "為每個 TA 對 5 情緒元素的需求強度打分（1-10）…",
     mockConclusion: {
       matrix: [
@@ -143,6 +166,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:differentiation",
     segmentId: "differentiation",
     agent: "differentiation-strategist",
+    researchBudget: { minUrls: 0, minChars: 0 }, // internal analysis
     mockThinking: "比對「TA 需求 × 競品佔據 × 品牌能力」，找 1-3 個高差異化元素…",
     mockConclusion: {
       emotional:  "（mock）情感差異化：歸屬認同 — 兄弟社群 + 領袖 IP，連鎖品牌無法複製。",
@@ -156,6 +180,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:tagline",
     segmentId: "tagline",
     agent: "brand-tagline-writer",
+    researchBudget: { minUrls: 2, minChars: 3000 }, // competitor taglines
     mockThinking: "依差異化元素生成 2 組（A 情感 / B 功能）共 10 個標語選項…",
     mockConclusion: {
       zhTagline: "征服軟弱",
@@ -172,6 +197,7 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:voice",
     segmentId: "voice",
     agent: "brand-voice-coach",
+    researchBudget: { minUrls: 0, minChars: 0 }, // distillation
     mockThinking: "從 12 經典原型挑主 + 次原型，定義特質 / 語調 / 態度…",
     mockConclusion: {
       archetypes: ["英雄（主）", "反叛者（次）"],
@@ -195,6 +221,7 @@ export const BRAND_PIPELINE_FINAL: PipelineStepSpec = {
   segmentTarget: "seg:goldenCircle",
   segmentId: "goldenCircle",
   agent: "brand-archetype-positioning",
+  researchBudget: { minUrls: 0, minChars: 0 }, // distillation
   mockThinking: "從 5 Whys 核心動機 + 差異化 + 聲音蒸餾出 Why / How / What…",
   mockConclusion: {
     why:  "（mock）相信每個人骨子裡都藏著不服輸的狠勁。",
