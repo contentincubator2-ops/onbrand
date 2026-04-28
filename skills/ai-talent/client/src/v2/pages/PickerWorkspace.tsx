@@ -27,7 +27,6 @@ import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { inferMockupVariant, getVariantsForPlatform, type MockupVariant } from "../lib/inferMockup";
 import { PlatformMockup } from "../components/PlatformMockup";
-import WorkflowRunner from "./WorkflowRunner";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
 import {
   Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
@@ -917,46 +916,7 @@ export default function PickerWorkspace() {
               </Button>
             </Tooltip>
           )}
-          {activeMissionId && selectedSquad ? (
-            <div className="flex-1 min-h-0 flex flex-col">
-              <div className="px-4 py-1.5 border-b border-divider bg-content1/50 flex items-center justify-between">
-                <span className="text-[0.7rem] text-default-500">執行中 · 隨時可從左側切換方法論</span>
-                <Button
-                  size="sm"
-                  variant="light"
-                  radius="sm"
-                  onPress={() => {
-                    setActiveMissionId(null);
-                    const next = new URLSearchParams(params);
-                    next.delete("mission");
-                    setParams(next, { replace: true });
-                  }}
-                  className="text-[0.7rem] h-6 min-w-0 px-2"
-                >
-                  返回預覽
-                </Button>
-              </div>
-              <div className="flex-1 min-h-0">
-                <WorkflowRunner
-                  missionId={activeMissionId}
-                  squad={selectedSquad}
-                  lang={lang}
-                  currentBrandId={brandId}
-                  currentBrandName={brands.find((b: any) => b.id === brandId)?.name ?? ""}
-                  onMissionDeleted={() => {
-                    setActiveMissionId(null);
-                    try { localStorage.removeItem("sowork.picker.activeMissionId"); } catch {}
-                    recentMissionsQuery.refetch?.();
-                  }}
-                  onMissionDuplicated={(newId: number) => {
-                    setActiveMissionId(newId);
-                    try { localStorage.setItem("sowork.picker.activeMissionId", String(newId)); } catch {}
-                    recentMissionsQuery.refetch?.();
-                  }}
-                />
-              </div>
-            </div>
-          ) : selectedSquad ? (
+          {selectedSquad ? (
             <div className="flex-1 min-h-0">
               <SquadDetailPanel
                 squad={selectedSquad}
@@ -972,6 +932,13 @@ export default function PickerWorkspace() {
                 agentNotes={agentNotes}
                 setAgentNotes={setAgentNotes}
                 brandName={brands.find((b: any) => b.id === brandId)?.name ?? null}
+                missionId={activeMissionId}
+                onMissionEnd={() => {
+                  setActiveMissionId(null);
+                  const next = new URLSearchParams(params);
+                  next.delete("mission");
+                  setParams(next, { replace: true });
+                }}
               />
             </div>
           ) : (
@@ -1159,6 +1126,7 @@ function SquadDetailPanel({
   squad, busy, error, onLaunch, lang,
   workspace, missionTitle, setMissionTitle, missionBrief, setMissionBrief,
   agentNotes, setAgentNotes, brandName,
+  missionId, onMissionEnd,
 }: {
   squad: any;
   busy: boolean;
@@ -1173,7 +1141,55 @@ function SquadDetailPanel({
   agentNotes: Record<number, string>;
   setAgentNotes: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   brandName: string | null;
+  missionId: number | null;
+  onMissionEnd: () => void;
 }) {
+  // ── Live progress polling (post-launch) ──────────────────────────────
+  const progressQuery: any = (trpc.squad as any).stepGetProgress?.useQuery
+    ? (trpc.squad as any).stepGetProgress.useQuery(
+        { missionId: missionId ?? 0 },
+        { enabled: !!missionId, refetchInterval: missionId ? 2000 : false, refetchOnWindowFocus: false },
+      )
+    : { data: null, refetch: () => Promise.resolve({}) };
+  const stepExecute: any = (trpc.squad as any).stepExecute?.useMutation
+    ? (trpc.squad as any).stepExecute.useMutation()
+    : { mutateAsync: async () => null, isPending: false };
+
+  const stepProgressList: any[] =
+    (progressQuery.data?.steps ?? progressQuery.data ?? []) as any[];
+  const progressByOrd = useMemo(() => {
+    const m = new Map<number, any>();
+    for (const p of stepProgressList) m.set(Number(p.stepOrder ?? p.step_order ?? 0), p);
+    return m;
+  }, [stepProgressList]);
+
+  // Active step = first step that's not 'confirmed' or 'skipped'.
+  const stepsArr: any[] = Array.isArray(squad.steps) ? squad.steps : [];
+  const activeStepOrder: number = useMemo(() => {
+    for (let i = 0; i < stepsArr.length; i++) {
+      const ord = i + 1;
+      const p = progressByOrd.get(ord);
+      const s = p?.status ?? "pending";
+      if (s !== "confirmed" && s !== "skipped") return ord;
+    }
+    return stepsArr.length; // all done
+  }, [stepsArr, progressByOrd]);
+
+  // Auto-trigger first step if mission just launched and no progress yet
+  useEffect(() => {
+    if (!missionId) return;
+    if (stepProgressList.length > 0) return;
+    if (stepExecute.isPending) return;
+    stepExecute.mutateAsync({
+      missionId,
+      squadSlug: squad.slug,
+      stepOrder: 1,
+      mode: "run",
+      userInput: "",
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missionId, stepProgressList.length]);
+
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
   const name = pickLocaleText(squad.name, lang) || squad.slug;
@@ -1386,53 +1402,127 @@ function SquadDetailPanel({
 
         <Divider />
 
-        {/* Primary launch CTA — visible right next to the team */}
-        <div className="space-y-2">
-          <Button
-            color="primary" size="lg" radius="lg"
-            className="w-full font-semibold"
-            isLoading={busy}
-            isDisabled={!missionTitle.trim() && !pickLocaleText(squad.name, lang)}
-            onPress={onLaunch}
-            startContent={!busy && <FontAwesomeIcon icon={faRocket} />}
-          >
-            {busy ? "啟動中…" : `派出小組（${steps.length} 個步驟）`}
-          </Button>
-          {Object.values(agentNotes).some((n) => n.trim()) && (
-            <p className="text-tiny text-secondary text-center flex items-center justify-center gap-1">
-              <FontAwesomeIcon icon={faPenToSquare} className="text-tiny" />
-              已寫 {Object.values(agentNotes).filter((n) => n.trim()).length} 則備註
+        {/* Launch CTA (pre-mission) OR live progress (post-launch) */}
+        {!missionId ? (
+          <div className="space-y-2">
+            <Button
+              color="primary" size="lg" radius="lg"
+              className="w-full font-semibold"
+              isLoading={busy}
+              isDisabled={!missionTitle.trim() && !pickLocaleText(squad.name, lang)}
+              onPress={onLaunch}
+              startContent={!busy && <FontAwesomeIcon icon={faRocket} />}
+            >
+              {busy ? "啟動中…" : `派出小組（${steps.length} 個步驟）`}
+            </Button>
+            {Object.values(agentNotes).some((n) => n.trim()) && (
+              <p className="text-tiny text-secondary text-center flex items-center justify-center gap-1">
+                <FontAwesomeIcon icon={faPenToSquare} className="text-tiny" />
+                已寫 {Object.values(agentNotes).filter((n) => n.trim()).length} 則備註
+              </p>
+            )}
+            <Progress size="sm" value={0} color="secondary" aria-label="pipeline progress" />
+            <p className="text-tiny text-default-500 text-center">
+              點擊上方派出 → agent 會逐段填入中央預覽
             </p>
-          )}
-          <Progress
-            size="sm"
-            value={busy ? undefined : 0}
-            isIndeterminate={busy}
-            color="secondary"
-            aria-label="pipeline progress"
-          />
-          <p className="text-tiny text-default-500 text-center">
-            {busy
-              ? "派出中…"
-              : "點擊上方派出 → agent 會逐段填入中央預覽"}
-          </p>
-        </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(() => {
+              const confirmedCount = Array.from(progressByOrd.values()).filter((p: any) => p?.status === "confirmed").length;
+              const pct = steps.length ? (confirmedCount / steps.length) * 100 : 0;
+              return (
+                <>
+                  <div className="flex items-center justify-between text-tiny">
+                    <span className="text-default-500 uppercase tracking-wider">PIPELINE</span>
+                    <span className="tabular-nums text-default-700">
+                      {confirmedCount} / {steps.length} 已確認
+                    </span>
+                  </div>
+                  <Progress size="sm" value={pct} color={pct === 100 ? "success" : "secondary"} aria-label="pipeline progress" />
+                  <p className="text-tiny text-default-500 text-center">
+                    {pct === 100
+                      ? "✓ 所有步驟完成"
+                      : `現在輪到：${stepsArr[activeStepOrder - 1]?.name ?? `Step ${activeStepOrder}`}`}
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         <Divider />
 
         <div className="space-y-2">
-          {steps.map((step: any, i: number) => (
-            <AgentQueueCard
-              key={i}
-              step={step}
-              idx={i + 1}
-              isOrchestrator={i === steps.length - 1 && steps.length > 1}
-              tone={tone}
-              hasNote={!!agentNotes[i]?.trim()}
-              onPress={() => setActiveStepIdx(i)}
-            />
-          ))}
+          {steps.map((step: any, i: number) => {
+            const ord = i + 1;
+            const prog = progressByOrd.get(ord);
+            const liveStatus = prog?.status ?? (missionId ? "pending" : "queued");
+            const isActive = !!missionId && ord === activeStepOrder;
+            return (
+              <AgentLiveCard
+                key={i}
+                step={step}
+                idx={ord}
+                isOrchestrator={i === steps.length - 1 && steps.length > 1}
+                tone={tone}
+                hasNote={!!agentNotes[i]?.trim()}
+                liveStatus={liveStatus}
+                liveOutput={prog?.agentOutput ?? prog?.agent_output ?? null}
+                liveAgentName={prog?.agentName ?? prog?.agent_name ?? null}
+                isActive={isActive}
+                missionId={missionId}
+                squadSlug={squad.slug}
+                onConfirmAndAdvance={async () => {
+                  if (!missionId) return;
+                  // Mark this step confirmed
+                  await stepExecute.mutateAsync({
+                    missionId, squadSlug: squad.slug, stepOrder: ord,
+                    mode: "confirm", userInput: "",
+                  });
+                  // Auto-trigger next step if any
+                  const next = ord + 1;
+                  if (next <= steps.length) {
+                    await stepExecute.mutateAsync({
+                      missionId, squadSlug: squad.slug, stepOrder: next,
+                      mode: "run", userInput: "",
+                    });
+                  }
+                  await progressQuery.refetch?.();
+                }}
+                onRedo={async () => {
+                  if (!missionId) return;
+                  await stepExecute.mutateAsync({
+                    missionId, squadSlug: squad.slug, stepOrder: ord,
+                    mode: "run", userInput: "",
+                  });
+                  await progressQuery.refetch?.();
+                }}
+                onAsk={async (q: string) => {
+                  if (!missionId || !q.trim()) return;
+                  await stepExecute.mutateAsync({
+                    missionId, squadSlug: squad.slug, stepOrder: ord,
+                    mode: "ask", userInput: q.trim(),
+                  });
+                  await progressQuery.refetch?.();
+                }}
+                isMutating={stepExecute.isPending}
+                onClick={() => setActiveStepIdx(i)}
+              />
+            );
+          })}
         </div>
+
+        {/* Mission control footer (post-launch) */}
+        {missionId && (
+          <>
+            <Divider />
+            <div className="flex items-center justify-between">
+              <Chip size="sm" variant="flat" color="success">執行中</Chip>
+              <Button size="sm" variant="light" onPress={onMissionEnd}>返回預覽</Button>
+            </div>
+          </>
+        )}
       </aside>
 
       {/* Agent detail modal */}
@@ -1570,6 +1660,204 @@ function AgentQueueCard({
           </div>
         </div>
       </CardBody>
+    </Card>
+  );
+}
+
+/* ─────────────── Sub: AgentLiveCard (PR4 — post-launch live state) ─────────── */
+
+function AgentLiveCard({
+  step, idx, isOrchestrator, tone, hasNote,
+  liveStatus, liveOutput, liveAgentName, isActive,
+  missionId, squadSlug,
+  onConfirmAndAdvance, onRedo, onAsk, isMutating, onClick,
+}: {
+  step: any; idx: number; isOrchestrator: boolean; tone: any; hasNote?: boolean;
+  liveStatus: string; liveOutput: string | null; liveAgentName: string | null;
+  isActive: boolean;
+  missionId: number | null; squadSlug: string;
+  onConfirmAndAdvance: () => Promise<void>;
+  onRedo: () => Promise<void>;
+  onAsk: (q: string) => Promise<void>;
+  isMutating: boolean;
+  onClick?: () => void;
+}) {
+  const title = step.name ?? step.title ?? `Step ${idx}`;
+  const agent = liveAgentName ?? step.assignedAgentName ?? step.owner ?? null;
+  const skills: string[] = Array.isArray(step.requiredSkills) ? step.requiredSkills : [];
+  const out = step.outputType ?? step.output ?? "";
+
+  // Map server status → display
+  const statusMeta = (() => {
+    if (!missionId) return { label: "queued", color: "default" as const, icon: faCircle };
+    if (liveStatus === "confirmed") return { label: "已確認", color: "success" as const, icon: faCircleCheck };
+    if (liveStatus === "drafted")   return { label: "等待審查", color: "warning" as const, icon: faPenToSquare };
+    if (liveStatus === "skipped")   return { label: "已跳過",   color: "default" as const, icon: faCircle };
+    if (liveStatus === "running" || isMutating && isActive)
+      return { label: "工作中…",  color: "secondary" as const, icon: faBolt };
+    return { label: "排隊中", color: "default" as const, icon: faCircle };
+  })();
+
+  const [chatInput, setChatInput] = useState("");
+  const expanded = isActive && (liveStatus === "drafted" || liveStatus === "running" || !!liveOutput);
+
+  return (
+    <Card
+      shadow={expanded ? "md" : "none"}
+      radius="md"
+      isPressable={!expanded && !!onClick}
+      onPress={!expanded ? onClick : undefined}
+      className={[
+        "border w-full transition",
+        isOrchestrator ? "bg-foreground text-background border-foreground" : "border-divider",
+        hasNote ? "ring-2 ring-secondary ring-offset-1 ring-offset-content1" : "",
+        expanded ? "ring-2 ring-primary ring-offset-1 ring-offset-content1" : "",
+      ].join(" ")}
+    >
+      <CardBody className="p-3 flex flex-row items-start gap-3">
+        <div className="shrink-0 flex flex-col items-center gap-1">
+          {agent ? (
+            <Avatar src={dicebear(agent)} size="md" isBordered
+              color={isOrchestrator ? "secondary" : statusMeta.color === "success" ? "success" : statusMeta.color === "warning" ? "warning" : "default"} />
+          ) : (
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-tiny font-bold"
+              style={{ background: `${tone.bg}33`, color: tone.bg }}>{idx}</div>
+          )}
+          <Chip size="sm" variant="flat" className={`text-tiny tabular-nums ${isOrchestrator ? "bg-white/20 text-background" : ""}`}>
+            0{idx}
+          </Chip>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className={`text-small font-medium truncate ${isOrchestrator ? "" : "text-foreground"}`}>{title}</p>
+            {isOrchestrator && (
+              <Chip size="sm" variant="solid" startContent={<FontAwesomeIcon icon={faGavel} className="text-tiny ml-1" />} className="bg-secondary text-white">
+                ORCHESTRATOR
+              </Chip>
+            )}
+          </div>
+          {agent && (
+            <p className={`text-tiny truncate ${isOrchestrator ? "text-white/60" : "text-default-500"}`}>{agent}</p>
+          )}
+          {(skills.length > 0 || out) && !expanded && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {skills.slice(0, 3).map((sk, i) => (
+                <Chip key={i} size="sm" variant="flat"
+                  classNames={{ base: `h-5 ${isOrchestrator ? "bg-white/15 text-white" : ""}`, content: "text-tiny px-1" }}>
+                  {sk}
+                </Chip>
+              ))}
+              {out && (
+                <Chip size="sm" variant="bordered"
+                  classNames={{ base: `h-5 ${isOrchestrator ? "border-white/30 text-white" : ""}`, content: "text-tiny px-1" }}>
+                  {out}
+                </Chip>
+              )}
+            </div>
+          )}
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <Chip size="sm" variant="flat" color={statusMeta.color}
+              startContent={
+                statusMeta.label === "工作中…"
+                  ? <Spinner size="sm" classNames={{ wrapper: "w-3 h-3 ml-1" }} />
+                  : <FontAwesomeIcon icon={statusMeta.icon} className="text-tiny ml-1" />
+              }
+              classNames={{ content: "text-tiny pr-1" }}>
+              {statusMeta.label}
+            </Chip>
+            {hasNote && (
+              <Chip size="sm" variant="flat" color="secondary"
+                startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny ml-1" />}
+                classNames={{ content: "text-tiny pr-1" }}>
+                有備註
+              </Chip>
+            )}
+          </div>
+        </div>
+      </CardBody>
+
+      {/* Expanded chat content */}
+      {expanded && (
+        <>
+          <Divider />
+          <CardBody className="px-3 py-3 gap-3 bg-default-50/50">
+            {/* Agent's output as a chat bubble */}
+            {liveStatus === "running" || (!liveOutput && missionId) ? (
+              <div className="flex items-start gap-2">
+                <Avatar src={dicebear(agent ?? `step${idx}`)} size="sm" />
+                <div className="flex-1 bg-content1 border border-divider rounded-2xl rounded-tl-sm px-3 py-2 space-y-1.5">
+                  <p className="text-tiny text-default-500 flex items-center gap-1.5">
+                    <Spinner size="sm" classNames={{ wrapper: "w-3 h-3" }} />
+                    {agent ?? "agent"} 思考中…
+                  </p>
+                  <Skeleton className="h-2.5 w-[88%] rounded" />
+                  <Skeleton className="h-2.5 w-[72%] rounded" />
+                </div>
+              </div>
+            ) : liveOutput ? (
+              <div className="flex items-start gap-2">
+                <Avatar src={dicebear(agent ?? `step${idx}`)} size="sm" />
+                <div className="flex-1 bg-content1 border border-divider rounded-2xl rounded-tl-sm px-3 py-2">
+                  <p className="text-tiny text-default-500 mb-1">{agent ?? "agent"}</p>
+                  <ScrollShadow className="max-h-64">
+                    <pre className="text-small leading-relaxed font-sans whitespace-pre-wrap">{liveOutput}</pre>
+                  </ScrollShadow>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Chat input */}
+            <div className="flex items-center gap-2">
+              <Input
+                size="sm" radius="lg" variant="bordered"
+                placeholder={`對 ${agent ?? "這個 agent"} 留訊息…`}
+                value={chatInput}
+                onValueChange={setChatInput}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter" && chatInput.trim() && !isMutating) {
+                    const q = chatInput.trim();
+                    setChatInput("");
+                    await onAsk(q);
+                  }
+                }}
+                isDisabled={isMutating || liveStatus === "running"}
+                startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny text-default-400" />}
+              />
+              <Button isIconOnly size="sm" color="primary" radius="lg" aria-label="送出"
+                isDisabled={!chatInput.trim() || isMutating || liveStatus === "running"}
+                onPress={async () => {
+                  const q = chatInput.trim();
+                  setChatInput("");
+                  await onAsk(q);
+                }}>
+                <FontAwesomeIcon icon={faPaperPlane} />
+              </Button>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <Button
+                size="sm" radius="md" color="success" className="flex-1 font-medium"
+                isDisabled={liveStatus !== "drafted" || isMutating}
+                isLoading={isMutating}
+                onPress={onConfirmAndAdvance}
+                startContent={!isMutating && <FontAwesomeIcon icon={faCircleCheck} />}
+              >
+                ✓ 滿意，下一步
+              </Button>
+              <Button
+                size="sm" radius="md" variant="bordered"
+                isDisabled={isMutating}
+                onPress={onRedo}
+                startContent={<FontAwesomeIcon icon={faRotateRight} />}
+              >
+                重做
+              </Button>
+            </div>
+          </CardBody>
+        </>
+      )}
     </Card>
   );
 }
