@@ -1465,51 +1465,120 @@ function MockupHeader({ icon, label }: { icon: any; label: string }) {
 }
 
 function IGMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+  const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
+  const carouselCount = 9;
   return (
     <div className="w-full max-w-[420px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" />
-      {/* Phone frame */}
-      <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
-        {/* IG header */}
-        <CardHeader className="flex items-center justify-between px-3 py-2 border-b border-divider">
-          <User
-            name={<span className="text-small font-semibold">{brandName ?? "your_brand"}</span>}
-            description={<span className="text-tiny text-default-500">贊助 · Sponsored</span>}
-            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "sm", isBordered: true, color: "secondary" }}
-          />
-          <Button isIconOnly size="sm" variant="light" aria-label="more">
-            <FontAwesomeIcon icon={faImages} />
+      {/* IG post frame — structurally faithful to mobile feed */}
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        {/* ── HEADER: story-ring avatar + handle + location + ⋯ ── */}
+        <div className="flex items-center justify-between px-3 py-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Story ring (gradient) — IG signature pink→orange→yellow */}
+            <span
+              className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full p-[2px]"
+              style={{ background: "conic-gradient(from 90deg, #fa7e1e, #d62976, #962fbf, #4f5bd5, #fa7e1e)" }}
+            >
+              <span className="block w-full h-full rounded-full bg-content1 p-[2px]">
+                <img
+                  src={dicebear(brandName ?? "brand")}
+                  alt={handle}
+                  className="w-full h-full rounded-full block object-cover"
+                />
+              </span>
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 text-[0.84rem] font-semibold leading-tight truncate">
+                {handle}
+                <FontAwesomeIcon icon={faCircleCheck} className="text-[0.66rem] text-primary" />
+              </div>
+              <p className="text-[0.7rem] text-default-500 truncate leading-tight">原創音訊</p>
+            </div>
+          </div>
+          <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
+            <span className="text-medium tracking-tighter">⋯</span>
           </Button>
-        </CardHeader>
-        {/* Square image area with carousel placeholder */}
-        <div className="relative aspect-square bg-default-100 flex items-center justify-center">
-          <Skeleton className="absolute inset-3 rounded-md" />
-          <div className="relative z-10 text-center text-default-400">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">9 張輪播 · 等待 craft agent</p>
+        </div>
+
+        {/* ── IMAGE: square + carousel page dots ── */}
+        <div className="relative aspect-square bg-default-100">
+          <Skeleton className="absolute inset-0" />
+          <div className="absolute inset-0 flex items-center justify-center text-default-400">
+            <div className="text-center">
+              <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
+              <p className="text-tiny">輪播 1 / {carouselCount} · 等待 craft agent</p>
+            </div>
           </div>
-          <div className="absolute top-2 right-2 bg-black/60 text-white text-tiny px-2 py-0.5 rounded-full">
-            1 / 9
+          {/* Top-right carousel counter */}
+          <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-[0.66rem] font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
+            1/{carouselCount}
           </div>
         </div>
-        {/* Action bar */}
-        <div className="flex items-center justify-between px-3 py-2 border-t border-divider">
-          <div className="flex gap-3 text-default-700">
-            <FontAwesomeIcon icon={faHeart} />
-            <FontAwesomeIcon icon={faComment} />
-            <FontAwesomeIcon icon={faShareNodes} />
-          </div>
-          <FontAwesomeIcon icon={faBookmark} className="text-default-700" />
+
+        {/* ── PAGE DOTS (5 dots — IG truncates to 5) ── */}
+        <div className="flex items-center justify-center gap-1 py-1.5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span
+              key={i}
+              className={`rounded-full transition ${
+                i === 0 ? "bg-primary w-1.5 h-1.5" : "bg-default-300 w-1.5 h-1.5 opacity-70"
+              }`}
+            />
+          ))}
         </div>
-        {/* Caption skeleton */}
-        <CardBody className="px-3 py-2 gap-1.5">
-          <p className="text-small font-semibold">{brandName ?? "your_brand"} <span className="font-normal text-default-600">{title}</span></p>
-          <Skeleton className="h-2.5 w-[92%] rounded" />
-          <Skeleton className="h-2.5 w-[80%] rounded" />
-          <Skeleton className="h-2.5 w-[60%] rounded" />
-          <p className="text-tiny text-secondary mt-1">#hashtag #等寫手 #等寫手</p>
-        </CardBody>
-      </Card>
+
+        {/* ── ACTION BAR: heart / comment / paper-plane · bookmark ── */}
+        <div className="flex items-center justify-between px-3 pb-1.5">
+          <div className="flex items-center gap-4 text-foreground">
+            <FontAwesomeIcon icon={faHeart} className="text-[1.4rem]" />
+            <FontAwesomeIcon icon={faComment} className="text-[1.35rem]" />
+            <FontAwesomeIcon icon={faPaperPlane} className="text-[1.35rem]" />
+          </div>
+          <FontAwesomeIcon icon={faBookmark} className="text-[1.4rem] text-foreground" />
+        </div>
+
+        {/* ── LIKES LINE ── */}
+        <div className="px-3 pb-1 flex items-center gap-1.5">
+          <AvatarGroup max={3} size="sm" isBordered className="scale-75 -ml-1">
+            <Avatar src={dicebear("liker1")} />
+            <Avatar src={dicebear("liker2")} />
+            <Avatar src={dicebear("liker3")} />
+          </AvatarGroup>
+          <p className="text-[0.78rem] leading-tight">
+            <span className="text-default-500">由 </span>
+            <span className="font-semibold">friend_handle</span>
+            <span className="text-default-500"> 與其他 </span>
+            <span className="font-semibold">1,234</span>
+            <span className="text-default-500"> 人按讚</span>
+          </p>
+        </div>
+
+        {/* ── CAPTION ── */}
+        <div className="px-3 pb-1 text-[0.82rem] leading-snug">
+          <span className="font-semibold mr-1.5">{handle}</span>
+          <span className="text-foreground">{title}</span>
+          {/* Caption body — agent fills */}
+          <div className="mt-1.5 space-y-1">
+            <Skeleton className="h-2.5 w-[94%] rounded" />
+            <Skeleton className="h-2.5 w-[78%] rounded" />
+          </div>
+          <p className="mt-1.5 text-secondary text-[0.78rem]">
+            #等寫手 #等寫手 #等寫手{" "}
+            <span className="text-default-500">…更多</span>
+          </p>
+        </div>
+
+        {/* ── COMMENTS PREVIEW ── */}
+        <p className="px-3 pb-1 text-[0.78rem] text-default-500">
+          查看全部 <span className="font-medium">87</span> 則留言
+        </p>
+
+        {/* ── TIME ── */}
+        <p className="px-3 pb-3 text-[0.66rem] text-default-400 uppercase tracking-wider">
+          5 分鐘前
+        </p>
+      </div>
     </div>
   );
 }
