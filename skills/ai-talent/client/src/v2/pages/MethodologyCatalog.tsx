@@ -34,7 +34,26 @@ import {
   faBullseye, faMessage, faChartLine, faPalette, faRocket, faBriefcase,
   faVideo, faShareNodes, faStar, faArrowRight, faEllipsis, faPlay,
   faXmark, faShare, faFlag,
+  faPenNib, faImage, faMicrophoneLines, faChartColumn, faChessKnight, faCode, faWandSparkles,
 } from "@fortawesome/free-solid-svg-icons";
+
+// Skill task_type → FontAwesome icon. Per design system: skills render as
+// "block / property" — a single neutral icon on bg-default-50, never a
+// generated illustration (those are reserved for squads).
+const SKILL_TASK_ICON: Record<string, any> = {
+  text:      faPenNib,
+  image:     faImage,
+  video:     faVideo,
+  audio:     faMicrophoneLines,
+  data:      faChartColumn,
+  research:  faMagnifyingGlass,
+  strategy:  faChessKnight,
+  code:      faCode,
+  generic:   faWandSparkles,
+};
+function skillIcon(taskType?: string | null) {
+  return SKILL_TASK_ICON[String(taskType ?? "").toLowerCase()] ?? faWandSparkles;
+}
 
 type Kind = "squad" | "agent" | "skill";
 
@@ -519,7 +538,16 @@ function LandscapeCard({
         className="relative w-full bg-default-50 overflow-hidden border-b border-divider"
         style={{ aspectRatio: aspect }}
       >
-        {coverImageUrl ? (
+        {entity.kind === "skill" ? (
+          // Skill — single FontAwesome icon (per design system rule)
+          <div className="absolute inset-0 flex items-center justify-center">
+            <FontAwesomeIcon
+              icon={skillIcon(entity.taskType)}
+              className="text-default-400"
+              style={{ fontSize: size === "sm" ? 56 : size === "lg" ? 96 : 72 }}
+            />
+          </div>
+        ) : coverImageUrl ? (
           <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center opacity-70">
@@ -648,7 +676,15 @@ function EntityDetailModal({
                 className={`relative w-full bg-${heroColor}-100 rounded-large overflow-hidden`}
                 style={{ aspectRatio: "4/3" }}
               >
-                {coverImageUrl ? (
+                {entity.kind === "skill" ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <FontAwesomeIcon
+                      icon={skillIcon(entity.taskType)}
+                      className="text-default-400"
+                      style={{ fontSize: 160 }}
+                    />
+                  </div>
+                ) : coverImageUrl ? (
                   <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">

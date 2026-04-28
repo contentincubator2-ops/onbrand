@@ -122,6 +122,13 @@ export interface HomeEntity {
   mockup?: { platform: string; format: string };
 
   /**
+   * Skill task_type — drives the icon shown on skill cards
+   * (text/image/video/audio/data/research/strategy/code/generic).
+   * Null for squad/agent kinds.
+   */
+  taskType?: string | null;
+
+  /**
    * Generated cover/portrait image. Populated for all three kinds:
    *   squad → squads.hero_image_url (Notion-style line illustration)
    *   agent → agents.avatarUrl       (react-nice-avatar / generated portrait)
@@ -346,10 +353,12 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
       stepCount: 0,
       memberCount: kind === "agent" ? 1 : 0,
       workspace: [],
-      // Agent-template skills currently fall back to cover_image_url; native
-      // agents use line-art portrait from soworkAgents.avatarUrl. Mixing the
-      // two is acceptable until we generate portraits for agent-templates too.
-      coverImageUrl: r.cover_image_url ?? null,
+      // Skill cards render a FontAwesome icon (driven by taskType), not an
+      // image — see design system rule. cover_image_url retained for legacy
+      // but client ignores it for kind=skill. Agent-template kind still uses
+      // cover_image_url as a temporary fallback.
+      coverImageUrl: kind === "skill" ? null : (r.cover_image_url ?? null),
+      taskType: r.task_type ?? null,
     };
   });
 }
