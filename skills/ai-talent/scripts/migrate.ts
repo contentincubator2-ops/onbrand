@@ -729,6 +729,60 @@ async function main() {
       }
     }
 
+    // ─── 13. products + events tables (scope: brand × product × event) ────
+    // CJ direction 2026-04-28: every agent run reads scope (user × brand
+    // × product × event) before kicking off. Choose-one is allowed; user
+    // selects one of the three as the active scope.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS products (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId          INT NOT NULL,
+        brandId         INT NULL,
+        slug            VARCHAR(120) NOT NULL,
+        name            VARCHAR(255) NOT NULL,
+        positioning     JSON NULL,
+        createdAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_user_slug (userId, slug),
+        INDEX idx_user (userId),
+        INDEX idx_brand (brandId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] products: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS events (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId          INT NOT NULL,
+        brandId         INT NULL,
+        productId       INT NULL,
+        slug            VARCHAR(120) NOT NULL,
+        name            VARCHAR(255) NOT NULL,
+        startAt         DATETIME NULL,
+        endAt           DATETIME NULL,
+        positioning     JSON NULL,
+        createdAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_user_slug (userId, slug),
+        INDEX idx_user (userId),
+        INDEX idx_brand (brandId),
+        INDEX idx_product (productId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] events: OK");
+
+    // brands.positioning JSON column (full brand positioning book + cards)
+    const [bp]: any = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands' AND COLUMN_NAME = 'positioning'
+    `);
+    if ((bp as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE brands ADD COLUMN positioning JSON NULL`);
+      console.log("[migrate] brands.positioning: added");
+    } else {
+      console.log("[migrate] brands.positioning: already exists, skipped");
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
