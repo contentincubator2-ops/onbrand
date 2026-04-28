@@ -1386,10 +1386,35 @@ function SquadDetailPanel({
 
         <Divider />
 
-        <div className="space-y-1">
-          <Progress size="sm" value={0} color="secondary" aria-label="pipeline progress" />
-          <p className="text-tiny text-default-500">
-            尚未派出 — 派出後 agent 會逐段填入中央預覽
+        {/* Primary launch CTA — visible right next to the team */}
+        <div className="space-y-2">
+          <Button
+            color="primary" size="lg" radius="lg"
+            className="w-full font-semibold"
+            isLoading={busy}
+            isDisabled={!missionTitle.trim() && !pickLocaleText(squad.name, lang)}
+            onPress={onLaunch}
+            startContent={!busy && <FontAwesomeIcon icon={faRocket} />}
+          >
+            {busy ? "啟動中…" : `派出小組（${steps.length} 個步驟）`}
+          </Button>
+          {Object.values(agentNotes).some((n) => n.trim()) && (
+            <p className="text-tiny text-secondary text-center flex items-center justify-center gap-1">
+              <FontAwesomeIcon icon={faPenToSquare} className="text-tiny" />
+              已寫 {Object.values(agentNotes).filter((n) => n.trim()).length} 則備註
+            </p>
+          )}
+          <Progress
+            size="sm"
+            value={busy ? undefined : 0}
+            isIndeterminate={busy}
+            color="secondary"
+            aria-label="pipeline progress"
+          />
+          <p className="text-tiny text-default-500 text-center">
+            {busy
+              ? "派出中…"
+              : "點擊上方派出 → agent 會逐段填入中央預覽"}
           </p>
         </div>
 
