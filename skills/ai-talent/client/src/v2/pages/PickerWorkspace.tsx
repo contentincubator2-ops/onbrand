@@ -27,7 +27,22 @@ import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import WorkflowRunner from "./WorkflowRunner";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
-import { Button, Input, Tooltip, Chip, Card, CardBody } from "@heroui/react";
+import {
+  Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
+  Button, Card, CardBody, CardHeader, Chip, Divider, Input, Progress,
+  ScrollShadow, Skeleton, Spinner, Textarea, Tooltip, User,
+} from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faRocket, faPaperPlane, faRotateRight, faBullseye, faPenToSquare,
+  faBrain, faUserGroup, faGavel, faMagnifyingGlass, faChartColumn,
+  faPenNib, faPalette, faBolt, faCircleCheck, faCircle, faLayerGroup,
+  faMobileScreen, faImages, faNewspaper, faVideo, faPodcast, faBookOpen,
+  faHeart, faComment, faShareNodes, faBookmark, faPlay,
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faInstagram, faFacebook, faLinkedin, faYoutube,
+} from "@fortawesome/free-brands-svg-icons";
 
 /* ─────────────────────────── Icon rail ─────────────────────────── */
 //
@@ -315,6 +330,10 @@ export default function PickerWorkspace() {
   const [q, setQ] = useState("");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(initialSlug);
 
+  // Mission brief — local state for the new 3-col detail panel.
+  const [missionTitle, setMissionTitle] = useState<string>(seedTitle);
+  const [missionBrief, setMissionBrief] = useState<string>("");
+
   // ── Data ────────────────────────────────────────────────────────────
   const squadsQuery = (trpc.squad as any).listByBrand?.useQuery
     ? (trpc.squad as any).listByBrand.useQuery(
@@ -446,8 +465,8 @@ export default function PickerWorkspace() {
     try {
       const ws = (Array.isArray(sq.workspace) ? sq.workspace[0] : sq.workspace) || channelFilter || "";
       const res = await createMission.mutateAsync({
-        title: seedTitle || pickLocaleText(sq.name, lang) || sq.slug,
-        description: safeLocalizedText(sq.description, lang) ?? undefined,
+        title: missionTitle.trim() || seedTitle || pickLocaleText(sq.name, lang) || sq.slug,
+        description: missionBrief.trim() || safeLocalizedText(sq.description, lang) || undefined,
         squadSlug: sq.slug,
         workspace: ws,
         brandId: brandId ?? undefined,
@@ -911,14 +930,20 @@ export default function PickerWorkspace() {
               </div>
             </div>
           ) : selectedSquad ? (
-            <div className="flex-1 min-h-0 overflow-y-auto">
-            <SquadDetailPanel
-              squad={selectedSquad}
-              busy={busy}
-              error={error}
-              onLaunch={() => launchSquad(selectedSquad)}
-              lang={lang}
-            />
+            <div className="flex-1 min-h-0">
+              <SquadDetailPanel
+                squad={selectedSquad}
+                busy={busy}
+                error={error}
+                onLaunch={() => launchSquad(selectedSquad)}
+                lang={lang}
+                workspace={effectiveChannel}
+                missionTitle={missionTitle}
+                setMissionTitle={setMissionTitle}
+                missionBrief={missionBrief}
+                setMissionBrief={setMissionBrief}
+                brandName={brands.find((b: any) => b.id === brandId)?.name ?? null}
+              />
             </div>
           ) : (
             <div className="h-full flex items-center justify-center p-10">
@@ -1083,16 +1108,39 @@ function SquadThumb({
   );
 }
 
-/* ─────────────────────────── Sub: Detail panel ─────────────────────────── */
+/* ─────────────────────── Sub: 3-col Detail panel ────────────────────────
+ * PR1 — skeleton:  left brief / middle preview placeholder / right agent
+ * orchestra. Mission stays unrun until user hits 派出小組; that swaps the
+ * whole right pane to <WorkflowRunner /> (handled upstream).
+ */
+
+const dicebear = (name: string) =>
+  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
+
+const WORKSPACE_META: Record<string, { label: string; icon: any; brand?: any; mockup: "instagram" | "facebook" | "linkedin" | "youtube" | "generic" }> = {
+  instagram: { label: "Instagram", icon: faInstagram, brand: faInstagram, mockup: "instagram" },
+  facebook:  { label: "Facebook",  icon: faFacebook,  brand: faFacebook,  mockup: "facebook"  },
+  linkedin:  { label: "LinkedIn",  icon: faLinkedin,  brand: faLinkedin,  mockup: "linkedin"  },
+  youtube:   { label: "YouTube",   icon: faYoutube,   brand: faYoutube,   mockup: "youtube"   },
+  pr:        { label: "公關",       icon: faNewspaper, mockup: "generic" },
+  email:     { label: "電子報",     icon: faPodcast,   mockup: "generic" },
+};
 
 function SquadDetailPanel({
   squad, busy, error, onLaunch, lang,
+  workspace, missionTitle, setMissionTitle, missionBrief, setMissionBrief, brandName,
 }: {
   squad: any;
   busy: boolean;
   error: string | null;
   onLaunch: () => void;
   lang: "zh-TW" | "en";
+  workspace: string | null;
+  missionTitle: string;
+  setMissionTitle: (s: string) => void;
+  missionBrief: string;
+  setMissionBrief: (s: string) => void;
+  brandName: string | null;
 }) {
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
@@ -1101,72 +1149,491 @@ function SquadDetailPanel({
   const author = squad.methodology?.author;
   const year = squad.methodology?.year;
   const steps: any[] = Array.isArray(squad.steps) ? squad.steps : [];
-  const memberCount = Array.isArray(squad.members) ? squad.members.length : 0;
+  const members: any[] = Array.isArray(squad.members) ? squad.members : [];
+  const wsKey = workspace ?? (Array.isArray(squad.workspace) ? squad.workspace[0] : squad.workspace) ?? null;
+  const wsMeta = wsKey ? WORKSPACE_META[wsKey] : null;
 
   return (
-    <div className="max-w-[820px] mx-auto px-8 py-8">
-      {/* Title block (Canva-style) */}
-      <h1 className="font-semibold text-[1.6rem] leading-tight text-foreground tracking-[-0.01em]">
-        {name}
-      </h1>
-      <div className="mt-2 text-[0.84rem] text-default-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: tone.bg }} />
-          {lk}・{tone.label}
-        </span>
-        <span className="mx-2 text-divider">|</span>
-        <span>{steps.length} 個工作步驟</span>
-        <span className="mx-2 text-divider">|</span>
-        <span>{memberCount} 位成員</span>
-      </div>
+    <div className="h-full grid grid-cols-1 lg:grid-cols-[300px_1fr_360px] divide-x divide-divider">
 
-      {/* Author byline */}
-      {(author || year) && (
-        <div className="mt-3 inline-flex items-center gap-2 text-[0.78rem] text-default-500">
-          <span className="w-6 h-6 rounded-full bg-content3 inline-flex items-center justify-center text-[0.62rem] font-bold text-foreground">
-            {(author?.charAt(0) ?? "·").toUpperCase()}
-          </span>
-          <span>方法論：{author ?? "—"}{year ? ` · ${year}` : ""}</span>
+      {/* ─── LEFT: BRIEF ─────────────────────────────────────────────── */}
+      <aside className="overflow-y-auto px-5 py-5 space-y-4 bg-content1">
+        <Breadcrumbs size="sm">
+          <BreadcrumbItem>挑選方法論</BreadcrumbItem>
+          <BreadcrumbItem>{name}</BreadcrumbItem>
+        </Breadcrumbs>
+
+        <div className="flex flex-wrap gap-1.5">
+          <Chip
+            size="sm" variant="flat"
+            startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}
+            style={{ background: `${tone.bg}1A`, color: tone.bg }}
+          >
+            {lk} · {tone.label}
+          </Chip>
+          {wsMeta && (
+            <Chip
+              size="sm" variant="flat" color="secondary"
+              startContent={<FontAwesomeIcon icon={wsMeta.icon} className="text-tiny ml-1" />}
+            >
+              {wsMeta.label}
+            </Chip>
+          )}
         </div>
-      )}
 
-      {/* Description */}
-      {description && (
-        <p className="mt-4 text-[0.92rem] text-foreground/80 leading-relaxed">
-          {description}
+        <div>
+          <h1 className="font-semibold text-xl tracking-tight leading-tight">{name}</h1>
+          {description && (
+            <p className="text-tiny text-default-500 leading-relaxed mt-2 line-clamp-4">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {(author || year) && (
+          <Chip
+            size="sm" variant="flat"
+            startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
+          >
+            {author ?? "—"}{year ? ` · ${year}` : ""}
+          </Chip>
+        )}
+
+        <Divider />
+
+        <p className="text-tiny tracking-wider uppercase text-default-500 font-medium flex items-center gap-1.5">
+          <FontAwesomeIcon icon={faPenToSquare} /> BRIEF
         </p>
-      )}
 
-      {/* Primary CTA — 套用 / 啟動 */}
-      <Button
-        onPress={onLaunch}
-        isLoading={busy}
-        color="primary"
-        radius="full"
-        size="lg"
-        fullWidth
-        className="mt-6 font-semibold text-[0.92rem]"
-      >
-        {busy ? "啟動中…" : `啟動小組（含 ${steps.length} 個工作步驟）`}
-      </Button>
+        <Input
+          label="任務標題"
+          labelPlacement="outside"
+          variant="bordered" radius="md" size="sm"
+          placeholder="幫這個任務取個名字"
+          value={missionTitle}
+          onValueChange={setMissionTitle}
+          isRequired
+          startContent={<FontAwesomeIcon icon={faBullseye} className="text-tiny text-default-400" />}
+        />
 
-      {error && (
-        <div className="mt-3 px-4 py-2.5 bg-danger-50 border border-danger-200 text-[0.82rem] text-danger-700 rounded-medium">
-          {error}
+        <Textarea
+          label="說明 / 重點"
+          labelPlacement="outside"
+          variant="bordered" radius="md"
+          placeholder="這次想做什麼、給誰、為什麼？（可選）"
+          minRows={4} maxRows={8}
+          value={missionBrief}
+          onValueChange={setMissionBrief}
+        />
+
+        {brandName && (
+          <Chip
+            size="md" variant="flat" color="secondary" radius="md"
+            className="w-full h-auto py-1.5 px-2"
+            startContent={<FontAwesomeIcon icon={faBrain} className="ml-1" />}
+            classNames={{ content: "flex items-center gap-1.5" }}
+          >
+            <span className="font-medium">{brandName}</span>
+            <span className="text-tiny text-default-500">brand brain 自動帶入</span>
+          </Chip>
+        )}
+
+        <Button
+          color="primary" size="lg" radius="lg"
+          className="w-full font-medium"
+          isLoading={busy}
+          isDisabled={!missionTitle.trim() && !seedTitleHint(squad, lang)}
+          onPress={onLaunch}
+          startContent={!busy && <FontAwesomeIcon icon={faRocket} />}
+        >
+          {busy ? "啟動中…" : `派出小組（${steps.length} 個步驟）`}
+        </Button>
+
+        {error && (
+          <Alert color="danger" variant="flat" title={error} />
+        )}
+      </aside>
+
+      {/* ─── MIDDLE: PREVIEW ─────────────────────────────────────────── */}
+      <section className="overflow-y-auto bg-default-50 flex items-start justify-center p-6 lg:p-10">
+        <PlatformMockupPlaceholder
+          mockup={wsMeta?.mockup ?? "generic"}
+          title={missionTitle || name}
+          brief={missionBrief || (description ?? "")}
+          brandName={brandName}
+        />
+      </section>
+
+      {/* ─── RIGHT: AGENT ORCHESTRA ──────────────────────────────────── */}
+      <aside className="overflow-y-auto px-4 py-5 space-y-3 bg-content1">
+        <div className="flex items-center justify-between">
+          <p className="text-tiny tracking-wider uppercase text-default-500 font-medium flex items-center gap-1.5">
+            <FontAwesomeIcon icon={faUserGroup} /> AGENT ORCHESTRA
+          </p>
+          <Chip size="sm" variant="flat">{steps.length} 階段</Chip>
         </div>
-      )}
 
-      {/* Step grid (Canva's "16 pages" preview) */}
-      {steps.length > 0 && (
-        <div className="mt-8">
-          <h2 className="font-semibold text-[1.0rem] text-foreground mb-3">工作步驟預覽</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {steps.map((step: any, idx: number) => (
-              <StepCard key={idx} step={step} idx={idx + 1} tone={tone} />
-            ))}
+        {members.length > 0 && (
+          <div className="flex items-center gap-2">
+            <AvatarGroup max={5} size="sm" isBordered>
+              {members.map((m: any, i: number) => (
+                <Tooltip key={m.id ?? m.name ?? i} content={
+                  <User
+                    name={m.name ?? "—"}
+                    description={m.role ?? m.primarySkill ?? ""}
+                    avatarProps={{ src: dicebear(m.name ?? `m${i}`), size: "sm" }}
+                  />
+                }>
+                  <Avatar
+                    src={dicebear(m.name ?? `m${i}`)}
+                    size="sm" isBordered
+                  />
+                </Tooltip>
+              ))}
+            </AvatarGroup>
+            <span className="text-tiny text-default-500">{members.length} 位成員</span>
+          </div>
+        )}
+
+        <Divider />
+
+        <div className="space-y-1">
+          <Progress size="sm" value={0} color="secondary" aria-label="pipeline progress" />
+          <p className="text-tiny text-default-500">
+            尚未派出 — 派出後 agent 會逐段填入中央預覽
+          </p>
+        </div>
+
+        <Divider />
+
+        <div className="space-y-2">
+          {steps.map((step: any, i: number) => (
+            <AgentQueueCard
+              key={i}
+              step={step}
+              idx={i + 1}
+              isOrchestrator={i === steps.length - 1 && steps.length > 1}
+              tone={tone}
+            />
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function seedTitleHint(squad: any, lang: "zh-TW" | "en") {
+  return pickLocaleText(squad.name, lang) || squad.slug || "";
+}
+
+/* ─────────────── Sub: AgentQueueCard (PR1: queued state only) ─────────── */
+
+function AgentQueueCard({
+  step, idx, isOrchestrator, tone,
+}: {
+  step: any;
+  idx: number;
+  isOrchestrator: boolean;
+  tone: any;
+}) {
+  const title = step.name ?? step.title ?? `Step ${idx}`;
+  const agent = step.assignedAgentName ?? step.owner ?? null;
+  const skills: string[] = Array.isArray(step.requiredSkills) ? step.requiredSkills : [];
+  const out = step.outputType ?? step.output ?? "";
+
+  return (
+    <Card
+      shadow="none" radius="md"
+      className={[
+        "border",
+        isOrchestrator ? "bg-foreground text-background border-foreground" : "border-divider",
+      ].join(" ")}
+    >
+      <CardBody className="p-3 flex flex-row items-start gap-3">
+        <div className="shrink-0 flex flex-col items-center gap-1">
+          {agent ? (
+            <Badge
+              content={<FontAwesomeIcon icon={faCircle} className="text-[0.5rem]" />}
+              color="default" placement="bottom-right" shape="circle" size="sm"
+              classNames={{ badge: "bg-default-300" }}
+            >
+              <Avatar src={dicebear(agent)} size="md" isBordered
+                color={isOrchestrator ? "secondary" : "default"} />
+            </Badge>
+          ) : (
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-tiny font-bold"
+              style={{ background: `${tone.bg}33`, color: tone.bg }}>
+              {idx}
+            </div>
+          )}
+          <Chip size="sm" variant="flat" className={`text-tiny tabular-nums ${isOrchestrator ? "bg-white/20 text-background" : ""}`}>
+            0{idx}
+          </Chip>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className={`text-small font-medium truncate ${isOrchestrator ? "" : "text-foreground"}`}>{title}</p>
+            {isOrchestrator && (
+              <Chip size="sm" variant="solid" startContent={<FontAwesomeIcon icon={faGavel} className="text-tiny ml-1" />} className="bg-secondary text-white">
+                ORCHESTRATOR
+              </Chip>
+            )}
+          </div>
+          {agent && (
+            <p className={`text-tiny truncate ${isOrchestrator ? "text-white/60" : "text-default-500"}`}>
+              {agent}
+            </p>
+          )}
+          {(skills.length > 0 || out) && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {skills.slice(0, 3).map((sk, i) => (
+                <Chip
+                  key={i} size="sm" variant="flat"
+                  classNames={{
+                    base: `h-5 ${isOrchestrator ? "bg-white/15 text-white" : ""}`,
+                    content: "text-tiny px-1",
+                  }}
+                >
+                  {sk}
+                </Chip>
+              ))}
+              {out && (
+                <Chip
+                  size="sm" variant="bordered"
+                  classNames={{
+                    base: `h-5 ${isOrchestrator ? "border-white/30 text-white" : ""}`,
+                    content: "text-tiny px-1",
+                  }}
+                >
+                  {out}
+                </Chip>
+              )}
+            </div>
+          )}
+          <Chip
+            size="sm" variant="flat" className="mt-1.5"
+            classNames={{
+              base: isOrchestrator ? "bg-white/15 text-white" : "",
+              content: "text-tiny",
+            }}
+          >
+            queued
+          </Chip>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+/* ─────────────── Sub: PlatformMockupPlaceholder (PR1: empty frames) ─────── */
+
+function PlatformMockupPlaceholder({
+  mockup, title, brief, brandName,
+}: {
+  mockup: "instagram" | "facebook" | "linkedin" | "youtube" | "generic";
+  title: string;
+  brief: string;
+  brandName: string | null;
+}) {
+  if (mockup === "instagram")
+    return <IGMockup title={title} brief={brief} brandName={brandName} />;
+  if (mockup === "facebook")
+    return <FBMockup title={title} brief={brief} brandName={brandName} />;
+  if (mockup === "linkedin")
+    return <LIMockup title={title} brief={brief} brandName={brandName} />;
+  if (mockup === "youtube")
+    return <YTMockup title={title} brief={brief} brandName={brandName} />;
+  return <GenericMockup title={title} brief={brief} />;
+}
+
+function MockupHeader({ icon, label }: { icon: any; label: string }) {
+  return (
+    <div className="text-center mb-4">
+      <Chip
+        size="sm" variant="flat" color="secondary"
+        startContent={<FontAwesomeIcon icon={icon} className="ml-1" />}
+        className="uppercase tracking-wider"
+      >
+        {label} 預覽
+      </Chip>
+      <p className="text-tiny text-default-500 mt-2">
+        agent 完成各階段後，內容會逐欄淡入填到下方
+      </p>
+    </div>
+  );
+}
+
+function IGMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+  return (
+    <div className="w-full max-w-[420px] mx-auto">
+      <MockupHeader icon={faInstagram} label="Instagram" />
+      {/* Phone frame */}
+      <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
+        {/* IG header */}
+        <CardHeader className="flex items-center justify-between px-3 py-2 border-b border-divider">
+          <User
+            name={<span className="text-small font-semibold">{brandName ?? "your_brand"}</span>}
+            description={<span className="text-tiny text-default-500">贊助 · Sponsored</span>}
+            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "sm", isBordered: true, color: "secondary" }}
+          />
+          <Button isIconOnly size="sm" variant="light" aria-label="more">
+            <FontAwesomeIcon icon={faImages} />
+          </Button>
+        </CardHeader>
+        {/* Square image area with carousel placeholder */}
+        <div className="relative aspect-square bg-default-100 flex items-center justify-center">
+          <Skeleton className="absolute inset-3 rounded-md" />
+          <div className="relative z-10 text-center text-default-400">
+            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
+            <p className="text-tiny">9 張輪播 · 等待 craft agent</p>
+          </div>
+          <div className="absolute top-2 right-2 bg-black/60 text-white text-tiny px-2 py-0.5 rounded-full">
+            1 / 9
           </div>
         </div>
-      )}
+        {/* Action bar */}
+        <div className="flex items-center justify-between px-3 py-2 border-t border-divider">
+          <div className="flex gap-3 text-default-700">
+            <FontAwesomeIcon icon={faHeart} />
+            <FontAwesomeIcon icon={faComment} />
+            <FontAwesomeIcon icon={faShareNodes} />
+          </div>
+          <FontAwesomeIcon icon={faBookmark} className="text-default-700" />
+        </div>
+        {/* Caption skeleton */}
+        <CardBody className="px-3 py-2 gap-1.5">
+          <p className="text-small font-semibold">{brandName ?? "your_brand"} <span className="font-normal text-default-600">{title}</span></p>
+          <Skeleton className="h-2.5 w-[92%] rounded" />
+          <Skeleton className="h-2.5 w-[80%] rounded" />
+          <Skeleton className="h-2.5 w-[60%] rounded" />
+          <p className="text-tiny text-secondary mt-1">#hashtag #等寫手 #等寫手</p>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function FBMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+  return (
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader icon={faFacebook} label="Facebook" />
+      <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
+        <CardHeader className="px-4 py-3 gap-3">
+          <User
+            name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
+            description={<span className="text-tiny text-default-500">贊助 · 剛剛 · 🌐</span>}
+            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+          />
+        </CardHeader>
+        <CardBody className="px-4 py-2 gap-2">
+          <p className="text-small">{title}</p>
+          <Skeleton className="h-2.5 w-[88%] rounded" />
+          <Skeleton className="h-2.5 w-[75%] rounded" />
+        </CardBody>
+        <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400">
+          <div className="text-center">
+            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
+            <p className="text-tiny">主圖 · 等待 craft agent</p>
+          </div>
+        </div>
+        <div className="px-4 py-2 border-t border-divider flex items-center justify-between text-default-500 text-tiny">
+          <span>👍❤️🎉 1.2K</span>
+          <span>87 留言 · 23 分享</span>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function LIMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+  return (
+    <div className="w-full max-w-[560px] mx-auto">
+      <MockupHeader icon={faLinkedin} label="LinkedIn" />
+      <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
+        <CardHeader className="px-5 py-4">
+          <User
+            name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
+            description={<span className="text-tiny text-default-500">追蹤者 1,234 · 1 小時前</span>}
+            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+          />
+        </CardHeader>
+        <CardBody className="px-5 py-3 gap-3">
+          <h2 className="text-medium font-semibold leading-snug">{title}</h2>
+          <Skeleton className="h-3 w-full rounded" />
+          <Skeleton className="h-3 w-[92%] rounded" />
+          <Skeleton className="h-3 w-[88%] rounded" />
+          <Divider />
+          <p className="text-tiny text-default-500">章節（writer agent 會填入）</p>
+          <Skeleton className="h-3 w-[60%] rounded" />
+          <Skeleton className="h-3 w-[55%] rounded" />
+          <Skeleton className="h-3 w-[50%] rounded" />
+        </CardBody>
+        <div className="px-5 py-2 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
+          <span>👍 喜歡</span>
+          <span>💬 留言</span>
+          <span>↗ 轉發</span>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function YTMockup({ title, brandName }: { title: string; brief: string; brandName: string | null }) {
+  return (
+    <div className="w-full max-w-[640px] mx-auto">
+      <MockupHeader icon={faYoutube} label="YouTube" />
+      <Card shadow="lg" radius="lg" className="overflow-hidden border border-divider">
+        <div className="relative aspect-video bg-default-100 flex items-center justify-center">
+          <div className="text-center text-default-400">
+            <FontAwesomeIcon icon={faVideo} className="text-5xl mb-2" />
+            <p className="text-tiny">縮圖 · 等待 craft agent</p>
+          </div>
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">
+            12:34
+          </div>
+          <Button
+            isIconOnly radius="full" size="lg" color="danger"
+            className="absolute opacity-90"
+            aria-label="play"
+          >
+            <FontAwesomeIcon icon={faPlay} />
+          </Button>
+        </div>
+        <CardBody className="p-4 gap-2">
+          <p className="text-medium font-semibold leading-snug">{title}</p>
+          <User
+            name={<span className="text-small">{brandName ?? "Your Channel"}</span>}
+            description={<span className="text-tiny text-default-500">12K 訂閱者 · 剛剛</span>}
+            avatarProps={{ src: dicebear(brandName ?? "channel"), size: "sm" }}
+          />
+          <Divider />
+          <p className="text-tiny text-default-500">影片描述</p>
+          <Skeleton className="h-2.5 w-[90%] rounded" />
+          <Skeleton className="h-2.5 w-[78%] rounded" />
+          <p className="text-tiny text-default-500 mt-2">章節時間軸</p>
+          <Skeleton className="h-2 w-full rounded-full" />
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function GenericMockup({ title, brief }: { title: string; brief: string }) {
+  return (
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader icon={faNewspaper} label="輸出" />
+      <Card shadow="lg" radius="lg" className="border border-divider">
+        <CardBody className="p-6 gap-3">
+          <h2 className="text-medium font-semibold">{title}</h2>
+          {brief ? <p className="text-small text-default-500">{brief}</p> : null}
+          <Divider />
+          <Skeleton className="h-3 w-full rounded" />
+          <Skeleton className="h-3 w-[92%] rounded" />
+          <Skeleton className="h-3 w-[80%] rounded" />
+          <Skeleton className="h-3 w-[68%] rounded" />
+        </CardBody>
+      </Card>
     </div>
   );
 }
