@@ -224,10 +224,10 @@ export default function BoardroomPage() {
           <BreadcrumbItem>Boardroom · 比稿</BreadcrumbItem>
         </Breadcrumbs>
 
-        <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider">
+        <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider">
           BOARDROOM
         </Chip>
-        <h1 className="font-semibold text-2xl tracking-tight leading-tight">
+        <h1 className="font-semibold text-3xl tracking-tight leading-tight">
           邀請顧問為您比稿
         </h1>
         <p className="text-tiny text-default-500">
@@ -236,7 +236,7 @@ export default function BoardroomPage() {
 
         {currentBrand && (
           <Chip
-            size="md" variant="flat" color="secondary" radius="md"
+            size="md" variant="flat" color="default" radius="md"
             className="w-full h-auto py-1.5 px-2"
             startContent={<FontAwesomeIcon icon={faBrain} className="ml-1" />}
             classNames={{ content: "flex items-center gap-1.5" }}
@@ -413,7 +413,7 @@ export default function BoardroomPage() {
         {candidates.length > 0 && (
           <div className="sticky bottom-0 p-3 bg-content1 border-t border-divider">
             <Button
-              color="secondary" size="lg" radius="lg"
+              color="default" size="lg" radius="lg"
               className="w-full font-medium"
               isDisabled={selected.size === 0 || anyPitchInFlight}
               isLoading={anyPitchInFlight}
@@ -474,7 +474,7 @@ function CandidateCard({
 }) {
   const statusChip = (() => {
     if (!pitched) return null;
-    if (pitchStatus === "working")   return <Chip size="sm" color="secondary" variant="flat" startContent={<Spinner size="sm" classNames={{ wrapper: "w-3 h-3 ml-1" }} />}>撰寫中</Chip>;
+    if (pitchStatus === "working")   return <Chip size="sm" color="default" variant="flat" startContent={<Spinner size="sm" classNames={{ wrapper: "w-3 h-3 ml-1" }} />}>撰寫中</Chip>;
     if (pitchStatus === "delivered") return <Chip size="sm" color="success" variant="flat" startContent={<FontAwesomeIcon icon={faCircleCheck} className="text-tiny ml-1" />}>已交稿</Chip>;
     if (pitchStatus === "failed")    return <Chip size="sm" color="danger" variant="flat" startContent={<FontAwesomeIcon icon={faTriangleExclamation} className="text-tiny ml-1" />}>失敗</Chip>;
     return <Chip size="sm" variant="flat">排隊中</Chip>;
@@ -496,7 +496,7 @@ function CandidateCard({
         {selected && !pitched && (
           <Badge
             content={<FontAwesomeIcon icon={faCheck} className="text-tiny" />}
-            color="secondary" placement="top-right" shape="circle"
+            color="default" placement="top-right" shape="circle"
             className="absolute -top-1 -right-1"
           >
             <span className="w-1 h-1" />
@@ -518,7 +518,7 @@ function CandidateCard({
         </div>
         {c.squadName && (
           <Chip
-            size="sm" variant="flat" color="secondary"
+            size="sm" variant="flat" color="default"
             startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
             classNames={{ content: "truncate max-w-[200px]" }}
           >
@@ -528,7 +528,7 @@ function CandidateCard({
         {c.matchReasons.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {c.matchReasons.slice(0, 3).map((r, i) => (
-              <Chip key={i} size="sm" variant="flat" color="warning" classNames={{ content: "text-tiny" }}>
+              <Chip key={i} size="sm" variant="flat" color="default" classNames={{ content: "text-tiny" }}>
                 {r}
               </Chip>
             ))}
@@ -586,7 +586,7 @@ function PitchCard({
             <p className="text-tiny text-default-500">{c.title}</p>
             {c.squadName && (
               <Chip
-                size="sm" variant="flat" color="secondary"
+                size="sm" variant="flat" color="default"
                 startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
                 className="mt-1.5 max-w-full"
                 classNames={{ content: "truncate" }}
