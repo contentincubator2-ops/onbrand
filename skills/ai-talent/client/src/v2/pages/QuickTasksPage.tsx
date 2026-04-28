@@ -821,20 +821,12 @@ function AgentCard({
       {/* Body */}
       <div className="flex-1 min-w-0">
         <div className={`flex items-center justify-between px-4 py-3 border-b gap-2 ${onDark ? "border-[#2C2C32]" : "border-divider"}`}>
-          <User
-            name={agent.name}
-            description={`${agent.role} · ${agent.skill}`}
-            avatarProps={{
-              src: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(agent.name)}`,
-              size: "sm",
-              isBordered: true,
-              color: agent.tone === "orchestrate" ? "secondary" : agent.tone === "research" ? "primary" : agent.tone === "analyze" ? "primary" : agent.tone === "write" ? "danger" : "warning",
-            }}
-            classNames={{
-              name: `text-small font-medium ${onDark ? "text-white" : ""}`,
-              description: `text-tiny ${onDark ? "text-white/50" : "text-default-500"}`,
-            }}
-          />
+          <div className="min-w-0">
+            <p className={`text-small font-medium truncate ${onDark ? "text-white" : ""}`}>{agent.name}</p>
+            <p className={`text-tiny truncate ${onDark ? "text-white/50" : "text-default-500"}`}>
+              {agent.role} · {agent.skill}
+            </p>
+          </div>
           <div className="shrink-0">{statusChip}</div>
         </div>
 
