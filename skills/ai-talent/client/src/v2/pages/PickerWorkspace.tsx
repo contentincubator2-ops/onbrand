@@ -25,8 +25,9 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
-import { inferMockupVariant, getVariantsForPlatform, type MockupVariant } from "../lib/inferMockup";
+import { inferMockupVariant, getVariantsForPlatform, inferStepKind, type MockupVariant } from "../lib/inferMockup";
 import { PlatformMockup } from "../components/PlatformMockup";
+import { DocMockup } from "../components/PlatformMockup/doc";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
 import {
   Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
@@ -1359,13 +1360,37 @@ function SquadDetailPanel({
           </div>
         )}
         <div className="flex-1 flex items-start justify-center p-6 lg:p-10">
-          <PlatformMockup
-            variant={previewVariant}
-            title={missionTitle || name}
-            brief={missionBrief || (description ?? "")}
-            brandName={brandName}
-            steps={steps}
-          />
+          {(() => {
+            // Post-launch: switch middle based on active step kind
+            if (missionId && stepsArr[activeStepOrder - 1]) {
+              const activeStep = stepsArr[activeStepOrder - 1];
+              const kind = inferStepKind(activeStep);
+              const prog = progressByOrd.get(activeStepOrder);
+              if (kind === "strategic") {
+                return (
+                  <DocMockup
+                    title={missionTitle || name}
+                    brief={missionBrief || (description ?? "")}
+                    brandName={brandName}
+                    stepName={activeStep.name ?? activeStep.title ?? `Step ${activeStepOrder}`}
+                    agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
+                    body={prog?.agentOutput ?? prog?.agent_output ?? null}
+                    status={prog?.status ?? "pending"}
+                  />
+                );
+              }
+              // content step: fall through to platform mockup
+            }
+            return (
+              <PlatformMockup
+                variant={previewVariant}
+                title={missionTitle || name}
+                brief={missionBrief || (description ?? "")}
+                brandName={brandName}
+                steps={steps}
+              />
+            );
+          })()}
         </div>
       </section>
 

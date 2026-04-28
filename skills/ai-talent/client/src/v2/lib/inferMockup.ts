@@ -270,3 +270,36 @@ const PLATFORM_TOP_VARIANTS: Record<Platform, Format[]> = {
 export function getVariantsForPlatform(platform: Platform): MockupVariant[] {
   return PLATFORM_TOP_VARIANTS[platform].map((f) => variant(platform, f));
 }
+
+/**
+ * Classify a squad step as "strategic" (research / analysis /
+ * brand context / framework — should render as a Word doc) vs
+ * "content" (caption / image / hashtag — should render as the
+ * platform mockup).
+ */
+export type StepKind = "strategic" | "content";
+
+const STRATEGIC_KEYWORDS = [
+  "research", "researcher", "analysis", "analyst", "audit",
+  "swot", "persona", "icp", "brand", "context", "interview",
+  "competitor", "competitive", "strategy", "strategic", "plan",
+  "planning", "brief", "outline", "framework", "insight",
+  "positioning", "methodology", "doc", "document", "report",
+  "scorecard", "matrix", "mapping", "journey",
+  // zh
+  "研究", "分析", "策略", "框架", "計畫", "計劃", "報告",
+  "訪談", "競品", "定位", "脈絡", "洞察", "矩陣", "藍圖",
+  "規劃", "盤點", "稽核",
+];
+
+export function inferStepKind(step: any): StepKind {
+  if (!step) return "content";
+  const haystack = [
+    step.outputType, step.output, step.name, step.title,
+    step.skill, step.assignedAgentName, step.role,
+    typeof step.description === "string" ? step.description : "",
+    Array.isArray(step.requiredSkills) ? step.requiredSkills.join(" ") : "",
+  ].filter(Boolean).join(" ").toLowerCase();
+  if (!haystack) return "content";
+  return STRATEGIC_KEYWORDS.some((kw) => haystack.includes(kw)) ? "strategic" : "content";
+}
