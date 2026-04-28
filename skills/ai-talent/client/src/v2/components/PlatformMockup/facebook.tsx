@@ -255,3 +255,108 @@ function RailIcon({ icon, count }: { icon: any; count?: string }) {
     </div>
   );
 }
+
+/* ─────────────── FB Ad (feed + Sponsored + CTA) ─────────────── */
+
+export function FBAd({ title, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <User
+            name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
+            description={
+              <span className="text-tiny text-default-500 flex items-center gap-1">
+                贊助 · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
+              </span>
+            }
+            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+          />
+        </div>
+        <div className="px-4 py-2">
+          <p className="text-small">{title}</p>
+          <p className="text-tiny text-default-500 mt-1">立即購買，限時 9 折優惠 →</p>
+        </div>
+        <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
+          <Skeleton className="absolute inset-0" />
+          <div className="text-center relative z-10">
+            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
+            <p className="text-tiny">廣告主圖 · 等待 craft agent</p>
+          </div>
+        </div>
+        {/* CTA bar (FB ad signature) */}
+        <div className="px-4 py-2.5 bg-default-100 border-y border-divider flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-tiny text-default-500 uppercase tracking-wider">YOUR-BRAND.COM</p>
+            <p className="text-small font-semibold truncate">立即購買 · 限時優惠</p>
+          </div>
+          <Button color="default" size="sm" radius="md" className="bg-default-200 font-semibold ml-2">
+            選購
+          </Button>
+        </div>
+        <div className="px-4 py-2 flex items-center justify-between text-default-500 text-tiny">
+          <span>👍❤️🎉 12K</span>
+          <span>456 留言 · 89 分享</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── FB Carousel Ad (multi-card horizontal scroll) ─────────────── */
+
+export function FBCarousel({ title, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <User
+            name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
+            description={<span className="text-tiny text-default-500">贊助 · 輪播廣告</span>}
+            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+          />
+        </div>
+        <div className="px-4 py-2">
+          <p className="text-small">{title}</p>
+        </div>
+        {/* Carousel: 3 cards visible side-by-side, 4th peeking */}
+        <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="shrink-0 w-[170px] border border-divider rounded-medium overflow-hidden bg-content1">
+              <div className="aspect-square bg-default-100 relative flex items-center justify-center">
+                <Skeleton className="absolute inset-0" />
+                <FontAwesomeIcon icon={faImages} className="relative z-10 text-default-400 text-2xl" />
+              </div>
+              <div className="p-2 space-y-1">
+                <p className="text-tiny font-semibold leading-tight line-clamp-2">商品 {i + 1}</p>
+                <p className="text-tiny text-default-500">NT$ 1,234</p>
+                <Button size="sm" radius="sm" color="default" className="w-full text-tiny h-6 bg-default-200 font-semibold">
+                  選購
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Carousel dots */}
+        <div className="flex items-center justify-center gap-1 pb-2">
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className={`rounded-full w-1.5 h-1.5 ${i === 0 ? "bg-primary" : "bg-default-300"}`} />
+          ))}
+        </div>
+        <div className="px-4 py-1 border-t border-divider flex items-center justify-around text-default-700 text-small">
+          <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
+            <FontAwesomeIcon icon={faThumbsUp} /> 讚
+          </button>
+          <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
+            <FontAwesomeIcon icon={faComment} /> 留言
+          </button>
+          <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
+            <FontAwesomeIcon icon={faShare} /> 分享
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

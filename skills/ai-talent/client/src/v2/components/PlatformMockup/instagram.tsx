@@ -21,7 +21,7 @@ import { faInstagram } from "@fortawesome/free-brands-svg-icons";
 import {
   faHeart, faComment, faPaperPlane, faBookmark, faImages, faCircleCheck,
   faMusic, faChevronLeft, faXmark, faVolumeHigh, faTableCellsLarge,
-  faVideo, faTag, faUserGroup,
+  faVideo, faTag, faUserGroup, faEye, faShoppingBag,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
@@ -344,6 +344,120 @@ export function IGProfile({ brandName, variantLabel }: MockupFields) {
               <FontAwesomeIcon icon={faImages} className="relative z-10 text-default-300" />
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── IG Live (9:16 + LIVE chip + viewers + chat) ─────────────── */
+
+export function IGLive({ title, brandName, variantLabel }: MockupFields) {
+  const handle = handleOf(brandName);
+  return (
+    <div className="w-full max-w-[280px] mx-auto">
+      <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
+      <div className="relative bg-default-900 rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
+        {/* Top: LIVE badge + viewer count + close */}
+        <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 text-white">
+          <div className="flex items-center gap-2">
+            <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase">LIVE</span>
+            <span className="bg-black/40 backdrop-blur-sm text-tiny px-2 py-0.5 rounded flex items-center gap-1">
+              <FontAwesomeIcon icon={faEye} className="text-tiny" /> 1.2K
+            </span>
+          </div>
+          <FontAwesomeIcon icon={faXmark} className="text-medium" />
+        </div>
+        {/* Host info top-left */}
+        <div className="absolute top-12 left-3 z-10 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full pl-1 pr-2 py-0.5">
+          <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={24} />
+          <span className="text-white text-tiny font-semibold">{handle}</span>
+          <button className="bg-white text-black text-tiny font-bold px-2 py-0.5 rounded-full">追蹤</button>
+        </div>
+        {/* Video placeholder */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Skeleton className="absolute inset-0 opacity-30" />
+          <div className="relative z-10 text-center text-white/60">
+            <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
+            <p className="text-tiny">直播中 · 等待 craft agent</p>
+          </div>
+        </div>
+        {/* Floating chat bubbles bottom-left */}
+        <div className="absolute bottom-16 left-3 z-10 space-y-1.5 max-w-[60%]">
+          {["太精彩了!", "什麼時候下一場?", "❤️❤️❤️"].map((m, i) => (
+            <div key={i} className="bg-black/50 backdrop-blur-sm text-white text-tiny px-2 py-1 rounded-medium">
+              <span className="font-semibold">user_{i+1}</span> {m}
+            </div>
+          ))}
+        </div>
+        {/* Bottom: comment input + reactions */}
+        <div className="absolute bottom-3 inset-x-3 z-10 flex items-center gap-2">
+          <div className="flex-1 bg-white/15 border border-white/30 rounded-full px-3 py-1.5 text-tiny text-white/70">
+            傳訊息…
+          </div>
+          <FontAwesomeIcon icon={faHeart} className="text-white text-medium" />
+          <FontAwesomeIcon icon={faPaperPlane} className="text-white text-medium" />
+        </div>
+        {/* Title overlay (small) */}
+        <div className="absolute top-20 inset-x-3 z-10 text-white text-tiny opacity-80 line-clamp-2">{title}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── IG Ad (feed + Sponsored + CTA bar) ─────────────── */
+
+export function IGAd({ title, brandName, variantLabel }: MockupFields) {
+  const handle = handleOf(brandName);
+  return (
+    <div className="w-full max-w-[420px] mx-auto">
+      <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="flex items-center justify-between px-3 py-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Avatar src={dicebear(brandName ?? "brand")} size="sm" isBordered color="default" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 text-[0.84rem] font-semibold leading-tight truncate">
+                {handle}
+                <FontAwesomeIcon icon={faCircleCheck} className="text-[0.66rem] text-primary" />
+              </div>
+              <p className="text-tiny text-default-500 truncate leading-tight">贊助 · Sponsored</p>
+            </div>
+          </div>
+          <span className="text-medium tracking-tighter">⋯</span>
+        </div>
+        <div className="relative aspect-square bg-default-100">
+          <Skeleton className="absolute inset-0" />
+          <div className="absolute inset-0 flex items-center justify-center text-default-400">
+            <div className="text-center">
+              <FontAwesomeIcon icon={faShoppingBag} className="text-4xl mb-2" />
+              <p className="text-tiny">廣告主圖 · 等待 craft agent</p>
+            </div>
+          </div>
+        </div>
+        {/* CTA bar — distinguishes ad from feed */}
+        <div className="px-3 py-2.5 border-y border-divider bg-default-50 flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-tiny text-default-500">your-brand.com</p>
+            <p className="text-small font-semibold truncate">立即購買 · 限時優惠</p>
+          </div>
+          <FontAwesomeIcon icon={faChevronLeft} className="rotate-180 text-default-500 shrink-0 ml-2" />
+        </div>
+        <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-4 text-foreground">
+            <FontAwesomeIcon icon={faHeart} className="text-[1.4rem]" />
+            <FontAwesomeIcon icon={faComment} className="text-[1.35rem]" />
+            <FontAwesomeIcon icon={faPaperPlane} className="text-[1.35rem]" />
+          </div>
+          <FontAwesomeIcon icon={faBookmark} className="text-[1.4rem] text-foreground" />
+        </div>
+        <div className="px-3 pb-3 text-[0.82rem] leading-snug">
+          <span className="font-semibold mr-1.5">{handle}</span>
+          <span>{title}</span>
+          <div className="mt-1.5 space-y-1">
+            <Skeleton className="h-2.5 w-[88%] rounded" />
+            <Skeleton className="h-2.5 w-[70%] rounded" />
+          </div>
         </div>
       </div>
     </div>

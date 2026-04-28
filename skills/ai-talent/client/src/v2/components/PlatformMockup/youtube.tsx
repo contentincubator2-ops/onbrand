@@ -234,3 +234,92 @@ function VerticalActionItem({ icon, count }: { icon: any; count: string }) {
     </div>
   );
 }
+
+/* ─────────────── YT Premiere (countdown overlay) ─────────────── */
+
+export function YTPremiere({ title, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[640px] mx-auto">
+      <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="relative aspect-video bg-black flex items-center justify-center">
+          <Skeleton className="absolute inset-0 opacity-40" />
+          {/* Premiere chip top-left */}
+          <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+            <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase">首播</span>
+            <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">即將開始</span>
+          </div>
+          {/* Countdown center */}
+          <div className="relative z-10 text-center text-white">
+            <p className="text-tiny uppercase tracking-wider opacity-80 mb-1">距離首播</p>
+            <p className="text-4xl font-bold tabular-nums tracking-tight">02:14:35</p>
+            <p className="text-tiny opacity-80 mt-2">提醒我 + 設定通知</p>
+          </div>
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">12:34</div>
+        </div>
+        <div className="p-4 space-y-2">
+          <p className="text-medium font-semibold leading-snug line-clamp-2">{title}</p>
+          <User
+            name={<span className="text-small">{brandName ?? "Your Channel"}</span>}
+            description={<span className="text-tiny text-default-500">12K 訂閱者 · 1.2K 人在等待</span>}
+            avatarProps={{ src: dicebear(brandName ?? "channel"), size: "sm" }}
+          />
+          <div className="flex gap-2 pt-1">
+            <Button color="danger" size="sm" radius="full" className="flex-1">設定提醒</Button>
+            <Button variant="bordered" size="sm" radius="full" className="flex-1">分享</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── YT Live (LIVE chip + viewers + chat panel) ─────────────── */
+
+export function YTLive({ title, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[640px] mx-auto">
+      <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="relative aspect-video bg-black flex items-center justify-center">
+          <div className="text-white/50 text-center relative z-10">
+            <FontAwesomeIcon icon={faVideo} className="text-5xl mb-2" />
+            <p className="text-tiny">直播中 · 等待 craft agent</p>
+          </div>
+          {/* LIVE chip top-left */}
+          <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+            <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
+            </span>
+            <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">2,345 人觀看</span>
+          </div>
+          <Button isIconOnly radius="full" size="lg" color="danger" className="absolute opacity-90" aria-label="watch">
+            <FontAwesomeIcon icon={faPlay} />
+          </Button>
+        </div>
+        {/* Live chat preview */}
+        <div className="px-4 py-2.5 border-b border-divider bg-default-50 space-y-1 max-h-32 overflow-hidden">
+          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">即時聊天</p>
+          {[
+            { user: "viewer_1", msg: "終於開播了!" },
+            { user: "viewer_2", msg: "音質很棒 👍" },
+            { user: "viewer_3", msg: "❤️❤️❤️" },
+          ].map((c, i) => (
+            <p key={i} className="text-tiny">
+              <span className="font-semibold mr-1.5">{c.user}</span>
+              {c.msg}
+            </p>
+          ))}
+        </div>
+        <div className="p-4 space-y-2">
+          <p className="text-medium font-semibold leading-snug line-clamp-2">{title}</p>
+          <User
+            name={<span className="text-small">{brandName ?? "Your Channel"}</span>}
+            description={<span className="text-tiny text-default-500">12K 訂閱者 · 直播中</span>}
+            avatarProps={{ src: dicebear(brandName ?? "channel"), size: "sm" }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -10,7 +10,7 @@
  *   - document:   Flowbite Carousel of PDF page thumbnails
  */
 import React from "react";
-import { Avatar, Button, Divider, Skeleton, User } from "@heroui/react";
+import { Avatar, Button, Chip, Divider, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLinkedin } from "@fortawesome/free-brands-svg-icons";
 import {
@@ -286,6 +286,150 @@ export function LIDocument({ title, brandName, variantLabel }: MockupFields) {
               <FontAwesomeIcon icon={b.icon} /> {b.label}
             </button>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── LI Native Video (feed + video player) ─────────────── */
+
+export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[540px] mx-auto">
+      <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 py-3">
+          <User
+            name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
+            description={<span className="text-tiny text-default-500">追蹤者 1,234 · 1 小時前 · 🌐</span>}
+            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+          />
+        </div>
+        <div className="px-4 pb-3 space-y-2">
+          <p className="text-small">{title}</p>
+          <Skeleton className="h-2.5 w-[88%] rounded" />
+          <Skeleton className="h-2.5 w-[72%] rounded" />
+        </div>
+        {/* Video player */}
+        <div className="relative aspect-video bg-black flex items-center justify-center">
+          <div className="text-white/50 text-tiny">影片載入中…</div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+              <span className="ml-1 text-foreground text-xl">▶</span>
+            </span>
+          </div>
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">3:45</div>
+          {/* Caption indicator */}
+          <div className="absolute top-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">CC</div>
+          {/* Play progress bar */}
+          <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20">
+            <div className="h-full w-1/4 bg-primary" />
+          </div>
+        </div>
+        <div className="px-4 py-2 flex items-center justify-between text-tiny text-default-500">
+          <span>👍❤️💡 1,234 · 12K 次觀看</span>
+          <span>87 留言 · 23 次轉發</span>
+        </div>
+        <Divider />
+        <div className="px-2 py-1 flex items-center justify-around text-default-700 text-small">
+          {[
+            { icon: faThumbsUp, label: "讚" },
+            { icon: faComment, label: "留言" },
+            { icon: faShareNodes, label: "轉發" },
+            { icon: faPaperPlane, label: "傳送" },
+          ].map((b, i) => (
+            <button key={i} className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
+              <FontAwesomeIcon icon={b.icon} /> {b.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── LI Ad (feed + Promoted + CTA) ─────────────── */
+
+export function LIAd({ title, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[540px] mx-auto">
+      <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 py-3">
+          <User
+            name={
+              <span className="flex items-center gap-1.5">
+                <span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>
+              </span>
+            }
+            description={
+              <span className="text-tiny text-default-500">推廣 · Promoted · 1.2K 位追蹤者</span>
+            }
+            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+          />
+        </div>
+        <div className="px-4 pb-3 space-y-2">
+          <p className="text-small">{title}</p>
+          <Skeleton className="h-2.5 w-[90%] rounded" />
+        </div>
+        <div className="aspect-[1.91/1] bg-default-100 flex items-center justify-center text-default-400 relative">
+          <Skeleton className="absolute inset-0" />
+          <div className="text-center relative z-10">
+            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
+            <p className="text-tiny">廣告主圖 · 等待 craft agent</p>
+          </div>
+        </div>
+        {/* CTA bar */}
+        <div className="px-4 py-3 bg-default-50 border-y border-divider flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-small font-semibold truncate">下載白皮書</p>
+            <p className="text-tiny text-default-500 truncate">your-brand.com</p>
+          </div>
+          <Button color="primary" size="sm" radius="full" className="font-medium ml-2">了解更多</Button>
+        </div>
+        <div className="px-4 py-2 flex items-center justify-between text-tiny text-default-500">
+          <span>👍❤️💡 234</span>
+          <span>12 留言 · 5 次轉發</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── LI Event (event card + RSVP) ─────────────── */
+
+export function LIEvent({ title, brief, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="aspect-[2.5/1] bg-default-100 flex items-center justify-center relative">
+          <Skeleton className="absolute inset-0" />
+          <div className="relative z-10 text-center text-default-400">
+            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
+            <p className="text-tiny">活動封面 · 等待 craft agent</p>
+          </div>
+        </div>
+        <div className="px-5 pt-4 pb-3 space-y-2">
+          <Chip size="sm" variant="flat" color="primary" className="uppercase tracking-wider">
+            線上活動
+          </Chip>
+          <p className="text-tiny font-bold uppercase tracking-wider text-primary">5 月 15 日 (四) · 10:00 PM</p>
+          <h3 className="text-medium font-bold leading-snug">{title}</h3>
+          <div className="flex items-center gap-2 text-tiny text-default-500">
+            <Avatar src={dicebear(brandName ?? "brand")} size="sm" />
+            <span>{brandName ?? "Your Brand"} · 主辦</span>
+          </div>
+          {brief && <p className="text-tiny text-default-500 line-clamp-2">{brief}</p>}
+          <div className="flex items-center gap-2 pt-1 text-tiny text-default-500">
+            <span><FontAwesomeIcon icon={faThumbsUp} /> 1,234 位有興趣</span>
+            <span>· 234 位將參加</span>
+          </div>
+        </div>
+        <div className="px-5 pb-4 flex gap-2">
+          <Button color="primary" size="sm" radius="full" className="flex-1 font-medium">參加</Button>
+          <Button variant="bordered" size="sm" radius="full" className="flex-1">分享</Button>
         </div>
       </div>
     </div>
