@@ -26,6 +26,8 @@ import {
   CardHeader, Chip, Divider, Input, Progress, ScrollShadow, Skeleton, Spinner,
   Textarea, Tooltip, User,
 } from "@heroui/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRight, faBookOpen, faBrain, faCheck, faCircleCheck, faComments,
@@ -80,21 +82,11 @@ function ProviderChip({ provider, model }: { provider: string; model: string }) 
 const dicebear = (name: string) =>
   `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
 
-function parsePitch(md: string) {
-  const out = { problem: "", steps: "", deliverables: "", differentiator: "" };
-  if (!md) return out;
-  const sections = md.split(/^##\s+/m).slice(1);
-  for (const s of sections) {
-    const [head, ...body] = s.split("\n");
-    const text = body.join("\n").trim();
-    const h = (head || "").trim();
-    if (h.includes("看見") || h.includes("問題") || h.includes("診斷")) out.problem = text;
-    else if (h.includes("這樣做") || h.includes("步驟")) out.steps = text;
-    else if (h.includes("交付") || h.includes("第一週")) out.deliverables = text;
-    else if (h.includes("為什麼選我") || h.includes("選我") || h.includes("獨特")) out.differentiator = text;
-  }
-  return out;
-}
+// parsePitch removed (PR8) — LLM output rarely matches the 4-heading
+// schema we tried to enforce; it was producing **1. ... **2. ...** style
+// numbered bold lists that left half the grid empty + text overflow.
+// We now render the full proposal as markdown, letting ReactMarkdown +
+// prose styles handle headings / lists / bold naturally.
 
 /* ─── Page ─────────────────────────────────────────────────────────── */
 
@@ -520,7 +512,6 @@ function PitchCard({ candidate: c, state }: { candidate: Candidate; state: Pitch
   const isWorking = state.status === "queued" || state.status === "working";
   const isFailed = state.status === "failed";
   const p = state.pitch;
-  const parsed = useMemo(() => p ? parsePitch(p.proposal || "") : null, [p]);
 
   return (
     <Card shadow="sm" radius="lg" className="border border-divider">
@@ -588,14 +579,27 @@ function PitchCard({ candidate: c, state }: { candidate: Candidate; state: Pitch
           </Card>
         )}
 
-        {state.status === "delivered" && p && parsed && !p.error && (
+        {state.status === "delivered" && p && !p.error && (
           <ScrollShadow className="max-h-[600px]">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <PitchSection title="我看見的問題"   color="danger"    body={parsed.problem} />
-              <PitchSection title="我會這樣做"     color="primary"   body={parsed.steps} />
-              <PitchSection title="第一週可交付"   color="warning"   body={parsed.deliverables} />
-              <PitchSection title="為什麼選我"     color="secondary" body={parsed.differentiator} />
-            </div>
+            <article
+              className={[
+                "prose prose-sm max-w-none",
+                "prose-headings:tracking-tight prose-headings:font-semibold",
+                "prose-h1:text-xl prose-h1:mt-4 prose-h1:mb-2",
+                "prose-h2:text-large prose-h2:mt-5 prose-h2:mb-2 prose-h2:text-secondary",
+                "prose-h3:text-medium prose-h3:mt-4 prose-h3:mb-1.5",
+                "prose-p:leading-relaxed prose-p:text-foreground prose-p:my-2",
+                "prose-ul:my-2 prose-ol:my-2 prose-li:my-1",
+                "prose-strong:font-semibold prose-strong:text-foreground",
+                "prose-hr:my-4 prose-hr:border-divider",
+                "prose-blockquote:border-l-secondary prose-blockquote:text-default-600",
+                "prose-code:text-tiny prose-code:bg-default-100 prose-code:rounded prose-code:px-1",
+              ].join(" ")}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {p.proposal || ""}
+              </ReactMarkdown>
+            </article>
           </ScrollShadow>
         )}
       </CardBody>
@@ -629,27 +633,3 @@ function PitchCard({ candidate: c, state }: { candidate: Candidate; state: Pitch
   );
 }
 
-function PitchSection({
-  title, color, body,
-}: {
-  title: string;
-  color: "primary" | "secondary" | "warning" | "danger";
-  body: string;
-}) {
-  const borderClass = {
-    primary: "border-l-primary",
-    secondary: "border-l-secondary",
-    warning: "border-l-warning",
-    danger: "border-l-danger",
-  }[color];
-  return (
-    <div className={`border-l-4 ${borderClass} pl-4`}>
-      <Chip size="sm" color={color} variant="flat" className="uppercase tracking-wider mb-2">
-        {title}
-      </Chip>
-      <p className="text-small leading-relaxed whitespace-pre-wrap text-foreground">
-        {body || <span className="text-default-400">（尚無內容）</span>}
-      </p>
-    </div>
-  );
-}
