@@ -714,6 +714,8 @@ async function main() {
       { table: "agents", name: "name_zh",        type: "VARCHAR(128) NULL" },
       { table: "agents", name: "title_zh",       type: "VARCHAR(255) NULL" },
       { table: "agents", name: "bio_zh",         type: "TEXT NULL" },
+      { table: "squads", name: "name_zh",        type: "VARCHAR(255) NULL" },
+      { table: "squads", name: "description_zh", type: "TEXT NULL" },
     ]) {
       const [r]: any = await conn.execute(`
         SELECT COLUMN_NAME FROM information_schema.COLUMNS

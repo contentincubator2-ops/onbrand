@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'skills | agents | all'
+        description: 'skills | agents | squads | all'
         required: false
         default: 'skills'
       apply:

@@ -150,7 +150,8 @@ const KIND_LABELS = {
 // ── Squad → HomeEntity ─────────────────────────────────────────────────────
 async function fetchSquadEntities(): Promise<HomeEntity[]> {
   const [rows] = await localPool.execute(
-    `SELECT id, slug, name, description, agents, steps,
+    `SELECT id, slug, name, name_zh, description, description_zh,
+            agents, steps,
             strategy_layer, methodology, workspace,
             task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind,
             hero_image_url, is_curated
@@ -176,8 +177,9 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
       ? `${methodologyRaw.author}${methodologyRaw.year ? ` · ${methodologyRaw.year}` : ""}`
       : (methodologyRaw?.summary ? fixMojibake(methodologyRaw.summary) : null);
 
-    const name = fixMojibake(pickName(r.name));
-    const description = fixMojibake(r.description) || null;
+    // Prefer zh-TW localized columns when populated.
+    const name = fixMojibake(pickName(r.name_zh ?? r.name));
+    const description = fixMojibake(r.description_zh ?? r.description) || null;
     const stepCount   = Array.isArray(steps)   ? steps.length   : 0;
     const memberCount = Array.isArray(members) ? members.length : 0;
     const stats = [

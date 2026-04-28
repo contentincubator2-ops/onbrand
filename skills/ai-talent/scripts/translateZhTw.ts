@@ -31,7 +31,7 @@ const arg = (n: string) => {
   const a = args.find((x) => x.startsWith(`--${n}=`));
   return a ? a.split("=").slice(1).join("=") : undefined;
 };
-const TARGET = (arg("target") ?? "all") as "skills" | "agents" | "all";
+const TARGET = (arg("target") ?? "all") as "skills" | "agents" | "squads" | "all";
 const LIMIT = arg("limit") ? parseInt(arg("limit")!, 10) : 0;
 const BATCH = arg("batch") ? parseInt(arg("batch")!, 10) : 20;
 const APPLY = args.includes("--apply");
@@ -222,6 +222,57 @@ async function translateAgents(pool: any) {
   console.log(`[agents] done: ${ok} ok, ${fail} fail`);
 }
 
+async function translateSquads(pool: any) {
+  const where = "is_active = 1 AND (name_zh IS NULL OR name_zh = '' OR description_zh IS NULL OR description_zh = '')";
+  const limitSql = LIMIT ? `LIMIT ${LIMIT}` : "";
+  const [rows]: any = await pool.execute(
+    `SELECT id, name, description FROM squads WHERE ${where} ORDER BY id ASC ${limitSql}`
+  );
+  const all: { id: number; name: string; description: string | null }[] = rows;
+  console.log(`[squads] ${all.length} rows to localize`);
+  if (all.length === 0) return;
+
+  let ok = 0, fail = 0;
+  for (let i = 0; i < all.length; i += BATCH) {
+    const chunk = all.slice(i, i + BATCH).map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: (r.description ?? "").slice(0, 360),
+    }));
+    process.stdout.write(`[squads] ${i + 1}-${i + chunk.length}/${all.length} ... `);
+    let results: Record<string, string>[];
+    try {
+      results = await callAzure(
+        SYSTEM_PROMPT,
+        chunk,
+        ["name_zh (≤24 chars)", "description_zh (≤120 chars)"],
+      );
+    } catch (e: any) {
+      console.log(`FAIL ${e.message}`);
+      fail += chunk.length;
+      continue;
+    }
+    if (!APPLY) {
+      console.log(`[dry] sample:`, results.slice(0, 2));
+      ok += chunk.length;
+      continue;
+    }
+    for (const r of results) {
+      const id = Number(r.id);
+      if (!id) continue;
+      try {
+        await pool.execute(
+          `UPDATE squads SET name_zh = ?, description_zh = ? WHERE id = ?`,
+          [(r as any).name_zh ?? null, (r as any).description_zh ?? null, id]
+        );
+        ok++;
+      } catch (e: any) { fail++; }
+    }
+    console.log(`ok ${ok} / fail ${fail}`);
+  }
+  console.log(`[squads] done: ${ok} ok, ${fail} fail`);
+}
+
 async function main() {
   const pool = getPool();
   console.log(`===== translateZhTw =====`);
@@ -232,6 +283,7 @@ async function main() {
   console.log(`batch:    ${BATCH}\n`);
 
   if (TARGET === "skills" || TARGET === "all") await translateSkills(pool);
+  if (TARGET === "squads" || TARGET === "all") await translateSquads(pool);
   if (TARGET === "agents" || TARGET === "all") {
     // sowork_db is on a different connection — translateAgents needs its own pool
     // Use the same pool here only if both tables live in the same DB. In our setup
