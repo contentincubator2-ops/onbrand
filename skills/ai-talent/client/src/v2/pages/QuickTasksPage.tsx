@@ -5,7 +5,7 @@
  *   1. 頂部自由輸入 → 自動 route 到 squad
  *   2. 任務牆：squad tile grid，編號 + 成員頭像
  *   3. 點選後 inline run panel：左 brief / 右 pipeline，stage 並行 → handoff →
- *      orchestrator 黑卡收尾 → 紫框 final deliverable → 派發到媒體中心
+ *      orchestrator 黑卡收尾 → 紫框 final deliverable → 複製全文
  *
  * v2 polish steals from v0 / Lovable / Bolt：overall progress bar，stage
  * counter chip，soft glow on active stage，Spinner-driven working state，
@@ -893,23 +893,6 @@ function useElapsed(startedAt: number | null) {
 function FinalDeliverable({
   result, finalKind,
 }: { result: AgentResult; finalKind: TaskMeta["finalKind"] }) {
-  const sendToMediaHub = () => {
-    try {
-      sessionStorage.setItem(
-        "media-hub-pending-asset",
-        JSON.stringify({
-          id: `qt-${result.taskId}-${Date.now()}`,
-          source: "quick-task",
-          title: `${result.agentRole} · ${result.taskId}`,
-          content: result.output,
-        })
-      );
-      window.location.href = "/media?from=quick-task";
-    } catch {
-      window.location.href = "/media";
-    }
-  };
-
   return (
     <Card
       shadow="lg" radius="lg"
@@ -938,13 +921,6 @@ function FinalDeliverable({
               BRAND BRAIN
             </Chip>
           )}
-          <Button
-            color="secondary" size="sm" radius="sm"
-            onPress={sendToMediaHub}
-            startContent={<FontAwesomeIcon icon={faPaperPlane} />}
-          >
-            派發到媒體中心
-          </Button>
           <CopyButton text={result.output} />
         </div>
       </CardHeader>

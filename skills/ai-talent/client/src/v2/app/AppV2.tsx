@@ -41,7 +41,6 @@ import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
 import BoardroomPage from "../pages/BoardroomPage";
-import MediaHubPage from "../pages/MediaHubPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
 
 export default function AppV2() {
@@ -89,7 +88,6 @@ export default function AppV2() {
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/ai" element={<QuickTasksPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
-          <Route path="/media" element={<MediaHubPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />

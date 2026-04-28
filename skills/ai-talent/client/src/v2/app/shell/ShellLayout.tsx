@@ -26,7 +26,7 @@ import { Avatar, Button, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles,
-  faMicrophone, faBookBookmark, faPhotoFilm, faEllipsis,
+  faMicrophone, faBookBookmark, faEllipsis,
   faChevronLeft, faChevronRight, faPlus, faBars, faRightFromBracket,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -156,7 +156,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/ai",         label: "AI 工具",  icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/boardroom",  label: "比稿",     icon: <FontAwesomeIcon icon={faMicrophone} /> },
   { to: "/playbooks",  label: "成長方案", icon: <FontAwesomeIcon icon={faBookBookmark} /> },
-  { to: "/media",      label: "媒體中心", icon: <FontAwesomeIcon icon={faPhotoFilm} /> },
 ];
 
 function Sidebar({
