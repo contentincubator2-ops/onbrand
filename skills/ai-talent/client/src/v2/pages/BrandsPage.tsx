@@ -197,55 +197,77 @@ export default function BrandsPage() {
       })
     : null;
 
-  // Pipeline tick: when running, advance through steps with timed
-  // thinking → write → next jump cadence. Phase 6 will replace the
-  // mock thinking + conclusion with real LLM streams.
+  // Phase 6 — call pipeline.runStep tRPC, server hits OpenClaw gateway
+  // (web_search) until budget met, persists conclusion + sources scoped
+  // to the active id, returns { thinking, conclusion, sources }. Client
+  // shows the returned thinking via ThinkingOverlay typewriter, then
+  // advances. Mock fallback remains if mutation isn't available yet.
+  const runStepMutation = (trpc as any).pipeline?.runStep?.useMutation
+    ? (trpc as any).pipeline.runStep.useMutation()
+    : null;
+  const [liveThinking, setLiveThinking] = useState<string | null>(null);
+
   React.useEffect(() => {
     if (pipeline.status !== "running") return;
     const step = pipelineSteps[pipeline.cursor];
     if (!step) {
       setPipeline((p) => ({ ...p, status: "done" }));
+      setLiveThinking(null);
       return;
     }
     // Auto-jump sub-nav to this step's target segment.
     setSection(step.segmentTarget);
-    // Mock streaming duration ≈ thinking text length / 35 cps + 1.5s write hold.
-    const cps = 35;
-    const typingMs = (step.mockThinking.length / cps) * 1000;
-    const totalMs = typingMs + 1500;
-    const timer = setTimeout(async () => {
-      // Write the conclusion to DB (skip the internal cache step 2).
-      if (step.segmentId !== "_valueElements" && targetId && scopeMode !== "none" && saveMutation) {
-        // Need to merge conclusion into existing positioning. We don't
-        // have the latest server snapshot in this scope; rely on
-        // scope.active query inside PositioningEditor for read. To
-        // write, fetch then merge — simplest: trust our local cache via
-        // savePositioning of full positioning. Phase 5e mock approach:
-        // save just this segment's value (server overwrites positioning JSON).
-        // For correctness we should merge — Phase 6 hardens this with
-        // a proper merge mutation. For now we update via segment-level
-        // save by reading current data from a query helper.
-        try {
-          const current = (utils?.scope?.active?.getData?.({
-            brandId: scopeMode === "brand" ? targetId : null,
-            productId: scopeMode === "product" ? targetId : null,
-            eventId: scopeMode === "event" ? targetId : null,
-          }) as any)?.[scopeMode]?.positioning ?? {};
-          const next = { ...current, [step.segmentId]: step.mockConclusion };
-          await saveMutation.mutateAsync({
-            kind: scopeMode as "brand" | "product" | "event",
-            id: targetId,
-            positioning: next,
-          });
-        } catch { /* swallow — mock mode */ }
-      }
+    setLiveThinking(null); // clear previous
+
+    let cancelled = false;
+    const advance = () => {
+      if (cancelled) return;
+      utils?.scope?.active?.invalidate?.();
       setPipeline((p) => ({
         ...p,
         cursor: p.cursor + 1,
         completed: [...p.completed, step.id],
       }));
-    }, totalMs);
-    return () => clearTimeout(timer);
+      setLiveThinking(null);
+    };
+
+    const runReal = async () => {
+      if (!targetId || scopeMode === "none" || !runStepMutation) return null;
+      try {
+        const res = await runStepMutation.mutateAsync({
+          kind: scopeMode as "brand" | "product" | "event",
+          id: targetId,
+          stepId: step.id,
+          segmentId: step.segmentId,
+          agent: step.agent,
+          title: step.title,
+          budget: step.researchBudget,
+        });
+        return res?.thinking ?? null;
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[pipeline] runStep failed, falling back to mock:", e);
+        return null;
+      }
+    };
+
+    (async () => {
+      // Real LLM call (may be slow — 20-60s incl. web search). Show
+      // mock thinking immediately so user sees activity while waiting.
+      setLiveThinking(step.mockThinking);
+      const realThinking = await runReal();
+      if (cancelled) return;
+      if (realThinking) {
+        setLiveThinking(realThinking); // restart typewriter with real text
+      }
+      // Wait for typewriter to roughly finish + 1.5s write hold.
+      const cps = 35;
+      const text = realThinking ?? step.mockThinking;
+      const typingMs = (text.length / cps) * 1000;
+      setTimeout(advance, typingMs + 1500);
+    })();
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipeline.status, pipeline.cursor]);
 
@@ -267,7 +289,7 @@ export default function BrandsPage() {
     pipeline.status === "running" && pipelineSteps[pipeline.cursor]
       ? {
           segmentTarget: pipelineSteps[pipeline.cursor]!.segmentTarget,
-          text: pipelineSteps[pipeline.cursor]!.mockThinking,
+          text: liveThinking ?? pipelineSteps[pipeline.cursor]!.mockThinking,
           stepNum: pipeline.cursor + 1,
           stepTotal: pipelineSteps.length,
           stepTitle: pipelineSteps[pipeline.cursor]!.title,
