@@ -25,6 +25,7 @@ import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { SquadEntityCard } from "../components/SquadEntityCard";
 import { EntityStats } from "../components/EntityStats";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
+import { TaskChip } from "../components/TaskChip";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Avatar, Badge, Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Skeleton } from "@heroui/react";
@@ -714,6 +715,16 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
           <p className="text-small font-medium leading-snug line-clamp-2 min-h-[2.4em]">
             {mission.title}
           </p>
+          <TaskChip
+            entity={{
+              workspace: mission.workspace,
+              name: mission.squadName,
+              slug: mission.squadSlug,
+            }}
+            kind="squad"
+            size="sm"
+            className="self-start"
+          />
           {mission.squadName && (
             <p className="text-tiny text-warning truncate">
               {mission.squadName}

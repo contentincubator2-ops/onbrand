@@ -20,6 +20,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
+import { TaskChip } from "../components/TaskChip";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Button, Card, CardBody, Chip, Divider,
@@ -561,11 +562,12 @@ function LandscapeCard({
         </div>
       </div>
 
-      <CardBody className="px-3 py-2.5 gap-0.5">
+      <CardBody className="px-3 py-2.5 gap-1">
         <p className={`${titleSize} font-semibold leading-tight line-clamp-1`}>{entity.name}</p>
         {entity.subtitle && (
           <p className={`${subtitleSize} text-default-500 line-clamp-1`}>{entity.subtitle}</p>
         )}
+        <TaskChip entity={entity} kind={entity.kind === "agent" ? "agent" : entity.kind === "skill" ? "skill" : "squad"} size="sm" className="self-start mt-0.5" />
       </CardBody>
     </Card>
   );

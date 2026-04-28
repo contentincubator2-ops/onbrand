@@ -28,6 +28,7 @@ import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMockupFields, type MockupVariant } from "../lib/inferMockup";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
+import { TaskChip } from "../components/TaskChip";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
 import {
   Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
@@ -897,7 +898,7 @@ export default function PickerWorkspace() {
             the whole body. */}
         <section
           className="absolute top-0 right-0 bottom-0 z-10 bg-background flex flex-col min-h-0"
-          style={{ left: fullscreen ? 0 : 68 }}
+          style={{ left: fullscreen ? 0 : (middleCollapsed ? 68 : 448) }}
         >
           {/* Fullscreen exit */}
           {fullscreen && (
@@ -1057,8 +1058,9 @@ function SquadMiniCard({
       >
         {(name.charAt(0) || "?").toUpperCase()}
       </div>
-      <CardBody className="px-2 py-1.5">
-        <div className="text-[0.74rem] text-foreground line-clamp-1 leading-snug">{name}</div>
+      <CardBody className="px-2 py-1.5 gap-1">
+        <div className="text-tiny text-foreground line-clamp-1 leading-snug font-medium">{name}</div>
+        <TaskChip entity={squad} kind="squad" size="sm" className="h-4" />
       </CardBody>
     </Card>
   );
@@ -1095,9 +1097,12 @@ function SquadThumb({
           {(name.charAt(0) || "?").toUpperCase()}
         </div>
         <div className="min-w-0 flex-1 text-left">
-          <div className="text-[0.82rem] font-semibold text-foreground line-clamp-1">{name}</div>
-          <div className="text-[0.7rem] text-default-500 line-clamp-1 mt-0.5">
+          <div className="text-small font-semibold text-foreground line-clamp-1">{name}</div>
+          <div className="text-tiny text-default-500 line-clamp-1 mt-0.5">
             {author ? `${author}` : tone.label} · {stepCount} 個步驟
+          </div>
+          <div className="mt-1.5">
+            <TaskChip entity={squad} kind="squad" size="sm" />
           </div>
         </div>
       </CardBody>

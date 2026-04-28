@@ -13,6 +13,7 @@ import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import {
   Card, CardHeader, CardBody, CardFooter, Chip, Divider,
 } from "@heroui/react";
+import { TaskChip } from "./TaskChip";
 
 interface SquadEntityCardProps {
   squad: any;
@@ -81,11 +82,14 @@ export function SquadEntityCard({
       <Divider />
 
       <CardBody className="gap-1.5">
-        {subtitle && (
-          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">
-            {subtitle}
-          </p>
-        )}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <TaskChip entity={squad} kind="squad" size="sm" />
+          {subtitle && (
+            <span className="text-tiny font-semibold uppercase tracking-wider text-default-500">
+              {subtitle}
+            </span>
+          )}
+        </div>
         <p className="text-small text-default-700 line-clamp-3 leading-snug">
           {description || (lang === "en" ? "No description yet." : "尚無描述。")}
         </p>
