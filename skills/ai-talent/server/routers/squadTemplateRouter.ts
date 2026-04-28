@@ -1460,19 +1460,51 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
       }
 
       // ── run: produce the draft for this step ─────────────────────────────────
+      // Detect output kind from outputType keywords so we can give targeted guidance.
+      const ot = (outputType || "").toLowerCase();
+      const isContent =
+        /caption|post|copy|hook|hashtag|tag\b|tags|article|newsletter|tweet|script|carousel|reel|story|thumbnail|title|headline|description|email|edm|video|short|長文|貼文|文案|hashtag|腳本|標題|簡介|文/i.test(ot)
+        || /caption|post|copy|hook|hashtag|article|新聞稿|長文|貼文|文案|腳本|標題/i.test(stepName);
+      const isStrategic =
+        /swot|persona|icp|research|analysis|brand|context|interview|competitor|strategy|plan|brief|outline|framework|insight|positioning|methodology|doc|report|matrix|mapping|journey|研究|分析|策略|框架|計畫|報告|訪談|競品|定位|脈絡|洞察|矩陣|藍圖/i.test(`${ot} ${stepName}`);
+
+      const outputGuide = isContent
+        ? `這是「內容類」交付物 — 你交出的東西要可以直接複製貼上發出去。
+- 不要寫「我會...」、「先...再...」、「Step 1 / Step 2」這種說明流程
+- 直接寫成品本身（caption / hashtag / 圖片描述 / 影片腳本 / 標題等）
+- 文案類加 emoji、CTA、換行；hashtag 類就純列 #tag
+- 如果產出是「圖文」、「視覺」、「縮圖」等視覺素材，請寫具體的圖片描述（讓 AI 繪圖工具可以根據此描述產圖）`
+        : isStrategic
+        ? `這是「策略 / 文件類」交付物 — 寫出完整的成品文件，不是「我會這樣做」的說明。
+- 用 markdown 結構（## 大標 / - 條列）
+- 每個段落要寫具體內容，不是描述「我會做什麼」
+- 例如要做 SWOT 就直接寫 4 格的具體內容；要做 Persona 就直接寫角色檔案`
+        : `直接寫出成品內容，不要寫「我會...」這種方法論說明。`;
+
       const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
-你正在執行「${stepName}」步驟。請依方法論交付這一步的成果，**直接給出可用的產出**，不要寒暄。
-用繁體中文。重點清楚、可條列。長度依產出類型：${outputType || "適中"}。
-${brandContext ? `\n【強制】這一步是為以下這個具體品牌服務，所有舉例、語氣、產品、受眾都必須緊扣這個品牌，禁止寫通用範本：\n${brandContext}\n如果你產出的內容換到別的品牌也成立，就是失敗。` : `\n【警告】此任務沒有綁定品牌，請提示使用者先到右上角選擇品牌再執行。`}`;
+你正在執行「${stepName}」步驟。
+
+【最高優先規則】直接交付完成品本身。
+✗ 錯誤輸出（寫方法論）：「先抓住眼球的 hook，再帶出產品價值，最後 CTA」
+✓ 正確輸出（寫成品）：「夏天還在悶熱中？這雙鞋讓你帶著風走 ☀️ / Air Mesh 透氣科技 + 反光防滑底 / 限時 9 折，只到週日！👉 連結見 bio」
+
+✗ 錯誤輸出（寫方法論）：「定位的 5 個維度是：產品、TA、競爭、價值、人格」
+✓ 正確輸出（寫成品）：「## 品牌定位\\nNIKE 是運動員突破自我的盟友。\\n## 目標 TA\\n18-34 歲都會運動者...」
+
+${outputGuide}
+
+用繁體中文。產出類型：${outputType || "適中"}。
+${brandContext ? `\n【強制】這一步是為以下品牌服務，所有舉例、語氣、產品、受眾都必須緊扣這個品牌，禁止通用範本：\n${brandContext}\n如果你產出的內容換到別的品牌也成立，就是失敗。` : `\n【警告】此任務沒有綁定品牌，請提示使用者先到右上角選擇品牌再執行。`}`;
 
       const userPrompt = `${missionContext}
 ${brandContext ? `\n${brandContext}\n` : ""}
-方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
+方法論參考：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
 此步驟說明：${stepDesc || stepName}
 預期產出類型：${outputType || "(未指定)"}
-${prevOutputs ? `\n上游步驟成果（請接續使用）：\n${prevOutputs}` : ""}
-${input.userInput ? `\n使用者本步補充：\n${input.userInput}` : ""}
-請直接交付本步驟的成果，**所有舉例必須來自上面這個品牌的真實產品 / 受眾 / 產業情境**，不要給通用模板。`;
+${prevOutputs ? `\n上游步驟成果（直接接續使用，不要重述）：\n${prevOutputs}` : ""}
+${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
+
+請直接交付【成品內容】 — 不是「我會這樣做」的說明。所有舉例必須來自上面這個品牌的真實產品 / 受眾 / 產業情境。`;
 
       const llm = await invokeLLM({
         messages: [
