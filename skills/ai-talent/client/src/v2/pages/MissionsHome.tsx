@@ -34,7 +34,13 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMagnifyingGlass, faChevronDown, faArrowDownWideShort, faArrowUpWideShort,
   faTableCells, faList, faBookmark, faEllipsis,
+  faArrowRight, faWandSparkles,
+  faBullseye, faRocket, faUsers, faNewspaper, faEnvelope, faPlus, faCloudArrowUp,
+  faF, // generic fallback letter icon
 } from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebookF, faInstagram, faLinkedinIn, faYoutube,
+} from "@fortawesome/free-brands-svg-icons";
 
 interface MissionRow {
   id: number;
@@ -53,8 +59,8 @@ interface MissionRow {
 }
 
 interface QuickTile {
-  /** Short monogram or unicode glyph — stays monochrome on white. */
-  glyph: string;
+  /** FontAwesome icon — neutral, never colored (per design system). */
+  icon: any;
   label: string;
   /** Layer hint for hover tint only. */
   layer?: MosLayer;
@@ -69,54 +75,51 @@ interface QuickTile {
 }
 
 const QUICK_TILES: QuickTile[] = [
-  { glyph: "f",   label: "Facebook",   layer: "L4",
+  { icon: faFacebookF, label: "Facebook", layer: "L4",
     missionTitle: "Facebook 月度經營計畫",
     missionDesc: "為品牌規劃下一個月的 Facebook 內容主軸、貼文節奏與互動策略。",
     workspace: "facebook" },
-  { glyph: "IG",  label: "Instagram",  layer: "L4",
+  { icon: faInstagram, label: "Instagram", layer: "L4",
     missionTitle: "Instagram 圖文系列企劃",
     missionDesc: "規劃 Instagram 連續貼文系列：視覺主題、文案結構、Hashtag、限動延伸。",
     workspace: "instagram" },
-  { glyph: "in",  label: "LinkedIn",   layer: "L4",
+  { icon: faLinkedinIn, label: "LinkedIn", layer: "L4",
     missionTitle: "LinkedIn 個人品牌經營",
     missionDesc: "以創辦人視角產出 B2B 思想領袖內容，建立信任與商機。",
     workspace: "linkedin" },
-  { glyph: "▶",   label: "YouTube",    layer: "L4",
+  { icon: faYoutube, label: "YouTube", layer: "L4",
     missionTitle: "YouTube 頻道內容企劃",
     missionDesc: "規劃 YouTube 頻道主題、長影片企劃與短影音延伸。",
     workspace: "youtube" },
-  { glyph: "品",  label: "品牌定位",   layer: "L1", badge: "推薦",
+  { icon: faBullseye, label: "品牌定位", layer: "L1", badge: "推薦",
     missionTitle: "品牌定位重塑（12 原型）",
     missionDesc: "用 Carol Pearson 12 原型任務範本梳理品牌個性與市場立足點。",
     squadSlug: "brand-archetype-positioning",
     workspace: "brand-positioning" },
-  { glyph: "新",  label: "新品上市",   layer: "L5",
+  { icon: faRocket, label: "新品上市", layer: "L5",
     missionTitle: "新品上市發表計畫",
     missionDesc: "依 Jeff Walker Product Launch Formula，規劃 4 階段發表節奏。",
     squadSlug: "plf-launch-formula",
     workspace: "campaign" },
-  { glyph: "眾",  label: "受眾分析",   layer: "L3",
+  { icon: faUsers, label: "受眾分析", layer: "L3",
     missionTitle: "受眾洞察與分群",
     missionDesc: "用 STP 與 Persona Canvas 產出可操作的受眾分群與訊息切入。",
     workspace: "audience" },
-  { glyph: "PR",  label: "公關",       layer: "L4",
+  { icon: faNewspaper, label: "公關", layer: "L4",
     missionTitle: "公關媒體曝光計畫",
     missionDesc: "規劃 PR 故事框架、新聞稿節奏與媒體名單。",
     workspace: "pr" },
-  { glyph: "✉",   label: "電子報",     layer: "L4",
+  { icon: faEnvelope, label: "電子報", layer: "L4",
     missionTitle: "電子報內容規劃",
     missionDesc: "建立電子報主題曲線、開信率優化與訂閱者分眾。",
     workspace: "email" },
-  { glyph: "+",   label: "自訂任務",
-    missionTitle: "",
-    missionDesc: "" },
-  { glyph: "☁",   label: "上傳",
-    missionTitle: "",
-    missionDesc: "",
+  { icon: faPlus, label: "自訂任務",
+    missionTitle: "", missionDesc: "" },
+  { icon: faCloudArrowUp, label: "上傳",
+    missionTitle: "", missionDesc: "",
     opensIngest: "upload" },
-  { glyph: "···", label: "顯示更多",
-    missionTitle: "",
-    missionDesc: "",
+  { icon: faEllipsis, label: "顯示更多",
+    missionTitle: "", missionDesc: "",
     isMore: true },
 ];
 
@@ -324,38 +327,38 @@ export default function MissionsHome() {
 
   return (
     <main>
-      {/* ─── Hero (HeroUI content1 background) ──────────────────── */}
-      <section className="relative px-8 pt-16 pb-12 border-b border-divider bg-content1">
-        {/* Top-right CTAs */}
-        <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <Button
-            size="sm"
-            variant="bordered"
-            onPress={() => navigate("/templates")}
-            startContent={<span aria-hidden>✦</span>}
-          >
-            瀏覽方法論型錄
-          </Button>
-          <Button
-            size="sm"
-            color="primary"
-            onPress={() => setCreateSource("recommended")}
-            endContent={<span aria-hidden>→</span>}
-          >
-            立即開新任務
-          </Button>
-        </div>
-
+      {/* ─── Hero ─── */}
+      <section className="relative px-8 pt-10 pb-10 border-b border-divider bg-content1">
         <div className="max-w-[1280px] mx-auto">
-          <div className="text-center">
-            <Chip variant="flat" color="warning" size="sm" className="mb-4">
-              SoWork · Marketing OS
-            </Chip>
-            <h1 className="text-4xl leading-tight tracking-tight font-bold">
-              今天，想將哪個<span className="text-warning">策略</span>付諸實現？
-            </h1>
-            <div className="mt-3 max-w-[560px] mx-auto leading-relaxed">
-              <EntityStats variant="inline" />
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <Chip variant="flat" color="default" size="sm" className="uppercase tracking-wider mb-2">
+                SoWork · Marketing OS
+              </Chip>
+              <h1 className="text-3xl font-semibold tracking-tight">
+                今天，想將哪個策略付諸實現？
+              </h1>
+              <div className="mt-2 max-w-[640px] text-small text-default-500 leading-relaxed">
+                <EntityStats variant="inline" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="bordered"
+                onPress={() => navigate("/templates")}
+                startContent={<FontAwesomeIcon icon={faWandSparkles} />}
+              >
+                瀏覽方法論型錄
+              </Button>
+              <Button
+                size="sm"
+                color="primary"
+                onPress={() => setCreateSource("recommended")}
+                endContent={<FontAwesomeIcon icon={faArrowRight} />}
+              >
+                立即開新任務
+              </Button>
             </div>
           </div>
 
@@ -584,7 +587,6 @@ function CircleTile({
   disabled: boolean;
   onClick: () => void;
 }) {
-  const tone = tile.layer ? LAYER_TOKENS[tile.layer] : null;
   return (
     <Button
       onPress={onClick}
@@ -600,14 +602,9 @@ function CircleTile({
         placement="top-right"
         size="sm"
       >
-        <Avatar
-          name={tile.glyph}
-          color={tone?.heroColor ?? "default"}
-          radius="full"
-          size="md"
-          isBordered
-          classNames={{ name: "text-medium" }}
-        />
+        <span className="flex items-center justify-center w-10 h-10 rounded-full bg-default-100 border border-divider text-default-600">
+          <FontAwesomeIcon icon={tile.icon} className="text-medium" />
+        </span>
       </Badge>
       <span className="text-tiny leading-tight text-center text-foreground line-clamp-2">
         {tile.missionTitle || tile.label}
