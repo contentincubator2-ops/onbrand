@@ -1,58 +1,69 @@
 /**
- * BrandsPage — Canva Brand Kit clone (full HeroUI rewrite).
+ * BrandsPage — Canva Brand Kit clone v2 (full-bleed layout).
  *
- * Page structure (top → bottom):
- *   1. Pastel hero with brand selector + 同步資產 CTA
- *   2. Promo banner (建立品牌準則 CTA)
- *   3. Vertical Tabs (left rail) + main content (right)
- *   4. Main content has multiple "asset sections":
- *        - 標誌 (logos)         — 4 cols, square cards, empty state
- *        - 顏色 (colors)        — palette row of swatch chips
- *        - 字型 (fonts)         — typography sample cards
- *        - 品牌口吻 (voice)     — text card backed by brandBrain
- *        - 品牌定位 (positioning)
- *        - 目標受眾 (audience)
- *        - 競品洞察 (competitors)
- *        - 照片 / 圖像 / 圖示 / 圖表 (placeholders)
+ * Layout matches Canva exactly:
+ *   - Top: thin pastel header strip with 品牌工具組 chip + brand name
+ *   - Left rail (260px, fixed width, no max-w): sub-nav links + brand
+ *     switcher dropdown
+ *   - Right: full-bleed grid of large pastel asset tiles (4 cols on
+ *     desktop, each ~4:3 aspect)
  *
- * Each section: HeroUI section header + 新增 Button (right) + grid of
- * items OR empty-state Card. Tabs control which section(s) render.
+ * Each tile is a HeroUI Card isPressable with a unique pastel-100 bg,
+ * a giant FA icon as the visual centerpiece, and a label below.
+ *
+ * No max-width container anywhere — extends to viewport edges.
  */
 import React, { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
-  Avatar, Button, Card, CardBody, CardFooter, CardHeader, Chip, Divider,
+  Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Skeleton, Tab, Tabs, Tooltip,
+  Skeleton,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faChevronDown, faPlus, faCloudArrowUp, faCrown, faWandMagicSparkles,
-  faShapes, faPalette, faFont, faQuoteLeft, faBullseye, faUsers,
-  faChartLine, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
+  faChevronDown, faPlus, faCloudArrowUp, faShapes,
+  faPalette, faFont, faQuoteLeft, faBullseye, faUsers,
+  faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
+  faFolderOpen, faUserPlus, faCrown,
 } from "@fortawesome/free-solid-svg-icons";
 
 type SectionId =
-  | "all" | "logo" | "colors" | "fonts" | "voice"
+  | "all" | "guidelines" | "templates"
+  | "logo" | "colors" | "fonts" | "voice"
   | "positioning" | "audience" | "competitor"
   | "photos" | "images" | "icons" | "charts";
 
-const SUBNAV: Array<{ id: SectionId; label: string; icon: any }> = [
-  { id: "all",         label: "所有資產", icon: faShapes },
-  { id: "logo",        label: "標誌",     icon: faPenNib },
-  { id: "colors",      label: "顏色",     icon: faPalette },
-  { id: "fonts",       label: "字型",     icon: faFont },
-  { id: "voice",       label: "品牌口吻", icon: faQuoteLeft },
-  { id: "positioning", label: "品牌定位", icon: faBullseye },
-  { id: "audience",    label: "目標受眾", icon: faUsers },
-  { id: "competitor",  label: "競品洞察", icon: faShieldHalved },
-  { id: "photos",      label: "照片",     icon: faImages },
-  { id: "images",      label: "圖像",     icon: faImage },
-  { id: "icons",       label: "圖示",     icon: faIcons },
-  { id: "charts",      label: "圖表",     icon: faChartPie },
+interface SubNavItem { id: SectionId; label: string; badge?: string; }
+const SUBNAV: SubNavItem[] = [
+  { id: "all",         label: "所有資產" },
+  { id: "guidelines",  label: "準則" },
+  { id: "templates",   label: "品牌範本", badge: "最新" },
+  { id: "logo",        label: "標誌" },
+  { id: "colors",      label: "顏色" },
+  { id: "fonts",       label: "字型" },
+  { id: "voice",       label: "品牌口吻" },
+  { id: "positioning", label: "品牌定位" },
+  { id: "audience",    label: "目標受眾" },
+  { id: "competitor",  label: "競品洞察" },
+  { id: "photos",      label: "照片" },
+  { id: "images",      label: "圖像" },
+  { id: "icons",       label: "圖示" },
+  { id: "charts",      label: "圖表" },
 ];
+
+// Tile colors (HeroUI semantic-100 backgrounds + matching tone)
+type Tone = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
+interface Tile {
+  id: SectionId;
+  label: string;
+  icon: any;
+  tone: Tone;
+  count?: number;
+  ready: boolean;
+}
 
 export default function BrandsPage() {
   const { brandId, setBrandId, brands } = useOutletContext<ShellOutletCtx>();
@@ -63,6 +74,7 @@ export default function BrandsPage() {
     [brands, brandId]
   );
   const brandName = currentBrand?.name ?? "我的品牌";
+  const brandInitial = brandName.charAt(0).toUpperCase();
 
   const brainQuery = (trpc as any).brandBrain?.list?.useQuery
     ? (trpc as any).brandBrain.list.useQuery(
@@ -73,325 +85,238 @@ export default function BrandsPage() {
 
   const brainEntries: Record<string, any[]> =
     ((brainQuery.data as any)?.entries as Record<string, any[]>) ?? {};
-  const brainList = (cat: string) => brainEntries[cat] ?? [];
-  const brainCount = (cat: string) => (brainEntries[cat]?.length ?? 0);
+  const cnt = (cat: string) => brainEntries[cat]?.length ?? 0;
 
-  const showAll = section === "all";
-  const showSection = (id: SectionId) => showAll || section === id;
+  const TILES: Tile[] = [
+    { id: "templates",   label: "品牌範本", icon: faFolderOpen,    tone: "warning",   ready: false },
+    { id: "logo",        label: "標誌",     icon: faPenNib,        tone: "secondary", ready: false },
+    { id: "colors",      label: "顏色",     icon: faPalette,       tone: "danger",    ready: false },
+    { id: "fonts",       label: "字型",     icon: faFont,          tone: "success",   ready: false },
+    { id: "voice",       label: "品牌口吻", icon: faQuoteLeft,     tone: "secondary", ready: true, count: cnt("voice") },
+    { id: "photos",      label: "照片",     icon: faImages,        tone: "success",   ready: false },
+    { id: "images",      label: "圖像",     icon: faImage,         tone: "warning",   ready: false },
+    { id: "icons",       label: "圖示",     icon: faIcons,         tone: "secondary", ready: false },
+    { id: "charts",      label: "圖表",     icon: faChartPie,      tone: "danger",    ready: false },
+    { id: "positioning", label: "品牌定位", icon: faBullseye,      tone: "primary",   ready: true, count: cnt("positioning") },
+    { id: "audience",    label: "目標受眾", icon: faUsers,         tone: "warning",   ready: true, count: cnt("audience") },
+    { id: "competitor",  label: "競品洞察", icon: faShieldHalved,  tone: "danger",    ready: true, count: cnt("competitors") },
+  ];
+
+  const visibleTiles =
+    section === "all" ? TILES : TILES.filter((t) => t.id === section);
+
+  const onTileClick = (t: Tile) => setSection(t.id);
 
   return (
-    <main className="pb-16">
-      {/* ─── Hero ────────────────────────────────────────────── */}
-      <section
-        className="relative overflow-hidden"
+    <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
+      {/* ─── Top header — pastel gradient strip ─────────────────── */}
+      <header
+        className="px-6 py-5 flex items-center justify-center gap-3 flex-wrap"
         style={{
           background:
-            "linear-gradient(135deg, hsl(170 40% 90%) 0%, hsl(260 50% 92%) 50%, hsl(340 60% 92%) 100%)",
+            "linear-gradient(135deg, hsl(170 40% 92%) 0%, hsl(260 50% 94%) 50%, hsl(340 60% 94%) 100%)",
         }}
       >
-        <div className="absolute top-5 right-6 z-10">
-          <Button
-            color="primary"
-            radius="full"
-            startContent={<FontAwesomeIcon icon={faCloudArrowUp} />}
+        <Chip
+          color="warning"
+          variant="flat"
+          size="md"
+          startContent={<FontAwesomeIcon icon={faFolderOpen} className="ml-1" />}
+        >
+          品牌工具組
+        </Chip>
+        <h1 className="text-2xl font-semibold tracking-tight">{brandName}</h1>
+        <Dropdown placement="bottom">
+          <DropdownTrigger>
+            <Button isIconOnly size="sm" variant="light" radius="full" aria-label="切換品牌">
+              <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />
+            </Button>
+          </DropdownTrigger>
+          <DropdownMenu
+            aria-label="切換品牌"
+            selectionMode="single"
+            selectedKeys={brandId != null ? new Set([String(brandId)]) : new Set()}
+            onAction={(k) => setBrandId(Number(k))}
           >
-            同步品牌資產
-          </Button>
-        </div>
-
-        <div className="max-w-[1280px] mx-auto px-6 pt-16 pb-12">
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <Avatar
-              name={brandName.charAt(0).toUpperCase()}
-              size="md"
-              radius="md"
-              color="primary"
-              classNames={{ name: "font-bold" }}
-            />
-            <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">
-              {brandName} 品牌工具組
-            </h1>
-            {brands.length > 1 && (
-              <Dropdown placement="bottom">
-                <DropdownTrigger>
-                  <Button size="sm" variant="bordered" radius="full" endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny" />}>
-                    切換品牌
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu
-                  aria-label="切換品牌"
-                  selectionMode="single"
-                  selectedKeys={brandId != null ? new Set([String(brandId)]) : new Set()}
-                  onAction={(k) => setBrandId(Number(k))}
-                >
-                  {brands.map((b: any) => (
-                    <DropdownItem key={String(b.id)}>{b.name}</DropdownItem>
-                  ))}
-                </DropdownMenu>
-              </Dropdown>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Promo banner ────────────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-6 mt-8">
-        <Card shadow="sm" className="bg-gradient-to-r from-secondary-100 to-primary-100">
-          <CardBody className="flex flex-row items-center justify-between gap-4 px-7 py-6">
-            <div className="max-w-[520px]">
-              <h2 className="text-xl font-semibold tracking-tight">讓你的品牌在不同設計間都生動無比</h2>
-              <p className="mt-2 text-small text-foreground leading-relaxed">
-                在品牌工具組內備妥資產與準則，Marketing OS 會自動把它們餵給每位 agent，維持一致的品牌形象。
-              </p>
-              <Button
-                className="mt-4"
-                color="primary"
-                radius="full"
-                startContent={<FontAwesomeIcon icon={faCrown} />}
-                onPress={() => setSection("positioning")}
-              >
-                建立品牌準則
-              </Button>
-            </div>
-            <div className="hidden md:flex w-[260px] h-[120px] rounded-large items-center justify-center bg-gradient-to-br from-success-400 via-secondary-500 to-danger-400">
-              <span className="text-6xl font-semibold text-white">Aa</span>
-            </div>
-          </CardBody>
-        </Card>
-      </section>
-
-      {/* ─── Body: vertical Tabs + asset sections ───────────── */}
-      <section className="max-w-[1280px] mx-auto px-6 mt-10 flex gap-8">
-        <aside className="w-[200px] shrink-0">
-          <Tabs
-            aria-label="品牌資產分類"
-            isVertical
-            variant="light"
-            color="primary"
-            selectedKey={section}
-            onSelectionChange={(k) => setSection(k as SectionId)}
-            classNames={{ tabList: "gap-1 w-full", tab: "justify-start h-10" }}
-          >
-            {SUBNAV.map((s) => (
-              <Tab
-                key={s.id}
-                title={
-                  <div className="flex items-center gap-2 text-small">
-                    <FontAwesomeIcon icon={s.icon} className="text-tiny w-4" />
-                    <span>{s.label}</span>
-                  </div>
-                }
-              />
+            {brands.map((b: any) => (
+              <DropdownItem key={String(b.id)}>{b.name}</DropdownItem>
             ))}
-          </Tabs>
+          </DropdownMenu>
+        </Dropdown>
+      </header>
+
+      {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
+      <div className="flex-1 flex">
+        {/* Left rail — full-bleed, fixed 240px, NO max-w-anything */}
+        <aside className="w-[240px] shrink-0 border-r border-divider bg-content1 flex flex-col">
+          {/* Top: 你的方案 + 邀請使用者 */}
+          <div className="p-4 space-y-2 border-b border-divider">
+            <Button
+              fullWidth
+              radius="lg"
+              variant="bordered"
+              startContent={<FontAwesomeIcon icon={faCrown} />}
+              className="justify-start"
+            >
+              你的方案
+            </Button>
+            <Button
+              fullWidth
+              radius="lg"
+              variant="bordered"
+              startContent={<FontAwesomeIcon icon={faUserPlus} />}
+              className="justify-start"
+            >
+              邀請使用者
+            </Button>
+          </div>
+
+          {/* 所有品牌範本 link */}
+          <Button
+            fullWidth
+            variant="light"
+            radius="none"
+            className="justify-start px-4 h-11"
+          >
+            所有品牌範本
+          </Button>
+
+          {/* Brand switcher dropdown — pinned section */}
+          <div className="px-3 pt-2 pb-1">
+            <Dropdown placement="bottom-start">
+              <DropdownTrigger>
+                <Button
+                  fullWidth
+                  variant="bordered"
+                  radius="lg"
+                  className="justify-between h-12"
+                  startContent={
+                    <Avatar
+                      name={brandInitial}
+                      size="sm"
+                      radius="md"
+                      color="warning"
+                      classNames={{ base: "shrink-0", name: "text-tiny font-bold" }}
+                    />
+                  }
+                  endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny text-default-400" />}
+                >
+                  <span className="text-small truncate flex-1 text-left">品牌工具組</span>
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                aria-label="切換品牌"
+                selectionMode="single"
+                selectedKeys={brandId != null ? new Set([String(brandId)]) : new Set()}
+                onAction={(k) => setBrandId(Number(k))}
+              >
+                {brands.map((b: any) => (
+                  <DropdownItem key={String(b.id)}>{b.name}</DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+
+          {/* Sub-nav */}
+          <nav className="px-3 py-2 flex flex-col gap-0.5 flex-1 overflow-y-auto">
+            {SUBNAV.map((s) => {
+              const active = section === s.id;
+              const isAll = s.id === "all";
+              return (
+                <Button
+                  key={s.id}
+                  fullWidth
+                  size="sm"
+                  variant={active ? "flat" : "light"}
+                  color={active ? "primary" : "default"}
+                  radius="lg"
+                  className="justify-between h-9 text-small"
+                  onPress={() => setSection(s.id)}
+                  endContent={
+                    <span className="flex items-center gap-1.5">
+                      {s.badge && <Chip size="sm" color="warning" variant="flat" className="h-4 text-tiny">{s.badge}</Chip>}
+                      {isAll && <FontAwesomeIcon icon={faPlus} className="text-tiny text-default-400" />}
+                    </span>
+                  }
+                >
+                  <span className="text-left flex-1">{s.label}</span>
+                </Button>
+              );
+            })}
+          </nav>
         </aside>
 
-        <div className="flex-1 min-w-0 space-y-10">
-          {/* 標誌 */}
-          {showSection("logo") && (
-            <AssetSection title="標誌" hint="主標、副標、icon 版、白底版" addLabel="上傳標誌">
-              <EmptyTile icon={faPenNib} label="尚未上傳標誌" />
-            </AssetSection>
-          )}
+        {/* Right: tile grid — full bleed */}
+        <div className="flex-1 min-w-0 px-6 py-6 overflow-y-auto">
+          {visibleTiles.length === 0 ? (
+            <Card shadow="none" className="border-2 border-dashed border-divider">
+              <CardBody className="py-16 items-center text-center gap-3">
+                <FontAwesomeIcon icon={faShapes} className="text-3xl text-default-300" />
+                <p className="text-medium font-medium">這個區塊還沒有資產</p>
+              </CardBody>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {visibleTiles.map((t) => (
+                <BrandAssetTile key={t.id} tile={t} onClick={() => onTileClick(t)} />
+              ))}
 
-          {/* 顏色 */}
-          {showSection("colors") && (
-            <AssetSection title="顏色" hint="主色、副色、強調色 — 影響每張素材的色調" addLabel="新增色票">
-              <Card shadow="none" className="border-2 border-dashed border-divider">
-                <CardBody className="py-10 items-center text-center gap-3">
-                  <FontAwesomeIcon icon={faPalette} className="text-3xl text-default-300" />
-                  <p className="text-small text-default-500">尚未設定品牌色票 — 新增後會被同步給每位 agent</p>
-                </CardBody>
-              </Card>
-            </AssetSection>
-          )}
-
-          {/* 字型 */}
-          {showSection("fonts") && (
-            <AssetSection title="字型" hint="標題字、內文字、輔助字" addLabel="新增字型">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  { role: "標題", family: "Noto Sans TC", weight: "700" },
-                  { role: "內文", family: "Noto Sans TC", weight: "400" },
-                ].map((f) => (
-                  <Card key={f.role} shadow="sm">
-                    <CardBody className="px-5 py-4">
-                      <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">{f.role}</p>
-                      <p className="text-3xl font-semibold mt-1" style={{ fontFamily: f.family, fontWeight: f.weight as any }}>
-                        AaBbCc 你好
-                      </p>
-                      <p className="text-tiny text-default-400 mt-1">{f.family} · {f.weight}</p>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </AssetSection>
-          )}
-
-          {/* 品牌口吻 */}
-          {showSection("voice") && (
-            <BrainSection
-              title="品牌口吻"
-              hint="agent 寫文案時的調性"
-              items={brainList("voice")}
-              loading={brainQuery.isLoading}
-              addLabel="新增口吻準則"
-              icon={faQuoteLeft}
-            />
-          )}
-
-          {/* 品牌定位 */}
-          {showSection("positioning") && (
-            <BrainSection
-              title="品牌定位"
-              hint="原型、核心價值、差異化"
-              items={brainList("positioning")}
-              loading={brainQuery.isLoading}
-              addLabel="新增定位"
-              icon={faBullseye}
-            />
-          )}
-
-          {/* 目標受眾 */}
-          {showSection("audience") && (
-            <BrainSection
-              title="目標受眾"
-              hint="STP / Persona / 痛點"
-              items={brainList("audience")}
-              loading={brainQuery.isLoading}
-              addLabel="新增 persona"
-              icon={faUsers}
-            />
-          )}
-
-          {/* 競品洞察 */}
-          {showSection("competitor") && (
-            <BrainSection
-              title="競品洞察"
-              hint="對手定位、優勢、缺口"
-              items={brainList("competitors")}
-              loading={brainQuery.isLoading}
-              addLabel="新增競品"
-              icon={faShieldHalved}
-            />
-          )}
-
-          {/* 照片 / 圖像 / 圖示 / 圖表 — placeholders */}
-          {showSection("photos") && (
-            <AssetSection title="照片" hint="品牌實景與人像" addLabel="上傳照片">
-              <EmptyTile icon={faImages} label="尚未上傳照片" />
-            </AssetSection>
-          )}
-          {showSection("images") && (
-            <AssetSection title="圖像" hint="插畫、illustration" addLabel="上傳圖像">
-              <EmptyTile icon={faImage} label="尚未上傳圖像" />
-            </AssetSection>
-          )}
-          {showSection("icons") && (
-            <AssetSection title="圖示" hint="品牌圖示集" addLabel="上傳圖示">
-              <EmptyTile icon={faIcons} label="尚未上傳圖示" />
-            </AssetSection>
-          )}
-          {showSection("charts") && (
-            <AssetSection title="圖表" hint="品牌圖表樣式" addLabel="上傳圖表">
-              <EmptyTile icon={faChartPie} label="尚未上傳圖表" />
-            </AssetSection>
+              {/* 新增類別 — last empty tile */}
+              {section === "all" && (
+                <Card
+                  isPressable
+                  isHoverable
+                  shadow="none"
+                  radius="lg"
+                  className="border-2 border-dashed border-divider"
+                >
+                  <CardBody className="aspect-[4/3] items-center justify-center gap-3 text-center">
+                    <div className="w-14 h-14 rounded-full bg-secondary-100 flex items-center justify-center">
+                      <FontAwesomeIcon icon={faPlus} className="text-2xl text-secondary" />
+                    </div>
+                    <p className="text-small text-default-500">新增類別</p>
+                  </CardBody>
+                </Card>
+              )}
+            </div>
           )}
         </div>
-      </section>
+      </div>
     </main>
   );
 }
 
-/* ─────────────────────────── AssetSection ─────────────────────────── */
+/* ─────────────────────────── BrandAssetTile ─────────────────────────── */
 
-function AssetSection({
-  title, hint, addLabel, children,
-}: {
-  title: string;
-  hint?: string;
-  addLabel?: string;
-  children: React.ReactNode;
-}) {
+function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-        <div>
-          <h3 className="text-large font-semibold tracking-tight">{title}</h3>
-          {hint && <p className="text-tiny text-default-500 mt-0.5">{hint}</p>}
-        </div>
-        {addLabel && (
-          <Button
-            size="sm"
-            variant="bordered"
-            radius="full"
-            startContent={<FontAwesomeIcon icon={faPlus} />}
-          >
-            {addLabel}
-          </Button>
+    <Card
+      isPressable
+      isHoverable
+      onPress={onClick}
+      shadow="sm"
+      radius="lg"
+      className={`overflow-hidden bg-${tile.tone}-100`}
+    >
+      <CardBody className="aspect-[4/3] items-center justify-center relative p-0">
+        <FontAwesomeIcon
+          icon={tile.icon}
+          className={`text-7xl text-${tile.tone}-600/70`}
+        />
+        {tile.count != null && tile.count > 0 && (
+          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md">
+            {tile.count}
+          </Chip>
         )}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/* ─────────────────────────── BrainSection (uses brandBrain data) ─────── */
-
-function BrainSection({
-  title, hint, items, loading, addLabel, icon,
-}: {
-  title: string;
-  hint?: string;
-  items: any[];
-  loading: boolean;
-  addLabel: string;
-  icon: any;
-}) {
-  return (
-    <AssetSection title={title} hint={hint} addLabel={addLabel}>
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-large" />
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <EmptyTile icon={icon} label={`尚未設定${title}`} />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.map((it: any, i: number) => (
-            <Card key={it.id ?? i} shadow="sm">
-              <CardHeader className="flex items-center gap-2">
-                <FontAwesomeIcon icon={icon} className="text-default-500 text-tiny" />
-                <p className="text-small font-medium line-clamp-1">
-                  {it.title ?? it.name ?? `${title} #${i + 1}`}
-                </p>
-              </CardHeader>
-              <Divider />
-              <CardBody className="text-small text-default-700 line-clamp-4 leading-snug">
-                {it.body ?? it.summary ?? it.description ?? "—"}
-              </CardBody>
-            </Card>
-          ))}
-        </div>
-      )}
-    </AssetSection>
-  );
-}
-
-/* ─────────────────────────── EmptyTile ─────────────────────────── */
-
-function EmptyTile({ icon, label }: { icon: any; label: string }) {
-  return (
-    <Card shadow="none" className="border-2 border-dashed border-divider">
-      <CardBody className="py-12 items-center text-center gap-3">
-        <FontAwesomeIcon icon={icon} className="text-3xl text-default-300" />
-        <p className="text-small text-default-500">{label}</p>
-        <Button size="sm" variant="bordered" radius="full" startContent={<FontAwesomeIcon icon={faPlus} />}>
-          新增
-        </Button>
+        {!tile.ready && (
+          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md text-default-500">
+            即將推出
+          </Chip>
+        )}
       </CardBody>
+      <div className="px-4 py-3 bg-content1">
+        <p className="text-small font-medium text-foreground">{tile.label}</p>
+      </div>
     </Card>
   );
 }

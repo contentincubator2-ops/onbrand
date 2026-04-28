@@ -1,15 +1,18 @@
 /**
- * ProjectsPage — Pure HeroUI rewrite.
+ * ProjectsPage — Canva /projects clone (full-bleed, 3-column).
  *
- * Components used (HeroUI inventory):
- *   Button, ButtonGroup, Input, Card, CardBody, CardHeader, Chip, Avatar,
- *   Tooltip, Divider, Tabs, Tab, Skeleton, Spinner,
- *   Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem.
+ * Layout (no max-w container — extends edge to edge):
+ *   ┌──────────────────┬──────────────────────────────┬─────────────────────────┐
+ *   │ Left rail 240px  │  Middle column (flex-1)      │ Right floating panel    │
+ *   │ - sub-nav        │  - search + filter chips     │ 360px, sticky, elevated │
+ *   │ - 已加星號標籤   │  - 最近的項目 (横向scroll)   │ - active preview /      │
+ *   │ - 資料夾         │  - 資料夾                    │   featured project /    │
+ *   │ - brand stripe   │  - 設計 grid                 │   quick actions card    │
+ *   └──────────────────┴──────────────────────────────┴─────────────────────────┘
  *
- * Behavioral parity with the previous Canva-faithful page; styling is now
- * stock HeroUI semantic tokens (no hex pins, no inline gradients).
+ * Pure HeroUI tokens, no hex pins.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
@@ -20,13 +23,14 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Avatar, Button, ButtonGroup, Card, CardBody, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem,
-  Input, Skeleton, Spinner, Tab, Tabs, Tooltip,
+  Input, Skeleton, Spinner, Tooltip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMagnifyingGlass, faChevronDown, faPlus, faArrowDownWideShort,
   faArrowUpWideShort, faTableCells, faList, faStar, faEllipsis, faBookmark,
   faFolder, faCloudArrowUp, faGlobe, faCrown, faWandMagicSparkles, faFolderOpen,
+  faRocket, faClockRotateLeft, faShareNodes, faCloudArrowDown,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faYoutube, faGoogleDrive, faMicrosoft, faDropbox,
@@ -48,11 +52,11 @@ interface MissionRow {
 
 type SubNavKey = "all" | "mine" | "shared" | "offline";
 
-const SUB_NAV: Array<{ id: SubNavKey; label: string }> = [
-  { id: "all",     label: "所有專案" },
-  { id: "mine",    label: "你的專案" },
-  { id: "shared",  label: "與你分享" },
-  { id: "offline", label: "可離線使用" },
+const SUB_NAV: Array<{ id: SubNavKey; label: string; icon: any }> = [
+  { id: "all",     label: "所有專案",   icon: faFolderOpen        },
+  { id: "mine",    label: "你的專案",   icon: faRocket            },
+  { id: "shared",  label: "與你分享",   icon: faShareNodes        },
+  { id: "offline", label: "可離線使用", icon: faCloudArrowDown    },
 ];
 
 const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; icon: any }> = [
@@ -96,6 +100,7 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
   const [syncSource, setSyncSource] = useState<SyncSource | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(null);
 
   const typeOptions = useMemo(() => {
     const set = new Set<string>();
@@ -168,6 +173,11 @@ export default function ProjectsPage() {
 
   const recent = useMemo(() => filtered.slice(0, 12), [filtered]);
   const all = filtered;
+  const active = useMemo(() => all.find((m) => m.id === activeId) ?? all[0] ?? null, [all, activeId]);
+
+  useEffect(() => {
+    if (!activeId && all[0]) setActiveId(all[0].id);
+  }, [all, activeId]);
 
   const goToMission = (m: MissionRow) => {
     const ws = m.workspace || "_";
@@ -179,35 +189,42 @@ export default function ProjectsPage() {
     opts.find((o) => o.value === v)?.label ?? "";
 
   return (
-    <main>
-      {/* ─── Hero ─────────────────────────────────────────────────── */}
-      <section className="relative px-8 pt-14 pb-10 bg-content1 border-b border-divider">
-        <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <Button
-            variant="bordered"
-            radius="full"
-            onPress={() => navigate("/templates")}
-            startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
-          >
-            先看看任務範本
-          </Button>
-          <Button
-            color="primary"
-            radius="full"
-            onPress={() => setCreateSource("recommended")}
-            startContent={<FontAwesomeIcon icon={faCrown} />}
-          >
-            開始建立
-          </Button>
+    <main className="flex flex-col h-full min-h-screen bg-content1">
+      {/* ─── Top header strip ─────────────────────────────────────── */}
+      <header className="px-6 pt-5 pb-3 border-b border-divider">
+        <div className="flex items-center gap-3">
+          <Chip variant="flat" size="sm" className="uppercase tracking-wider">PROJECTS</Chip>
+          <h1 className="text-2xl font-semibold tracking-tight">所有專案</h1>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="bordered"
+              radius="full"
+              size="sm"
+              onPress={() => navigate("/templates")}
+              startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+            >
+              先看看任務範本
+            </Button>
+            <Button
+              color="primary"
+              radius="full"
+              size="sm"
+              onPress={() => setCreateSource("recommended")}
+              startContent={<FontAwesomeIcon icon={faCrown} />}
+            >
+              開始建立
+            </Button>
+            <CreateMenu
+              onNewMission={() => navigate("/templates")}
+              onSyncSource={(s) => setSyncSource(s as SyncSource)}
+            />
+          </div>
         </div>
 
-        <div className="max-w-[1280px] mx-auto">
-          <Chip variant="flat" size="sm" className="uppercase tracking-wider">PROJECTS</Chip>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight">所有專案</h1>
-
-          <div className="mt-6 max-w-[720px]">
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <div className="w-full max-w-[420px]">
             <Input
-              size="lg"
+              size="sm"
               radius="full"
               variant="bordered"
               value={searchQ}
@@ -218,111 +235,124 @@ export default function ProjectsPage() {
               startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
             />
           </div>
-        </div>
-      </section>
-
-      {/* ─── Filter row ──────────────────────────────────────────── */}
-      <section className="border-b border-divider bg-content1 sticky top-0 z-20">
-        <div className="max-w-[1280px] mx-auto px-8 py-3 flex items-center gap-2 flex-wrap">
           <FilterDropdown
             label={typeFilter === "all" ? "類型" : `類型：${labelFor(typeOptions, typeFilter)}`}
-            options={typeOptions}
-            value={typeFilter}
-            onSelect={setTypeFilter}
+            options={typeOptions} value={typeFilter} onSelect={setTypeFilter}
           />
           <FilterDropdown
             label={categoryFilter === "all" ? "類別" : `類別：${labelFor(categoryOptions, categoryFilter)}`}
-            options={categoryOptions}
-            value={categoryFilter}
-            onSelect={setCategoryFilter}
+            options={categoryOptions} value={categoryFilter} onSelect={setCategoryFilter}
           />
           <FilterDropdown
             label={ownerFilter === "all" ? "擁有者" : `擁有者：${labelFor(ownerOptions, ownerFilter)}`}
-            options={ownerOptions}
-            value={ownerFilter}
-            onSelect={setOwnerFilter}
+            options={ownerOptions} value={ownerFilter} onSelect={setOwnerFilter}
           />
           <FilterDropdown
             label={dateFilter === "all" ? "已修改日期" : `修改：${labelFor(dateOptions, dateFilter)}`}
-            options={dateOptions}
-            value={dateFilter}
-            onSelect={setDateFilter}
+            options={dateOptions} value={dateFilter} onSelect={setDateFilter}
           />
 
           <div className="ml-auto flex items-center gap-2">
             <Tooltip content={sortDesc ? "新到舊" : "舊到新"}>
               <Button
-                size="sm"
-                variant="light"
-                radius="full"
+                size="sm" variant="light" radius="full"
                 onPress={() => setSortDesc((v) => !v)}
                 startContent={<FontAwesomeIcon icon={sortDesc ? faArrowDownWideShort : faArrowUpWideShort} />}
               >
                 {sortDesc ? "新到舊" : "舊到新"}
               </Button>
             </Tooltip>
-
             <ButtonGroup variant="flat" size="sm" radius="full">
               <Tooltip content="格狀檢視">
-                <Button
-                  isIconOnly
+                <Button isIconOnly
                   color={viewMode === "grid" ? "primary" : "default"}
                   variant={viewMode === "grid" ? "solid" : "flat"}
-                  onPress={() => setViewMode("grid")}
-                  aria-label="格狀檢視"
-                >
-                  <FontAwesomeIcon icon={faTableCells} />
-                </Button>
+                  onPress={() => setViewMode("grid")} aria-label="格狀檢視"
+                ><FontAwesomeIcon icon={faTableCells} /></Button>
               </Tooltip>
               <Tooltip content="清單檢視">
-                <Button
-                  isIconOnly
+                <Button isIconOnly
                   color={viewMode === "list" ? "primary" : "default"}
                   variant={viewMode === "list" ? "solid" : "flat"}
-                  onPress={() => setViewMode("list")}
-                  aria-label="清單檢視"
-                >
-                  <FontAwesomeIcon icon={faList} />
-                </Button>
+                  onPress={() => setViewMode("list")} aria-label="清單檢視"
+                ><FontAwesomeIcon icon={faList} /></Button>
               </Tooltip>
             </ButtonGroup>
-
-            <CreateMenu
-              onNewMission={() => navigate("/templates")}
-              onSyncSource={(s) => setSyncSource(s as SyncSource)}
-            />
           </div>
         </div>
-      </section>
+      </header>
 
-      {/* ─── Body ─────────────────────────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 py-8 flex gap-8">
-        {/* Left rail — vertical Tabs */}
-        <aside className="w-[220px] shrink-0">
-          <Tabs
-            aria-label="專案分類"
-            isVertical
-            variant="light"
-            color="primary"
-            selectedKey={subNav}
-            onSelectionChange={(k) => setSubNav(k as SubNavKey)}
-            classNames={{ tabList: "gap-1 w-full", tab: "justify-start h-10" }}
-          >
-            {SUB_NAV.map((n) => <Tab key={n.id} title={n.label} />)}
-          </Tabs>
+      {/* ─── 3-column body ────────────────────────────────────────── */}
+      <div className="flex-1 flex min-h-0">
+        {/* LEFT RAIL */}
+        <aside className="w-[240px] shrink-0 border-r border-divider px-4 py-6 overflow-y-auto">
+          <nav className="flex flex-col gap-1">
+            {SUB_NAV.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => setSubNav(n.id)}
+                className={[
+                  "flex items-center gap-3 px-3 h-10 rounded-medium text-small transition text-left",
+                  subNav === n.id
+                    ? "bg-primary-100 text-primary-700 font-medium"
+                    : "text-default-700 hover:bg-default-100",
+                ].join(" ")}
+              >
+                <FontAwesomeIcon icon={n.icon} className="w-4" />
+                <span>{n.label}</span>
+              </button>
+            ))}
+          </nav>
 
-          <Card shadow="sm" className="mt-6">
-            <CardBody className="gap-2">
-              <FontAwesomeIcon icon={faStar} className="text-2xl text-warning" />
-              <p className="text-tiny text-default-500 leading-snug">
-                點擊任一專案的星號圖示，即可從這裡輕鬆找到。
-              </p>
-            </CardBody>
-          </Card>
+          <Divider className="my-4" />
+
+          <div className="px-3 mb-2 flex items-center justify-between">
+            <span className="text-tiny font-medium uppercase tracking-wider text-default-500">已加星號標籤</span>
+            <Button isIconOnly size="sm" variant="light" aria-label="新增標籤">
+              <FontAwesomeIcon icon={faPlus} className="text-tiny" />
+            </Button>
+          </div>
+          <p className="px-3 text-tiny text-default-400 leading-snug">
+            點擊任一專案的星號圖示，即可從這裡輕鬆找到。
+          </p>
+
+          <Divider className="my-4" />
+
+          <div className="px-3 mb-2 flex items-center justify-between">
+            <span className="text-tiny font-medium uppercase tracking-wider text-default-500">資料夾</span>
+            <Button isIconOnly size="sm" variant="light" aria-label="新增資料夾">
+              <FontAwesomeIcon icon={faPlus} className="text-tiny" />
+            </Button>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <RailFolderRow icon={faCloudArrowUp} label="上傳" />
+            <RailFolderRow icon={faStar} label="已加星號" />
+          </div>
+
+          <Divider className="my-4" />
+
+          <div className="px-3 mb-2">
+            <span className="text-tiny font-medium uppercase tracking-wider text-default-500">品牌</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {brands.slice(0, 6).map((b: any) => (
+              <button
+                key={b.id}
+                onClick={() => setOwnerFilter(String(b.id))}
+                className={[
+                  "flex items-center gap-2 px-3 h-9 rounded-medium text-small transition text-left",
+                  ownerFilter === String(b.id) ? "bg-default-100 font-medium" : "text-default-700 hover:bg-default-100",
+                ].join(" ")}
+              >
+                <Avatar size="sm" name={b.name} className="w-5 h-5 text-tiny" />
+                <span className="truncate">{b.name}</span>
+              </button>
+            ))}
+          </div>
         </aside>
 
-        {/* Main column */}
-        <div className="flex-1 min-w-0">
+        {/* MIDDLE COLUMN */}
+        <section className="flex-1 min-w-0 overflow-y-auto px-8 py-6">
           {isLoading && (
             <div className="flex items-center gap-3 text-small text-default-500">
               <Spinner size="sm" /> 載入專案中…
@@ -344,7 +374,6 @@ export default function ProjectsPage() {
             </Card>
           )}
 
-          {/* 最近的項目 */}
           {!isLoading && recent.length > 0 && (
             <div className="mb-10">
               <SectionHeader title="最近的項目" subtitle={`${recent.length} 個`} />
@@ -352,7 +381,12 @@ export default function ProjectsPage() {
                 <div className="flex gap-3 px-1 pb-2">
                   {recent.map((m) => (
                     <div key={m.id} className="w-[200px] shrink-0">
-                      <MissionThumb mission={m} onClick={() => goToMission(m)} />
+                      <MissionThumb
+                        mission={m}
+                        active={m.id === active?.id}
+                        onClick={() => setActiveId(m.id)}
+                        onOpen={() => goToMission(m)}
+                      />
                     </div>
                   ))}
                 </div>
@@ -360,7 +394,6 @@ export default function ProjectsPage() {
             </div>
           )}
 
-          {/* 資料夾 */}
           <div className="mb-10">
             <SectionHeader title="資料夾" subtitle="2 個" />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -369,14 +402,19 @@ export default function ProjectsPage() {
             </div>
           </div>
 
-          {/* 設計 */}
           {!isLoading && all.length > 0 && (
             <div>
               <SectionHeader title="設計" subtitle={`${all.length} 個`} />
               {viewMode === "grid" ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {all.map((m) => (
-                    <MissionThumb key={m.id} mission={m} onClick={() => goToMission(m)} />
+                    <MissionThumb
+                      key={m.id}
+                      mission={m}
+                      active={m.id === active?.id}
+                      onClick={() => setActiveId(m.id)}
+                      onOpen={() => goToMission(m)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -392,8 +430,8 @@ export default function ProjectsPage() {
           )}
 
           {isLoading && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mt-6">
-              {Array.from({ length: 12 }).map((_, i) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mt-6">
+              {Array.from({ length: 10 }).map((_, i) => (
                 <Card key={i} shadow="none" className="overflow-hidden">
                   <Skeleton className="w-full" style={{ aspectRatio: "5 / 4" }} />
                   <CardBody className="p-3 gap-1.5">
@@ -404,8 +442,23 @@ export default function ProjectsPage() {
               ))}
             </div>
           )}
-        </div>
-      </section>
+        </section>
+
+        {/* RIGHT FLOATING PANEL */}
+        <aside className="hidden xl:block w-[360px] shrink-0 px-5 py-6 overflow-y-auto">
+          <div className="sticky top-4 flex flex-col gap-4">
+            {active ? (
+              <PreviewCard mission={active} onOpen={() => goToMission(active)} />
+            ) : (
+              <EmptyPreviewCard onCreate={() => setCreateSource("recommended")} />
+            )}
+            <QuickActionsCard
+              onNewMission={() => navigate("/templates")}
+              onSync={(s) => setSyncSource(s)}
+            />
+          </div>
+        </aside>
+      </div>
 
       <ProjectSyncModal
         open={syncSource !== null}
@@ -441,7 +494,18 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
-/* ─────────────────────────── Folder tile ─────────────────────────── */
+/* ─────────────────────────── Rail folder row ────────────────────────── */
+
+function RailFolderRow({ icon, label }: { icon: any; label: string }) {
+  return (
+    <button className="flex items-center gap-2 px-3 h-9 rounded-medium text-small text-default-700 hover:bg-default-100 transition text-left">
+      <FontAwesomeIcon icon={icon} className="w-4 text-default-500" />
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
+/* ─────────────────────────── Folder tile ────────────────────────────── */
 
 function FolderTile({ icon, label, hint }: { icon: any; label: string; hint: string }) {
   return (
@@ -460,9 +524,16 @@ function FolderTile({ icon, label, hint }: { icon: any; label: string; hint: str
   );
 }
 
-/* ─────────────────────────── Mission thumb ─────────────────────────── */
+/* ─────────────────────────── Mission thumb ──────────────────────────── */
 
-function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+function MissionThumb({
+  mission, active, onClick, onOpen,
+}: {
+  mission: MissionRow;
+  active?: boolean;
+  onClick: () => void;
+  onOpen: () => void;
+}) {
   const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
   const isLayerKnown = layerStr in LAYER_TOKENS;
   const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
@@ -475,8 +546,12 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
         isPressable
         isHoverable
         onPress={onClick}
+        onDoubleClick={onOpen}
         shadow="sm"
-        className="overflow-hidden w-full"
+        className={[
+          "overflow-hidden w-full transition",
+          active ? "ring-2 ring-primary ring-offset-2 ring-offset-content1" : "",
+        ].join(" ")}
       >
         <div className="relative w-full overflow-hidden bg-default-100" style={{ aspectRatio: "5 / 4" }}>
           <div className="absolute inset-0 flex items-center justify-center">
@@ -496,7 +571,7 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
         </CardBody>
       </Card>
 
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip content="收藏">
           <Button isIconOnly size="sm" radius="full" variant="flat" aria-label="收藏" onClick={(e) => e.stopPropagation()}>
             <FontAwesomeIcon icon={faBookmark} />
@@ -538,6 +613,111 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
         </div>
       </div>
     </Card>
+  );
+}
+
+/* ─────────────────────────── Right preview card ─────────────────────── */
+
+function PreviewCard({ mission, onOpen }: { mission: MissionRow; onOpen: () => void }) {
+  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
+  const isLayerKnown = layerStr in LAYER_TOKENS;
+  const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
+  const tone = LAYER_TOKENS[lk];
+
+  return (
+    <Card shadow="lg" className="overflow-hidden border border-divider">
+      <CardHeader className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2">
+          <Chip size="sm" color={tone.heroColor} variant="flat">{lk}</Chip>
+          <Chip size="sm" variant="flat">預覽</Chip>
+        </div>
+        <Button isIconOnly size="sm" variant="light" aria-label="更多">
+          <FontAwesomeIcon icon={faEllipsis} />
+        </Button>
+      </CardHeader>
+      <div className="relative w-full bg-default-100" style={{ aspectRatio: "16 / 11" }}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={120} />
+        </div>
+      </div>
+      <CardBody className="px-4 py-4 gap-2">
+        <p className="text-medium font-semibold leading-snug">{mission.title}</p>
+        {mission.description && (
+          <p className="text-small text-default-500 line-clamp-3">{mission.description}</p>
+        )}
+        <div className="mt-1 flex items-center gap-2 text-tiny text-default-500">
+          <FontAwesomeIcon icon={faClockRotateLeft} />
+          <span>{formatRelative(mission.updatedAt)}</span>
+          {mission.brandName && (<><span>·</span><span className="truncate">{mission.brandName}</span></>)}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <Button color="primary" radius="full" className="flex-1" onPress={onOpen}>
+            開啟任務
+          </Button>
+          <Tooltip content="收藏">
+            <Button isIconOnly variant="flat" radius="full" aria-label="收藏">
+              <FontAwesomeIcon icon={faBookmark} />
+            </Button>
+          </Tooltip>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+function EmptyPreviewCard({ onCreate }: { onCreate: () => void }) {
+  return (
+    <Card shadow="lg" className="overflow-hidden border border-divider">
+      <CardBody className="py-10 px-5 items-center text-center gap-3">
+        <FontAwesomeIcon icon={faRocket} className="text-3xl text-primary" />
+        <p className="text-medium font-semibold">挑一個任務開始</p>
+        <p className="text-tiny text-default-500">點擊左側專案以在此預覽，或建立新任務。</p>
+        <Button color="primary" radius="full" className="mt-1" onPress={onCreate}>
+          建立任務
+        </Button>
+      </CardBody>
+    </Card>
+  );
+}
+
+function QuickActionsCard({
+  onNewMission, onSync,
+}: {
+  onNewMission: () => void;
+  onSync: (s: SyncSource) => void;
+}) {
+  return (
+    <Card shadow="sm" className="border border-divider">
+      <CardHeader className="px-4 pt-4 pb-1 text-tiny font-medium uppercase tracking-wider text-default-500">
+        快速動作
+      </CardHeader>
+      <CardBody className="px-3 pt-1 pb-3 gap-1">
+        <ActionRow icon={faWandMagicSparkles} label="從任務範本建立" onPress={onNewMission} />
+        <Divider className="my-1" />
+        {SYNC_SOURCES.slice(0, 4).map((s) => (
+          <ActionRow key={s.id} icon={s.icon} label={s.label} hint={s.hint} onPress={() => onSync(s.id)} />
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
+function ActionRow({
+  icon, label, hint, onPress,
+}: { icon: any; label: string; hint?: string; onPress: () => void }) {
+  return (
+    <button
+      onClick={onPress}
+      className="flex items-center gap-3 px-2 h-11 rounded-medium hover:bg-default-100 transition text-left"
+    >
+      <span className="w-8 h-8 rounded-medium bg-default-100 flex items-center justify-center shrink-0">
+        <FontAwesomeIcon icon={icon} className="text-default-600" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-small font-medium truncate">{label}</p>
+        {hint && <p className="text-tiny text-default-400 truncate">{hint}</p>}
+      </div>
+    </button>
   );
 }
 
@@ -584,7 +764,7 @@ function CreateMenu({
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
-        <Button isIconOnly color="primary" radius="full" aria-label="新增項目">
+        <Button isIconOnly variant="flat" radius="full" aria-label="新增項目">
           <FontAwesomeIcon icon={faPlus} />
         </Button>
       </DropdownTrigger>
@@ -597,17 +777,10 @@ function CreateMenu({
         }}
       >
         <DropdownSection title="新增項目">
-          <DropdownItem
-            key="new-folder"
-            description="把任務分類（如客戶、季度）"
-            isDisabled
-          >
+          <DropdownItem key="new-folder" description="把任務分類（如客戶、季度）" isDisabled>
             新增資料夾（即將推出）
           </DropdownItem>
-          <DropdownItem
-            key="new-mission"
-            description="從任務範本型錄建立任務"
-          >
+          <DropdownItem key="new-mission" description="從任務範本型錄建立任務">
             新任務
           </DropdownItem>
         </DropdownSection>
