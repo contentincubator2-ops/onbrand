@@ -337,6 +337,10 @@ export default function PickerWorkspace() {
   // Mission brief — local state for the new 3-col detail panel.
   const [missionTitle, setMissionTitle] = useState<string>(seedTitle);
   const [missionBrief, setMissionBrief] = useState<string>("");
+  // Per-step agent notes — wired into createMission description on launch.
+  const [agentNotes, setAgentNotes] = useState<Record<number, string>>({});
+  // Reset notes when user picks a different squad.
+  useEffect(() => { setAgentNotes({}); }, [selectedSlug]);
 
   // ── Data ────────────────────────────────────────────────────────────
   const squadsQuery = (trpc.squad as any).listByBrand?.useQuery
@@ -468,9 +472,28 @@ export default function PickerWorkspace() {
     setBusy(true);
     try {
       const ws = (Array.isArray(sq.workspace) ? sq.workspace[0] : sq.workspace) || channelFilter || "";
+
+      // Build description: user brief + per-step agent notes appended as a
+      // markdown section so WorkflowRunner picks them up via the existing
+      // mission.description prompt path. No backend schema change needed.
+      const baseDesc = missionBrief.trim() || safeLocalizedText(sq.description, lang) || "";
+      const steps: any[] = Array.isArray(sq.steps) ? sq.steps : [];
+      const noteLines = steps
+        .map((step, i) => {
+          const txt = (agentNotes[i] ?? "").trim();
+          if (!txt) return null;
+          const agent = step.assignedAgentName ?? step.owner ?? `Step ${i + 1}`;
+          const stepName = step.name ?? step.title ?? `Step ${i + 1}`;
+          return `- **${stepName}**（${agent}）：${txt}`;
+        })
+        .filter(Boolean);
+      const description = noteLines.length
+        ? `${baseDesc}\n\n## 給 agent 的備註\n${noteLines.join("\n")}`.trim()
+        : (baseDesc || undefined);
+
       const res = await createMission.mutateAsync({
         title: missionTitle.trim() || seedTitle || pickLocaleText(sq.name, lang) || sq.slug,
-        description: missionBrief.trim() || safeLocalizedText(sq.description, lang) || undefined,
+        description,
         squadSlug: sq.slug,
         workspace: ws,
         brandId: brandId ?? undefined,
@@ -946,6 +969,8 @@ export default function PickerWorkspace() {
                 setMissionTitle={setMissionTitle}
                 missionBrief={missionBrief}
                 setMissionBrief={setMissionBrief}
+                agentNotes={agentNotes}
+                setAgentNotes={setAgentNotes}
                 brandName={brands.find((b: any) => b.id === brandId)?.name ?? null}
               />
             </div>
@@ -1132,7 +1157,8 @@ const WORKSPACE_META: Record<string, { label: string; icon: any; brand?: any; mo
 
 function SquadDetailPanel({
   squad, busy, error, onLaunch, lang,
-  workspace, missionTitle, setMissionTitle, missionBrief, setMissionBrief, brandName,
+  workspace, missionTitle, setMissionTitle, missionBrief, setMissionBrief,
+  agentNotes, setAgentNotes, brandName,
 }: {
   squad: any;
   busy: boolean;
@@ -1144,6 +1170,8 @@ function SquadDetailPanel({
   setMissionTitle: (s: string) => void;
   missionBrief: string;
   setMissionBrief: (s: string) => void;
+  agentNotes: Record<number, string>;
+  setAgentNotes: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   brandName: string | null;
 }) {
   const lk = resolveLayer(squad.strategyLayer);
@@ -1168,10 +1196,6 @@ function SquadDetailPanel({
     () => getVariantsForPlatform(mockupVariant.platform),
     [mockupVariant.platform],
   );
-
-  // Per-step custom instructions — keyed by step index. Reset on squad change.
-  const [agentNotes, setAgentNotes] = useState<Record<number, string>>({});
-  useEffect(() => { setAgentNotes({}); }, [squad?.slug]);
 
   // Currently expanded agent card (Modal). null when closed.
   const [activeStepIdx, setActiveStepIdx] = useState<number | null>(null);
