@@ -18,7 +18,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import { getSoworkDb } from "../db";
 import { soworkAgents } from "../_schemas/soworkAgents";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // ── HeroUI semantic palette (single source of truth, mirrors client tokens.ts) ──
 type HeroUIColor =
@@ -202,43 +202,23 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
 
 // ── Agent → HomeEntity ─────────────────────────────────────────────────────
 async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
-  // Raw SQL on sowork_db.agents — Drizzle schema (soworkAgents) doesn't
-  // declare avatarUrl, but the column exists and is populated by
-  // generateAgentAvatars.ts. Use raw query so we can SELECT it.
+  // Raw SQL via Drizzle's sql tag — soworkAgents schema doesn't declare
+  // avatarUrl but the column exists and is populated by generateAgentAvatars.
   const db = await getSoworkDb();
   if (!db) return [];
-  const conn = (db as any).session?.client ?? (db as any)._.session?.client;
-  let rawRows: any[] = [];
+  let rows: any[] = [];
   try {
-    const [r]: any = await ((db as any).execute
-      ? (db as any).execute(
-          `SELECT id, slug, name, title, bio, specialty, layer, workspace, avatarUrl
-             FROM agents
-            WHERE isAvailable = 1
-            LIMIT ${limit}`
-        )
-      : conn.query(
-          `SELECT id, slug, name, title, bio, specialty, layer, workspace, avatarUrl
-             FROM agents
-            WHERE isAvailable = 1
-            LIMIT ${limit}`
-        ));
-    rawRows = Array.isArray(r) ? r : (r?.rows ?? []);
+    const [r] = (await db.execute(sql`
+      SELECT id, slug, name, title, bio, specialty, layer, workspace, avatarUrl
+        FROM agents
+       WHERE isAvailable = 1
+       LIMIT ${limit}
+    `)) as any;
+    rows = Array.isArray(r) ? r : [];
   } catch (e: any) {
-    console.warn(`[entity] agents raw SELECT failed, falling back to Drizzle: ${e.message}`);
-    const fallback = await db
-      .select({
-        id: soworkAgents.id, slug: soworkAgents.slug, name: soworkAgents.name,
-        title: soworkAgents.title, bio: soworkAgents.bio,
-        specialty: soworkAgents.specialty, layer: soworkAgents.layer,
-        workspace: soworkAgents.workspace,
-      })
-      .from(soworkAgents)
-      .where(eq(soworkAgents.isAvailable, true))
-      .limit(limit);
-    rawRows = fallback as any[];
+    console.warn(`[entity] agents raw SELECT failed: ${e.message}`);
+    return [];
   }
-  const rows = rawRows;
 
   // Agents use a 3-tier layer (strategy / execution / training) — map to L1/L4/L6
   // for visual consistency with squads. This is a temporary mapping until
