@@ -21,7 +21,7 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Avatar, AvatarGroup, Badge, Button, Card, CardBody, CardHeader, CardFooter,
   Chip, Divider, Input, Textarea, Select, SelectItem, NumberInput,
-  Progress, ScrollShadow, Skeleton, Snippet, Spinner, Tooltip,
+  Progress, ScrollShadow, Skeleton, Snippet, Spinner, Tooltip, User,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -178,7 +178,7 @@ export default function QuickTasksPage() {
           className="absolute inset-0 opacity-30 pointer-events-none"
           style={{ background: `radial-gradient(900px 360px at 70% 0%, ${ACCENT}22 0%, transparent 70%)` }}
         />
-        <div className="relative max-w-[1280px] mx-auto px-8 pt-14 pb-10">
+        <div className="relative px-8 pt-14 pb-10">
           <div className="flex items-center justify-between gap-6 flex-wrap">
             <div>
               <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider">
@@ -222,7 +222,7 @@ export default function QuickTasksPage() {
 
       {/* INLINE RUN VIEW or TILE GRID */}
       {activeTask ? (
-        <section ref={runRef} className="max-w-[1280px] mx-auto px-8 pt-8">
+        <section ref={runRef} className="px-8 pt-8">
           <Button
             variant="bordered"
             size="sm"
@@ -241,7 +241,7 @@ export default function QuickTasksPage() {
           </div>
         </section>
       ) : (
-        <section className="max-w-[1280px] mx-auto px-8 mt-14">
+        <section className="px-8 mt-14">
           <div className="flex items-end justify-between mb-6">
             <h2 className="font-semibold text-2xl tracking-tight">所有 Squads</h2>
             <Chip size="sm" variant="flat">
@@ -299,8 +299,22 @@ function SquadTile({
       <CardFooter className="px-5 pb-4 pt-0 flex items-center gap-2">
         <AvatarGroup max={5} size="sm" isBordered>
           {allAgents.map((a) => (
-            <Tooltip key={a.id} content={`${a.name} · ${a.role}`}>
-              <span><PortraitAvatar name={a.name} tone={a.tone} size={28} /></span>
+            <Tooltip key={a.id} content={
+              <User
+                name={a.name}
+                description={`${a.role} · ${TONE_LABEL[a.tone]}`}
+                avatarProps={{
+                  src: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(a.name)}`,
+                  size: "sm",
+                  color: a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary",
+                }}
+              />
+            }>
+              <Avatar
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(a.name)}`}
+                size="sm" isBordered
+                color={a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary"}
+              />
             </Tooltip>
           ))}
         </AvatarGroup>
@@ -502,7 +516,19 @@ function RunPanel({
         <div className="flex items-center gap-5">
           <AvatarGroup max={5} size="md" isBordered>
             {task.stages.flatMap((s) => s.agents).slice(0, 5).map((a) => (
-              <span key={a.id}><PortraitAvatar name={a.name} tone={a.tone} size={40} /></span>
+              <Tooltip key={a.id} content={
+                <div className="px-1 py-1">
+                  <p className="font-semibold text-small">{a.name}</p>
+                  <p className="text-tiny text-default-500">{a.role}</p>
+                  <p className="text-tiny" style={{ color: TONE_COLOR[a.tone] }}>{TONE_LABEL[a.tone]}</p>
+                </div>
+              }>
+                <Avatar
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(a.name)}`}
+                  size="md" isBordered
+                  color={a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary"}
+                />
+              </Tooltip>
             ))}
           </AvatarGroup>
           <div>
@@ -795,12 +821,20 @@ function AgentCard({
       {/* Body */}
       <div className="flex-1 min-w-0">
         <div className={`flex items-center justify-between px-4 py-3 border-b gap-2 ${onDark ? "border-[#2C2C32]" : "border-divider"}`}>
-          <div className="min-w-0">
-            <p className={`text-small font-medium truncate ${onDark ? "text-white" : ""}`}>{agent.name}</p>
-            <p className={`text-tiny truncate ${onDark ? "text-white/50" : "text-default-500"}`}>
-              {agent.role} · {agent.skill}
-            </p>
-          </div>
+          <User
+            name={agent.name}
+            description={`${agent.role} · ${agent.skill}`}
+            avatarProps={{
+              src: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(agent.name)}`,
+              size: "sm",
+              isBordered: true,
+              color: agent.tone === "orchestrate" ? "secondary" : agent.tone === "research" ? "primary" : agent.tone === "analyze" ? "primary" : agent.tone === "write" ? "danger" : "warning",
+            }}
+            classNames={{
+              name: `text-small font-medium ${onDark ? "text-white" : ""}`,
+              description: `text-tiny ${onDark ? "text-white/50" : "text-default-500"}`,
+            }}
+          />
           <div className="shrink-0">{statusChip}</div>
         </div>
 
@@ -891,7 +925,12 @@ function FinalDeliverable({
     >
       <CardHeader className="flex items-center justify-between gap-3 px-6 pt-5 pb-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <PortraitAvatar name={result.agentName} tone={result.agentTone} size={48} glow />
+          <Badge content="✓" color="secondary" placement="bottom-right" shape="circle" size="md">
+            <Avatar
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(result.agentName)}`}
+              size="lg" isBordered color="secondary"
+            />
+          </Badge>
           <div>
             <Chip size="sm" color="secondary" variant="flat" className="uppercase tracking-wider">
               FINAL DELIVERABLE · 交付完成
