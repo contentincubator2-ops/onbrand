@@ -157,51 +157,66 @@ export default function MethodologyCatalog() {
   };
 
   return (
-    <main className="pb-16">
-      {/* ─── Hero (very light pastel — Canva-faithful) ──────────── */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(135deg, hsl(210 60% 96%) 0%, hsl(280 50% 96%) 50%, hsl(340 60% 96%) 100%)",
-        }}
-      >
-        <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <Button variant="bordered" radius="full" startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />} onPress={() => setDrawerOpen(true)}>
-            先睹為快
-          </Button>
-          <Button color="primary" radius="full" startContent={<FontAwesomeIcon icon={faCrown} />} onPress={() => setDrawerOpen(true)}>
-            開始試用 NT$0 元
-          </Button>
-        </div>
-
-        <div className="max-w-[1280px] mx-auto px-6 pt-14 pb-10">
-          <h1 className="text-center text-5xl md:text-6xl font-semibold tracking-tight text-foreground">範本</h1>
-
-          <div className="mt-6 max-w-[720px] mx-auto">
-            <Input
-              size="lg"
-              radius="full"
-              variant="bordered"
-              value={searchQ}
-              onValueChange={setSearchQ}
-              placeholder="搜尋數百個範本"
-              isClearable
-              onClear={() => setSearchQ("")}
-              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
-            />
+    <main className="pb-16 max-w-[1280px] mx-auto px-8 py-10">
+      {/* ─── Header (Notion-discipline) ──────────────────────────── */}
+      <header className="mb-8">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <Chip size="sm" variant="flat" className="uppercase tracking-wider mb-2">
+              TEMPLATES · 範本
+            </Chip>
+            <h1 className="text-3xl font-semibold tracking-tight">範本</h1>
+            <p className="text-small text-default-500 max-w-[640px] leading-relaxed mt-2">
+              方法論小組、AI agent、技能模板 — 找一個套上去，立刻開工。
+            </p>
           </div>
-
-          {/* 3 quick filter pills (Canva: 商務 / 影片 / 社交媒體) */}
-          <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
-            <Chip variant="flat" startContent={<FontAwesomeIcon icon={faBriefcase} className="ml-1" />} size="lg" className="cursor-pointer hover:scale-105 transition" onClick={() => applyExploreTile({ key: "biz", label: "", hint: "", icon: null, color: "default", filter: { layer: "L2" } })}>商務</Chip>
-            <Chip variant="flat" startContent={<FontAwesomeIcon icon={faVideo} className="ml-1" />} size="lg" className="cursor-pointer hover:scale-105 transition" onClick={() => applyExploreTile({ key: "vid", label: "", hint: "", icon: null, color: "default", filter: { query: "video" } })}>影片</Chip>
-            <Chip variant="flat" startContent={<FontAwesomeIcon icon={faShareNodes} className="ml-1" />} size="lg" className="cursor-pointer hover:scale-105 transition" onClick={() => applyExploreTile({ key: "soc", label: "", hint: "", icon: null, color: "default", filter: { query: "social" } })}>社交媒體</Chip>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="bordered" radius="full"
+              startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+              onPress={() => setDrawerOpen(true)}>
+              先睹為快
+            </Button>
+            <Button size="sm" color="primary" radius="full"
+              startContent={<FontAwesomeIcon icon={faCrown} />}
+              onPress={() => setDrawerOpen(true)}>
+              開始試用
+            </Button>
           </div>
         </div>
-      </section>
 
-      {/* ─── 探索範本 — pastel category tiles ───────────────────── */}
+        <div className="mt-5">
+          <Input
+            size="md"
+            radius="full"
+            variant="bordered"
+            value={searchQ}
+            onValueChange={setSearchQ}
+            placeholder="搜尋數百個範本"
+            isClearable
+            onClear={() => setSearchQ("")}
+            startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+            className="max-w-[640px]"
+          />
+        </div>
+
+        {/* Quick-filter chips — neutral, no hover scale */}
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <Chip variant="flat" size="sm"
+            startContent={<FontAwesomeIcon icon={faBriefcase} className="ml-1 text-default-500" />}
+            className="cursor-pointer hover:bg-default-100 transition"
+            onClick={() => applyExploreTile({ key: "biz", label: "", hint: "", icon: null, color: "default", filter: { layer: "L2" } })}>商務</Chip>
+          <Chip variant="flat" size="sm"
+            startContent={<FontAwesomeIcon icon={faVideo} className="ml-1 text-default-500" />}
+            className="cursor-pointer hover:bg-default-100 transition"
+            onClick={() => applyExploreTile({ key: "vid", label: "", hint: "", icon: null, color: "default", filter: { query: "video" } })}>影片</Chip>
+          <Chip variant="flat" size="sm"
+            startContent={<FontAwesomeIcon icon={faShareNodes} className="ml-1 text-default-500" />}
+            className="cursor-pointer hover:bg-default-100 transition"
+            onClick={() => applyExploreTile({ key: "soc", label: "", hint: "", icon: null, color: "default", filter: { query: "social" } })}>社交媒體</Chip>
+        </div>
+      </header>
+
+      {/* ─── 探索範本 — neutral category tiles ───────────────────── */}
       <ScrollSection title="探索範本">
         {EXPLORE_TILES.map((t) => (
           <Card
@@ -209,8 +224,9 @@ export default function MethodologyCatalog() {
             isPressable
             isHoverable
             onPress={() => applyExploreTile(t)}
-            shadow="sm"
-            className={`shrink-0 w-[260px] h-[120px] bg-${t.color}-100`}
+            shadow="none"
+            radius="md"
+            className="shrink-0 w-[260px] h-[120px] border border-divider hover:bg-default-50 transition"
           >
             <CardBody className="flex flex-row items-center justify-between gap-3 px-5 py-4">
               <div className="min-w-0">
@@ -218,8 +234,8 @@ export default function MethodologyCatalog() {
                 <p className="text-medium font-semibold leading-tight mt-0.5">{t.label}</p>
                 <p className="text-tiny text-default-500 mt-0.5">{t.hint}</p>
               </div>
-              <div className={`w-14 h-14 rounded-xl bg-${t.color}-200 flex items-center justify-center shrink-0`}>
-                <FontAwesomeIcon icon={t.icon} className="text-2xl" />
+              <div className="w-14 h-14 rounded-md bg-default-100 flex items-center justify-center shrink-0">
+                <FontAwesomeIcon icon={t.icon} className="text-2xl text-default-500" />
               </div>
             </CardBody>
           </Card>
@@ -460,6 +476,19 @@ function ScrollSection({
  *     as a giant glyph. When Path B image-gen runs, image slots in here.
  * ─────────────────────────────────────────────────────────────────── */
 
+/**
+ * LandscapeCard — Notion-discipline card.
+ *
+ * Per design system rules (memory: project_design_system.md):
+ *  - shadow="none", border-divider, radius=md
+ *  - hover: bg-default-50 (no scale, no big shadow)
+ *  - hero area: neutral bg-default-50, glyph in default-500 (no
+ *    color-coded gradient, no kind-specific tint)
+ *  - layer chip: secondary flat (single accent), L# distinguishes
+ *  - kind chip: default flat (no decorative color)
+ *  - hover overlay: subtle dark fade + neutral action buttons (no
+ *    colorful "primary" CTA on every card)
+ */
 function LandscapeCard({
   entity, onPreview, aspect = "16/9", size = "md",
 }: {
@@ -470,92 +499,73 @@ function LandscapeCard({
 }) {
   const layerKey = (entity.strategyLayer ?? "L1") as MosLayer;
   const tone = LAYER_TOKENS[layerKey];
-  const heroColor = tone?.heroColor ?? "default";
   const coverImageUrl: string | undefined = entity.coverImageUrl ?? entity.heroImageUrl;
   const kindLabel = entity.kind === "squad" ? "小組" : entity.kind === "agent" ? "Agent" : "技能";
-  const ctaLabel  = entity.kind === "squad" ? "啟動小組" : entity.kind === "agent" ? "套用 Agent" : "套用技能";
   const titleSize = size === "sm" ? "text-small" : size === "lg" ? "text-large" : "text-medium";
-  const subtitleSize = size === "sm" ? "text-tiny" : "text-tiny";
-  const glyphSize = size === "sm" ? 80 : size === "lg" ? 160 : 120;
+  const subtitleSize = "text-tiny";
+  const glyphSize = size === "sm" ? 64 : size === "lg" ? 120 : 90;
 
   return (
     <Card
       isPressable
       isHoverable
       onPress={() => onPreview(entity)}
-      shadow="sm"
-      radius="lg"
-      className="w-full h-full overflow-hidden group"
+      shadow="none"
+      radius="md"
+      className="w-full h-full overflow-hidden group border border-divider hover:bg-default-50 transition"
     >
-      {/* Visual area — image if available, else gradient + glyph */}
-      <div className={`relative w-full bg-${heroColor}-100 overflow-hidden`} style={{ aspectRatio: aspect }}>
+      {/* Hero area — neutral. Image if available, else mono glyph. */}
+      <div
+        className="relative w-full bg-default-50 overflow-hidden border-b border-divider"
+        style={{ aspectRatio: aspect }}
+      >
         {coverImageUrl ? (
           <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center opacity-70">
             <MethodologyGlyph seed={entity.slug ?? entity.id} layer={layerKey} size={glyphSize} />
           </div>
         )}
 
-        {/* Top-left layer chip — always visible */}
+        {/* Top-left layer chip — always default/secondary, never colorful */}
         <Chip
           size="sm"
-          color={heroColor}
-          variant="solid"
-          className="absolute top-2.5 left-2.5 shadow-sm pointer-events-none"
+          variant="flat"
+          className="absolute top-2.5 left-2.5 bg-content1/95 backdrop-blur-sm pointer-events-none"
         >
           {layerKey}・{tone?.label}
         </Chip>
 
-        {/* Top-right kind chip — hides on hover so action buttons can take its spot */}
+        {/* Top-right kind chip — neutral */}
         <Chip
           size="sm"
           variant="flat"
-          className="absolute top-2.5 right-2.5 bg-content1/80 backdrop-blur-md transition-opacity duration-150 group-hover:opacity-0 pointer-events-none"
+          className="absolute top-2.5 right-2.5 bg-content1/95 backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-0 pointer-events-none"
         >
           {kindLabel}
         </Chip>
 
-        {/* Hover overlay (dark gradient + actions) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-          {/* Center primary action — Canva pattern */}
-          <Button
-            color="primary"
-            radius="full"
-            size={size === "sm" ? "sm" : "md"}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto shadow-lg"
-            startContent={<FontAwesomeIcon icon={faPlay} />}
-            onPress={(ev: any) => { ev?.stopPropagation?.(); onPreview(entity); }}
-          >
-            {ctaLabel}
-          </Button>
-
-          {/* Top-right star (favourite) + more menu */}
+        {/* Hover overlay — subtle, neutral icon actions. No colorful CTA. */}
+        <div className="absolute inset-0 bg-foreground/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
           <div className="absolute top-2.5 right-2.5 flex gap-1.5 pointer-events-auto">
             <Tooltip content="收藏" placement="bottom">
               <Button
-                isIconOnly
-                size="sm"
-                radius="full"
-                variant="flat"
-                className="bg-content1/90 backdrop-blur-md"
+                isIconOnly size="sm" radius="full" variant="flat"
+                className="bg-content1/95 backdrop-blur-sm"
                 aria-label="收藏"
                 onClick={(e) => { e.stopPropagation(); /* TODO: bookmark */ }}
               >
-                <FontAwesomeIcon icon={faStar} />
+                <FontAwesomeIcon icon={faStar} className="text-default-600" />
               </Button>
             </Tooltip>
             <Tooltip content="更多" placement="bottom">
               <Button
-                isIconOnly
-                size="sm"
-                radius="full"
-                variant="flat"
-                className="bg-content1/90 backdrop-blur-md"
+                isIconOnly size="sm" radius="full" variant="flat"
+                className="bg-content1/95 backdrop-blur-sm"
                 aria-label="更多"
                 onClick={(e) => { e.stopPropagation(); /* TODO: more menu */ }}
               >
-                <FontAwesomeIcon icon={faEllipsis} />
+                <FontAwesomeIcon icon={faEllipsis} className="text-default-600" />
               </Button>
             </Tooltip>
           </div>
@@ -567,7 +577,12 @@ function LandscapeCard({
         {entity.subtitle && (
           <p className={`${subtitleSize} text-default-500 line-clamp-1`}>{entity.subtitle}</p>
         )}
-        <TaskChip entity={entity} kind={entity.kind === "agent" ? "agent" : entity.kind === "skill" ? "skill" : "squad"} size="sm" className="self-start mt-0.5" />
+        <TaskChip
+          entity={entity}
+          kind={entity.kind === "agent" ? "agent" : entity.kind === "skill" ? "skill" : "squad"}
+          size="sm"
+          className="self-start mt-0.5"
+        />
       </CardBody>
     </Card>
   );
