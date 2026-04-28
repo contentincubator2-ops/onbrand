@@ -28,6 +28,7 @@ import {
 } from "@heroui/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { AgentAvatar } from "../components/AgentAvatar";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRight, faBookOpen, faBrain, faCheck, faCircleCheck, faComments,
@@ -501,14 +502,20 @@ function CandidateCard({
             <span className="w-1 h-1" />
           </Badge>
         )}
-        <User
-          name={<span className="text-small font-bold">{c.name}</span>}
-          description={<span className="text-tiny line-clamp-2 leading-tight">{c.title}</span>}
-          avatarProps={{
-            src: dicebear(c.name), size: "md", isBordered: true,
-            color: selected ? "secondary" : "default",
-          }}
-        />
+        <div className="flex items-center gap-2.5">
+          <AgentAvatar
+            seed={c.agentId ?? c.name}
+            size={40}
+            className={[
+              "rounded-full ring-2 shrink-0",
+              selected ? "ring-secondary" : "ring-divider",
+            ].join(" ")}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-small font-bold truncate">{c.name}</p>
+            <p className="text-tiny line-clamp-2 leading-tight text-default-500">{c.title}</p>
+          </div>
+        </div>
         {c.squadName && (
           <Chip
             size="sm" variant="flat" color="secondary"
@@ -565,33 +572,31 @@ function PitchCard({
   return (
     <Card shadow="sm" radius="lg" className="border border-divider">
       <CardHeader className="flex items-start justify-between gap-3 px-6 pt-5 pb-3 flex-wrap">
-        <User
-          name={
-            <span className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <AgentAvatar
+            seed={c.agentId ?? c.name}
+            size={56}
+            className="rounded-full ring-2 ring-secondary shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-medium">{c.name}</span>
               {p && <ProviderChip provider={p.provider} model={p.model} />}
-            </span>
-          }
-          description={
-            <span className="block">
-              <span className="text-tiny text-default-500">{c.title}</span>
-              {c.squadName && (
-                <Chip
-                  size="sm" variant="flat" color="secondary"
-                  startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
-                  className="mt-1.5 max-w-full"
-                  classNames={{ content: "truncate" }}
-                >
-                  {c.squadName}
-                  {c.squadMethodology ? ` · ${c.squadMethodology.slice(0, 60)}` : ""}
-                </Chip>
-              )}
-            </span>
-          }
-          avatarProps={{
-            src: dicebear(c.name), size: "lg", isBordered: true, color: "secondary",
-          }}
-        />
+            </div>
+            <p className="text-tiny text-default-500">{c.title}</p>
+            {c.squadName && (
+              <Chip
+                size="sm" variant="flat" color="secondary"
+                startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
+                className="mt-1.5 max-w-full"
+                classNames={{ content: "truncate" }}
+              >
+                {c.squadName}
+                {c.squadMethodology ? ` · ${c.squadMethodology.slice(0, 60)}` : ""}
+              </Chip>
+            )}
+          </div>
+        </div>
         {state.status === "delivered" && (
           <Chip size="sm" color="success" variant="flat"
             startContent={<FontAwesomeIcon icon={faCircleCheck} className="text-tiny ml-1" />}

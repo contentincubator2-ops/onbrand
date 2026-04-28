@@ -30,6 +30,7 @@ import { searchAndRankSquads } from "../lib/searchSquads";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import { TaskChip } from "../components/TaskChip";
+import { AgentAvatar } from "../components/AgentAvatar";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
 import {
   Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
@@ -1395,24 +1396,26 @@ function SquadDetailPanel({
         </div>
 
         {members.length > 0 && (
-          <div className="flex items-center gap-2">
-            <AvatarGroup max={5} size="sm" isBordered>
-              {members.map((m: any, i: number) => (
-                <Tooltip key={m.id ?? m.name ?? i} content={
-                  <User
-                    name={m.name ?? "—"}
-                    description={m.role ?? m.primarySkill ?? ""}
-                    avatarProps={{ src: dicebear(m.name ?? `m${i}`), size: "sm" }}
-                  />
-                }>
-                  <Avatar
-                    src={dicebear(m.name ?? `m${i}`)}
-                    size="sm" isBordered
-                  />
-                </Tooltip>
-              ))}
-            </AvatarGroup>
-            <span className="text-tiny text-default-500">{members.length} 位成員</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {members.slice(0, 5).map((m: any, i: number) => (
+              <Tooltip key={m.id ?? m.name ?? i} content={
+                <div className="flex items-center gap-2 px-1 py-1">
+                  <AgentAvatar seed={m.id ?? m.name ?? `m${i}`} size={32} className="rounded-full" />
+                  <div>
+                    <p className="text-small font-semibold">{m.name ?? "—"}</p>
+                    <p className="text-tiny text-default-500">{m.role ?? m.primarySkill ?? ""}</p>
+                  </div>
+                </div>
+              }>
+                <span className="ring-2 ring-content1 rounded-full -mr-2 last:mr-0">
+                  <AgentAvatar seed={m.id ?? m.name ?? `m${i}`} size={32} className="rounded-full" />
+                </span>
+              </Tooltip>
+            ))}
+            {members.length > 5 && (
+              <span className="ml-3 text-tiny text-default-500">+{members.length - 5}</span>
+            )}
+            <span className="ml-1 text-tiny text-default-500">{members.length} 位成員</span>
           </div>
         )}
 
@@ -1600,8 +1603,7 @@ function AgentQueueCard({
               color="default" placement="bottom-right" shape="circle" size="sm"
               classNames={{ badge: "bg-default-300" }}
             >
-              <Avatar src={dicebear(agent)} size="md" isBordered
-                color={isOrchestrator ? "secondary" : "default"} />
+              <AgentAvatar seed={agent} size={40} className={isOrchestrator ? "rounded-full ring-2 ring-secondary" : "rounded-full ring-1 ring-divider"} />
             </Badge>
           ) : (
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-tiny font-bold"
@@ -1733,8 +1735,16 @@ function AgentLiveCard({
       <CardBody className="p-3 flex flex-row items-start gap-3">
         <div className="shrink-0 flex flex-col items-center gap-1">
           {agent ? (
-            <Avatar src={dicebear(agent)} size="md" isBordered
-              color={isOrchestrator ? "secondary" : statusMeta.color === "success" ? "success" : statusMeta.color === "warning" ? "warning" : "default"} />
+            <AgentAvatar
+              seed={agent}
+              size={40}
+              className={[
+                "rounded-full ring-2",
+                isOrchestrator ? "ring-secondary" :
+                statusMeta.color === "success" ? "ring-success" :
+                statusMeta.color === "warning" ? "ring-warning" : "ring-divider",
+              ].join(" ")}
+            />
           ) : (
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-tiny font-bold"
               style={{ background: `${tone.bg}33`, color: tone.bg }}>{idx}</div>
@@ -1801,7 +1811,7 @@ function AgentLiveCard({
             {/* Agent's output as a chat bubble */}
             {liveStatus === "running" || (!liveOutput && missionId) ? (
               <div className="flex items-start gap-2">
-                <Avatar src={dicebear(agent ?? `step${idx}`)} size="sm" />
+                <AgentAvatar seed={agent ?? `step${idx}`} size={32} className="rounded-full shrink-0" />
                 <div className="flex-1 bg-content1 border border-divider rounded-2xl rounded-tl-sm px-3 py-2 space-y-1.5">
                   <p className="text-tiny text-default-500 flex items-center gap-1.5">
                     <Spinner size="sm" classNames={{ wrapper: "w-3 h-3" }} />
@@ -1813,7 +1823,7 @@ function AgentLiveCard({
               </div>
             ) : liveOutput ? (
               <div className="flex items-start gap-2">
-                <Avatar src={dicebear(agent ?? `step${idx}`)} size="sm" />
+                <AgentAvatar seed={agent ?? `step${idx}`} size={32} className="rounded-full shrink-0" />
                 <div className="flex-1 bg-content1 border border-divider rounded-2xl rounded-tl-sm px-3 py-2">
                   <p className="text-tiny text-default-500 mb-1">{agent ?? "agent"}</p>
                   <ScrollShadow className="max-h-64">
@@ -1916,7 +1926,7 @@ function AgentDetailModal({
       <ModalContent>
         <ModalHeader className="flex items-start gap-4 px-6 pt-6 pb-3">
           {agent ? (
-            <Avatar src={dicebear(agent)} size="lg" isBordered color="secondary" />
+            <AgentAvatar seed={agent} size={56} className="rounded-full ring-2 ring-secondary" />
           ) : (
             <div className="w-14 h-14 rounded-full flex items-center justify-center text-medium font-bold"
               style={{ background: `${tone.bg}33`, color: tone.bg }}>
