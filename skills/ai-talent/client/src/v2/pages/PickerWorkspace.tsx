@@ -31,8 +31,10 @@ import WorkflowRunner from "./WorkflowRunner";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
 import {
   Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
-  Button, Card, CardBody, CardHeader, Chip, Divider, Input, Progress,
-  ScrollShadow, Skeleton, Spinner, Tab, Tabs, Textarea, Tooltip, User,
+  Button, Card, CardBody, CardHeader, Chip, Divider, Input,
+  Modal, ModalBody, ModalContent, ModalFooter, ModalHeader,
+  Progress, ScrollShadow, Skeleton, Spinner, Tab, Tabs, Textarea,
+  Tooltip, User,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -1167,6 +1169,13 @@ function SquadDetailPanel({
     [mockupVariant.platform],
   );
 
+  // Per-step custom instructions — keyed by step index. Reset on squad change.
+  const [agentNotes, setAgentNotes] = useState<Record<number, string>>({});
+  useEffect(() => { setAgentNotes({}); }, [squad?.slug]);
+
+  // Currently expanded agent card (Modal). null when closed.
+  const [activeStepIdx, setActiveStepIdx] = useState<number | null>(null);
+
   // User-overridable preview variant (defaults to inferred)
   const [previewFormatKey, setPreviewFormatKey] = useState<string>(mockupVariant.format);
   // Reset preview to inferred whenever squad / platform changes
@@ -1369,10 +1378,27 @@ function SquadDetailPanel({
               idx={i + 1}
               isOrchestrator={i === steps.length - 1 && steps.length > 1}
               tone={tone}
+              hasNote={!!agentNotes[i]?.trim()}
+              onPress={() => setActiveStepIdx(i)}
             />
           ))}
         </div>
       </aside>
+
+      {/* Agent detail modal */}
+      <AgentDetailModal
+        isOpen={activeStepIdx !== null}
+        onClose={() => setActiveStepIdx(null)}
+        step={activeStepIdx !== null ? steps[activeStepIdx] : null}
+        idx={activeStepIdx !== null ? activeStepIdx + 1 : 0}
+        totalSteps={steps.length}
+        tone={tone}
+        note={activeStepIdx !== null ? (agentNotes[activeStepIdx] ?? "") : ""}
+        setNote={(v) => {
+          if (activeStepIdx === null) return;
+          setAgentNotes((p) => ({ ...p, [activeStepIdx]: v }));
+        }}
+      />
     </div>
   );
 }
@@ -1384,12 +1410,14 @@ function seedTitleHint(squad: any, lang: "zh-TW" | "en") {
 /* ─────────────── Sub: AgentQueueCard (PR1: queued state only) ─────────── */
 
 function AgentQueueCard({
-  step, idx, isOrchestrator, tone,
+  step, idx, isOrchestrator, tone, hasNote, onPress,
 }: {
   step: any;
   idx: number;
   isOrchestrator: boolean;
   tone: any;
+  hasNote?: boolean;
+  onPress?: () => void;
 }) {
   const title = step.name ?? step.title ?? `Step ${idx}`;
   const agent = step.assignedAgentName ?? step.owner ?? null;
@@ -1399,9 +1427,13 @@ function AgentQueueCard({
   return (
     <Card
       shadow="none" radius="md"
+      isPressable={!!onPress}
+      isHoverable={!!onPress}
+      onPress={onPress}
       className={[
-        "border",
+        "border w-full",
         isOrchestrator ? "bg-foreground text-background border-foreground" : "border-divider",
+        hasNote ? "ring-2 ring-secondary ring-offset-1 ring-offset-content1" : "",
       ].join(" ")}
     >
       <CardBody className="p-3 flex flex-row items-start gap-3">
@@ -1466,18 +1498,150 @@ function AgentQueueCard({
               )}
             </div>
           )}
-          <Chip
-            size="sm" variant="flat" className="mt-1.5"
-            classNames={{
-              base: isOrchestrator ? "bg-white/15 text-white" : "",
-              content: "text-tiny",
-            }}
-          >
-            queued
-          </Chip>
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <Chip
+              size="sm" variant="flat"
+              classNames={{
+                base: isOrchestrator ? "bg-white/15 text-white" : "",
+                content: "text-tiny",
+              }}
+            >
+              queued
+            </Chip>
+            {hasNote && (
+              <Chip
+                size="sm" variant="flat" color="secondary"
+                startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny ml-1" />}
+                classNames={{ content: "text-tiny pr-1" }}
+              >
+                有備註
+              </Chip>
+            )}
+          </div>
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+/* ─────────────── Sub: AgentDetailModal (PR3) ─────────────── */
+
+function AgentDetailModal({
+  isOpen, onClose, step, idx, totalSteps, tone, note, setNote,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  step: any | null;
+  idx: number;
+  totalSteps: number;
+  tone: any;
+  note: string;
+  setNote: (v: string) => void;
+}) {
+  if (!step) return null;
+  const title = step.name ?? step.title ?? `Step ${idx}`;
+  const agent = step.assignedAgentName ?? step.owner ?? null;
+  const role = step.assignedAgentRole ?? step.role ?? null;
+  const skills: string[] = Array.isArray(step.requiredSkills) ? step.requiredSkills : [];
+  const out = step.outputType ?? step.output ?? "";
+  const tool = step.tool ?? step.requiredTools?.[0] ?? null;
+  const desc = step.description ?? null;
+  const isOrchestrator = idx === totalSteps && totalSteps > 1;
+
+  const QUICK_PROMPTS = [
+    "再口語一點",
+    "加 emoji",
+    "縮短到 50 字",
+    "更專業一些",
+    "強調品牌調性",
+    "加 CTA",
+  ];
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur" scrollBehavior="inside">
+      <ModalContent>
+        <ModalHeader className="flex items-start gap-4 px-6 pt-6 pb-3">
+          {agent ? (
+            <Avatar src={dicebear(agent)} size="lg" isBordered color="secondary" />
+          ) : (
+            <div className="w-14 h-14 rounded-full flex items-center justify-center text-medium font-bold"
+              style={{ background: `${tone.bg}33`, color: tone.bg }}>
+              {idx}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <Chip size="sm" variant="flat" className="tabular-nums">
+                STEP 0{idx} / 0{totalSteps}
+              </Chip>
+              {isOrchestrator && (
+                <Chip size="sm" variant="solid" startContent={<FontAwesomeIcon icon={faGavel} className="text-tiny ml-1" />} className="bg-foreground text-background">
+                  ORCHESTRATOR
+                </Chip>
+              )}
+            </div>
+            <h2 className="font-semibold text-large tracking-tight leading-tight">{title}</h2>
+            {agent && (
+              <p className="text-small text-default-500 mt-0.5">
+                {agent}{role ? ` · ${role}` : ""}
+              </p>
+            )}
+          </div>
+        </ModalHeader>
+        <Divider />
+        <ModalBody className="px-6 py-5 space-y-5">
+          {desc && (
+            <div>
+              <p className="text-tiny tracking-wider uppercase text-default-500 font-medium mb-1.5">
+                這個階段在做什麼
+              </p>
+              <p className="text-small text-foreground leading-relaxed whitespace-pre-line">{desc}</p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {skills.map((sk, i) => (
+              <Chip key={i} size="sm" variant="flat">{sk}</Chip>
+            ))}
+            {out && <Chip size="sm" variant="bordered">輸出：{out}</Chip>}
+            {tool && <Chip size="sm" variant="flat" color="secondary">工具：{tool}</Chip>}
+          </div>
+
+          <Divider />
+
+          <div>
+            <p className="text-tiny tracking-wider uppercase text-default-500 font-medium mb-2 flex items-center gap-1.5">
+              <FontAwesomeIcon icon={faPenToSquare} /> 給 {agent ?? "這個 agent"} 的備註
+            </p>
+            <Textarea
+              variant="bordered" radius="md"
+              placeholder="例：請用更口語的口吻 / 重點放在價格優勢 / 加入 CTA「立即試用」…"
+              minRows={3} maxRows={6}
+              value={note}
+              onValueChange={setNote}
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {QUICK_PROMPTS.map((p) => (
+                <Chip
+                  key={p} size="sm" variant="bordered"
+                  className="cursor-pointer hover:bg-default-100"
+                  onClick={() => setNote(note ? `${note}；${p}` : p)}
+                >
+                  + {p}
+                </Chip>
+              ))}
+            </div>
+            <p className="text-tiny text-default-500 mt-2">
+              派出小組時會把這個備註傳給該 agent，調整輸出風格。
+            </p>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="light" onPress={() => setNote("")} isDisabled={!note}>清除備註</Button>
+          <Button color="primary" onPress={onClose}>完成</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }
 
