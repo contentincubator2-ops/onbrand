@@ -40,7 +40,7 @@ export default function RequireAuthV2({ children }: { children: React.ReactNode 
   if (checking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-[0.78rem] tracking-[0.2em] uppercase text-default-400">
+        <div className="text-small tracking-[0.2em] uppercase text-default-400">
           Marketing OS · 載入中
         </div>
       </div>

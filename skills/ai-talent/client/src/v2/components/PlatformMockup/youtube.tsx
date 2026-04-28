@@ -185,7 +185,7 @@ export function YTShorts({ title, brandName, variantLabel }: MockupFields) {
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 text-white">
-          <span className="text-[0.92rem] font-semibold">Shorts</span>
+          <span className="text-small font-semibold">Shorts</span>
           <span className="text-medium">⋯</span>
         </div>
         <div className="absolute inset-0 flex items-center justify-center">
@@ -210,10 +210,10 @@ export function YTShorts({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1.5 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
           <div className="flex items-center gap-2">
-            <span className="text-[0.82rem] font-semibold">@{(brandName ?? "your_channel").toLowerCase().replace(/\s+/g, "_")}</span>
+            <span className="text-small font-semibold">@{(brandName ?? "your_channel").toLowerCase().replace(/\s+/g, "_")}</span>
             <Button size="sm" radius="sm" className="h-6 min-w-0 px-2 text-tiny bg-white text-black">訂閱</Button>
           </div>
-          <p className="text-[0.78rem] line-clamp-2">{title}</p>
+          <p className="text-small line-clamp-2">{title}</p>
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
             <span>原創音訊</span>

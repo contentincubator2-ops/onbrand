@@ -91,24 +91,24 @@ export default function ChatDrawer({
         {/* Header */}
         <div className="px-5 py-4 border-b border-divider flex items-start justify-between bg-background">
           <div>
-            <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400">
+            <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
               MISSION CHAT
             </div>
-            <div className="font-semibold text-[1.05rem] text-foreground">
+            <div className="font-semibold text-medium text-foreground">
               {squadName ? `與 ${squadName} 對話` : "Squad Chat"}
             </div>
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={clearAll}
-              className="text-[0.66rem] tracking-[0.16em] uppercase text-default-400 hover:text-danger px-2 py-1"
+              className="text-tiny tracking-[0.16em] uppercase text-default-400 hover:text-danger px-2 py-1"
               title="清空"
             >
               清空
             </button>
             <button
               onClick={onClose}
-              className="text-[0.66rem] tracking-[0.16em] uppercase text-default-500 hover:text-foreground px-2 py-1"
+              className="text-tiny tracking-[0.16em] uppercase text-default-500 hover:text-foreground px-2 py-1"
             >
               關閉 ×
             </button>
@@ -118,14 +118,14 @@ export default function ChatDrawer({
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {listQuery.isLoading && (
-            <div className="text-[0.78rem] text-default-500">載入對話中…</div>
+            <div className="text-small text-default-500">載入對話中…</div>
           )}
           {!listQuery.isLoading && messages.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400">
+              <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
                 EMPTY
               </div>
-              <div className="mt-1 text-[0.86rem] text-default-500">
+              <div className="mt-1 text-small text-default-500">
                 還沒有對話 — 在下方輸入問題開始
               </div>
             </div>
@@ -151,17 +151,17 @@ export default function ChatDrawer({
             }}
             placeholder="問 squad lead — Enter 送出，Shift+Enter 換行"
             rows={3}
-            className="w-full bg-white border border-divider px-3 py-2 text-[0.88rem] text-foreground focus:outline-none focus:border-foreground resize-none"
+            className="w-full bg-white border border-divider px-3 py-2 text-small text-foreground focus:outline-none focus:border-foreground resize-none"
             disabled={busy}
           />
           <div className="mt-2 flex items-center justify-between">
-            <div className="text-[0.62rem] tracking-[0.16em] text-default-400">
+            <div className="text-tiny tracking-[0.16em] text-default-400">
               對話內容會綁定到此任務
             </div>
             <button
               onClick={send}
               disabled={!draft.trim() || busy}
-              className="px-4 py-1.5 text-[0.7rem] tracking-[0.18em] uppercase bg-foreground text-white hover:bg-foreground/90 transition disabled:opacity-50"
+              className="px-4 py-1.5 text-tiny tracking-[0.18em] uppercase bg-foreground text-white hover:bg-foreground/90 transition disabled:opacity-50"
             >
               送出 →
             </button>
@@ -184,7 +184,7 @@ function Bubble({
     <div className={["flex", isUser ? "justify-end" : "justify-start"].join(" ")}>
       <div
         className={[
-          "max-w-[80%] px-4 py-2.5 text-[0.88rem] leading-relaxed whitespace-pre-wrap",
+          "max-w-[80%] px-4 py-2.5 text-small leading-relaxed whitespace-pre-wrap",
           isUser
             ? "bg-foreground text-white"
             : "bg-background border border-divider text-foreground",

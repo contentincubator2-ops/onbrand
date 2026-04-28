@@ -40,11 +40,11 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
           <div className="flex items-center gap-2.5 min-w-0">
             <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={36} />
             <div className="min-w-0">
-              <div className="flex items-center gap-1 text-[0.84rem] font-semibold leading-tight truncate">
+              <div className="flex items-center gap-1 text-small font-semibold leading-tight truncate">
                 {handle}
-                <FontAwesomeIcon icon={faCircleCheck} className="text-[0.66rem] text-primary" />
+                <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-[0.7rem] text-default-500 truncate leading-tight">原創音訊</p>
+              <p className="text-tiny text-default-500 truncate leading-tight">原創音訊</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
@@ -64,11 +64,11 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
 
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-4 text-foreground">
-            <FontAwesomeIcon icon={faHeart} className="text-[1.4rem]" />
-            <FontAwesomeIcon icon={faComment} className="text-[1.35rem]" />
-            <FontAwesomeIcon icon={faPaperPlane} className="text-[1.35rem]" />
+            <FontAwesomeIcon icon={faHeart} className="text-xl" />
+            <FontAwesomeIcon icon={faComment} className="text-xl" />
+            <FontAwesomeIcon icon={faPaperPlane} className="text-xl" />
           </div>
-          <FontAwesomeIcon icon={faBookmark} className="text-[1.4rem] text-foreground" />
+          <FontAwesomeIcon icon={faBookmark} className="text-xl text-foreground" />
         </div>
 
         <div className="px-3 pb-1 flex items-center gap-1.5">
@@ -77,7 +77,7 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
             <Avatar src={dicebear("liker2")} />
             <Avatar src={dicebear("liker3")} />
           </AvatarGroup>
-          <p className="text-[0.78rem] leading-tight">
+          <p className="text-small leading-tight">
             <span className="text-default-500">由 </span>
             <span className="font-semibold">friend_handle</span>
             <span className="text-default-500"> 與其他 </span>
@@ -86,7 +86,7 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
           </p>
         </div>
 
-        <div className="px-3 pb-1 text-[0.82rem] leading-snug">
+        <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
           <span className="text-foreground">{title}</span>
           {liveCaption ? (
@@ -98,20 +98,20 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
             </div>
           )}
           {liveHashtags && liveHashtags.length > 0 ? (
-            <p className="mt-1.5 text-secondary text-[0.78rem]">
+            <p className="mt-1.5 text-secondary text-small">
               {liveHashtags.slice(0, 8).join(" ")}{liveHashtags.length > 8 && <span className="text-default-500"> …更多</span>}
             </p>
           ) : (
-            <p className="mt-1.5 text-secondary text-[0.78rem]">
+            <p className="mt-1.5 text-secondary text-small">
               #等寫手 #等寫手 #等寫手 <span className="text-default-500">…更多</span>
             </p>
           )}
         </div>
 
-        <p className="px-3 pb-1 text-[0.78rem] text-default-500">
+        <p className="px-3 pb-1 text-small text-default-500">
           查看全部 <span className="font-medium">87</span> 則留言
         </p>
-        <p className="px-3 pb-3 text-[0.66rem] text-default-400 uppercase tracking-wider">5 分鐘前</p>
+        <p className="px-3 pb-3 text-tiny text-default-400 uppercase tracking-wider">5 分鐘前</p>
       </div>
     </div>
   );
@@ -130,11 +130,11 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
           <div className="flex items-center gap-2.5 min-w-0">
             <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={36} />
             <div className="min-w-0">
-              <div className="flex items-center gap-1 text-[0.84rem] font-semibold leading-tight truncate">
+              <div className="flex items-center gap-1 text-small font-semibold leading-tight truncate">
                 {handle}
-                <FontAwesomeIcon icon={faCircleCheck} className="text-[0.66rem] text-primary" />
+                <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-[0.7rem] text-default-500 truncate leading-tight">原創音訊</p>
+              <p className="text-tiny text-default-500 truncate leading-tight">原創音訊</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
@@ -150,7 +150,7 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
               <p className="text-tiny line-clamp-3">{liveImageDesc ?? `輪播 1 / ${carouselCount} · 等待 craft agent`}</p>
             </div>
           </div>
-          <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-[0.66rem] font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
+          <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-tiny font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
             1/{carouselCount}
           </div>
         </div>
@@ -163,14 +163,14 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
 
         <div className="flex items-center justify-between px-3 pb-1.5">
           <div className="flex items-center gap-4 text-foreground">
-            <FontAwesomeIcon icon={faHeart} className="text-[1.4rem]" />
-            <FontAwesomeIcon icon={faComment} className="text-[1.35rem]" />
-            <FontAwesomeIcon icon={faPaperPlane} className="text-[1.35rem]" />
+            <FontAwesomeIcon icon={faHeart} className="text-xl" />
+            <FontAwesomeIcon icon={faComment} className="text-xl" />
+            <FontAwesomeIcon icon={faPaperPlane} className="text-xl" />
           </div>
-          <FontAwesomeIcon icon={faBookmark} className="text-[1.4rem] text-foreground" />
+          <FontAwesomeIcon icon={faBookmark} className="text-xl text-foreground" />
         </div>
 
-        <div className="px-3 pb-1 text-[0.82rem] leading-snug">
+        <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
           <span className="text-foreground">{title}</span>
           {liveCaption ? (
@@ -182,13 +182,13 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
             </div>
           )}
           {liveHashtags && liveHashtags.length > 0 && (
-            <p className="mt-1.5 text-secondary text-[0.78rem]">
+            <p className="mt-1.5 text-secondary text-small">
               {liveHashtags.slice(0, 8).join(" ")}
             </p>
           )}
         </div>
 
-        <p className="px-3 pb-3 text-[0.66rem] text-default-400 uppercase tracking-wider">5 分鐘前</p>
+        <p className="px-3 pb-3 text-tiny text-default-400 uppercase tracking-wider">5 分鐘前</p>
       </div>
     </div>
   );
@@ -204,7 +204,7 @@ export function IGReels({ title, brandName, variantLabel, liveCaption, liveVideo
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         {/* Top bar */}
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 text-white">
-          <span className="text-[0.92rem] font-semibold">Reels</span>
+          <span className="text-small font-semibold">Reels</span>
           <FontAwesomeIcon icon={faImages} />
         </div>
 
@@ -230,10 +230,10 @@ export function IGReels({ title, brandName, variantLabel, liveCaption, liveVideo
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1.5 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
           <div className="flex items-center gap-2">
             <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={28} />
-            <span className="text-[0.82rem] font-semibold">{handle}</span>
+            <span className="text-small font-semibold">{handle}</span>
             <Button size="sm" radius="sm" variant="bordered" className="h-6 min-w-0 px-2 text-tiny border-white text-white">追蹤</Button>
           </div>
-          <p className="text-[0.78rem] line-clamp-3 whitespace-pre-wrap">{liveCaption ?? title}</p>
+          <p className="text-small line-clamp-3 whitespace-pre-wrap">{liveCaption ?? title}</p>
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
             <span>原創音訊 · {handle}</span>
@@ -267,11 +267,11 @@ export function IGStories({ title, brandName, variantLabel }: MockupFields) {
         <div className="absolute top-5 inset-x-0 z-20 flex items-center justify-between px-3 pt-2 text-white">
           <div className="flex items-center gap-2">
             <img src={dicebear(brandName ?? "brand")} alt="" className="w-7 h-7 rounded-full border border-white/40" />
-            <span className="text-[0.78rem] font-semibold">{handle}</span>
+            <span className="text-small font-semibold">{handle}</span>
             <span className="text-tiny opacity-80">5 分鐘前</span>
           </div>
           <div className="flex items-center gap-3 opacity-90">
-            <FontAwesomeIcon icon={faVolumeHigh} className="text-[0.92rem]" />
+            <FontAwesomeIcon icon={faVolumeHigh} className="text-small" />
             <FontAwesomeIcon icon={faXmark} className="text-medium" />
           </div>
         </div>
@@ -287,7 +287,7 @@ export function IGStories({ title, brandName, variantLabel }: MockupFields) {
 
         {/* Bottom caption / sticker placeholder */}
         <div className="absolute bottom-16 inset-x-3 z-10">
-          <div className="bg-white/20 backdrop-blur-sm rounded-medium p-2 text-white text-[0.82rem] line-clamp-2">
+          <div className="bg-white/20 backdrop-blur-sm rounded-medium p-2 text-white text-small line-clamp-2">
             {title}
           </div>
         </div>
@@ -436,9 +436,9 @@ export function IGAd({ title, brandName, variantLabel }: MockupFields) {
           <div className="flex items-center gap-2.5 min-w-0">
             <Avatar src={dicebear(brandName ?? "brand")} size="sm" isBordered color="default" />
             <div className="min-w-0">
-              <div className="flex items-center gap-1 text-[0.84rem] font-semibold leading-tight truncate">
+              <div className="flex items-center gap-1 text-small font-semibold leading-tight truncate">
                 {handle}
-                <FontAwesomeIcon icon={faCircleCheck} className="text-[0.66rem] text-primary" />
+                <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
               <p className="text-tiny text-default-500 truncate leading-tight">贊助 · Sponsored</p>
             </div>
@@ -464,13 +464,13 @@ export function IGAd({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-4 text-foreground">
-            <FontAwesomeIcon icon={faHeart} className="text-[1.4rem]" />
-            <FontAwesomeIcon icon={faComment} className="text-[1.35rem]" />
-            <FontAwesomeIcon icon={faPaperPlane} className="text-[1.35rem]" />
+            <FontAwesomeIcon icon={faHeart} className="text-xl" />
+            <FontAwesomeIcon icon={faComment} className="text-xl" />
+            <FontAwesomeIcon icon={faPaperPlane} className="text-xl" />
           </div>
-          <FontAwesomeIcon icon={faBookmark} className="text-[1.4rem] text-foreground" />
+          <FontAwesomeIcon icon={faBookmark} className="text-xl text-foreground" />
         </div>
-        <div className="px-3 pb-3 text-[0.82rem] leading-snug">
+        <div className="px-3 pb-3 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
           <span>{title}</span>
           <div className="mt-1.5 space-y-1">

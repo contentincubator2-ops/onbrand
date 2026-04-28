@@ -401,7 +401,7 @@ export default function CreateMethodologyModal({
     >
       <ModalContent>
         <ModalHeader className="px-8 py-5 border-b border-divider">
-          <h2 className="font-semibold text-[1.6rem] text-foreground tracking-[-0.015em]">
+          <h2 className="font-semibold text-2xl text-foreground tracking-[-0.015em]">
             新增任務範本
           </h2>
         </ModalHeader>
@@ -411,7 +411,7 @@ export default function CreateMethodologyModal({
             {GROUPED_SOURCES.map((g) => (
               <div key={g.key} className="mb-3">
                 {GROUP_LABELS[g.key] && (
-                  <div className="px-6 py-1.5 text-[0.6rem] tracking-[0.24em] uppercase text-default-400">
+                  <div className="px-6 py-1.5 text-tiny tracking-[0.24em] uppercase text-default-400">
                     {GROUP_LABELS[g.key]}
                   </div>
                 )}
@@ -432,19 +432,19 @@ export default function CreateMethodologyModal({
                   >
                     <span
                       className={[
-                        "w-7 h-7 rounded-md flex items-center justify-center text-[0.82rem] shrink-0",
+                        "w-7 h-7 rounded-md flex items-center justify-center text-small shrink-0",
                         activeId === s.id ? "bg-white border border-foreground" : "bg-background",
                       ].join(" ")}
                     >
                       {s.glyph}
                     </span>
-                    <span className="text-[0.86rem]">{s.label}</span>
+                    <span className="text-small">{s.label}</span>
                     {!s.ready && (
                       <Chip
                         size="sm"
                         radius="sm"
                         variant="bordered"
-                        className="ml-auto text-[0.6rem] tracking-[0.12em] uppercase text-default-400 border-divider"
+                        className="ml-auto text-tiny tracking-[0.12em] uppercase text-default-400 border-divider"
                       >
                         Beta
                       </Chip>
@@ -459,13 +459,13 @@ export default function CreateMethodologyModal({
           <section className="flex-1 overflow-y-auto p-8">
             {/* Header for active source */}
             <div className="mb-6">
-              <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400">
+              <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
                 {GROUP_LABELS[active.group] || "INGEST"}
               </div>
-              <h3 className="mt-1 font-semibold text-[1.4rem] text-foreground tracking-[-0.015em]">
+              <h3 className="mt-1 font-semibold text-xl text-foreground tracking-[-0.015em]">
                 {active.label}
               </h3>
-              <p className="mt-2 text-[0.86rem] text-foreground max-w-[640px]">
+              <p className="mt-2 text-small text-foreground max-w-[640px]">
                 {active.blurb}
               </p>
             </div>
@@ -500,7 +500,7 @@ export default function CreateMethodologyModal({
             )}
 
             {phase === "saving" && (
-              <div className="text-[0.86rem] text-default-500 py-12 text-center">
+              <div className="text-small text-default-500 py-12 text-center">
                 寫入資料庫中…
               </div>
             )}
@@ -589,7 +589,7 @@ function SourcePane({
   if (source.id === "blank") {
     return (
       <div className="max-w-[640px] space-y-4">
-        <div className="text-[0.86rem] text-foreground">
+        <div className="text-small text-foreground">
           先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。
         </div>
         <Button
@@ -643,9 +643,9 @@ function SourcePane({
             isDragging ? "border-foreground bg-background" : "border-divider bg-white hover:border-foreground/50",
           ].join(" ")}
         >
-          <div className="text-[2.4rem] leading-none mb-3" aria-hidden>☁</div>
-          <div className="text-[1rem] text-foreground mb-1">將你的內容拖放至此</div>
-          <div className="text-[0.78rem] text-default-500 mb-5">或選擇檔案上傳</div>
+          <div className="text-3xl leading-none mb-3" aria-hidden>☁</div>
+          <div className="text-medium text-foreground mb-1">將你的內容拖放至此</div>
+          <div className="text-small text-default-500 mb-5">或選擇檔案上傳</div>
           <label className="inline-block cursor-pointer">
             <input
               type="file"
@@ -661,27 +661,27 @@ function SourcePane({
                 }
               }}
             />
-            <span className="inline-block px-5 py-2.5 text-[0.74rem] tracking-[0.18em] uppercase border border-foreground text-foreground hover:bg-foreground hover:text-white transition rounded">
+            <span className="inline-block px-5 py-2.5 text-tiny tracking-[0.18em] uppercase border border-foreground text-foreground hover:bg-foreground hover:text-white transition rounded">
               上傳檔案
             </span>
           </label>
         </div>
         {pickedFile && (
           <div className="border border-divider bg-background px-4 py-3 rounded">
-            <div className="text-[0.7rem] tracking-[0.18em] uppercase text-default-400">已選取</div>
-            <div className="text-[0.86rem] text-foreground mt-0.5">
+            <div className="text-tiny tracking-[0.18em] uppercase text-default-400">已選取</div>
+            <div className="text-small text-foreground mt-0.5">
               {pickedFile.name}{" "}
-              <span className="text-default-500 text-[0.78rem]">({Math.round(pickedFile.size / 1024)} KB)</span>
+              <span className="text-default-500 text-small">({Math.round(pickedFile.size / 1024)} KB)</span>
             </div>
             {filePreview && (
-              <pre className="mt-2 text-[0.72rem] text-default-500 whitespace-pre-wrap max-h-24 overflow-hidden">
+              <pre className="mt-2 text-tiny text-default-500 whitespace-pre-wrap max-h-24 overflow-hidden">
                 {filePreview}
               </pre>
             )}
           </div>
         )}
         {!source.ready && (
-          <div className="border border-divider bg-background px-4 py-3 rounded text-[0.78rem] text-default-500">
+          <div className="border border-divider bg-background px-4 py-3 rounded text-small text-default-500">
             💡 檔案上傳的後端萃取將於下一輪上線。在這之前，請改用{" "}
             <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
             {" "}或{" "}
@@ -709,7 +709,7 @@ function SourcePane({
           <p className="text-small text-default-500">{source.hint}</p>
         )}
         {!source.ready && (
-          <div className="border border-divider bg-background px-4 py-3 rounded text-[0.78rem] text-default-500">
+          <div className="border border-divider bg-background px-4 py-3 rounded text-small text-default-500">
             💡 文字貼上的後端萃取將於下一輪上線。先用{" "}
             <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
             {" "}或{" "}
@@ -737,8 +737,8 @@ function RecoTile({ label, desc, onClick }: { label: string; desc: string; onCli
       className="w-full border border-divider data-[hover=true]:border-foreground bg-white"
     >
       <CardBody className="px-5 py-4 text-left">
-        <div className="text-[0.92rem] text-foreground">{label}</div>
-        <div className="mt-1 text-[0.78rem] text-default-500">{desc}</div>
+        <div className="text-small text-foreground">{label}</div>
+        <div className="mt-1 text-small text-default-500">{desc}</div>
       </CardBody>
     </Card>
   );
@@ -909,17 +909,17 @@ function ExtractingFeed({ source, url }: { source: SourceDef; url: string }) {
     <div className="max-w-[720px] space-y-4">
       {/* Header strip — current agent + status */}
       <div className="border border-divider bg-white p-5 rounded-lg flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-[1.2rem]">
+        <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-large">
           {AGENT_GLYPH[activeAgent]}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400">
+          <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
             ACTIVE AGENT
           </div>
-          <div className="font-semibold text-[1.05rem] text-foreground truncate">
+          <div className="font-semibold text-medium text-foreground truncate">
             {activeAgent}
           </div>
-          <div className="text-[0.74rem] text-default-500 truncate">
+          <div className="text-tiny text-default-500 truncate">
             正在分析 {host}…
           </div>
         </div>
@@ -932,14 +932,14 @@ function ExtractingFeed({ source, url }: { source: SourceDef; url: string }) {
 
       {/* Activity feed */}
       <div className="border border-divider bg-background rounded-lg overflow-hidden">
-        <div className="px-4 py-2 border-b border-divider text-[0.6rem] tracking-[0.28em] uppercase text-default-400 bg-white">
+        <div className="px-4 py-2 border-b border-divider text-tiny tracking-[0.28em] uppercase text-default-400 bg-white">
           ACTIVITY
         </div>
         <div className="px-4 py-3 max-h-[340px] overflow-y-auto font-mono space-y-1.5">
           {events.map((e, i) => (
             <FeedRow key={i} event={e} fading={i < events.length - 6} />
           ))}
-          <div className="text-[0.78rem] text-default-400 flex items-center gap-2">
+          <div className="text-small text-default-400 flex items-center gap-2">
             <span className="inline-block w-1.5 h-3 bg-foreground animate-pulse" />
             <span>working…</span>
           </div>
@@ -953,7 +953,7 @@ function FeedRow({ event, fading }: { event: FeedEvent; fading: boolean }) {
   return (
     <div
       className={[
-        "flex items-baseline gap-2 text-[0.78rem] transition-opacity",
+        "flex items-baseline gap-2 text-small transition-opacity",
         fading ? "opacity-60" : "opacity-100",
       ].join(" ")}
     >

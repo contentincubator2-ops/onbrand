@@ -152,16 +152,16 @@ export default function MediaHubPage() {
           <div className="flex items-start justify-between gap-6 flex-wrap">
             <div>
               <div
-                className="font-semibold text-[0.6rem] tracking-[0.32em] uppercase"
+                className="font-semibold text-tiny tracking-[0.32em] uppercase"
                 style={{ color: "#888" }}
               >
                 MEDIA HUB · 派發中心
               </div>
-              <h1 className="mt-3 font-semibold text-[3.2rem] leading-[1.02] tracking-[-0.025em]">
+              <h1 className="mt-3 font-semibold text-5xl leading-[1.02] tracking-[-0.025em]">
                 媒體中心
               </h1>
               <p
-                className="mt-3 text-[1rem] leading-relaxed"
+                className="mt-3 text-medium leading-relaxed"
                 style={{ color: "#444", maxWidth: 680 }}
               >
                 把策略變成投放，把文案變成排程。
@@ -180,12 +180,12 @@ export default function MediaHubPage() {
                 />
                 <div>
                   <div
-                    className="text-[0.6rem] tracking-[0.22em] uppercase"
+                    className="text-tiny tracking-[0.22em] uppercase"
                     style={{ color: "#888" }}
                   >
                     BRAND BRAIN · 已連線
                   </div>
-                  <div className="text-[0.92rem] font-medium">
+                  <div className="text-small font-medium">
                     {currentBrand.name}
                   </div>
                 </div>
@@ -206,7 +206,7 @@ export default function MediaHubPage() {
                 <React.Fragment key={s.n}>
                   <li className="flex items-center gap-2">
                     <span
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-[0.78rem] font-medium"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-small font-medium"
                       style={{
                         background: active ? INK : done ? ACCENT : "white",
                         color: active || done ? "white" : "#888",
@@ -216,7 +216,7 @@ export default function MediaHubPage() {
                       {done ? "✓" : s.n}
                     </span>
                     <span
-                      className="text-[0.86rem]"
+                      className="text-small"
                       style={{
                         color: active ? INK : done ? ACCENT : "#888",
                         fontWeight: active ? 500 : 400,
@@ -304,12 +304,12 @@ function Step1PickAsset({
     <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-8">
       {/* Brand library */}
       <div>
-        <h2 className="font-semibold text-[1.4rem] tracking-[-0.015em] mb-4">
+        <h2 className="font-semibold text-xl tracking-[-0.015em] mb-4">
           從 {currentBrandName ?? "品牌"} 大腦挑一份素材
         </h2>
         {brandAssets.length === 0 ? (
           <div
-            className="p-8 text-center text-[0.86rem]"
+            className="p-8 text-center text-small"
             style={{ border: `1px dashed ${HAIR}`, color: "#888" }}
           >
             這個品牌的 brand brain 還沒有內容。
@@ -332,14 +332,14 @@ function Step1PickAsset({
                 style={{ border: `1px solid ${HAIR}` }}
               >
                 <div
-                  className="text-[0.62rem] tracking-[0.22em] uppercase"
+                  className="text-tiny tracking-[0.22em] uppercase"
                   style={{ color: ACCENT }}
                 >
                   {a.category}
                 </div>
-                <div className="mt-1 font-medium text-[0.96rem]">{a.title}</div>
+                <div className="mt-1 font-medium text-small">{a.title}</div>
                 <div
-                  className="mt-1 text-[0.78rem] line-clamp-3"
+                  className="mt-1 text-small line-clamp-3"
                   style={{ color: "#666" }}
                 >
                   {a.content}
@@ -353,7 +353,7 @@ function Step1PickAsset({
       {/* Manual paste */}
       <div>
         <h3
-          className="font-semibold text-[1.1rem] tracking-[-0.01em] mb-3"
+          className="font-semibold text-medium tracking-[-0.01em] mb-3"
           style={{ color: "#444" }}
         >
           或手動貼一份
@@ -362,7 +362,7 @@ function Step1PickAsset({
           value={manualTitle}
           onChange={(e) => setManualTitle(e.target.value)}
           placeholder="素材標題（例：夏季新鞋 IG hooks）"
-          className="w-full px-3 py-2 text-[0.88rem] outline-none mb-2"
+          className="w-full px-3 py-2 text-small outline-none mb-2"
           style={{ border: `1px solid ${HAIR}` }}
         />
         <textarea
@@ -370,7 +370,7 @@ function Step1PickAsset({
           onChange={(e) => setManualText(e.target.value)}
           placeholder="貼上你的文案、提案、策略結論…"
           rows={10}
-          className="w-full px-3 py-2 text-[0.88rem] outline-none resize-none"
+          className="w-full px-3 py-2 text-small outline-none resize-none"
           style={{ border: `1px solid ${HAIR}` }}
         />
         <button
@@ -382,7 +382,7 @@ function Step1PickAsset({
             })
           }
           disabled={manualText.trim().length < 10}
-          className="mt-3 w-full py-2.5 text-[0.78rem] tracking-[0.2em] uppercase transition disabled:opacity-40"
+          className="mt-3 w-full py-2.5 text-small tracking-[0.2em] uppercase transition disabled:opacity-40"
           style={{ background: INK, color: "white" }}
         >
           用這份 →
@@ -411,7 +411,7 @@ function Step2PickChannel({
     <div>
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h2 className="font-semibold text-[1.4rem] tracking-[-0.015em]">
+          <h2 className="font-semibold text-xl tracking-[-0.015em]">
             把這份素材推到哪個通路？
           </h2>
           <div
@@ -419,16 +419,16 @@ function Step2PickChannel({
             style={{ border: `1px solid ${HAIR}`, background: "#FAFAFA" }}
           >
             <div
-              className="text-[0.62rem] tracking-[0.2em] uppercase"
+              className="text-tiny tracking-[0.2em] uppercase"
               style={{ color: "#888" }}
             >
               SELECTED ASSET · {asset.source}
             </div>
-            <div className="font-medium text-[0.96rem] mt-0.5">
+            <div className="font-medium text-small mt-0.5">
               {asset.title}
             </div>
             <div
-              className="mt-1 text-[0.78rem] line-clamp-2"
+              className="mt-1 text-small line-clamp-2"
               style={{ color: "#666" }}
             >
               {asset.content}
@@ -437,7 +437,7 @@ function Step2PickChannel({
         </div>
         <button
           onClick={onBack}
-          className="text-[0.72rem] tracking-[0.2em] uppercase px-3 py-1.5 transition hover:bg-[#FAFAFA]"
+          className="text-tiny tracking-[0.2em] uppercase px-3 py-1.5 transition hover:bg-[#FAFAFA]"
           style={{ border: `1px solid ${HAIR}`, color: "#666" }}
         >
           ← 換素材
@@ -445,7 +445,7 @@ function Step2PickChannel({
       </div>
 
       {isLoading ? (
-        <div className="text-[0.86rem] py-12" style={{ color: "#888" }}>
+        <div className="text-small py-12" style={{ color: "#888" }}>
           載入通路…
         </div>
       ) : (
@@ -461,13 +461,13 @@ function Step2PickChannel({
               >
                 <div className="flex items-start justify-between">
                   <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-[1.4rem]"
+                    className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-xl"
                     style={{ background: c.color, color: "white" }}
                   >
                     {c.logo}
                   </div>
                   <span
-                    className="text-[0.6rem] tracking-[0.22em] uppercase px-1.5 py-0.5"
+                    className="text-tiny tracking-[0.22em] uppercase px-1.5 py-0.5"
                     style={{
                       background: ready ? ACCENT : "#EEE",
                       color: ready ? "white" : "#888",
@@ -476,20 +476,20 @@ function Step2PickChannel({
                     {ready ? "READY" : "Preview"}
                   </span>
                 </div>
-                <div className="mt-4 font-medium text-[1.08rem] tracking-[-0.005em]">
+                <div className="mt-4 font-medium text-medium tracking-[-0.005em]">
                   {c.name}
                 </div>
-                <div className="text-[0.74rem]" style={{ color: "#888" }}>
+                <div className="text-tiny" style={{ color: "#888" }}>
                   {c.platform}
                 </div>
                 <div
-                  className="mt-3 text-[0.84rem] leading-snug"
+                  className="mt-3 text-small leading-snug"
                   style={{ color: "#444" }}
                 >
                   {c.pitch}
                 </div>
                 <div
-                  className="mt-4 text-[0.66rem] tracking-[0.18em] uppercase"
+                  className="mt-4 text-tiny tracking-[0.18em] uppercase"
                   style={{ color: ACCENT }}
                 >
                   匯出 · {c.exportFormat}
@@ -537,12 +537,12 @@ function Step3Configure({
       {/* Config column */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-[1.2rem] tracking-[-0.01em]">
+          <h2 className="font-semibold text-large tracking-[-0.01em]">
             設定投放
           </h2>
           <button
             onClick={onBack}
-            className="text-[0.7rem] tracking-[0.2em] uppercase px-2.5 py-1 transition hover:bg-[#FAFAFA]"
+            className="text-tiny tracking-[0.2em] uppercase px-2.5 py-1 transition hover:bg-[#FAFAFA]"
             style={{ border: `1px solid ${HAIR}`, color: "#666" }}
           >
             ← 換通路
@@ -561,8 +561,8 @@ function Step3Configure({
               {channel.logo}
             </div>
             <div>
-              <div className="font-medium text-[0.96rem]">{channel.name}</div>
-              <div className="text-[0.7rem]" style={{ color: "#666" }}>
+              <div className="font-medium text-small">{channel.name}</div>
+              <div className="text-tiny" style={{ color: "#666" }}>
                 {channel.exportFormat}
               </div>
             </div>
@@ -573,7 +573,7 @@ function Step3Configure({
           <select
             value={config.objective}
             onChange={(e) => setConfig({ ...config, objective: e.target.value })}
-            className="w-full px-3 py-2 text-[0.88rem] outline-none"
+            className="w-full px-3 py-2 text-small outline-none"
             style={{ border: `1px solid ${HAIR}` }}
           >
             <option value="awareness">品牌曝光 awareness</option>
@@ -589,7 +589,7 @@ function Step3Configure({
             type="number"
             value={config.dailyBudget}
             onChange={(e) => setConfig({ ...config, dailyBudget: Number(e.target.value) })}
-            className="w-full px-3 py-2 text-[0.88rem] outline-none"
+            className="w-full px-3 py-2 text-small outline-none"
             style={{ border: `1px solid ${HAIR}` }}
             min={50}
           />
@@ -600,7 +600,7 @@ function Step3Configure({
             type="number"
             value={config.durationDays}
             onChange={(e) => setConfig({ ...config, durationDays: Number(e.target.value) })}
-            className="w-full px-3 py-2 text-[0.88rem] outline-none"
+            className="w-full px-3 py-2 text-small outline-none"
             style={{ border: `1px solid ${HAIR}` }}
             min={1}
             max={90}
@@ -608,10 +608,10 @@ function Step3Configure({
         </Field>
 
         <div
-          className="mb-4 px-3 py-2 text-[0.84rem] flex justify-between"
+          className="mb-4 px-3 py-2 text-small flex justify-between"
           style={{ background: "#F5F2FE", color: ACCENT }}
         >
-          <span className="text-[0.7rem] tracking-[0.18em] uppercase">總預算</span>
+          <span className="text-tiny tracking-[0.18em] uppercase">總預算</span>
           <span className="font-medium" style={{ color: INK }}>
             NT$ {totalBudget.toLocaleString()}
           </span>
@@ -622,7 +622,7 @@ function Step3Configure({
             value={config.audience}
             onChange={(e) => setConfig({ ...config, audience: e.target.value })}
             placeholder="例：25-34 都市女性 / 對精品咖啡有興趣"
-            className="w-full px-3 py-2 text-[0.88rem] outline-none"
+            className="w-full px-3 py-2 text-small outline-none"
             style={{ border: `1px solid ${HAIR}` }}
           />
         </Field>
@@ -632,7 +632,7 @@ function Step3Configure({
             value={config.tone}
             onChange={(e) => setConfig({ ...config, tone: e.target.value })}
             placeholder="例：俏皮 / 嚴肅 / Z 世代"
-            className="w-full px-3 py-2 text-[0.88rem] outline-none"
+            className="w-full px-3 py-2 text-small outline-none"
             style={{ border: `1px solid ${HAIR}` }}
           />
         </Field>
@@ -640,7 +640,7 @@ function Step3Configure({
         <button
           onClick={onPrepare}
           disabled={isPending}
-          className="w-full mt-3 py-3 text-[0.78rem] tracking-[0.22em] uppercase disabled:opacity-40 transition"
+          className="w-full mt-3 py-3 text-small tracking-[0.22em] uppercase disabled:opacity-40 transition"
           style={{ background: INK, color: "white" }}
         >
           {isPending ? "生成中…" : result ? "重新生成" : "🖨 出稿"}
@@ -648,7 +648,7 @@ function Step3Configure({
 
         {err && (
           <div
-            className="mt-3 px-3 py-2 text-[0.78rem]"
+            className="mt-3 px-3 py-2 text-small"
             style={{ background: "#FEF2F2", color: "#B91C1C" }}
           >
             {err}
@@ -664,18 +664,18 @@ function Step3Configure({
             style={{ border: `1px dashed ${HAIR}`, background: "#FAFAFA" }}
           >
             <div>
-              <div className="text-[3rem] mb-2">🖨</div>
+              <div className="text-5xl mb-2">🖨</div>
               <div
-                className="text-[0.7rem] tracking-[0.22em] uppercase"
+                className="text-tiny tracking-[0.22em] uppercase"
                 style={{ color: "#888" }}
               >
                 READY TO PRINT
               </div>
-              <div className="mt-2 font-semibold text-[1.3rem] tracking-[-0.015em]">
+              <div className="mt-2 font-semibold text-xl tracking-[-0.015em]">
                 按右邊「出稿」開始生成
               </div>
               <div
-                className="mt-2 text-[0.84rem]"
+                className="mt-2 text-small"
                 style={{ color: "#666", maxWidth: 380 }}
               >
                 我會把「{asset.title}」用 {channel.name} 的格式包好，
@@ -701,7 +701,7 @@ function Step3Configure({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block mb-3">
-      <div className="text-[0.7rem] mb-1" style={{ color: "#666" }}>
+      <div className="text-tiny mb-1" style={{ color: "#666" }}>
         {label}
       </div>
       {children}
@@ -768,15 +768,15 @@ function ResultPanel({
       <div className="flex items-center justify-between mb-4">
         <div>
           <div
-            className="text-[0.62rem] tracking-[0.28em] uppercase"
+            className="text-tiny tracking-[0.28em] uppercase"
             style={{ color: ACCENT }}
           >
             DELIVERED · 出稿完成
           </div>
-          <div className="font-semibold text-[1.3rem] tracking-[-0.015em] mt-0.5">
+          <div className="font-semibold text-xl tracking-[-0.015em] mt-0.5">
             {channel.name} · {assetTitle}
           </div>
-          <div className="text-[0.72rem]" style={{ color: "#888" }}>
+          <div className="text-tiny" style={{ color: "#888" }}>
             {result.provider} · {result.model}
           </div>
         </div>
@@ -784,7 +784,7 @@ function ResultPanel({
           {result.csvRows && (
             <button
               onClick={downloadCsv}
-              className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase transition"
+              className="px-4 py-2 text-tiny tracking-[0.18em] uppercase transition"
               style={{ background: ACCENT, color: "white" }}
             >
               ⬇ 下載 CSV
@@ -793,7 +793,7 @@ function ResultPanel({
           {result.payload && (
             <button
               onClick={downloadJson}
-              className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase transition"
+              className="px-4 py-2 text-tiny tracking-[0.18em] uppercase transition"
               style={{ border: `1px solid ${HAIR}`, color: "#666" }}
             >
               ⬇ JSON
@@ -801,7 +801,7 @@ function ResultPanel({
           )}
           <button
             onClick={onReset}
-            className="px-4 py-2 text-[0.72rem] tracking-[0.18em] uppercase transition"
+            className="px-4 py-2 text-tiny tracking-[0.18em] uppercase transition"
             style={{ border: `1px solid ${HAIR}`, color: "#666" }}
           >
             重來
@@ -818,7 +818,7 @@ function ResultPanel({
       )}
       {!["meta-ads", "ig-schedule"].includes(channel.id) && (
         <pre
-          className="whitespace-pre-wrap text-[0.84rem] leading-relaxed font-sans p-4"
+          className="whitespace-pre-wrap text-small leading-relaxed font-sans p-4"
           style={{ border: `1px solid ${HAIR}`, background: "#FAFAFA" }}
         >
           {JSON.stringify(result.payload, null, 2)}
@@ -828,7 +828,7 @@ function ResultPanel({
       {/* Fallback raw text */}
       {!result.payload && (
         <pre
-          className="whitespace-pre-wrap text-[0.84rem] leading-relaxed font-sans p-4"
+          className="whitespace-pre-wrap text-small leading-relaxed font-sans p-4"
           style={{ border: `1px solid ${HAIR}` }}
         >
           {result.rawText}
@@ -853,36 +853,36 @@ function MetaAdsPreview({ payload, channel }: { payload: any; channel: Channel }
               style={{ background: channel.color, color: "white" }}
             >
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-[0.78rem]">
+                <span className="font-semibold text-small">
                   {channel.logo}
                 </span>
-                <span className="text-[0.7rem] tracking-[0.18em] uppercase opacity-90">
+                <span className="text-tiny tracking-[0.18em] uppercase opacity-90">
                   Variant {i + 1}
                 </span>
               </div>
-              <span className="text-[0.66rem] opacity-80">{v.angle}</span>
+              <span className="text-tiny opacity-80">{v.angle}</span>
             </div>
             <div className="p-4 bg-white">
               <div
-                className="text-[0.86rem] leading-relaxed mb-3"
+                className="text-small leading-relaxed mb-3"
                 style={{ color: INK }}
               >
                 {v.primary_text}
               </div>
-              <div className="aspect-[1.91/1] bg-[#F5F5F5] flex items-center justify-center text-[0.72rem]" style={{ color: "#999" }}>
+              <div className="aspect-[1.91/1] bg-[#F5F5F5] flex items-center justify-center text-tiny" style={{ color: "#999" }}>
                 [creative 預覽 · 1.91:1]
               </div>
               <div className="mt-3 flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <div className="font-medium text-[0.92rem] tracking-[-0.005em]">
+                  <div className="font-medium text-small tracking-[-0.005em]">
                     {v.headline}
                   </div>
-                  <div className="text-[0.74rem]" style={{ color: "#888" }}>
+                  <div className="text-tiny" style={{ color: "#888" }}>
                     {v.description}
                   </div>
                 </div>
                 <button
-                  className="shrink-0 px-3 py-1.5 text-[0.7rem] tracking-[0.16em] uppercase"
+                  className="shrink-0 px-3 py-1.5 text-tiny tracking-[0.16em] uppercase"
                   style={{ background: INK, color: "white" }}
                   disabled
                 >
@@ -897,12 +897,12 @@ function MetaAdsPreview({ payload, channel }: { payload: any; channel: Channel }
       {payload.audience_suggestion && (
         <div className="mt-5 p-4" style={{ border: `1px solid ${HAIR}` }}>
           <div
-            className="text-[0.62rem] tracking-[0.22em] uppercase"
+            className="text-tiny tracking-[0.22em] uppercase"
             style={{ color: ACCENT }}
           >
             建議受眾
           </div>
-          <div className="mt-2 text-[0.84rem]">
+          <div className="mt-2 text-small">
             <div>
               <b>年齡：</b> {payload.audience_suggestion.age}
             </div>
@@ -927,7 +927,7 @@ function MetaAdsPreview({ payload, channel }: { payload: any; channel: Channel }
           {payload.placement.map((p: string) => (
             <span
               key={p}
-              className="text-[0.7rem] px-2 py-0.5"
+              className="text-tiny px-2 py-0.5"
               style={{ border: `1px solid ${HAIR}`, color: "#666" }}
             >
               {p}
@@ -953,31 +953,31 @@ function IgSchedulePreview({ payload }: { payload: any }) {
             style={{ background: "#FAFAFA" }}
           >
             <div
-              className="text-[0.6rem] tracking-[0.18em] uppercase"
+              className="text-tiny tracking-[0.18em] uppercase"
               style={{ color: "#888" }}
             >
               DAY
             </div>
-            <div className="font-semibold text-[1.1rem] leading-none">
+            <div className="font-semibold text-medium leading-none">
               {s.day}
             </div>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span
-                className="text-[0.6rem] tracking-[0.18em] uppercase px-1.5 py-0.5"
+                className="text-tiny tracking-[0.18em] uppercase px-1.5 py-0.5"
                 style={{ background: "#E1306C", color: "white" }}
               >
                 {s.type}
               </span>
-              <span className="font-medium text-[0.9rem]">{s.hook}</span>
+              <span className="font-medium text-small">{s.hook}</span>
             </div>
-            <div className="mt-1 text-[0.82rem]" style={{ color: "#444" }}>
+            <div className="mt-1 text-small" style={{ color: "#444" }}>
               {s.caption}
             </div>
             {Array.isArray(s.hashtags) && (
               <div
-                className="mt-1 text-[0.74rem]"
+                className="mt-1 text-tiny"
                 style={{ color: ACCENT }}
               >
                 {s.hashtags.join(" ")}

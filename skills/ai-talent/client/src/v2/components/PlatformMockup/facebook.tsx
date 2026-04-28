@@ -83,7 +83,7 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 text-white">
-          <span className="text-[0.92rem] font-semibold">Reels</span>
+          <span className="text-small font-semibold">Reels</span>
           <FontAwesomeIcon icon={faVideo} />
         </div>
         <div className="absolute inset-0 flex items-center justify-center">
@@ -102,10 +102,10 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1.5 bg-gradient-to-t from-black/80 to-transparent">
           <div className="flex items-center gap-2">
             <Avatar src={dicebear(brandName ?? "brand")} size="sm" isBordered color="primary" />
-            <span className="text-[0.82rem] font-semibold">{handle}</span>
+            <span className="text-small font-semibold">{handle}</span>
             <Button size="sm" radius="sm" className="h-6 min-w-0 px-2 text-tiny bg-primary text-white">追蹤</Button>
           </div>
-          <p className="text-[0.78rem] line-clamp-2">{title}</p>
+          <p className="text-small line-clamp-2">{title}</p>
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
             <span>原創音訊 · {handle}</span>
@@ -134,11 +134,11 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
         <div className="absolute top-5 inset-x-0 z-20 flex items-center justify-between px-3 pt-2 text-white">
           <div className="flex items-center gap-2">
             <Avatar src={dicebear(brandName ?? "brand")} size="sm" isBordered color="primary" />
-            <span className="text-[0.78rem] font-semibold">{handle}</span>
+            <span className="text-small font-semibold">{handle}</span>
             <span className="text-tiny opacity-80">5 分鐘前</span>
           </div>
           <div className="flex items-center gap-3 opacity-90">
-            <FontAwesomeIcon icon={faVolumeHigh} className="text-[0.92rem]" />
+            <FontAwesomeIcon icon={faVolumeHigh} className="text-small" />
             <FontAwesomeIcon icon={faXmark} className="text-medium" />
           </div>
         </div>
@@ -150,7 +150,7 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
           </div>
         </div>
         <div className="absolute bottom-16 inset-x-3 z-10">
-          <div className="bg-white/20 backdrop-blur-sm rounded-medium p-2 text-white text-[0.82rem] line-clamp-2">{title}</div>
+          <div className="bg-white/20 backdrop-blur-sm rounded-medium p-2 text-white text-small line-clamp-2">{title}</div>
         </div>
         <div className="absolute bottom-3 inset-x-3 z-10 flex items-center gap-2">
           <div className="flex-1 bg-white/15 border border-white/30 rounded-full px-3 py-1.5 text-tiny text-white/70">

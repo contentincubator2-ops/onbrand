@@ -52,20 +52,20 @@ export default function StepEditor({
       {/* Row header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <span
-          className="w-8 h-8 rounded-full text-white text-[0.72rem] font-semibold flex items-center justify-center shrink-0"
+          className="w-8 h-8 rounded-full text-white text-tiny font-semibold flex items-center justify-center shrink-0"
           style={{ background: tone.bg }}
         >
           0{index + 1}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-[1rem] text-foreground truncate">{step.name}</div>
-          <div className="text-[0.72rem] text-default-500 truncate">
+          <div className="font-semibold text-medium text-foreground truncate">{step.name}</div>
+          <div className="text-tiny text-default-500 truncate">
             {step.assignedAgentName ?? "未派工"}
             {step.requiredSkill && ` · ${step.requiredSkill}`}
             {step.outputType && ` · ${step.outputType}`}
           </div>
         </div>
-        <div className="flex items-center gap-1 text-[0.7rem] tracking-[0.16em] uppercase">
+        <div className="flex items-center gap-1 text-tiny tracking-[0.16em] uppercase">
           {onMoveUp && (
             <button onClick={onMoveUp} className="px-2 py-1 text-default-400 hover:text-foreground">↑</button>
           )}
@@ -98,7 +98,7 @@ export default function StepEditor({
             <input
               value={step.name}
               onChange={(e) => onChange({ name: e.target.value })}
-              className="w-full bg-white border border-divider px-3 py-2 text-[0.88rem] text-foreground focus:outline-none focus:border-foreground"
+              className="w-full bg-white border border-divider px-3 py-2 text-small text-foreground focus:outline-none focus:border-foreground"
             />
           </Field>
 
@@ -107,7 +107,7 @@ export default function StepEditor({
               value={step.description ?? ""}
               onChange={(e) => onChange({ description: e.target.value })}
               rows={2}
-              className="w-full bg-white border border-divider px-3 py-2 text-[0.88rem] text-foreground focus:outline-none focus:border-foreground"
+              className="w-full bg-white border border-divider px-3 py-2 text-small text-foreground focus:outline-none focus:border-foreground"
             />
           </Field>
 
@@ -117,14 +117,14 @@ export default function StepEditor({
                 value={step.requiredSkill ?? ""}
                 onChange={(e) => onChange({ requiredSkill: e.target.value })}
                 placeholder="kebab-case"
-                className="w-full bg-white border border-divider px-3 py-2 text-[0.82rem] text-foreground focus:outline-none focus:border-foreground"
+                className="w-full bg-white border border-divider px-3 py-2 text-small text-foreground focus:outline-none focus:border-foreground"
               />
             </Field>
             <Field label="產出類型">
               <select
                 value={step.outputType ?? ""}
                 onChange={(e) => onChange({ outputType: e.target.value })}
-                className="w-full bg-white border border-divider px-3 py-2 text-[0.82rem] text-foreground focus:outline-none focus:border-foreground"
+                className="w-full bg-white border border-divider px-3 py-2 text-small text-foreground focus:outline-none focus:border-foreground"
               >
                 <option value="">—</option>
                 <option value="brief">brief</option>
@@ -143,7 +143,7 @@ export default function StepEditor({
               onChange={(e) => onChange({ prompt: e.target.value })}
               rows={4}
               placeholder="這個 step 要交給 agent 的 prompt — 留空則用 squad 預設"
-              className="w-full bg-white border border-divider px-3 py-2 text-[0.82rem] text-foreground font-mono focus:outline-none focus:border-foreground"
+              className="w-full bg-white border border-divider px-3 py-2 text-small text-foreground font-mono focus:outline-none focus:border-foreground"
             />
           </Field>
         </div>
@@ -155,7 +155,7 @@ export default function StepEditor({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-[0.62rem] tracking-[0.22em] uppercase text-default-400 mb-1">
+      <div className="text-tiny tracking-[0.22em] uppercase text-default-400 mb-1">
         {label}
       </div>
       {children}

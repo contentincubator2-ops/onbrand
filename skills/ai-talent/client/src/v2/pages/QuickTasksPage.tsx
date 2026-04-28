@@ -184,7 +184,7 @@ export default function QuickTasksPage() {
               <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider">
                 QUICK · 30s DELIVERY
               </Chip>
-              <h1 className="mt-3 font-semibold text-[3.2rem] leading-[1.02] tracking-tight">
+              <h1 className="mt-3 font-semibold text-5xl leading-[1.02] tracking-tight">
                 30 秒產出
               </h1>
             </div>

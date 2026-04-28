@@ -174,11 +174,11 @@ export default function ProjectSyncModal({
       <div className="relative bg-white w-full max-w-[520px] rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.25)] overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-5 pb-3 border-b border-divider">
-          <div className="text-[0.62rem] tracking-[0.18em] uppercase text-default-400">
+          <div className="text-tiny tracking-[0.18em] uppercase text-default-400">
             從雲端 / 網路同步
           </div>
-          <div className="mt-0.5 text-[1.05rem] text-foreground">{spec.label}</div>
-          <div className="mt-1 text-[0.78rem] text-default-500 leading-snug">{spec.blurb}</div>
+          <div className="mt-0.5 text-medium text-foreground">{spec.label}</div>
+          <div className="mt-1 text-small text-default-500 leading-snug">{spec.blurb}</div>
         </div>
 
         {/* Body */}
@@ -187,7 +187,7 @@ export default function ProjectSyncModal({
             <div className="space-y-3">
               {spec.fields.map((f) => (
                 <div key={f.key}>
-                  <label className="block text-[0.72rem] tracking-[0.06em] text-foreground mb-1">
+                  <label className="block text-tiny tracking-[0.06em] text-foreground mb-1">
                     {f.label}{f.required && <span className="text-[#D14] ml-0.5">*</span>}
                   </label>
                   <input
@@ -195,15 +195,15 @@ export default function ProjectSyncModal({
                     value={params[f.key] ?? ""}
                     onChange={(e) => setParams((p) => ({ ...p, [f.key]: e.target.value }))}
                     placeholder={f.placeholder}
-                    className="w-full px-3 py-2 text-[0.86rem] bg-white border border-divider rounded-lg focus:outline-none focus:border-foreground transition"
+                    className="w-full px-3 py-2 text-small bg-white border border-divider rounded-lg focus:outline-none focus:border-foreground transition"
                   />
                   {f.hint && (
-                    <div className="mt-1 text-[0.66rem] text-default-500">{f.hint}</div>
+                    <div className="mt-1 text-tiny text-default-500">{f.hint}</div>
                   )}
                 </div>
               ))}
               {errorMsg && (
-                <div className="px-3 py-2 text-[0.78rem] text-[#D14] bg-[#FEE] border border-[#FCC] rounded">
+                <div className="px-3 py-2 text-small text-[#D14] bg-[#FEE] border border-[#FCC] rounded">
                   {errorMsg}
                 </div>
               )}
@@ -212,7 +212,7 @@ export default function ProjectSyncModal({
 
           {phase === "running" && (
             <div className="text-center py-6">
-              <div className="inline-flex items-center gap-2 text-[0.86rem] text-foreground">
+              <div className="inline-flex items-center gap-2 text-small text-foreground">
                 <span className="inline-block w-2 h-2 rounded-full bg-foreground animate-pulse" />
                 透過 Pipedream 同步中…
               </div>
@@ -223,7 +223,7 @@ export default function ProjectSyncModal({
                     style={{ width: `${statusQuery.data?.progressPct ?? 5}%` }}
                   />
                 </div>
-                <div className="mt-2 text-[0.7rem] text-default-500">
+                <div className="mt-2 text-tiny text-default-500">
                   已同步 {statusQuery.data?.assetCount ?? 0} 個資產
                 </div>
               </div>
@@ -232,9 +232,9 @@ export default function ProjectSyncModal({
 
           {phase === "done" && (
             <div className="text-center py-6">
-              <div className="text-[2rem]">✓</div>
-              <div className="mt-1 text-[0.92rem] text-foreground font-medium">同步完成</div>
-              <div className="mt-1 text-[0.78rem] text-default-500">
+              <div className="text-2xl">✓</div>
+              <div className="mt-1 text-small text-foreground font-medium">同步完成</div>
+              <div className="mt-1 text-small text-default-500">
                 共匯入 {statusQuery.data?.assetCount ?? 0} 個資產到你的專案
               </div>
             </div>
@@ -242,11 +242,11 @@ export default function ProjectSyncModal({
 
           {phase === "error" && (
             <div className="py-2">
-              <div className="px-3 py-2 text-[0.78rem] text-[#D14] bg-[#FEE] border border-[#FCC] rounded leading-relaxed">
+              <div className="px-3 py-2 text-small text-[#D14] bg-[#FEE] border border-[#FCC] rounded leading-relaxed">
                 <div className="font-medium mb-1">同步失敗</div>
                 <div className="break-all">{errorMsg ?? "未知錯誤"}</div>
               </div>
-              <div className="mt-3 text-[0.7rem] text-default-500 leading-relaxed">
+              <div className="mt-3 text-tiny text-default-500 leading-relaxed">
                 若是 Pipedream workflow 未設定，請於後端 .env 加入 <code className="px-1 bg-divider/30 rounded">PIPEDREAM_WEBHOOK_{spec.id.toUpperCase().replace("-", "_")}</code>，
                 指向你建立的 Pipedream 工作流 HTTP trigger URL。
               </div>
@@ -260,14 +260,14 @@ export default function ProjectSyncModal({
             <>
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-[0.78rem] text-default-500 hover:text-foreground transition"
+                className="px-4 py-2 text-small text-default-500 hover:text-foreground transition"
               >
                 取消
               </button>
               <button
                 onClick={submit}
                 disabled={startMutation.isPending}
-                className="px-4 py-2 text-[0.78rem] bg-foreground text-white hover:bg-foreground/90 disabled:opacity-50 rounded-full transition"
+                className="px-4 py-2 text-small bg-foreground text-white hover:bg-foreground/90 disabled:opacity-50 rounded-full transition"
               >
                 {startMutation.isPending ? "啟動中…" : "開始同步"}
               </button>
@@ -276,7 +276,7 @@ export default function ProjectSyncModal({
           {(phase === "running") && (
             <button
               onClick={onClose}
-              className="px-4 py-2 text-[0.78rem] text-default-500 hover:text-foreground transition"
+              className="px-4 py-2 text-small text-default-500 hover:text-foreground transition"
             >
               在背景繼續
             </button>
@@ -284,7 +284,7 @@ export default function ProjectSyncModal({
           {(phase === "done" || phase === "error") && (
             <button
               onClick={onClose}
-              className="px-4 py-2 text-[0.78rem] bg-foreground text-white hover:bg-foreground/90 rounded-full transition"
+              className="px-4 py-2 text-small bg-foreground text-white hover:bg-foreground/90 rounded-full transition"
             >
               關閉
             </button>

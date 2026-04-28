@@ -92,10 +92,10 @@ function Chip({
         style={{ background: tone }}
         aria-hidden
       />
-      <span className="font-semibold text-[0.66rem] tracking-[0.22em] uppercase text-foreground">
+      <span className="font-semibold text-tiny tracking-[0.22em] uppercase text-foreground">
         {label}
       </span>
-      <span className="text-[0.7rem] text-default-500">{subLabel}</span>
+      <span className="text-tiny text-default-500">{subLabel}</span>
     </button>
   );
 }

@@ -118,35 +118,35 @@ export default function MissionDetail() {
       <section className="col-span-4 space-y-4">
         <button
           onClick={() => navigate("/")}
-          className="text-[0.7rem] tracking-[0.18em] uppercase text-default-500 hover:text-foreground"
+          className="text-tiny tracking-[0.18em] uppercase text-default-500 hover:text-foreground"
         >
           ← 任務牆
         </button>
         <div>
-          <div className="text-[0.66rem] tracking-[0.28em] uppercase text-default-400">
+          <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
             MISSION
           </div>
-          <h1 className="mt-1 font-semibold text-[1.9rem] leading-[1.1] text-foreground tracking-[-0.02em]">
+          <h1 className="mt-1 font-semibold text-2xl leading-[1.1] text-foreground tracking-[-0.02em]">
             {m.title}
           </h1>
-          <div className="mt-2 text-[0.72rem] tracking-[0.14em] text-default-500">
+          <div className="mt-2 text-tiny tracking-[0.14em] text-default-500">
             {m.workspace?.toUpperCase() ?? "WORKSPACE"} · {m.status === "completed" ? "已完成" : "進行中"}
           </div>
         </div>
 
         {m.description && (
           <div className="border border-divider bg-white p-5">
-            <div className="text-[0.62rem] tracking-[0.22em] uppercase text-default-400 mb-2">
+            <div className="text-tiny tracking-[0.22em] uppercase text-default-400 mb-2">
               任務需求
             </div>
-            <div className="text-[0.88rem] leading-relaxed text-foreground whitespace-pre-wrap">
+            <div className="text-small leading-relaxed text-foreground whitespace-pre-wrap">
               {m.description}
             </div>
           </div>
         )}
 
         {(m.objective || m.audience || m.successMetrics) && (
-          <div className="border border-divider bg-white p-5 space-y-3 text-[0.84rem]">
+          <div className="border border-divider bg-white p-5 space-y-3 text-small">
             {m.objective && <BriefRow label="目標">{m.objective}</BriefRow>}
             {m.audience && <BriefRow label="受眾">{m.audience}</BriefRow>}
             {m.successMetrics && <BriefRow label="成功指標">{m.successMetrics}</BriefRow>}
@@ -169,21 +169,21 @@ export default function MissionDetail() {
         )}
 
         {methodologyQuery.isLoading && (
-          <div className="text-[0.82rem] text-default-500">載入任務範本…</div>
+          <div className="text-small text-default-500">載入任務範本…</div>
         )}
 
         {sq && (
           <>
             <div className="flex items-end justify-between">
               <div>
-                <div className="text-[0.66rem] tracking-[0.22em] uppercase text-default-400">
+                <div className="text-tiny tracking-[0.22em] uppercase text-default-400">
                   APPLIED METHODOLOGY · {(sq.source ?? "seeded").toUpperCase()}
                 </div>
-                <h2 className="mt-1 font-semibold text-[1.5rem] text-foreground tracking-[-0.015em]">
+                <h2 className="mt-1 font-semibold text-xl text-foreground tracking-[-0.015em]">
                   {sq.name}
                 </h2>
                 {sq.methodology?.author && (
-                  <div className="text-[0.74rem] text-default-500">
+                  <div className="text-tiny text-default-500">
                     {sq.methodology.author}
                     {sq.methodology.year ? ` · ${sq.methodology.year}` : ""}
                   </div>
@@ -191,7 +191,7 @@ export default function MissionDetail() {
               </div>
               <button
                 onClick={onApplyMethodology}
-                className="px-3 py-1.5 text-[0.66rem] tracking-[0.16em] uppercase border border-divider text-default-500 hover:text-foreground hover:border-foreground transition"
+                className="px-3 py-1.5 text-tiny tracking-[0.16em] uppercase border border-divider text-default-500 hover:text-foreground hover:border-foreground transition"
               >
                 換任務範本
               </button>
@@ -254,7 +254,7 @@ export default function MissionDetail() {
                     },
                   ])
                 }
-                className="w-full border border-dashed border-divider bg-white py-3 text-[0.74rem] tracking-[0.16em] uppercase text-default-500 hover:text-foreground hover:border-foreground transition"
+                className="w-full border border-dashed border-divider bg-white py-3 text-tiny tracking-[0.16em] uppercase text-default-500 hover:text-foreground hover:border-foreground transition"
               >
                 + 新增步驟
               </button>
@@ -262,7 +262,7 @@ export default function MissionDetail() {
 
             <button
               onClick={() => setChatOpen(true)}
-              className="mt-4 w-full py-3 bg-foreground text-white text-[0.74rem] tracking-[0.18em] uppercase hover:bg-foreground/90 transition"
+              className="mt-4 w-full py-3 bg-foreground text-white text-tiny tracking-[0.18em] uppercase hover:bg-foreground/90 transition"
               title="打開對話面板，跟 squad lead 開始這個任務"
             >
               開始對話 RUN →
@@ -291,7 +291,7 @@ export default function MissionDetail() {
             onCtaClick={() => navigate(`/templates/${sq.slug}`)}
           />
         ) : (
-          <div className="w-[320px] h-[460px] border border-dashed border-divider bg-white flex items-center justify-center text-[0.74rem] text-default-400">
+          <div className="w-[320px] h-[460px] border border-dashed border-divider bg-white flex items-center justify-center text-tiny text-default-400">
             尚未套用任務範本
           </div>
         )}
@@ -311,7 +311,7 @@ export default function MissionDetail() {
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 z-30 px-5 py-3 bg-foreground text-white text-[0.72rem] tracking-[0.2em] uppercase shadow-lift hover:bg-foreground/90 transition"
+          className="fixed bottom-6 right-6 z-30 px-5 py-3 bg-foreground text-white text-tiny tracking-[0.2em] uppercase shadow-lift hover:bg-foreground/90 transition"
         >
           對話 →
         </button>
@@ -330,10 +330,10 @@ export default function MissionDetail() {
 function BriefRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[0.6rem] tracking-[0.22em] uppercase text-default-400 mb-0.5">
+      <div className="text-tiny tracking-[0.22em] uppercase text-default-400 mb-0.5">
         {label}
       </div>
-      <div className="text-[0.86rem] text-foreground whitespace-pre-wrap">{children}</div>
+      <div className="text-small text-foreground whitespace-pre-wrap">{children}</div>
     </div>
   );
 }
@@ -397,19 +397,19 @@ function RecommendationPanel({
     <div className="border border-divider bg-white p-7">
       <div className="flex items-end justify-between mb-5">
         <div>
-          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-default-400 mb-1">
+          <div className="text-tiny tracking-[0.28em] uppercase text-default-400 mb-1">
             AI · METHODOLOGY MATCH
           </div>
-          <h2 className="font-semibold text-[1.4rem] text-foreground tracking-[-0.015em]">
+          <h2 className="font-semibold text-xl text-foreground tracking-[-0.015em]">
             為這個任務挑了這幾個任務範本
           </h2>
-          <p className="mt-1 text-[0.78rem] text-default-500 max-w-[420px]">
+          <p className="mt-1 text-small text-default-500 max-w-[420px]">
             按你的任務說明排序。點「套用」一鍵接管步驟，不滿意可以再換。
           </p>
         </div>
         <button
           onClick={onBrowseManually}
-          className="text-[0.66rem] tracking-[0.18em] uppercase border border-divider px-3 py-1.5 text-default-500 hover:text-foreground hover:border-foreground transition"
+          className="text-tiny tracking-[0.18em] uppercase border border-divider px-3 py-1.5 text-default-500 hover:text-foreground hover:border-foreground transition"
         >
           自己挑 →
         </button>
@@ -420,18 +420,18 @@ function RecommendationPanel({
           {[0, 1, 2].map((i) => (
             <div key={i} className="border border-divider bg-content2/50 h-[78px] animate-pulse" />
           ))}
-          <div className="text-[0.74rem] text-default-500 text-center mt-3">AI 配對中…</div>
+          <div className="text-tiny text-default-500 text-center mt-3">AI 配對中…</div>
         </div>
       )}
 
       {err && !isLoading && (
-        <div className="text-[0.78rem] text-red-600 whitespace-pre-wrap">
+        <div className="text-small text-red-600 whitespace-pre-wrap">
           推薦失敗：{err}
         </div>
       )}
 
       {recs && recs.length === 0 && !isLoading && (
-        <div className="text-[0.82rem] text-default-500">
+        <div className="text-small text-default-500">
           AI 沒挑出推薦（型錄可能空的）。你可以
           <button
             onClick={onBrowseManually}
@@ -496,28 +496,28 @@ function RecTile({
             style={{ background: tone.bg }}
             aria-hidden
           />
-          <span className="font-semibold text-[0.62rem] tracking-[0.06em] text-foreground">
+          <span className="font-semibold text-tiny tracking-[0.06em] text-foreground">
             {lk}
           </span>
-          <span className="text-[0.62rem] tracking-[0.04em] text-default-400">
+          <span className="text-tiny tracking-[0.04em] text-default-400">
             ・{tone.label}
           </span>
         </div>
-        <div className="font-semibold text-[1rem] leading-tight text-foreground line-clamp-2">
+        <div className="font-semibold text-medium leading-tight text-foreground line-clamp-2">
           {rec.name}
         </div>
         {rec.author && (
-          <div className="mt-0.5 text-[0.66rem] tracking-[0.04em] text-default-500 truncate">
+          <div className="mt-0.5 text-tiny tracking-[0.04em] text-default-500 truncate">
             {rec.author}
           </div>
         )}
         {rec.rationale && (
-          <div className="mt-2 text-[0.74rem] text-foreground leading-snug line-clamp-3">
+          <div className="mt-2 text-tiny text-foreground leading-snug line-clamp-3">
             {rec.rationale}
           </div>
         )}
         <div
-          className="mt-3 inline-flex items-center gap-1 text-[0.66rem] tracking-[0.18em] uppercase font-medium"
+          className="mt-3 inline-flex items-center gap-1 text-tiny tracking-[0.18em] uppercase font-medium"
           style={{ color: tone.bg }}
         >
           {picking ? "套用中…" : "套用"} →
@@ -547,7 +547,7 @@ function RecTile({
       </div>
       {/* corner number — Canva-y order tag */}
       <span
-        className="absolute top-2 left-2 font-semibold text-[0.58rem] tracking-[0.26em] uppercase text-default-400/80"
+        className="absolute top-2 left-2 font-semibold text-tiny tracking-[0.26em] uppercase text-default-400/80"
         aria-hidden
       >
         0{index + 1}

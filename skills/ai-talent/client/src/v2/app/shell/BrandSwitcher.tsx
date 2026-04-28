@@ -30,12 +30,12 @@ export default function BrandSwitcher({
           variant="bordered"
           radius="sm"
           startContent={
-            <span className="w-5 h-5 rounded-full bg-success text-white text-[0.6rem] flex items-center justify-center font-semibold shrink-0">
+            <span className="w-5 h-5 rounded-full bg-success text-white text-tiny flex items-center justify-center font-semibold shrink-0">
               {initial}
             </span>
           }
           endContent={<span className="text-default-400">▾</span>}
-          className="text-[0.74rem] text-foreground h-8 min-w-[140px] justify-start border-divider"
+          className="text-tiny text-foreground h-8 min-w-[140px] justify-start border-divider"
         >
           <span className="max-w-[140px] truncate">{selected?.name ?? "選擇品牌"}</span>
         </Button>

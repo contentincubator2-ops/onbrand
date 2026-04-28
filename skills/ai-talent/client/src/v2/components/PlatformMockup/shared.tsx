@@ -93,9 +93,9 @@ export function VerticalActionRail({
       {items.map((it, i) => (
         <div key={i} className="flex flex-col items-center gap-0.5 text-white drop-shadow-lg">
           <span className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-            <FontAwesomeIcon icon={it.icon} className="text-[1.1rem]" />
+            <FontAwesomeIcon icon={it.icon} className="text-medium" />
           </span>
-          {it.count && <span className="text-[0.66rem] font-semibold">{it.count}</span>}
+          {it.count && <span className="text-tiny font-semibold">{it.count}</span>}
         </div>
       ))}
     </div>

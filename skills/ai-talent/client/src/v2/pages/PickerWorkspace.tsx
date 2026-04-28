@@ -597,7 +597,7 @@ export default function PickerWorkspace() {
         >
           返回
         </Button>
-        <div className="font-semibold text-[0.92rem] text-foreground truncate px-4">
+        <div className="font-semibold text-small text-foreground truncate px-4">
           {headerTitle}
         </div>
         <div className="flex items-center gap-2">
@@ -655,7 +655,7 @@ export default function PickerWorkspace() {
                     ].join(" ")}
                   >
                     <FontAwesomeIcon icon={it.icon} className="text-medium leading-none" />
-                    <span className="text-[0.62rem] tracking-[0.06em]">{it.label}</span>
+                    <span className="text-tiny tracking-[0.06em]">{it.label}</span>
                   </button>
                 </Tooltip>
               </React.Fragment>
@@ -778,7 +778,7 @@ export default function PickerWorkspace() {
               "所有結果" list. */}
           <div className="flex-1 min-h-0 overflow-y-auto p-3">
             {squadsQuery.isLoading ? (
-              <div className="text-[0.84rem] text-default-500 py-6 text-center">載入中…</div>
+              <div className="text-small text-default-500 py-6 text-center">載入中…</div>
             ) : (
               <>
                 {/* ── 1. 最近使用的方法論 (hidden while searching) ── */}
@@ -826,14 +826,14 @@ export default function PickerWorkspace() {
                       ) : (
                         <Card shadow="none" radius="lg" className="border border-divider">
                           <CardBody className="p-3 flex flex-row items-start gap-3">
-                            <div className="w-12 h-12 shrink-0 border border-divider rounded-medium flex items-center justify-center text-default-400 text-[1.4rem]">
+                            <div className="w-12 h-12 shrink-0 border border-divider rounded-medium flex items-center justify-center text-default-400 text-xl">
                               +
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-[0.82rem] font-semibold text-foreground">
+                              <div className="text-small font-semibold text-foreground">
                                 發佈為品牌範本
                               </div>
-                              <div className="text-[0.7rem] text-default-500 leading-snug mt-0.5">
+                              <div className="text-tiny text-default-500 leading-snug mt-0.5">
                                 完成此設計後，你可以將其變成可重複使用的範本。
                               </div>
                             </div>
@@ -849,7 +849,7 @@ export default function PickerWorkspace() {
                   title={q ? `搜尋結果（${filtered.length}）` : "所有結果"}
                 >
                   {filtered.length === 0 ? (
-                    <div className="text-[0.84rem] text-default-500 py-6 text-center px-4">
+                    <div className="text-small text-default-500 py-6 text-center px-4">
                       {q ? `沒有找到符合「${q}」的方法論。` : "這個分類目前沒有方法論。"}
                     </div>
                   ) : (
@@ -926,11 +926,11 @@ export default function PickerWorkspace() {
           ) : (
             <div className="h-full flex items-center justify-center p-10">
               <div className="text-center max-w-[420px]">
-                <div className="text-[3rem] mb-4 text-default-400">▣</div>
-                <h2 className="font-semibold text-[1.4rem] text-foreground mb-2">
+                <div className="text-5xl mb-4 text-default-400">▣</div>
+                <h2 className="font-semibold text-xl text-foreground mb-2">
                   從左側挑一個方法論小組來開始
                 </h2>
-                <p className="text-[0.86rem] text-default-500 leading-relaxed">
+                <p className="text-small text-default-500 leading-relaxed">
                   每個方法論都附帶完整的工作步驟與 AI 專員陣容，點擊 → 預覽 → 啟動。
                 </p>
               </div>
@@ -966,7 +966,7 @@ function RailPill({
     <button
       onClick={onClick}
       className={[
-        "inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] rounded-full border transition",
+        "inline-flex items-center gap-1.5 px-2.5 py-1 text-tiny rounded-full border transition",
         active
           ? "bg-foreground text-white border-foreground"
           : "bg-white text-foreground border-divider hover:border-foreground",
@@ -991,14 +991,14 @@ function ThumbSection({
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2 px-0.5">
-        <h3 className="text-[0.78rem] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-small font-semibold text-foreground">{title}</h3>
         {onCta && ctaLabel && (
           <Button
             size="sm"
             variant="light"
             radius="sm"
             onPress={onCta}
-            className="text-[0.7rem] h-6 min-w-0 px-2 text-default-500"
+            className="text-tiny h-6 min-w-0 px-2 text-default-500"
           >
             {ctaLabel}
           </Button>
@@ -1031,7 +1031,7 @@ function SquadMiniCard({
       ].join(" ")}
     >
       <div
-        className="aspect-[16/10] flex items-center justify-center text-white font-bold text-[1.6rem]"
+        className="aspect-[16/10] flex items-center justify-center text-white font-bold text-2xl"
         style={{ background: tone.bg }}
       >
         {(name.charAt(0) || "?").toUpperCase()}
@@ -1596,7 +1596,7 @@ function AgentQueueCard({
         <div className="shrink-0 flex flex-col items-center gap-1">
           {agent ? (
             <Badge
-              content={<FontAwesomeIcon icon={faCircle} className="text-[0.5rem]" />}
+              content={<FontAwesomeIcon icon={faCircle} className="text-tiny" />}
               color="default" placement="bottom-right" shape="circle" size="sm"
               classNames={{ badge: "bg-default-300" }}
             >
@@ -2012,26 +2012,26 @@ function StepCard({ step, idx, tone }: { step: any; idx: number; tone: any }) {
     <Card shadow="none" radius="lg" className="border border-divider hover:border-foreground transition">
       <CardBody className="p-4 flex flex-row items-start gap-3">
         <div
-          className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-white text-[0.72rem] font-bold"
+          className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-white text-tiny font-bold"
           style={{ background: tone.bg }}
         >
           {idx}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[0.86rem] font-semibold text-foreground line-clamp-2">{title}</div>
+          <div className="text-small font-semibold text-foreground line-clamp-2">{title}</div>
           {agent && (
-            <div className="text-[0.72rem] text-default-500 mt-0.5 line-clamp-1">{agent}</div>
+            <div className="text-tiny text-default-500 mt-0.5 line-clamp-1">{agent}</div>
           )}
           {(skills.length > 0 || out || tool) && (
             <div className="mt-2 flex flex-wrap gap-1">
               {skills.slice(0, 3).map((sk, i) => (
-                <Chip key={i} size="sm" radius="sm" variant="flat" className="h-5 text-[0.66rem]">{sk}</Chip>
+                <Chip key={i} size="sm" radius="sm" variant="flat" className="h-5 text-tiny">{sk}</Chip>
               ))}
               {out && (
-                <Chip size="sm" radius="sm" variant="solid" color="default" className="h-5 text-[0.66rem] bg-foreground text-background">{out}</Chip>
+                <Chip size="sm" radius="sm" variant="solid" color="default" className="h-5 text-tiny bg-foreground text-background">{out}</Chip>
               )}
               {tool && (
-                <Chip size="sm" radius="sm" variant="bordered" className="h-5 text-[0.66rem]">{tool}</Chip>
+                <Chip size="sm" radius="sm" variant="bordered" className="h-5 text-tiny">{tool}</Chip>
               )}
             </div>
           )}
@@ -2108,15 +2108,15 @@ function LayerAssetDrawer({
       {/* Header */}
       <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
         <div className="min-w-0">
-          <div className="text-[0.72rem] text-default-500">資產 / Assets</div>
-          <div className="font-semibold text-[1.0rem] text-foreground truncate">{meta.title}</div>
+          <div className="text-tiny text-default-500">資產 / Assets</div>
+          <div className="font-semibold text-medium text-foreground truncate">{meta.title}</div>
         </div>
         <Button
           size="sm"
           variant="light"
           radius="sm"
           onPress={onBackToTemplates}
-          className="text-[0.72rem] h-6 min-w-0 px-2 shrink-0 ml-2"
+          className="text-tiny h-6 min-w-0 px-2 shrink-0 ml-2"
         >
           ← 範本
         </Button>
@@ -2125,15 +2125,15 @@ function LayerAssetDrawer({
       {/* Body — placeholder shell */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {meta.blurb && (
-          <p className="text-[0.82rem] text-foreground/80 leading-relaxed mb-4">{meta.blurb}</p>
+          <p className="text-small text-foreground/80 leading-relaxed mb-4">{meta.blurb}</p>
         )}
 
         {/* Empty-state card with primary action */}
         <Card shadow="none" radius="lg" className="border border-dashed border-divider bg-content2/40">
           <CardBody className="p-5 text-center">
             <div className="text-3xl mb-2 text-default-400"><FontAwesomeIcon icon={item.icon} /></div>
-            <div className="text-[0.86rem] text-foreground font-semibold mb-1">尚未有資料</div>
-            <div className="text-[0.74rem] text-default-500 leading-snug mb-4">
+            <div className="text-small text-foreground font-semibold mb-1">尚未有資料</div>
+            <div className="text-tiny text-default-500 leading-snug mb-4">
               這個資產庫即將推出。目前可以先上傳檔案或從範本開始一個 mission。
             </div>
             <div className="flex gap-2 justify-center">

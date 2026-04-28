@@ -102,10 +102,10 @@ export default function PlaybooksPage() {
         <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider mb-2">
           PLAYBOOKS · 成長方案
         </Chip>
-        <h1 className="font-semibold text-[2.4rem] leading-tight text-foreground mb-3">
+        <h1 className="font-semibold text-3xl leading-tight text-foreground mb-3">
           挑一個劇本，90 天讓品牌變成下一個案例
         </h1>
-        <p className="text-default-500 text-[0.95rem] max-w-[640px] leading-relaxed">
+        <p className="text-default-500 text-small max-w-[640px] leading-relaxed">
           每個方案都是 SoWork 策展團隊把 squad（任務範本）、顧問團、媒體通路、
           KPI 串好的「可賣包」。背後是真實案例與可驗證的階段方法。
           選一個，按下「套用」，剩下交給流程。
@@ -189,7 +189,7 @@ function PlaybookCard({
         >
           {BADGE_COPY[playbook.badge] ?? playbook.badge}
         </Chip>
-        <div className="absolute right-4 bottom-2 text-[3.4rem] leading-none drop-shadow-md">
+        <div className="absolute right-4 bottom-2 text-5xl leading-none drop-shadow-md">
           {playbook.emoji}
         </div>
         <Tooltip content="查看詳情" placement="left">
@@ -307,7 +307,7 @@ function PlaybookDetail({
               </Breadcrumbs>
 
               <div className="flex items-start gap-4">
-                <div className="text-[3.4rem] leading-none">{data.emoji}</div>
+                <div className="text-5xl leading-none">{data.emoji}</div>
                 <div className="flex-1 min-w-0">
                   <Chip size="sm" color={cc} variant="flat" className="uppercase tracking-wider mb-1">
                     {BADGE_COPY[data.badge] ?? data.badge} · 成長方案
