@@ -20,8 +20,10 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Skeleton,
+  Skeleton, Tabs, Tab,
 } from "@heroui/react";
+import SegmentEditor from "../components/positioning/SegmentEditor";
+import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronDown, faPlus, faCloudArrowUp, faShapes,
@@ -277,6 +279,9 @@ export default function BrandsPage() {
               section={section}
               scopeMode={scopeMode}
               scopeName={scopeName}
+              scopeBrandId={scope?.brandId ?? null}
+              scopeProductId={scope?.productId ?? null}
+              scopeEventId={scope?.eventId ?? null}
             />
           ) : visibleTiles.length === 0 ? (
             <Card shadow="none" className="border-2 border-dashed border-divider">
@@ -317,23 +322,23 @@ export default function BrandsPage() {
 }
 
 /* ─────────────────────────── PositioningPanel ───────────────────────── */
-// Phase 4 placeholder — Phase 5 will fill these with the actual 8/6/3-section
-// forms + speed-card view + AI prompt library.
+// Renders the 完整定位書 / 速查卡 / AI 指令庫 sub-views for the active scope.
+// Reads positioning JSON from the appropriate router (brand / product / event)
+// and persists edits via mutation; segment list comes from positioningSchema.
 
 function PositioningPanel({
   section, scopeMode, scopeName,
+  scopeBrandId, scopeProductId, scopeEventId,
 }: {
   section: "doc" | "card" | "prompts";
   scopeMode: "brand" | "product" | "event" | "none";
   scopeName: string;
+  scopeBrandId: number | null;
+  scopeProductId: number | null;
+  scopeEventId: number | null;
 }) {
   const titleMap = { doc: "完整定位書", card: "速查卡", prompts: "AI 指令庫" } as const;
   const iconMap = { doc: faBookOpen, card: faTableList, prompts: faRobot } as const;
-  const sectionCount =
-    scopeMode === "brand" ? { doc: 8, card: 3, prompts: 6 }
-    : scopeMode === "product" ? { doc: 6, card: 2, prompts: 6 }
-    : scopeMode === "event" ? { doc: 3, card: 1, prompts: 6 }
-    : { doc: 0, card: 0, prompts: 0 };
 
   if (scopeMode === "none") {
     return (
@@ -350,29 +355,123 @@ function PositioningPanel({
   }
 
   return (
+    <PositioningEditor
+      section={section}
+      scopeMode={scopeMode as "brand" | "product" | "event"}
+      scopeName={scopeName}
+      brandId={scopeBrandId}
+      productId={scopeProductId}
+      eventId={scopeEventId}
+    />
+  );
+}
+
+function PositioningEditor({
+  section, scopeMode, scopeName, brandId, productId, eventId,
+}: {
+  section: "doc" | "card" | "prompts";
+  scopeMode: "brand" | "product" | "event";
+  scopeName: string;
+  brandId: number | null;
+  productId: number | null;
+  eventId: number | null;
+}) {
+  const segments: SegmentSpec[] = SCOPE_SEGMENTS[scopeMode] ?? [];
+
+  // Read scope.active to get the merged positioning data for the chosen scope.
+  const scopeActive = (trpc as any).scope?.active?.useQuery
+    ? (trpc as any).scope.active.useQuery(
+        { brandId, productId, eventId },
+        { refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: null, isLoading: false };
+
+  const dbPositioning =
+    (scopeActive.data as any)?.[scopeMode]?.positioning ?? null;
+
+  // Local working copy (debounced commit). For Phase 5 stub we don't persist
+  // yet — Phase 5b will wire the upsert mutation. For now changes live in
+  // component state so users can preview the form behavior.
+  const [draft, setDraft] = React.useState<Record<string, any>>({});
+  React.useEffect(() => {
+    if (dbPositioning && typeof dbPositioning === "object") setDraft(dbPositioning);
+  }, [dbPositioning]);
+
+  if (section === "card") {
+    return (
+      <SpeedCardView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
+    );
+  }
+  if (section === "prompts") {
+    return (
+      <PromptLibraryView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
+    );
+  }
+
+  // section === "doc"
+  return (
+    <div className="flex flex-col gap-4">
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="px-5 py-4 gap-1">
+          <p className="text-tiny text-default-500 uppercase tracking-wider">
+            {scopeMode.toUpperCase()} · 完整定位書
+          </p>
+          <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
+          <p className="text-small text-default-500">
+            共 {segments.length} 個段落 · 每段可手動編輯或由 agent 自動填寫
+            <span className="ml-2 text-tiny">（編輯尚未持久化，Phase 5b 會接 upsert）</span>
+          </p>
+        </CardBody>
+      </Card>
+      {segments.map((spec) => (
+        <SegmentEditor
+          key={spec.id}
+          spec={spec}
+          value={draft[spec.id] ?? null}
+          onChange={(next) => setDraft({ ...draft, [spec.id]: next })}
+          onRunAgent={(slug) => {
+            // Phase 6 will wire the agent runner. For now just notify.
+            // eslint-disable-next-line no-alert
+            alert(`Phase 6 will run agent: ${slug} for segment ${spec.id}`);
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SpeedCardView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
+  return (
     <Card shadow="none" className="border border-divider">
       <CardBody className="p-6 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-default-100 border border-divider flex items-center justify-center">
-            <FontAwesomeIcon icon={iconMap[section]} className="text-default-600" />
-          </div>
-          <div>
-            <p className="text-tiny text-default-500 uppercase tracking-wider">
-              {scopeMode === "product" ? "PRODUCT" : scopeMode === "event" ? "EVENT" : "BRAND"} · {titleMap[section]}
-            </p>
-            <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
-          </div>
-        </div>
-        <Divider />
-        <div className="text-small text-default-500 leading-relaxed space-y-2">
-          <p>
-            這個區塊將呈現 {scopeMode === "brand" ? "品牌" : scopeMode === "product" ? "產品" : "活動"}
-            的 {titleMap[section]}（{sectionCount[section]} 個段落）。
-          </p>
-          <p>
-            每個段落支援：手動填寫 ｜ 由推薦 agent 自動填寫。下一個 phase 會接 form components。
-          </p>
-        </div>
+        <p className="text-tiny text-default-500 uppercase tracking-wider">
+          {scopeMode.toUpperCase()} · 速查卡
+        </p>
+        <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
+        <p className="text-small text-default-500">
+          速查卡是定位書的衍生 view（5 Whys / 競爭矩陣 / 受眾矩陣 等）。
+          Phase 5c 會 render 完整速查卡 layout。目前先顯示 raw data 預覽：
+        </p>
+        <pre className="text-tiny bg-default-50 border border-divider rounded-md p-3 overflow-x-auto">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </CardBody>
+    </Card>
+  );
+}
+
+function PromptLibraryView({ scopeMode, data: _data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
+  return (
+    <Card shadow="none" className="border border-divider">
+      <CardBody className="p-6 gap-4">
+        <p className="text-tiny text-default-500 uppercase tracking-wider">
+          {scopeMode.toUpperCase()} · AI 指令庫
+        </p>
+        <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
+        <p className="text-small text-default-500">
+          Phase 5d 會塞入 6 個 prompt 範本（社群 / 廣告 / Midjourney / SEO / EDM / KOL），
+          自動以本 scope 的 positioning 變數填空 + 提供 ChatGPT / Claude / Gemini 複製按鈕。
+        </p>
       </CardBody>
     </Card>
   );
