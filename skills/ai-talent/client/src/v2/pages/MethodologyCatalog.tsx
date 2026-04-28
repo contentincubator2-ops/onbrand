@@ -176,7 +176,7 @@ export default function MethodologyCatalog() {
   };
 
   return (
-    <main className="pb-16 max-w-[1280px] mx-auto px-8 py-10">
+    <main className="pb-16 px-8 py-10">
       {/* ─── Header (Notion-discipline) ──────────────────────────── */}
       <header className="mb-8">
         <div className="flex items-start justify-between gap-3 flex-wrap">

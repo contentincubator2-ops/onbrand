@@ -146,7 +146,7 @@ export default function PlaybooksPage() {
   ];
 
   return (
-    <div className="px-8 py-10 max-w-[1280px] mx-auto">
+    <div className="px-8 py-10">
       {/* ── Hero ──────────────────────────────────────────── */}
       <div className="mb-6">
         <Breadcrumbs size="sm" className="mb-3">

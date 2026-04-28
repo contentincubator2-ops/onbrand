@@ -329,7 +329,7 @@ export default function MissionsHome() {
     <main>
       {/* ─── Hero ─── */}
       <section className="relative px-8 pt-10 pb-10 border-b border-divider bg-content1">
-        <div className="max-w-[1280px] mx-auto">
+        <div>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <Chip variant="flat" color="default" size="sm" className="uppercase tracking-wider mb-2">
@@ -435,7 +435,7 @@ export default function MissionsHome() {
       </section>
 
       {/* ─── Body sections ──────────────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 py-10">
+      <section className="px-8 py-10">
         {showCustom && (
           <CustomMissionForm
             title={customTitle}

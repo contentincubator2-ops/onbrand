@@ -57,11 +57,11 @@ export default function MethodologyDetail() {
   const s: any = squadQuery.data;
 
   if (squadQuery.isLoading) {
-    return <div className="max-w-[1280px] mx-auto px-8 py-10 text-default-500">載入中…</div>;
+    return <div className="px-8 py-10 text-default-500">載入中…</div>;
   }
   if (!s) {
     return (
-      <div className="max-w-[1280px] mx-auto px-8 py-10">
+      <div className="px-8 py-10">
         <div className="text-default-500">找不到任務範本「{slug}」。</div>
         <Link to="/templates" className="mt-4 inline-block text-foreground underline underline-offset-4">
           ← 回任務範本型錄
@@ -74,7 +74,7 @@ export default function MethodologyDetail() {
   const accent = accentForIndex(Number(s.id ?? 0));
 
   return (
-    <main className="max-w-[1280px] mx-auto px-8 py-10">
+    <main className="px-8 py-10">
       <button
         onClick={() => navigate(-1)}
         className="text-tiny tracking-[0.18em] uppercase text-default-500 hover:text-foreground mb-6"

@@ -97,11 +97,11 @@ export default function MissionDetail() {
   };
 
   if (missionQuery.isLoading) {
-    return <div className="max-w-[1280px] mx-auto px-8 py-10 text-default-500">載入中…</div>;
+    return <div className="px-8 py-10 text-default-500">載入中…</div>;
   }
   if (!m) {
     return (
-      <div className="max-w-[1280px] mx-auto px-8 py-10">
+      <div className="px-8 py-10">
         <div className="text-default-500">找不到任務。</div>
         <Link to="/" className="mt-4 inline-block text-foreground underline underline-offset-4">
           ← 回任務牆
@@ -113,7 +113,7 @@ export default function MissionDetail() {
   const accent = accentForIndex(Number(sq?.id ?? id));
 
   return (
-    <main className="max-w-[1280px] mx-auto px-8 py-10 grid grid-cols-12 gap-6 pb-32">
+    <main className="px-8 py-10 grid grid-cols-12 gap-6 pb-32">
       {/* ── LEFT: Brief ───────────────────────────────────────────────── */}
       <section className="col-span-4 space-y-4">
         <button
