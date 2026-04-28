@@ -129,10 +129,13 @@ export default function MethodologyCatalog() {
   }, [allEntities]);
 
   // Curated subsets for horizontal-scroll rows
-  const curatedSquads = useMemo(
-    () => allEntities.filter((e) => e.kind === "squad").slice(0, 24),
-    [allEntities]
-  );
+  // 精選 row shows only is_curated=1 squads (the 30 IPs that get hero covers).
+  // Falls back to top squads if no curated entries are available.
+  const curatedSquads = useMemo(() => {
+    const squads = allEntities.filter((e) => e.kind === "squad");
+    const curated = squads.filter((e) => e.isCurated);
+    return (curated.length > 0 ? curated : squads).slice(0, 24);
+  }, [allEntities]);
   const topAgents = useMemo(
     () => allEntities.filter((e) => e.kind === "agent").slice(0, 24),
     [allEntities]

@@ -128,6 +128,9 @@ export interface HomeEntity {
    */
   taskType?: string | null;
 
+  /** True for squads with is_curated=1 (the 30 親選 IPs that get covers). */
+  isCurated?: boolean;
+
   /**
    * Generated cover/portrait image. Populated for all three kinds:
    *   squad → squads.hero_image_url (Notion-style line illustration)
@@ -150,7 +153,7 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
     `SELECT id, slug, name, description, agents, steps,
             strategy_layer, methodology, workspace,
             task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind,
-            hero_image_url
+            hero_image_url, is_curated
        FROM squads
       WHERE is_active = 1
       ORDER BY COALESCE(tier, 99) ASC, id ASC
@@ -208,6 +211,7 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
         ? { platform: String(r.mockup_platform), format: String(r.mockup_format) }
         : undefined,
       coverImageUrl: r.hero_image_url ?? null,
+      isCurated: Number(r.is_curated) === 1,
     };
   });
 }
