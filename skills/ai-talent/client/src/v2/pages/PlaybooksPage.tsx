@@ -154,7 +154,7 @@ export default function PlaybooksPage() {
           <BreadcrumbItem>成長方案</BreadcrumbItem>
         </Breadcrumbs>
 
-        <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider mb-2">
+        <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
           PLAYBOOKS · 成長方案
         </Chip>
         <h1 className="font-semibold text-3xl leading-tight text-foreground mb-3">
@@ -164,7 +164,7 @@ export default function PlaybooksPage() {
           每個方案都對應一個有作者背景的方法論小組（squad），由真實顧問
           + 多階段工作流組成。選一個 → 直接派出。
           {currentBrand && (
-            <> — 將套用到 <Chip size="sm" variant="flat" color="secondary">{currentBrand.name}</Chip></>
+            <> — 將套用到 <Chip size="sm" variant="flat" color="default">{currentBrand.name}</Chip></>
           )}
         </p>
       </div>
@@ -303,7 +303,7 @@ function PlaybookCard({ playbook: p, onClick }: { playbook: SquadPlaybook; onCli
         {/* Top row: layer + workspace + task */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <Chip
-            size="sm" variant="flat" color={lkColor}
+            size="sm" variant="flat" color="default"
             startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}
           >
             {lk} · {LAYER_LABEL[lk] ?? "策略"}
@@ -478,7 +478,7 @@ function PlaybookDetail({
               </Breadcrumbs>
 
               <div className="flex items-start gap-2 flex-wrap">
-                <Chip size="sm" color={lkColor} variant="flat"
+                <Chip size="sm" color="default" variant="flat"
                   startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}>
                   {lk} · {LAYER_LABEL[lk] ?? "策略"}
                 </Chip>
