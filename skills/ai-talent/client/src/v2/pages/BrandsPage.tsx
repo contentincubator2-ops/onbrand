@@ -25,6 +25,7 @@ import {
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
+import SpeedCard from "../components/positioning/SpeedCard";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { BRAND_FULL_PIPELINE, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -650,21 +651,11 @@ function SaveIndicator({ state, hasTarget }: { state: "idle" | "saving" | "saved
 
 function SpeedCardView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
   return (
-    <Card shadow="none" className="border border-divider">
-      <CardBody className="p-6 gap-4">
-        <p className="text-tiny text-default-500 uppercase tracking-wider">
-          {scopeMode.toUpperCase()} · 速查卡
-        </p>
-        <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
-        <p className="text-small text-default-500">
-          速查卡是定位書的衍生 view（5 Whys / 競爭矩陣 / 受眾矩陣 等）。
-          Phase 5c 會 render 完整速查卡 layout。目前先顯示 raw data 預覽：
-        </p>
-        <pre className="text-tiny bg-default-50 border border-divider rounded-md p-3 overflow-x-auto">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      </CardBody>
-    </Card>
+    <SpeedCard
+      scopeMode={scopeMode as "brand" | "product" | "event"}
+      scopeName={scopeName}
+      data={data}
+    />
   );
 }
 
