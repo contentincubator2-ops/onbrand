@@ -252,3 +252,21 @@ export function getAllVariants(): MockupVariant[] {
     return variant(p as Platform, f as Format);
   });
 }
+
+/**
+ * Top variants per platform, ordered by user preference. Used in
+ * PickerWorkspace to render a variant switcher Tabs row so the user
+ * can preview the same squad in different formats.
+ */
+const PLATFORM_TOP_VARIANTS: Record<Platform, Format[]> = {
+  instagram: ["feed", "carousel", "reel", "story", "profile"],
+  facebook:  ["feed", "reel", "story", "event", "marketplace"],
+  linkedin:  ["feed", "article", "newsletter", "poll", "document"],
+  youtube:   ["video-card", "watch", "shorts", "community"],
+  tiktok:    ["foryou", "profile"],
+  generic:   ["generic"],
+};
+
+export function getVariantsForPlatform(platform: Platform): MockupVariant[] {
+  return PLATFORM_TOP_VARIANTS[platform].map((f) => variant(platform, f));
+}

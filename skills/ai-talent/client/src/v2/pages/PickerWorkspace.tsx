@@ -25,14 +25,14 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
-import { inferMockupVariant, type MockupVariant } from "../lib/inferMockup";
+import { inferMockupVariant, getVariantsForPlatform, type MockupVariant } from "../lib/inferMockup";
 import { PlatformMockup } from "../components/PlatformMockup";
 import WorkflowRunner from "./WorkflowRunner";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
 import {
   Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
   Button, Card, CardBody, CardHeader, Chip, Divider, Input, Progress,
-  ScrollShadow, Skeleton, Spinner, Textarea, Tooltip, User,
+  ScrollShadow, Skeleton, Spinner, Tab, Tabs, Textarea, Tooltip, User,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -1161,6 +1161,24 @@ function SquadDetailPanel({
     [squad],
   );
 
+  // Sibling variants on the same platform — populates the variant switcher Tabs
+  const platformVariants = useMemo(
+    () => getVariantsForPlatform(mockupVariant.platform),
+    [mockupVariant.platform],
+  );
+
+  // User-overridable preview variant (defaults to inferred)
+  const [previewFormatKey, setPreviewFormatKey] = useState<string>(mockupVariant.format);
+  // Reset preview to inferred whenever squad / platform changes
+  useEffect(() => {
+    setPreviewFormatKey(mockupVariant.format);
+  }, [mockupVariant.platform, mockupVariant.format]);
+
+  const previewVariant: MockupVariant = useMemo(
+    () => platformVariants.find((v) => v.format === previewFormatKey) ?? mockupVariant,
+    [platformVariants, previewFormatKey, mockupVariant],
+  );
+
   return (
     <div className="h-full grid grid-cols-1 lg:grid-cols-[300px_1fr_360px] divide-x divide-divider">
 
@@ -1263,13 +1281,42 @@ function SquadDetailPanel({
       </aside>
 
       {/* ─── MIDDLE: PREVIEW ─────────────────────────────────────────── */}
-      <section className="overflow-y-auto bg-default-50 flex items-start justify-center p-6 lg:p-10">
-        <PlatformMockup
-          variant={mockupVariant}
-          title={missionTitle || name}
-          brief={missionBrief || (description ?? "")}
-          brandName={brandName}
-        />
+      <section className="overflow-y-auto bg-default-50 flex flex-col">
+        {/* Variant switcher — only when platform has 2+ variants */}
+        {platformVariants.length > 1 && (
+          <div className="sticky top-0 z-10 bg-default-50/90 backdrop-blur-sm border-b border-divider px-4 py-2 flex items-center justify-between gap-2">
+            <Tabs
+              size="sm" radius="full" variant="solid" color="secondary"
+              selectedKey={previewFormatKey}
+              onSelectionChange={(k) => setPreviewFormatKey(String(k))}
+              aria-label="預覽格式"
+              classNames={{ tabList: "bg-content1" }}
+            >
+              {platformVariants.map((v) => (
+                <Tab key={v.format} title={v.label.replace(/^.*?\s/, "")} />
+              ))}
+            </Tabs>
+            {previewFormatKey !== mockupVariant.format && (
+              <Tooltip content={`系統推薦：${mockupVariant.label}`}>
+                <Chip
+                  size="sm" variant="flat" color="warning"
+                  className="cursor-pointer"
+                  onClick={() => setPreviewFormatKey(mockupVariant.format)}
+                >
+                  ⤺ 推薦：{mockupVariant.label.replace(/^.*?\s/, "")}
+                </Chip>
+              </Tooltip>
+            )}
+          </div>
+        )}
+        <div className="flex-1 flex items-start justify-center p-6 lg:p-10">
+          <PlatformMockup
+            variant={previewVariant}
+            title={missionTitle || name}
+            brief={missionBrief || (description ?? "")}
+            brandName={brandName}
+          />
+        </div>
       </section>
 
       {/* ─── RIGHT: AGENT ORCHESTRA ──────────────────────────────────── */}
