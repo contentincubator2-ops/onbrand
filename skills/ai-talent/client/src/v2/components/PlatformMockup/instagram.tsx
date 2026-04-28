@@ -14,11 +14,14 @@ import React from "react";
 import {
   Avatar, AvatarGroup, Button, Skeleton,
 } from "@heroui/react";
+// brand icons used for IG Profile tabs
+// (none needed beyond instagram itself)
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faInstagram } from "@fortawesome/free-brands-svg-icons";
 import {
   faHeart, faComment, faPaperPlane, faBookmark, faImages, faCircleCheck,
-  faMusic, faChevronLeft, faXmark, faVolumeHigh,
+  faMusic, faChevronLeft, faXmark, faVolumeHigh, faTableCellsLarge,
+  faVideo, faTag, faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
@@ -282,6 +285,65 @@ export function IGStories({ title, brandName, variantLabel }: MockupFields) {
         {/* Tap navigation hints (nav arrows) */}
         <div className="absolute left-1 top-1/2 -translate-y-1/2 z-10 text-white/40">
           <FontAwesomeIcon icon={faChevronLeft} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── IG Profile (3-col grid) ─────────────── */
+
+export function IGProfile({ brandName, variantLabel }: MockupFields) {
+  const handle = handleOf(brandName);
+  return (
+    <div className="w-full max-w-[400px] mx-auto">
+      <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <p className="text-medium font-semibold">{handle}</p>
+          <span className="text-medium tracking-tighter">⋯</span>
+        </div>
+        <div className="px-4 py-3 flex items-center gap-5">
+          <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={84} />
+          <div className="flex-1 grid grid-cols-3 gap-2 text-center text-small">
+            <div><div className="font-bold">42</div><div className="text-tiny text-default-500">貼文</div></div>
+            <div><div className="font-bold">12.3K</div><div className="text-tiny text-default-500">粉絲</div></div>
+            <div><div className="font-bold">567</div><div className="text-tiny text-default-500">追蹤中</div></div>
+          </div>
+        </div>
+        <div className="px-4 pb-2 space-y-1">
+          <p className="text-small font-semibold flex items-center gap-1">
+            {brandName ?? "Your Brand"}
+            <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
+          </p>
+          <p className="text-tiny text-default-500">藝術家・創作者・分享靈感</p>
+          <p className="text-tiny text-primary">your-brand.com</p>
+        </div>
+        <div className="px-4 pb-3 grid grid-cols-3 gap-2">
+          <Button size="sm" radius="md" color="primary" className="font-medium">追蹤</Button>
+          <Button size="sm" radius="md" variant="bordered">傳訊息</Button>
+          <Button isIconOnly size="sm" radius="md" variant="bordered" aria-label="more"><FontAwesomeIcon icon={faUserGroup} /></Button>
+        </div>
+        <div className="px-4 pb-3 flex gap-3 overflow-x-auto">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="shrink-0 flex flex-col items-center gap-1 w-16">
+              <div className="w-14 h-14 rounded-full border-2 border-divider bg-default-100" />
+              <p className="text-tiny text-default-500 truncate w-full text-center">精選 {i + 1}</p>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-divider flex items-center justify-around text-default-500">
+          <button className="flex-1 py-2 border-t-2 border-foreground text-foreground"><FontAwesomeIcon icon={faTableCellsLarge} /></button>
+          <button className="flex-1 py-2"><FontAwesomeIcon icon={faVideo} /></button>
+          <button className="flex-1 py-2"><FontAwesomeIcon icon={faTag} /></button>
+        </div>
+        <div className="grid grid-cols-3 gap-px bg-divider">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="aspect-square bg-default-100 relative flex items-center justify-center">
+              <Skeleton className="absolute inset-0" />
+              <FontAwesomeIcon icon={faImages} className="relative z-10 text-default-300" />
+            </div>
+          ))}
         </div>
       </div>
     </div>

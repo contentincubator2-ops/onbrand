@@ -1,19 +1,21 @@
 /**
  * YouTube mockups.
- * PR2.1: video-card, shorts (rest fall back to video-card)
+ * PR2.2: video-card, shorts, watch, community
+ *        (premiere/live still fall to video-card)
  * References (MIT):
  *   - video-card: ShakirFarhan/Youtube-Clone src/components/VideoCard.jsx
- *   - shorts: 9:16 + side rail pattern from SashenJayathilaka/TIK-TOK-Clone
+ *   - shorts:     9:16 + side rail from SashenJayathilaka/TIK-TOK-Clone
+ *   - watch:      ShakirFarhan/Youtube-Clone src/pages/Watch
  */
 import React from "react";
 import { Avatar, Button, Divider, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faYoutube } from "@fortawesome/free-brands-svg-icons";
 import {
-  faPlay, faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes, faMusic,
-  faImages,
+  faPlay, faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes,
+  faMusic, faImages, faDownload, faBell, faScissors,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, VerticalActionRail, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, dicebear } from "./shared";
 
 /* ─────────────── YT Video Card ─────────────── */
 
@@ -52,20 +54,140 @@ export function YTVideoCard({ title, brandName, variantLabel }: MockupFields) {
   );
 }
 
-/* ─────────────── YT Shorts (9:16 + side rail) ─────────────── */
+/* ─────────────── YT Watch (player + meta + actions) ─────────────── */
+
+export function YTWatch({ title, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[800px] mx-auto">
+      <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        {/* Player */}
+        <div className="relative aspect-video bg-black flex items-center justify-center">
+          <div className="text-center text-white/50 relative z-10">
+            <FontAwesomeIcon icon={faVideo} className="text-6xl mb-2" />
+            <p className="text-tiny">影片播放器 · 等待 craft agent</p>
+          </div>
+          <Button isIconOnly radius="full" size="lg" color="danger" className="absolute opacity-90" aria-label="play">
+            <FontAwesomeIcon icon={faPlay} />
+          </Button>
+          {/* Progress bar */}
+          <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20">
+            <div className="h-full w-1/3 bg-danger" />
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="px-4 pt-4 space-y-2">
+          <h2 className="text-xl font-semibold leading-tight tracking-tight line-clamp-2">{title}</h2>
+        </div>
+
+        {/* Channel row + actions */}
+        <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Avatar src={dicebear(brandName ?? "channel")} size="md" />
+            <div className="min-w-0 flex-1">
+              <p className="text-small font-semibold truncate">{brandName ?? "Your Channel"}</p>
+              <p className="text-tiny text-default-500">12K 訂閱者</p>
+            </div>
+            <Button color="default" radius="full" size="sm" className="bg-foreground text-background ml-2">
+              訂閱
+            </Button>
+            <Button isIconOnly variant="light" radius="full" size="sm" aria-label="bell">
+              <FontAwesomeIcon icon={faBell} />
+            </Button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ActionPill icon={faThumbsUp} label="1.2K" />
+            <ActionPill icon={faThumbsDown} />
+            <ActionPill icon={faShareNodes} label="分享" />
+            <ActionPill icon={faDownload} label="下載" />
+            <ActionPill icon={faScissors} label="片段" />
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="mx-4 mb-4 p-3 bg-default-100 rounded-medium space-y-1.5">
+          <div className="flex items-center gap-2 text-tiny text-default-700">
+            <span className="font-semibold">1.2K 次觀看</span>
+            <span>· 5 分鐘前</span>
+          </div>
+          <Skeleton className="h-2.5 w-[90%] rounded" />
+          <Skeleton className="h-2.5 w-[78%] rounded" />
+          <Skeleton className="h-2.5 w-[60%] rounded" />
+          <p className="text-tiny font-medium pt-1">…顯示完整資訊</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionPill({ icon, label }: { icon: any; label?: string }) {
+  return (
+    <button className="h-9 px-3 rounded-full bg-default-100 hover:bg-default-200 text-small flex items-center gap-1.5">
+      <FontAwesomeIcon icon={icon} />
+      {label && <span className="font-medium">{label}</span>}
+    </button>
+  );
+}
+
+/* ─────────────── YT Community post ─────────────── */
+
+export function YTCommunity({ title, brief, brandName, variantLabel }: MockupFields) {
+  return (
+    <div className="w-full max-w-[600px] mx-auto">
+      <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <Avatar src={dicebear(brandName ?? "channel")} size="md" />
+          <div>
+            <p className="text-small font-semibold">{brandName ?? "Your Channel"}</p>
+            <p className="text-tiny text-default-500">5 分鐘前</p>
+          </div>
+        </div>
+        <div className="px-4 pb-3 space-y-2">
+          <p className="text-small">{title}</p>
+          {brief && <p className="text-tiny text-default-500 line-clamp-3">{brief}</p>}
+        </div>
+        {/* Optional poll */}
+        <div className="mx-4 mb-3 p-3 border border-divider rounded-medium space-y-2">
+          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">投票</p>
+          {[
+            { text: "選項 A", pct: 56 },
+            { text: "選項 B", pct: 32 },
+            { text: "選項 C", pct: 12 },
+          ].map((opt, i) => (
+            <div key={i} className="relative h-7 rounded-full bg-default-100 overflow-hidden border border-divider">
+              <span className="absolute inset-y-0 left-0 bg-danger-100" style={{ width: `${opt.pct}%` }} />
+              <span className="relative h-full flex items-center justify-between px-3 text-tiny">
+                <span>{opt.text}</span>
+                <span className="font-semibold tabular-nums">{opt.pct}%</span>
+              </span>
+            </div>
+          ))}
+          <p className="text-tiny text-default-500">567 票</p>
+        </div>
+        <div className="px-4 py-2 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
+          <span><FontAwesomeIcon icon={faThumbsUp} /> 1.2K</span>
+          <span><FontAwesomeIcon icon={faThumbsDown} /></span>
+          <span><FontAwesomeIcon icon={faComment} /> 87</span>
+          <span className="ml-auto">分享</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── YT Shorts ─────────────── */
 
 export function YTShorts({ title, brandName, variantLabel }: MockupFields) {
   return (
     <div className="w-full max-w-[280px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
-        {/* Top */}
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 text-white">
           <span className="text-[0.92rem] font-semibold">Shorts</span>
           <span className="text-medium">⋯</span>
         </div>
-
-        {/* Video placeholder */}
         <div className="absolute inset-0 flex items-center justify-center">
           <Skeleton className="absolute inset-0 opacity-30" />
           <div className="relative z-10 text-center text-white/60">
@@ -73,8 +195,6 @@ export function YTShorts({ title, brandName, variantLabel }: MockupFields) {
             <p className="text-tiny">9:16 短片 · 等待 craft agent</p>
           </div>
         </div>
-
-        {/* Right rail (Shorts pattern: subscribe avatar plus, like, dislike, comment, share, audio disc) */}
         <div className="absolute right-2 bottom-20 z-10 flex flex-col items-center gap-3.5">
           <div className="relative">
             <Avatar src={dicebear(brandName ?? "channel")} size="md" isBordered color="danger" />
@@ -88,8 +208,6 @@ export function YTShorts({ title, brandName, variantLabel }: MockupFields) {
             <FontAwesomeIcon icon={faMusic} />
           </span>
         </div>
-
-        {/* Bottom */}
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1.5 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
           <div className="flex items-center gap-2">
             <span className="text-[0.82rem] font-semibold">@{(brandName ?? "your_channel").toLowerCase().replace(/\s+/g, "_")}</span>
