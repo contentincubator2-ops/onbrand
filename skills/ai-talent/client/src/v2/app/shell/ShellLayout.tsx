@@ -22,6 +22,7 @@ import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import BrandSwitcher from "./BrandSwitcher";
+import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
 import { Avatar, Button, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -54,6 +55,16 @@ export default function ShellLayout() {
     if (!brandId && brands.length > 0) setBrandId(brands[0].id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brands.length]);
+
+  // ScopeBar (top-right) — brand × product × event choose-one. Replaces the
+  // legacy BrandSwitcher per CJ direction 2026-04-28.
+  const [scope, setScope] = useScopeState();
+  // Keep legacy brandId state in sync with scope.brandId so existing pages
+  // that read ShellOutletCtx.brandId still work without refactor.
+  React.useEffect(() => {
+    if (scope.brandId && scope.brandId !== brandId) setBrandId(scope.brandId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope.brandId]);
 
   // Sidebar collapsed state
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
@@ -108,11 +119,7 @@ export default function ShellLayout() {
             </div>
 
             <div className="flex items-center gap-3">
-              <BrandSwitcher
-                brands={brands}
-                selectedId={brandId}
-                onSelect={setBrandId}
-              />
+              <ScopeBar scope={scope} setScope={setScope} />
               <Button
                 size="sm"
                 variant="light"
@@ -129,7 +136,7 @@ export default function ShellLayout() {
           </div>
         </header>
 
-        <Outlet context={{ brandId, setBrandId, brands }} />
+        <Outlet context={{ brandId, setBrandId, brands, scope, setScope }} />
       </div>
     </div>
   );
@@ -297,4 +304,7 @@ export interface ShellOutletCtx {
   brandId: number | null;
   setBrandId: (id: number | null) => void;
   brands: any[];
+  /** Active scope (brand × product × event). Pages should prefer this. */
+  scope: ScopeState;
+  setScope: (s: ScopeState) => void;
 }
