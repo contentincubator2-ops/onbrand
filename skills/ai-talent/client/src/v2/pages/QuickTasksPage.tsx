@@ -172,26 +172,21 @@ export default function QuickTasksPage() {
   return (
     <main className="bg-background pb-24">
       {/* HERO */}
-      <section className="border-b border-divider relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-30 pointer-events-none"
-          style={{ background: `radial-gradient(900px 360px at 70% 0%, ${ACCENT}22 0%, transparent 70%)` }}
-        />
-        <div className="relative px-8 pt-14 pb-10">
-          <div className="flex items-center justify-between gap-6 flex-wrap">
+      <section className="border-b border-divider bg-content1">
+        <div className="px-8 pt-10 pb-10">
+          <div className="flex items-start justify-between gap-6 flex-wrap">
             <div>
-              <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider">
+              <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
                 QUICK · 30s DELIVERY
               </Chip>
-              <h1 className="mt-3 font-semibold text-5xl leading-[1.02] tracking-tight">
+              <h1 className="text-3xl font-semibold tracking-tight">
                 30 秒產出
               </h1>
             </div>
             {currentBrand && (
-              <Card shadow="sm" className="border border-divider">
+              <Card shadow="none" className="border border-divider">
                 <CardBody className="flex flex-row items-center gap-3 px-4 py-3">
-                  <Badge content="" color="secondary" placement="top-right" shape="circle">
+                  <Badge content="" color="default" placement="top-right" shape="circle">
                     <Avatar name={currentBrand.name} size="sm" radius="full" />
                   </Badge>
                   <div>
@@ -320,7 +315,7 @@ function SquadTile({
         </AvatarGroup>
         <span className="ml-1 text-tiny text-default-400">{allAgents.length} 位</span>
         <Chip
-          size="sm" variant="flat" color="secondary"
+          size="sm" variant="flat" color="default"
           className="ml-auto"
           startContent={<FontAwesomeIcon icon={faRocket} className="text-tiny ml-1" />}
         >
@@ -537,7 +532,7 @@ function RunPanel({
               <Chip size="sm" variant="flat">~ {task.etaSeconds}s</Chip>
               <Chip size="sm" variant="flat">{task.stages.length} 階段接力</Chip>
               {currentBrand && (
-                <Chip size="sm" color="secondary" variant="flat">
+                <Chip size="sm" color="default" variant="flat">
                   已自動帶入 {currentBrand.name} 的 brand brain
                 </Chip>
               )}
@@ -575,7 +570,7 @@ function RunPanel({
 
           {currentBrand && task.fields.some((f) => f.key === "brand") && (
             <Chip
-              size="md" variant="flat" color="secondary" radius="sm"
+              size="md" variant="flat" color="default" radius="sm"
               className="w-full h-auto py-2 px-3"
               startContent={<span className="text-tiny tracking-wider uppercase mr-1">BRAND</span>}
             >
@@ -664,8 +659,8 @@ function ReadyState({ stages }: { stages: number }) {
   return (
     <div className="h-full min-h-[460px] flex items-center justify-center text-center">
       <div className="flex flex-col items-center gap-3">
-        <Spinner size="lg" color="secondary" label={null as any} />
-        <Chip size="sm" variant="flat" color="secondary" className="uppercase tracking-wider">READY</Chip>
+        <Spinner size="lg" color="default" label={null as any} />
+        <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider">READY</Chip>
         <p className="font-semibold text-2xl tracking-tight">{stages} 階段管線已就位</p>
         <p className="text-small text-default-500 max-w-[420px]">
           填好左邊的 brief，點「派出管線」<br />
@@ -767,7 +762,7 @@ function AgentCard({
   const statusChip = (() => {
     if (status === "queued") return <Chip size="sm" variant="flat">queued</Chip>;
     if (status === "working")
-      return <Chip size="sm" color="secondary" variant="flat" startContent={<Spinner size="sm" color="secondary" classNames={{ wrapper: "w-3 h-3 ml-1" }} />}>
+      return <Chip size="sm" color="default" variant="flat" startContent={<Spinner size="sm" color="default" classNames={{ wrapper: "w-3 h-3 ml-1" }} />}>
         {(elapsed / 1000).toFixed(1)}s
       </Chip>;
     if (status === "delivered" && state && "result" in state)
@@ -900,14 +895,14 @@ function FinalDeliverable({
     >
       <CardHeader className="flex items-center justify-between gap-3 px-6 pt-5 pb-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <Badge content="✓" color="secondary" placement="bottom-right" shape="circle" size="md">
+          <Badge content="✓" color="default" placement="bottom-right" shape="circle" size="md">
             <Avatar
               src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(result.agentName)}`}
-              size="lg" isBordered color="secondary"
+              size="lg" isBordered color="default"
             />
           </Badge>
           <div>
-            <Chip size="sm" color="secondary" variant="flat" className="uppercase tracking-wider">
+            <Chip size="sm" color="default" variant="flat" className="uppercase tracking-wider">
               FINAL DELIVERABLE · 交付完成
             </Chip>
             <p className="font-semibold text-medium tracking-tight mt-1">
@@ -917,7 +912,7 @@ function FinalDeliverable({
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {result.brandInjected && (
-            <Chip size="sm" variant="bordered" color="secondary" className="uppercase tracking-wider">
+            <Chip size="sm" variant="bordered" color="default" className="uppercase tracking-wider">
               BRAND BRAIN
             </Chip>
           )}
@@ -987,7 +982,7 @@ function SwotGrid({ data }: { data: any }) {
       {data.advice && (
         <Card shadow="none" className="bg-secondary-50 border border-secondary-200">
           <CardBody className="p-4 text-small leading-relaxed">
-            <Chip size="sm" color="secondary" variant="flat" className="uppercase tracking-wider mr-2">STRATEGY</Chip>
+            <Chip size="sm" color="default" variant="flat" className="uppercase tracking-wider mr-2">STRATEGY</Chip>
             {data.advice}
           </CardBody>
         </Card>
@@ -1061,7 +1056,7 @@ function Swatches({ data }: { data: any[] }) {
             >
               {c.hex}
             </Snippet>
-            <Chip size="sm" color="secondary" variant="flat" className="uppercase tracking-wider">{c.role}</Chip>
+            <Chip size="sm" color="default" variant="flat" className="uppercase tracking-wider">{c.role}</Chip>
             <p className="text-tiny text-default-500">{c.usage}</p>
           </CardBody>
         </Card>
