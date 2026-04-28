@@ -399,7 +399,7 @@ export default function MissionsHome() {
               SoWork · Marketing OS
             </Chip>
             <h1 className="text-4xl leading-tight tracking-tight font-bold">
-              今天，把哪一個<span className="text-warning">方法論</span>變成成果？
+              今天，想將哪個<span className="text-warning">策略</span>付諸實現？
             </h1>
             <div className="mt-3 max-w-[560px] mx-auto leading-relaxed">
               <EntityStats variant="inline" />
