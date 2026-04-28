@@ -21,6 +21,9 @@ on:
       slug:
         description: 'Only generate for this squad slug (overrides limit)'
         required: false
+      slugs:
+        description: 'Comma-separated slug list — regenerates these even if hero exists'
+        required: false
 
 jobs:
   generate:
@@ -34,6 +37,7 @@ jobs:
           REUSE: ${{ github.event.inputs.reuse }}
           LIMIT: ${{ github.event.inputs.limit }}
           SLUG:  ${{ github.event.inputs.slug }}
+          SLUGS: ${{ github.event.inputs.slugs }}
           AZURE_IMAGE_API_KEY:  ${{ secrets.GPT }}
           AZURE_IMAGE_ENDPOINT: "https://proj-claude-sweden-resource.cognitiveservices.azure.com"
           AZURE_IMAGE_DEPLOYMENT: "gpt-image-2"
@@ -42,7 +46,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 5400s
-          envs: GH_TOKEN,DRY,REUSE,LIMIT,SLUG,AZURE_IMAGE_API_KEY,AZURE_IMAGE_ENDPOINT,AZURE_IMAGE_DEPLOYMENT
+          envs: GH_TOKEN,DRY,REUSE,LIMIT,SLUG,SLUGS,AZURE_IMAGE_API_KEY,AZURE_IMAGE_ENDPOINT,AZURE_IMAGE_DEPLOYMENT
           script: |
             set -e
             APP=/opt/marketing-os/app
@@ -63,6 +67,7 @@ jobs:
             [ "$REUSE" = "true" ] && ARGS="$ARGS --reuse"
             [ -n "$LIMIT" ]       && ARGS="$ARGS --limit=$LIMIT"
             [ -n "$SLUG" ]        && ARGS="$ARGS --slug=$SLUG"
+            [ -n "$SLUGS" ]       && ARGS="$ARGS --slugs=$SLUGS"
 
             echo "===== tsx scripts/generateSquadCovers.ts $ARGS ====="
             ./node_modules/.bin/tsx scripts/generateSquadCovers.ts $ARGS

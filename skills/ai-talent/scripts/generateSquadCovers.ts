@@ -41,6 +41,7 @@ const LIMIT = arg("limit") ? parseInt(arg("limit")!, 10) : 0;
 const REUSE = args.includes("--reuse");
 const DRY = args.includes("--dry-run");
 const SLUG = arg("slug");
+const SLUGS = arg("slugs"); // comma-separated list, regenerates these even if hero exists
 const QUALITY = (arg("quality") ?? "low") as "low" | "medium" | "high";
 
 // ── Azure gpt-image-2 ──────────────────────────────────────────────────────
@@ -144,8 +145,16 @@ async function main() {
   console.log(`dry-run:    ${DRY}\n`);
 
   let where = "is_curated = 1 AND is_active = 1";
-  if (REUSE) where += " AND (hero_image_url IS NULL OR hero_image_url = '')";
-  if (SLUG) where += ` AND slug = '${SLUG.replace(/'/g, "''")}'`;
+  if (SLUGS) {
+    // Explicit slug list — regenerate regardless of existing hero_image_url
+    const list = SLUGS.split(",").map((s) => s.trim()).filter(Boolean)
+      .map((s) => `'${s.replace(/'/g, "''")}'`)
+      .join(",");
+    if (list) where += ` AND slug IN (${list})`;
+  } else {
+    if (REUSE) where += " AND (hero_image_url IS NULL OR hero_image_url = '')";
+    if (SLUG) where += ` AND slug = '${SLUG.replace(/'/g, "''")}'`;
+  }
   const limitSql = LIMIT ? `LIMIT ${LIMIT}` : "";
 
   const [rows]: any = await pool.execute(
