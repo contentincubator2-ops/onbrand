@@ -27,7 +27,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faWandMagicSparkles, faArrowLeft, faCircleCheck, faCircleXmark,
   faPlay, faRotateRight, faPaperPlane, faClipboard, faClipboardCheck,
-  faRocket, faMagnifyingGlass, faChartColumn, faPenNib, faPalette,
+  faRocket, faMagnifyingGlass, faChartColumn, faPenNib, faPalette, faClock,
   faBullseye, faBolt,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -287,20 +287,35 @@ export default function QuickTasksPage() {
 /* ─────────────────────────── Squad tile ─────────────────────────────── */
 
 function SquadTile({
-  task, index, onPress,
+  task, index: _index, onPress,
 }: { task: TaskMeta; index: number; onPress: () => void }) {
   const allAgents = useMemo(() => task.stages.flatMap((s) => s.agents), [task]);
   return (
-    <Card isPressable isHoverable onPress={onPress} shadow="sm" className="p-1">
-      <CardBody className="px-5 pt-5 pb-3">
-        <div className="flex items-start justify-between">
-          <span className="font-semibold text-3xl tracking-tight" style={{ color: ACCENT }}>
-            {String(index + 1).padStart(2, "0")}
-          </span>
-          <Chip size="sm" variant="flat">~ {task.etaSeconds}s</Chip>
+    <Card
+      isPressable
+      isHoverable
+      onPress={onPress}
+      shadow="none"
+      className="border border-divider hover:bg-default-50 transition"
+    >
+      <CardBody className="px-5 pt-5 pb-3 gap-1">
+        {/* Row 1 — name (left) + eta meta (right) */}
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-medium font-semibold leading-tight line-clamp-1 flex-1 min-w-0">
+            {task.squadName}
+          </h3>
+          <Chip
+            size="sm" variant="flat" color="default"
+            className="shrink-0"
+            startContent={<FontAwesomeIcon icon={faClock} className="text-tiny ml-1" />}
+          >
+            ~ {task.etaSeconds}s
+          </Chip>
         </div>
-        <p className="mt-3 font-medium text-medium tracking-tight">{task.squadName}</p>
-        <p className="mt-1 text-tiny text-default-500 line-clamp-2">{task.squadTagline}</p>
+        {/* Row 2 — description (clamp 2) */}
+        <p className="text-small text-default-500 line-clamp-2 leading-relaxed">
+          {task.squadTagline}
+        </p>
       </CardBody>
       <CardFooter className="px-5 pb-4 pt-0 flex items-center gap-2">
         <AvatarGroup max={5} size="sm" isBordered>
@@ -309,24 +324,16 @@ function SquadTile({
               <User
                 name={a.name}
                 description={`${a.role} · ${TONE_LABEL[a.tone]}`}
-                avatarProps={{
-                  name: a.name,
-                  size: "sm",
-                  color: a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary",
-                }}
+                avatarProps={{ name: a.name, size: "sm" }}
               />
             }>
-              <Avatar
-                name={a.name}
-                size="sm" isBordered
-                color={a.tone === "orchestrate" ? "secondary" : a.tone === "write" ? "danger" : a.tone === "craft" ? "warning" : "primary"}
-              />
+              <Avatar name={a.name} size="sm" isBordered />
             </Tooltip>
           ))}
         </AvatarGroup>
         <span className="ml-1 text-tiny text-default-400">{allAgents.length} 位</span>
         <Chip
-          size="sm" variant="flat" color="default"
+          size="sm" variant="flat" color="primary"
           className="ml-auto"
           startContent={<FontAwesomeIcon icon={faRocket} className="text-tiny ml-1" />}
         >
