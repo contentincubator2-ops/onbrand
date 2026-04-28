@@ -23,7 +23,10 @@ import {
   Skeleton, Tabs, Tab,
 } from "@heroui/react";
 import SegmentEditor from "../components/positioning/SegmentEditor";
+import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
+import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
+import { BRAND_FULL_PIPELINE, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronDown, faPlus, faCloudArrowUp, faShapes,
@@ -175,6 +178,102 @@ export default function BrandsPage() {
 
   const onTileClick = (t: Tile) => setSection(t.id);
 
+  // ── Pipeline (research mode) — only for brand scope right now ─────────
+  const pipelineSteps: PipelineStepSpec[] = scopeMode === "brand" ? BRAND_FULL_PIPELINE : [];
+  const [pipeline, setPipeline] = useState<PipelineState>({
+    status: "idle", cursor: 0, completed: [],
+  });
+
+  const targetId =
+    scopeMode === "brand" ? (scope?.brandId ?? brandId)
+    : scopeMode === "product" ? scope?.productId
+    : scopeMode === "event" ? scope?.eventId
+    : null;
+
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const saveMutation = (trpc as any).scope?.savePositioning?.useMutation
+    ? (trpc as any).scope.savePositioning.useMutation({
+        onSuccess: () => utils?.scope?.active?.invalidate?.(),
+      })
+    : null;
+
+  // Pipeline tick: when running, advance through steps with timed
+  // thinking → write → next jump cadence. Phase 6 will replace the
+  // mock thinking + conclusion with real LLM streams.
+  React.useEffect(() => {
+    if (pipeline.status !== "running") return;
+    const step = pipelineSteps[pipeline.cursor];
+    if (!step) {
+      setPipeline((p) => ({ ...p, status: "done" }));
+      return;
+    }
+    // Auto-jump sub-nav to this step's target segment.
+    setSection(step.segmentTarget);
+    // Mock streaming duration ≈ thinking text length / 35 cps + 1.5s write hold.
+    const cps = 35;
+    const typingMs = (step.mockThinking.length / cps) * 1000;
+    const totalMs = typingMs + 1500;
+    const timer = setTimeout(async () => {
+      // Write the conclusion to DB (skip the internal cache step 2).
+      if (step.segmentId !== "_valueElements" && targetId && scopeMode !== "none" && saveMutation) {
+        // Need to merge conclusion into existing positioning. We don't
+        // have the latest server snapshot in this scope; rely on
+        // scope.active query inside PositioningEditor for read. To
+        // write, fetch then merge — simplest: trust our local cache via
+        // savePositioning of full positioning. Phase 5e mock approach:
+        // save just this segment's value (server overwrites positioning JSON).
+        // For correctness we should merge — Phase 6 hardens this with
+        // a proper merge mutation. For now we update via segment-level
+        // save by reading current data from a query helper.
+        try {
+          const current = (utils?.scope?.active?.getData?.({
+            brandId: scopeMode === "brand" ? targetId : null,
+            productId: scopeMode === "product" ? targetId : null,
+            eventId: scopeMode === "event" ? targetId : null,
+          }) as any)?.[scopeMode]?.positioning ?? {};
+          const next = { ...current, [step.segmentId]: step.mockConclusion };
+          await saveMutation.mutateAsync({
+            kind: scopeMode as "brand" | "product" | "event",
+            id: targetId,
+            positioning: next,
+          });
+        } catch { /* swallow — mock mode */ }
+      }
+      setPipeline((p) => ({
+        ...p,
+        cursor: p.cursor + 1,
+        completed: [...p.completed, step.id],
+      }));
+    }, totalMs);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.status, pipeline.cursor]);
+
+  const startPipeline = () => setPipeline({ status: "running", cursor: 0, completed: [] });
+  const pausePipeline  = () => setPipeline((p) => ({ ...p, status: "paused" }));
+  const resumePipeline = () => setPipeline((p) => ({ ...p, status: "running" }));
+  const skipPipeline   = () => {
+    const step = pipelineSteps[pipeline.cursor];
+    if (!step) return;
+    setPipeline((p) => ({
+      ...p,
+      cursor: p.cursor + 1,
+      completed: [...p.completed, step.id],
+    }));
+  };
+  const stopPipeline = () => setPipeline({ status: "idle", cursor: 0, completed: [] });
+
+  const pipelineThinking =
+    pipeline.status === "running" && pipelineSteps[pipeline.cursor]
+      ? {
+          segmentTarget: pipelineSteps[pipeline.cursor]!.segmentTarget,
+          text: pipelineSteps[pipeline.cursor]!.mockThinking,
+          stepNum: pipeline.cursor + 1,
+          stepTotal: pipelineSteps.length,
+          stepTitle: pipelineSteps[pipeline.cursor]!.title,
+        }
+      : null;
+
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* ─── Top header — scope-aware (brand / product / event) ─────── */}
@@ -276,7 +375,18 @@ export default function BrandsPage() {
         </aside>
 
         {/* Right: scope-aware content pane */}
-        <div className="flex-1 min-w-0 px-6 py-6 overflow-y-auto">
+        <div className="flex-1 min-w-0 px-6 py-6 overflow-y-auto flex flex-col gap-4">
+          {scopeMode === "brand" && pipelineSteps.length > 0 && (
+            <PipelineRunner
+              steps={pipelineSteps}
+              state={pipeline}
+              onStart={startPipeline}
+              onPause={pausePipeline}
+              onResume={resumePipeline}
+              onSkip={skipPipeline}
+              onStop={stopPipeline}
+            />
+          )}
           {section === "card" || section === "prompts" || section.startsWith("seg:") ? (
             <PositioningPanel
               section={section}
@@ -285,6 +395,11 @@ export default function BrandsPage() {
               scopeBrandId={scope?.brandId ?? null}
               scopeProductId={scope?.productId ?? null}
               scopeEventId={scope?.eventId ?? null}
+              pipelineThinking={
+                pipelineThinking && pipelineThinking.segmentTarget === section
+                  ? pipelineThinking
+                  : null
+              }
             />
           ) : visibleTiles.length === 0 ? (
             <Card shadow="none" className="border-2 border-dashed border-divider">
@@ -329,9 +444,18 @@ export default function BrandsPage() {
 // Reads positioning JSON from the appropriate router (brand / product / event)
 // and persists edits via mutation; segment list comes from positioningSchema.
 
+interface PipelineThinking {
+  segmentTarget: string;
+  text: string;
+  stepNum: number;
+  stepTotal: number;
+  stepTitle: string;
+}
+
 function PositioningPanel({
   section, scopeMode, scopeName,
   scopeBrandId, scopeProductId, scopeEventId,
+  pipelineThinking,
 }: {
   section: string;
   scopeMode: "brand" | "product" | "event" | "none";
@@ -339,6 +463,7 @@ function PositioningPanel({
   scopeBrandId: number | null;
   scopeProductId: number | null;
   scopeEventId: number | null;
+  pipelineThinking?: PipelineThinking | null;
 }) {
   if (scopeMode === "none") {
     return (
@@ -362,12 +487,13 @@ function PositioningPanel({
       brandId={scopeBrandId}
       productId={scopeProductId}
       eventId={scopeEventId}
+      pipelineThinking={pipelineThinking ?? null}
     />
   );
 }
 
 function PositioningEditor({
-  section, scopeMode, scopeName, brandId, productId, eventId,
+  section, scopeMode, scopeName, brandId, productId, eventId, pipelineThinking,
 }: {
   section: string;
   scopeMode: "brand" | "product" | "event";
@@ -375,6 +501,7 @@ function PositioningEditor({
   brandId: number | null;
   productId: number | null;
   eventId: number | null;
+  pipelineThinking: PipelineThinking | null;
 }) {
   const segments: SegmentSpec[] = SCOPE_SEGMENTS[scopeMode] ?? [];
   const segmentId = section.startsWith("seg:") ? section.slice(4) : null;
@@ -464,6 +591,14 @@ function PositioningEditor({
           <SaveIndicator state={saveState} hasTarget={!!targetId} />
         </CardBody>
       </Card>
+      {pipelineThinking && (
+        <ThinkingOverlay
+          text={pipelineThinking.text}
+          stepNum={pipelineThinking.stepNum}
+          stepTotal={pipelineThinking.stepTotal}
+          stepTitle={pipelineThinking.stepTitle}
+        />
+      )}
       <SegmentEditor
         spec={activeSegment}
         value={draft[activeSegment.id] ?? null}
