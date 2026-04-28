@@ -236,6 +236,36 @@ export const scopeRouter = router({
       return out;
     }),
 
+  /**
+   * Persist positioning JSON for any scope kind. Single endpoint avoids
+   * having three near-identical save mutations on the client.
+   */
+  savePositioning: protectedProcedure
+    .input(z.object({
+      kind: z.enum(["brand", "product", "event"]),
+      id: z.number(),
+      positioning: z.any(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const json = input.positioning != null ? JSON.stringify(input.positioning) : null;
+      const table = input.kind === "brand" ? "brands"
+                  : input.kind === "product" ? "products" : "events";
+      const userCol = input.kind === "brand" ? "userId" : "userId";
+      const [r]: any = await localPool.execute(
+        `UPDATE \`${table}\` SET positioning = ? WHERE id = ? AND ${userCol} = ?`,
+        [json, input.id, userId],
+      );
+      const affected = (r as any)?.affectedRows ?? 0;
+      if (!affected) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `${input.kind} #${input.id} not found for this user`,
+        });
+      }
+      return { ok: true };
+    }),
+
   /** Pick lists for the top-right ScopeBar (brands/products/events the user owns). */
   options: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.user!.id;

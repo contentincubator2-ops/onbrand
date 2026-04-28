@@ -388,14 +388,42 @@ function PositioningEditor({
 
   const dbPositioning =
     (scopeActive.data as any)?.[scopeMode]?.positioning ?? null;
+  const targetId =
+    scopeMode === "brand" ? brandId
+    : scopeMode === "product" ? productId
+    : eventId;
 
-  // Local working copy (debounced commit). For Phase 5 stub we don't persist
-  // yet — Phase 5b will wire the upsert mutation. For now changes live in
-  // component state so users can preview the form behavior.
+  // Local working copy + debounced persist via scope.savePositioning.
   const [draft, setDraft] = React.useState<Record<string, any>>({});
+  const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   React.useEffect(() => {
     if (dbPositioning && typeof dbPositioning === "object") setDraft(dbPositioning);
   }, [dbPositioning]);
+
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const saveMutation = (trpc as any).scope?.savePositioning?.useMutation
+    ? (trpc as any).scope.savePositioning.useMutation({
+        onSuccess: () => {
+          setSaveState("saved");
+          utils?.scope?.active?.invalidate?.();
+        },
+        onError: () => setSaveState("error"),
+      })
+    : null;
+
+  const dirtyRef = React.useRef(false);
+  const timerRef = React.useRef<any>(null);
+  const onDraftChange = (next: Record<string, any>) => {
+    setDraft(next);
+    dirtyRef.current = true;
+    if (!targetId || !saveMutation) return;
+    setSaveState("saving");
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      saveMutation.mutate({ kind: scopeMode, id: targetId, positioning: next });
+      dirtyRef.current = false;
+    }, 800);
+  };
 
   if (section === "card") {
     return (
@@ -412,15 +440,17 @@ function PositioningEditor({
   return (
     <div className="flex flex-col gap-4">
       <Card shadow="none" className="border border-divider">
-        <CardBody className="px-5 py-4 gap-1">
-          <p className="text-tiny text-default-500 uppercase tracking-wider">
-            {scopeMode.toUpperCase()} · 完整定位書
-          </p>
-          <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
-          <p className="text-small text-default-500">
-            共 {segments.length} 個段落 · 每段可手動編輯或由 agent 自動填寫
-            <span className="ml-2 text-tiny">（編輯尚未持久化，Phase 5b 會接 upsert）</span>
-          </p>
+        <CardBody className="px-5 py-4 gap-1 flex-row items-center justify-between flex-wrap">
+          <div>
+            <p className="text-tiny text-default-500 uppercase tracking-wider">
+              {scopeMode.toUpperCase()} · 完整定位書
+            </p>
+            <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
+            <p className="text-small text-default-500">
+              共 {segments.length} 個段落 · 每段可手動編輯或由 agent 自動填寫
+            </p>
+          </div>
+          <SaveIndicator state={saveState} hasTarget={!!targetId} />
         </CardBody>
       </Card>
       {segments.map((spec) => (
@@ -428,7 +458,7 @@ function PositioningEditor({
           key={spec.id}
           spec={spec}
           value={draft[spec.id] ?? null}
-          onChange={(next) => setDraft({ ...draft, [spec.id]: next })}
+          onChange={(next) => onDraftChange({ ...draft, [spec.id]: next })}
           onRunAgent={(slug) => {
             // Phase 6 will wire the agent runner. For now just notify.
             // eslint-disable-next-line no-alert
@@ -438,6 +468,20 @@ function PositioningEditor({
       ))}
     </div>
   );
+}
+
+function SaveIndicator({ state, hasTarget }: { state: "idle" | "saving" | "saved" | "error"; hasTarget: boolean }) {
+  if (!hasTarget) {
+    return (
+      <Chip size="sm" variant="flat" color="warning" className="shrink-0">
+        未綁定 ID — 編輯不會儲存
+      </Chip>
+    );
+  }
+  if (state === "saving") return <Chip size="sm" variant="flat" color="default" className="shrink-0">儲存中…</Chip>;
+  if (state === "saved")  return <Chip size="sm" variant="flat" color="success" className="shrink-0">已儲存</Chip>;
+  if (state === "error")  return <Chip size="sm" variant="flat" color="danger"  className="shrink-0">儲存失敗</Chip>;
+  return null;
 }
 
 function SpeedCardView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
