@@ -26,6 +26,7 @@ import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
 import SpeedCard from "../components/positioning/SpeedCard";
+import PromptLibrary from "../components/positioning/PromptLibrary";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { BRAND_FULL_PIPELINE, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -659,20 +660,13 @@ function SpeedCardView({ scopeMode, data, scopeName }: { scopeMode: string; data
   );
 }
 
-function PromptLibraryView({ scopeMode, data: _data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
+function PromptLibraryView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
   return (
-    <Card shadow="none" className="border border-divider">
-      <CardBody className="p-6 gap-4">
-        <p className="text-tiny text-default-500 uppercase tracking-wider">
-          {scopeMode.toUpperCase()} · AI 指令庫
-        </p>
-        <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
-        <p className="text-small text-default-500">
-          Phase 5d 會塞入 6 個 prompt 範本（社群 / 廣告 / Midjourney / SEO / EDM / KOL），
-          自動以本 scope 的 positioning 變數填空 + 提供 ChatGPT / Claude / Gemini 複製按鈕。
-        </p>
-      </CardBody>
-    </Card>
+    <PromptLibrary
+      scopeMode={scopeMode as "brand" | "product" | "event"}
+      scopeName={scopeName}
+      data={data}
+    />
   );
 }
 
