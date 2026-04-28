@@ -705,6 +705,28 @@ async function main() {
     `);
     console.log("[migrate] agent_skill_assignments: OK");
 
+    // ─── 12. Localized name columns for skills + agents ────────────────────
+    // CJ direction 2026-04-28: skill code names (e.g., "accessibility-tester")
+    // and English agent bios need a zh-TW human-readable variant for display.
+    for (const col of [
+      { table: "skills", name: "name_zh",        type: "VARCHAR(255) NULL" },
+      { table: "skills", name: "description_zh", type: "TEXT NULL" },
+      { table: "agents", name: "name_zh",        type: "VARCHAR(128) NULL" },
+      { table: "agents", name: "title_zh",       type: "VARCHAR(255) NULL" },
+      { table: "agents", name: "bio_zh",         type: "TEXT NULL" },
+    ]) {
+      const [r]: any = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+      `, [col.table, col.name]);
+      if ((r as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE \`${col.table}\` ADD COLUMN \`${col.name}\` ${col.type}`);
+        console.log(`[migrate] ${col.table}.${col.name}: added`);
+      } else {
+        console.log(`[migrate] ${col.table}.${col.name}: already exists, skipped`);
+      }
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

@@ -225,7 +225,8 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
   let rows: any[] = [];
   try {
     const [r] = (await db.execute(sql`
-      SELECT id, slug, name, title, bio, specialty, layer, workspace, avatarUrl
+      SELECT id, slug, name, name_zh, title, title_zh, bio, bio_zh,
+             specialty, layer, workspace, avatarUrl
         FROM agents
        WHERE isAvailable = 1
        LIMIT ${limit}
@@ -248,9 +249,10 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
   return rows.map((r) => {
     const layer = AGENT_LAYER_MAP[String(r.layer ?? "").toLowerCase()] ?? "L1";
     const tone = LAYER_TO_HERO[layer]!;
-    const name = fixMojibake(String(r.name ?? ""));
-    const description = fixMojibake(r.bio ?? r.specialty ?? "") || null;
-    const subtitle = fixMojibake(r.title ?? "") || null;
+    // Prefer zh-TW localized columns when populated.
+    const name = fixMojibake(String((r as any).name_zh ?? r.name ?? ""));
+    const description = fixMojibake(((r as any).bio_zh ?? r.bio) ?? r.specialty ?? "") || null;
+    const subtitle = fixMojibake(((r as any).title_zh ?? r.title) ?? "") || null;
     return {
       id: Number(r.id),
       kind: "agent" as const,
@@ -296,7 +298,8 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
   let rows: any[] = [];
   try {
     const [r]: any = await localPool.execute(
-      `SELECT id, slug, name, description, category, strategy_layer,
+      `SELECT id, slug, name, name_zh, description, description_zh,
+              category, strategy_layer,
               origin_model, source, task_type, recommended_models,
               quality_score, cover_image_url
          FROM skills
@@ -313,8 +316,11 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
   return rows.map((r: any) => {
     const layer = resolveLayerKey(r.strategy_layer);
     const tone = LAYER_TO_HERO[layer]!;
-    const name = fixMojibake(String(r.name ?? r.slug ?? ""));
-    const description = fixMojibake(r.description ?? "") || null;
+    // Prefer zh-TW localized columns when available (populated by
+    // scripts/translateZhTw.ts), fall back to original raw name/description.
+    const rawName = String(r.name_zh ?? r.name ?? r.slug ?? "");
+    const name = fixMojibake(rawName);
+    const description = fixMojibake(r.description_zh ?? r.description ?? "") || null;
     const kind = opts.onlyAgentTemplates ? "agent" : "skill";
 
     const recommended = (() => {

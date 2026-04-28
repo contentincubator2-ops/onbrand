@@ -587,12 +587,18 @@ function LandscapeCard({
         style={{ aspectRatio: aspect }}
       >
         {entity.kind === "skill" ? (
-          // Skill — single FontAwesome icon (per design system rule)
-          <div className="absolute inset-0 flex items-center justify-center">
+          // Skill hero — Stripe/Linear-style: big skill name as the visual,
+          // small task-type icon in the corner. Uses zh-TW name if available.
+          <div className="absolute inset-0 flex items-end p-4 bg-default-50">
+            <p className={`font-semibold tracking-tight leading-[1.05] line-clamp-3 break-words pr-8 ${
+              size === "sm" ? "text-xl" : size === "lg" ? "text-3xl" : "text-2xl"
+            } text-default-700`}>
+              {entity.name}
+            </p>
             <FontAwesomeIcon
               icon={skillIcon(entity.taskType)}
-              className="text-default-400"
-              style={{ fontSize: size === "sm" ? 56 : size === "lg" ? 96 : 72 }}
+              className="absolute bottom-3 right-3 text-default-400"
+              style={{ fontSize: size === "sm" ? 20 : size === "lg" ? 32 : 24 }}
             />
           </div>
         ) : coverImageUrl ? (
@@ -649,25 +655,43 @@ function LandscapeCard({
       </div>
 
       <CardBody className="px-3 py-2.5 gap-1">
-        {/* Row 1 — name (left) + format icon (right) */}
-        <div className="flex items-center justify-between gap-2">
-          <p className={`${titleSize} font-semibold leading-tight line-clamp-1 flex-1 min-w-0`}>
-            {entity.name}
-          </p>
-          {entity.mockup?.format && formatIcon(entity.mockup.format) && (
-            <Tooltip content={formatLabel(entity.mockup.format)} placement="top">
-              <FontAwesomeIcon
-                icon={formatIcon(entity.mockup.format)!}
-                className="text-default-400 shrink-0"
-              />
-            </Tooltip>
-          )}
-        </div>
-        {/* Row 2 — description (clamp 2) */}
-        {entity.description && (
-          <p className={`${subtitleSize} text-default-500 leading-relaxed line-clamp-2`}>
-            {entity.description}
-          </p>
+        {entity.kind === "skill" ? (
+          // Skill body — name lives in the hero band; body shows meta + desc.
+          <>
+            {entity.subtitle && (
+              <p className="text-tiny text-default-500 uppercase tracking-wider truncate">
+                {entity.subtitle}
+              </p>
+            )}
+            {entity.description && (
+              <p className={`${subtitleSize} text-default-500 leading-relaxed line-clamp-2`}>
+                {entity.description}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Row 1 — name (left) + format icon (right) */}
+            <div className="flex items-center justify-between gap-2">
+              <p className={`${titleSize} font-semibold leading-tight line-clamp-1 flex-1 min-w-0`}>
+                {entity.name}
+              </p>
+              {entity.mockup?.format && formatIcon(entity.mockup.format) && (
+                <Tooltip content={formatLabel(entity.mockup.format)} placement="top">
+                  <FontAwesomeIcon
+                    icon={formatIcon(entity.mockup.format)!}
+                    className="text-default-400 shrink-0"
+                  />
+                </Tooltip>
+              )}
+            </div>
+            {/* Row 2 — description (clamp 2) */}
+            {entity.description && (
+              <p className={`${subtitleSize} text-default-500 leading-relaxed line-clamp-2`}>
+                {entity.description}
+              </p>
+            )}
+          </>
         )}
       </CardBody>
     </Card>
