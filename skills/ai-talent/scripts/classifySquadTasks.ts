@@ -195,22 +195,33 @@ function summarizeSquad(s: SquadRow): string {
 
 /* ─── LLM call ────────────────────────────────────────────────────── */
 
+// Endpoint can be either format (matches classifySkills.ts):
+//   Foundry router:  https://*.services.ai.azure.com  → /openai/v1/chat/completions, model in body
+//   Azure OpenAI:    https://*.openai.azure.com       → /openai/deployments/{name}/chat/completions?api-version=...
+const IS_AZURE_OPENAI = AZURE_ENDPOINT.includes("openai.azure.com");
+const URL_PATH = IS_AZURE_OPENAI
+  ? `/openai/deployments/${AZURE_DEPLOYMENT}/chat/completions?api-version=2024-10-01-preview`
+  : `/openai/v1/chat/completions`;
+
 async function callLLM(squads: SquadRow[]): Promise<any[]> {
   const userMsg = squads.map(summarizeSquad).join("\n");
-  const url = `${AZURE_ENDPOINT}/chat/completions?api-version=2024-12-01-preview`;
+  const url = `${AZURE_ENDPOINT}${URL_PATH}`;
+  const body: any = {
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userMsg },
+    ],
+    temperature: 0.2,
+    max_tokens: 4000,
+    response_format: { type: "json_object" },
+  };
+  // Foundry router needs `model` in body; Azure OpenAI doesn't (deployment in URL).
+  if (!IS_AZURE_OPENAI) body.model = AZURE_DEPLOYMENT;
+
   const resp = await fetch(url, {
     method: "POST",
     headers: { "api-key": AZURE_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: AZURE_DEPLOYMENT,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userMsg },
-      ],
-      temperature: 0.2,
-      max_tokens: 4000,
-      response_format: { type: "json_object" },
-    }),
+    body: JSON.stringify(body),
   });
   if (!resp.ok) {
     const t = await resp.text();
