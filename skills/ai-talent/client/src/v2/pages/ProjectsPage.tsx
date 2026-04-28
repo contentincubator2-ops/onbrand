@@ -194,7 +194,7 @@ export default function ProjectsPage() {
       <header className="px-6 pt-5 pb-3 border-b border-divider">
         <div className="flex items-center gap-3">
           <Chip variant="flat" size="sm" className="uppercase tracking-wider">PROJECTS</Chip>
-          <h1 className="text-2xl font-semibold tracking-tight">所有專案</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">所有專案</h1>
           <div className="ml-auto flex items-center gap-2">
             <Button
               variant="bordered"
@@ -558,7 +558,7 @@ function MissionThumb({
             <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={70} />
           </div>
           {isLayerKnown && (
-            <Chip size="sm" color={tone.heroColor} variant="solid" className="absolute top-2 left-2">
+            <Chip size="sm" variant="flat" className="absolute top-2 left-2 bg-content1/95 backdrop-blur-sm">
               {lk}
             </Chip>
           )}
@@ -606,7 +606,7 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
       <div className="flex-1 min-w-0">
         <p className="text-small font-medium truncate">{mission.title}</p>
         <div className="mt-0.5 flex items-center gap-2 text-tiny text-default-500">
-          <Chip size="sm" color={tone.heroColor} variant="flat">{lk}</Chip>
+          <Chip size="sm" variant="flat">{lk}</Chip>
           {ws && <span className="capitalize">{ws}</span>}
           <span>·</span>
           <span>{formatRelative(mission.updatedAt)}</span>
@@ -625,10 +625,10 @@ function PreviewCard({ mission, onOpen }: { mission: MissionRow; onOpen: () => v
   const tone = LAYER_TOKENS[lk];
 
   return (
-    <Card shadow="lg" className="overflow-hidden border border-divider">
+    <Card shadow="none" className="overflow-hidden border border-divider">
       <CardHeader className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
-          <Chip size="sm" color={tone.heroColor} variant="flat">{lk}</Chip>
+          <Chip size="sm" variant="flat">{lk}</Chip>
           <Chip size="sm" variant="flat">預覽</Chip>
         </div>
         <Button isIconOnly size="sm" variant="light" aria-label="更多">
