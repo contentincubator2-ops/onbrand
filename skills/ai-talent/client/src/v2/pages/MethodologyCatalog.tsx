@@ -35,7 +35,52 @@ import {
   faVideo, faShareNodes, faStar, faArrowRight, faEllipsis, faPlay,
   faXmark, faShare, faFlag,
   faPenNib, faImage, faMicrophoneLines, faChartColumn, faChessKnight, faCode, faWandSparkles,
+  faSquare, faImages, faMobileScreenButton, faFilePowerpoint, faFileLines,
+  faNewspaper, faPodcast, faCalendarDay, faSquarePollVertical, faFile,
 } from "@fortawesome/free-solid-svg-icons";
+
+// Squad/skill output format → FontAwesome icon (shown on the card top-right).
+// Sourced from entity.mockup.format (server-classified). Keeps the card body
+// clean (name + description only).
+const FORMAT_ICON: Record<string, any> = {
+  feed:         faSquare,
+  carousel:     faImages,
+  reel:         faVideo,
+  shorts:       faVideo,
+  "video-card": faVideo,
+  watch:        faVideo,
+  "native-video": faVideo,
+  story:        faMobileScreenButton,
+  live:         faPodcast,
+  article:      faNewspaper,
+  newsletter:   faNewspaper,
+  document:     faFilePowerpoint,
+  poll:         faSquarePollVertical,
+  event:        faCalendarDay,
+  community:    faMessage,
+  ad:           faBullseye,
+  premiere:     faVideo,
+  marketplace:  faBriefcase,
+  foryou:       faVideo,
+  profile:      faImage,
+};
+const FORMAT_LABEL: Record<string, string> = {
+  feed: "貼文", carousel: "輪播", reel: "短影音", shorts: "Shorts",
+  "video-card": "影片卡", watch: "影片", "native-video": "原生影片",
+  story: "限時動態", live: "直播", article: "長文",
+  newsletter: "電子報", document: "簡報文件", poll: "投票",
+  event: "活動", community: "社群貼文", ad: "廣告",
+  premiere: "首映", marketplace: "商品卡", foryou: "FYP",
+  profile: "個人頁",
+};
+function formatIcon(fmt?: string | null) {
+  if (!fmt) return null;
+  return FORMAT_ICON[String(fmt).toLowerCase()] ?? faFile;
+}
+function formatLabel(fmt?: string | null) {
+  if (!fmt) return null;
+  return FORMAT_LABEL[String(fmt).toLowerCase()] ?? fmt;
+}
 
 // Skill task_type → FontAwesome icon. Per design system: skills render as
 // "block / property" — a single neutral icon on bg-default-50, never a
@@ -604,16 +649,26 @@ function LandscapeCard({
       </div>
 
       <CardBody className="px-3 py-2.5 gap-1">
-        <p className={`${titleSize} font-semibold leading-tight line-clamp-1`}>{entity.name}</p>
-        {entity.subtitle && (
-          <p className={`${subtitleSize} text-default-500 line-clamp-1`}>{entity.subtitle}</p>
+        {/* Row 1 — name (left) + format icon (right) */}
+        <div className="flex items-center justify-between gap-2">
+          <p className={`${titleSize} font-semibold leading-tight line-clamp-1 flex-1 min-w-0`}>
+            {entity.name}
+          </p>
+          {entity.mockup?.format && formatIcon(entity.mockup.format) && (
+            <Tooltip content={formatLabel(entity.mockup.format)} placement="top">
+              <FontAwesomeIcon
+                icon={formatIcon(entity.mockup.format)!}
+                className="text-default-400 shrink-0"
+              />
+            </Tooltip>
+          )}
+        </div>
+        {/* Row 2 — description (clamp 2) */}
+        {entity.description && (
+          <p className={`${subtitleSize} text-default-500 leading-relaxed line-clamp-2`}>
+            {entity.description}
+          </p>
         )}
-        <TaskChip
-          entity={entity}
-          kind={entity.kind === "agent" ? "agent" : entity.kind === "skill" ? "skill" : "squad"}
-          size="sm"
-          className="self-start mt-0.5"
-        />
       </CardBody>
     </Card>
   );
@@ -676,7 +731,7 @@ function EntityDetailModal({
             <div className="md:col-span-7 p-6 md:p-8 border-b md:border-b-0 md:border-r border-divider overflow-y-auto">
               {/* Big visual */}
               <div
-                className={`relative w-full bg-${heroColor}-100 rounded-large overflow-hidden`}
+                className="relative w-full bg-default-50 border border-divider rounded-large overflow-hidden"
                 style={{ aspectRatio: "4/3" }}
               >
                 {entity.kind === "skill" ? (
@@ -694,10 +749,10 @@ function EntityDetailModal({
                     <MethodologyGlyph seed={entity.slug ?? entity.id} layer={layerKey} size={240} />
                   </div>
                 )}
-                <Chip size="sm" color={heroColor} variant="solid" className="absolute top-3 left-3 shadow-sm">
+                <Chip size="sm" variant="flat" className="absolute top-3 left-3 bg-content1/95 backdrop-blur-sm">
                   {layerKey}・{tone?.label}
                 </Chip>
-                <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md">
+                <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/95 backdrop-blur-sm">
                   {kindLabel}
                 </Chip>
               </div>
@@ -710,8 +765,6 @@ function EntityDetailModal({
                   </p>
                   <div className="grid grid-cols-3 gap-3">
                     {relatedEntities.map((r) => {
-                      const rTone = LAYER_TOKENS[(r.strategyLayer ?? "L1") as MosLayer];
-                      const rColor = rTone?.heroColor ?? "default";
                       return (
                         <Card
                           key={`rel-${r.kind}-${r.id}`}
@@ -720,9 +773,9 @@ function EntityDetailModal({
                           onPress={() => onSelectRelated(r)}
                           shadow="none"
                           radius="md"
-                          className="overflow-hidden border border-divider"
+                          className="overflow-hidden border border-divider hover:bg-default-50 transition"
                         >
-                          <div className={`relative w-full bg-${rColor}-100`} style={{ aspectRatio: "4/3" }}>
+                          <div className="relative w-full bg-default-50 border-b border-divider" style={{ aspectRatio: "4/3" }}>
                             <div className="absolute inset-0 flex items-center justify-center">
                               <MethodologyGlyph seed={r.slug ?? r.id} layer={(r.strategyLayer ?? "L1") as MosLayer} size={64} />
                             </div>
