@@ -109,26 +109,25 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Top header — pastel gradient strip ─────────────────── */}
-      <header
-        className="px-6 py-5 flex items-center justify-center gap-3 flex-wrap"
-        style={{
-          background:
-            "linear-gradient(135deg, hsl(170 40% 92%) 0%, hsl(260 50% 94%) 50%, hsl(340 60% 94%) 100%)",
-        }}
-      >
+      {/* ─── Top header — design-system canonical pattern ─────────── */}
+      <header className="px-8 py-10 border-b border-divider bg-content1">
         <Chip
-          color="warning"
+          color="default"
           variant="flat"
-          size="md"
+          size="sm"
+          className="uppercase tracking-wider mb-2"
           startContent={<FontAwesomeIcon icon={faFolderOpen} className="ml-1" />}
         >
           品牌工具組
         </Chip>
-        <h1 className="text-2xl font-semibold tracking-tight">{brandName}</h1>
-        <Dropdown placement="bottom">
+        <h1 className="text-3xl font-semibold tracking-tight">{brandName}</h1>
+        <p className="text-small text-default-500 mt-1">
+          切換品牌請使用左側 sidebar
+        </p>
+        {/* legacy switcher kept hidden — single source of truth is ShellLayout sidebar */}
+        <Dropdown placement="bottom" classNames={{ base: "hidden" }}>
           <DropdownTrigger>
-            <Button isIconOnly size="sm" variant="light" radius="full" aria-label="切換品牌">
+            <Button isIconOnly size="sm" variant="light" radius="full" aria-label="切換品牌" className="hidden">
               <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />
             </Button>
           </DropdownTrigger>
@@ -195,8 +194,7 @@ export default function BrandsPage() {
                       name={brandInitial}
                       size="sm"
                       radius="md"
-                      color="warning"
-                      classNames={{ base: "shrink-0", name: "text-tiny font-bold" }}
+                      classNames={{ base: "shrink-0 bg-default-100 text-default-600", name: "text-tiny font-bold" }}
                     />
                   }
                   endContent={<FontAwesomeIcon icon={faChevronDown} className="text-tiny text-default-400" />}
@@ -234,7 +232,7 @@ export default function BrandsPage() {
                   onPress={() => setSection(s.id)}
                   endContent={
                     <span className="flex items-center gap-1.5">
-                      {s.badge && <Chip size="sm" color="warning" variant="flat" className="h-4 text-tiny">{s.badge}</Chip>}
+                      {s.badge && <Chip size="sm" color="primary" variant="flat" className="h-4 text-tiny">{s.badge}</Chip>}
                       {isAll && <FontAwesomeIcon icon={faPlus} className="text-tiny text-default-400" />}
                     </span>
                   }
