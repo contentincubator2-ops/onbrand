@@ -119,19 +119,31 @@ export const eventRouter = router({
     }).optional())
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const conds: string[] = ["userId = ?"];
+      const conds: string[] = ["e.userId = ?"];
       const params: any[] = [userId];
-      if (input?.brandId)   { conds.push("brandId = ?");   params.push(input.brandId); }
-      if (input?.productId) { conds.push("productId = ?"); params.push(input.productId); }
-      return rows(
-        `SELECT id, slug, name, brandId, productId, startAt, endAt, positioning, createdAt, updatedAt
-           FROM events
+      if (input?.brandId)   { conds.push("e.brandId = ?");   params.push(input.brandId); }
+      if (input?.productId) {
+        // Match either the legacy single-product link OR the m:n join table.
+        conds.push("(e.productId = ? OR EXISTS (SELECT 1 FROM event_products ep WHERE ep.eventId = e.id AND ep.productId = ?))");
+        params.push(input.productId, input.productId);
+      }
+      const list = await rows(
+        `SELECT e.id, e.slug, e.name, e.brandId, e.productId, e.startAt, e.endAt,
+                e.positioning, e.createdAt, e.updatedAt
+           FROM events e
           WHERE ${conds.join(" AND ")}
-          ORDER BY updatedAt DESC`,
+          ORDER BY e.updatedAt DESC`,
         params,
-      ).then((r) =>
-        r.map((e: any) => ({ ...e, positioning: safeJson(e.positioning) })),
       );
+      // Hydrate productIds[] from event_products for each row
+      return Promise.all(list.map(async (e: any) => ({
+        ...e,
+        positioning: safeJson(e.positioning),
+        productIds: await rows(
+          `SELECT productId FROM event_products WHERE eventId = ? ORDER BY productId`,
+          [e.id],
+        ).then((rs: any[]) => rs.map((x) => Number(x.productId))),
+      })));
     }),
 
   get: protectedProcedure
@@ -144,14 +156,19 @@ export const eventRouter = router({
         [input.id, userId],
       );
       if (!r) throw new TRPCError({ code: "NOT_FOUND", message: "event not found" });
-      return { ...r, positioning: safeJson(r.positioning) };
+      const productIds = await rows(
+        `SELECT productId FROM event_products WHERE eventId = ? ORDER BY productId`,
+        [input.id],
+      ).then((rs: any[]) => rs.map((x) => Number(x.productId)));
+      return { ...r, positioning: safeJson(r.positioning), productIds };
     }),
 
   upsert: protectedProcedure
     .input(z.object({
       id: z.number().optional(),
       brandId: z.number().nullable().optional(),
-      productId: z.number().nullable().optional(),
+      productId: z.number().nullable().optional(),     // primary product (back-compat)
+      productIds: z.array(z.number()).optional(),      // many-to-many — full list of linked products
       slug: z.string().min(1).max(120),
       name: z.string().min(1).max(255),
       startAt: z.string().nullable().optional(),
@@ -165,25 +182,50 @@ export const eventRouter = router({
         : null;
       const startAt = input.startAt ? new Date(input.startAt) : null;
       const endAt   = input.endAt   ? new Date(input.endAt)   : null;
+      // Resolve primary productId: explicit input wins; else first of productIds.
+      const primaryProductId: number | null = input.productId
+        ?? (input.productIds && input.productIds.length > 0 ? input.productIds[0]! : null);
+      let eventId: number;
       if (input.id) {
         await localPool.execute(
           `UPDATE events
               SET brandId = ?, productId = ?, slug = ?, name = ?,
                   startAt = ?, endAt = ?, positioning = ?
             WHERE id = ? AND userId = ?`,
-          [input.brandId ?? null, input.productId ?? null,
+          [input.brandId ?? null, primaryProductId,
            input.slug, input.name, startAt, endAt, positioningJson,
            input.id, userId],
         );
-        return { id: input.id };
+        eventId = input.id;
+      } else {
+        const [r]: any = await localPool.execute(
+          `INSERT INTO events (userId, brandId, productId, slug, name, startAt, endAt, positioning)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, input.brandId ?? null, primaryProductId,
+           input.slug, input.name, startAt, endAt, positioningJson],
+        );
+        eventId = Number(r?.insertId ?? 0);
       }
-      const [r]: any = await localPool.execute(
-        `INSERT INTO events (userId, brandId, productId, slug, name, startAt, endAt, positioning)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [userId, input.brandId ?? null, input.productId ?? null,
-         input.slug, input.name, startAt, endAt, positioningJson],
-      );
-      return { id: Number(r?.insertId ?? 0) };
+      // Sync m:n event_products. When productIds is undefined, we leave it
+      // alone (no change). When provided (even empty array), we replace
+      // the full set so the UI is the single source of truth.
+      if (input.productIds !== undefined) {
+        await localPool.execute(`DELETE FROM event_products WHERE eventId = ?`, [eventId]);
+        for (const pid of input.productIds) {
+          await localPool.execute(
+            `INSERT IGNORE INTO event_products (eventId, productId) VALUES (?, ?)`,
+            [eventId, pid],
+          );
+        }
+      } else if (primaryProductId && !input.id) {
+        // New event with single productId only — mirror into the join table
+        // so list/get can read uniformly.
+        await localPool.execute(
+          `INSERT IGNORE INTO event_products (eventId, productId) VALUES (?, ?)`,
+          [eventId, primaryProductId],
+        );
+      }
+      return { id: eventId };
     }),
 
   remove: protectedProcedure
@@ -409,11 +451,32 @@ export const scopeRouter = router({
   /** Pick lists for the top-right ScopeBar (brands/products/events the user owns). */
   options: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.user!.id;
-    const [b, p, e] = await Promise.all([
+    const [b, p, e, ep] = await Promise.all([
       rows(`SELECT id, name FROM brands   WHERE userId = ? ORDER BY name ASC`, [userId]),
       rows(`SELECT id, name, brandId FROM products WHERE userId = ? ORDER BY name ASC`, [userId]),
       rows(`SELECT id, name, brandId, productId FROM events WHERE userId = ? ORDER BY name ASC`, [userId]),
+      // event_products join — for each event, the list of linked product ids.
+      // Single query joined back in JS to avoid N+1.
+      rows<{ eventId: number; productId: number }>(
+        `SELECT ep.eventId, ep.productId
+           FROM event_products ep
+           JOIN events e ON e.id = ep.eventId
+          WHERE e.userId = ?
+          ORDER BY ep.eventId, ep.productId`,
+        [userId],
+      ),
     ]);
-    return { brands: b, products: p, events: e };
+    // Group productIds by eventId
+    const productIdsByEvent = new Map<number, number[]>();
+    for (const r of ep as any[]) {
+      const list = productIdsByEvent.get(Number(r.eventId)) ?? [];
+      list.push(Number(r.productId));
+      productIdsByEvent.set(Number(r.eventId), list);
+    }
+    const eventsWithIds = (e as any[]).map((ev) => ({
+      ...ev,
+      productIds: productIdsByEvent.get(Number(ev.id)) ?? (ev.productId ? [Number(ev.productId)] : []),
+    }));
+    return { brands: b, products: p, events: eventsWithIds };
   }),
 });

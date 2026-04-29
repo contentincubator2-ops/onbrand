@@ -117,13 +117,28 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
       }
       const e = events.find((x: any) => x.id === id);
       const parentBrandId: number | null = e?.brandId ?? scope.brandId ?? null;
-      // events.productId is single-FK today; future m:n via event_products
-      // join table will set productId only when the event scopes to one
-      // product (else null = "spans multiple products").
-      const parentProductId: number | null = e?.productId ?? null;
+      // event.productIds is the m:n list (event_products join). When event
+      // spans 0 or 2+ products, we leave product picker empty (null) so
+      // "—" displays — caller can read scope.eventId and look up productIds
+      // for full context. Single-product events auto-set the product.
+      const productIds: number[] = (e?.productIds as number[] | undefined) ?? [];
+      const parentProductId: number | null = productIds.length === 1
+        ? productIds[0]
+        : (productIds.length === 0 ? (e?.productId ?? null) : null);
       setScope({ brandId: parentBrandId, productId: parentProductId, eventId: id });
     }
   };
+
+  // When the active event spans multiple products, surface them as a chip
+  // group below the picker so the user knows the scope without clicking in.
+  const eventMultiProducts: any[] = React.useMemo(() => {
+    if (!event) return [];
+    const ids = (event.productIds as number[] | undefined) ?? [];
+    if (ids.length < 2) return [];
+    return ids
+      .map((pid) => products.find((p: any) => p.id === pid))
+      .filter(Boolean);
+  }, [event, products]);
 
   // Filter children to the active brand so the picker shows coherent options.
   // When no brand is set, show everything (user is browsing all scopes).
@@ -150,7 +165,12 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
       <ScopePicker
         icon={faBox}
         label="產品"
-        current={product?.name ?? null}
+        current={
+          product?.name
+            ?? (eventMultiProducts.length > 0
+                ? `${eventMultiProducts.length} 個產品`
+                : null)
+        }
         items={filteredProducts.map((p: any) => ({ id: p.id, name: p.name }))}
         onPick={(id) => pick("product", id)}
         onCreate={() => setCreateKind("product")}

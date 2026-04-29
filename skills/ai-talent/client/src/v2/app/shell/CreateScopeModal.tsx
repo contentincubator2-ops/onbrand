@@ -13,6 +13,7 @@ import React from "react";
 import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Input, Textarea, Button, Chip, Card, CardBody, Progress, Spinner,
+  CheckboxGroup, Checkbox,
 } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -67,12 +68,25 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
   const [picked, setPicked] = React.useState<number | null>(null); // -1 = "都不是 / 新建"
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState<string | null>(null);
+  // Event-only: m:n product links. Defaults to empty (event scopes brand-wide).
+  const [eventProductIds, setEventProductIds] = React.useState<number[]>([]);
+
+  // Pull candidate products for the event's parent brand. CheckboxGroup
+  // displays them so user can link 1+ products to this event.
+  const productsQuery = (trpc as any).product?.list?.useQuery
+    ? (trpc as any).product.list.useQuery(
+        { brandId: brandId ?? undefined },
+        { enabled: kind === "event" && !!brandId, refetchOnWindowFocus: false },
+      )
+    : { data: [] };
+  const candidateProducts: any[] = (productsQuery.data as any[]) ?? [];
 
   React.useEffect(() => {
     if (open) {
       setStep("input");
       setName(""); setWebsite(""); setFacebook(""); setDescription("");
       setCandidates([]); setSummary(""); setPicked(null);
+      setEventProductIds([]);
       setErr(null); setBusy(false);
     }
   }, [open]);
@@ -156,6 +170,7 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
         const r: any = await eventUpsert.mutateAsync({
           brandId: brandId ?? null, slug: slugify(name),
           name: chosen?.name?.trim() || name.trim(),
+          productIds: eventProductIds.length > 0 ? eventProductIds : undefined,
         });
         newId = Number(r?.id ?? 0);
       }
@@ -215,6 +230,9 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
                   facebook={facebook} setFacebook={setFacebook}
                   description={description} setDescription={setDescription}
                   brandId={brandId}
+                  candidateProducts={candidateProducts}
+                  eventProductIds={eventProductIds}
+                  setEventProductIds={setEventProductIds}
                 />
               )}
               {step === "checking" && (
@@ -295,6 +313,7 @@ function StepIndicator({ step }: { step: Step }) {
 function InputStep({
   kind, name, setName, website, setWebsite, facebook, setFacebook,
   description, setDescription, brandId,
+  candidateProducts, eventProductIds, setEventProductIds,
 }: any) {
   return (
     <>
@@ -340,6 +359,37 @@ function InputStep({
       />
       {kind === "product" && !brandId && (
         <p className="text-tiny text-warning">提醒：建立產品需要綁定品牌，請先在 ScopeBar 選擇一個品牌。</p>
+      )}
+      {kind === "event" && (
+        <>
+          {!brandId && (
+            <p className="text-tiny text-warning">提醒：活動會自動隸屬於目前選的品牌，建議先選一個品牌再建立活動。</p>
+          )}
+          {brandId && candidateProducts.length > 0 && (
+            <Card shadow="none" className="border border-divider">
+              <CardBody className="px-3 py-3 gap-2">
+                <p className="text-tiny text-default-500 uppercase tracking-wider">關聯產品（可多選）</p>
+                <p className="text-tiny text-default-500 leading-relaxed">
+                  此活動是針對哪些產品？選 0 個 = 品牌層級活動；選 1 個 = 產品檔；選 2+ 個 = 跨產品活動（如 Pokemon Go 五月活動同打 GO Battle League + GO Fest）。
+                </p>
+                <CheckboxGroup
+                  value={eventProductIds.map(String)}
+                  onValueChange={(vals) => setEventProductIds(vals.map((v: string) => Number(v)))}
+                  classNames={{ wrapper: "gap-1.5" }}
+                >
+                  {candidateProducts.map((p: any) => (
+                    <Checkbox key={p.id} value={String(p.id)} size="sm">
+                      <span className="text-small">{p.name}</span>
+                    </Checkbox>
+                  ))}
+                </CheckboxGroup>
+              </CardBody>
+            </Card>
+          )}
+          {brandId && candidateProducts.length === 0 && (
+            <p className="text-tiny text-default-500">此品牌尚無產品。活動會建立為「品牌層級」（不綁定特定產品）。</p>
+          )}
+        </>
       )}
       <p className="text-tiny text-default-500">
         提示：填寫官網 / FB 能幫系統更準確找對品牌，避免同名（如 sowork.tw vs sowork.com）。

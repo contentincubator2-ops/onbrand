@@ -33,6 +33,7 @@ import MediaGenFlow from "../components/media/MediaGenFlow";
 import { TaskChip } from "../components/TaskChip";
 import { AgentAvatar } from "../components/AgentAvatar";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
+import ScopeBar, { useScopeState } from "../app/shell/ScopeBar";
 import {
   Alert, Avatar, AvatarGroup, Badge, Breadcrumbs, BreadcrumbItem,
   Button, Card, CardBody, CardHeader, Chip, Divider, Input,
@@ -279,28 +280,29 @@ export default function PickerWorkspace() {
     initialMissionId ? Number(initialMissionId) : null,
   );
 
-  // ── Brand context (D) ───────────────────────────────────────────────
+  // ── Scope context (brand × product × event) ────────────────────────
   // Picker lives outside ShellLayout so it doesn't get the shared context.
-  // We mirror the same localStorage key the shell uses, and fetch the
-  // user's brand list directly to populate the in-header BrandSwitcher.
+  // We use the same useScopeState hook that ShellLayout uses, which is
+  // backed by localStorage (sowork.scope.*) — so /picker stays in sync
+  // with the rest of the app without explicit prop drilling.
+  const [scope, setScope] = useScopeState();
+  const brandId = scope.brandId;
+
   const brandsQuery = (trpc as any).brand?.listByMember?.useQuery
     ? (trpc as any).brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false })
     : { data: [] };
   const brands: any[] = (brandsQuery.data as any[]) ?? [];
-  const [brandId, setBrandIdState] = useState<number | null>(() => {
-    try { return Number(localStorage.getItem("sowork.selectedBrandId")) || null; }
-    catch { return null; }
-  });
+
+  // Setter that ScopeBar uses internally — writes brandId only, mimics
+  // legacy behavior (clear product/event when explicitly switching brand).
   const setBrandId = (id: number | null) => {
-    setBrandIdState(id);
-    try {
-      if (id) localStorage.setItem("sowork.selectedBrandId", String(id));
-      else localStorage.removeItem("sowork.selectedBrandId");
-    } catch {}
+    setScope({ brandId: id, productId: null, eventId: null });
   };
-  // Auto-pick first brand once list loads.
+  // Auto-pick first brand once list loads (only if no scope is set yet).
   useEffect(() => {
-    if (!brandId && brands.length > 0) setBrandId(brands[0].id);
+    if (!scope.brandId && !scope.productId && !scope.eventId && brands.length > 0) {
+      setBrandId(brands[0].id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brands.length]);
 
@@ -603,11 +605,10 @@ export default function PickerWorkspace() {
           {headerTitle}
         </div>
         <div className="flex items-center gap-2">
-          <BrandSwitcher
-            brands={brands}
-            selectedId={brandId}
-            onSelect={setBrandId}
-          />
+          {/* Full 3-tier scope picker (brand × product × event) per CJ
+              direction 2026-04-29 — replaces the brand-only switcher so
+              /picker matches the global ShellLayout header. */}
+          <ScopeBar scope={scope} setScope={setScope} />
           <Tooltip content="進入專注模式 (F)" placement="bottom" radius="sm">
             <Button
               isIconOnly
