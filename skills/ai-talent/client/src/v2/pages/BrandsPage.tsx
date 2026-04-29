@@ -314,18 +314,20 @@ export default function BrandsPage() {
     };
 
     (async () => {
-      // Three-phase UX: loading (LLM 20-60s) → typing (typewriter on real
-      // reasoning) → writing (fields populate). User had no feedback during
-      // the LLM wait so the system felt frozen.
+      // Three-phase UX: loading → typing → writing. CJ caught timing bug:
+      // pipeline advanced before fields visibly populated. Extended the
+      // "fields visible" hold to 5s + double-invalidate to force refetch.
       setThinkingStartedAt(Date.now());
       setThinkingPhase("loading");
-      setLiveThinking(""); // overlay shows loading state, no text yet
+      setLiveThinking("");
 
       const realThinking = await runReal();
       if (cancelled) return;
+      // Force a refetch right after server write so the draft/query is
+      // already updated by the time typing finishes.
+      utils?.scope?.active?.invalidate?.();
 
       const text = realThinking ?? step.mockThinking ?? "";
-      // Switch to typing phase with the REAL reasoning text
       setThinkingPhase("typing");
       setLiveThinking(text);
 
@@ -333,17 +335,22 @@ export default function BrandsPage() {
       const typingMs = (text.length / cps) * 1000;
       setTimeout(() => {
         if (cancelled) return;
-        // Brief "writing to fields" moment, then fade and advance
         setThinkingPhase("writing");
+        // Re-invalidate at the writing handoff so any in-flight render gets
+        // the latest server state before the overlay fades.
+        utils?.scope?.active?.invalidate?.();
         setTimeout(() => {
           if (cancelled) return;
-          setLiveThinking(null); // hide overlay → reveal populated fields
+          setLiveThinking(null); // hide overlay → fields visible
+          // Long hold so user actually reads the populated fields
+          // (CJ feedback: 跳太快). 5 seconds gives query refetch + render
+          // time + reading time for the average user.
           setTimeout(() => {
             if (cancelled) return;
             advance();
-          }, 2200);
-        }, 800);
-      }, typingMs + 200);
+          }, 5000);
+        }, 1500);
+      }, typingMs + 300);
     })();
 
     return () => { cancelled = true; };
