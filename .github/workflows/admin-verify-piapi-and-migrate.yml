@@ -25,7 +25,7 @@ jobs:
         env:
           # Prefer manual override (typed at dispatch) over the stored secret —
           # lets us bypass a wrong GitHub secret without UI fighting.
-          PIAPI_KEY: ${{ inputs.piapi_key_override != '' && inputs.piapi_key_override || secrets.PI_API_KEY }}
+          PIAPI_KEY: ${{ github.event.inputs.piapi_key_override || secrets.PI_API_KEY }}
           ATLAS_CLOUD_API: ${{ secrets.ATLAS_CLOUD_API }}
         with:
           host: ${{ secrets.VM_HOST }}
