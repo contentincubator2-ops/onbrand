@@ -269,6 +269,8 @@ export default function BrandsPage() {
       })
     : null;
   const [liveThinking, setLiveThinking] = useState<string | null>(null);
+  const [thinkingPhase, setThinkingPhase] = useState<"loading" | "typing" | "writing">("loading");
+  const [thinkingStartedAt, setThinkingStartedAt] = useState<number | null>(null);
 
   React.useEffect(() => {
     if (pipeline.status !== "running") return;
@@ -317,34 +319,36 @@ export default function BrandsPage() {
     };
 
     (async () => {
-      // Real LLM call (may be slow — 20-60s incl. web search). Show
-      // mock thinking immediately so user sees activity while waiting.
-      setLiveThinking(step.mockThinking);
+      // Three-phase UX: loading (LLM 20-60s) → typing (typewriter on real
+      // reasoning) → writing (fields populate). User had no feedback during
+      // the LLM wait so the system felt frozen.
+      setThinkingStartedAt(Date.now());
+      setThinkingPhase("loading");
+      setLiveThinking(""); // overlay shows loading state, no text yet
+
       const realThinking = await runReal();
       if (cancelled) return;
-      if (realThinking) {
-        setLiveThinking(realThinking); // restart typewriter with real text
-      }
-      // Phase 6: typewriter + 'fill fields' moment + hold + advance.
-      // User wants to SEE the conclusion populate the segment fields.
-      // Sequence:
-      //   typingMs   typewriter animates
-      //   +500ms    fade thinking, fields are already populated by
-      //             the runStep mutation's onSuccess invalidate, so
-      //             clearing liveThinking reveals filled fields
-      //   +2500ms   hold on filled fields (user notices "啊，欄位填好了")
-      //   advance() jump to next segment
+
+      const text = realThinking ?? step.mockThinking ?? "";
+      // Switch to typing phase with the REAL reasoning text
+      setThinkingPhase("typing");
+      setLiveThinking(text);
+
       const cps = 35;
-      const text = realThinking ?? step.mockThinking;
       const typingMs = (text.length / cps) * 1000;
       setTimeout(() => {
         if (cancelled) return;
-        setLiveThinking(null); // hide overlay → reveal populated fields
+        // Brief "writing to fields" moment, then fade and advance
+        setThinkingPhase("writing");
         setTimeout(() => {
           if (cancelled) return;
-          advance();
-        }, 2500);
-      }, typingMs + 500);
+          setLiveThinking(null); // hide overlay → reveal populated fields
+          setTimeout(() => {
+            if (cancelled) return;
+            advance();
+          }, 2200);
+        }, 800);
+      }, typingMs + 200);
     })();
 
     return () => { cancelled = true; };
@@ -366,10 +370,12 @@ export default function BrandsPage() {
   const stopPipeline = () => setPipeline({ status: "idle", cursor: 0, completed: [] });
 
   const pipelineThinking =
-    pipeline.status === "running" && pipelineSteps[pipeline.cursor]
+    pipeline.status === "running" && pipelineSteps[pipeline.cursor] && liveThinking !== null
       ? {
           segmentTarget: pipelineSteps[pipeline.cursor]!.segmentTarget,
-          text: liveThinking ?? pipelineSteps[pipeline.cursor]!.mockThinking,
+          text: liveThinking,
+          phase: thinkingPhase,
+          startedAt: thinkingStartedAt,
           stepNum: pipeline.cursor + 1,
           stepTotal: pipelineSteps.length,
           stepTitle: pipelineSteps[pipeline.cursor]!.title,
@@ -549,6 +555,8 @@ export default function BrandsPage() {
 interface PipelineThinking {
   segmentTarget: string;
   text: string;
+  phase: "loading" | "typing" | "writing";
+  startedAt: number | null;
   stepNum: number;
   stepTotal: number;
   stepTitle: string;
@@ -696,6 +704,8 @@ function PositioningEditor({
       {pipelineThinking && (
         <ThinkingOverlay
           text={pipelineThinking.text}
+          phase={pipelineThinking.phase}
+          startedAt={pipelineThinking.startedAt ?? undefined}
           stepNum={pipelineThinking.stepNum}
           stepTotal={pipelineThinking.stepTotal}
           stepTitle={pipelineThinking.stepTitle}
