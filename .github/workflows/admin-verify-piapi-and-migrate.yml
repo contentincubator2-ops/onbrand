@@ -43,12 +43,19 @@ jobs:
 
             echo ""
             echo "===== 1. Run migrate.ts ====="
+            # SAVE action-provided keys BEFORE sourcing .env (which would
+            # otherwise clobber them with stale persisted values)
+            ACTION_PIAPI_KEY="$PIAPI_KEY"
+            ACTION_ATLAS_KEY="$ATLAS_CLOUD_API"
             # Load .env so DB_* vars are present
             set -a
             [ -f .env ] && . .env
             [ -f /opt/marketing-os/app/skills/ai-talent/.env ] && . /opt/marketing-os/app/skills/ai-talent/.env
             [ -f /opt/marketing-os/skills/ai-talent/.env ] && . /opt/marketing-os/skills/ai-talent/.env
             set +a
+            # Restore action-provided keys (input override beats stored .env)
+            [ -n "$ACTION_PIAPI_KEY" ] && export PIAPI_KEY="$ACTION_PIAPI_KEY"
+            [ -n "$ACTION_ATLAS_KEY" ] && export ATLAS_CLOUD_API="$ACTION_ATLAS_KEY"
             npx tsx scripts/migrate.ts 2>&1 | tail -50
 
             echo ""
