@@ -6,11 +6,12 @@
 import React from "react";
 import { Card, CardBody, Chip, Button, Tooltip, Tabs, Tab } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCopy, faCheck, faRobot } from "@fortawesome/free-solid-svg-icons";
+import { faCopy, faCheck, faRobot, faPalette } from "@fortawesome/free-solid-svg-icons";
 import {
   SCOPE_PROMPTS, buildVariableMap, interpolatePrompt,
   type PromptTemplate, type LLM,
 } from "../../lib/positioningPrompts";
+import MediaGenFlow from "../media/MediaGenFlow";
 
 interface PromptLibraryProps {
   scopeMode: "brand" | "product" | "event";
@@ -82,6 +83,7 @@ export default function PromptLibrary({ scopeMode, scopeName, data }: PromptLibr
 function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record<string, string> }) {
   const filled = interpolatePrompt(template.body, vars);
   const [copied, setCopied] = React.useState<LLM | null>(null);
+  const [mediaFlowOpen, setMediaFlowOpen] = React.useState(false);
 
   const onCopy = async (llm: LLM) => {
     try {
@@ -94,6 +96,12 @@ function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record
   // Identify variables that are still unfilled (template still has {變數})
   const unfilled = template.variables.filter((v) => !vars[v] || !vars[v].trim());
 
+  // Visual generation templates get an extra CTA — open the 3-step
+  // MediaGenFlow (設計方向 → AI prompt → 模型選擇) instead of just
+  // copy-paste. Per CJ direction 2026-04-29.
+  const isVisual = template.category === "視覺生成"
+    || template.llms.includes("midjourney");
+
   return (
     <Card shadow="none" className="border border-divider">
       <CardBody className="p-5 gap-3">
@@ -102,7 +110,20 @@ function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record
             <p className="text-medium font-semibold truncate">{template.title}</p>
             <p className="text-small text-default-500 mt-0.5">{template.description}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isVisual && (
+              <Tooltip content="3-step 視覺生成（設計方向 → AI prompt → 模型選擇）" placement="top">
+                <Button
+                  size="sm"
+                  color="primary"
+                  radius="full"
+                  startContent={<FontAwesomeIcon icon={faPalette} className="text-tiny" />}
+                  onPress={() => setMediaFlowOpen(true)}
+                >
+                  AI 視覺流程
+                </Button>
+              </Tooltip>
+            )}
             {template.llms.map((llm) => (
               <Tooltip key={llm} content={`複製到 ${llmLabel(llm)}`} placement="top">
                 <Button
@@ -139,6 +160,15 @@ function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record
           </div>
         )}
       </CardBody>
+      {/* 3-step media flow modal — only for visual templates */}
+      {isVisual && (
+        <MediaGenFlow
+          open={mediaFlowOpen}
+          onClose={() => setMediaFlowOpen(false)}
+          initialBrief={filled}
+          kind="image"
+        />
+      )}
     </Card>
   );
 }
