@@ -15,9 +15,20 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
-const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/marketing-os/covers";
+// On Vercel the function filesystem is read-only outside /tmp, so the
+// VM-style /opt/marketing-os/covers path crashes mkdirSync at module
+// load. Fall back to /tmp/covers (ephemeral but writable) on Vercel,
+// and wrap the mkdir in try/catch so any other unexpected env can't
+// brick boot.
+const COVERS_DIR =
+  process.env.COVERS_DIR ??
+  (process.env.VERCEL ? "/tmp/covers" : "/opt/marketing-os/covers");
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
-mkdirSync(COVERS_DIR, { recursive: true });
+try {
+  mkdirSync(COVERS_DIR, { recursive: true });
+} catch (err) {
+  console.warn(`[mediaGen] Could not create COVERS_DIR=${COVERS_DIR}:`, err);
+}
 
 export type GenStatus = "ready" | "submitted" | "failed";
 
