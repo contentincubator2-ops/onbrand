@@ -659,8 +659,123 @@ export const PRODUCT_FULL_PIPELINE: PipelineStepSpec[] = [
   },
 ];
 
-// ── Event pipeline placeholder (build when CJ shares spec) ───────────────
-export const EVENT_FULL_PIPELINE: PipelineStepSpec[] = [];
+// ── Event pipeline (3 steps mirroring sowork-ai-v2 campaign positioning) ─
+// Architecture differs from brand/product: Step 2 + 3 use DB-injected
+// award case context (RAG) to ground the LLM. server/pipelineRouter
+// detects scopeMode==="event" and injects awards + creative_cases.
+export const EVENT_FULL_PIPELINE: PipelineStepSpec[] = [
+  {
+    id: 1,
+    title: "Step 1 — 業務診斷（核心問題 / 根本原因 / 機會點 / 策略方向）",
+    segmentTarget: "seg:diagnosis",
+    segmentId: "diagnosis",
+    agent: "campaign-diagnostic",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是資深品牌策略顧問。基於下方品牌/產品定位資料 + 活動需求，分析「{brand_name}」這個活動面臨的核心挑戰。
+
+請輸出 4 個欄位：
+- coreProblem: 核心問題（1 句話描述當前主要挑戰）
+- rootCause: 根本原因（造成此問題的深層原因，2-3 句）
+- opportunity: 機會點（基於分析找出可突破的機會，2-3 句）
+- strategyDirection: 策略方向（建議的整體策略方向，2-3 句）
+
+依範例結構輸出 conclusion。`,
+    mockThinking: "讀入品牌/產品 positioning + 活動需求，逐層挖掘核心挑戰與機會...",
+    mockConclusion: {
+      coreProblem: "（mock）品牌面臨「理性專業感強但感性共鳴度低」的品牌斷層。",
+      rootCause: "（mock）長期以數據與邏輯為核心溝通，忽略了情感支持。",
+      opportunity: "（mock）市場偏好從「工具」轉向「意義導向夥伴關係」。",
+      strategyDirection: "（mock）實施「導航員」策略 — 從「數據之準」轉向「賦能之溫」。",
+    },
+  },
+  {
+    id: 2,
+    title: "Step 2 — 獎項匹配（推薦 3 個子獎項 + 注入歷年得獎案例）",
+    segmentTarget: "seg:awards",
+    segmentId: "awards",
+    agent: "award-matcher",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是頂尖廣告創意策略師，精通主要國際 / 大中華區廣告獎項的子類別與評審標準。
+
+任務：根據業務診斷 + 活動需求，從可選獎項清單中（已注入近期得獎案例供你判斷）推薦 3 個最適合的「子獎項」。
+重要：必須具體到子獎項層級，不可只說大獎名（例：要說「坎城創意節 - PR Lions」，不要只說「坎城創意節」）。
+
+常見子獎項：
+- 坎城：Film Lions / Film Craft Lions / PR Lions / Direct Lions / Media Lions / Digital Craft Lions / Creative Effectiveness Lions / Brand Experience & Activation Lions / Creative Strategy Lions / Entertainment Lions / Social & Influencer Lions
+- D&AD：Crafts (Film/Photography/Typography...) / Impact (Diversity & Inclusion / Sustainable Development...)
+- Effie：產業類別 + Crisis Response / Social Good 等特殊類別
+- One Show / Clio：Film / Digital / Direct / PR / Health / Music / Entertainment
+
+依範例結構輸出 conclusion (selectedAwards 陣列，3 個 entries)：
+[
+  { name: "坎城創意節 - PR Lions", parentAward: "坎城創意節", subCategory: "PR Lions", matchScore: 90, matchReason: "..." },
+  ...
+]
+
+每個 matchReason 必須引用注入的「近期得獎案例」精神來說明為何此子獎項勝過其他選擇。`,
+    mockThinking: "讀取可選獎項 + 近期案例，匹配業務挑戰，選 3 個子獎項...",
+    mockConclusion: {
+      selectedAwards: [
+        { name: "（mock）坎城創意節 - PR Lions", parentAward: "坎城創意節", subCategory: "PR Lions", matchScore: 90, matchReason: "從近期案例看，此子獎項著重 X，正好對應本活動的 Y 挑戰..." },
+        { name: "（mock）Effie - Crisis Response", parentAward: "艾菲獎", subCategory: "Crisis Response", matchScore: 85, matchReason: "..." },
+        { name: "（mock）D&AD - Impact: Sustainable Development", parentAward: "D&AD", subCategory: "Impact", matchScore: 78, matchReason: "..." },
+      ],
+    },
+  },
+  {
+    id: 3,
+    title: "Step 3 — 方案生成（每獎項一個方案 + 注入 Grand Prix / Gold 標竿案例）",
+    segmentTarget: "seg:solution",
+    segmentId: "solution",
+    agent: "campaign-architect",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是頂尖整合行銷策略師。基於 Step 2 推薦的 3 個子獎項（已注入 Grand Prix / Gold 等標竿案例），為每個獎項設計一個對應的策略方案。
+
+每個方案必須圍繞該獎項的核心精神，並引用注入案例的成功要素。
+
+每個 proposal 含：
+- name: 方案名稱（體現該獎項精神）
+- awardName: 對應的子獎項名稱
+- coreConcept: 核心創意概念（1-2 句靈魂）
+- strategy: 執行策略（含週期規劃）
+- highlights: 3-5 條方案亮點
+- taglines: [{chinese, english}] 多組
+- positioningStatement: 活動定位陳述
+- contentAngles: 4-6 個內容切角
+- influencerFit: 適合的 KOL 輪廓
+- channels: 渠道清單
+- kpiFramework: KPI 框架敘述
+- referenceCases: 引用注入的標竿案例（含 brand / awardLevel / year / description / sourceUrl）
+
+依範例結構輸出 conclusion (proposals 陣列，3 個 entries)。`,
+    mockThinking: "整合業務診斷 + 推薦獎項 + Grand Prix 標竿案例，為每個獎項設計創意方案...",
+    mockConclusion: {
+      proposals: [
+        {
+          id: "proposal_a",
+          name: "（mock）方案 A — 圍繞 PR Lions 精神",
+          awardName: "坎城創意節 - PR Lions",
+          awardMatchReason: "（mock）參考 X 品牌 Grand Prix 案例的 PR 精神...",
+          coreConcept: "（mock）核心創意：把數據敘事化成英雄旅程。",
+          strategy: "（mock）9 週執行策略：迷航 → 引路 → 閃耀 三階段。",
+          highlights: ["（mock）亮點 1", "（mock）亮點 2", "（mock）亮點 3"],
+          taglines: [
+            { chinese: "（mock）中文標語 1", english: "(mock) Tagline 1" },
+            { chinese: "（mock）中文標語 2", english: "(mock) Tagline 2" },
+          ],
+          positioningStatement: "（mock）活動定位陳述。",
+          contentAngles: ["（mock）切角 1", "（mock）切角 2", "（mock）切角 3", "（mock）切角 4"],
+          influencerFit: "（mock）KOL 輪廓：具國際視野的微型創業者...",
+          channels: ["IG Reels", "LinkedIn", "TikTok", "概念官網"],
+          kpiFramework: "（mock）品牌情緒共鳴度 + 關鍵字搜索增長 + 海外諮詢轉化率",
+          referenceCases: [
+            { brand: "（mock）品牌", awardName: "PR Lions", year: 2024, awardLevel: "Grand Prix", description: "（mock）案例描述", sourceUrl: "https://..." },
+          ],
+        },
+      ],
+    },
+  },
+];
 
 /** Pick the right pipeline for a scope mode. */
 export function pipelineFor(scopeMode: "brand" | "product" | "event" | "none"): PipelineStepSpec[] {

@@ -208,10 +208,52 @@ ${input.budget.minUrls === 0 && input.budget.minChars === 0 ? "→ 此步驟為�
         return out;
       })();
 
+      // Event scope Step 2/3: inject award_frameworks + creative_cases
+      // (RAG style — DB grounded, mirrors sowork-ai-v2 pattern).
+      let awardContextBlock = "";
+      if (input.kind === "event" && (input.segmentId === "awards" || input.segmentId === "solution")) {
+        try {
+          const [frameworks]: any = await localPool.execute(
+            `SELECT name, category, description, suitableFor FROM award_frameworks ORDER BY id ASC`
+          );
+          // For Step 2: pull recent cases per award (3 each)
+          // For Step 3: pull Grand Prix / Gold benchmark cases
+          const isStep2 = input.segmentId === "awards";
+          const namePatterns = (frameworks as any[]).map((f) => f.name);
+          let casesByAward: Record<string, any[]> = {};
+          for (const name of namePatterns) {
+            const sql = isStep2
+              ? `SELECT brand, year, award_level, sub_category, description, source_url
+                   FROM creative_cases
+                  WHERE award_name LIKE CONCAT('%', SUBSTRING_INDEX(?, ' (', 1), '%')
+                  ORDER BY year DESC, FIELD(award_level, 'Grand Prix', 'Gold', 'Silver', 'Bronze') ASC
+                  LIMIT 3`
+              : `SELECT brand, year, award_level, sub_category, description, source_url
+                   FROM creative_cases
+                  WHERE award_name LIKE CONCAT('%', SUBSTRING_INDEX(?, ' (', 1), '%')
+                    AND award_level IN ('Grand Prix', 'Gold')
+                  ORDER BY year DESC LIMIT 5`;
+            const [rows]: any = await localPool.execute(sql, [name]);
+            casesByAward[name] = (rows as any[]) ?? [];
+          }
+          const blocks = (frameworks as any[]).map((f) => {
+            const cases = casesByAward[f.name] ?? [];
+            const casesText = cases.length === 0
+              ? "  （資料庫尚無案例）"
+              : cases.map((c: any) => `  • ${c.brand ?? "?"} [${c.award_level ?? ""}] ${c.year ?? ""}${c.sub_category ? ` (${c.sub_category})` : ""} — ${(c.description ?? "").slice(0, 200)}${c.source_url ? `\n    ${c.source_url}` : ""}`).join("\n");
+            return `▸ ${f.name}（${f.category ?? ""}）\n  ${(f.description ?? "").slice(0, 200)}\n${casesText}`;
+          }).join("\n\n");
+          awardContextBlock = `\n\n【可選獎項清單 + 注入案例】\n${blocks}`;
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[pipeline] award context injection failed:", e);
+        }
+      }
+
       const user = `${taskPrompt}
 
 【已有 positioning context（前面步驟的 conclusion）】
-${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}
+${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}${awardContextBlock}
 
 注意：上面只是其他段落的結論，不要當成本步驟的 sources。本步驟的 sources[] 必須是你自己 web_search 抓到的新 URL，不可複製其他段落的引用清單。
 

@@ -783,6 +783,97 @@ async function main() {
       console.log("[migrate] brands.positioning: already exists, skipped");
     }
 
+    // ─── 14. Creative cases / award frameworks (event positioning RAG) ──
+    // From sowork-ai-v2 — campaign positioning analysis pipeline injects
+    // these as context when matching awards + generating proposals.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS award_frameworks (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        name            VARCHAR(200) NOT NULL,
+        category        VARCHAR(100) NULL,
+        description     TEXT NULL,
+        successCriteria JSON NULL,
+        caseStudies     JSON NULL,
+        averageRoi      VARCHAR(50) NULL,
+        suitableFor     JSON NULL,
+        createdAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_name (name),
+        INDEX idx_category (category)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] award_frameworks: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS creative_cases (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        award_name      VARCHAR(200) NULL,
+        year            INT NULL,
+        award_level     VARCHAR(100) NULL COMMENT 'Grand Prix/Gold/Silver/Bronze/Shortlist',
+        award_category  VARCHAR(300) NULL,
+        sub_category    VARCHAR(300) NULL,
+        campaign_title  VARCHAR(500) NULL,
+        brand           VARCHAR(300) NULL,
+        agency          VARCHAR(300) NULL,
+        country         VARCHAR(100) NULL,
+        industry        VARCHAR(300) NULL,
+        description     TEXT NULL,
+        source_url      VARCHAR(500) NULL,
+        tags            JSON NULL,
+        scraped_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_award_name (award_name),
+        INDEX idx_year (year),
+        INDEX idx_award_level (award_level),
+        INDEX idx_industry (industry),
+        UNIQUE KEY uk_source_url (source_url(490))
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] creative_cases: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS award_categories (
+        id                   INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        award_name           VARCHAR(200) NOT NULL,
+        category_name        VARCHAR(300) NOT NULL COMMENT '子獎項名稱',
+        category_description TEXT NULL,
+        judging_criteria     TEXT NULL,
+        eligibility          TEXT NULL,
+        entry_fee            VARCHAR(200) NULL,
+        source_url           TEXT NULL,
+        scraped_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_award_name (award_name),
+        UNIQUE KEY uk_award_category (award_name, category_name(200))
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] award_categories: OK");
+
+    // Seed 6 base award frameworks (idempotent — INSERT IGNORE)
+    await conn.execute(`
+      INSERT IGNORE INTO award_frameworks
+        (name, category, description, successCriteria, suitableFor, averageRoi)
+      VALUES
+        ('坎城創意節 (Cannes Lions)',  '國際創意獎', '全球廣告創意界最高榮譽，著重於原創性、品牌關聯性和商業影響力',
+          '[\"原創創意概念\",\"品牌契合度\",\"商業影響力\",\"跨媒體整合\"]',
+          '{\"challenges\":[\"awareness\",\"differentiation\",\"perception\"],\"goals\":[\"brand_awareness\",\"brand_refresh\"]}', '300%+'),
+        ('艾菲獎 (Effie Awards)',      '行銷效果獎', '專注於行銷效果和 ROI 的權威獎項',
+          '[\"清晰的策略思維\",\"可量化的成效指標\",\"創意與效果的平衡\",\"預算效率\"]',
+          '{\"challenges\":[\"conversion\",\"retention\",\"motivation\"],\"goals\":[\"sales_growth\",\"market_expansion\"]}', '250%+'),
+        ('龍璽獎 (Long Xi Awards)',    '大中華創意獎', '大中華區最具影響力的創意獎項',
+          '[\"本土文化洞察\",\"國際創意水準\",\"市場適應性\",\"社會影響力\"]',
+          '{\"challenges\":[\"awareness\",\"trust\",\"engagement\"],\"goals\":[\"brand_awareness\",\"new_product_launch\"]}', '200%+'),
+        ('金手指獎 (Golden Finger Awards)', '數位行銷獎', '專注於數位行銷創新的獎項',
+          '[\"數位創新\",\"用戶體驗\",\"數據驅動\",\"社群互動\"]',
+          '{\"challenges\":[\"engagement\",\"conversion\",\"differentiation\"],\"goals\":[\"sales_growth\",\"brand_awareness\"]}', '180%+'),
+        ('時報廣告金像獎', '台灣本土獎', '台灣歷史最悠久的廣告獎項',
+          '[\"本土市場洞察\",\"創意表現\",\"品牌建設\",\"社會責任\"]',
+          '{\"challenges\":[\"awareness\",\"trust\",\"perception\"],\"goals\":[\"brand_awareness\",\"brand_refresh\"]}', '150%+'),
+        ('CLIO 獎', '國際創意獎', '歷史悠久的國際廣告獎項',
+          '[\"創意卓越\",\"文化影響力\",\"執行品質\",\"突破性概念\"]',
+          '{\"challenges\":[\"differentiation\",\"perception\",\"awareness\"],\"goals\":[\"brand_refresh\",\"brand_awareness\"]}', '220%+')
+    `);
+    console.log("[migrate] award_frameworks seed: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

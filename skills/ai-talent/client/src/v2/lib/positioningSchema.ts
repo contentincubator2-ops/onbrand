@@ -310,6 +310,20 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     ],
   },
   {
+    id: "awards",
+    num: "2.5",
+    title: "獎項匹配",
+    agent: "award-matcher",
+    fields: [
+      { key: "selectedAwards", label: "推薦子獎項", type: "tableRows", columns: [
+        { key: "name",         label: "完整名稱",     type: "text" },
+        { key: "subCategory",  label: "子獎項",       type: "text" },
+        { key: "matchScore",   label: "匹配分數",     type: "number" },
+        { key: "matchReason",  label: "匹配理由",     type: "textarea" },
+      ]},
+    ],
+  },
+  {
     id: "solution",
     num: "3",
     title: "選定方案",
@@ -329,6 +343,12 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
       { key: "kolFit",          label: "KOL 適配建議",       type: "textarea" },
       { key: "contentAngles",   label: "內容切角",           type: "array" },
       { key: "kpis",            label: "KPI 成效指標",       type: "array" },
+      { key: "proposals",       label: "完整提案陣列（含對應獎項 + 標竿案例）", type: "tableRows", columns: [
+        { key: "name",         label: "提案名稱",   type: "text" },
+        { key: "awardName",    label: "對應獎項",   type: "text" },
+        { key: "coreConcept",  label: "核心概念",   type: "textarea" },
+        { key: "kpiFramework", label: "KPI 框架",   type: "textarea" },
+      ]},
     ],
   },
 ];
