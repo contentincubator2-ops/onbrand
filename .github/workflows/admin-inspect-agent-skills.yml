@@ -1,0 +1,75 @@
+name: Admin — inspect agent skills shapes (read-only)
+
+# One-shot read-only: dump sample rows of agents.skills JSON +
+# agent_skill_assignments + skill_catalog so we know what shape to
+# backfill into agents.skills. Avoids guessing structure.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            cd /opt/marketing-os/app/skills/ai-talent 2>/dev/null || cd /opt/marketing-os/skills/ai-talent
+            set -a
+            [ -f .env ] && . .env
+            [ -f /opt/marketing-os/.env ] && . /opt/marketing-os/.env
+            set +a
+            DB_HOST_V=${DB_HOST:-127.0.0.1}
+            DB_USER_V=${DB_USER:-root}
+            DB_NAME_V=${DB_NAME:-mos_db}
+            run_sql() { MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST_V" -u"$DB_USER_V" "$DB_NAME_V" -t "$@"; }
+
+            echo "===== agents schema ====="
+            run_sql -e "DESCRIBE agents;"
+
+            echo ""
+            echo "===== sample agents.skills JSON values (3 rows with non-null) ====="
+            run_sql -e "
+              SELECT id, name, JSON_PRETTY(skills) AS skills
+                FROM agents
+               WHERE skills IS NOT NULL AND JSON_LENGTH(skills) > 0
+               LIMIT 3;"
+
+            echo ""
+            echo "===== agent_skill_assignments schema ====="
+            run_sql -e "DESCRIBE agent_skill_assignments;"
+
+            echo ""
+            echo "===== sample agent_skill_assignments rows ====="
+            run_sql -e "
+              SELECT * FROM agent_skill_assignments LIMIT 5;"
+
+            echo ""
+            echo "===== skill_catalog schema ====="
+            run_sql -e "DESCRIBE skill_catalog;"
+
+            echo ""
+            echo "===== sample skill_catalog rows ====="
+            run_sql -e "
+              SELECT id, slug, name, source, boundProvider, category FROM skill_catalog LIMIT 5;"
+
+            echo ""
+            echo "===== a sample agent's full picture: agents.skills JSON + assignments + skill_catalog details ====="
+            run_sql -e "
+              SELECT 'agents JSON' AS src, a.id, a.name, JSON_PRETTY(a.skills) AS data
+                FROM agents a
+               WHERE a.id = 60001
+              UNION ALL
+              SELECT 'assignments', asa.agentId, NULL,
+                     CONCAT('skillSlug=', asa.skillSlug, ' provider=', asa.boundProvider,
+                            ' confidence=', asa.confidence, ' reason=', asa.matchReason)
+                FROM agent_skill_assignments asa
+               WHERE asa.agentId = 60001;"
+
+            echo ""
+            echo "===== Done ====="
