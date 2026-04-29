@@ -755,23 +755,11 @@ async function main() {
         ON squads (is_active, is_approved)
     `).catch(() => { /* MySQL 5.7 doesn't support IF NOT EXISTS on CREATE INDEX */ });
 
-    // ── One-time: mark existing 688 squads as approved ─────────────────────
-    // Pre-2026-04-30 squads were curated by hand; they're all "approved"
-    // de-facto. New squads created after this point default is_approved=0
-    // and require explicit approval before front-stage visibility.
-    // Idempotent: only flips squads still at default 0 with no approved_at.
-    const [seedRes]: any = await conn.execute(`
-      UPDATE squads
-         SET is_approved = 1, approved_at = NOW()
-       WHERE is_approved = 0
-         AND approved_at IS NULL
-    `);
-    const affected = (seedRes as any)?.affectedRows ?? 0;
-    if (affected > 0) {
-      console.log(`[migrate] squads: marked ${affected} existing rows as is_approved=1 (one-time seed)`);
-    } else {
-      console.log("[migrate] squads: no rows needed approval seed (all already flagged)");
-    }
+    // CJ correction 2026-04-30: existing squads are NOT auto-approved.
+    // All current squads are drafts pending CJ review. The previous one-
+    // time seed was reverted via admin-revert-squad-approval workflow.
+    // Future squads default is_approved=0 and require explicit approval.
+    console.log("[migrate] squads.is_approved: column ready (no auto-seed; CJ reviews each squad)");
 
     // ─── 10. skill_catalog — harvested skill registry (anthropic + GLM + tools) ──
     // Source of truth for orphan-agent skill assignment. Each row binds a skill

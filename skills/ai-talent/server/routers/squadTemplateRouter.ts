@@ -171,6 +171,11 @@ export const squadTemplateRouter = router({
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async () => {
+      // CJ direction 2026-04-30 update: existing squads ARE drafts pending
+      // CJ review — listByBrand keeps showing all is_active=1 (to not
+      // break existing UI), but each row carries its is_approved flag so
+      // the front can render a "🟡 reviewing" badge. listForFront remains
+      // the strict-governance procedure for future audited callers.
       const [rows] = await localPool.execute(
         `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
                 s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
@@ -178,9 +183,9 @@ export const squadTemplateRouter = router({
                 s.use_cases, s.output_formats,
                 s.task_label_zh, s.task_label_en,
                 s.mockup_platform, s.mockup_format, s.output_kind,
-                s.is_approved
+                s.is_approved, s.approved_at
            FROM squads s
-          WHERE s.is_active = 1 AND s.is_approved = 1
+          WHERE s.is_active = 1
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
           LIMIT 1000`
       ) as any[];
