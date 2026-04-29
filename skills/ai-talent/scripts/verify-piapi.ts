@@ -71,20 +71,21 @@ async function pickUrl(out: any): Promise<string> {
   let pass = 0;
   let fail = 0;
 
-  // ── Test 1: Ideogram v3 (image, fast) ─────────────────────────────
-  console.log("\n[1/2] Ideogram v3 — image / sync");
+  // ── Test 1: FLUX schnell (image, fast — PiAPI canonical model) ────
+  console.log("\n[1/2] FLUX schnell — image / sync");
   try {
-    const { taskId } = await submit("Qubico/ideogram", "txt2img", {
+    const { taskId } = await submit("Qubico/flux1-schnell", "txt2img", {
       prompt: "minimal black-and-white logo for a marketing technology brand named 'Marketing OS', sans-serif wordmark",
-      aspect_ratio: "1:1",
+      width: 1024,
+      height: 1024,
     });
     console.log(`  submitted task_id=${taskId}`);
     const data = await poll(taskId, 90_000);
     const url = await pickUrl(data?.output ?? data?.result ?? data);
     if (!url) throw new Error("no output URL in completed task");
     console.log(`  output url=${url}`);
-    await dl(url, "/tmp/piapi-ideogram-test.png");
-    console.log(`  ✓ saved /tmp/piapi-ideogram-test.png`);
+    await dl(url, "/tmp/piapi-flux-test.png");
+    console.log(`  ✓ saved /tmp/piapi-flux-test.png`);
     pass++;
   } catch (e: any) {
     console.error(`  ✗ ${e.message ?? e}`);

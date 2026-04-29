@@ -170,7 +170,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Ideogram via PiAPI",
     provider: "piapi",
     kind: "image",
-    status: "ready",
+    status: "soon", // VERIFY 2026-04-29: PiAPI rejected both "ideogram" and "Qubico/ideogram" with 400 invalid model. Need exact model identifier from PiAPI dashboard.
     strengths: "字體 / 標誌 / 海報文字合成最強，logo 設計首選",
     costEstimateUsd: 0.04,
     durationSecEstimate: 12,
@@ -183,7 +183,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Stability AI via PiAPI",
     provider: "piapi",
     kind: "image",
-    status: "ready",
+    status: "soon", // VERIFY 2026-04-29: pending exact PiAPI model identifier — try Qubico/sdxl first.
     strengths: "開源 LoRA 生態最廣，風格化 / 二次元 / 客製化訓練",
     costEstimateUsd: 0.02,
     durationSecEstimate: 8,
