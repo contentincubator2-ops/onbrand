@@ -13,7 +13,7 @@ import React from "react";
 import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Input, Textarea, Button, Chip, Card, CardBody, Progress, Spinner,
-  CheckboxGroup, Checkbox,
+  CheckboxGroup, Checkbox, Select, SelectItem,
 } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -63,6 +63,12 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
   const [website, setWebsite]   = React.useState("");
   const [facebook, setFacebook] = React.useState("");
   const [description, setDescription] = React.useState("");
+  // Per CJ direction 2026-04-29: in-modal brand selector for product/event
+  // (defaults to ScopeBar's current brand) + event date pickers + event-side
+  // optional product multi-select.
+  const [pickedBrandId, setPickedBrandId] = React.useState<number | null>(brandId);
+  const [eventStartAt, setEventStartAt] = React.useState<string>("");
+  const [eventEndAt,   setEventEndAt]   = React.useState<string>("");
   const [candidates, setCandidates] = React.useState<Candidate[]>([]);
   const [summary, setSummary] = React.useState<string>("");
   const [picked, setPicked] = React.useState<number | null>(null); // -1 = "都不是 / 新建"
@@ -71,12 +77,18 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
   // Event-only: m:n product links. Defaults to empty (event scopes brand-wide).
   const [eventProductIds, setEventProductIds] = React.useState<number[]>([]);
 
-  // Pull candidate products for the event's parent brand. CheckboxGroup
-  // displays them so user can link 1+ products to this event.
+  // Brand list for the in-modal brand selector (product / event creation).
+  const brandsQuery = (trpc as any).brand?.listByMember?.useQuery
+    ? (trpc as any).brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const brandsList: any[] = (brandsQuery.data as any[]) ?? [];
+
+  // Pull candidate products for the picked brand. CheckboxGroup displays
+  // them so user can optionally link 1+ products to this event.
   const productsQuery = (trpc as any).product?.list?.useQuery
     ? (trpc as any).product.list.useQuery(
-        { brandId: brandId ?? undefined },
-        { enabled: kind === "event" && !!brandId, refetchOnWindowFocus: false },
+        { brandId: pickedBrandId ?? undefined },
+        { enabled: kind === "event" && !!pickedBrandId, refetchOnWindowFocus: false },
       )
     : { data: [] };
   const candidateProducts: any[] = (productsQuery.data as any[]) ?? [];
@@ -87,8 +99,11 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
       setName(""); setWebsite(""); setFacebook(""); setDescription("");
       setCandidates([]); setSummary(""); setPicked(null);
       setEventProductIds([]);
+      setPickedBrandId(brandId);
+      setEventStartAt(""); setEventEndAt("");
       setErr(null); setBusy(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -160,17 +175,21 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
         newId = Number(r?.id ?? r?.brandId ?? r?.[0]?.insertId ?? 0);
       } else if (kind === "product") {
         if (!productUpsert) throw new Error("product.upsert not available");
-        if (!brandId) throw new Error("產品需要綁定品牌，請先選一個品牌");
+        if (!pickedBrandId) throw new Error("產品需要綁定品牌，請先選擇");
         const r: any = await productUpsert.mutateAsync({
-          brandId, slug: slugify(name), name: chosen?.name?.trim() || name.trim(),
+          brandId: pickedBrandId, slug: slugify(name),
+          name: chosen?.name?.trim() || name.trim(),
         });
         newId = Number(r?.id ?? 0);
       } else {
         if (!eventUpsert) throw new Error("event.upsert not available");
+        if (!pickedBrandId) throw new Error("活動需要綁定品牌，請先選擇");
         const r: any = await eventUpsert.mutateAsync({
-          brandId: brandId ?? null, slug: slugify(name),
+          brandId: pickedBrandId, slug: slugify(name),
           name: chosen?.name?.trim() || name.trim(),
           productIds: eventProductIds.length > 0 ? eventProductIds : undefined,
+          startAt: eventStartAt || undefined,
+          endAt: eventEndAt || undefined,
         });
         newId = Number(r?.id ?? 0);
       }
@@ -229,10 +248,14 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
                   website={website} setWebsite={setWebsite}
                   facebook={facebook} setFacebook={setFacebook}
                   description={description} setDescription={setDescription}
-                  brandId={brandId}
+                  brandsList={brandsList}
+                  pickedBrandId={pickedBrandId}
+                  setPickedBrandId={setPickedBrandId}
                   candidateProducts={candidateProducts}
                   eventProductIds={eventProductIds}
                   setEventProductIds={setEventProductIds}
+                  eventStartAt={eventStartAt} setEventStartAt={setEventStartAt}
+                  eventEndAt={eventEndAt} setEventEndAt={setEventEndAt}
                 />
               )}
               {step === "checking" && (
@@ -263,7 +286,10 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
                   <Button variant="light" onPress={onClose}>取消</Button>
                   <Button
                     color="primary"
-                    isDisabled={!name.trim() || (kind === "product" && !brandId)}
+                    isDisabled={
+                      !name.trim()
+                      || ((kind === "product" || kind === "event") && !pickedBrandId)
+                    }
                     onPress={onCheck}
                     startContent={<FontAwesomeIcon icon={faMagnifyingGlass} />}
                   >
@@ -312,11 +338,34 @@ function StepIndicator({ step }: { step: Step }) {
 
 function InputStep({
   kind, name, setName, website, setWebsite, facebook, setFacebook,
-  description, setDescription, brandId,
+  description, setDescription,
+  brandsList, pickedBrandId, setPickedBrandId,
   candidateProducts, eventProductIds, setEventProductIds,
+  eventStartAt, setEventStartAt, eventEndAt, setEventEndAt,
 }: any) {
   return (
     <>
+      {/* In-modal brand selector for product / event creation. Defaults
+          to ScopeBar's current brand but user can change here without
+          backing out. Required for both product and event. */}
+      {(kind === "product" || kind === "event") && (
+        <Select
+          size="sm" radius="md" variant="bordered"
+          label="所屬品牌（必選）"
+          labelPlacement="outside"
+          placeholder={`選擇此${kind === "product" ? "產品" : "活動"}隸屬的品牌`}
+          selectedKeys={pickedBrandId ? new Set([String(pickedBrandId)]) : new Set()}
+          onSelectionChange={(keys) => {
+            const k = Array.from(keys as Set<string>)[0];
+            setPickedBrandId(k ? Number(k) : null);
+          }}
+          isRequired
+        >
+          {brandsList.map((b: any) => (
+            <SelectItem key={String(b.id)}>{b.name}</SelectItem>
+          ))}
+        </Select>
+      )}
       <Input
         size="sm" radius="md" variant="bordered"
         label="名稱（必填）"
@@ -326,6 +375,24 @@ function InputStep({
         onValueChange={setName}
         autoFocus
       />
+      {kind === "event" && (
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            size="sm" radius="md" variant="bordered" type="date"
+            label="活動開始日期（選填）"
+            labelPlacement="outside"
+            value={eventStartAt}
+            onValueChange={setEventStartAt}
+          />
+          <Input
+            size="sm" radius="md" variant="bordered" type="date"
+            label="活動結束日期（選填）"
+            labelPlacement="outside"
+            value={eventEndAt}
+            onValueChange={setEventEndAt}
+          />
+        </div>
+      )}
       {kind === "brand" && (
         <>
           <Input
@@ -357,15 +424,9 @@ function InputStep({
         value={description}
         onValueChange={setDescription}
       />
-      {kind === "product" && !brandId && (
-        <p className="text-tiny text-warning">提醒：建立產品需要綁定品牌，請先在 ScopeBar 選擇一個品牌。</p>
-      )}
       {kind === "event" && (
         <>
-          {!brandId && (
-            <p className="text-tiny text-warning">提醒：活動會自動隸屬於目前選的品牌，建議先選一個品牌再建立活動。</p>
-          )}
-          {brandId && candidateProducts.length > 0 && (
+          {pickedBrandId && candidateProducts.length > 0 && (
             <Card shadow="none" className="border border-divider">
               <CardBody className="px-3 py-3 gap-2">
                 <p className="text-tiny text-default-500 uppercase tracking-wider">關聯產品（可多選）</p>
@@ -386,7 +447,7 @@ function InputStep({
               </CardBody>
             </Card>
           )}
-          {brandId && candidateProducts.length === 0 && (
+          {pickedBrandId && candidateProducts.length === 0 && (
             <p className="text-tiny text-default-500">此品牌尚無產品。活動會建立為「品牌層級」（不綁定特定產品）。</p>
           )}
         </>

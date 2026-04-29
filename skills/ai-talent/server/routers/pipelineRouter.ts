@@ -152,8 +152,13 @@ export const pipelineRouter = router({
       const table = input.kind === "brand" ? "brands"
                   : input.kind === "product" ? "products" : "events";
       const [rows]: any = await localPool.execute(
-        `SELECT name, ${input.kind === "brand" ? "industry" : "name AS industry"}
-           FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
+        // For events `industry` doesn't apply — fetch startAt/endAt instead.
+        // Brand has industry, product/event don't (events have date range).
+        input.kind === "brand"
+          ? `SELECT name, industry FROM brands WHERE id = ? AND userId = ? LIMIT 1`
+          : input.kind === "product"
+          ? `SELECT name, '' AS industry FROM products WHERE id = ? AND userId = ? LIMIT 1`
+          : `SELECT name, '' AS industry, startAt, endAt, brandId FROM events WHERE id = ? AND userId = ? LIMIT 1`,
         [input.id, userId],
       );
       if (!rows?.[0]) {
@@ -161,15 +166,33 @@ export const pipelineRouter = router({
       }
       const entityName = String(rows[0].name ?? "");
       const industry   = String(rows[0].industry ?? "");
+      const eventStartAt = input.kind === "event" ? rows[0].startAt : null;
+      const eventEndAt   = input.kind === "event" ? rows[0].endAt   : null;
 
       // Substitute placeholders in the CJ-spec promptTemplate
-      // ({brand_name} / {industry} / {description}) with real entity data.
+      // ({brand_name} / {industry} / {description} / {event_name} /
+      //  {event_period}) with real entity data. CJ caught the bug 2026-04-29:
+      // intake agent saw "no concrete event name" because the placeholders
+      // weren't being filled — event name was thrown into the {industry}
+      // slot instead of {event_name}.
       const description = (() => {
         const meta = (positioning as any)?._meta;
         return String(meta?.description ?? "（無補充描述）");
       })();
+      const formatDate = (d: any): string => {
+        if (!d) return "";
+        try {
+          if (d instanceof Date) return d.toISOString().split("T")[0]!;
+          return String(d).split("T")[0] ?? String(d);
+        } catch { return String(d); }
+      };
+      const eventPeriod = input.kind === "event"
+        ? `${formatDate(eventStartAt) || "(未填)"} ~ ${formatDate(eventEndAt) || "(未填)"}`
+        : "";
       const taskPrompt = (input.systemHint ?? input.title)
         .replace(/\{brand_name\}/g, entityName)
+        .replace(/\{event_name\}/g, entityName)
+        .replace(/\{event_period\}/g, eventPeriod)
         .replace(/\{industry\}/g, industry || "未指定")
         .replace(/\{description\}/g, description);
 
@@ -207,6 +230,20 @@ ${input.budget.minUrls === 0 && input.budget.minChars === 0 ? "→ 此步驟為�
         delete out._meta;         // create-time metadata
         return out;
       })();
+
+      // ── Event metadata block: ALWAYS inject for event scope ─────────────
+      // Without this, intake agent sees the prompt say "based on activity
+      // name and period" but never gets told what they actually are. CJ
+      // caught the bug 2026-04-29: "明明標題有寫活動名稱，但 intake 卻說
+      // 沒有具體名字" → eventId 資訊沒被帶到 intake agent.
+      let eventMetaBlock = "";
+      if (input.kind === "event") {
+        const lines = [
+          `【活動名稱】${entityName}`,
+          eventPeriod ? `【活動期間】${eventPeriod}` : null,
+        ].filter(Boolean);
+        eventMetaBlock = `\n\n${lines.join("\n")}`;
+      }
 
       // ── Event scope: extra context injections ────────────────────────────
       // CJ direction 2026-04-29 — 11-step event pipeline needs 3 distinct
@@ -366,7 +403,7 @@ ${input.budget.minUrls === 0 && input.budget.minChars === 0 ? "→ 此步驟為�
         }
       }
 
-      const user = `${taskPrompt}
+      const user = `${taskPrompt}${eventMetaBlock}
 
 【已有 positioning context（前面步驟的 conclusion）】
 ${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}${parentBrandProductBlock}${brandAssetsBlock}${awardContextBlock}

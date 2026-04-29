@@ -305,10 +305,20 @@ export default function BrandsPage() {
           systemHint: step.promptTemplate, // CJ-spec prompt per step
           schemaHint: step.mockConclusion, // canonical JSON shape for this segment
         });
+        // Track empty conclusion as a failure even if the request succeeded —
+        // 2026-04-29 CJ caught: product step 3-5 silently empty after step 2.
+        // Likely cause: LLM JSON parse failed mid-pipeline, server returns
+        // empty conclusion, advance ran, segment stayed blank, no error UI.
+        if (!res?.conclusion || Object.keys(res.conclusion).length === 0) {
+          setFailedStepIds((s) => Array.from(new Set([...s, step.id])));
+          // eslint-disable-next-line no-console
+          console.warn(`[pipeline] step ${step.id} (${step.segmentId}) returned empty conclusion — segment will be blank. Run "重跑此步" to retry.`);
+        }
         return res?.thinking ?? null;
       } catch (e) {
         // eslint-disable-next-line no-console
         console.warn("[pipeline] runStep failed, falling back to mock:", e);
+        setFailedStepIds((s) => Array.from(new Set([...s, step.id])));
         return null;
       }
     };
@@ -357,7 +367,10 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipeline.status, pipeline.cursor]);
 
-  const startPipeline = () => setPipeline({ status: "running", cursor: 0, completed: [] });
+  const startPipeline = () => {
+    setFailedStepIds([]); // reset error trail on fresh start
+    setPipeline({ status: "running", cursor: 0, completed: [] });
+  };
   const pausePipeline  = () => setPipeline((p) => ({ ...p, status: "paused" }));
   const resumePipeline = () => setPipeline((p) => ({ ...p, status: "running" }));
   const skipPipeline   = () => {
@@ -375,6 +388,10 @@ export default function BrandsPage() {
   // runner halts after the requested segment finishes (vs the full
   // Wizard which runs all 14 steps).
   const [autoFillStopAt, setAutoFillStopAt] = useState<number | null>(null);
+  // Tracks which step ids failed (LLM error or empty conclusion). Surfaces
+  // as a banner so user can spot which segments need rerun. Cleared on
+  // pipeline restart.
+  const [failedStepIds, setFailedStepIds] = useState<number[]>([]);
   const runSegmentAutoFill = (segmentId: string) => {
     if (scopeMode === "none" || pipelineSteps.length === 0) return;
     const targetIdx = pipelineSteps.findIndex((s) => s.segmentId === segmentId);
@@ -517,6 +534,27 @@ export default function BrandsPage() {
               onSkip={skipPipeline}
               onStop={stopPipeline}
             />
+          )}
+          {/* Failure trail — shows step ids that errored or returned empty
+              conclusion so user knows which segments to rerun (CJ caught
+              2026-04-29: product step 3-5 silently empty after step 2). */}
+          {failedStepIds.length > 0 && (
+            <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
+              ⚠ 以下 step 沒寫入內容，建議到對應頁籤重跑：
+              {" "}
+              {failedStepIds
+                .map((id) => {
+                  const s = pipelineSteps.find((x) => x.id === id);
+                  return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`;
+                })
+                .join("、")}
+              <button
+                className="ml-2 underline"
+                onClick={() => setFailedStepIds([])}
+              >
+                關閉
+              </button>
+            </div>
           )}
           {section.startsWith("asset:") && scopeMode === "brand" && (scope?.brandId ?? brandId) ? (
             <BrandAssetPanel
