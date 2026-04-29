@@ -1180,13 +1180,16 @@ function SquadDetailPanel({
   }, [missionId]);
 
   // Auto-trigger first step if mission just launched and no progress yet.
-  // Uses `autoTriggered` (not stepProgressList.length) as the guard so a
-  // failed first attempt doesn't infinite-retry on every poll tick.
+  // Fires ONCE per missionId — depending only on `missionId` keeps this
+  // effect from re-running every poll tick (which previously caused the
+  // visible flicker even though the inner guard was meant to short-circuit).
   useEffect(() => {
     if (!missionId) return;
-    if (autoTriggered) return;
-    if (stepProgressList.length > 0) { setAutoTriggered(true); return; }
+    // Skip if a row already exists (mission was launched in a previous
+    // session, user reopened /picker?mission=…).
+    if (stepProgressList.length > 0) return;
     if (stepExecute.isPending) return;
+    if (autoTriggered) return;
     setAutoTriggered(true);
     setStepError(null);
     stepExecute
@@ -1201,11 +1204,11 @@ function SquadDetailPanel({
       .catch((e: any) => {
         const msg = e?.message ?? String(e);
         setStepError(`第一步啟動失敗：${msg}`);
-        // Allow retry
-        setAutoTriggered(false);
+        // Don't reset autoTriggered here — let the user click 重試 to
+        // retry. Auto-retrying on every poll tick caused the flicker.
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionId, autoTriggered, stepProgressList.length]);
+  }, [missionId]);
 
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
