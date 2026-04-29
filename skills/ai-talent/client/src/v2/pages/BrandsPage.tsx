@@ -48,9 +48,8 @@ type SectionId = string;
 interface SubNavItem { id: SectionId; label: string; badge?: string; group?: string; }
 
 // Brand has positioning segments + visual/asset entries.
-// Per CJ: 圖像/圖示/圖表/品牌範本/準則/照片 all removed — only logo/colors/fonts.
+// Per CJ: 圖像/圖示/圖表/品牌範本/準則/照片/所有資產 all removed.
 const BRAND_ASSET_SUBNAV: SubNavItem[] = [
-  { id: "asset:all",    label: "所有資產", group: "visuals" },
   { id: "asset:logo",   label: "標誌",     group: "visuals" },
   { id: "asset:colors", label: "顏色",     group: "visuals" },
   { id: "asset:fonts",  label: "字型",     group: "visuals" },
@@ -104,7 +103,6 @@ export default function BrandsPage() {
   const segments = scopeMode === "none" ? [] : SCOPE_SEGMENTS[scopeMode];
   const SUBNAV: SubNavItem[] = useMemo(() => {
     const items: SubNavItem[] = [];
-    if (scopeMode === "brand") items.push({ id: "asset:all", label: "所有資產", group: "visuals" });
     items.push({ id: "card",    label: "速查卡",     group: "doc" });
     items.push({ id: "prompts", label: "AI 指令庫",  group: "doc" });
     for (const s of segments) {
@@ -116,17 +114,14 @@ export default function BrandsPage() {
     }
     if (scopeMode === "brand") {
       for (const a of BRAND_ASSET_SUBNAV) {
-        if (a.id === "asset:all") continue; // already added
         items.push(a);
       }
     }
     return items;
   }, [scopeMode, segments]);
 
-  const defaultSection: SectionId =
-    scopeMode === "brand" ? "asset:all"
-    : scopeMode === "none" ? "card"
-    : `seg:${segments[0]?.id ?? ""}`;
+  // Default to 速查卡 for all scopes (CJ: 預設為速查卡頁籤).
+  const defaultSection: SectionId = "card";
   const [section, setSection] = useState<SectionId>(defaultSection);
   // Reset section when scope mode changes
   React.useEffect(() => {
@@ -172,8 +167,7 @@ export default function BrandsPage() {
     { id: "asset:fonts",  label: "字型", icon: faFont,    tone: "default", ready: true },
   ];
 
-  const visibleTiles =
-    section === "asset:all" ? TILES : TILES.filter((t) => t.id === section);
+  const visibleTiles = TILES.filter((t) => t.id === section);
 
   const onTileClick = (t: Tile) => setSection(t.id);
 
@@ -512,7 +506,7 @@ export default function BrandsPage() {
               onStop={stopPipeline}
             />
           )}
-          {section.startsWith("asset:") && section !== "asset:all" && scopeMode === "brand" && (scope?.brandId ?? brandId) ? (
+          {section.startsWith("asset:") && scopeMode === "brand" && (scope?.brandId ?? brandId) ? (
             <BrandAssetPanel
               assetKey={section.slice("asset:".length) as AssetKey}
               brandId={(scope?.brandId ?? brandId)!}
@@ -545,23 +539,6 @@ export default function BrandsPage() {
                 <BrandAssetTile key={t.id} tile={t} onClick={() => onTileClick(t)} />
               ))}
 
-              {/* 新增類別 — last empty tile */}
-              {section === "all" && (
-                <Card
-                  isPressable
-                  isHoverable
-                  shadow="none"
-                  radius="lg"
-                  className="border-2 border-dashed border-divider"
-                >
-                  <CardBody className="aspect-[4/3] items-center justify-center gap-3 text-center">
-                    <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center">
-                      <FontAwesomeIcon icon={faPlus} className="text-2xl text-default-500" />
-                    </div>
-                    <p className="text-small text-default-500">新增類別</p>
-                  </CardBody>
-                </Card>
-              )}
             </div>
           )}
         </div>
