@@ -687,6 +687,44 @@ async function main() {
       }
     }
 
+    // ── 9c. mission_step_progress.canonical_message ─────────────────────────
+    // Per CJ direction 2026-04-30: cross-model agents need ONE canonical
+    // envelope (AgentMessage — see server/_core/agentMessage.ts). Each step
+    // output gets persisted here as JSON conforming to the AgentMessage
+    // schema. Legacy columns (status / agent_output / user_input) stay for
+    // back-compat — read-time converter synthesizes envelope when missing.
+    // Auto-create the table first in case earlier migrations haven't run.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS mission_step_progress (
+        id           INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        mission_id   INT           NOT NULL,
+        step_order   INT           NOT NULL,
+        status       VARCHAR(20)   NOT NULL DEFAULT 'pending',
+        user_input   TEXT,
+        agent_output MEDIUMTEXT,
+        agent_id     INT,
+        agent_name   VARCHAR(120),
+        history      JSON          NULL,
+        updated_at   DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                   ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uniq_step (mission_id, step_order)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    const [canonCol]: any = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'mission_step_progress'
+        AND COLUMN_NAME = 'canonical_message'
+    `);
+    if ((canonCol as any[]).length === 0) {
+      await conn.execute(
+        `ALTER TABLE mission_step_progress ADD COLUMN canonical_message JSON NULL`,
+      );
+      console.log("[migrate] mission_step_progress.canonical_message: added");
+    } else {
+      console.log("[migrate] mission_step_progress.canonical_message: already exists, skipped");
+    }
+
     // ─── 10. skill_catalog — harvested skill registry (anthropic + GLM + tools) ──
     // Source of truth for orphan-agent skill assignment. Each row binds a skill
     // to a provider so the skill cannot be moved across model families.
