@@ -47,16 +47,13 @@ type SectionId = string;
 
 interface SubNavItem { id: SectionId; label: string; badge?: string; group?: string; }
 
-// Brand has positioning segments + visual/asset entries (some manual-fill,
-// 圖像/圖示/圖表 removed per CJ direction).
+// Brand has positioning segments + visual/asset entries.
+// Per CJ: 圖像/圖示/圖表/品牌範本/準則/照片 all removed — only logo/colors/fonts.
 const BRAND_ASSET_SUBNAV: SubNavItem[] = [
-  { id: "asset:all",         label: "所有資產",  group: "visuals" },
-  { id: "asset:guidelines",  label: "準則",       group: "visuals" },
-  { id: "asset:templates",   label: "品牌範本", badge: "最新", group: "visuals" },
-  { id: "asset:logo",        label: "標誌",       group: "visuals" },
-  { id: "asset:colors",      label: "顏色",       group: "visuals" },
-  { id: "asset:fonts",       label: "字型",       group: "visuals" },
-  { id: "asset:photos",      label: "照片",       group: "visuals" },
+  { id: "asset:all",    label: "所有資產", group: "visuals" },
+  { id: "asset:logo",   label: "標誌",     group: "visuals" },
+  { id: "asset:colors", label: "顏色",     group: "visuals" },
+  { id: "asset:fonts",  label: "字型",     group: "visuals" },
 ];
 
 // Tile colors (HeroUI semantic-100 backgrounds + matching tone)
@@ -167,14 +164,12 @@ export default function BrandsPage() {
     ((brainQuery.data as any)?.entries as Record<string, any[]>) ?? {};
   const cnt = (cat: string) => brainEntries[cat]?.length ?? 0;
 
-  // Brand asset tiles (visuals — non-positioning). Positioning content
-  // lives in the segments now. 圖像/圖示/圖表 dropped per CJ direction.
+  // Brand asset tiles (visuals — non-positioning).
+  // Per CJ: only logo / colors / fonts remain.
   const TILES: Tile[] = [
-    { id: "asset:templates", label: "品牌範本", icon: faFolderOpen, tone: "default", ready: false },
-    { id: "asset:logo",      label: "標誌",     icon: faPenNib,     tone: "default", ready: true },
-    { id: "asset:colors",    label: "顏色",     icon: faPalette,    tone: "default", ready: true },
-    { id: "asset:fonts",     label: "字型",     icon: faFont,       tone: "default", ready: true },
-    { id: "asset:photos",    label: "照片",     icon: faImages,     tone: "default", ready: false },
+    { id: "asset:logo",   label: "標誌", icon: faPenNib,  tone: "default", ready: true },
+    { id: "asset:colors", label: "顏色", icon: faPalette, tone: "default", ready: true },
+    { id: "asset:fonts",  label: "字型", icon: faFont,    tone: "default", ready: true },
   ];
 
   const visibleTiles =
