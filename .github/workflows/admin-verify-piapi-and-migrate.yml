@@ -10,6 +10,12 @@ name: Admin — verify PiAPI + migrate preferredModelTags
 
 on:
   workflow_dispatch:
+    inputs:
+      piapi_key_override:
+        description: "Override PIAPI key (one-shot — bypasses GitHub secret if it's wrong). Leave blank to use secrets.PI_API_KEY."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   verify:
@@ -17,7 +23,9 @@ jobs:
     steps:
       - uses: appleboy/ssh-action@v1.0.3
         env:
-          PIAPI_KEY: ${{ secrets.PI_API_KEY }}
+          # Prefer manual override (typed at dispatch) over the stored secret —
+          # lets us bypass a wrong GitHub secret without UI fighting.
+          PIAPI_KEY: ${{ inputs.piapi_key_override != '' && inputs.piapi_key_override || secrets.PI_API_KEY }}
           ATLAS_CLOUD_API: ${{ secrets.ATLAS_CLOUD_API }}
         with:
           host: ${{ secrets.VM_HOST }}
