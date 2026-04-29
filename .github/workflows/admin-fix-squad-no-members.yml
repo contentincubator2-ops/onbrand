@@ -1,0 +1,26 @@
+name: Admin - fix squads with no members
+on:
+  workflow_dispatch:
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +a
+            [ -f /opt/marketing-os/.env ] && set -a && . /opt/marketing-os/.env && set +a
+            DB_HOST_V=${DB_HOST:-127.0.0.1}
+            DB_USER_V=${DB_USER:-root}
+            DB_NAME_V=${DB_NAME:-mos_db}
+            run_sql() { MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST_V" -u"$DB_USER_V" "$DB_NAME_V" -t "$@"; }
+            echo "BEFORE:"
+            run_sql -e "SELECT s.id, s.slug, s.lead_agent_id, JSON_LENGTH(s.agents) AS members FROM squads s WHERE s.lead_agent_id IS NOT NULL AND (s.agents IS NULL OR JSON_LENGTH(s.agents) = 0);"
+            echo "APPLY:"
+            run_sql -e "UPDATE squads s JOIN agents a ON a.id = s.lead_agent_id SET s.agents = JSON_ARRAY(JSON_OBJECT('id', a.id, 'name', a.name, 'role', 'Squad Lead', 'is_lead', TRUE)) WHERE s.lead_agent_id IS NOT NULL AND (s.agents IS NULL OR JSON_LENGTH(s.agents) = 0);"
+            echo "AFTER:"
+            run_sql -e "SELECT COUNT(*) AS remaining FROM squads s WHERE s.lead_agent_id IS NOT NULL AND (s.agents IS NULL OR JSON_LENGTH(s.agents) = 0);"
