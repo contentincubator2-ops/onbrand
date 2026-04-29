@@ -53,7 +53,7 @@ export default function GeometricCard({
     <div
       onClick={onClick}
       className={[
-        "group relative flex flex-col bg-white border border-mos-hair",
+        "group relative flex flex-col bg-white border border-divider",
         "transition-shadow duration-200",
         onClick ? "cursor-pointer hover:shadow-lift" : "shadow-card",
         compact ? "w-full" : "w-[300px]",
@@ -66,7 +66,7 @@ export default function GeometricCard({
         style={{ aspectRatio: compact ? "5 / 2" : "3 / 2.1" }}
       >
         {eyebrow && (
-          <div className="absolute left-5 top-5 font-display text-[0.68rem] tracking-[0.22em] text-white/90 uppercase">
+          <div className="absolute left-5 top-5 font-semibold text-[0.68rem] tracking-[0.22em] text-white/90 uppercase">
             {eyebrow}
           </div>
         )}
@@ -74,33 +74,33 @@ export default function GeometricCard({
 
       {/* Headline */}
       <div className="px-5 pt-5">
-        <h3 className="mos-display text-[1.55rem] leading-[1.08] text-mos-ink">
+        <h3 className="mos-display text-[1.55rem] leading-[1.08] text-foreground">
           {title}
         </h3>
         {subtitle && (
-          <div className="mos-display text-[1.25rem] leading-[1.15] text-mos-body mt-1">
+          <div className="mos-display text-[1.25rem] leading-[1.15] text-foreground mt-1">
             {subtitle}
           </div>
         )}
         {meta && (
-          <div className="mt-3 text-[0.7rem] tracking-[0.16em] uppercase text-mos-muted">
+          <div className="mt-3 text-[0.7rem] tracking-[0.16em] uppercase text-default-500">
             {meta}
           </div>
         )}
       </div>
 
       {/* Rule */}
-      <div className="mx-5 mt-4 border-t border-mos-hair" />
+      <div className="mx-5 mt-4 border-t border-divider" />
 
       {/* Bullets — "Our Services" style */}
       {bullets.length > 0 && (
         <div className="px-5 py-4">
-          <div className="text-[0.68rem] tracking-[0.22em] uppercase text-mos-muted mb-3">
+          <div className="text-[0.68rem] tracking-[0.22em] uppercase text-default-500 mb-3">
             Our Steps
           </div>
           <ul className="space-y-2">
             {bullets.map((b, i) => (
-              <li key={i} className="flex items-start gap-3 text-[0.88rem] leading-snug text-mos-body">
+              <li key={i} className="flex items-start gap-3 text-[0.88rem] leading-snug text-foreground">
                 <span
                   className={`mt-[0.55rem] inline-block w-1.5 h-1.5 rounded-full shrink-0`}
                   style={{ background: tone.bg }}
@@ -113,25 +113,25 @@ export default function GeometricCard({
       )}
 
       {footerMeta && (
-        <div className="px-5 text-[0.75rem] tracking-wide text-mos-muted">
+        <div className="px-5 text-[0.75rem] tracking-wide text-default-500">
           {footerMeta}
         </div>
       )}
 
-      {(tag || why) && <div className="mx-5 mt-4 border-t border-mos-hair" />}
+      {(tag || why) && <div className="mx-5 mt-4 border-t border-divider" />}
 
       {tag && (
-        <div className="px-5 pt-4 text-[0.68rem] tracking-[0.22em] uppercase text-mos-ink font-semibold">
+        <div className="px-5 pt-4 text-[0.68rem] tracking-[0.22em] uppercase text-foreground font-semibold">
           {tag}
         </div>
       )}
 
       {why && (
         <div className="px-5 pt-2">
-          <div className="text-[0.68rem] tracking-[0.22em] uppercase text-mos-muted mb-1">
+          <div className="text-[0.68rem] tracking-[0.22em] uppercase text-default-500 mb-1">
             Why
           </div>
-          <p className="text-[0.88rem] leading-snug text-mos-body">{why}</p>
+          <p className="text-[0.88rem] leading-snug text-foreground">{why}</p>
         </div>
       )}
 

@@ -91,7 +91,7 @@ export default function MissionCard({
       onClick={onClick}
       className={[
         "group relative flex flex-col w-[360px] bg-white",
-        "border border-mos-hair shadow-card overflow-hidden",
+        "border border-divider shadow-card overflow-hidden",
         "transition-shadow duration-200",
         onClick ? "cursor-pointer hover:shadow-lift" : "",
         className,
@@ -101,15 +101,15 @@ export default function MissionCard({
       {/* ── HEADER: brand + status ─────────────────────────────────── */}
       <header className="flex items-start justify-between px-5 pt-4">
         <div>
-          <div className="text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft">
+          <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
             MISSION
           </div>
-          <div className="mt-0.5 text-[0.74rem] tracking-[0.12em] text-mos-muted truncate max-w-[200px]">
+          <div className="mt-0.5 text-tiny tracking-[0.12em] text-default-500 truncate max-w-[200px]">
             {(brandName ?? "SOWORK")} · {(workspace ?? "WORKSPACE").toUpperCase()}
           </div>
         </div>
         <span
-          className="inline-flex items-center gap-1 px-2 py-1 text-[0.62rem] tracking-[0.18em] uppercase rounded-full"
+          className="inline-flex items-center gap-1 px-2 py-1 text-tiny tracking-[0.18em] uppercase rounded-full"
           style={{ background: st.bg, color: st.tone }}
         >
           <span
@@ -122,17 +122,17 @@ export default function MissionCard({
 
       {/* ── BODY: huge title + brief ───────────────────────────────── */}
       <div className="px-5 pt-5 pb-3">
-        <h3 className="font-display text-[1.5rem] leading-[1.12] text-mos-ink tracking-[-0.015em] line-clamp-3">
+        <h3 className="font-semibold text-xl leading-[1.12] text-foreground tracking-[-0.015em] line-clamp-3">
           {title}
         </h3>
         {brief && (
-          <p className="mt-2 text-[0.84rem] leading-snug text-mos-body line-clamp-3">
+          <p className="mt-2 text-small leading-snug text-foreground line-clamp-3">
             {brief}
           </p>
         )}
       </div>
 
-      <div className="mx-5 border-t border-mos-hair" />
+      <div className="mx-5 border-t border-divider" />
 
       {/* ── METHODOLOGY STRIP (if applied) ─────────────────────────── */}
       {hasMethodology ? (
@@ -144,14 +144,14 @@ export default function MissionCard({
             withBackground
           />
           <div className="flex-1 min-w-0">
-            <div className="text-[0.58rem] tracking-[0.28em] uppercase text-mos-soft">
-              APPLIED · {lk} · {tone.shortLabel}
+            <div className="text-tiny tracking-[0.04em] text-default-400">
+              已套用 ・{lk}・{tone.label}
             </div>
-            <div className="mt-0.5 font-display text-[0.96rem] leading-tight text-mos-ink truncate">
+            <div className="mt-0.5 font-semibold text-small leading-tight text-foreground truncate">
               {methodologyName ?? methodologySlug}
             </div>
             {typeof stepCount === "number" && stepCount > 0 && (
-              <div className="text-[0.68rem] text-mos-muted">
+              <div className="text-tiny text-default-500">
                 {stepCount} steps · 工作流就緒
               </div>
             )}
@@ -166,23 +166,23 @@ export default function MissionCard({
               borderRadius: "9999px 9999px 9999px 0",
             }}
           >
-            <span className="text-mos-soft text-[0.6rem] tracking-[0.2em] uppercase">N/A</span>
+            <span className="text-default-400 text-tiny tracking-[0.2em] uppercase">N/A</span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[0.58rem] tracking-[0.28em] uppercase text-mos-soft">
+            <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
               METHODOLOGY · NONE
             </div>
-            <div className="mt-0.5 font-display text-[0.96rem] leading-tight text-mos-muted">
+            <div className="mt-0.5 font-semibold text-small leading-tight text-default-500">
               尚未套用任務範本
             </div>
-            <div className="text-[0.68rem] text-mos-soft">進入後 AI 會自動推薦</div>
+            <div className="text-tiny text-default-400">進入後 AI 會自動推薦</div>
           </div>
         </div>
       )}
 
       {/* ── FOOTER: light strip with updated + CTA ─────────────────── */}
-      <footer className="mt-auto flex items-center justify-between border-t border-mos-hair px-5 py-3 bg-mos-paper">
-        <div className="text-[0.7rem] text-mos-muted">
+      <footer className="mt-auto flex items-center justify-between border-t border-divider px-5 py-3 bg-background">
+        <div className="text-tiny text-default-500">
           {updatedTxt ? `更新 · ${updatedTxt}` : "尚未啟動"}
         </div>
         <button
@@ -190,7 +190,7 @@ export default function MissionCard({
             e.stopPropagation();
             onCtaClick?.();
           }}
-          className="px-3.5 py-1.5 text-[0.7rem] tracking-[0.16em] uppercase font-medium text-white hover:opacity-90 transition"
+          className="px-3.5 py-1.5 text-tiny tracking-[0.16em] uppercase font-medium text-white hover:opacity-90 transition"
           style={{ background: hasMethodology ? tone.bg : "#0A0A0A" }}
         >
           {ctaLabel}

@@ -64,7 +64,7 @@ export default function Login() {
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
-              Facebook、LinkedIn、YouTube 全渠道整合
+              Facebook、LinkedIn、YouTube 全管道整合
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>

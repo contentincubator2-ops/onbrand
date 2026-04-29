@@ -73,10 +73,10 @@ export default function TriagePage() {
     <StudioLayout>
       <div className="py-10 max-w-[1120px] mx-auto">
         <div className="mos-eyebrow mb-3">Decision AI</div>
-        <h1 className="mos-display text-[3rem] leading-[1.05] text-mos-ink mb-3">
+        <h1 className="mos-display text-[3rem] leading-[1.05] text-foreground mb-3">
           What brings you here today.
         </h1>
-        <p className="text-mos-muted text-[0.95rem] mb-12 max-w-[640px]">
+        <p className="text-default-500 text-[0.95rem] mb-12 max-w-[640px]">
           Pick the situation that best describes this week. We&rsquo;ll match it
           against SoWork&rsquo;s methodology library and recommend three
           approaches.
@@ -84,7 +84,7 @@ export default function TriagePage() {
 
         {/* Question 1 */}
         <div className="mos-eyebrow mb-4">01 · Situation</div>
-        <div className="grid grid-cols-4 gap-px bg-mos-hair border border-mos-hair mb-12">
+        <div className="grid grid-cols-4 gap-px bg-divider border border-divider mb-12">
           {TRIGGERS.map((t) => {
             const selected = trigger === t.key;
             return (
@@ -94,19 +94,19 @@ export default function TriagePage() {
                 className={[
                   "relative bg-white text-left p-6 h-[168px] flex flex-col justify-between transition",
                   selected
-                    ? "ring-2 ring-mos-ink z-10"
-                    : "hover:bg-mos-paper",
+                    ? "ring-2 ring-foreground z-10"
+                    : "hover:bg-background",
                 ].join(" ")}
               >
                 {selected && (
-                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-mos-ink" />
+                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-foreground" />
                 )}
                 <div className="mos-eyebrow">{String(TRIGGERS.indexOf(t) + 1).padStart(2, "0")}</div>
                 <div>
-                  <div className="mos-display text-[1.15rem] text-mos-ink leading-tight">
+                  <div className="mos-display text-[1.15rem] text-foreground leading-tight">
                     {t.label}
                   </div>
-                  <div className="text-meta text-mos-muted mt-1">{t.zh}</div>
+                  <div className="text-meta text-default-500 mt-1">{t.zh}</div>
                 </div>
               </button>
             );
@@ -115,7 +115,7 @@ export default function TriagePage() {
 
         {/* Question 2 */}
         <div className="mos-eyebrow mb-4">02 · Brand Stage</div>
-        <div className="flex gap-px bg-mos-hair border border-mos-hair mb-12">
+        <div className="flex gap-px bg-divider border border-divider mb-12">
           {STAGES.map((s) => (
             <button
               key={s.key}
@@ -123,8 +123,8 @@ export default function TriagePage() {
               className={[
                 "flex-1 bg-white py-5 text-[0.9rem] tracking-wide transition",
                 stage === s.key
-                  ? "bg-mos-ink text-white"
-                  : "text-mos-body hover:bg-mos-paper",
+                  ? "bg-foreground text-white"
+                  : "text-foreground hover:bg-background",
               ].join(" ")}
             >
               {s.label}
@@ -139,11 +139,11 @@ export default function TriagePage() {
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder="Anything specific about this situation..."
-          className="w-full border border-mos-hair px-4 py-3 text-[0.92rem] text-mos-ink bg-white focus:outline-none focus:border-mos-ink mb-10"
+          className="w-full border border-divider px-4 py-3 text-[0.92rem] text-foreground bg-white focus:outline-none focus:border-foreground mb-10"
         />
 
-        <div className="flex items-center justify-between border-t border-mos-hair pt-8">
-          <div className="text-meta text-mos-muted">
+        <div className="flex items-center justify-between border-t border-divider pt-8">
+          <div className="text-meta text-default-500">
             {trigger ? `Selected: ${TRIGGERS.find((t) => t.key === trigger)?.label}` : "Select a situation to continue"}
           </div>
           <button
@@ -152,8 +152,8 @@ export default function TriagePage() {
             className={[
               "px-8 py-4 text-[0.88rem] tracking-[0.18em] uppercase transition",
               trigger
-                ? "bg-mos-ink text-white hover:bg-black"
-                : "bg-mos-hair text-mos-soft cursor-not-allowed",
+                ? "bg-foreground text-white hover:bg-black"
+                : "bg-divider text-default-400 cursor-not-allowed",
             ].join(" ")}
           >
             {start.isPending ? "Starting…" : "Start Diagnosis →"}

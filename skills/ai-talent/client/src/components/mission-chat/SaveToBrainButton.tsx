@@ -10,7 +10,14 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Brain, Check, ChevronDown } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBrain, faCheck, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+const Brain = ({ size = 16, style, className }: any) =>
+  <FontAwesomeIcon icon={faBrain} style={{ fontSize: size, ...style }} className={className} />;
+const Check = ({ size = 16, style, className }: any) =>
+  <FontAwesomeIcon icon={faCheck} style={{ fontSize: size, ...style }} className={className} />;
+const ChevronDown = ({ size = 16, style, className }: any) =>
+  <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: size, ...style }} className={className} />;
 import { useToast } from "../ui/Toast";
 import { useLang } from "../../lib/i18n";
 

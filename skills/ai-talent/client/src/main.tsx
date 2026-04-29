@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { trpc, trpcClient } from "./lib/trpc";
 import { ToastProvider } from "./components/ui/Toast";
+import { HeroUIProvider } from "@heroui/react";
 // v2 frontend rebuild — Sprint 1 (2026-04-25). The legacy App is kept on
 // disk for one cycle then removed. Flip USE_V2 to false to fall back.
 import App from "./App";
@@ -59,15 +60,17 @@ class AppErrorBoundary extends React.Component<
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <ToastProvider>
-        <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
-              <RootApp />
-            </BrowserRouter>
-          </QueryClientProvider>
-        </trpc.Provider>
-      </ToastProvider>
+      <HeroUIProvider>
+        <ToastProvider>
+          <trpc.Provider client={trpcClient} queryClient={queryClient}>
+            <QueryClientProvider client={queryClient}>
+              <BrowserRouter>
+                <RootApp />
+              </BrowserRouter>
+            </QueryClientProvider>
+          </trpc.Provider>
+        </ToastProvider>
+      </HeroUIProvider>
     </AppErrorBoundary>
   </React.StrictMode>
 );

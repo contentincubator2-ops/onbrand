@@ -166,14 +166,14 @@ export default function StudioPage() {
   if (brandQuery.isLoading || squadsQuery.isLoading) {
     return (
       <StudioLayout>
-        <div className="py-24 text-center text-meta text-mos-muted">Loading…</div>
+        <div className="py-24 text-center text-meta text-default-500">Loading…</div>
       </StudioLayout>
     );
   }
   if (!squad) {
     return (
       <StudioLayout>
-        <div className="py-24 text-center text-meta text-mos-muted">
+        <div className="py-24 text-center text-meta text-default-500">
           Squad not found. Start from diagnosis.
         </div>
       </StudioLayout>
@@ -208,19 +208,19 @@ export default function StudioPage() {
       title={squad.name}
       actions={
         <>
-          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink">
+          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground">
             Save as Template
           </button>
-          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink">
+          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground">
             Schedule
           </button>
-          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] bg-mos-ink text-white">
+          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] bg-foreground text-white">
             Export PDF
           </button>
         </>
       }
     >
-      <div className="flex border border-mos-hair bg-white min-h-[640px]">
+      <div className="flex border border-divider bg-white min-h-[640px]">
         <BrandContextRail
           brandName={brandName}
           accent={accent}
@@ -233,7 +233,7 @@ export default function StudioPage() {
 
         <section className="flex-1 flex flex-col">
           {/* Stepper */}
-          <div className="px-8 pt-8 pb-6 border-b border-mos-hair">
+          <div className="px-8 pt-8 pb-6 border-b border-divider">
             <StepProgressBar
               steps={stepBarItems}
               accent={accent}
@@ -248,10 +248,10 @@ export default function StudioPage() {
             <div className="mos-eyebrow mb-2">
               Step {String(stepIndex + 1).padStart(2, "0")} of {steps.length}
             </div>
-            <h2 className="mos-display text-[1.8rem] text-mos-ink mb-1">
+            <h2 className="mos-display text-[1.8rem] text-foreground mb-1">
               {currentStep?.name}
             </h2>
-            <div className="text-meta uppercase tracking-[0.14em] text-mos-muted mb-6">
+            <div className="text-meta uppercase tracking-[0.14em] text-default-500 mb-6">
               Agent · {currentStep?.agent} · Brand Brain Injected
             </div>
 
@@ -271,26 +271,26 @@ export default function StudioPage() {
                 approving={approveMut.isPending}
               />
             ) : (
-              <div className="border border-dashed border-mos-hair px-6 py-16 text-center text-meta text-mos-muted">
+              <div className="border border-dashed border-divider px-6 py-16 text-center text-meta text-default-500">
                 Generating draft…
               </div>
             )}
 
-            <div className="mt-8 border-t border-mos-hair pt-6 flex items-center justify-between">
+            <div className="mt-8 border-t border-divider pt-6 flex items-center justify-between">
               <button
                 disabled={stepIndex === 0}
                 onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-                className="text-meta uppercase tracking-[0.16em] text-mos-muted disabled:opacity-30 hover:text-mos-ink"
+                className="text-meta uppercase tracking-[0.16em] text-default-500 disabled:opacity-30 hover:text-foreground"
               >
                 ← Previous step
               </button>
-              <div className="text-meta uppercase tracking-[0.16em] text-mos-muted">
+              <div className="text-meta uppercase tracking-[0.16em] text-default-500">
                 {approvedSteps.has(stepIndex) ? "Approved" : "Awaiting approval"}
               </div>
               <button
                 disabled={stepIndex >= steps.length - 1 || !approvedSteps.has(stepIndex)}
                 onClick={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
-                className="text-meta uppercase tracking-[0.16em] text-mos-muted disabled:opacity-30 hover:text-mos-ink"
+                className="text-meta uppercase tracking-[0.16em] text-default-500 disabled:opacity-30 hover:text-foreground"
               >
                 Next step →
               </button>

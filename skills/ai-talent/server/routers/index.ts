@@ -38,6 +38,10 @@ import { quickTaskRouter } from "./quickTaskRouter";
 import { boardroomRouter } from "./boardroomRouter";
 import { mediaHubRouter } from "./mediaHubRouter";
 import { playbookRouter } from "./playbookRouter";
+import { entityRouter } from "./entityRouter";
+import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
+import { pipelineRouter } from "./pipelineRouter";
+import { mediaRouter } from "./mediaRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -79,6 +83,12 @@ export const appRouter = router({
   boardroom:     boardroomRouter,
   mediaHub:      mediaHubRouter,
   playbook:      playbookRouter,
+  entity:        entityRouter,
+  product:       productRouter,
+  event:         eventRouter,
+  scope:         scopeRouter,
+  pipeline:      pipelineRouter,
+  media:         mediaRouter,
 });
 
 export type AppRouter = typeof appRouter;

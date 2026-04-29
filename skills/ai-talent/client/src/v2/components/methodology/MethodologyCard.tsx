@@ -88,7 +88,7 @@ export default function MethodologyCard({
       onClick={onClick}
       className={[
         "group relative flex flex-col w-[320px] bg-white",
-        "border border-mos-hair shadow-card overflow-hidden",
+        "border border-divider shadow-card overflow-hidden",
         "transition-shadow duration-200",
         onClick ? "cursor-pointer hover:shadow-lift" : "",
         className,
@@ -105,19 +105,19 @@ export default function MethodologyCard({
                 style={{ background: tone.bg }}
                 aria-hidden
               />
-              <span className="font-display text-[0.62rem] tracking-[0.28em] uppercase text-mos-ink">
+              <span className="font-semibold text-tiny tracking-[0.28em] uppercase text-foreground">
                 {lk}
               </span>
             </div>
-            <div className="mt-1 text-[0.66rem] tracking-[0.18em] uppercase text-mos-muted">
-              {tone.shortLabel} · {tone.label}
+            <div className="mt-1 text-tiny tracking-[0.04em] text-default-500">
+              {tone.label}
             </div>
           </div>
           <div
-            className="font-display text-[0.6rem] tracking-[0.32em] uppercase text-mos-soft"
+            className="font-semibold text-tiny tracking-[0.04em] text-default-400"
             aria-hidden
           >
-            METHOD
+            方法論
           </div>
         </div>
         {/* hairline ribbon under header */}
@@ -164,7 +164,7 @@ export default function MethodologyCard({
             </div>
           )}
           {/* faint corner mark */}
-          <div className="absolute top-1 right-1 text-[0.56rem] tracking-[0.28em] uppercase text-mos-soft mix-blend-difference">
+          <div className="absolute top-1 right-1 text-tiny tracking-[0.28em] uppercase text-default-400 mix-blend-difference">
             {String((typeof seed === "string" ? hashStr(seed) : (seed ?? 0)) % 100).padStart(2, "0")}
           </div>
         </div>
@@ -176,12 +176,12 @@ export default function MethodologyCard({
           className="inline-block px-3.5 py-2 max-w-[92%]"
           style={{ background: tone.bg }}
         >
-          <h3 className="font-display text-white text-[1.04rem] leading-[1.2] tracking-[-0.01em]">
+          <h3 className="font-semibold text-white text-medium leading-[1.2] tracking-[-0.01em]">
             {title}
           </h3>
         </div>
         {author && (
-          <div className="mt-1.5 text-[0.7rem] tracking-[0.06em] text-mos-muted">
+          <div className="mt-1.5 text-tiny tracking-[0.06em] text-default-500">
             {author}
           </div>
         )}
@@ -189,29 +189,29 @@ export default function MethodologyCard({
 
       {/* ── STEPS list ────────────────────────────────────────────── */}
       <div className="px-5 pt-4 pb-3 flex-1">
-        <div className="text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft mb-2.5">
+        <div className="text-tiny tracking-[0.28em] uppercase text-default-400 mb-2.5">
           工作流 · OUR STEPS
         </div>
         <ul className="space-y-2">
           {visible.length === 0 && (
-            <li className="text-[0.76rem] text-mos-soft italic">
+            <li className="text-small text-default-400 italic">
               尚未設定執行流程
             </li>
           )}
           {visible.map((s, i) => (
             <li key={i} className="flex items-start gap-2.5">
               <span
-                className="mt-[1px] inline-flex w-5 h-5 items-center justify-center rounded-full text-white text-[0.62rem] font-display shrink-0"
+                className="mt-[1px] inline-flex w-5 h-5 items-center justify-center rounded-full text-white text-tiny font-semibold shrink-0"
                 style={{ background: tone.bg }}
               >
                 {s.glyph ?? `0${i + 1}`}
               </span>
               <span className="flex-1 min-w-0">
-                <span className="block text-[0.8rem] leading-tight text-mos-ink font-medium">
+                <span className="block text-small leading-tight text-foreground font-medium">
                   {s.name}
                 </span>
                 {s.desc && (
-                  <span className="block mt-0.5 text-[0.68rem] leading-snug text-mos-muted truncate">
+                  <span className="block mt-0.5 text-tiny leading-snug text-default-500 truncate">
                     {s.desc}
                   </span>
                 )}
@@ -219,7 +219,7 @@ export default function MethodologyCard({
             </li>
           ))}
           {overflowCount > 0 && (
-            <li className="text-[0.66rem] tracking-[0.14em] uppercase text-mos-soft pl-7">
+            <li className="text-tiny tracking-[0.14em] uppercase text-default-400 pl-7">
               + {overflowCount} more
             </li>
           )}
@@ -227,16 +227,16 @@ export default function MethodologyCard({
       </div>
 
       {/* ── FOOTER: dark contact bar ──────────────────────────────── */}
-      <footer className="mt-auto bg-mos-ink text-white px-4 py-3 flex items-center gap-3">
+      <footer className="mt-auto bg-foreground text-white px-4 py-3 flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-[0.58rem] tracking-[0.28em] uppercase text-white/55">
-            {lk} · {tone.shortLabel} · {sourceLabel}
+          <div className="text-tiny tracking-[0.04em] text-white/60">
+            {lk}・{tone.label}・{sourceLabel}
           </div>
-          <div className="mt-0.5 text-[0.78rem] truncate text-white">
-            {leadName ?? "Squad Lead"}
+          <div className="mt-0.5 text-small truncate text-white">
+            {leadName ?? "領隊待指派"}
           </div>
           {steps.length > 0 && (
-            <div className="text-[0.6rem] tracking-[0.1em] text-white/45">
+            <div className="text-tiny tracking-[0.1em] text-white/45">
               {steps.length} steps
             </div>
           )}
@@ -246,7 +246,7 @@ export default function MethodologyCard({
             e.stopPropagation();
             onCtaClick?.();
           }}
-          className="shrink-0 rounded-full px-3.5 py-1.5 text-[0.7rem] tracking-[0.16em] uppercase font-medium hover:opacity-90 transition"
+          className="shrink-0 rounded-full px-3.5 py-1.5 text-tiny tracking-[0.16em] uppercase font-medium hover:opacity-90 transition"
           style={{ background: tone.bg, color: "#fff" }}
         >
           {ctaLabel}

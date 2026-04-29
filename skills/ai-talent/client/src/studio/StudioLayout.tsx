@@ -33,19 +33,19 @@ export default function StudioLayout({
   return (
     <div className="mos-scope min-h-screen">
       {/* Top bar */}
-      <header className="border-b border-mos-hair bg-white">
+      <header className="border-b border-divider bg-white">
         <div className="max-w-[1440px] mx-auto px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <Link to="/" className="mos-display text-[1rem] tracking-[0.02em] text-mos-ink">
+            <Link to="/" className="mos-display text-[1rem] tracking-[0.02em] text-foreground">
               SOWORK
             </Link>
-            <div className="h-4 w-px bg-mos-hair" />
-            <div className="text-meta uppercase text-mos-muted">Marketing&nbsp;OS&nbsp;/&nbsp;Decision&nbsp;AI</div>
+            <div className="h-4 w-px bg-divider" />
+            <div className="text-meta uppercase text-default-500">Marketing&nbsp;OS&nbsp;/&nbsp;Decision&nbsp;AI</div>
           </div>
-          <div className="flex items-center gap-4 text-meta text-mos-body">
+          <div className="flex items-center gap-4 text-meta text-foreground">
             <button
               onClick={() => navigate("/")}
-              className="hover:text-mos-ink transition"
+              className="hover:text-foreground transition"
             >
               Exit Studio
             </button>
@@ -55,7 +55,7 @@ export default function StudioLayout({
 
       {/* Sub nav */}
       {!hideSubNav && (
-        <nav className="border-b border-mos-hair bg-white">
+        <nav className="border-b border-divider bg-white">
           <div className="max-w-[1440px] mx-auto px-8 flex items-center gap-8 h-11">
             <StudioTab to={`${base}/triage`} label="Diagnose" />
             <StudioTab to={`${base}/templates`} label="Templates" />
@@ -68,19 +68,19 @@ export default function StudioLayout({
 
       {/* Page header */}
       {(title || back || actions) && (
-        <div className="border-b border-mos-hair bg-white">
+        <div className="border-b border-divider bg-white">
           <div className="max-w-[1440px] mx-auto px-8 py-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               {back && (
                 <button
                   onClick={() => navigate(back.to)}
-                  className="text-meta uppercase tracking-[0.18em] text-mos-muted hover:text-mos-ink"
+                  className="text-meta uppercase tracking-[0.18em] text-default-500 hover:text-foreground"
                 >
                   ← {back.label}
                 </button>
               )}
               {title && (
-                <h1 className="mos-display text-[1.6rem] text-mos-ink">{title}</h1>
+                <h1 className="mos-display text-[1.6rem] text-foreground">{title}</h1>
               )}
             </div>
             {actions && <div className="flex items-center gap-3">{actions}</div>}
@@ -102,8 +102,8 @@ function StudioTab({ to, label }: { to: string; label: string }) {
         [
           "text-meta uppercase tracking-[0.16em] transition",
           isActive
-            ? "text-mos-ink border-b-2 border-mos-ink h-11 flex items-center"
-            : "text-mos-muted hover:text-mos-ink h-11 flex items-center",
+            ? "text-foreground border-b-2 border-foreground h-11 flex items-center"
+            : "text-default-500 hover:text-foreground h-11 flex items-center",
         ].join(" ")
       }
     >

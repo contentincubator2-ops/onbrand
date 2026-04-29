@@ -1,0 +1,455 @@
+/**
+ * positioningSchema — typed config for the brand / product / event
+ * positioning books.
+ *
+ * Each scope has an ordered list of segments. Each segment lists its
+ * fields, a recommended agent slug for auto-fill, and a label.
+ *
+ * Field types supported:
+ *   text       — single-line input
+ *   textarea   — multi-line textarea
+ *   array      — string[] (each item rendered as removable chip-input row)
+ *   tableRows  — array of objects with named columns
+ *   number     — numeric input (used for scores)
+ *
+ * Stored in DB as JSON keyed by segment.id under
+ *   brands.positioning / products.positioning / events.positioning.
+ */
+
+export type FieldType = "text" | "textarea" | "array" | "tableRows" | "number";
+
+export interface FieldSpec {
+  key: string;
+  label: string;
+  type: FieldType;
+  /** For tableRows: list of column keys. */
+  columns?: { key: string; label: string; type: "text" | "textarea" | "number" }[];
+  /** Optional placeholder / hint shown below input. */
+  hint?: string;
+}
+
+export interface SegmentSpec {
+  id: string;
+  /** Section number in the printed doc, e.g., "1.1". */
+  num: string;
+  title: string;
+  /** Recommended agent slug — used by the "🤖 由 X 幫我填寫" button. */
+  agent: string;
+  fields: FieldSpec[];
+}
+
+// ── Brand (8 segments) ───────────────────────────────────────────────────
+export const BRAND_SEGMENTS: SegmentSpec[] = [
+  {
+    id: "goldenCircle",
+    num: "1.1",
+    title: "品牌黃金圈",
+    agent: "brand-archetype-positioning",
+    fields: [
+      { key: "why",  label: "WHY — 品牌願景",        type: "textarea" },
+      { key: "how",  label: "HOW — 品牌使命",        type: "textarea" },
+      { key: "what", label: "WHAT — 品牌產品 / 服務", type: "textarea" },
+    ],
+  },
+  {
+    id: "tagline",
+    num: "1.2",
+    title: "品牌核心標語",
+    agent: "brand-tagline-writer",
+    fields: [
+      { key: "zhTagline",      label: "中文標語",      type: "text" },
+      { key: "enTagline",      label: "英文標語",      type: "text" },
+      { key: "type",           label: "標語類型",      type: "text" },
+      { key: "scenes",         label: "應用場景",      type: "array" },
+      { key: "competitorDiff", label: "競品差異",      type: "textarea" },
+      { key: "story",          label: "標語品牌故事",  type: "textarea" },
+    ],
+  },
+  {
+    id: "taglineScore",
+    num: "1.3",
+    title: "標語評分摘要",
+    agent: "brand-tagline-scorer",
+    fields: [
+      { key: "rows", label: "評分", type: "tableRows", columns: [
+        { key: "dim",     label: "維度",   type: "text" },
+        { key: "code",    label: "英文",   type: "text" },
+        { key: "score",   label: "分數",   type: "number" },
+        { key: "comment", label: "評析",   type: "text" },
+      ]},
+      { key: "total", label: "總分 / 100", type: "number" },
+    ],
+  },
+  {
+    id: "origin",
+    num: "2.1",
+    title: "品牌起源故事",
+    agent: "brand-storyteller",
+    fields: [
+      { key: "story",         label: "起源故事",       type: "textarea" },
+      { key: "belief5Layers", label: "信念五層深挖",   type: "tableRows", columns: [
+        { key: "layer", label: "層", type: "text" },
+        { key: "body",  label: "內容", type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    id: "values",
+    num: "2.2",
+    title: "品牌核心價值觀",
+    agent: "brand-values-coach",
+    fields: [
+      { key: "items", label: "核心價值觀", type: "tableRows", columns: [
+        { key: "label", label: "核心",   type: "text" },
+        { key: "body",  label: "說明",   type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    id: "audience",
+    num: "3",
+    title: "目標受眾",
+    agent: "persona-architect",
+    fields: [
+      { key: "primary",   label: "主受眾（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道）", type: "textarea" },
+      { key: "secondary", label: "次受眾",                                                  type: "textarea" },
+      { key: "matrix",    label: "情感需求評分矩陣", type: "tableRows", columns: [
+        { key: "dim",     label: "需求維度",      type: "text" },
+        { key: "primary", label: "主受眾分數",    type: "number" },
+        { key: "fan",     label: "粉絲分數",      type: "number" },
+        { key: "weight",  label: "重要性 (★)",    type: "text" },
+      ]},
+    ],
+  },
+  {
+    id: "competition",
+    num: "4",
+    title: "競爭格局分析",
+    agent: "competitive-intel",
+    fields: [
+      { key: "intensity",  label: "競爭強度評估",  type: "textarea" },
+      { key: "direct",     label: "直接競爭對手",  type: "tableRows", columns: [
+        { key: "name",     label: "名稱",   type: "text" },
+        { key: "position", label: "市場地位", type: "text" },
+        { key: "tone",     label: "品牌調性", type: "text" },
+        { key: "weakness", label: "弱點",     type: "textarea" },
+        { key: "ourEdge",  label: "我方差異點", type: "textarea" },
+      ]},
+      { key: "indirect",   label: "間接競爭對手",  type: "tableRows", columns: [
+        { key: "name",     label: "名稱",      type: "text" },
+        { key: "threat",   label: "威脅程度",  type: "text" },
+        { key: "response", label: "應對策略",  type: "textarea" },
+      ]},
+      { key: "map",        label: "競爭定位地圖（描述）", type: "textarea" },
+    ],
+  },
+  {
+    id: "differentiation",
+    num: "5",
+    title: "品牌差異化戰略",
+    agent: "differentiation-strategist",
+    fields: [
+      { key: "emotional",  label: "情感差異化",  type: "textarea" },
+      { key: "functional", label: "功能差異化",  type: "textarea" },
+      { key: "summary",    label: "差異化總結",  type: "textarea" },
+    ],
+  },
+  {
+    id: "trends",
+    num: "7",
+    title: "市場趨勢與機會",
+    agent: "trend-radar",
+    fields: [
+      { key: "favorable", label: "有利趨勢", type: "tableRows", columns: [
+        { key: "name", label: "趨勢", type: "text" },
+        { key: "body", label: "說明", type: "textarea" },
+      ]},
+      { key: "risks", label: "需關注的風險", type: "tableRows", columns: [
+        { key: "name", label: "風險", type: "text" },
+        { key: "body", label: "說明", type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    id: "voice",
+    num: "8",
+    title: "品牌個性與溝通風格",
+    agent: "brand-voice-coach",
+    fields: [
+      { key: "archetypes", label: "人格原型（主 / 次）",   type: "array" },
+      { key: "tone",       label: "核心語調關鍵詞",         type: "array" },
+      { key: "forbidden",  label: "溝通禁區",               type: "array" },
+      { key: "samples",    label: "溝通範例對比",            type: "tableRows", columns: [
+        { key: "generic", label: "一般說法", type: "textarea" },
+        { key: "ours",    label: "我們的說法", type: "textarea" },
+      ]},
+    ],
+  },
+];
+
+// ── Product (6 segments) ─────────────────────────────────────────────────
+export const PRODUCT_SEGMENTS: SegmentSpec[] = [
+  {
+    id: "core",
+    num: "1.1",
+    title: "產品核心定位",
+    agent: "product-strategist",
+    fields: [
+      { key: "name",          label: "產品名稱",       type: "text" },
+      { key: "zhTagline",     label: "中文標語",       type: "text" },
+      { key: "enTagline",     label: "英文標語",       type: "text" },
+      { key: "coreStatement", label: "核心定位",       type: "textarea" },
+      { key: "oneLineValueProp", label: "一句話價值主張（速查卡用）", type: "textarea" },
+    ],
+  },
+  {
+    id: "audience",
+    num: "1.2",
+    title: "目標族群",
+    agent: "persona-architect",
+    fields: [
+      { key: "primary",   label: "主目標族群",  type: "textarea" },
+      { key: "secondary", label: "次目標族群",  type: "textarea" },
+      { key: "pains",     label: "族群痛點",    type: "array" },
+      { key: "needs",     label: "族群需求",    type: "array" },
+      { key: "mots",      label: "MOT（每受眾關鍵時刻）", type: "tableRows", columns: [
+        { key: "audience", label: "受眾",   type: "text" },
+        { key: "mot",      label: "MOT",   type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    id: "value",
+    num: "2",
+    title: "產品價值主張",
+    agent: "product-value-mapper",
+    fields: [
+      { key: "coreFunctions", label: "核心功能",   type: "array" },
+      { key: "features",      label: "產品特色",   type: "array" },
+      { key: "advantages",    label: "產品優勢",   type: "array" },
+      { key: "primaryEmotion", label: "主要情緒價值", type: "textarea" },
+      { key: "personality",    label: "品牌個性",     type: "textarea" },
+      { key: "userFeeling",    label: "使用者感受",   type: "textarea" },
+    ],
+  },
+  {
+    id: "competition",
+    num: "3",
+    title: "競爭定位",
+    agent: "competitive-intel",
+    fields: [
+      { key: "competitors", label: "競品", type: "tableRows", columns: [
+        { key: "name",     label: "名稱",   type: "text" },
+        { key: "position", label: "定位",   type: "text" },
+      ]},
+      { key: "uniqueUsp",   label: "獨家賣點",         type: "textarea" },
+      { key: "rareUsp",     label: "少數競品也說的賣點", type: "textarea" },
+      { key: "commonUsp",   label: "多數競爭者都說的賣點", type: "textarea" },
+    ],
+  },
+  {
+    id: "strategy",
+    num: "4",
+    title: "產品策略",
+    agent: "gtm-architect",
+    fields: [
+      { key: "positioning",         label: "產品定位策略", type: "textarea" },
+      { key: "pricing",             label: "定價策略",      type: "textarea" },
+      { key: "channel",             label: "通路策略",      type: "textarea" },
+      { key: "promotion",           label: "推廣策略",      type: "array" },
+      { key: "lifecycleStage",      label: "生命週期階段",  type: "text" },
+      { key: "developmentStrategy", label: "發展策略",      type: "textarea" },
+      { key: "marketGap",           label: "市場受眾缺口",  type: "textarea" },
+      { key: "channelGap",          label: "銷售通路缺口",  type: "textarea" },
+      { key: "priceGap",            label: "價格區間缺口",  type: "textarea" },
+      { key: "promotionGap",        label: "推廣策略缺口",  type: "textarea" },
+    ],
+  },
+  {
+    id: "marketing",
+    num: "5",
+    title: "行銷指引",
+    agent: "brand-voice-coach",
+    fields: [
+      { key: "tone",          label: "品牌語氣",      type: "textarea" },
+      { key: "style",          label: "溝通風格",      type: "textarea" },
+      { key: "keywords",       label: "關鍵詞彙",       type: "array" },
+      { key: "visualStyle",    label: "視覺風格",       type: "textarea" },
+      { key: "colorStrategy",  label: "色彩策略",       type: "textarea" },
+      { key: "imageStyle",     label: "圖像風格",       type: "textarea" },
+    ],
+  },
+];
+
+// ── Event (11 segments — CJ direction 2026-04-29) ────────────────────────
+//
+// Schema mirrors the 10 user-facing campaign sections (背景 → 受眾 → 目標 →
+// SMP → 訊息 → 創意 → 規範 → 管道 → 旅程) plus an upfront `brief` segment
+// auto-filled by the intake agent (eventType / roleThisRound) and the
+// `awards` segment which sits between objectives and SMP and is grounded in
+// DB-injected creative_cases (RAG).
+//
+// NOTE on backward compat: old events have segId in
+// {overview, diagnosis, awards, solution}. New schema reuses `awards` and
+// retires the others. Old data stays in JSON but the new UI won't render
+// it; user must re-run the pipeline to repopulate. Migration script TBD.
+export const EVENT_SEGMENTS: SegmentSpec[] = [
+  {
+    // 1. Strategic brief — filled automatically by intake agent reading
+    // brand + product positioning. User can edit afterwards.
+    id: "brief",
+    num: "1",
+    title: "戰略 Brief（intake 自動填寫）",
+    agent: "intake-agent",
+    fields: [
+      { key: "eventType",       label: "活動類型（brand / growth / conversion / hybrid）", type: "text" },
+      { key: "roleThisRound",   label: "本次角色（品牌升維 / 新市場切入 / 認知建立 / 轉換衝刺）", type: "text" },
+      { key: "briefSummary",    label: "活動定位摘要（200 字）", type: "textarea" },
+      { key: "relatedProducts", label: "對應產品（從 ScopeBar 自動帶入；可能多個）", type: "array" },
+    ],
+  },
+  {
+    // 2. Background & problem — user section 2
+    id: "context",
+    num: "2",
+    title: "背景與問題",
+    agent: "business-diagnostician",
+    fields: [
+      { key: "businessBackground", label: "商業背景（公司 / 品牌目前狀態）", type: "textarea" },
+      { key: "marketingStatus",    label: "當前行銷現況（被市場怎麼認知）", type: "textarea" },
+      { key: "coreProblem",        label: "核心問題（1 句話）",            type: "textarea" },
+      { key: "rootCause",          label: "根本原因（為什麼會發生）",       type: "textarea" },
+    ],
+  },
+  {
+    // 3. Audience — three layers
+    id: "audience",
+    num: "3",
+    title: "目標受眾",
+    agent: "audience-strategist",
+    fields: [
+      { key: "primaryAudience",   label: "核心受眾（人群輪廓 / 行為特徵 / 心理洞察）", type: "textarea" },
+      { key: "secondaryAudience", label: "次要受眾",                                  type: "textarea" },
+      { key: "keyInsight",        label: "關鍵洞察（一句話）",                        type: "textarea" },
+    ],
+  },
+  {
+    // 4. Objectives — three tiers (business / marketing / user-action)
+    id: "objectives",
+    num: "4",
+    title: "活動目標（三層）",
+    agent: "campaign-objectives",
+    fields: [
+      { key: "businessGoal",  label: "商業目標（Business）",        type: "textarea" },
+      { key: "marketingGoal", label: "行銷目標（Marketing / Brand）", type: "textarea" },
+      { key: "userActionGoal",label: "用戶行為目標（User Action）",   type: "textarea" },
+      { key: "kpis",          label: "可量化 KPI 指標",              type: "array" },
+    ],
+  },
+  {
+    // 5. Award matching (DB-RAG retained from previous schema)
+    id: "awards",
+    num: "5",
+    title: "獎項匹配（DB-RAG）",
+    agent: "award-matcher",
+    fields: [
+      { key: "selectedAwards", label: "推薦子獎項", type: "tableRows", columns: [
+        { key: "name",         label: "完整名稱",     type: "text" },
+        { key: "subCategory",  label: "子獎項",       type: "text" },
+        { key: "matchScore",   label: "匹配分數",     type: "number" },
+        { key: "matchReason",  label: "匹配理由",     type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    // 6. Single-Minded Proposition — the highest creative principle
+    id: "smp",
+    num: "6",
+    title: "單一核心命題（SMP）",
+    agent: "smp-architect",
+    fields: [
+      { key: "singleMindedProposition", label: "SMP（一句話）",          type: "textarea" },
+      { key: "rationale",               label: "為什麼是這句（200 字內）", type: "textarea" },
+    ],
+  },
+  {
+    // 7. Messaging framework
+    id: "messaging",
+    num: "7",
+    title: "訊息架構",
+    agent: "messaging-architect",
+    fields: [
+      { key: "coreMessage",      label: "核心訊息（Core Message）",        type: "textarea" },
+      { key: "supportingPoints", label: "支撐訊息（3-5 條）",              type: "array" },
+      { key: "proofs",           label: "證據（案例 / 數據 / 使用者故事）", type: "array" },
+    ],
+  },
+  {
+    // 8. Creative concept — uses Grand Prix / Gold cases as RAG benchmark
+    id: "creative",
+    num: "8",
+    title: "創意概念",
+    agent: "creative-architect",
+    fields: [
+      { key: "creativeTheme",   label: "創意主題（活動 big idea）",        type: "textarea" },
+      { key: "coreMetaphor",    label: "核心比喻（市場/事件對應為何 metaphor）", type: "textarea" },
+      { key: "coreTranslation", label: "核心轉譯（一句話 hook）",         type: "textarea" },
+      { key: "referenceCases",  label: "參考案例（注入的 Grand Prix / Gold）", type: "tableRows", columns: [
+        { key: "brand",       label: "品牌",       type: "text" },
+        { key: "awardLevel",  label: "獎項層級",   type: "text" },
+        { key: "year",        label: "年份",       type: "text" },
+        { key: "description", label: "案例描述",   type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    // 9. Creative & content guidelines — pulled from brand visual + voice
+    id: "guidelines",
+    num: "9",
+    title: "創意與內容規範",
+    agent: "guideline-architect",
+    fields: [
+      { key: "visualLanguage",     label: "視覺語言（Visual System）",       type: "textarea" },
+      { key: "toneOfVoice",        label: "語氣（Tone of Voice）",           type: "textarea" },
+      { key: "mustHaveElements",   label: "必須出現元素（Must-have）",        type: "array" },
+      { key: "forbiddenElements",  label: "禁用元素（Don't）",                type: "array" },
+      { key: "sourceWarning",      label: "資料完整度警告（系統自動填）",      type: "textarea" },
+    ],
+  },
+  {
+    // 10. Content & channel strategy — Taiwan term: 管道, not 渠道
+    id: "channels",
+    num: "10",
+    title: "內容與管道策略",
+    agent: "channel-architect",
+    fields: [
+      { key: "phases", label: "階段 + 管道 + 內容型態", type: "tableRows", columns: [
+        { key: "stage",        label: "階段",         type: "text" },
+        { key: "channels",     label: "管道（逗號分隔）",   type: "text" },
+        { key: "contentTypes", label: "內容型態（逗號分隔）", type: "text" },
+        { key: "rationale",    label: "為何這配置",    type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    // 11. User journey — 5 step Awareness → Conversion arc
+    id: "journey",
+    num: "11",
+    title: "用戶旅程",
+    agent: "journey-architect",
+    fields: [
+      { key: "journey", label: "旅程（每步：情緒 / 接觸點 / 期望反應）", type: "tableRows", columns: [
+        { key: "step",       label: "步驟",     type: "text" },
+        { key: "emotion",    label: "情緒狀態", type: "text" },
+        { key: "touchpoint", label: "接觸點",   type: "text" },
+        { key: "outcome",    label: "預期反應", type: "textarea" },
+      ]},
+    ],
+  },
+];
+
+export const SCOPE_SEGMENTS = {
+  brand: BRAND_SEGMENTS,
+  product: PRODUCT_SEGMENTS,
+  event: EVENT_SEGMENTS,
+} as const;

@@ -31,14 +31,16 @@ import OnboardingWizard from "../../pages/OnboardingWizard";
 import RequireAuthV2 from "./RequireAuthV2";
 import ShellLayout from "./shell/ShellLayout";
 import MissionsHome from "../pages/MissionsHome";
-import MissionDetail from "../pages/MissionDetail";
+// MissionDetail retired 2026-04-27 (C1) — replaced by in-picker WorkflowRunner.
+// /m/:missionId now redirects to /picker?mission=:id.
+import MissionRedirect from "./MissionRedirect";
 import MethodologyCatalog from "../pages/MethodologyCatalog";
 import MethodologyDetail from "../pages/MethodologyDetail";
+import PickerWorkspace from "../pages/PickerWorkspace";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
 import BoardroomPage from "../pages/BoardroomPage";
-import MediaHubPage from "../pages/MediaHubPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
 
 export default function AppV2() {
@@ -63,6 +65,16 @@ export default function AppV2() {
           }
         />
 
+        {/* Picker — full-screen workspace, no shell chrome (Canva-style new tab) */}
+        <Route
+          path="/picker"
+          element={
+            <RequireAuthV2>
+              <PickerWorkspace />
+            </RequireAuthV2>
+          }
+        />
+
         {/* v2 protected routes — share ShellLayout */}
         <Route
           element={
@@ -76,10 +88,9 @@ export default function AppV2() {
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/ai" element={<QuickTasksPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
-          <Route path="/media" element={<MediaHubPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
-          <Route path="/m/:missionId" element={<MissionDetail />} />
-          <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionDetail />} />
+          <Route path="/m/:missionId" element={<MissionRedirect />} />
+          <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
           <Route path="/templates" element={<MethodologyCatalog />} />
           <Route path="/templates/:slug" element={<MethodologyDetail />} />
         </Route>

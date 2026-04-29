@@ -29,7 +29,7 @@ export default function OptionCard({
 }: OptionCardProps) {
   const tone = ACCENTS[accent];
   return (
-    <div className="border border-mos-hair bg-white">
+    <div className="border border-divider bg-white">
       <div className="flex items-center justify-between px-5 pt-4">
         <div className="flex items-center gap-3">
           <div
@@ -48,7 +48,7 @@ export default function OptionCard({
           )}
         </div>
         {typeof confidence === "number" && (
-          <div className="text-meta text-mos-muted">
+          <div className="text-meta text-default-500">
             Confidence {Math.round(confidence * 100)}%
           </div>
         )}
@@ -56,15 +56,15 @@ export default function OptionCard({
 
       {payload && (
         <div className="px-5 pt-3 pb-2">
-          <dl className="divide-y divide-mos-hair">
+          <dl className="divide-y divide-divider">
             {Object.entries(payload)
               .slice(0, 8)
               .map(([k, v]) => (
                 <div key={k} className="grid grid-cols-[140px_1fr] py-2 gap-4">
-                  <dt className="text-meta uppercase tracking-[0.14em] text-mos-muted">
+                  <dt className="text-meta uppercase tracking-[0.14em] text-default-500">
                     {k.replace(/([a-z])([A-Z])/g, "$1 $2")}
                   </dt>
-                  <dd className="text-[0.9rem] text-mos-ink leading-snug">
+                  <dd className="text-[0.9rem] text-foreground leading-snug">
                     {typeof v === "object" ? JSON.stringify(v) : String(v)}
                   </dd>
                 </div>
@@ -74,18 +74,18 @@ export default function OptionCard({
       )}
 
       {rationale && (
-        <div className="px-5 pb-3 text-[0.85rem] text-mos-body leading-snug">
+        <div className="px-5 pb-3 text-[0.85rem] text-foreground leading-snug">
           {rationale}
         </div>
       )}
 
-      <div className="border-t border-mos-hair px-5 py-3 flex items-center justify-between text-meta uppercase tracking-[0.14em] text-mos-muted">
+      <div className="border-t border-divider px-5 py-3 flex items-center justify-between text-meta uppercase tracking-[0.14em] text-default-500">
         <div>Reversibility · {reversibility ?? "two-way"}</div>
         <div className="flex gap-2">
           {onRevise && (
             <button
               onClick={onRevise}
-              className="px-3 py-1.5 border border-mos-hair text-mos-body hover:border-mos-ink hover:text-mos-ink"
+              className="px-3 py-1.5 border border-divider text-foreground hover:border-foreground hover:text-foreground"
             >
               Revise
             </button>

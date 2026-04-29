@@ -1,0 +1,123 @@
+name: Admin — Backup squads (mysqldump → artifact)
+
+# Dumps the squads / agents / methodology / squad_workflow_* tables from
+# the production MySQL on the VM, packs them into a tar.gz, and uploads
+# it as a GitHub Actions Artifact you can download from the Actions page.
+#
+# The VM keeps its data untouched. Re-run any time as a safety net before
+# destructive migrations.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump on VM + pull tarball back
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            STAMP=$(date -u +%Y%m%d-%H%M%S)
+            DEST="/tmp/squads-backup-${STAMP}"
+            mkdir -p "$DEST"
+
+            DB_HOST="${DB_HOST:-127.0.0.1}"
+            DB_USER="${DB_USER:-root}"
+            DB_NAME="${DB_NAME:-mos_db}"
+
+            # Pull DB credentials from the app's .env so we don't need to
+            # plumb extra secrets — same pattern as other admin workflows.
+            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            if [ -f "$ENV_FILE" ]; then
+              set -a; source "$ENV_FILE"; set +a
+            fi
+            DB_HOST="${DB_HOST:-127.0.0.1}"
+            DB_USER="${DB_USER:-root}"
+            DB_NAME="${DB_NAME:-mos_db}"
+
+            echo "===== Dumping from $DB_USER@$DB_HOST/$DB_NAME ====="
+
+            # Tables we care about. We dump structure + data per table so
+            # restore is precise. Missing tables are skipped without abort.
+            for TBL in \
+              squads \
+              agents \
+              squad_workflow_templates \
+              squad_workflow_steps \
+              squad_agents \
+              missions \
+              brands \
+              skill_catalog \
+              agent_skill_assignments \
+              methodology \
+              skills
+            do
+              if MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+                "SELECT 1 FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_name='$TBL' LIMIT 1" \
+                "$DB_NAME" 2>/dev/null | grep -q 1
+              then
+                echo "  - dumping $TBL"
+                MYSQL_PWD="$DB_PASSWORD" mysqldump \
+                  -h"$DB_HOST" -u"$DB_USER" \
+                  --single-transaction --routines --triggers \
+                  --skip-lock-tables \
+                  "$DB_NAME" "$TBL" > "$DEST/${TBL}.sql"
+              else
+                echo "  - skipping $TBL (table does not exist)"
+              fi
+            done
+
+            # Manifest with row counts for audit
+            {
+              echo "Backup created: $STAMP UTC"
+              echo "DB: $DB_USER@$DB_HOST/$DB_NAME"
+              echo ""
+              echo "Row counts:"
+              for F in "$DEST"/*.sql; do
+                T=$(basename "$F" .sql)
+                C=$(MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+                  "SELECT COUNT(*) FROM \`$T\`" "$DB_NAME" 2>/dev/null || echo "?")
+                printf "  %-32s %s\n" "$T" "$C"
+              done
+            } > "$DEST/MANIFEST.txt"
+
+            cat "$DEST/MANIFEST.txt"
+
+            tar czf "/tmp/squads-backup-${STAMP}.tar.gz" -C /tmp "squads-backup-${STAMP}"
+            ls -lh "/tmp/squads-backup-${STAMP}.tar.gz"
+            echo "STAMP=${STAMP}" > /tmp/squads-backup-stamp.env
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+
+      - name: Fetch tarball from VM (scp pull)
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          mkdir -p backup
+          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          scp "${VM_USER}@${VM_HOST}:/tmp/squads-backup-*.tar.gz" backup/
+          ls -lh backup/
+
+      - name: Upload as GitHub Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: squads-backup
+          path: backup/squads-backup-*.tar.gz
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Print download instructions
+        run: |
+          echo "::notice::Backup uploaded as artifact 'squads-backup'."
+          echo "::notice::Download from the Actions run summary page → Artifacts section."
+          ls -lh backup/

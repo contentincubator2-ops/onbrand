@@ -61,7 +61,23 @@ jobs:
             npm install --legacy-peer-deps 2>&1 | tail -3
             cd "$AI/client"
             npm install --legacy-peer-deps 2>&1 | tail -3
-            npm run build 2>&1 | tail -5
+
+            # Vite's emptyOutDir doesn't reliably clear outDir when it's
+            # outside the project root (../public). Stale asset hashes
+            # accumulate and the index.html may end up pointing at an old
+            # one. Force a clean before build.
+            echo "Cleaning $AI/public/assets before build..."
+            rm -rf "$AI/public/assets" "$AI/public/index.html"
+
+            BUILD_OUT=$(npm run build 2>&1)
+            echo "$BUILD_OUT" | tail -15
+            # Fail the deploy hard if vite/tsc didn't actually emit a fresh bundle.
+            NEW_HASH=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$AI/public/index.html" 2>/dev/null | head -1)
+            if [ -z "$NEW_HASH" ]; then
+              echo "❌ Build did not produce $AI/public/index.html — aborting"
+              exit 1
+            fi
+            echo "✓ Built bundle: $NEW_HASH"
 
             echo "===== Restart (delete + start fresh) ====="
             AI=/opt/marketing-os/app/skills/ai-talent

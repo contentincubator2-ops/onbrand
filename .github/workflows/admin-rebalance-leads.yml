@@ -1,0 +1,68 @@
+name: Admin — Rebalance squad lead aiModel
+
+# Diversifies squad lead_agent_id across aiModel families per the
+# layer-aware preference table:
+#   L1_brand      → claude-opus / gpt-5 / gpt-4.1 / claude-sonnet
+#   L2_product    → gpt-4o / claude-sonnet / gemini-pro / gpt-4.1
+#   L3_audience   → gemini-pro / claude-sonnet / gpt-4o / deepseek
+#   L4_channel    → gpt-4o / claude-sonnet / deepseek / gpt-4.1
+#   L5_campaign   → claude-sonnet / gpt-4o / gpt-5 / gemini-pro
+#   L6_validation → o3 / o4 / claude-opus / gpt-5
+#   unassigned    → gpt-4o / claude-sonnet / deepseek / gemini-pro
+#
+# Picks a candidate agent with same primarySkill + a target-family aiModel.
+# Author-locked squads (where the lead's name matches the methodology
+# author) are left untouched.
+#
+# Default = dry-run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Show planned swaps only"
+        type: boolean
+        default: true
+      layer:
+        description: "Limit to one layer (L1_brand / L2_product / ... / blank=all)"
+        type: string
+        default: ""
+      apply_cap:
+        description: "Hard cap on number of swaps (safety)"
+        type: string
+        default: "200"
+
+jobs:
+  rebalance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          LAYER: ${{ inputs.layer }}
+          CAP: ${{ inputs.apply_cap }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          envs: GH_TOKEN,DRY_RUN,LAYER,CAP
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            cd "$APP/skills/ai-talent"
+            if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -5; fi
+            ARGS=""
+            if [ "$DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+            if [ -n "$LAYER" ]; then ARGS="$ARGS --layer=$LAYER"; fi
+            if [ -n "$CAP" ] && [ "$CAP" != "200" ]; then ARGS="$ARGS --apply-cap=$CAP"; fi
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  ⚖️  Rebalance squad lead aiModel  (args: $ARGS)"
+            echo "════════════════════════════════════════════════════════════════"
+            npx tsx scripts/rebalance-lead-aimodel.ts $ARGS

@@ -33,6 +33,10 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import {
+  Modal, ModalContent, ModalHeader, ModalBody,
+  Button, Input, Textarea, Card, CardBody, Chip,
+} from "@heroui/react";
 
 // ─────────────────────────────────────────────────────────────────────
 // Source registry
@@ -379,65 +383,73 @@ export default function CreateMethodologyModal({
     }
   };
 
-  if (!open) return null;
+  const isBusy = phase === "extract" || phase === "saving";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-mos-ink/30 backdrop-blur-sm p-6">
-      <div className="bg-white w-full max-w-[1200px] max-h-[88vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-mos-hair">
-          <h2 className="font-display text-[1.6rem] text-mos-ink tracking-[-0.015em]">
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      size="5xl"
+      radius="lg"
+      scrollBehavior="inside"
+      isDismissable={!isBusy}
+      hideCloseButton={false}
+      classNames={{
+        base: "max-w-[1200px] max-h-[88vh]",
+        backdrop: "bg-foreground/30 backdrop-blur-sm",
+      }}
+    >
+      <ModalContent>
+        <ModalHeader className="px-8 py-5 border-b border-divider">
+          <h2 className="font-semibold text-2xl text-foreground tracking-[-0.015em]">
             新增任務範本
           </h2>
-          <button
-            onClick={onClose}
-            disabled={phase === "extract" || phase === "saving"}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-mos-muted hover:bg-mos-paper hover:text-mos-ink disabled:opacity-40 transition"
-            title="關閉"
-          >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 6l12 12M18 6l-12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body: left nav + right pane */}
-        <div className="flex-1 flex min-h-0">
+        </ModalHeader>
+        <ModalBody className="p-0 flex flex-row min-h-0">
           {/* Left nav */}
-          <aside className="w-[260px] shrink-0 border-r border-mos-hair overflow-y-auto py-4">
+          <aside className="w-[260px] shrink-0 border-r border-divider overflow-y-auto py-4">
             {GROUPED_SOURCES.map((g) => (
               <div key={g.key} className="mb-3">
                 {GROUP_LABELS[g.key] && (
-                  <div className="px-6 py-1.5 text-[0.6rem] tracking-[0.24em] uppercase text-mos-soft">
+                  <div className="px-6 py-1.5 text-tiny tracking-[0.24em] uppercase text-default-400">
                     {GROUP_LABELS[g.key]}
                   </div>
                 )}
                 {g.items.map((s) => (
-                  <button
+                  <Button
                     key={s.id}
-                    onClick={() => setActiveId(s.id)}
+                    onPress={() => setActiveId(s.id)}
+                    variant="light"
+                    radius="none"
+                    fullWidth
+                    disableRipple
                     className={[
-                      "w-full flex items-center gap-3 px-6 py-2.5 text-left transition",
+                      "h-auto justify-start gap-3 px-6 py-2.5 min-w-0",
                       activeId === s.id
-                        ? "bg-mos-ink/[0.06] text-mos-ink"
-                        : "text-mos-body hover:bg-mos-ink/[0.03] hover:text-mos-ink",
+                        ? "bg-foreground/[0.06] text-foreground"
+                        : "text-foreground data-[hover=true]:bg-foreground/[0.03] data-[hover=true]:text-foreground",
                     ].join(" ")}
                   >
                     <span
                       className={[
-                        "w-7 h-7 rounded-md flex items-center justify-center text-[0.82rem] shrink-0",
-                        activeId === s.id ? "bg-white border border-mos-ink" : "bg-mos-paper",
+                        "w-7 h-7 rounded-md flex items-center justify-center text-small shrink-0",
+                        activeId === s.id ? "bg-white border border-foreground" : "bg-background",
                       ].join(" ")}
                     >
                       {s.glyph}
                     </span>
-                    <span className="text-[0.86rem]">{s.label}</span>
+                    <span className="text-small">{s.label}</span>
                     {!s.ready && (
-                      <span className="ml-auto text-[0.6rem] tracking-[0.12em] uppercase text-mos-soft border border-mos-hair px-1.5 py-0.5 rounded">
+                      <Chip
+                        size="sm"
+                        radius="sm"
+                        variant="bordered"
+                        className="ml-auto text-tiny tracking-[0.12em] uppercase text-default-400 border-divider"
+                      >
                         Beta
-                      </span>
+                      </Chip>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             ))}
@@ -447,13 +459,13 @@ export default function CreateMethodologyModal({
           <section className="flex-1 overflow-y-auto p-8">
             {/* Header for active source */}
             <div className="mb-6">
-              <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft">
+              <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
                 {GROUP_LABELS[active.group] || "INGEST"}
               </div>
-              <h3 className="mt-1 font-display text-[1.4rem] text-mos-ink tracking-[-0.015em]">
+              <h3 className="mt-1 font-semibold text-xl text-foreground tracking-[-0.015em]">
                 {active.label}
               </h3>
-              <p className="mt-2 text-[0.86rem] text-mos-body max-w-[640px]">
+              <p className="mt-2 text-small text-foreground max-w-[640px]">
                 {active.blurb}
               </p>
             </div>
@@ -488,29 +500,33 @@ export default function CreateMethodologyModal({
             )}
 
             {phase === "saving" && (
-              <div className="text-[0.86rem] text-mos-muted py-12 text-center">
+              <div className="text-small text-default-500 py-12 text-center">
                 寫入資料庫中…
               </div>
             )}
 
             {phase === "error" && (
-              <div className="border border-mos-red bg-white p-5 max-w-[640px]">
-                <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-red">
-                  ERROR
-                </div>
-                <div className="mt-1 text-[0.86rem] text-mos-body">{error}</div>
-                <button
-                  onClick={() => { setPhase("input"); setError(null); setJobId(null); }}
-                  className="mt-4 px-4 py-2 text-[0.7rem] tracking-[0.18em] uppercase border border-mos-ink text-mos-ink hover:bg-mos-ink hover:text-white transition"
-                >
-                  重試
-                </button>
-              </div>
+              <Card shadow="none" className="border border-danger max-w-[640px]">
+                <CardBody className="p-5 gap-2">
+                  <h4 className="text-small font-semibold uppercase tracking-wider text-danger">
+                    Error
+                  </h4>
+                  <p className="text-small">{error}</p>
+                  <Button
+                    color="danger"
+                    variant="flat"
+                    onPress={() => { setPhase("input"); setError(null); setJobId(null); }}
+                    className="mt-2 self-start"
+                  >
+                    重試
+                  </Button>
+                </CardBody>
+              </Card>
             )}
           </section>
-        </div>
-      </div>
-    </div>
+        </ModalBody>
+      </ModalContent>
+    </Modal>
   );
 }
 
@@ -573,15 +589,16 @@ function SourcePane({
   if (source.id === "blank") {
     return (
       <div className="max-w-[640px] space-y-4">
-        <div className="text-[0.86rem] text-mos-body">
+        <div className="text-small text-foreground">
           先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。
         </div>
-        <button
-          onClick={() => { onClose(); window.location.assign("/templates?new=blank"); }}
-          className="px-5 py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition"
+        <Button
+          color="primary"
+          onPress={() => { onClose(); window.location.assign("/templates?new=blank"); }}
+          endContent={<span aria-hidden>→</span>}
         >
-          建立空白任務範本 →
-        </button>
+          建立空白任務範本
+        </Button>
       </div>
     );
   }
@@ -590,23 +607,25 @@ function SourcePane({
   if (source.inputType === "url") {
     return (
       <div className="max-w-[640px] space-y-4">
-        <input
+        <Input
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onValueChange={setUrl}
           onKeyDown={(e) => { if (e.key === "Enter") onSubmitUrl(); }}
           placeholder={source.placeholder}
-          className="w-full bg-white border border-mos-hair px-4 py-3 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded"
+          variant="bordered"
         />
         {source.hint && (
-          <div className="text-[0.74rem] text-mos-muted">{source.hint}</div>
+          <p className="text-small text-default-500">{source.hint}</p>
         )}
-        <button
-          onClick={onSubmitUrl}
-          disabled={!url.trim()}
-          className="w-full py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-50 rounded"
+        <Button
+          color="primary"
+          fullWidth
+          onPress={onSubmitUrl}
+          isDisabled={!url.trim()}
+          endContent={<span aria-hidden>→</span>}
         >
-          開始抽取 →
-        </button>
+          開始抽取
+        </Button>
       </div>
     );
   }
@@ -621,12 +640,12 @@ function SourcePane({
           onDrop={onFileDrop}
           className={[
             "border-2 border-dashed transition rounded-lg px-6 py-16 text-center",
-            isDragging ? "border-mos-ink bg-mos-paper" : "border-mos-hair bg-white hover:border-mos-ink/50",
+            isDragging ? "border-foreground bg-background" : "border-divider bg-white hover:border-foreground/50",
           ].join(" ")}
         >
-          <div className="text-[2.4rem] leading-none mb-3" aria-hidden>☁</div>
-          <div className="text-[1rem] text-mos-ink mb-1">將你的內容拖放至此</div>
-          <div className="text-[0.78rem] text-mos-muted mb-5">或選擇檔案上傳</div>
+          <div className="text-3xl leading-none mb-3" aria-hidden>☁</div>
+          <div className="text-medium text-foreground mb-1">將你的內容拖放至此</div>
+          <div className="text-small text-default-500 mb-5">或選擇檔案上傳</div>
           <label className="inline-block cursor-pointer">
             <input
               type="file"
@@ -642,31 +661,31 @@ function SourcePane({
                 }
               }}
             />
-            <span className="inline-block px-5 py-2.5 text-[0.74rem] tracking-[0.18em] uppercase border border-mos-ink text-mos-ink hover:bg-mos-ink hover:text-white transition rounded">
+            <span className="inline-block px-5 py-2.5 text-tiny tracking-[0.18em] uppercase border border-foreground text-foreground hover:bg-foreground hover:text-white transition rounded">
               上傳檔案
             </span>
           </label>
         </div>
         {pickedFile && (
-          <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded">
-            <div className="text-[0.7rem] tracking-[0.18em] uppercase text-mos-soft">已選取</div>
-            <div className="text-[0.86rem] text-mos-ink mt-0.5">
+          <div className="border border-divider bg-background px-4 py-3 rounded">
+            <div className="text-tiny tracking-[0.18em] uppercase text-default-400">已選取</div>
+            <div className="text-small text-foreground mt-0.5">
               {pickedFile.name}{" "}
-              <span className="text-mos-muted text-[0.78rem]">({Math.round(pickedFile.size / 1024)} KB)</span>
+              <span className="text-default-500 text-small">({Math.round(pickedFile.size / 1024)} KB)</span>
             </div>
             {filePreview && (
-              <pre className="mt-2 text-[0.72rem] text-mos-muted whitespace-pre-wrap max-h-24 overflow-hidden">
+              <pre className="mt-2 text-tiny text-default-500 whitespace-pre-wrap max-h-24 overflow-hidden">
                 {filePreview}
               </pre>
             )}
           </div>
         )}
         {!source.ready && (
-          <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded text-[0.78rem] text-mos-muted">
+          <div className="border border-divider bg-background px-4 py-3 rounded text-small text-default-500">
             💡 檔案上傳的後端萃取將於下一輪上線。在這之前，請改用{" "}
-            <button onClick={() => onSwitchSource("github")} className="underline text-mos-ink">GitHub</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
             {" "}或{" "}
-            <button onClick={() => onSwitchSource("web")} className="underline text-mos-ink">網頁</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">網頁</Button>
             {" "}模式建立任務範本。
           </div>
         )}
@@ -678,31 +697,29 @@ function SourcePane({
   if (source.inputType === "text") {
     return (
       <div className="max-w-[720px] space-y-4">
-        <textarea
+        <Textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onValueChange={setText}
           placeholder={source.placeholder}
-          rows={14}
-          className="w-full bg-white border border-mos-hair px-4 py-3 text-[0.86rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded font-mono"
+          minRows={14}
+          variant="bordered"
+          classNames={{ input: "font-mono" }}
         />
         {source.hint && (
-          <div className="text-[0.74rem] text-mos-muted">{source.hint}</div>
+          <p className="text-small text-default-500">{source.hint}</p>
         )}
         {!source.ready && (
-          <div className="border border-mos-hair bg-mos-paper px-4 py-3 rounded text-[0.78rem] text-mos-muted">
+          <div className="border border-divider bg-background px-4 py-3 rounded text-small text-default-500">
             💡 文字貼上的後端萃取將於下一輪上線。先用{" "}
-            <button onClick={() => onSwitchSource("github")} className="underline text-mos-ink">GitHub</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
             {" "}或{" "}
-            <button onClick={() => onSwitchSource("web")} className="underline text-mos-ink">網頁</button>
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">網頁</Button>
             {" "}抽取相同內容。
           </div>
         )}
-        <button
-          disabled
-          className="w-full py-3 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink/40 text-white rounded cursor-not-allowed"
-        >
+        <Button color="primary" fullWidth isDisabled>
           開始抽取（敬請期待）
-        </button>
+        </Button>
       </div>
     );
   }
@@ -712,13 +729,18 @@ function SourcePane({
 
 function RecoTile({ label, desc, onClick }: { label: string; desc: string; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-5 py-4 border border-mos-hair hover:border-mos-ink rounded-lg transition group bg-white"
+    <Card
+      isPressable
+      onPress={onClick}
+      shadow="none"
+      radius="lg"
+      className="w-full border border-divider data-[hover=true]:border-foreground bg-white"
     >
-      <div className="text-[0.92rem] text-mos-ink group-hover:text-mos-teal-ink">{label}</div>
-      <div className="mt-1 text-[0.78rem] text-mos-muted">{desc}</div>
-    </button>
+      <CardBody className="px-5 py-4 text-left">
+        <div className="text-small text-foreground">{label}</div>
+        <div className="mt-1 text-small text-default-500">{desc}</div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -886,39 +908,39 @@ function ExtractingFeed({ source, url }: { source: SourceDef; url: string }) {
   return (
     <div className="max-w-[720px] space-y-4">
       {/* Header strip — current agent + status */}
-      <div className="border border-mos-hair bg-white p-5 rounded-lg flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-mos-paper flex items-center justify-center text-[1.2rem]">
+      <div className="border border-divider bg-white p-5 rounded-lg flex items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-large">
           {AGENT_GLYPH[activeAgent]}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft">
+          <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
             ACTIVE AGENT
           </div>
-          <div className="font-display text-[1.05rem] text-mos-ink truncate">
+          <div className="font-semibold text-medium text-foreground truncate">
             {activeAgent}
           </div>
-          <div className="text-[0.74rem] text-mos-muted truncate">
+          <div className="text-tiny text-default-500 truncate">
             正在分析 {host}…
           </div>
         </div>
         <div className="flex gap-1 shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "0ms" }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "200ms" }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-mos-ink animate-pulse" style={{ animationDelay: "400ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-foreground animate-pulse" style={{ animationDelay: "0ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-foreground animate-pulse" style={{ animationDelay: "200ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-foreground animate-pulse" style={{ animationDelay: "400ms" }} />
         </div>
       </div>
 
       {/* Activity feed */}
-      <div className="border border-mos-hair bg-mos-paper rounded-lg overflow-hidden">
-        <div className="px-4 py-2 border-b border-mos-hair text-[0.6rem] tracking-[0.28em] uppercase text-mos-soft bg-white">
+      <div className="border border-divider bg-background rounded-lg overflow-hidden">
+        <div className="px-4 py-2 border-b border-divider text-tiny tracking-[0.28em] uppercase text-default-400 bg-white">
           ACTIVITY
         </div>
         <div className="px-4 py-3 max-h-[340px] overflow-y-auto font-mono space-y-1.5">
           {events.map((e, i) => (
             <FeedRow key={i} event={e} fading={i < events.length - 6} />
           ))}
-          <div className="text-[0.78rem] text-mos-soft flex items-center gap-2">
-            <span className="inline-block w-1.5 h-3 bg-mos-ink animate-pulse" />
+          <div className="text-small text-default-400 flex items-center gap-2">
+            <span className="inline-block w-1.5 h-3 bg-foreground animate-pulse" />
             <span>working…</span>
           </div>
         </div>
@@ -931,13 +953,13 @@ function FeedRow({ event, fading }: { event: FeedEvent; fading: boolean }) {
   return (
     <div
       className={[
-        "flex items-baseline gap-2 text-[0.78rem] transition-opacity",
+        "flex items-baseline gap-2 text-small transition-opacity",
         fading ? "opacity-60" : "opacity-100",
       ].join(" ")}
     >
       <span className="w-4 shrink-0 text-center" aria-hidden>{KIND_GLYPH[event.kind]}</span>
-      <span className="text-mos-soft tracking-[0.04em] w-[88px] shrink-0">{KIND_LABEL[event.kind]}:</span>
-      <span className="text-mos-ink truncate">{event.arg}</span>
+      <span className="text-default-400 tracking-[0.04em] w-[88px] shrink-0">{KIND_LABEL[event.kind]}:</span>
+      <span className="text-foreground truncate">{event.arg}</span>
     </div>
   );
 }
@@ -954,108 +976,87 @@ function ReviewPane({
   onBack: () => void;
   onCommit: () => void;
 }) {
+  const updateStep = (i: number, patch: Partial<ExtractedMethodology["steps"][number]>) => {
+    const next = [...draft.steps];
+    next[i] = { ...next[i], ...patch };
+    setDraft({ ...draft, steps: next });
+  };
   return (
     <div className="max-w-[720px] space-y-4">
-      <DraftField label="名稱" required>
-        <input
-          value={draft.name}
-          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded"
-        />
-      </DraftField>
+      <Input
+        label="名稱"
+        labelPlacement="outside"
+        isRequired
+        variant="bordered"
+        value={draft.name}
+        onValueChange={(v) => setDraft({ ...draft, name: v })}
+      />
       <div className="grid grid-cols-2 gap-3">
-        <DraftField label="作者">
-          <input
-            value={draft.author ?? ""}
-            onChange={(e) => setDraft({ ...draft, author: e.target.value })}
-            className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.86rem] focus:outline-none focus:border-mos-ink rounded"
-          />
-        </DraftField>
-        <DraftField label="年份">
-          <input
-            value={draft.year ?? ""}
-            onChange={(e) => setDraft({ ...draft, year: e.target.value })}
-            className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.86rem] focus:outline-none focus:border-mos-ink rounded"
-          />
-        </DraftField>
-      </div>
-      <DraftField label="說明">
-        <textarea
-          value={draft.description ?? ""}
-          onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-          rows={3}
-          className="w-full bg-white border border-mos-hair px-3 py-2 text-[0.86rem] text-mos-body focus:outline-none focus:border-mos-ink rounded"
+        <Input
+          label="作者"
+          labelPlacement="outside"
+          variant="bordered"
+          value={draft.author ?? ""}
+          onValueChange={(v) => setDraft({ ...draft, author: v })}
         />
-      </DraftField>
-      <DraftField label={`步驟 (${draft.steps.length})`}>
+        <Input
+          label="年份"
+          labelPlacement="outside"
+          variant="bordered"
+          value={draft.year ?? ""}
+          onValueChange={(v) => setDraft({ ...draft, year: v })}
+        />
+      </div>
+      <Textarea
+        label="說明"
+        labelPlacement="outside"
+        variant="bordered"
+        value={draft.description ?? ""}
+        onValueChange={(v) => setDraft({ ...draft, description: v })}
+        minRows={3}
+      />
+      <div>
+        <p className="text-small font-medium mb-2">步驟 ({draft.steps.length})</p>
         <div className="space-y-2">
           {draft.steps.map((s, i) => (
-            <div key={i} className="border border-mos-hair bg-white p-3 rounded">
-              <input
-                value={s.name}
-                onChange={(e) => {
-                  const next = [...draft.steps];
-                  next[i] = { ...next[i], name: e.target.value };
-                  setDraft({ ...draft, steps: next });
-                }}
-                className="w-full text-[0.88rem] font-display text-mos-ink focus:outline-none"
-              />
-              <div className="mt-1 grid grid-cols-2 gap-2">
-                <input
-                  placeholder="所需技能"
-                  value={s.requiredSkill ?? ""}
-                  onChange={(e) => {
-                    const next = [...draft.steps];
-                    next[i] = { ...next[i], requiredSkill: e.target.value };
-                    setDraft({ ...draft, steps: next });
-                  }}
-                  className="text-[0.78rem] text-mos-muted border-b border-mos-hair focus:outline-none focus:border-mos-ink"
+            <Card key={i} shadow="none" className="border border-divider">
+              <CardBody className="p-3 gap-2">
+                <Input
+                  variant="bordered"
+                  value={s.name}
+                  onValueChange={(v) => updateStep(i, { name: v })}
                 />
-                <input
-                  placeholder="產出"
-                  value={s.outputType ?? ""}
-                  onChange={(e) => {
-                    const next = [...draft.steps];
-                    next[i] = { ...next[i], outputType: e.target.value };
-                    setDraft({ ...draft, steps: next });
-                  }}
-                  className="text-[0.78rem] text-mos-muted border-b border-mos-hair focus:outline-none focus:border-mos-ink"
-                />
-              </div>
-            </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    variant="bordered"
+                    size="sm"
+                    placeholder="所需技能"
+                    value={s.requiredSkill ?? ""}
+                    onValueChange={(v) => updateStep(i, { requiredSkill: v })}
+                  />
+                  <Input
+                    variant="bordered"
+                    size="sm"
+                    placeholder="產出"
+                    value={s.outputType ?? ""}
+                    onValueChange={(v) => updateStep(i, { outputType: v })}
+                  />
+                </div>
+              </CardBody>
+            </Card>
           ))}
         </div>
-      </DraftField>
+      </div>
 
-      <div className="flex items-center gap-3 pt-4 border-t border-mos-hair">
-        <button
-          onClick={onBack}
-          className="px-4 py-2.5 text-[0.7rem] tracking-[0.18em] uppercase border border-mos-hair text-mos-muted hover:text-mos-ink hover:border-mos-ink transition rounded"
-        >
-          ← 換來源
-        </button>
-        <button
-          onClick={onCommit}
-          className="flex-1 py-2.5 text-[0.74rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition rounded"
-        >
-          確認新增任務範本 →
-        </button>
+      <div className="flex items-center gap-3 pt-4 border-t border-divider">
+        <Button variant="bordered" onPress={onBack} startContent={<span aria-hidden>←</span>}>
+          換來源
+        </Button>
+        <Button color="primary" onPress={onCommit} fullWidth endContent={<span aria-hidden>→</span>}>
+          確認新增任務範本
+        </Button>
       </div>
     </div>
   );
 }
 
-function DraftField({
-  label, children, required,
-}: {
-  label: string; children: React.ReactNode; required?: boolean;
-}) {
-  return (
-    <label className="block">
-      <div className="text-[0.62rem] tracking-[0.22em] uppercase text-mos-soft mb-1">
-        {label}{required && <span className="text-mos-red ml-1">*</span>}
-      </div>
-      {children}
-    </label>
-  );
-}

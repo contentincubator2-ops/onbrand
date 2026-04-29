@@ -1,511 +1,1181 @@
 /**
- * BrandsPage — Canva-style 品牌工具組 page.
+ * BrandsPage — Canva Brand Kit clone v2 (full-bleed layout).
  *
- * Mirrors Canva's Brand Hub:
- *   1. Pastel hero with centered "{brand} 品牌工具組" title
- *   2. Promo banner ("讓你的品牌在不同設計間都生動無比") with side art
- *   3. Two-column body:
- *       - Left rail sub-nav (所有資產 / 準則 / 品牌範本 / 標誌 / 顏色 ...
- *         + brand switcher dropdown at top)
- *       - Right grid of pastel asset tiles (4 per row), each opens the
- *         relevant section. Hooks into existing brandBrain data where
- *         it already exists (品牌定位 / 受眾 / 語調 / 競品).
+ * Layout matches Canva exactly:
+ *   - Top: thin pastel header strip with 品牌工具組 chip + brand name
+ *   - Left rail (260px, fixed width, no max-w): sub-nav links + brand
+ *     switcher dropdown
+ *   - Right: full-bleed grid of large pastel asset tiles (4 cols on
+ *     desktop, each ~4:3 aspect)
  *
- * No new backend tables required — visual identity tiles (標誌/顏色/字型/
- * 照片/圖像/圖示/圖表) are placeholders that point at "即將推出" or the
- * Pipedream sync flow when applicable.
+ * Each tile is a HeroUI Card isPressable with a unique pastel-100 bg,
+ * a giant FA icon as the visual centerpiece, and a label below.
+ *
+ * No max-width container anywhere — extends to viewport edges.
  */
 import React, { useMemo, useState } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import {
+  Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
+  Skeleton, Tabs, Tab,
+  Input, Select, SelectItem, CheckboxGroup, Checkbox,
+} from "@heroui/react";
+import SegmentEditor from "../components/positioning/SegmentEditor";
+import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
+import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
+import SpeedCard from "../components/positioning/SpeedCard";
+import PromptLibrary from "../components/positioning/PromptLibrary";
+import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
+import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
+import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faChevronDown, faPlus, faCloudArrowUp, faShapes,
+  faPalette, faFont, faQuoteLeft, faBullseye, faUsers,
+  faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
+  faFolderOpen, faUserPlus, faCrown,
+  faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
+  faWandSparkles,
+} from "@fortawesome/free-solid-svg-icons";
 
-type SectionId =
-  | "all" | "guidelines" | "templates"
-  | "logo" | "colors" | "fonts" | "voice"
-  | "photos" | "images" | "icons" | "charts"
-  | "positioning" | "audience" | "competitor";
+// Sub-nav id format:
+//   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
+//   "seg:<segment>" — one positioning segment (driven by positioningSchema)
+//   "card" / "prompts" / "all"
+type SectionId = string;
 
-const SUBNAV: Array<{ id: SectionId; label: string; badge?: string }> = [
-  { id: "all",          label: "所有資產" },
-  { id: "guidelines",   label: "品牌準則" },
-  { id: "templates",    label: "品牌範本", badge: "最新" },
-  { id: "logo",         label: "標誌" },
-  { id: "colors",       label: "顏色" },
-  { id: "fonts",        label: "字型" },
-  { id: "voice",        label: "品牌口吻" },
-  { id: "positioning",  label: "品牌定位" },
-  { id: "audience",     label: "目標受眾" },
-  { id: "competitor",   label: "競品洞察" },
-  { id: "photos",       label: "照片" },
-  { id: "images",       label: "圖像" },
-  { id: "icons",        label: "圖示" },
-  { id: "charts",       label: "圖表" },
+interface SubNavItem { id: SectionId; label: string; badge?: string; group?: string; }
+
+// Brand has positioning segments + visual/asset entries.
+// Per CJ: 圖像/圖示/圖表/品牌範本/準則/照片/所有資產 all removed.
+const BRAND_ASSET_SUBNAV: SubNavItem[] = [
+  { id: "asset:logo",   label: "標誌",     group: "visuals" },
+  { id: "asset:colors", label: "顏色",     group: "visuals" },
+  { id: "asset:fonts",  label: "字型",     group: "visuals" },
 ];
 
-type AssetTile = {
+// Event-specific subnav additions (CJ direction 2026-04-29):
+// - settings page lets user edit metadata (brand / name / period /
+//   productIds) post-creation — previously only set at create time.
+// - 視覺資產 deferred to a later round (event posters / videos go through
+//   MediaGenFlow per the visual-step rule, not stored as static assets).
+const EVENT_SETTINGS_SUBNAV: SubNavItem[] = [
+  { id: "settings", label: "設定（品牌 / 期間 / 產品）", group: "settings" },
+];
+
+// Tile colors (HeroUI semantic-100 backgrounds + matching tone)
+type Tone = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
+interface Tile {
   id: SectionId;
   label: string;
-  bg: string;
-  art: React.ReactNode;
+  icon: any;
+  tone: Tone;
+  count?: number;
   ready: boolean;
-  // Hook-up: function returning a count badge (or null if no data hookup).
-  count?: number | null;
-};
+}
 
 export default function BrandsPage() {
-  const navigate = useNavigate();
-  const { brandId, setBrandId, brands } = useOutletContext<ShellOutletCtx>();
-  const [section, setSection] = useState<SectionId>("all");
-  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const { brandId, setBrandId, brands, scope } = useOutletContext<ShellOutletCtx>();
+
+  // Resolve scope mode — choose-one rule from ScopeBar.
+  const scopeMode: "brand" | "product" | "event" | "none" =
+    scope?.eventId ? "event"
+    : scope?.productId ? "product"
+    : scope?.brandId ? "brand"
+    : (brandId ? "brand" : "none"); // legacy fallback
+
+  // Pull product/event details when those scopes are active
+  const productQuery = (trpc as any).product?.get?.useQuery
+    ? (trpc as any).product.get.useQuery(
+        { id: scope?.productId ?? 0 },
+        { enabled: scopeMode === "product" && !!scope?.productId, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+  const eventQuery = (trpc as any).event?.get?.useQuery
+    ? (trpc as any).event.get.useQuery(
+        { id: scope?.eventId ?? 0 },
+        { enabled: scopeMode === "event" && !!scope?.eventId, refetchOnWindowFocus: false }
+      )
+    : { data: null };
+  // scope.options is the canonical brand list (filtered by userId, same
+  // as ScopeBar). Legacy `brands` from listByMember can lag — use this
+  // when resolving the active brand name.
+  const scopeOptionsQuery = (trpc as any).scope?.options?.useQuery
+    ? (trpc as any).scope.options.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: null };
+  const scopeBrands = ((scopeOptionsQuery.data as any)?.brands as any[]) ?? brands;
+
+  // Build sub-nav from positioning schema + brand-only asset list.
+  // Each segment becomes its own sub-nav entry (id = "seg:<segmentId>"),
+  // alongside 速查卡 / AI 指令庫 / brand assets (brand only).
+  const segments = scopeMode === "none" ? [] : SCOPE_SEGMENTS[scopeMode];
+  const SUBNAV: SubNavItem[] = useMemo(() => {
+    const items: SubNavItem[] = [];
+    items.push({ id: "card",    label: "速查卡",     group: "doc" });
+    items.push({ id: "prompts", label: "AI 指令庫",  group: "doc" });
+    for (const s of segments) {
+      items.push({
+        id: `seg:${s.id}`,
+        label: `${s.num} ${s.title}`,
+        group: "segments",
+      });
+    }
+    if (scopeMode === "brand") {
+      for (const a of BRAND_ASSET_SUBNAV) {
+        items.push(a);
+      }
+    }
+    if (scopeMode === "event") {
+      for (const a of EVENT_SETTINGS_SUBNAV) {
+        items.push(a);
+      }
+    }
+    return items;
+  }, [scopeMode, segments]);
+
+  // Default to 速查卡 for all scopes (CJ: 預設為速查卡頁籤).
+  const defaultSection: SectionId = "card";
+  const [section, setSection] = useState<SectionId>(defaultSection);
+  // Reset section when scope mode changes
+  React.useEffect(() => {
+    setSection(defaultSection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeMode]);
 
   const currentBrand = useMemo(
-    () => brands.find((b: any) => b.id === brandId) ?? brands[0] ?? null,
-    [brands, brandId]
+    () => scopeBrands.find((b: any) => b.id === (scope?.brandId ?? brandId)) ?? null,
+    [scopeBrands, scope?.brandId, brandId]
   );
+  const scopeName =
+    scopeMode === "product" ? ((productQuery.data as any)?.name ?? "（請於右上選擇產品）")
+    : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? "（請於右上選擇活動）")
+    : (currentBrand?.name ?? "（請於右上選擇品牌）");
+  const scopeIcon =
+    scopeMode === "product" ? faBox
+    : scopeMode === "event" ? faCalendarDay
+    : faTrademark;
+  const scopeEyebrow =
+    scopeMode === "product" ? "PRODUCT"
+    : scopeMode === "event" ? "EVENT"
+    : "BRAND";
   const brandName = currentBrand?.name ?? "我的品牌";
+  const brandInitial = brandName.charAt(0).toUpperCase();
 
-  // Brain entries (positioning / audience / voice / competitor / other)
   const brainQuery = (trpc as any).brandBrain?.list?.useQuery
     ? (trpc as any).brandBrain.list.useQuery(
         { brandId: brandId ?? 0 },
         { enabled: !!brandId, refetchOnWindowFocus: false }
       )
-    : { data: [], isLoading: false };
+    : { data: null, isLoading: false };
+
   const brainEntries: Record<string, any[]> =
     ((brainQuery.data as any)?.entries as Record<string, any[]>) ?? {};
+  const cnt = (cat: string) => brainEntries[cat]?.length ?? 0;
 
-  const countByCat = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const [cat, arr] of Object.entries(brainEntries)) {
-      out[cat] = Array.isArray(arr) ? arr.length : 0;
-    }
-    // alias: tile uses "competitor" singular, server returns "competitors"
-    out["competitor"] = out["competitors"] ?? 0;
-    return out;
-  }, [brainEntries]);
-
-  const TILES: AssetTile[] = [
-    {
-      id: "templates", label: "品牌範本", bg: "#FBE9DA", ready: false,
-      art: <ArtTemplates />,
-    },
-    {
-      id: "logo", label: "標誌", bg: "#EAD9F5", ready: false,
-      art: <ArtLogo />,
-    },
-    {
-      id: "colors", label: "顏色", bg: "#FFE0CD", ready: false,
-      art: <ArtColors />,
-    },
-    {
-      id: "fonts", label: "字型", bg: "#D9EBD7", ready: false,
-      art: <ArtFonts />,
-    },
-    {
-      id: "voice", label: "品牌口吻", bg: "#E7DAF5", ready: true,
-      art: <ArtQuote />, count: countByCat["voice"] ?? 0,
-    },
-    {
-      id: "positioning", label: "品牌定位", bg: "#FCE7DD", ready: true,
-      art: <ArtPositioning />, count: countByCat["positioning"] ?? 0,
-    },
-    {
-      id: "audience", label: "目標受眾", bg: "#DEF1EE", ready: true,
-      art: <ArtAudience />, count: countByCat["audience"] ?? 0,
-    },
-    {
-      id: "competitor", label: "競品洞察", bg: "#FCE0EA", ready: true,
-      art: <ArtCompetitor />, count: countByCat["competitor"] ?? 0,
-    },
-    {
-      id: "photos", label: "照片", bg: "#D9EAD9", ready: false,
-      art: <ArtPhotos />,
-    },
-    {
-      id: "images", label: "圖像", bg: "#FCEAD0", ready: false,
-      art: <ArtImage />,
-    },
-    {
-      id: "icons", label: "圖示", bg: "#E5DAF5", ready: false,
-      art: <ArtIcons />,
-    },
-    {
-      id: "charts", label: "圖表", bg: "#D9E6F5", ready: false,
-      art: <ArtChart />,
-    },
+  // Brand asset tiles (visuals — non-positioning).
+  // Per CJ: only logo / colors / fonts remain.
+  const TILES: Tile[] = [
+    { id: "asset:logo",   label: "標誌", icon: faPenNib,  tone: "default", ready: true },
+    { id: "asset:colors", label: "顏色", icon: faPalette, tone: "default", ready: true },
+    { id: "asset:fonts",  label: "字型", icon: faFont,    tone: "default", ready: true },
   ];
 
-  const visibleTiles =
-    section === "all" ? TILES : TILES.filter((t) => t.id === section);
+  const visibleTiles = TILES.filter((t) => t.id === section);
 
-  const onTileClick = (t: AssetTile) => {
-    if (!t.ready) {
-      alert(`${t.label}（即將推出）`);
+  const onTileClick = (t: Tile) => setSection(t.id);
+
+  // ── Pipeline (research mode) — scope-aware (brand 14 / product 5 / event 11) ─
+  const pipelineSteps: PipelineStepSpec[] = pipelineFor(scopeMode);
+
+  // Read positioning at top level (deduped by React Query — same key as
+  // PositioningEditor's query). Used to surface SMP value in the
+  // checkpoint card without requiring user to click into the SMP segment.
+  const topScopeActive = (trpc as any).scope?.active?.useQuery
+    ? (trpc as any).scope.active.useQuery(
+        { brandId: scope?.brandId, productId: scope?.productId, eventId: scope?.eventId },
+        { enabled: scopeMode !== "none", refetchOnWindowFocus: false, staleTime: 30_000 },
+      )
+    : { data: null };
+  const topPositioning = (topScopeActive.data as any)?.[scopeMode]?.positioning ?? null;
+  const smpData = topPositioning?.smp ?? null;
+
+  // Persist pipeline state per (kind, id) so page refresh resumes mid-run.
+  const pipelineKey = scopeMode !== "none" && (scope?.brandId ?? scope?.productId ?? scope?.eventId)
+    ? `sowork.pipeline.${scopeMode}.${scope?.brandId ?? scope?.productId ?? scope?.eventId}`
+    : null;
+  const [pipeline, setPipeline] = useState<PipelineState>(() => {
+    if (!pipelineKey) return { status: "idle", cursor: 0, completed: [] };
+    try {
+      const raw = localStorage.getItem(pipelineKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        // Auto-resume if previous run was paused; running runs become paused
+        // (user must hit ▶ continue to actually fire) so we don't surprise
+        // them with an LLM call on cold load.
+        if (saved && (saved.status === "running" || saved.status === "paused")) {
+          return { status: "paused", cursor: saved.cursor ?? 0, completed: saved.completed ?? [] };
+        }
+      }
+    } catch { /* ignore */ }
+    return { status: "idle", cursor: 0, completed: [] };
+  });
+  React.useEffect(() => {
+    if (!pipelineKey) return;
+    try {
+      if (pipeline.status === "done" || pipeline.status === "idle") {
+        localStorage.removeItem(pipelineKey);
+      } else {
+        localStorage.setItem(pipelineKey, JSON.stringify(pipeline));
+      }
+    } catch { /* ignore */ }
+  }, [pipelineKey, pipeline]);
+  // Reset pipeline state when scope changes (user picks a different brand)
+  const lastKeyRef = React.useRef<string | null>(pipelineKey);
+  React.useEffect(() => {
+    if (lastKeyRef.current === pipelineKey) return;
+    lastKeyRef.current = pipelineKey;
+    if (!pipelineKey) {
+      setPipeline({ status: "idle", cursor: 0, completed: [] });
       return;
     }
-    setSection(t.id);
+    try {
+      const raw = localStorage.getItem(pipelineKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved?.status === "running" || saved?.status === "paused") {
+          setPipeline({ status: "paused", cursor: saved.cursor ?? 0, completed: saved.completed ?? [] });
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+    setPipeline({ status: "idle", cursor: 0, completed: [] });
+  }, [pipelineKey]);
+
+  const targetId =
+    scopeMode === "brand" ? (scope?.brandId ?? brandId)
+    : scopeMode === "product" ? scope?.productId
+    : scopeMode === "event" ? scope?.eventId
+    : null;
+
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const saveMutation = (trpc as any).scope?.savePositioning?.useMutation
+    ? (trpc as any).scope.savePositioning.useMutation({
+        onSuccess: () => utils?.scope?.active?.invalidate?.(),
+      })
+    : null;
+
+  // Phase 6 — call pipeline.runStep tRPC, server hits OpenClaw gateway
+  // (web_search) until budget met, persists conclusion + sources scoped
+  // to the active id, returns { thinking, conclusion, sources }. Client
+  // shows the returned thinking via ThinkingOverlay typewriter, then
+  // advances. Mock fallback remains if mutation isn't available yet.
+  const runStepMutation = (trpc as any).pipeline?.runStep?.useMutation
+    ? (trpc as any).pipeline.runStep.useMutation({
+        // Invalidate as soon as the server has written; the segment editor's
+        // draft will refresh while the typewriter is still animating, so by
+        // the time it finishes the user sees the fields already populated.
+        onSuccess: () => utils?.scope?.active?.invalidate?.(),
+      })
+    : null;
+  const [liveThinking, setLiveThinking] = useState<string | null>(null);
+  const [thinkingPhase, setThinkingPhase] = useState<"loading" | "typing" | "writing">("loading");
+  const [thinkingStartedAt, setThinkingStartedAt] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (pipeline.status !== "running") return;
+    const step = pipelineSteps[pipeline.cursor];
+    if (!step) {
+      setPipeline((p) => ({ ...p, status: "done" }));
+      setLiveThinking(null);
+      return;
+    }
+    // Auto-jump sub-nav to this step's target segment.
+    setSection(step.segmentTarget);
+    setLiveThinking(null); // clear previous
+
+    let cancelled = false;
+    const advance = () => {
+      if (cancelled) return;
+      utils?.scope?.active?.invalidate?.();
+      // If single-segment auto-fill: halt after this step.
+      if (autoFillStopAt !== null && pipeline.cursor === autoFillStopAt) {
+        setPipeline((p) => ({
+          ...p,
+          status: "done",
+          completed: [...p.completed, step.id],
+        }));
+        setAutoFillStopAt(null);
+        setLiveThinking(null);
+        return;
+      }
+      // SMP checkpoint gate (event scope only). Server marks the segment
+      // with _wizardMeta.smp.requiresUserApproval=true after writing; we
+      // pause here so user must press 繼續 before steps 7-11 fire.
+      if (scopeMode === "event" && step.segmentId === "smp") {
+        setPipeline((p) => ({
+          ...p,
+          status: "paused",
+          completed: [...p.completed, step.id],
+        }));
+        setSmpCheckpointActive(true);
+        setLiveThinking(null);
+        return;
+      }
+      setPipeline((p) => ({
+        ...p,
+        cursor: p.cursor + 1,
+        completed: [...p.completed, step.id],
+      }));
+      setLiveThinking(null);
+    };
+
+    const runReal = async () => {
+      if (!targetId || scopeMode === "none" || !runStepMutation) return null;
+      try {
+        const res = await runStepMutation.mutateAsync({
+          kind: scopeMode as "brand" | "product" | "event",
+          id: targetId,
+          stepId: step.id,
+          segmentId: step.segmentId,
+          agent: step.agent,
+          title: step.title,
+          budget: step.researchBudget,
+          systemHint: step.promptTemplate, // CJ-spec prompt per step
+          schemaHint: step.mockConclusion, // canonical JSON shape for this segment
+        });
+        // Track empty conclusion as a failure even if the request succeeded —
+        // 2026-04-29 CJ caught: product step 3-5 silently empty after step 2.
+        // Likely cause: LLM JSON parse failed mid-pipeline, server returns
+        // empty conclusion, advance ran, segment stayed blank, no error UI.
+        if (!res?.conclusion || Object.keys(res.conclusion).length === 0) {
+          setFailedStepIds((s) => Array.from(new Set([...s, step.id])));
+          // eslint-disable-next-line no-console
+          console.warn(`[pipeline] step ${step.id} (${step.segmentId}) returned empty conclusion — segment will be blank. Run "重跑此步" to retry.`);
+        }
+        return res?.thinking ?? null;
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[pipeline] runStep failed, falling back to mock:", e);
+        setFailedStepIds((s) => Array.from(new Set([...s, step.id])));
+        return null;
+      }
+    };
+
+    (async () => {
+      // Three-phase UX: loading → typing → writing. CJ caught timing bug:
+      // pipeline advanced before fields visibly populated. Extended the
+      // "fields visible" hold to 5s + double-invalidate to force refetch.
+      setThinkingStartedAt(Date.now());
+      setThinkingPhase("loading");
+      setLiveThinking("");
+
+      const realThinking = await runReal();
+      if (cancelled) return;
+      // Force a refetch right after server write so the draft/query is
+      // already updated by the time typing finishes.
+      utils?.scope?.active?.invalidate?.();
+
+      const text = realThinking ?? step.mockThinking ?? "";
+      setThinkingPhase("typing");
+      setLiveThinking(text);
+
+      const cps = 35;
+      const typingMs = (text.length / cps) * 1000;
+      setTimeout(() => {
+        if (cancelled) return;
+        setThinkingPhase("writing");
+        // Re-invalidate at the writing handoff so any in-flight render gets
+        // the latest server state before the overlay fades.
+        utils?.scope?.active?.invalidate?.();
+        setTimeout(() => {
+          if (cancelled) return;
+          setLiveThinking(null); // hide overlay → fields visible
+          // Long hold so user actually reads the populated fields
+          // (CJ feedback: 跳太快). 5 seconds gives query refetch + render
+          // time + reading time for the average user.
+          setTimeout(() => {
+            if (cancelled) return;
+            advance();
+          }, 5000);
+        }, 1500);
+      }, typingMs + 300);
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.status, pipeline.cursor]);
+
+  const startPipeline = () => {
+    setFailedStepIds([]); // reset error trail on fresh start
+    setSmpCheckpointActive(false); // clear stale SMP gate
+    setPipeline({ status: "running", cursor: 0, completed: [] });
+  };
+  // SMP checkpoint resume — fired when user presses 繼續 on the gate card.
+  // Resume = clear gate flag + advance cursor + flip pipeline back to running.
+  const resumeAfterSmp = () => {
+    setSmpCheckpointActive(false);
+    setPipeline((p) => ({
+      ...p,
+      status: "running",
+      cursor: p.cursor + 1,
+    }));
+  };
+  const pausePipeline  = () => setPipeline((p) => ({ ...p, status: "paused" }));
+  const resumePipeline = () => setPipeline((p) => ({ ...p, status: "running" }));
+  const skipPipeline   = () => {
+    const step = pipelineSteps[pipeline.cursor];
+    if (!step) return;
+    setPipeline((p) => ({
+      ...p,
+      cursor: p.cursor + 1,
+      completed: [...p.completed, step.id],
+    }));
+  };
+  const stopPipeline = () => setPipeline({ status: "idle", cursor: 0, completed: [] });
+
+  // "自動填寫" — single-segment auto-fill. Track a stop-cursor so the
+  // runner halts after the requested segment finishes (vs the full
+  // Wizard which runs all 14 steps).
+  const [autoFillStopAt, setAutoFillStopAt] = useState<number | null>(null);
+  // Tracks which step ids failed (LLM error or empty conclusion). Surfaces
+  // as a banner so user can spot which segments need rerun. Cleared on
+  // pipeline restart.
+  const [failedStepIds, setFailedStepIds] = useState<number[]>([]);
+  // SMP checkpoint state — when event scope's SMP step completes, server
+  // marks _wizardMeta.smp.requiresUserApproval=true. We pause the runner
+  // here and surface a confirmation card; user clicks 繼續 to resume.
+  // Per CJ direction 2026-04-29: SMP is the campaign's highest principle,
+  // user must commit before steps 7-11 (messaging/creative/...) fire.
+  const [smpCheckpointActive, setSmpCheckpointActive] = useState(false);
+  const runSegmentAutoFill = (segmentId: string) => {
+    if (scopeMode === "none" || pipelineSteps.length === 0) return;
+    const targetIdx = pipelineSteps.findIndex((s) => s.segmentId === segmentId);
+    if (targetIdx < 0) return;
+    setAutoFillStopAt(targetIdx);
+    setPipeline({
+      status: "running",
+      cursor: targetIdx,
+      completed: pipelineSteps.slice(0, targetIdx).map((s) => s.id),
+    });
   };
 
+  const pipelineThinking =
+    pipeline.status === "running" && pipelineSteps[pipeline.cursor] && liveThinking !== null
+      ? {
+          segmentTarget: pipelineSteps[pipeline.cursor]!.segmentTarget,
+          text: liveThinking,
+          phase: thinkingPhase,
+          startedAt: thinkingStartedAt,
+          stepNum: pipeline.cursor + 1,
+          stepTotal: pipelineSteps.length,
+          stepTitle: pipelineSteps[pipeline.cursor]!.title,
+        }
+      : null;
+
   return (
-    <main className="pb-16">
-      {/* ─── HERO ───────────────────────────────────────────────────────── */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(135deg, #C8E8DA 0%, #DDD5F2 45%, #F5D5E2 100%)",
-        }}
-      >
-        <div className="absolute top-5 right-6 z-10">
-          <button
-            onClick={() => alert("品牌資產同步（即將推出）")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] text-white rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-            style={{ background: "#5B3CC8" }}
-          >
-            <span aria-hidden>✦</span>
-            <span>同步品牌資產</span>
-          </button>
-        </div>
-
-        <div className="max-w-[1280px] mx-auto px-8 pt-20 pb-14">
-          <div className="flex items-center justify-center gap-3">
-            <div
-              className="w-9 h-7 rounded-md"
-              style={{ background: "#0A0A0A" }}
-              aria-hidden
-            />
-            <h1 className="font-display text-[2.6rem] leading-[1.05] text-mos-ink tracking-[-0.02em]">
-              {brandName} 品牌工具組
-            </h1>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── PROMO BANNER ──────────────────────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 mt-10">
-        <div
-          className="relative overflow-hidden rounded-2xl px-7 py-7 flex items-center justify-between gap-6"
-          style={{ background: "#E1E5FB" }}
+    <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
+      {/* ─── Top header — scope-aware (brand / product / event) ─────── */}
+      <header className="px-8 py-10 border-b border-divider bg-content1">
+        <Chip
+          color="default"
+          variant="flat"
+          size="sm"
+          className="uppercase tracking-wider mb-2"
+          startContent={<FontAwesomeIcon icon={scopeIcon} className="ml-1" />}
         >
-          <div className="max-w-[480px]">
-            <h2 className="font-display text-[1.25rem] text-mos-ink tracking-[-0.01em]">
-              讓你的品牌在不同設計間都生動無比
-            </h2>
-            <p className="mt-2 text-[0.84rem] text-mos-body leading-relaxed">
-              在品牌工具組內即可備妥你的品牌資產與準則。Marketing OS 會自動把它們餵給每位 agent，維持一致的品牌形象。
-            </p>
-            <button
-              onClick={() => setSection("guidelines")}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2.5 text-[0.78rem] text-white rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-              style={{ background: "#5B3CC8" }}
+          {scopeEyebrow}
+        </Chip>
+        <h1 className="text-3xl font-semibold tracking-tight">{scopeName}</h1>
+        <p className="text-small text-default-500 mt-1">
+          請於右上 ScopeBar 切換 品牌 / 產品 / 活動
+        </p>
+      </header>
+
+      {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
+      <div className="flex-1 flex">
+        {/* Left rail — full-bleed, fixed 240px, NO max-w-anything */}
+        <aside className="w-[240px] shrink-0 border-r border-divider bg-content1 flex flex-col">
+          {/* Top: 你的方案 + 邀請使用者 */}
+          <div className="p-4 space-y-2 border-b border-divider">
+            <Button
+              fullWidth
+              radius="lg"
+              variant="bordered"
+              startContent={<FontAwesomeIcon icon={faCrown} />}
+              className="justify-start"
             >
-              <span aria-hidden>👑</span>
-              <span>建立品牌準則</span>
-            </button>
+              你的方案
+            </Button>
+            <Button
+              fullWidth
+              radius="lg"
+              variant="bordered"
+              startContent={<FontAwesomeIcon icon={faUserPlus} />}
+              className="justify-start"
+            >
+              邀請使用者
+            </Button>
           </div>
 
-          <div className="hidden md:block relative w-[340px] h-[140px]">
-            <div
-              className="absolute inset-0 rounded-xl flex items-center justify-center"
-              style={{
-                background:
-                  "linear-gradient(135deg, #1FB8B3 0%, #5B3CC8 50%, #E94F7A 100%)",
-              }}
-            >
-              <span className="font-display text-[5rem] text-white tracking-[-0.04em] leading-none">Aa</span>
+          {/* 所有品牌範本 link */}
+          <Button
+            fullWidth
+            variant="light"
+            radius="none"
+            className="justify-start px-4 h-11"
+          >
+            所有品牌範本
+          </Button>
+
+          {/* Scope read-only chip (single source of truth = ScopeBar) */}
+          <div className="px-3 pt-2 pb-1">
+            <div className="flex items-center gap-2 px-3 h-12 rounded-lg border border-divider bg-default-50">
+              <Avatar
+                name={(scopeName.charAt(0) || "?").toUpperCase()}
+                size="sm"
+                radius="md"
+                classNames={{ base: "shrink-0 bg-default-100 text-default-600", name: "text-tiny font-bold" }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-tiny text-default-400 uppercase tracking-wider">{scopeEyebrow}</p>
+                <p className="text-small font-medium truncate">{scopeName}</p>
+              </div>
             </div>
-            <div className="absolute -bottom-4 left-6 flex gap-1">
-              <span className="w-10 h-3 rounded-sm" style={{ background: "#1F4FD9" }} />
-              <span className="w-10 h-3 rounded-sm" style={{ background: "#E94F7A" }} />
-              <span className="w-10 h-3 rounded-sm" style={{ background: "#1FB8B3" }} />
-              <span className="w-10 h-3 rounded-sm" style={{ background: "#FFD53D" }} />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── BODY: left rail + grid ─────────────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 mt-10 grid grid-cols-[240px_1fr] gap-8">
-        {/* Left rail */}
-        <aside className="border-r border-mos-hair pr-6">
-          <div className="text-[0.62rem] tracking-[0.28em] uppercase text-mos-soft mb-2">
-            品牌
-          </div>
-
-          {/* Brand switcher */}
-          <div className="relative mb-5">
-            <button
-              onClick={() => setSwitcherOpen((v) => !v)}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-white border border-mos-hair rounded-lg hover:border-mos-ink transition"
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                <span className="w-5 h-4 rounded-sm bg-mos-ink shrink-0" aria-hidden />
-                <span className="text-[0.86rem] text-mos-ink truncate">{brandName}</span>
-              </span>
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-mos-muted shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </button>
-
-            {switcherOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setSwitcherOpen(false)} />
-                <div className="absolute z-40 top-full left-0 right-0 mt-1 bg-white border border-mos-hair rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1 max-h-[280px] overflow-y-auto">
-                  {brands.map((b: any) => (
-                    <button
-                      key={b.id}
-                      onClick={() => { setBrandId(b.id); setSwitcherOpen(false); }}
-                      className={[
-                        "w-full text-left flex items-center gap-2 px-3 py-2 text-[0.84rem] hover:bg-mos-paper",
-                        b.id === brandId ? "text-mos-ink font-medium" : "text-mos-body",
-                      ].join(" ")}
-                    >
-                      <span className="w-4 h-3 rounded-sm bg-mos-ink/80" aria-hidden />
-                      <span className="truncate">{b.name}</span>
-                    </button>
-                  ))}
-                  {brands.length === 0 && (
-                    <div className="px-3 py-2 text-[0.78rem] text-mos-muted">尚無品牌</div>
-                  )}
-                </div>
-              </>
-            )}
           </div>
 
           {/* Sub-nav */}
-          <nav className="flex flex-col gap-0.5">
+          <nav className="px-3 py-2 flex flex-col gap-0.5 flex-1 overflow-y-auto">
             {SUBNAV.map((s) => {
               const active = section === s.id;
+              const isAll = s.id === "all";
               return (
-                <button
+                <Button
                   key={s.id}
-                  onClick={() => setSection(s.id)}
-                  className={[
-                    "flex items-center justify-between px-3 py-2 rounded-lg text-[0.86rem] transition",
-                    active
-                      ? "bg-mos-ink text-white"
-                      : "text-mos-body hover:bg-mos-paper hover:text-mos-ink",
-                  ].join(" ")}
-                >
-                  <span>{s.label}</span>
-                  {s.badge && (
-                    <span
-                      className={[
-                        "text-[0.6rem] tracking-[0.16em] uppercase px-1.5 py-0.5 rounded-sm",
-                        active ? "bg-white/20" : "bg-[#5B3CC8] text-white",
-                      ].join(" ")}
-                    >
-                      {s.badge}
+                  fullWidth
+                  size="sm"
+                  variant={active ? "flat" : "light"}
+                  color={active ? "primary" : "default"}
+                  radius="lg"
+                  className="justify-between h-9 text-small"
+                  onPress={() => setSection(s.id)}
+                  endContent={
+                    <span className="flex items-center gap-1.5">
+                      {s.badge && <Chip size="sm" color="primary" variant="flat" className="h-4 text-tiny">{s.badge}</Chip>}
+                      {isAll && <FontAwesomeIcon icon={faPlus} className="text-tiny text-default-400" />}
                     </span>
-                  )}
-                </button>
+                  }
+                >
+                  <span className="text-left flex-1">{s.label}</span>
+                </Button>
               );
             })}
           </nav>
         </aside>
 
-        {/* Asset grid */}
-        <div>
-          <div className="flex items-end justify-between mb-5">
-            <h2 className="font-display text-[1.4rem] text-mos-ink tracking-[-0.015em]">
-              {section === "all"
-                ? "所有資產"
-                : SUBNAV.find((s) => s.id === section)?.label}
-            </h2>
-            <div className="text-[0.78rem] text-mos-muted">
-              {section === "all" ? `${TILES.length} 個類別` : "1 個類別"}
+        {/* Right: scope-aware content pane */}
+        <div className="flex-1 min-w-0 px-6 py-6 overflow-y-auto flex flex-col gap-4">
+          {scopeMode !== "none" && pipelineSteps.length > 0 && (
+            <PipelineRunner
+              steps={pipelineSteps}
+              state={pipeline}
+              title={
+                scopeMode === "product" ? "產品定位分析"
+                : scopeMode === "event" ? "活動定位分析"
+                : "品牌定位分析"
+              }
+              onStart={startPipeline}
+              onPause={pausePipeline}
+              onResume={resumePipeline}
+              onSkip={skipPipeline}
+              onStop={stopPipeline}
+            />
+          )}
+          {/* SMP checkpoint card — gates auto-advance after event Step 6.
+              User reviews the auto-generated SMP, edits the segment if
+              needed, then presses 繼續 to fire steps 7-11. Per CJ rule
+              2026-04-29: SMP is highest creative principle, can't auto-pass. */}
+          {smpCheckpointActive && (
+            <div className="mt-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-small font-semibold text-primary-800">
+                    🛑 SMP Checkpoint — 請確認單一核心命題
+                  </p>
+                  <p className="text-tiny text-default-600 mt-1">
+                    SMP 是這次活動的最高創意準則，後面 5 個 step（訊息架構、創意概念、規範、管道、旅程）都會圍繞它展開。先確認再繼續。
+                  </p>
+                  {smpData?.singleMindedProposition && (
+                    <div className="mt-2 p-2 rounded bg-white border border-divider">
+                      <p className="text-small font-medium text-foreground">
+                        「{smpData.singleMindedProposition}」
+                      </p>
+                      {smpData.rationale && (
+                        <p className="text-tiny text-default-500 mt-1 leading-relaxed">
+                          {smpData.rationale}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    <button
+                      className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90"
+                      onClick={resumeAfterSmp}
+                    >
+                      ▶ 繼續（跑 step 7-11）
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded-md border border-divider text-tiny hover:bg-default-50"
+                      onClick={() => setSection("seg:smp")}
+                    >
+                      編輯 SMP
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-            {visibleTiles.map((t) => (
+          )}
+          {/* Failure trail — shows step ids that errored or returned empty
+              conclusion so user knows which segments to rerun (CJ caught
+              2026-04-29: product step 3-5 silently empty after step 2). */}
+          {failedStepIds.length > 0 && (
+            <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
+              ⚠ 以下 step 沒寫入內容，建議到對應頁籤重跑：
+              {" "}
+              {failedStepIds
+                .map((id) => {
+                  const s = pipelineSteps.find((x) => x.id === id);
+                  return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`;
+                })
+                .join("、")}
               <button
-                key={t.id}
-                onClick={() => onTileClick(t)}
-                className="group text-left overflow-hidden rounded-2xl transition hover:shadow-[0_6px_18px_rgba(0,0,0,0.08)]"
+                className="ml-2 underline"
+                onClick={() => setFailedStepIds([])}
               >
-                <div
-                  className="relative h-[220px] flex items-center justify-center"
-                  style={{ background: t.bg }}
-                >
-                  {t.art}
-                  {!t.ready && (
-                    <span className="absolute top-2 right-2 text-[0.58rem] tracking-[0.18em] uppercase bg-white/90 text-mos-muted px-2 py-0.5 rounded-full">
-                      即將推出
-                    </span>
-                  )}
-                  {typeof t.count === "number" && t.count > 0 && (
-                    <span className="absolute top-2 left-2 text-[0.6rem] tracking-[0.16em] uppercase bg-white/95 text-mos-ink px-2 py-0.5 rounded-full">
-                      {t.count} 筆
-                    </span>
-                  )}
-                </div>
-                <div className="px-1 pt-3 pb-1 flex items-center justify-between">
-                  <span className="text-[0.92rem] text-mos-ink font-medium">
-                    {t.label}
-                  </span>
-                  <span aria-hidden className="text-[0.78rem]" style={{ color: "#5B3CC8" }}>👑</span>
-                </div>
+                關閉
               </button>
-            ))}
-          </div>
+            </div>
+          )}
+          {section.startsWith("asset:") && scopeMode === "brand" && (scope?.brandId ?? brandId) ? (
+            <BrandAssetPanel
+              assetKey={section.slice("asset:".length) as AssetKey}
+              brandId={(scope?.brandId ?? brandId)!}
+            />
+          ) : section === "settings" && scopeMode === "event" && scope?.eventId ? (
+            <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
+          ) : section === "card" || section === "prompts" || section.startsWith("seg:") ? (
+            <PositioningPanel
+              section={section}
+              scopeMode={scopeMode}
+              scopeName={scopeName}
+              scopeBrandId={scope?.brandId ?? null}
+              scopeProductId={scope?.productId ?? null}
+              scopeEventId={scope?.eventId ?? null}
+              pipelineThinking={
+                pipelineThinking && pipelineThinking.segmentTarget === section
+                  ? pipelineThinking
+                  : null
+              }
+              onAutoFill={runSegmentAutoFill}
+            />
+          ) : visibleTiles.length === 0 ? (
+            <Card shadow="none" className="border-2 border-dashed border-divider">
+              <CardBody className="py-16 items-center text-center gap-3">
+                <FontAwesomeIcon icon={faShapes} className="text-3xl text-default-300" />
+                <p className="text-medium font-medium">這個區塊還沒有資產</p>
+              </CardBody>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {visibleTiles.map((t) => (
+                <BrandAssetTile key={t.id} tile={t} onClick={() => onTileClick(t)} />
+              ))}
 
-          {visibleTiles.length === 0 && (
-            <div className="text-[0.82rem] text-mos-muted py-10">沒有資產。</div>
+            </div>
           )}
         </div>
-      </section>
+      </div>
     </main>
   );
 }
 
-/* ──────────────────────────── inline SVG art ─────────────────────────── */
+/* ─────────────────────────── PositioningPanel ───────────────────────── */
+// Renders the 完整定位書 / 速查卡 / AI 指令庫 sub-views for the active scope.
+// Reads positioning JSON from the appropriate router (brand / product / event)
+// and persists edits via mutation; segment list comes from positioningSchema.
 
-function ArtTemplates() {
+interface PipelineThinking {
+  segmentTarget: string;
+  text: string;
+  phase: "loading" | "typing" | "writing";
+  startedAt: number | null;
+  stepNum: number;
+  stepTotal: number;
+  stepTitle: string;
+}
+
+function PositioningPanel({
+  section, scopeMode, scopeName,
+  scopeBrandId, scopeProductId, scopeEventId,
+  pipelineThinking, onAutoFill,
+}: {
+  section: string;
+  scopeMode: "brand" | "product" | "event" | "none";
+  scopeName: string;
+  scopeBrandId: number | null;
+  scopeProductId: number | null;
+  scopeEventId: number | null;
+  pipelineThinking?: PipelineThinking | null;
+  onAutoFill?: (segmentId: string) => void;
+}) {
+  if (scopeMode === "none") {
+    return (
+      <Card shadow="none" className="border-2 border-dashed border-divider">
+        <CardBody className="py-16 items-center text-center gap-3">
+          <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-300" />
+          <p className="text-medium font-medium">尚未選擇 scope</p>
+          <p className="text-small text-default-500 max-w-[320px]">
+            請於右上 ScopeBar 選擇品牌 / 產品 / 活動，才能編輯定位內容。
+          </p>
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
-    <svg viewBox="0 0 200 140" className="w-[80%] h-[80%]">
-      <rect x="10" y="20" width="80" height="100" rx="6" fill="#fff"/>
-      <rect x="20" y="32" width="50" height="6" rx="2" fill="#FBC4A0"/>
-      <rect x="20" y="44" width="40" height="5" rx="2" fill="#F2D7C2"/>
-      <path d="M20 80 L40 60 L60 90 L80 70 L80 110 L20 110 Z" fill="#FBC4A0"/>
-      <rect x="100" y="20" width="80" height="100" rx="6" fill="#fff"/>
-      <circle cx="155" cy="48" r="14" fill="#5B3CC8"/>
-      <text x="155" y="53" textAnchor="middle" fontSize="14" fill="#fff" fontWeight="600">CO</text>
-      <rect x="110" y="78" width="60" height="5" rx="2" fill="#E5C9DA"/>
-      <rect x="110" y="88" width="40" height="5" rx="2" fill="#F1DCE6"/>
-    </svg>
+    <PositioningEditor
+      section={section}
+      scopeMode={scopeMode}
+      scopeName={scopeName}
+      brandId={scopeBrandId}
+      productId={scopeProductId}
+      eventId={scopeEventId}
+      pipelineThinking={pipelineThinking ?? null}
+      onAutoFill={onAutoFill}
+    />
   );
 }
 
-function ArtLogo() {
-  return (
-    <svg viewBox="0 0 200 140" className="w-[60%] h-[60%]">
-      <circle cx="100" cy="70" r="50" fill="#5B3CC8"/>
-      <text x="100" y="80" textAnchor="middle" fontSize="34" fill="#fff" fontWeight="700">CO</text>
-    </svg>
-  );
-}
+function PositioningEditor({
+  section, scopeMode, scopeName, brandId, productId, eventId, pipelineThinking, onAutoFill,
+}: {
+  section: string;
+  scopeMode: "brand" | "product" | "event";
+  scopeName: string;
+  brandId: number | null;
+  productId: number | null;
+  eventId: number | null;
+  pipelineThinking: PipelineThinking | null;
+  onAutoFill?: (segmentId: string) => void;
+}) {
+  const segments: SegmentSpec[] = SCOPE_SEGMENTS[scopeMode] ?? [];
+  const segmentId = section.startsWith("seg:") ? section.slice(4) : null;
+  const activeSegment = segmentId ? segments.find((s) => s.id === segmentId) ?? null : null;
 
-function ArtColors() {
-  const swatches = [
-    "#F5A86A", "#E78959", "#D86C5C", "#A23F52",
-    "#5B3CC8", "#9A6FE0", "#C9A6F5", "#E8DAF5",
-    "#3D9B6B", "#4FB07F", "#7FCAA0", "#B0E0C2",
-  ];
+  // Read scope.active to get the merged positioning data for the chosen scope.
+  const scopeActive = (trpc as any).scope?.active?.useQuery
+    ? (trpc as any).scope.active.useQuery(
+        { brandId, productId, eventId },
+        { refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: null, isLoading: false };
+
+  const dbPositioning =
+    (scopeActive.data as any)?.[scopeMode]?.positioning ?? null;
+  const targetId =
+    scopeMode === "brand" ? brandId
+    : scopeMode === "product" ? productId
+    : eventId;
+
+  // Local working copy + debounced persist via scope.savePositioning.
+  const [draft, setDraft] = React.useState<Record<string, any>>({});
+  const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+  React.useEffect(() => {
+    if (dbPositioning && typeof dbPositioning === "object") setDraft(dbPositioning);
+  }, [dbPositioning]);
+
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const saveMutation = (trpc as any).scope?.savePositioning?.useMutation
+    ? (trpc as any).scope.savePositioning.useMutation({
+        onSuccess: () => {
+          setSaveState("saved");
+          utils?.scope?.active?.invalidate?.();
+        },
+        onError: () => setSaveState("error"),
+      })
+    : null;
+
+  const dirtyRef = React.useRef(false);
+  const timerRef = React.useRef<any>(null);
+  const onDraftChange = (next: Record<string, any>) => {
+    setDraft(next);
+    dirtyRef.current = true;
+    if (!targetId || !saveMutation) return;
+    setSaveState("saving");
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      saveMutation.mutate({ kind: scopeMode, id: targetId, positioning: next });
+      dirtyRef.current = false;
+    }, 800);
+  };
+
+  if (section === "card") {
+    return (
+      <SpeedCardView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
+    );
+  }
+  if (section === "prompts") {
+    return (
+      <PromptLibraryView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
+    );
+  }
+
+  // section === "seg:xxx" — render ONE segment editor
+  if (!activeSegment) {
+    return (
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="py-12 items-center text-center gap-2">
+          <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-300" />
+          <p className="text-medium font-medium">找不到段落</p>
+          <p className="text-small text-default-500">請於左側選擇要編輯的定位書段落。</p>
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-4 gap-1 w-[70%]">
-      {swatches.map((c, i) => (
-        <div key={i} className="aspect-square rounded-sm" style={{ background: c }} />
-      ))}
+    <div className="flex flex-col gap-4">
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="px-5 py-4 gap-1 flex-row items-center justify-between flex-wrap">
+          <div>
+            <p className="text-tiny text-default-500 uppercase tracking-wider">
+              {scopeMode.toUpperCase()} · {activeSegment.num} {activeSegment.title}
+            </p>
+            <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
+          </div>
+          <SaveIndicator state={saveState} hasTarget={!!targetId} />
+        </CardBody>
+      </Card>
+      {pipelineThinking && (
+        <ThinkingOverlay
+          text={pipelineThinking.text}
+          phase={pipelineThinking.phase}
+          startedAt={pipelineThinking.startedAt ?? undefined}
+          stepNum={pipelineThinking.stepNum}
+          stepTotal={pipelineThinking.stepTotal}
+          stepTitle={pipelineThinking.stepTitle}
+        />
+      )}
+      <SegmentEditor
+        spec={activeSegment}
+        value={draft[activeSegment.id] ?? null}
+        onChange={(next) => onDraftChange({ ...draft, [activeSegment.id]: next })}
+        onRunAgent={() => onAutoFill?.(activeSegment.id)}
+        research={(draft._research as any)?.[activeSegment.id] ?? null}
+        wizardMeta={(draft._wizardMeta as any)?.[activeSegment.id] ?? null}
+      />
     </div>
   );
 }
 
-function ArtFonts() {
+/* ─────────────────────────── BrandAssetPanel ───────────────────────── */
+// Manual-fill panel for non-positioning brand assets (logo/colors/fonts/...).
+// Reads scope.active.brand.positioning._assets[assetKey], writes via
+// scope.savePositioning with debounced (800ms) auto-save.
+function BrandAssetPanel({ assetKey, brandId }: { assetKey: AssetKey; brandId: number }) {
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const scopeActive = (trpc as any).scope?.active?.useQuery
+    ? (trpc as any).scope.active.useQuery(
+        { brandId, productId: null, eventId: null },
+        { refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: null };
+  const positioning = (scopeActive.data as any)?.brand?.positioning ?? {};
+  const initialValue = (positioning._assets as any)?.[assetKey] ?? null;
+
+  const [draft, setDraft] = useState<any>(initialValue);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  React.useEffect(() => { setDraft(initialValue); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [JSON.stringify(initialValue)]);
+
+  const saveMutation = (trpc as any).scope?.savePositioning?.useMutation
+    ? (trpc as any).scope.savePositioning.useMutation({
+        onSuccess: () => { setSaveState("saved"); utils?.scope?.active?.invalidate?.(); },
+        onError: () => setSaveState("error"),
+      })
+    : null;
+
+  const timerRef = React.useRef<any>(null);
+  const onChange = (next: any) => {
+    setDraft(next);
+    if (!saveMutation) return;
+    setSaveState("saving");
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      const nextAssets = { ...(positioning._assets ?? {}), [assetKey]: next };
+      const nextPositioning = { ...positioning, _assets: nextAssets };
+      saveMutation.mutate({ kind: "brand", id: brandId, positioning: nextPositioning });
+    }, 800);
+  };
+
   return (
-    <svg viewBox="0 0 200 140" className="w-[80%] h-[80%]">
-      <text x="35" y="80" fontSize="60" fontWeight="700" fill="#3D9B6B">文</text>
-      <text x="100" y="80" fontSize="60" fontFamily="Georgia, serif" fontStyle="italic" fontWeight="700" fill="#3D9B6B">A</text>
-      <text x="140" y="80" fontSize="60" fontFamily="Georgia, serif" fontStyle="italic" fontWeight="500" fill="#7FCAA0">a</text>
-    </svg>
+    <div className="flex flex-col gap-3">
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="px-5 py-3 flex-row items-center justify-between flex-wrap">
+          <p className="text-small text-default-500">
+            這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets
+          </p>
+          <SaveIndicator state={saveState} hasTarget={true} />
+        </CardBody>
+      </Card>
+      <BrandAssetEditor assetKey={assetKey} value={draft} onChange={onChange} />
+    </div>
   );
 }
 
-function ArtQuote() {
+function SaveIndicator({ state, hasTarget }: { state: "idle" | "saving" | "saved" | "error"; hasTarget: boolean }) {
+  if (!hasTarget) {
+    return (
+      <Chip size="sm" variant="flat" color="warning" className="shrink-0">
+        未綁定 ID — 編輯不會儲存
+      </Chip>
+    );
+  }
+  if (state === "saving") return <Chip size="sm" variant="flat" color="default" className="shrink-0">儲存中…</Chip>;
+  if (state === "saved")  return <Chip size="sm" variant="flat" color="success" className="shrink-0">已儲存</Chip>;
+  if (state === "error")  return <Chip size="sm" variant="flat" color="danger"  className="shrink-0">儲存失敗</Chip>;
+  return null;
+}
+
+function SpeedCardView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
   return (
-    <svg viewBox="0 0 200 140" className="w-[70%] h-[70%]">
-      <path d="M40 40 Q40 30 50 30 L70 30 Q80 30 80 40 L80 60 Q80 80 60 90 L55 80 Q70 75 70 60 L60 60 Q40 60 40 50 Z" fill="#9A6FE0"/>
-      <path d="M105 40 Q105 30 115 30 L135 30 Q145 30 145 40 L145 60 Q145 80 125 90 L120 80 Q135 75 135 60 L125 60 Q105 60 105 50 Z" fill="#9A6FE0"/>
-      <rect x="40" y="100" width="120" height="6" rx="3" fill="#C9A6F5"/>
-      <rect x="40" y="112" width="80" height="6" rx="3" fill="#E8DAF5"/>
-    </svg>
+    <SpeedCard
+      scopeMode={scopeMode as "brand" | "product" | "event"}
+      scopeName={scopeName}
+      data={data}
+    />
   );
 }
 
-function ArtPositioning() {
+function PromptLibraryView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
   return (
-    <svg viewBox="0 0 200 140" className="w-[75%] h-[75%]">
-      <circle cx="100" cy="70" r="50" fill="none" stroke="#D86C5C" strokeWidth="2" strokeDasharray="3 3"/>
-      <circle cx="100" cy="70" r="32" fill="none" stroke="#D86C5C" strokeWidth="2"/>
-      <circle cx="100" cy="70" r="14" fill="#D86C5C"/>
-      <circle cx="100" cy="70" r="4" fill="#fff"/>
-    </svg>
+    <PromptLibrary
+      scopeMode={scopeMode as "brand" | "product" | "event"}
+      scopeName={scopeName}
+      data={data}
+    />
   );
 }
 
-function ArtAudience() {
+/* ─────────────────────────── BrandAssetTile ─────────────────────────── */
+
+function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) {
   return (
-    <svg viewBox="0 0 200 140" className="w-[80%] h-[80%]" stroke="#3D9B6B" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="60" cy="55" r="14"/>
-      <path d="M40 100 Q40 80 60 80 Q80 80 80 100"/>
-      <circle cx="140" cy="55" r="14"/>
-      <path d="M120 100 Q120 80 140 80 Q160 80 160 100"/>
-      <circle cx="100" cy="40" r="10"/>
-      <path d="M85 75 Q85 60 100 60 Q115 60 115 75"/>
-    </svg>
+    <Card
+      isPressable
+      isHoverable
+      onPress={onClick}
+      shadow="sm"
+      radius="lg"
+      className={`overflow-hidden bg-${tile.tone}-100`}
+    >
+      <CardBody className="aspect-[4/3] items-center justify-center relative p-0">
+        <FontAwesomeIcon
+          icon={tile.icon}
+          className={`text-7xl text-${tile.tone}-600/70`}
+        />
+        {tile.count != null && tile.count > 0 && (
+          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md">
+            {tile.count}
+          </Chip>
+        )}
+        {!tile.ready && (
+          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md text-default-500">
+            即將推出
+          </Chip>
+        )}
+      </CardBody>
+      <div className="px-4 py-3 bg-content1">
+        <p className="text-small font-medium text-foreground">{tile.label}</p>
+      </div>
+    </Card>
   );
 }
 
-function ArtCompetitor() {
-  return (
-    <svg viewBox="0 0 200 140" className="w-[80%] h-[80%]">
-      <rect x="20" y="80" width="30" height="40" fill="#F0B5C8"/>
-      <rect x="60" y="50" width="30" height="70" fill="#E78AA5"/>
-      <rect x="100" y="30" width="30" height="90" fill="#D86C5C"/>
-      <rect x="140" y="65" width="30" height="55" fill="#F0B5C8"/>
-    </svg>
-  );
-}
+/* ─────────────────────── Event Settings Panel ───────────────────────
+ * CJ direction 2026-04-29: post-creation event editing — brand picker,
+ * name, period, linked productIds (m:n via event_products). All metadata
+ * that previously could only be set at create time. Lives as the
+ * "settings" sub-nav entry under event scope.
+ */
+function EventSettingsPanel({
+  eventId, brands,
+}: { eventId: number; brands: any[] }) {
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const eventQuery = (trpc as any).event?.get?.useQuery
+    ? (trpc as any).event.get.useQuery({ id: eventId }, { refetchOnWindowFocus: false })
+    : { data: null, isLoading: false };
+  const event = eventQuery.data as any;
 
-function ArtPhotos() {
-  return (
-    <svg viewBox="0 0 200 140" className="w-[80%] h-[80%]">
-      <rect x="20" y="30" width="160" height="90" rx="6" fill="#fff"/>
-      <rect x="20" y="30" width="160" height="60" rx="6" fill="#A8D9D2"/>
-      <circle cx="155" cy="50" r="8" fill="#FFD53D"/>
-      <path d="M20 90 L60 65 L100 90 L130 70 L180 90 L180 90 Z" fill="#3D9B6B"/>
-    </svg>
-  );
-}
+  const [name, setName] = React.useState("");
+  const [brandId, setBrandId] = React.useState<number | null>(null);
+  const [startAt, setStartAt] = React.useState("");
+  const [endAt, setEndAt]     = React.useState("");
+  const [productIds, setProductIds] = React.useState<number[]>([]);
+  const [savedAt, setSavedAt] = React.useState<string | null>(null);
+  const [err, setErr] = React.useState<string | null>(null);
 
-function ArtImage() {
-  return (
-    <svg viewBox="0 0 200 140" className="w-[70%] h-[70%]">
-      <circle cx="100" cy="70" r="38" fill="#FFD53D"/>
-      {Array.from({ length: 12 }).map((_, i) => {
-        const a = (i * Math.PI * 2) / 12;
-        const x1 = 100 + Math.cos(a) * 42;
-        const y1 = 70 + Math.sin(a) * 42;
-        const x2 = 100 + Math.cos(a) * 58;
-        const y2 = 70 + Math.sin(a) * 58;
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#F5A86A" strokeWidth="6" strokeLinecap="round"/>;
-      })}
-      <circle cx="100" cy="70" r="22" fill="#F5A86A"/>
-    </svg>
-  );
-}
+  // Hydrate from server data once it arrives.
+  React.useEffect(() => {
+    if (!event) return;
+    setName(event.name ?? "");
+    setBrandId(event.brandId ?? null);
+    const fmt = (d: any): string => {
+      if (!d) return "";
+      try {
+        const s = String(d);
+        return s.split("T")[0] ?? s;
+      } catch { return ""; }
+    };
+    setStartAt(fmt(event.startAt));
+    setEndAt(fmt(event.endAt));
+    setProductIds(Array.isArray(event.productIds) ? event.productIds : []);
+  }, [event]);
 
-function ArtIcons() {
-  return (
-    <svg viewBox="0 0 200 140" className="w-[80%] h-[80%]" stroke="#5B3CC8" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M40 50 a8 8 0 0 1 16 0 c0 6 -8 8 -8 14 M48 75 v1"/>
-      <path d="M95 40 v6 M110 50 v18 a4 4 0 0 1 -4 4 H86 a4 4 0 0 1 -4 -4 V50 H110 Z M91 78 v3 M101 78 v3"/>
-      <path d="M150 60 h12 v-6 a4 4 0 0 0 -4 -4 h-4 a4 4 0 0 0 -4 4 V72 a6 6 0 0 0 6 6 h6 a6 6 0 0 0 6 -6 H150"/>
-      <path d="M40 110 c0 -6 4 -10 10 -10 c6 0 10 4 10 10"/>
-      <path d="M86 100 a8 8 0 0 1 16 0 a8 8 0 0 1 -16 0 Z"/>
-      <rect x="148" y="98" width="22" height="16" rx="2"/>
-      <path d="M150 102 l9 6 l9 -6"/>
-    </svg>
-  );
-}
+  // Candidate products from the picked brand (so user can re-link if
+  // brand changes). Same query the create-modal uses.
+  const productsQuery = (trpc as any).product?.list?.useQuery
+    ? (trpc as any).product.list.useQuery(
+        { brandId: brandId ?? undefined },
+        { enabled: !!brandId, refetchOnWindowFocus: false },
+      )
+    : { data: [] };
+  const candidateProducts: any[] = (productsQuery.data as any[]) ?? [];
 
-function ArtChart() {
+  const upsert = (trpc as any).event?.upsert?.useMutation?.() ?? null;
+
+  const onSave = async () => {
+    if (!upsert) { setErr("event.upsert not available"); return; }
+    if (!name.trim()) { setErr("名稱不能為空"); return; }
+    if (!brandId) { setErr("必須綁定品牌"); return; }
+    setErr(null);
+    try {
+      await upsert.mutateAsync({
+        id: eventId,
+        brandId,
+        slug: event?.slug ?? "",
+        name: name.trim(),
+        startAt: startAt || undefined,
+        endAt: endAt || undefined,
+        productIds, // replace full set per upsert contract
+      });
+      setSavedAt(new Date().toLocaleTimeString());
+      utils?.event?.get?.invalidate?.();
+      utils?.scope?.options?.invalidate?.();
+      utils?.scope?.active?.invalidate?.();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  };
+
+  if (eventQuery.isLoading) {
+    return <p className="text-small text-default-500">載入中…</p>;
+  }
+  if (!event) {
+    return (
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="py-16 items-center text-center">
+          <p className="text-medium font-medium">找不到此活動</p>
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
-    <svg viewBox="0 0 200 140" className="w-[75%] h-[75%]">
-      <path d="M100 70 L100 25 A45 45 0 0 1 145 70 Z" fill="#1F7FD4"/>
-      <path d="M100 70 L145 70 A45 45 0 0 1 115 112 Z" fill="#5B3CC8"/>
-      <path d="M100 70 L115 112 A45 45 0 0 1 70 100 Z" fill="#E78AA5"/>
-      <path d="M100 70 L70 100 A45 45 0 0 1 55 70 Z" fill="#F5A86A"/>
-      <path d="M100 70 L55 70 A45 45 0 0 1 100 25 Z" fill="#FFD53D"/>
-    </svg>
+    <div className="flex flex-col gap-4 max-w-3xl">
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="px-5 py-4 gap-1">
+          <p className="text-tiny text-default-500 uppercase tracking-wider">EVENT · 設定</p>
+          <h2 className="text-xl font-semibold tracking-tight">{event.name}</h2>
+          <p className="text-small text-default-500">
+            slug: <code className="text-tiny">{event.slug}</code>
+          </p>
+        </CardBody>
+      </Card>
+
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="p-5 gap-4">
+          <Input
+            label="活動名稱（必填）"
+            labelPlacement="outside"
+            variant="bordered" size="sm" radius="md"
+            value={name}
+            onValueChange={setName}
+            isRequired
+          />
+          <Select
+            label="所屬品牌（必選）"
+            labelPlacement="outside"
+            variant="bordered" size="sm" radius="md"
+            selectedKeys={brandId ? new Set([String(brandId)]) : new Set()}
+            onSelectionChange={(keys) => {
+              const k = Array.from(keys as Set<string>)[0];
+              setBrandId(k ? Number(k) : null);
+            }}
+            isRequired
+          >
+            {brands.map((b: any) => (
+              <SelectItem key={String(b.id)}>{b.name}</SelectItem>
+            ))}
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="開始日期" labelPlacement="outside"
+              variant="bordered" size="sm" radius="md" type="date"
+              value={startAt} onValueChange={setStartAt}
+            />
+            <Input
+              label="結束日期" labelPlacement="outside"
+              variant="bordered" size="sm" radius="md" type="date"
+              value={endAt} onValueChange={setEndAt}
+            />
+          </div>
+          <div>
+            <p className="text-small font-medium mb-1">關聯產品（可多選）</p>
+            <p className="text-tiny text-default-500 mb-2">
+              選 0 個 = 品牌層級活動；2+ 個 = 跨產品活動。改變綁定的品牌後產品清單會更新。
+            </p>
+            {candidateProducts.length === 0 ? (
+              <p className="text-tiny text-default-500">此品牌尚無產品。</p>
+            ) : (
+              <CheckboxGroup
+                value={productIds.map(String)}
+                onValueChange={(vals) => setProductIds((vals as string[]).map((v) => Number(v)))}
+                classNames={{ wrapper: "gap-1.5" }}
+              >
+                {candidateProducts.map((p: any) => (
+                  <Checkbox key={p.id} value={String(p.id)} size="sm">
+                    <span className="text-small">{p.name}</span>
+                  </Checkbox>
+                ))}
+              </CheckboxGroup>
+            )}
+          </div>
+          {err && <p className="text-tiny text-danger">{err}</p>}
+          <div className="flex items-center gap-3">
+            <Button
+              color="primary" size="sm"
+              isLoading={upsert?.isPending ?? false}
+              onPress={onSave}
+            >
+              儲存
+            </Button>
+            {savedAt && <span className="text-tiny text-success">已儲存 · {savedAt}</span>}
+          </div>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

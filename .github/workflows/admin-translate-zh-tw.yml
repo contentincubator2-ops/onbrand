@@ -1,0 +1,67 @@
+name: Admin — Translate skills + agents to zh-TW
+
+# Runs scripts/translateZhTw.ts on the VM. Reads rows where the *_zh
+# column is NULL, calls Azure Foundry gpt-4o-mini with a Taiwan locale
+# prompt, writes back name_zh / title_zh / bio_zh / description_zh.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'skills | agents | squads | all'
+        required: false
+        default: 'skills'
+      apply:
+        description: 'true = write to DB; false = dry-run'
+        required: false
+        default: 'false'
+      limit:
+        description: 'Limit rows (blank = all)'
+        required: false
+      batch:
+        description: 'Rows per LLM call (default 20, max 50)'
+        required: false
+        default: '20'
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ inputs.target }}
+          APPLY:  ${{ inputs.apply }}
+          LIMIT:  ${{ inputs.limit }}
+          BATCH:  ${{ inputs.batch }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 18000s
+          envs: GH_TOKEN,TARGET,APPLY,LIMIT,BATCH
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+
+            echo "===== Pull latest main ====="
+            cd "$APP"
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Commit: $(git log --oneline -1)"
+
+            echo ""
+            echo "===== Run migrations (idempotent — adds *_zh cols if missing) ====="
+            cd "$AI"
+            if [ -f .env ]; then set -a; source .env; set +a; fi
+            npx tsx scripts/migrate.ts 2>&1 | tail -20 || true
+
+            echo ""
+            echo "===== Run translator (target=$TARGET apply=$APPLY) ====="
+            ARGS="--target=$TARGET --batch=${BATCH:-20}"
+            [ "$APPLY" = "true" ] && ARGS="$ARGS --apply"
+            [ -n "$LIMIT" ]       && ARGS="$ARGS --limit=$LIMIT"
+            npx tsx scripts/translateZhTw.ts $ARGS 2>&1 | tail -200

@@ -1,0 +1,151 @@
+name: Admin — Migrate skills/methodology schema
+
+# Phase 2 of curated-30 + skill ingest plan.
+#
+# Idempotent SQL migration on the VM:
+#   - CREATE TABLE methodology      (new — top of the four-layer hierarchy)
+#   - CREATE TABLE skills           (new — atomic capabilities, includes
+#                                    security check + compatible model list)
+#   - ALTER TABLE squads ADD        is_curated, methodology_id
+#   - ALTER TABLE agents ADD        primary_skill_id, attached_skill_ids (JSON)
+#
+# Each statement is wrapped so re-running is safe.
+#
+# Run AFTER admin-backup-squads.yml. The backup is your safety net.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "MIGRATE" to confirm — will modify production schema'
+        required: true
+        default: ''
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'MIGRATE' }}
+    steps:
+      - name: Apply schema migration on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            if [ -f "$ENV_FILE" ]; then
+              set -a; source "$ENV_FILE"; set +a
+            fi
+            DB_HOST="${DB_HOST:-127.0.0.1}"
+            DB_USER="${DB_USER:-root}"
+            DB_NAME="${DB_NAME:-mos_db}"
+
+            run_sql() { MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$1"; }
+
+            echo "===== 1. CREATE methodology table ====="
+            run_sql "
+              CREATE TABLE IF NOT EXISTS methodology (
+                id            INT AUTO_INCREMENT PRIMARY KEY,
+                slug          VARCHAR(190) NOT NULL UNIQUE,
+                name          VARCHAR(255) NOT NULL,
+                author        VARCHAR(255) NULL,
+                year          VARCHAR(16)  NULL,
+                source_url    TEXT NULL,
+                description   TEXT NULL,
+                philosophy    TEXT NULL,
+                strategy_layer VARCHAR(8)  NULL,
+                default_squad_id INT NULL,
+                is_curated    TINYINT(1) NOT NULL DEFAULT 0,
+                created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_layer (strategy_layer),
+                INDEX idx_curated (is_curated),
+                INDEX idx_default_squad (default_squad_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            "
+
+            echo "===== 2. CREATE skills table ====="
+            run_sql "
+              CREATE TABLE IF NOT EXISTS skills (
+                id              INT AUTO_INCREMENT PRIMARY KEY,
+                slug            VARCHAR(190) NOT NULL UNIQUE,
+                name            VARCHAR(255) NOT NULL,
+                category        VARCHAR(64) NULL,
+                strategy_layer  VARCHAR(8)  NULL,
+                source          VARCHAR(64) NOT NULL DEFAULT 'internal',
+                source_url      TEXT NULL,
+                description     TEXT NULL,
+                manifest        JSON NULL,
+                compatible_models JSON NULL,
+                security_check  JSON NULL,
+                quality_score   DECIMAL(3,1) NULL,
+                is_active       TINYINT(1) NOT NULL DEFAULT 1,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_layer (strategy_layer),
+                INDEX idx_source (source),
+                INDEX idx_active (is_active),
+                INDEX idx_category (category)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            "
+
+            echo "===== 3. ALTER squads ADD is_curated, methodology_id ====="
+            # MySQL doesn't support `IF NOT EXISTS` on ADD COLUMN consistently,
+            # so probe first.
+            HAS_CURATED=$(MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+              "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='$DB_NAME' AND table_name='squads' AND column_name='is_curated'" "$DB_NAME")
+            if [ "$HAS_CURATED" = "0" ]; then
+              run_sql "ALTER TABLE squads ADD COLUMN is_curated TINYINT(1) NOT NULL DEFAULT 0, ADD INDEX idx_squads_curated (is_curated);"
+              echo "  + added is_curated"
+            else
+              echo "  = is_curated already present"
+            fi
+
+            HAS_METH=$(MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+              "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='$DB_NAME' AND table_name='squads' AND column_name='methodology_id'" "$DB_NAME")
+            if [ "$HAS_METH" = "0" ]; then
+              run_sql "ALTER TABLE squads ADD COLUMN methodology_id INT NULL, ADD INDEX idx_squads_methodology (methodology_id);"
+              echo "  + added methodology_id"
+            else
+              echo "  = methodology_id already present"
+            fi
+
+            echo "===== 4. ALTER agents ADD primary_skill_id, attached_skill_ids ====="
+            HAS_PSKILL=$(MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+              "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='$DB_NAME' AND table_name='agents' AND column_name='primary_skill_id'" "$DB_NAME")
+            if [ "$HAS_PSKILL" = "0" ]; then
+              run_sql "ALTER TABLE agents ADD COLUMN primary_skill_id INT NULL, ADD INDEX idx_agents_pskill (primary_skill_id);"
+              echo "  + added primary_skill_id"
+            else
+              echo "  = primary_skill_id already present"
+            fi
+
+            HAS_ASKILL=$(MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST" -u"$DB_USER" -N -B -e \
+              "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='$DB_NAME' AND table_name='agents' AND column_name='attached_skill_ids'" "$DB_NAME")
+            if [ "$HAS_ASKILL" = "0" ]; then
+              run_sql "ALTER TABLE agents ADD COLUMN attached_skill_ids JSON NULL;"
+              echo "  + added attached_skill_ids"
+            else
+              echo "  = attached_skill_ids already present"
+            fi
+
+            echo "===== 5. Verify ====="
+            run_sql "SHOW CREATE TABLE methodology\G" | head -30
+            run_sql "SHOW CREATE TABLE skills\G"      | head -40
+            run_sql "
+              SELECT COLUMN_NAME, COLUMN_TYPE
+                FROM information_schema.columns
+               WHERE table_schema='$DB_NAME' AND table_name='squads'
+                 AND column_name IN ('is_curated','methodology_id')
+            "
+            run_sql "
+              SELECT COLUMN_NAME, COLUMN_TYPE
+                FROM information_schema.columns
+               WHERE table_schema='$DB_NAME' AND table_name='agents'
+                 AND column_name IN ('primary_skill_id','attached_skill_ids')
+            "
+
+            echo "===== Done ====="

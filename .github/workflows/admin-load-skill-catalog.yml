@@ -1,0 +1,37 @@
+name: Admin — Load skill catalog into DB
+
+# Reads skills/ai-talent/data/skill-catalog.json (produced by harvest) and
+# upserts each skill into the skill_catalog MySQL table. Run AFTER:
+#   1. admin-migrate-modelstack.yml (creates the table)
+#   2. admin-harvest-skill-catalog.yml (writes the JSON)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            cd "$APP"
+            git remote set-url origin "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+            cd "$APP/skills/ai-talent"
+            if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -5; fi
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  📥 Load skill_catalog from data/skill-catalog.json"
+            echo "════════════════════════════════════════════════════════════════"
+            npm run db:load-skill-catalog

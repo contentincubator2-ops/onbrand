@@ -1,0 +1,73 @@
+name: Admin — Generate squad cover images (FAL flux/dev)
+
+# Runs scripts/generateSquadCovers.ts on the VM. Pulls FAL key from
+# GH Secrets pool, reads 30 curated squads, generates landscape covers,
+# stores URLs in squads.hero_image_url.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Type "true" to preview prompts, no API call'
+        required: false
+        default: 'false'
+      reuse:
+        description: 'Type "true" to SKIP squads that already have hero_image_url'
+        required: false
+        default: 'true'
+      limit:
+        description: 'Limit (blank = all 30 curated)'
+        required: false
+      slug:
+        description: 'Only generate for this squad slug (overrides limit)'
+        required: false
+      slugs:
+        description: 'Comma-separated slug list — regenerates these even if hero exists'
+        required: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY: ${{ github.event.inputs.dry_run }}
+          REUSE: ${{ github.event.inputs.reuse }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          SLUG:  ${{ github.event.inputs.slug }}
+          SLUGS: ${{ github.event.inputs.slugs }}
+          AZURE_IMAGE_API_KEY:  ${{ secrets.GPT }}
+          AZURE_IMAGE_ENDPOINT: "https://proj-claude-sweden-resource.cognitiveservices.azure.com"
+          AZURE_IMAGE_DEPLOYMENT: "gpt-image-2"
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5400s
+          envs: GH_TOKEN,DRY,REUSE,LIMIT,SLUG,SLUGS,AZURE_IMAGE_API_KEY,AZURE_IMAGE_ENDPOINT,AZURE_IMAGE_DEPLOYMENT
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main && git reset --hard origin/main
+
+            ENV_FILE=$APP/skills/ai-talent/.env
+            set -a; source "$ENV_FILE"; set +a
+            cd $APP/skills/ai-talent
+
+            # Persistent dir for cover images (survives git reset --hard during deploys)
+            sudo mkdir -p /opt/marketing-os/covers || mkdir -p /opt/marketing-os/covers
+            sudo chown -R $(whoami):$(whoami) /opt/marketing-os/covers 2>/dev/null || true
+
+            ARGS=""
+            [ "$DRY" = "true" ]   && ARGS="$ARGS --dry-run"
+            [ "$REUSE" = "true" ] && ARGS="$ARGS --reuse"
+            [ -n "$LIMIT" ]       && ARGS="$ARGS --limit=$LIMIT"
+            [ -n "$SLUG" ]        && ARGS="$ARGS --slug=$SLUG"
+            [ -n "$SLUGS" ]       && ARGS="$ARGS --slugs=$SLUGS"
+
+            echo "===== tsx scripts/generateSquadCovers.ts $ARGS ====="
+            ./node_modules/.bin/tsx scripts/generateSquadCovers.ts $ARGS

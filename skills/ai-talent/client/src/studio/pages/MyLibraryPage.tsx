@@ -37,25 +37,25 @@ export default function MyLibraryPage() {
         <>
           <button
             onClick={() => navigate(`/studio/${brandId}/triage`)}
-            className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink"
+            className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground"
           >
             From Diagnosis
           </button>
-          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] bg-mos-ink text-white">
+          <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] bg-foreground text-white">
             + New Template
           </button>
         </>
       }
     >
-      <div className="flex items-center justify-between border-b border-mos-hair pb-4 mb-6">
-        <div className="flex gap-px bg-mos-hair border border-mos-hair">
+      <div className="flex items-center justify-between border-b border-divider pb-4 mb-6">
+        <div className="flex gap-px bg-divider border border-divider">
           {(["all", "my-remix", "sowork", "scheduled"] as Filter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={[
                 "px-4 py-2 text-meta uppercase tracking-[0.16em]",
-                filter === f ? "bg-mos-ink text-white" : "bg-white text-mos-body",
+                filter === f ? "bg-foreground text-white" : "bg-white text-foreground",
               ].join(" ")}
             >
               {f.replace("-", " ")}
@@ -66,16 +66,16 @@ export default function MyLibraryPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search"
-          className="border border-mos-hair px-3 py-2 text-[0.88rem] w-[280px] focus:outline-none focus:border-mos-ink"
+          className="border border-divider px-3 py-2 text-[0.88rem] w-[280px] focus:outline-none focus:border-foreground"
         />
       </div>
 
       <div className="space-y-3">
         {q_list.isLoading && (
-          <div className="text-meta text-mos-muted py-16 text-center">Loading…</div>
+          <div className="text-meta text-default-500 py-16 text-center">Loading…</div>
         )}
         {!q_list.isLoading && templates.length === 0 && (
-          <div className="border border-dashed border-mos-hair p-12 text-center text-meta text-mos-muted">
+          <div className="border border-dashed border-divider p-12 text-center text-meta text-default-500">
             No templates yet. Save one after approving a methodology run.
           </div>
         )}
@@ -94,21 +94,21 @@ function TemplateRow({ t }: { t: any }) {
     d ? new Date(d).toLocaleDateString() : "—";
 
   return (
-    <div className="flex items-stretch border border-mos-hair bg-white">
+    <div className="flex items-stretch border border-divider bg-white">
       <div className={`w-[88px] shrink-0 ${tone.bgClass} ${clipForIndex(0)}`} />
       <div className="flex-1 px-5 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="mos-display text-[1.1rem] text-mos-ink">{t.name}</div>
-            <div className="text-meta text-mos-muted mt-1">
+            <div className="mos-display text-[1.1rem] text-foreground">{t.name}</div>
+            <div className="text-meta text-default-500 mt-1">
               {t.description ?? (t.stepsOverride ? "Remixed" : "SoWork original")}
             </div>
           </div>
-          <div className="text-meta uppercase tracking-[0.16em] text-mos-muted">
+          <div className="text-meta uppercase tracking-[0.16em] text-default-500">
             {t.lastRunAt ? `last run · ${fmtDate(t.lastRunAt)}` : `updated · ${fmtDate(t.updatedAt)}`}
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-6 text-meta text-mos-body">
+        <div className="mt-3 flex items-center gap-6 text-meta text-foreground">
           {typeof t.runCount === "number" && (
             <span>Runs · {t.runCount}</span>
           )}
@@ -119,10 +119,10 @@ function TemplateRow({ t }: { t: any }) {
         </div>
       </div>
       <div className="flex items-center gap-2 pr-5">
-        <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink">
+        <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground">
           Open
         </button>
-        <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-mos-hair text-mos-body hover:border-mos-ink">
+        <button className="px-4 py-2 text-meta uppercase tracking-[0.16em] border border-divider text-foreground hover:border-foreground">
           Duplicate
         </button>
       </div>

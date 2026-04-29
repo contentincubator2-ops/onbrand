@@ -19,10 +19,28 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
-import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
+import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
+import { useLang } from "../../lib/i18n";
+import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
+import { searchAndRankSquads } from "../lib/searchSquads";
+import { SquadEntityCard } from "../components/SquadEntityCard";
+import { EntityStats } from "../components/EntityStats";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
+import { TaskChip } from "../components/TaskChip";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import { Avatar, Badge, Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Skeleton } from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faMagnifyingGlass, faChevronDown, faArrowDownWideShort, faArrowUpWideShort,
+  faTableCells, faList, faBookmark, faEllipsis,
+  faArrowRight, faWandSparkles,
+  faBullseye, faRocket, faUsers, faNewspaper, faEnvelope, faPlus, faCloudArrowUp,
+  faF, // generic fallback letter icon
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebookF, faInstagram, faLinkedinIn, faYoutube,
+} from "@fortawesome/free-brands-svg-icons";
 
 interface MissionRow {
   id: number;
@@ -41,8 +59,8 @@ interface MissionRow {
 }
 
 interface QuickTile {
-  /** Short monogram or unicode glyph — stays monochrome on white. */
-  glyph: string;
+  /** FontAwesome icon — neutral, never colored (per design system). */
+  icon: any;
   label: string;
   /** Layer hint for hover tint only. */
   layer?: MosLayer;
@@ -57,54 +75,51 @@ interface QuickTile {
 }
 
 const QUICK_TILES: QuickTile[] = [
-  { glyph: "f",   label: "Facebook",   layer: "L4",
+  { icon: faFacebookF, label: "Facebook", layer: "L4",
     missionTitle: "Facebook 月度經營計畫",
     missionDesc: "為品牌規劃下一個月的 Facebook 內容主軸、貼文節奏與互動策略。",
     workspace: "facebook" },
-  { glyph: "IG",  label: "Instagram",  layer: "L4",
+  { icon: faInstagram, label: "Instagram", layer: "L4",
     missionTitle: "Instagram 圖文系列企劃",
     missionDesc: "規劃 Instagram 連續貼文系列：視覺主題、文案結構、Hashtag、限動延伸。",
     workspace: "instagram" },
-  { glyph: "in",  label: "LinkedIn",   layer: "L4",
+  { icon: faLinkedinIn, label: "LinkedIn", layer: "L4",
     missionTitle: "LinkedIn 個人品牌經營",
     missionDesc: "以創辦人視角產出 B2B 思想領袖內容，建立信任與商機。",
     workspace: "linkedin" },
-  { glyph: "▶",   label: "YouTube",    layer: "L4",
+  { icon: faYoutube, label: "YouTube", layer: "L4",
     missionTitle: "YouTube 頻道內容企劃",
     missionDesc: "規劃 YouTube 頻道主題、長影片企劃與短影音延伸。",
     workspace: "youtube" },
-  { glyph: "品",  label: "品牌定位",   layer: "L1", badge: "推薦",
+  { icon: faBullseye, label: "品牌定位", layer: "L1", badge: "推薦",
     missionTitle: "品牌定位重塑（12 原型）",
     missionDesc: "用 Carol Pearson 12 原型任務範本梳理品牌個性與市場立足點。",
     squadSlug: "brand-archetype-positioning",
     workspace: "brand-positioning" },
-  { glyph: "新",  label: "新品上市",   layer: "L5",
+  { icon: faRocket, label: "新品上市", layer: "L5",
     missionTitle: "新品上市發表計畫",
     missionDesc: "依 Jeff Walker Product Launch Formula，規劃 4 階段發表節奏。",
     squadSlug: "plf-launch-formula",
     workspace: "campaign" },
-  { glyph: "眾",  label: "受眾分析",   layer: "L3",
+  { icon: faUsers, label: "受眾分析", layer: "L3",
     missionTitle: "受眾洞察與分群",
     missionDesc: "用 STP 與 Persona Canvas 產出可操作的受眾分群與訊息切入。",
     workspace: "audience" },
-  { glyph: "PR",  label: "公關",       layer: "L4",
+  { icon: faNewspaper, label: "公關", layer: "L4",
     missionTitle: "公關媒體曝光計畫",
     missionDesc: "規劃 PR 故事框架、新聞稿節奏與媒體名單。",
     workspace: "pr" },
-  { glyph: "✉",   label: "電子報",     layer: "L4",
+  { icon: faEnvelope, label: "電子報", layer: "L4",
     missionTitle: "電子報內容規劃",
     missionDesc: "建立電子報主題曲線、開信率優化與訂閱者分眾。",
     workspace: "email" },
-  { glyph: "+",   label: "自訂任務",
-    missionTitle: "",
-    missionDesc: "" },
-  { glyph: "☁",   label: "上傳",
-    missionTitle: "",
-    missionDesc: "",
+  { icon: faPlus, label: "自訂任務",
+    missionTitle: "", missionDesc: "" },
+  { icon: faCloudArrowUp, label: "上傳",
+    missionTitle: "", missionDesc: "",
     opensIngest: "upload" },
-  { glyph: "···", label: "顯示更多",
-    missionTitle: "",
-    missionDesc: "",
+  { icon: faEllipsis, label: "顯示更多",
+    missionTitle: "", missionDesc: "",
     isMore: true },
 ];
 
@@ -120,9 +135,15 @@ export default function MissionsHome() {
     { enabled: !allQuery && !!brandId, refetchOnWindowFocus: false }
   );
 
-  // Featured methodologies — fetched via squadTemplate.listByBrand and
-  // truncated. Falls back gracefully if no brandId.
-  const squadsQuery = (trpc.squad as any).listByBrand?.useQuery
+  // Featured entities (squad + agent + skill) via the unified endpoint.
+  // Falls back to the legacy squad endpoint if entity router isn't deployed yet.
+  const entityQuery = (trpc as any).entity?.listForHome?.useQuery
+    ? (trpc as any).entity.listForHome.useQuery(
+        { brandId: brandId ?? null },
+        { refetchOnWindowFocus: false }
+      )
+    : null;
+  const squadsQuery = !entityQuery && (trpc.squad as any).listByBrand?.useQuery
     ? (trpc.squad as any).listByBrand.useQuery(
         { brandId: brandId ?? 0 },
         { enabled: !!brandId, refetchOnWindowFocus: false }
@@ -138,24 +159,70 @@ export default function MissionsHome() {
 
   const isLoading = allQuery?.isLoading ?? fallbackQuery.isLoading;
 
-  // ── Featured templates: pick 8 strong squads, prefer L1/L5 + has steps
+  // ── Filters
+  const [selectedLayer, setSelectedLayer] = useState<MosLayer | "ALL">("ALL");
+  // 類型 (entity kind): squad / agent / skill — drives the dropdown
+  const [kindFilter, setKindFilter] = useState<"all" | "squad" | "agent" | "skill">("all");
+
+  // Unified entity list (preferred path) — already comes pre-shaped from server.
+  // Legacy squad list (fallback) — coerce to a near-compatible shape.
+  const allEntities = useMemo<any[]>(() => {
+    if (entityQuery?.data) return entityQuery.data as any[];
+    const legacy = (squadsQuery.data as any[]) ?? [];
+    return legacy
+      .filter((s) => Array.isArray(s.steps) && s.steps.length > 0)
+      .map((s) => ({ ...s, kind: "squad" }));
+  }, [entityQuery?.data, squadsQuery.data]);
+
+  // Counts per layer (drives LayerNav badges)
+  const layerCounts = useMemo(() => {
+    const filtered = kindFilter === "all" ? allEntities : allEntities.filter((s) => s.kind === kindFilter);
+    const c: Record<string, number> = { ALL: filtered.length, L1: 0, L2: 0, L3: 0, L4: 0, L5: 0, L6: 0 };
+    for (const s of filtered) {
+      const k = (s.strategyLayer ?? "").toString().slice(0, 2);
+      if (k in c) c[k]++;
+    }
+    return c;
+  }, [allEntities, kindFilter]);
+
+  // Counts per kind (drives 類型 dropdown labels)
+  const kindCounts = useMemo(() => {
+    const c = { squad: 0, agent: 0, skill: 0 } as Record<string, number>;
+    for (const e of allEntities) {
+      const k = String(e.kind ?? "squad");
+      if (k in c) c[k]++;
+    }
+    return c;
+  }, [allEntities]);
+
+  const [searchQ, setSearchQ] = useState("");
+
+  // Featured: filter by selected layer + searchQ, then sort, then slice
+  // PR6 — uses shared searchAndRankSquads for score-based ranking.
   const featured = useMemo(() => {
-    const all = (squadsQuery.data as any[]) ?? [];
-    const hasSteps = all.filter((s) => Array.isArray(s.steps) && s.steps.length > 0);
-    const pool = hasSteps.length >= 8 ? hasSteps : all;
-    const layerOrder = ["L1", "L5", "L3", "L2", "L4", "L6"];
-    return [...pool]
+    const layerOrder = ["L1", "L2", "L3", "L4", "L5", "L6"];
+    const q = searchQ.trim();
+    const passesFacets = (s: any) =>
+      (kindFilter === "all" || s.kind === kindFilter) &&
+      (selectedLayer === "ALL" || (s.strategyLayer ?? "").toString().slice(0, 2) === selectedLayer);
+
+    if (q) {
+      // Score-ranked: best matches first
+      const result = searchAndRankSquads(allEntities, q);
+      const ranked = result.hits.map((h) => h.squad).filter(passesFacets);
+      return ranked.slice(0, 24);
+    }
+    // No query — facet-only filter, sorted by layer
+    const filtered = allEntities.filter(passesFacets);
+    return [...filtered]
       .sort((a, b) => {
         const la = (a.strategyLayer ?? "L9").slice(0, 2);
         const lb = (b.strategyLayer ?? "L9").slice(0, 2);
         return layerOrder.indexOf(la) - layerOrder.indexOf(lb);
       })
-      .slice(0, 12);
-  }, [squadsQuery.data]);
-
-  const [searchQ, setSearchQ] = useState("");
+      .slice(0, selectedLayer === "ALL" ? 12 : 24);
+  }, [allEntities, kindFilter, selectedLayer, searchQ]);
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sortDesc, setSortDesc] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
@@ -170,23 +237,27 @@ export default function MissionsHome() {
         (m.workspace ?? "").toLowerCase().includes(q)
       );
     }
-    if (typeFilter !== "all") {
-      r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
-    }
     r = [...r].sort((a, b) => {
       const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return sortDesc ? tb - ta : ta - tb;
     });
     return r;
-  }, [rows, searchQ, typeFilter, sortDesc]);
+  }, [rows, searchQ, sortDesc]);
 
-  // Build the type filter dropdown options from actual data
-  const typeOptions = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((m) => { if (m.workspace) set.add(m.workspace.toLowerCase()); });
-    return ["all", ...Array.from(set).sort()];
-  }, [rows]);
+  // Type (kind) dropdown options
+  const kindOptions = useMemo(() => ([
+    { value: "all",   label: `任何類型 (${allEntities.length})` },
+    { value: "squad", label: `小組 (${kindCounts.squad ?? 0})` },
+    { value: "agent", label: `Agent (${kindCounts.agent ?? 0})` },
+    { value: "skill", label: `純技能 (${kindCounts.skill ?? 0})` },
+  ]), [allEntities.length, kindCounts]);
+  const kindLabelMap: Record<string, string> = {
+    all:   "類型",
+    squad: "小組",
+    agent: "Agent",
+    skill: "純技能",
+  };
 
   const goToMission = (m: MissionRow) => {
     const ws = m.workspace || "_";
@@ -206,23 +277,16 @@ export default function MissionsHome() {
     if (t.isMore) { navigate("/templates"); return; }
     if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
     if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-    setError(null);
-    setCreatingTpl(t.label);
-    try {
-      const res = await createMission.mutateAsync({
-        title: t.missionTitle,
-        description: t.missionDesc || undefined,
-        squadSlug: t.squadSlug,
-        workspace: t.workspace ?? "",
-        brandId: brandId ?? undefined,
-      });
-      if (!res?.id) throw new Error("後端沒有回傳 mission id");
-      const ws = t.workspace || "_";
-      navigate(brandId ? `/b/${brandId}/${ws}/m/${res.id}` : `/m/${res.id}`);
-    } catch (e: any) {
-      setError(`建立任務失敗：${e?.message ?? String(e)}`);
-      setCreatingTpl(null);
-    }
+    // ── Canva-style: open Picker workspace in a new tab.
+    // The picker is pre-filtered by workspace (channel) or layer, lets the
+    // user browse methodology squads + preview steps, then click 啟動 to
+    // create the mission and land in /m/:id.
+    const qs = new URLSearchParams();
+    if (t.workspace) qs.set("workspace", t.workspace);
+    if (t.layer) qs.set("layer", t.layer);
+    qs.set("title", t.missionTitle);
+    if (t.squadSlug) qs.set("slug", t.squadSlug);
+    window.open(`/picker?${qs.toString()}`, "_blank", "noopener");
   };
 
   const submitCustom = async () => {
@@ -263,54 +327,94 @@ export default function MissionsHome() {
 
   return (
     <main>
-      {/* ─── Pastel hero ──────────────────────────────────────────── */}
-      <section
-        className="relative px-8 pt-16 pb-12"
-        style={{
-          background:
-            "linear-gradient(135deg, #EAF2FF 0%, #EFE9FB 35%, #F8E8FF 70%, #FFE9F1 100%)",
-        }}
-      >
-        {/* Top-right CTAs (Canva-style: '先睹為快' + '開始試用') */}
-        <div className="absolute top-5 right-6 flex items-center gap-2 z-10">
-          <button
-            onClick={() => navigate("/templates")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[0.78rem] bg-white/90 hover:bg-white border border-mos-hair rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-          >
-            <span aria-hidden style={{ color: "#5B3CC8" }}>✦</span>
-            <span className="text-mos-ink">先看看任務範本</span>
-          </button>
-          <button
-            onClick={() => setCreateSource("recommended")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.78rem] bg-white hover:bg-mos-ink/5 border border-mos-ink rounded-full transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-          >
-            <span aria-hidden style={{ color: "#D4A24C" }}>👑</span>
-            <span className="text-mos-ink font-medium">立即建立任務</span>
-          </button>
-        </div>
-
-        <div className="max-w-[1280px] mx-auto">
-          <h1 className="text-center font-display text-[2.4rem] leading-[1.1] tracking-[-0.02em] text-mos-ink">
-            你今天要做什麼<span style={{ color: "#5B3CC8" }}>任務</span>呢？
-          </h1>
+      {/* ─── Hero ─── */}
+      <section className="relative px-8 pt-10 pb-10 border-b border-divider bg-content1">
+        <div>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <Chip variant="flat" color="default" size="sm" className="uppercase tracking-wider mb-2">
+                SoWork · Marketing OS
+              </Chip>
+              <h1 className="text-3xl font-semibold tracking-tight">
+                今天，想將哪個策略付諸實現？
+              </h1>
+              <div className="mt-2 max-w-[640px] text-small text-default-500 leading-relaxed">
+                <EntityStats variant="inline" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="bordered"
+                onPress={() => navigate("/templates")}
+                startContent={<FontAwesomeIcon icon={faWandSparkles} />}
+              >
+                瀏覽方法論型錄
+              </Button>
+              <Button
+                size="sm"
+                color="primary"
+                onPress={() => setCreateSource("recommended")}
+                endContent={<FontAwesomeIcon icon={faArrowRight} />}
+              >
+                立即開新任務
+              </Button>
+            </div>
+          </div>
 
           {/* Search bar */}
           <div className="mt-7 max-w-[680px] mx-auto">
-            <div className="relative">
-              <svg
-                className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-mos-muted pointer-events-none"
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-                strokeLinecap="round" strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="7.5" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                type="text"
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="搜尋任務範本、任務模板與最近的項目"
-                className="w-full pl-14 pr-5 py-[14px] text-[0.92rem] bg-white rounded-full border border-[#5B3CC8]/30 focus:outline-none focus:border-[#5B3CC8] focus:ring-2 focus:ring-[#5B3CC8]/15 transition shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+            <Input
+              size="lg"
+              radius="full"
+              variant="bordered"
+              value={searchQ}
+              onValueChange={setSearchQ}
+              isClearable
+              onClear={() => setSearchQ("")}
+              placeholder="搜尋方法論、任務、最近的工作"
+              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+            />
+
+            {/* Filter pills under search bar — Canva style */}
+            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+              <FilterChip
+                label={kindLabelMap[kindFilter] ?? "類型"}
+                options={kindOptions}
+                onSelect={(v) => setKindFilter(v as typeof kindFilter)}
+              />
+              <FilterChip
+                label={
+                  selectedLayer === "ALL"
+                    ? "類別"
+                    : `${selectedLayer}・${LAYER_TOKENS[selectedLayer].label}`
+                }
+                options={[
+                  { value: "ALL", label: "全部層級" },
+                  { value: "L1", label: "L1・品牌策略" },
+                  { value: "L2", label: "L2・產品策略" },
+                  { value: "L3", label: "L3・受眾策略" },
+                  { value: "L4", label: "L4・通路策略" },
+                  { value: "L5", label: "L5・活動策略" },
+                  { value: "L6", label: "L6・驗證校準" },
+                ]}
+                onSelect={(v) => setSelectedLayer(v as MosLayer | "ALL")}
+              />
+              <FilterChip
+                label={ownerFilter === "mine" ? "擁有者・我的" : "擁有者・全部"}
+                options={[
+                  { value: "mine", label: "我的" },
+                  { value: "all", label: "全部" },
+                ]}
+                onSelect={(v) => setOwnerFilter(v as "mine" | "all")}
+              />
+              <FilterChip
+                label={sortDesc ? "已修改日期・新→舊" : "已修改日期・舊→新"}
+                options={[
+                  { value: "desc", label: "新→舊" },
+                  { value: "asc", label: "舊→新" },
+                ]}
+                onSelect={(v) => setSortDesc(v === "desc")}
               />
             </div>
           </div>
@@ -331,7 +435,7 @@ export default function MissionsHome() {
       </section>
 
       {/* ─── Body sections ──────────────────────────────────────── */}
-      <section className="max-w-[1280px] mx-auto px-8 py-10">
+      <section className="px-8 py-10">
         {showCustom && (
           <CustomMissionForm
             title={customTitle}
@@ -345,79 +449,35 @@ export default function MissionsHome() {
           />
         )}
         {error && !showCustom && (
-          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 text-[0.82rem] text-red-700 rounded">
-            {error}
-          </div>
-        )}
-
-        {/* Featured methodologies — horizontal scroll */}
-        {featured.length > 0 && (
-          <>
-            <SectionHeader
-              title="為你推薦的任務範本"
-              cta="完整型錄 →"
-              onCtaClick={() => navigate("/templates")}
-            />
-            <div className="-mx-2 mb-12 overflow-x-auto pb-2">
-              <div className="flex gap-4 px-2" style={{ minWidth: "min-content" }}>
-                {featured.map((sq: any) => (
-                  <FeaturedSquadTile
-                    key={sq.id ?? sq.slug}
-                    squad={sq}
-                    busy={creatingTpl === `sq-${sq.slug}`}
-                    disabled={!!creatingTpl}
-                    onClick={() => startFromSquad(sq)}
-                    onPreview={() => navigate(`/templates/${sq.slug}`)}
-                  />
-                ))}
-              </div>
-            </div>
-          </>
+          <Card shadow="none" className="mb-6 border border-danger">
+            <CardBody className="text-small text-danger">{error}</CardBody>
+          </Card>
         )}
 
         {/* Recent missions — header + filter chips */}
         <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-          <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">
-            最近的項目
-          </h2>
+          <h2 className="text-xl font-semibold">最近的任務</h2>
           <div className="flex items-center gap-2">
             <FilterChip
               label={ownerFilter === "mine" ? "擁有者" : "全部"}
               onClick={() => setOwnerFilter((v) => (v === "mine" ? "all" : "mine"))}
             />
             <FilterChip
-              label={typeFilter === "all" ? "任何類型" : typeFilter}
-              options={typeOptions.map((t) => ({
-                value: t,
-                label: t === "all" ? "任何類型" : t,
-              }))}
-              onSelect={(v) => setTypeFilter(v)}
+              label={kindLabelMap[kindFilter] ?? "類型"}
+              options={kindOptions}
+              onSelect={(v) => setKindFilter(v as typeof kindFilter)}
             />
             <IconButton
               title={sortDesc ? "新→舊" : "舊→新"}
               onClick={() => setSortDesc((v) => !v)}
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 4v16M7 4l-3 3M7 4l3 3" />
-                <path d="M17 20V4M17 20l-3-3M17 20l3-3" style={{ opacity: sortDesc ? 1 : 0.4 }} />
-              </svg>
+              <FontAwesomeIcon icon={sortDesc ? faArrowDownWideShort : faArrowUpWideShort} />
             </IconButton>
             <IconButton
               title={viewMode === "grid" ? "切換為列表" : "切換為網格"}
               onClick={() => setViewMode((v) => (v === "grid" ? "list" : "grid"))}
             >
-              {viewMode === "grid" ? (
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-                  <rect x="4" y="4" width="7" height="7" rx="1" />
-                  <rect x="13" y="4" width="7" height="7" rx="1" />
-                  <rect x="4" y="13" width="7" height="7" rx="1" />
-                  <rect x="13" y="13" width="7" height="7" rx="1" />
-                </svg>
-              )}
+              <FontAwesomeIcon icon={viewMode === "grid" ? faList : faTableCells} />
             </IconButton>
           </div>
         </div>
@@ -427,9 +487,11 @@ export default function MissionsHome() {
             {Array.from({ length: 6 }).map((_, i) => <ThumbSkeleton key={i} />)}
           </div>
         ) : filteredRows.length === 0 ? (
-          <div className="border border-dashed border-mos-hair bg-white py-12 px-10 text-center text-[0.86rem] text-mos-muted rounded-lg">
-            {searchQ ? `沒有找到「${searchQ}」相關的項目。` : "還沒有任務 — 從上方挑一個快速開始。"}
-          </div>
+          <Card shadow="none" className="border-2 border-dashed border-divider">
+            <CardBody className="py-12 text-center text-small text-default-500">
+              {searchQ ? `沒有找到「${searchQ}」相關的項目。` : "還沒有任務 — 從上方挑一個快速開始。"}
+            </CardBody>
+          </Card>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {filteredRows.map((m) => (
@@ -437,11 +499,13 @@ export default function MissionsHome() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col divide-y divide-mos-hair border border-mos-hair rounded-lg overflow-hidden bg-white">
-            {filteredRows.map((m) => (
-              <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
-            ))}
-          </div>
+          <Card shadow="none" className="border border-divider overflow-hidden">
+            <div className="flex flex-col divide-y divide-divider">
+              {filteredRows.map((m) => (
+                <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
+              ))}
+            </div>
+          </Card>
         )}
       </section>
 
@@ -466,15 +530,49 @@ function SectionHeader({
 }: { title: string; cta?: string; onCtaClick?: () => void }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="font-display text-[1.32rem] text-mos-ink tracking-[-0.01em]">{title}</h2>
+      <h2 className="text-xl font-semibold">{title}</h2>
       {cta && (
-        <button
-          onClick={onCtaClick}
-          className="text-[0.74rem] tracking-[0.06em] text-mos-muted hover:text-mos-ink transition"
-        >
+        <Button size="sm" variant="light" onPress={onCtaClick}>
           {cta}
-        </button>
+        </Button>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────── Layer nav (L1–L6 chips) ──────────────── */
+
+function LayerNav({
+  selected, counts, onSelect,
+}: {
+  selected: MosLayer | "ALL";
+  counts: Record<string, number>;
+  onSelect: (l: MosLayer | "ALL") => void;
+}) {
+  const layers: Array<MosLayer | "ALL"> = ["ALL", "L1", "L2", "L3", "L4", "L5", "L6"];
+  return (
+    <div className="-mt-2 mb-5 flex items-center gap-1.5 flex-wrap">
+      {layers.map((l) => {
+        const isAll = l === "ALL";
+        const tone = isAll ? null : LAYER_TOKENS[l as MosLayer];
+        const active = selected === l;
+        return (
+          <Button
+            key={l}
+            size="sm"
+            variant={active ? "solid" : "bordered"}
+            color={isAll ? "default" : tone!.heroColor}
+            onPress={() => onSelect(l)}
+            endContent={
+              <span className="text-tiny tabular-nums opacity-70">
+                {counts[l] ?? 0}
+              </span>
+            }
+          >
+            {isAll ? "全部" : `${l} · ${tone!.label}`}
+          </Button>
+        );
+      })}
     </div>
   );
 }
@@ -489,143 +587,29 @@ function CircleTile({
   disabled: boolean;
   onClick: () => void;
 }) {
-  const tone = tile.layer ? LAYER_TOKENS[tile.layer] : null;
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={[
-        "group relative flex flex-col items-center gap-2",
-        "w-[78px] py-2 px-1 rounded-lg transition",
-        disabled && !busy ? "opacity-40 pointer-events-none" : "",
-      ].join(" ")}
+    <Button
+      onPress={onClick}
+      isDisabled={disabled}
+      variant="light"
+      isLoading={busy}
+      className="flex flex-col items-center gap-2 h-auto w-[112px] py-2 px-1 min-w-0"
     >
-      <div className="relative">
-        <div
-          className={[
-            "w-[52px] h-[52px] rounded-full flex items-center justify-center",
-            "bg-white border border-mos-hair text-mos-ink",
-            "transition-all duration-200",
-            "group-hover:border-mos-ink group-hover:scale-105 group-hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]",
-            busy ? "ring-2 ring-mos-ink ring-offset-2" : "",
-          ].join(" ")}
-          style={{
-            // hover tint via inline so we can use layer color subtly
-            ["--hoverBg" as any]: tone ? tone.bgTint : "#F4F4F4",
-          }}
-        >
-          <span
-            className="font-display text-[0.95rem] tracking-[-0.02em]"
-            style={{
-              fontFeatureSettings: '"ss01"',
-              letterSpacing: tile.glyph.length > 1 ? "0.02em" : "0",
-            }}
-          >
-            {tile.glyph}
-          </span>
-        </div>
-        {tile.badge && (
-          <span
-            className="absolute -top-1 -right-1 px-1.5 py-[1px] text-[0.5rem] tracking-[0.04em] text-white rounded-full"
-            style={{ background: "#5B3CC8" }}
-          >
-            {tile.badge}
-          </span>
-        )}
-      </div>
-      <span className="text-[0.7rem] text-mos-ink leading-tight text-center">
-        {tile.label}
+      <Badge
+        content={tile.badge}
+        color="primary"
+        isInvisible={!tile.badge}
+        placement="top-right"
+        size="sm"
+      >
+        <span className="flex items-center justify-center w-10 h-10 rounded-full bg-default-100 border border-divider text-default-600">
+          <FontAwesomeIcon icon={tile.icon} className="text-medium" />
+        </span>
+      </Badge>
+      <span className="text-tiny leading-tight text-center text-foreground line-clamp-2">
+        {tile.missionTitle || tile.label}
       </span>
-    </button>
-  );
-}
-
-/* ─────────────────────────── Featured squad tile ───────────────────── */
-
-function FeaturedSquadTile({
-  squad, busy, disabled, onClick, onPreview,
-}: {
-  squad: any;
-  busy: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  onPreview: () => void;
-}) {
-  const lk = ((squad.strategyLayer ?? "L1").toString().slice(0, 2)) as MosLayer;
-  const tone = LAYER_TOKENS[lk in LAYER_TOKENS ? lk : "L1"];
-  const author =
-    squad.methodology?.author
-      ? `${squad.methodology.author}${squad.methodology?.year ? " · " + squad.methodology.year : ""}`
-      : null;
-  const stepCount =
-    Array.isArray(squad.steps) ? squad.steps.length : (squad.stepCount ?? 0);
-
-  return (
-    <div className="w-[240px] shrink-0 group">
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={[
-          "relative w-full bg-white border border-mos-hair rounded-xl overflow-hidden",
-          "transition-all duration-200 text-left",
-          "hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 hover:border-mos-ink/50",
-          disabled && !busy ? "opacity-40 pointer-events-none" : "",
-        ].join(" ")}
-      >
-        <div
-          className="relative w-full overflow-hidden"
-          style={{ aspectRatio: "5 / 3" }}
-        >
-          {squad.heroImageUrl ? (
-            <img src={squad.heroImageUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}1A 100%)`,
-              }}
-            >
-              <MethodologyGlyph
-                seed={squad.slug ?? squad.id ?? squad.name}
-                layer={lk}
-                size={92}
-              />
-            </div>
-          )}
-          <div
-            className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded"
-            style={{ background: tone.bg }}
-          >
-            {lk} · {tone.shortLabel}
-          </div>
-          {busy && (
-            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-              <span className="text-[0.7rem] tracking-[0.16em] uppercase text-mos-ink">建立中…</span>
-            </div>
-          )}
-        </div>
-        <div className="p-3">
-          <div className="text-[0.86rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
-            {squad.name ?? squad.slug}
-          </div>
-          {author && (
-            <div className="mt-1 text-[0.66rem] text-mos-muted line-clamp-1">
-              {author}
-            </div>
-          )}
-          <div className="mt-2 text-[0.62rem] text-mos-soft tracking-[0.06em]">
-            {stepCount} steps
-          </div>
-        </div>
-      </button>
-      <button
-        onClick={onPreview}
-        disabled={disabled}
-        className="mt-1.5 w-full text-[0.66rem] text-mos-muted hover:text-mos-ink transition py-1"
-      >
-        預覽任務範本 →
-      </button>
-    </div>
+    </Button>
   );
 }
 
@@ -633,24 +617,26 @@ function FeaturedSquadTile({
 
 function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
   const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
+  const isLayerKnown = layerStr in LAYER_TOKENS;
+  const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
   const tone = LAYER_TOKENS[lk];
   const updatedTxt = formatRelative(mission.updatedAt);
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsBadge = WORKSPACE_BADGE[ws] ?? null;
+  const stepCount = mission.squadStepCount ?? 0;
 
   return (
     <div className="group relative">
-      <button
-        onClick={onClick}
-        className="flex flex-col text-left bg-white border border-mos-hair rounded-xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 w-full"
+      <Card
+        isPressable
+        isHoverable
+        onPress={onClick}
+        shadow="sm"
+        className="flex flex-col text-left overflow-hidden w-full"
       >
         <div
-          className="relative w-full overflow-hidden"
-          style={{
-            aspectRatio: "5 / 4",
-            background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)`,
-          }}
+          className="relative w-full overflow-hidden bg-default-100"
+          style={{ aspectRatio: "5 / 4" }}
         >
           <div className="absolute inset-0 flex items-center justify-center">
             <MethodologyGlyph
@@ -659,46 +645,61 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
               size={70}
             />
           </div>
-          {mission.squadLayer && (
-            <div
-              className="absolute top-2 left-2 px-1.5 py-[2px] text-[0.52rem] tracking-[0.18em] uppercase font-display text-white rounded"
-              style={{ background: tone.bg }}
+          {isLayerKnown && (
+            <Chip
+              size="sm"
+              color={tone.heroColor}
+              variant="solid"
+              className="absolute top-2 left-2"
             >
-              {lk}
-            </div>
+              {lk}・{tone.label}
+            </Chip>
+          )}
+          {stepCount > 0 && (
+            <Chip size="sm" variant="flat" className="absolute top-2 right-2">
+              {stepCount} 步
+            </Chip>
           )}
         </div>
-        <div className="p-3">
-          <div className="text-[0.82rem] text-mos-ink font-medium leading-snug line-clamp-2 min-h-[2.4em]">
+        <CardBody className="p-3 gap-1">
+          <p className="text-small font-medium leading-snug line-clamp-2 min-h-[2.4em]">
             {mission.title}
-          </div>
-          <div className="mt-1.5 flex items-center gap-1.5 text-[0.66rem] text-mos-muted">
+          </p>
+          <TaskChip
+            entity={{
+              workspace: mission.workspace,
+              name: mission.squadName,
+              slug: mission.squadSlug,
+            }}
+            kind="squad"
+            size="sm"
+            className="self-start"
+          />
+          {mission.squadName && (
+            <p className="text-tiny text-warning truncate">
+              {mission.squadName}
+            </p>
+          )}
+          <div className="flex items-center gap-1.5 text-tiny text-default-500">
             {wsBadge && (
-              <span
-                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-white text-[0.5rem] font-bold shrink-0"
-                style={{ background: wsBadge.color }}
-                aria-label={ws}
-              >
-                {wsBadge.glyph}
-              </span>
+              <Avatar
+                name={wsBadge.glyph}
+                size="sm"
+                className="w-4 h-4 text-tiny shrink-0"
+                style={{ background: wsBadge.color, color: "white" }}
+              />
             )}
             <span className="truncate">{updatedTxt}</span>
           </div>
-        </div>
-      </button>
+        </CardBody>
+      </Card>
       {/* Hover action — bookmark + ⋯ menu (Canva pattern) */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
         <ThumbAction title="收藏" onClick={(e) => { e.stopPropagation(); /* TODO: bookmark */ }}>
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-          </svg>
+          <FontAwesomeIcon icon={faBookmark} />
         </ThumbAction>
         <ThumbAction title="更多" onClick={(e) => { e.stopPropagation(); /* TODO: menu */ }}>
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-            <circle cx="5" cy="12" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="19" cy="12" r="1.6" />
-          </svg>
+          <FontAwesomeIcon icon={faEllipsis} />
         </ThumbAction>
       </div>
     </div>
@@ -709,13 +710,18 @@ function ThumbAction({
   title, onClick, children,
 }: { title: string; onClick: (e: React.MouseEvent) => void; children: React.ReactNode }) {
   return (
-    <button
-      title={title}
-      onClick={onClick}
-      className="w-7 h-7 flex items-center justify-center bg-white/95 border border-mos-hair text-mos-ink hover:bg-white hover:border-mos-ink rounded-full shadow-sm transition"
-    >
-      {children}
-    </button>
+    <Tooltip content={title}>
+      <Button
+        isIconOnly
+        size="sm"
+        radius="full"
+        variant="flat"
+        onClick={onClick}
+        aria-label={title}
+      >
+        {children}
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -726,39 +732,34 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsBadge = WORKSPACE_BADGE[ws] ?? null;
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-4 px-4 py-3 hover:bg-mos-ink/[0.02] transition text-left"
+    <Card
+      isPressable
+      onPress={onClick}
+      shadow="none"
+      radius="none"
+      className="flex flex-row items-center gap-4 px-4 py-3 bg-transparent data-[hover=true]:bg-default-100 transition text-left w-full"
     >
-      <div
-        className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${tone.bgTint} 0%, ${tone.bg}14 100%)` }}
-      >
+      <div className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-default-100">
         <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={36} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[0.88rem] text-mos-ink font-medium truncate">{mission.title}</div>
-        <div className="mt-0.5 flex items-center gap-2 text-[0.7rem] text-mos-muted">
-          <span className="font-display tracking-[0.12em] uppercase">{lk}</span>
-          {wsBadge && (
-            <>
-              <span className="text-mos-soft">·</span>
-              <span className="capitalize">{ws}</span>
-            </>
-          )}
-          <span className="text-mos-soft">·</span>
+        <p className="text-small font-medium truncate">{mission.title}</p>
+        <div className="mt-0.5 flex items-center gap-2 text-tiny text-default-500">
+          <Chip size="sm" color={tone.heroColor} variant="flat">{lk}</Chip>
+          {wsBadge && <span className="capitalize">{ws}</span>}
+          <span>·</span>
           <span>{formatRelative(mission.updatedAt)}</span>
         </div>
       </div>
       {wsBadge && (
-        <span
-          className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-[0.6rem] font-bold"
-          style={{ background: wsBadge.color }}
-        >
-          {wsBadge.glyph}
-        </span>
+        <Avatar
+          name={wsBadge.glyph}
+          size="sm"
+          className="shrink-0 w-5 h-5 text-tiny"
+          style={{ background: wsBadge.color, color: "white" }}
+        />
       )}
-    </button>
+    </Card>
   );
 }
 
@@ -784,51 +785,32 @@ function FilterChip({
   onClick?: () => void;
   onSelect?: (v: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const isDropdown = !!options;
+  const chevron = <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />;
 
-  if (!isDropdown) {
+  if (!options) {
     return (
-      <button
-        onClick={onClick}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition"
-      >
+      <Button size="sm" radius="full" variant="bordered" onPress={onClick} endContent={chevron}>
         {label}
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-mos-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+      </Button>
     );
   }
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.74rem] text-mos-ink bg-white border border-mos-hair hover:border-mos-ink rounded-full transition capitalize"
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button size="sm" radius="full" variant="bordered" endContent={chevron} className="capitalize">
+          {label}
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu
+        aria-label={label}
+        onAction={(key) => onSelect?.(String(key))}
       >
-        {label}
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-mos-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full mt-1.5 right-0 z-20 min-w-[160px] bg-white border border-mos-hair rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1">
-            {options!.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => { onSelect?.(o.value); setOpen(false); }}
-                className="w-full text-left px-3 py-1.5 text-[0.78rem] text-mos-ink hover:bg-mos-ink/5 transition capitalize"
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+        {options.map((o) => (
+          <DropdownItem key={o.value} className="capitalize">{o.label}</DropdownItem>
+        ))}
+      </DropdownMenu>
+    </Dropdown>
   );
 }
 
@@ -836,13 +818,11 @@ function IconButton({
   title, onClick, children,
 }: { title: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      title={title}
-      onClick={onClick}
-      className="w-9 h-9 inline-flex items-center justify-center bg-white border border-mos-hair hover:border-mos-ink text-mos-ink rounded-full transition"
-    >
-      {children}
-    </button>
+    <Tooltip content={title}>
+      <Button isIconOnly size="sm" radius="full" variant="bordered" onPress={onClick} aria-label={title}>
+        {children}
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -867,13 +847,13 @@ function formatRelative(iso?: string | null): string {
 
 function ThumbSkeleton() {
   return (
-    <div className="bg-white border border-mos-hair rounded-xl overflow-hidden animate-pulse">
-      <div className="w-full bg-mos-hair/40" style={{ aspectRatio: "4 / 3" }} />
-      <div className="p-3 space-y-1.5">
-        <div className="h-3 w-4/5 bg-mos-hair/50 rounded" />
-        <div className="h-2 w-2/5 bg-mos-hair/40 rounded" />
-      </div>
-    </div>
+    <Card shadow="none" className="overflow-hidden">
+      <Skeleton className="w-full" style={{ aspectRatio: "4 / 3" }} />
+      <CardBody className="p-3 gap-1.5">
+        <Skeleton className="h-3 w-4/5 rounded" />
+        <Skeleton className="h-2 w-2/5 rounded" />
+      </CardBody>
+    </Card>
   );
 }
 
@@ -890,50 +870,47 @@ function CustomMissionForm({
   error: string | null;
 }) {
   return (
-    <div className="mb-8 border border-mos-ink bg-white p-6 rounded-xl shadow-card">
-      <div className="font-display text-[0.66rem] tracking-[0.28em] uppercase text-mos-soft mb-3">
-        CUSTOM MISSION · 自訂任務
-      </div>
-      <label className="block">
-        <span className="text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted">任務標題</span>
-        <input
+    <Card shadow="sm" className="mb-8">
+      <CardBody className="p-6 gap-4">
+        <h3 className="text-small font-semibold text-default-500 uppercase tracking-wider">
+          自訂任務
+        </h3>
+        <Input
           autoFocus
+          label="任務標題"
+          labelPlacement="outside"
           value={title}
-          onChange={(e) => onTitleChange(e.target.value)}
+          onValueChange={onTitleChange}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit(); }}
           placeholder="例如：4 月 SoWork 自有 FB 經營"
-          className="mt-2 w-full border border-mos-hair bg-white px-3 py-2.5 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded-lg"
+          variant="bordered"
         />
-      </label>
-      <label className="block mt-4">
-        <span className="text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted">任務說明（選填）</span>
-        <textarea
+        <Textarea
+          label="任務說明（選填）"
+          labelPlacement="outside"
           value={desc}
-          onChange={(e) => onDescChange(e.target.value)}
-          rows={3}
+          onValueChange={onDescChange}
+          minRows={3}
           placeholder="說一下這個任務想達成什麼、給誰看、限制是什麼。"
-          className="mt-2 w-full border border-mos-hair bg-white px-3 py-2.5 text-[0.92rem] text-mos-ink focus:outline-none focus:border-mos-ink rounded-lg"
+          variant="bordered"
         />
-      </label>
-      {error && (
-        <div className="mt-3 text-[0.78rem] text-red-600 whitespace-pre-wrap">{error}</div>
-      )}
-      <div className="mt-5 flex gap-3 justify-end">
-        <button
-          onClick={onCancel}
-          disabled={busy}
-          className="px-5 py-2.5 text-[0.72rem] tracking-[0.18em] uppercase text-mos-muted hover:text-mos-ink transition disabled:opacity-40"
-        >
-          取消
-        </button>
-        <button
-          onClick={onSubmit}
-          disabled={busy || !title.trim()}
-          className="px-5 py-2.5 text-[0.72rem] tracking-[0.18em] uppercase bg-mos-ink text-white hover:bg-mos-body transition disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
-        >
-          {busy ? "建立中…" : "建立任務 →"}
-        </button>
-      </div>
-    </div>
+        {error && (
+          <p className="text-small text-danger whitespace-pre-wrap">{error}</p>
+        )}
+        <div className="flex gap-3 justify-end">
+          <Button variant="light" onPress={onCancel} isDisabled={busy}>
+            取消
+          </Button>
+          <Button
+            color="primary"
+            onPress={onSubmit}
+            isDisabled={busy || !title.trim()}
+            isLoading={busy}
+          >
+            {busy ? "建立中…" : "建立任務"}
+          </Button>
+        </div>
+      </CardBody>
+    </Card>
   );
 }

@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
+import localPool from "../localDb";
 import { sql } from "drizzle-orm";
 
 export type PlaybookPhase = {
@@ -629,6 +630,87 @@ export const playbookRouter = router({
       channelCount: p.bundle.channelIds.length,
     }))
   ),
+
+  /**
+   * listFromSquads — squads whose methodology has a named author,
+   * used as the new /playbooks data source. Each card represents
+   * a squad backed by a real methodology / "success case".
+   */
+  listFromSquads: protectedProcedure.query(async () => {
+    // Only squads with a real success case — relies on the existing
+    // `showcases` JSON column. squad-builder auto-fills 1 baseline
+    // showcase per squad ("由 X 主導，運用 Y 方法論"); curator-added
+    // real cases push the array to 2+, which is what we filter for.
+    const [rows] = (await localPool.execute(`
+      SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
+             s.strategy_layer, s.methodology, s.workspace, s.tags,
+             s.task_label_zh, s.task_label_en,
+             s.mockup_platform, s.mockup_format,
+             s.showcases
+        FROM squads s
+       WHERE s.is_active = 1
+         AND s.showcases IS NOT NULL
+         AND JSON_LENGTH(s.showcases) >= 2
+       ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
+    `)) as any;
+
+    const safe = (raw: any) => {
+      if (!raw) return null;
+      if (typeof raw === "object") return raw;
+      try { return JSON.parse(raw); } catch { return null; }
+    };
+
+    return (rows as any[])
+      .map((r) => {
+        const methodology = safe(r.methodology) ?? (typeof r.methodology === "string" ? { summary: r.methodology } : null);
+        const showcases = (safe(r.showcases) ?? []) as Array<{ title?: string; description?: string; result?: string }>;
+        const members  = safe(r.agents)  ?? [];
+        const steps    = safe(r.steps)   ?? [];
+        const workspace= safe(r.workspace) ?? [];
+        const tags     = safe(r.tags)    ?? [];
+        const nameObj  = safe(r.name);
+        const descObj  = safe(r.description);
+        const name     = nameObj?.["zh-TW"] || nameObj?.en || (typeof r.name === "string" ? r.name : r.slug);
+        const description = descObj?.["zh-TW"] || descObj?.en || (typeof r.description === "string" ? r.description : null);
+
+        return {
+          id: String(r.id),
+          slug: String(r.slug),
+          taskLabel: r.task_label_zh ?? null,
+          taskLabelEn: r.task_label_en ?? null,
+          name,
+          description,
+          memberCount: Array.isArray(members) ? members.length : 0,
+          stepCount: Array.isArray(steps) ? steps.length : 0,
+          strategyLayer: r.strategy_layer ?? null,
+          methodology: methodology ? {
+            slug: typeof methodology === "object" ? methodology.slug ?? null : null,
+            author: typeof methodology === "object" ? methodology.author ?? null : null,
+            year:   typeof methodology === "object" ? methodology.year   ?? null : null,
+            summary: typeof methodology === "object" ? methodology.summary ?? null : null,
+          } : null,
+          // Track-record proof — uses existing `showcases` column.
+          // Each item: { title, description, result }. SQL filter
+          // ensures length >= 2 (1 baseline auto-fill + curator-added).
+          showcases,
+          workspace: Array.isArray(workspace) ? workspace : [],
+          tags: Array.isArray(tags) ? tags : [],
+          mockup: (r.mockup_platform && r.mockup_format)
+            ? { platform: String(r.mockup_platform), format: String(r.mockup_format) }
+            : undefined,
+          // first 5 members for avatar group
+          memberPreview: Array.isArray(members)
+            ? members.slice(0, 5).map((m: any) => ({
+                id: m.id ?? m.agentId ?? null,
+                name: m.name ?? null,
+                role: m.role ?? null,
+                primarySkill: m.primarySkill ?? null,
+              }))
+            : [],
+        };
+      });
+    // SQL already filters case_study IS NOT NULL — no extra .filter needed.
+  }),
 
   /** Full detail for a single playbook. */
   get: protectedProcedure

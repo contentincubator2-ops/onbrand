@@ -142,7 +142,10 @@ export const squadTemplateRouter = router({
       const [rows] = await localPool.execute(
         `SELECT s.id, s.slug, s.name, s.description, s.agents, s.steps,
                 s.tier, s.strategy_layer, s.methodology, s.lead_agent_id, s.token,
-                s.hero_image_url
+                s.hero_image_url, s.source, s.ingest_source_url, s.workspace, s.tags,
+                s.use_cases, s.output_formats,
+                s.task_label_zh, s.task_label_en,
+                s.mockup_platform, s.mockup_format, s.output_kind
            FROM squads s
           WHERE s.is_active = 1
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
@@ -261,6 +264,21 @@ export const squadTemplateRouter = router({
           tier: r.tier ?? null,
           strategyLayer: r.strategy_layer ?? null,
           heroImageUrl: r.hero_image_url ?? null,
+          source: (r.source ?? "seeded") as "seeded" | "ingested" | "forked",
+          ingestSourceUrl: r.ingest_source_url ?? null,
+          // workspace + tags + use_cases + output_formats for client-side
+          // channel filtering and richer keyword search in the Picker.
+          workspace: safeJsonParse<string[]>(r.workspace, []),
+          tags: safeJsonParse<string[]>(r.tags, []),
+          useCases: safeJsonParse<string[]>(r.use_cases, []),
+          outputFormats: safeJsonParse<string[]>(r.output_formats, []),
+          // PR6 / Q2 — explicit task label + mockup variant from LLM classifier
+          taskLabel: r.task_label_zh ?? null,
+          taskLabelEn: r.task_label_en ?? null,
+          outputKind: r.output_kind ?? null,
+          mockup: (r.mockup_platform && r.mockup_format)
+            ? { platform: r.mockup_platform, format: r.mockup_format }
+            : undefined,
           methodology,
           lead,
           members,
@@ -1232,6 +1250,526 @@ ${agentCtx.systemPromptPrefix}`;
           found: false,
           stepResults: {} as Record<string, string>,
         };
+      }
+    }),
+
+  // ── stepExecute ──────────────────────────────────────────────────────────────
+  // Run ONE workflow step against the assigned agent, persist the draft to
+  // mission_step_progress, return the output text. Powers the in-place
+  // WorkflowRunner in PickerWorkspace (post-launch right pane).
+  //
+  // Behavior (B3 hybrid):
+  //   - mode="ask": agent asks the user a clarifying question for this step
+  //                  (used on step 1 to gather requirements). Returns a
+  //                  question string; no draft persisted.
+  //   - mode="run": agent generates the draft for this step using prev step
+  //                  outputs + user's most recent input. Persists `output`
+  //                  with status="drafted".
+  //   - mode="confirm": user accepted the draft → status="confirmed".
+  //
+  // Storage: one row per (missionId, stepOrder) in mission_step_progress.
+  stepExecute: protectedProcedure
+    .input(z.object({
+      missionId:  z.number(),
+      squadSlug:  z.string(),
+      stepOrder:  z.number(),
+      mode:       z.enum(["ask", "run", "confirm", "skip", "unskip"]),
+      userInput:  z.string().max(4000).optional().default(""),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      // Auto-create progress table on first use
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS mission_step_progress (
+          id           INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          mission_id   INT           NOT NULL,
+          step_order   INT           NOT NULL,
+          status       VARCHAR(20)   NOT NULL DEFAULT 'pending',
+          user_input   TEXT,
+          agent_output MEDIUMTEXT,
+          agent_id     INT,
+          agent_name   VARCHAR(120),
+          history      JSON          NULL,
+          updated_at   DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                     ON UPDATE CURRENT_TIMESTAMP(3),
+          UNIQUE KEY uniq_step (mission_id, step_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      // Idempotent: add `history` column to existing tables (Sprint 1, E.undo).
+      await db.execute(sql`
+        SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'mission_step_progress'
+           AND COLUMN_NAME = 'history'
+      `).then(async (res: any) => {
+        const rows = Array.isArray(res) ? res[0] : res?.rows ?? res;
+        const c = Number((rows as any[])?.[0]?.c ?? 0);
+        if (c === 0) {
+          await db.execute(sql`ALTER TABLE mission_step_progress ADD COLUMN history JSON NULL`);
+        }
+      }).catch(() => { /* already added or alter not allowed; ignore */ });
+
+      // Load squad row + steps + agents (localPool — same shape as listByBrand)
+      const [sqRows] = await localPool.execute(
+        `SELECT id, slug, name, agents, steps, methodology
+           FROM squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
+        [input.squadSlug],
+      ) as any[];
+      const squad = (sqRows as any[])?.[0];
+      if (!squad) throw new TRPCError({ code: "NOT_FOUND", message: `squad slug ${input.squadSlug} not found` });
+
+      const stepsRaw = safeJsonParse<any[]>(squad.steps, []);
+      const step = stepsRaw.find((s: any) => Number(s.order ?? s.step) === input.stepOrder)
+                ?? stepsRaw[input.stepOrder - 1];
+      if (!step) throw new TRPCError({ code: "NOT_FOUND", message: `step ${input.stepOrder} not found` });
+
+      // Resolve assigned agent
+      const assignedId = step.assignedAgentId ? Number(step.assignedAgentId) : null;
+      let agentRow: any = null;
+      if (assignedId) {
+        const [aRows] = await localPool.execute(
+          `SELECT id, name, title, primarySkill, aiModel, specialty FROM agents WHERE id = ? LIMIT 1`,
+          [assignedId],
+        ) as any[];
+        agentRow = (aRows as any[])?.[0] ?? null;
+      }
+      const agentName = agentRow?.name ?? step.assignedAgentName ?? "AI 專員";
+      const agentTitle = agentRow?.title ?? "";
+      const agentSkill = agentRow?.primarySkill ?? step.requiredSkill ?? "";
+
+      // ── confirm: just flip status, no LLM ────────────────────────────────────
+      if (input.mode === "confirm") {
+        await db.execute(sql`
+          UPDATE mission_step_progress
+             SET status = 'confirmed'
+           WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+        `);
+        return { ok: true, status: "confirmed" as const };
+      }
+
+      // ── skip: mark step as skipped (no LLM, no chaining) ─────────────────────
+      if (input.mode === "skip") {
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, agent_name, agent_output)
+          VALUES (${input.missionId}, ${input.stepOrder}, 'skipped', '使用者跳過', '')
+          ON DUPLICATE KEY UPDATE status = 'skipped'
+        `);
+        return { ok: true, status: "skipped" as const };
+      }
+      if (input.mode === "unskip") {
+        await db.execute(sql`
+          UPDATE mission_step_progress
+             SET status = 'pending'
+           WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+             AND status = 'skipped'
+        `);
+        return { ok: true, status: "pending" as const };
+      }
+
+      // ── Load previous step outputs for chaining context ──────────────────────
+      const [prevRows] = await db.execute(sql`
+        SELECT step_order, agent_output
+          FROM mission_step_progress
+         WHERE mission_id = ${input.missionId}
+           AND step_order < ${input.stepOrder}
+           AND status IN ('drafted', 'confirmed')
+         ORDER BY step_order ASC
+      `) as any[];
+      const prevOutputs = (prevRows as any[]).map((r: any) =>
+        `【Step ${r.step_order} 結果】\n${(r.agent_output ?? "").slice(0, 1500)}`
+      ).join("\n\n");
+
+      // Mission context
+      const [mRows] = await db.execute(sql`
+        SELECT title, description, objective, audience, brandId FROM missions
+         WHERE id = ${input.missionId} AND userId = ${ctx.user.id} LIMIT 1
+      `) as any[];
+      const mission = (mRows as any[])?.[0];
+      const missionContext = mission
+        ? `任務：${mission.title}${mission.description ? ` · ${mission.description}` : ""}`
+        : "";
+
+      // Brand context — auto-injected so every step inherits brand voice.
+      // Pulled from the mission's bound brand (mission.create captures
+      // brandId from the picker's brand switcher).
+      let brandContext = "";
+      if (mission?.brandId) {
+        const [bRows] = await db.execute(sql`
+          SELECT name, industry, description, positioningSummary
+            FROM brands WHERE id = ${mission.brandId} LIMIT 1
+        `) as any[];
+        const brand = (bRows as any[])?.[0];
+        if (brand) {
+          const parts: string[] = [];
+          parts.push(`【品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}`);
+          if (brand.positioningSummary) {
+            parts.push(`定位：${String(brand.positioningSummary).slice(0, 600)}`);
+          } else if (brand.description) {
+            parts.push(`描述：${String(brand.description).slice(0, 400)}`);
+          }
+          brandContext = parts.join("\n");
+        }
+      }
+
+      const stepName = step.name ?? step.title ?? `Step ${input.stepOrder}`;
+      const stepDesc = step.description ?? "";
+      const outputType = step.outputType ?? step.output ?? "";
+
+      // ── ask: agent asks 1–3 clarifying questions for this step ───────────────
+      if (input.mode === "ask") {
+        const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
+你即將執行「${stepName}」這個步驟。先用使用者聽得懂的話，提出 1–3 個最關鍵的問題，幫你完成這一步。
+語氣專業但溫暖，像真正帶過品牌的行銷顧問。用繁體中文。控制在 200 字內。`;
+        const userPrompt = `${missionContext}
+${brandContext}
+方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
+此步驟說明：${stepDesc || "(無)"}
+預期產出：${outputType || "(未指定)"}
+${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
+請只輸出問題本身，不要前言、不要編號以外的客套話。`;
+
+        const llm = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        });
+        const reply = String(llm.choices?.[0]?.message?.content ?? "");
+
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, agent_id, agent_name, agent_output)
+          VALUES
+            (${input.missionId}, ${input.stepOrder}, 'asking',
+             ${assignedId ?? null}, ${agentName}, ${reply})
+          ON DUPLICATE KEY UPDATE
+            status = 'asking', agent_output = VALUES(agent_output),
+            agent_id = VALUES(agent_id), agent_name = VALUES(agent_name)
+        `);
+
+        return {
+          ok: true,
+          status: "asking" as const,
+          agentName, agentTitle, agentSkill,
+          stepName, stepDesc, outputType,
+          message: reply,
+        };
+      }
+
+      // ── run: produce the draft for this step ─────────────────────────────────
+      // Detect output kind from outputType keywords so we can give targeted guidance.
+      // Explicit `outputKind` on the step or its assigned agent wins over keyword regex.
+      const explicitKind = String((step as any).outputKind ?? (step as any).assignedAgent?.outputKind ?? "").toLowerCase();
+      const ot = (outputType || "").toLowerCase();
+      // Visual steps: detect first so we don't mis-label as content.
+      const isVisual = explicitKind === "image" || explicitKind === "video"
+        || /\b(image|visual|kv|banner|thumbnail|cover|carousel|poster|logo|illustration|video|reel|short|tvc|footage|clip|i2v|t2v|motion|spokesperson)\b/i.test(`${ot} ${stepName}`)
+        || /(圖像|視覺|主視覺|封面|縮圖|海報|插畫|圖卡|圖文|圖示|影片|短片|短影音|動畫|動態)/.test(`${ot} ${stepName}`);
+      const isContent = !isVisual && (
+        /caption|post|copy|hook|hashtag|tag\b|tags|article|newsletter|tweet|script|story|title|headline|description|email|edm|長文|貼文|文案|hashtag|腳本|標題|簡介|文/i.test(ot)
+        || /caption|post|copy|hook|hashtag|article|新聞稿|長文|貼文|文案|腳本|標題/i.test(stepName)
+      );
+      const isStrategic = !isVisual && !isContent &&
+        /swot|persona|icp|research|analysis|brand|context|interview|competitor|strategy|plan|brief|outline|framework|insight|positioning|methodology|doc|report|matrix|mapping|journey|研究|分析|策略|框架|計畫|報告|訪談|競品|定位|脈絡|洞察|矩陣|藍圖/i.test(`${ot} ${stepName}`);
+
+      // ── Visual step short-circuit: agent produces the visual BRIEF only.
+      // The actual image/video is generated client-side via the 3-step
+      // MediaGenFlow (設計方向 → AI prompt → 模型選擇) — server must NOT
+      // call image APIs here, that violates CJ's rule "由用戶在 Step 3 挑模型".
+      // Detect a "media completion" payload coming back via userInput when
+      // MediaGenFlow finishes — that arrives as `__media_url__: ...` and we
+      // store as-is so subsequent steps can reference it.
+      if (isVisual && /^__media_url__:/m.test(input.userInput || "")) {
+        // Persist the media completion as the confirmed output for this step.
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, user_input, agent_output, agent_id, agent_name)
+          VALUES
+            (${input.missionId}, ${input.stepOrder}, 'drafted',
+             ${input.userInput}, ${input.userInput},
+             ${assignedId ?? null}, ${agentName})
+          ON DUPLICATE KEY UPDATE
+            status = 'drafted',
+            user_input = VALUES(user_input),
+            agent_output = VALUES(agent_output)
+        `);
+        return {
+          ok: true, status: "drafted" as const,
+          agentName, agentTitle, agentSkill, stepName, stepDesc, outputType,
+          output: input.userInput,
+        };
+      }
+
+      const outputGuide = isVisual
+        ? `這是「視覺素材類」交付物 — 你的工作是寫出【視覺 brief】，不是真的生成圖像 / 影片。
+- 用繁體中文描述這個畫面 / 影片要呈現什麼：主體、構圖、色彩、情緒、風格參考
+- 如果是影片，再加上分鏡（每個鏡頭的時長 / 鏡頭運動 / 主體動作）
+- 不要寫「我會這樣做」，直接寫「這個畫面是…」、「鏡頭一：…」
+- 寫 3-6 句即可。後面用戶會看著這個 brief，在 3-step 流程裡進一步選方向、寫 AI prompt、挑模型生成
+- 禁止輸出 Markdown code block 或 prompt template；就是純自然語言 brief`
+        : isContent
+        ? `這是「內容類」交付物 — 你交出的東西要可以直接複製貼上發出去。
+- 不要寫「我會...」、「先...再...」、「Step 1 / Step 2」這種說明流程
+- 直接寫成品本身（caption / hashtag / 圖片描述 / 影片腳本 / 標題等）
+- 文案類加 emoji、CTA、換行；hashtag 類就純列 #tag
+- 如果產出是「圖文」、「視覺」、「縮圖」等視覺素材，請寫具體的圖片描述（讓 AI 繪圖工具可以根據此描述產圖）`
+        : isStrategic
+        ? `這是「策略 / 文件類」交付物 — 寫出完整的成品文件，不是「我會這樣做」的說明。
+- 用 markdown 結構（## 大標 / - 條列）
+- 每個段落要寫具體內容，不是描述「我會做什麼」
+- 例如要做 SWOT 就直接寫 4 格的具體內容；要做 Persona 就直接寫角色檔案`
+        : `直接寫出成品內容，不要寫「我會...」這種方法論說明。`;
+
+      const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
+你正在執行「${stepName}」步驟。
+
+【最高優先規則】直接交付完成品本身。
+✗ 錯誤輸出（寫方法論）：「先抓住眼球的 hook，再帶出產品價值，最後 CTA」
+✓ 正確輸出（寫成品）：「夏天還在悶熱中？這雙鞋讓你帶著風走 ☀️ / Air Mesh 透氣科技 + 反光防滑底 / 限時 9 折，只到週日！👉 連結見 bio」
+
+✗ 錯誤輸出（寫方法論）：「定位的 5 個維度是：產品、TA、競爭、價值、人格」
+✓ 正確輸出（寫成品）：「## 品牌定位\\nNIKE 是運動員突破自我的盟友。\\n## 目標 TA\\n18-34 歲都會運動者...」
+
+${outputGuide}
+
+用繁體中文。產出類型：${outputType || "適中"}。
+${brandContext ? `\n【強制】這一步是為以下品牌服務，所有舉例、語氣、產品、受眾都必須緊扣這個品牌，禁止通用範本：\n${brandContext}\n如果你產出的內容換到別的品牌也成立，就是失敗。` : `\n【警告】此任務沒有綁定品牌，請提示使用者先到右上角選擇品牌再執行。`}`;
+
+      const userPrompt = `${missionContext}
+${brandContext ? `\n${brandContext}\n` : ""}
+方法論參考：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
+此步驟說明：${stepDesc || stepName}
+預期產出類型：${outputType || "(未指定)"}
+${prevOutputs ? `\n上游步驟成果（直接接續使用，不要重述）：\n${prevOutputs}` : ""}
+${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
+
+請直接交付【成品內容】 — 不是「我會這樣做」的說明。所有舉例必須來自上面這個品牌的真實產品 / 受眾 / 產業情境。`;
+
+      const llm = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const output = String(llm.choices?.[0]?.message?.content ?? "");
+
+      // Push the previous draft (if any) into history so the user can undo.
+      // history is a JSON array of { output, userInput, ts }.
+      const [existRows] = await db.execute(sql`
+        SELECT agent_output, user_input, history FROM mission_step_progress
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder} LIMIT 1
+      `) as any[];
+      const exist = (existRows as any[])?.[0];
+      let nextHistory: any[] = [];
+      if (exist?.agent_output) {
+        const prevHist = safeJsonParse<any[]>(exist.history, []);
+        nextHistory = [
+          ...prevHist,
+          { output: exist.agent_output, userInput: exist.user_input, ts: new Date().toISOString() },
+        ].slice(-10); // cap at last 10 versions
+      }
+
+      await db.execute(sql`
+        INSERT INTO mission_step_progress
+          (mission_id, step_order, status, user_input, agent_output, agent_id, agent_name, history)
+        VALUES
+          (${input.missionId}, ${input.stepOrder}, 'drafted',
+           ${input.userInput || null}, ${output},
+           ${assignedId ?? null}, ${agentName},
+           ${JSON.stringify(nextHistory)})
+        ON DUPLICATE KEY UPDATE
+          status = 'drafted',
+          user_input = VALUES(user_input),
+          agent_output = VALUES(agent_output),
+          agent_id = VALUES(agent_id),
+          agent_name = VALUES(agent_name),
+          history = VALUES(history)
+      `);
+
+      return {
+        ok: true,
+        status: "drafted" as const,
+        agentName, agentTitle, agentSkill,
+        stepName, stepDesc, outputType,
+        output,
+      };
+    }),
+
+  // ── stepGetProgress ──────────────────────────────────────────────────────────
+  // Read all step rows for a mission. Powers the WorkflowRunner timeline so
+  // it can re-hydrate state on page reload (e.g. user shares /picker?mission=).
+  stepGetProgress: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      try {
+        const [rows] = await db.execute(sql`
+          SELECT step_order, status, user_input, agent_output, agent_name, history, updated_at
+            FROM mission_step_progress
+           WHERE mission_id = ${input.missionId}
+           ORDER BY step_order ASC
+        `) as any[];
+        return (rows as any[]).map((r: any) => {
+          const hist = safeJsonParse<any[]>(r.history, []);
+          return {
+            stepOrder:   Number(r.step_order),
+            status:      String(r.status) as "asking" | "drafted" | "confirmed" | "pending",
+            userInput:   r.user_input ?? "",
+            agentOutput: r.agent_output ?? "",
+            agentName:   r.agent_name ?? "",
+            historyCount: Array.isArray(hist) ? hist.length : 0,
+            updatedAt:   r.updated_at,
+          };
+        });
+      } catch {
+        return []; // table may not exist yet
+      }
+    }),
+
+  // ── stepUndo ─────────────────────────────────────────────────────────────────
+  // Pop the last history entry back into agent_output. Powers the "↶ 上一版"
+  // button. No-op (return ok:false) if history is empty.
+  stepUndo: protectedProcedure
+    .input(z.object({
+      missionId: z.number(),
+      stepOrder: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      const [rows] = await db.execute(sql`
+        SELECT agent_output, user_input, history FROM mission_step_progress
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder} LIMIT 1
+      `) as any[];
+      const row = (rows as any[])?.[0];
+      if (!row) return { ok: false, reason: "no-row" as const };
+
+      const hist = safeJsonParse<any[]>(row.history, []);
+      if (!Array.isArray(hist) || hist.length === 0) {
+        return { ok: false, reason: "no-history" as const };
+      }
+      const last = hist[hist.length - 1];
+      const remaining = hist.slice(0, -1);
+
+      await db.execute(sql`
+        UPDATE mission_step_progress
+           SET agent_output = ${last.output ?? ""},
+               user_input   = ${last.userInput ?? null},
+               history      = ${JSON.stringify(remaining)},
+               status       = 'drafted'
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+      `);
+      return { ok: true, output: String(last.output ?? "") };
+    }),
+
+  // ── askMary ──────────────────────────────────────────────────────────────────
+  // Floating "問 Mary Allen" helper. Mary is the brand-strategy spokesperson
+  // — given the mission's full step progress + brand context, she answers a
+  // freeform user question about the run (e.g. "this step seems weak, why?",
+  // "summarize what we have so far", "should we pivot the angle?").
+  // Stateless: each call rebuilds context from DB. No history persisted yet
+  // (drawer keeps it in client memory until refresh).
+  askMary: protectedProcedure
+    .input(z.object({
+      missionId: z.number(),
+      question:  z.string().min(1).max(2000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      // Mission + brand
+      const [mRows] = await db.execute(sql`
+        SELECT id, title, description, brandId, methodology FROM missions
+         WHERE id = ${input.missionId} AND userId = ${ctx.user.id} LIMIT 1
+      `) as any[];
+      const mission = (mRows as any[])?.[0];
+      if (!mission) throw new TRPCError({ code: "NOT_FOUND", message: "mission not found" });
+
+      let brandLine = "";
+      if (mission.brandId) {
+        const [bRows] = await db.execute(sql`
+          SELECT name, industry, positioningSummary FROM brands WHERE id = ${mission.brandId} LIMIT 1
+        `) as any[];
+        const b = (bRows as any[])?.[0];
+        if (b) brandLine = `品牌：${b.name}${b.industry ? `（${b.industry}）` : ""}${b.positioningSummary ? ` · ${String(b.positioningSummary).slice(0, 300)}` : ""}`;
+      }
+
+      // Step progress
+      const [pRows] = await db.execute(sql`
+        SELECT step_order, status, agent_name, agent_output FROM mission_step_progress
+         WHERE mission_id = ${input.missionId}
+         ORDER BY step_order ASC
+      `) as any[];
+      const progress = (pRows as any[]) ?? [];
+      const progressLines = progress.map((r: any) => {
+        const o = String(r.agent_output ?? "").slice(0, 600);
+        return `[Step ${r.step_order} · ${r.status} · ${r.agent_name ?? ""}]\n${o}`;
+      }).join("\n\n");
+
+      const systemPrompt = `你是 Mary Allen，SoWork 的品牌策略召集人。語氣專業、誠實、不繞圈。
+你正在陪一個團隊跑一個 marketing mission。使用者會問你關於這個任務的事 ——
+你要根據目前的進度與品牌資訊作答，不要憑空編造。
+回答用繁體中文，控制在 250 字內。如果答案需要看更多資料，明確說「我需要先看 Step X」。`;
+      const userPrompt = `${brandLine}
+任務：${mission.title}${mission.description ? ` · ${mission.description}` : ""}
+方法論：${mission.methodology ?? "(未指定)"}
+
+目前進度：
+${progressLines || "(還沒有任何步驟產出)"}
+
+使用者的問題：
+${input.question}`;
+
+      const llm = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const answer = String(llm.choices?.[0]?.message?.content ?? "");
+      return { ok: true, answer };
+    }),
+
+  // ── missionAnalytics ─────────────────────────────────────────────────────────
+  // Per-mission analytics for the Canva-style 分析 dropdown. Reports
+  // step-level timings, agent assignments, status counts. Token tracking
+  // would slot in here later (we don't yet record token usage per call).
+  missionAnalytics: protectedProcedure
+    .input(z.object({ missionId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      try {
+        const [rows] = await db.execute(sql`
+          SELECT step_order, status, agent_name, LENGTH(agent_output) AS output_len, updated_at
+            FROM mission_step_progress
+           WHERE mission_id = ${input.missionId}
+           ORDER BY step_order ASC
+        `) as any[];
+        const arr = (rows as any[]) ?? [];
+        const counts = arr.reduce((acc: any, r: any) => {
+          acc[r.status] = (acc[r.status] ?? 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        return {
+          totalSteps: arr.length,
+          counts,
+          steps: arr.map((r: any) => ({
+            stepOrder: Number(r.step_order),
+            status:    String(r.status),
+            agentName: r.agent_name ?? "",
+            outputLen: Number(r.output_len ?? 0),
+            updatedAt: r.updated_at,
+          })),
+        };
+      } catch {
+        return { totalSteps: 0, counts: {}, steps: [] };
       }
     }),
 

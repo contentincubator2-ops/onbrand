@@ -1,30 +1,17 @@
 /** @type {import('tailwindcss').Config} */
+import { heroui } from "@heroui/react";
+
 export default {
   darkMode: "class",
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
-      colors: {
-        // Decision AI palette — teal / red / blue rack, mono text
-        mos: {
-          teal:   "#1A9B8E",
-          "teal-ink": "#0E6B62",
-          red:    "#C8322E",
-          "red-ink": "#8B1F1C",
-          blue:   "#1E7FD4",
-          "blue-ink": "#14558F",
-          ink:    "#0A0A0A",
-          body:   "#1E1E1E",
-          muted:  "#6B6B6B",
-          soft:   "#9B9B9B",
-          hair:   "#E4E4E4",
-          paper:  "#FAFAF7",
-          white:  "#FFFFFF",
-        },
-      },
+      // Color palette is owned by the HeroUI theme below — no custom mos-* tokens.
+      // Use bg-primary / text-foreground / border-divider / etc. instead.
       fontFamily: {
         display: ["'Inter Tight'", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         sans:    ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
@@ -53,6 +40,9 @@ export default {
     },
   },
   plugins: [
+    // Pure HeroUI theme — no SoWork brand overrides. Stock primary (blue),
+    // success (green), danger (red), warning (yellow), secondary (purple).
+    heroui(),
     function ({ addUtilities }) {
       // Geometric clip-paths matching the roll-up banner reference image.
       // Each variant gives a slightly different asymmetric cut so the teal/red/blue

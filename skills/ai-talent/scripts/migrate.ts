@@ -717,6 +717,329 @@ async function main() {
     `);
     console.log("[migrate] project_assets: OK");
 
+    // ─── 9. agents.modelStack — multi-modal model declaration per agent ────
+    // One JSON blob with the agent's full toolkit:
+    //   {
+    //     primary_llm: "gpt-4o" | "claude-opus-4-6" | ...,
+    //     image_gen:   "fal/flux-pro-1.1" | "openai/gpt-image-1" | null,
+    //     video_gen:   "fal/kling-2" | "fal/minimax-video" | null,
+    //     tts:         "fal/elevenlabs-tts" | "openai/tts-1" | null,
+    //     asr:         "fal/whisper" | "openai/whisper" | null,
+    //     embed:       "azure/text-embedding-3-large" | "cohere/embed-v4",
+    //     web_search:  "tavily" | "perplexity" | null,
+    //     browser:     "browserbase" | null,
+    //     social_post: "meta-graph" | null
+    //   }
+    // primary_llm SHOULD mirror agents.aiModel; the rest is opt-in per skill needs.
+    const [agentModelStackCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agents' AND COLUMN_NAME = 'modelStack'
+    `) as any;
+    if ((agentModelStackCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE agents ADD COLUMN modelStack JSON NULL`);
+      console.log("[migrate] agents.modelStack: added");
+    } else {
+      console.log("[migrate] agents.modelStack: already exists, skipped");
+    }
+
+    // ── 9b. preferredModelTags — drives the squad-runner media picker ─────────
+    // When a step's outputKind is image|video, the runner asks mediaModels.ts
+    // `modelsForTag()` for each tag in this array and pre-selects the union as
+    // recommended models in MediaGenFlow Step 3. Examples:
+    //   ["logo", "vector"]              → Ideogram v3, Recraft v3, GPT Image 1
+    //   ["cinematic", "ad-film"]        → Runway Gen-4, Veo 3
+    //   ["i2v", "kv-animate"]           → Kling v1.6 i2v
+    //   ["lipsync", "spokesperson"]     → Hedra Character 3
+    //   ["asian-face", "chinese-style"] → Kling v2 master, Hailuo image
+    // Empty / null = runner falls back to all `availableModels(kind)`.
+    // agents + squads only — skills are an embedded JSON column on agents,
+    // not their own table. Squad-runner reads either source.
+    for (const table of ["agents", "squads"] as const) {
+      const [tagCol] = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '${table}' AND COLUMN_NAME = 'preferredModelTags'
+      `) as any;
+      if ((tagCol as any[]).length === 0) {
+        // agents uses camelCase; squads (raw-SQL table) uses snake_case
+        // historically but Drizzle migration above shows quoted ident is fine.
+        // Use camelCase consistently — MySQL is case-insensitive on identifiers.
+        await conn.execute(`ALTER TABLE \`${table}\` ADD COLUMN preferredModelTags JSON NULL`);
+        console.log(`[migrate] ${table}.preferredModelTags: added`);
+      } else {
+        console.log(`[migrate] ${table}.preferredModelTags: already exists, skipped`);
+      }
+    }
+
+    // ── 9c. mission_step_progress.canonical_message ─────────────────────────
+    // Per CJ direction 2026-04-30: cross-model agents need ONE canonical
+    // envelope (AgentMessage — see server/_core/agentMessage.ts). Each step
+    // output gets persisted here as JSON conforming to the AgentMessage
+    // schema. Legacy columns (status / agent_output / user_input) stay for
+    // back-compat — read-time converter synthesizes envelope when missing.
+    // Auto-create the table first in case earlier migrations haven't run.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS mission_step_progress (
+        id           INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        mission_id   INT           NOT NULL,
+        step_order   INT           NOT NULL,
+        status       VARCHAR(20)   NOT NULL DEFAULT 'pending',
+        user_input   TEXT,
+        agent_output MEDIUMTEXT,
+        agent_id     INT,
+        agent_name   VARCHAR(120),
+        history      JSON          NULL,
+        updated_at   DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                   ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uniq_step (mission_id, step_order)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    const [canonCol]: any = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'mission_step_progress'
+        AND COLUMN_NAME = 'canonical_message'
+    `);
+    if ((canonCol as any[]).length === 0) {
+      await conn.execute(
+        `ALTER TABLE mission_step_progress ADD COLUMN canonical_message JSON NULL`,
+      );
+      console.log("[migrate] mission_step_progress.canonical_message: added");
+    } else {
+      console.log("[migrate] mission_step_progress.canonical_message: already exists, skipped");
+    }
+
+    // ─── 10. skill_catalog — harvested skill registry (anthropic + GLM + tools) ──
+    // Source of truth for orphan-agent skill assignment. Each row binds a skill
+    // to a provider so the skill cannot be moved across model families.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS skill_catalog (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        slug              VARCHAR(160) NOT NULL UNIQUE,
+        name              VARCHAR(255) NOT NULL,
+        source            VARCHAR(64)  NOT NULL,
+        sourceUrl         VARCHAR(1024) NULL,
+        boundProvider     VARCHAR(64)  NOT NULL,
+        compatibleModels  JSON         NULL,
+        category          VARCHAR(64)  NULL,
+        description       TEXT         NULL,
+        tools             JSON         NULL,
+        modelCompat       JSON         NULL,
+        tags              JSON         NULL,
+        harvestedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_provider (boundProvider),
+        INDEX idx_category (category),
+        INDEX idx_source   (source)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] skill_catalog: OK");
+
+    // ─── 11. agent_skill_assignments — orphan agent ↔ skill_catalog binding ──
+    // Tracks which catalog skill each agent has been assigned, with provenance
+    // (matched by primarySkill / aiModel / title token) for later audit.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS agent_skill_assignments (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        agentId       INT NOT NULL,
+        skillSlug     VARCHAR(160) NOT NULL,
+        boundProvider VARCHAR(64)  NOT NULL,
+        matchReason   VARCHAR(64)  NULL,
+        confidence    DECIMAL(4,3) NULL,
+        assignedAt    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_agent_skill (agentId, skillSlug),
+        INDEX idx_agent (agentId),
+        INDEX idx_skill (skillSlug),
+        INDEX idx_provider (boundProvider)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] agent_skill_assignments: OK");
+
+    // ─── 12. Localized name columns for skills + agents ────────────────────
+    // CJ direction 2026-04-28: skill code names (e.g., "accessibility-tester")
+    // and English agent bios need a zh-TW human-readable variant for display.
+    for (const col of [
+      { table: "skills", name: "name_zh",        type: "VARCHAR(255) NULL" },
+      { table: "skills", name: "description_zh", type: "TEXT NULL" },
+      { table: "agents", name: "name_zh",        type: "VARCHAR(128) NULL" },
+      { table: "agents", name: "title_zh",       type: "VARCHAR(255) NULL" },
+      { table: "agents", name: "bio_zh",         type: "TEXT NULL" },
+      { table: "squads", name: "name_zh",        type: "VARCHAR(255) NULL" },
+      { table: "squads", name: "description_zh", type: "TEXT NULL" },
+    ]) {
+      const [r]: any = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+      `, [col.table, col.name]);
+      if ((r as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE \`${col.table}\` ADD COLUMN \`${col.name}\` ${col.type}`);
+        console.log(`[migrate] ${col.table}.${col.name}: added`);
+      } else {
+        console.log(`[migrate] ${col.table}.${col.name}: already exists, skipped`);
+      }
+    }
+
+    // ─── 13. products + events tables (scope: brand × product × event) ────
+    // CJ direction 2026-04-28: every agent run reads scope (user × brand
+    // × product × event) before kicking off. Choose-one is allowed; user
+    // selects one of the three as the active scope.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS products (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId          INT NOT NULL,
+        brandId         INT NULL,
+        slug            VARCHAR(120) NOT NULL,
+        name            VARCHAR(255) NOT NULL,
+        positioning     JSON NULL,
+        createdAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_user_slug (userId, slug),
+        INDEX idx_user (userId),
+        INDEX idx_brand (brandId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] products: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS events (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId          INT NOT NULL,
+        brandId         INT NULL,
+        productId       INT NULL,
+        slug            VARCHAR(120) NOT NULL,
+        name            VARCHAR(255) NOT NULL,
+        startAt         DATETIME NULL,
+        endAt           DATETIME NULL,
+        positioning     JSON NULL,
+        createdAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_user_slug (userId, slug),
+        INDEX idx_user (userId),
+        INDEX idx_brand (brandId),
+        INDEX idx_product (productId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] events: OK");
+
+    // event_products — many-to-many join (CJ direction 2026-04-29:
+    // 活動可以隸屬於品牌或多個產品). The single events.productId column
+    // stays for backward compat — when an event scopes to exactly ONE
+    // product, both columns agree; when it spans multiple, productId stays
+    // NULL and links live in this join table.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS event_products (
+        eventId    INT NOT NULL,
+        productId  INT NOT NULL,
+        createdAt  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (eventId, productId),
+        INDEX idx_event   (eventId),
+        INDEX idx_product (productId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] event_products (m:n): OK");
+
+    // brands.positioning JSON column (full brand positioning book + cards)
+    const [bp]: any = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands' AND COLUMN_NAME = 'positioning'
+    `);
+    if ((bp as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE brands ADD COLUMN positioning JSON NULL`);
+      console.log("[migrate] brands.positioning: added");
+    } else {
+      console.log("[migrate] brands.positioning: already exists, skipped");
+    }
+
+    // ─── 14. Creative cases / award frameworks (event positioning RAG) ──
+    // From sowork-ai-v2 — campaign positioning analysis pipeline injects
+    // these as context when matching awards + generating proposals.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS award_frameworks (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        name            VARCHAR(200) NOT NULL,
+        category        VARCHAR(100) NULL,
+        description     TEXT NULL,
+        successCriteria JSON NULL,
+        caseStudies     JSON NULL,
+        averageRoi      VARCHAR(50) NULL,
+        suitableFor     JSON NULL,
+        createdAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_name (name),
+        INDEX idx_category (category)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] award_frameworks: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS creative_cases (
+        id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        award_name      VARCHAR(200) NULL,
+        year            INT NULL,
+        award_level     VARCHAR(100) NULL COMMENT 'Grand Prix/Gold/Silver/Bronze/Shortlist',
+        award_category  VARCHAR(300) NULL,
+        sub_category    VARCHAR(300) NULL,
+        campaign_title  VARCHAR(500) NULL,
+        brand           VARCHAR(300) NULL,
+        agency          VARCHAR(300) NULL,
+        country         VARCHAR(100) NULL,
+        industry        VARCHAR(300) NULL,
+        description     TEXT NULL,
+        source_url      VARCHAR(500) NULL,
+        tags            JSON NULL,
+        scraped_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_award_name (award_name),
+        INDEX idx_year (year),
+        INDEX idx_award_level (award_level),
+        INDEX idx_industry (industry),
+        UNIQUE KEY uk_source_url (source_url(490))
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] creative_cases: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS award_categories (
+        id                   INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        award_name           VARCHAR(200) NOT NULL,
+        category_name        VARCHAR(300) NOT NULL COMMENT '子獎項名稱',
+        category_description TEXT NULL,
+        judging_criteria     TEXT NULL,
+        eligibility          TEXT NULL,
+        entry_fee            VARCHAR(200) NULL,
+        source_url           TEXT NULL,
+        scraped_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_award_name (award_name),
+        UNIQUE KEY uk_award_category (award_name, category_name(200))
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] award_categories: OK");
+
+    // Seed 6 base award frameworks (idempotent — INSERT IGNORE)
+    await conn.execute(`
+      INSERT IGNORE INTO award_frameworks
+        (name, category, description, successCriteria, suitableFor, averageRoi)
+      VALUES
+        ('坎城創意節 (Cannes Lions)',  '國際創意獎', '全球廣告創意界最高榮譽，著重於原創性、品牌關聯性和商業影響力',
+          '[\"原創創意概念\",\"品牌契合度\",\"商業影響力\",\"跨媒體整合\"]',
+          '{\"challenges\":[\"awareness\",\"differentiation\",\"perception\"],\"goals\":[\"brand_awareness\",\"brand_refresh\"]}', '300%+'),
+        ('艾菲獎 (Effie Awards)',      '行銷效果獎', '專注於行銷效果和 ROI 的權威獎項',
+          '[\"清晰的策略思維\",\"可量化的成效指標\",\"創意與效果的平衡\",\"預算效率\"]',
+          '{\"challenges\":[\"conversion\",\"retention\",\"motivation\"],\"goals\":[\"sales_growth\",\"market_expansion\"]}', '250%+'),
+        ('龍璽獎 (Long Xi Awards)',    '大中華創意獎', '大中華區最具影響力的創意獎項',
+          '[\"本土文化洞察\",\"國際創意水準\",\"市場適應性\",\"社會影響力\"]',
+          '{\"challenges\":[\"awareness\",\"trust\",\"engagement\"],\"goals\":[\"brand_awareness\",\"new_product_launch\"]}', '200%+'),
+        ('金手指獎 (Golden Finger Awards)', '數位行銷獎', '專注於數位行銷創新的獎項',
+          '[\"數位創新\",\"用戶體驗\",\"數據驅動\",\"社群互動\"]',
+          '{\"challenges\":[\"engagement\",\"conversion\",\"differentiation\"],\"goals\":[\"sales_growth\",\"brand_awareness\"]}', '180%+'),
+        ('時報廣告金像獎', '台灣本土獎', '台灣歷史最悠久的廣告獎項',
+          '[\"本土市場洞察\",\"創意表現\",\"品牌建設\",\"社會責任\"]',
+          '{\"challenges\":[\"awareness\",\"trust\",\"perception\"],\"goals\":[\"brand_awareness\",\"brand_refresh\"]}', '150%+'),
+        ('CLIO 獎', '國際創意獎', '歷史悠久的國際廣告獎項',
+          '[\"創意卓越\",\"文化影響力\",\"執行品質\",\"突破性概念\"]',
+          '{\"challenges\":[\"differentiation\",\"perception\",\"awareness\"],\"goals\":[\"brand_refresh\",\"brand_awareness\"]}', '220%+')
+    `);
+    console.log("[migrate] award_frameworks seed: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

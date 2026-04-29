@@ -101,14 +101,14 @@ export default function PublishGatePage() {
       back={{ to: `/studio/${brandId}/session/new`, label: "Back to Step" }}
       title="Publish Gate"
       actions={
-        <div className="flex gap-px bg-mos-hair border border-mos-hair">
+        <div className="flex gap-px bg-divider border border-divider">
           {(["fb", "ig"] as Channel[]).map((c) => (
             <button
               key={c}
               onClick={() => setChannel(c)}
               className={[
                 "px-5 py-2 text-meta uppercase tracking-[0.18em]",
-                channel === c ? "bg-mos-ink text-white" : "bg-white text-mos-body",
+                channel === c ? "bg-foreground text-white" : "bg-white text-foreground",
               ].join(" ")}
             >
               {c.toUpperCase()}
@@ -121,45 +121,45 @@ export default function PublishGatePage() {
         {/* Left — drafts */}
         <div className="space-y-6">
           {drafts.length === 0 && (
-            <div className="border border-dashed border-mos-hair p-12 text-center text-meta text-mos-muted">
+            <div className="border border-dashed border-divider p-12 text-center text-meta text-default-500">
               No drafts for {channel.toUpperCase()} yet.
             </div>
           )}
           {drafts.map((d, i) => {
             const imgState = imagesByDraft[i] ?? {};
             return (
-              <div key={i} className="border border-mos-hair bg-white">
-                <div className="px-5 py-3 border-b border-mos-hair flex items-center justify-between">
+              <div key={i} className="border border-divider bg-white">
+                <div className="px-5 py-3 border-b border-divider flex items-center justify-between">
                   <div className="mos-eyebrow" style={{ color: tone.text }}>
                     {d.kind}
                   </div>
-                  <div className="flex gap-2 text-meta uppercase tracking-[0.16em] text-mos-muted">
-                    <button className="hover:text-mos-ink">Revise</button>
+                  <div className="flex gap-2 text-meta uppercase tracking-[0.16em] text-default-500">
+                    <button className="hover:text-foreground">Revise</button>
                     <span>·</span>
-                    <button className="hover:text-mos-ink">Style</button>
+                    <button className="hover:text-foreground">Style</button>
                     <span>·</span>
                     <button
                       onClick={() => genImage(i)}
-                      className="hover:text-mos-ink"
+                      className="hover:text-foreground"
                     >
                       {imgState.loading ? "Generating…" : "Generate Image"}
                     </button>
                   </div>
                 </div>
-                <div className="px-5 py-5 text-[0.94rem] text-mos-body whitespace-pre-wrap leading-relaxed">
+                <div className="px-5 py-5 text-[0.94rem] text-foreground whitespace-pre-wrap leading-relaxed">
                   {d.body}
                 </div>
                 {(imgState.url || imgState.b64) && (
-                  <div className="border-t border-mos-hair p-4 bg-mos-paper">
+                  <div className="border-t border-divider p-4 bg-background">
                     <img
                       src={imgState.url ?? `data:image/png;base64,${imgState.b64}`}
                       alt=""
-                      className="max-w-full max-h-[360px] mx-auto border border-mos-hair"
+                      className="max-w-full max-h-[360px] mx-auto border border-divider"
                     />
                   </div>
                 )}
                 {imgState.error && (
-                  <div className="border-t border-mos-hair p-4 text-meta text-mos-red-ink">
+                  <div className="border-t border-divider p-4 text-meta text-danger">
                     {imgState.error}
                   </div>
                 )}
@@ -169,13 +169,13 @@ export default function PublishGatePage() {
         </div>
 
         {/* Right — Audit */}
-        <aside className="border border-mos-hair bg-white self-start sticky top-6">
-          <div className="px-5 py-4 border-b border-mos-hair">
+        <aside className="border border-divider bg-white self-start sticky top-6">
+          <div className="px-5 py-4 border-b border-divider">
             <div className="mos-eyebrow mb-1">Audit Score</div>
-            <div className="mos-display text-[2.6rem] leading-none text-mos-ink">
+            <div className="mos-display text-[2.6rem] leading-none text-foreground">
               {audit ? audit.score : "—"}
             </div>
-            <div className="mt-1 text-meta uppercase tracking-[0.18em] text-mos-muted">
+            <div className="mt-1 text-meta uppercase tracking-[0.18em] text-default-500">
               {audit
                 ? `Verdict · ${audit.verdict}`
                 : scoreMut.isPending
@@ -187,10 +187,10 @@ export default function PublishGatePage() {
             {(audit?.dimensions ?? []).map((d: any) => (
               <div key={d.key}>
                 <div className="flex items-center justify-between text-[0.78rem]">
-                  <span className="text-mos-body">{d.label}</span>
-                  <span className="text-mos-ink font-medium">{d.score}</span>
+                  <span className="text-foreground">{d.label}</span>
+                  <span className="text-foreground font-medium">{d.score}</span>
                 </div>
-                <div className="h-1 bg-mos-hair mt-1">
+                <div className="h-1 bg-divider mt-1">
                   <div
                     className="h-1"
                     style={{ width: `${d.score}%`, background: tone.bg }}
@@ -200,14 +200,14 @@ export default function PublishGatePage() {
             ))}
           </div>
           {audit?.summary && (
-            <div className="border-t border-mos-hair px-5 py-4">
+            <div className="border-t border-divider px-5 py-4">
               <div className="mos-eyebrow mb-2">Suggestion</div>
-              <p className="text-[0.85rem] text-mos-body leading-snug">
+              <p className="text-[0.85rem] text-foreground leading-snug">
                 {audit.summary}
               </p>
             </div>
           )}
-          <div className="border-t border-mos-hair px-5 py-4 space-y-2 text-[0.85rem] text-mos-body">
+          <div className="border-t border-divider px-5 py-4 space-y-2 text-[0.85rem] text-foreground">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={alsoIG} onChange={(e) => setAlsoIG(e.target.checked)} />
               Also publish to IG
@@ -221,9 +221,9 @@ export default function PublishGatePage() {
               Schedule for later
             </label>
           </div>
-          <div className="border-t border-mos-hair p-4 flex gap-2">
+          <div className="border-t border-divider p-4 flex gap-2">
             <button
-              className="flex-1 py-3 text-[0.78rem] uppercase tracking-[0.18em] border border-mos-hair text-mos-body"
+              className="flex-1 py-3 text-[0.78rem] uppercase tracking-[0.18em] border border-divider text-foreground"
               onClick={() => navigate(-1)}
             >
               Save Draft
