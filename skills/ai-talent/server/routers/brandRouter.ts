@@ -124,8 +124,17 @@ export const brandRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { brands } = await import("../../drizzle/schema");
+      // Auto-generate a unique slug from the brand name (lowercase,
+      // ascii/CJK-safe). brands.slug has NOT NULL with no default.
+      const slugBase = input.name.toLowerCase().trim()
+        .replace(/[^\w一-鿿-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 80) || `brand-${Date.now()}`;
+      const slug = `${slugBase}-${Math.random().toString(36).slice(2, 7)}`;
       const result = await (db.insert(brands) as any).values({
         userId: ctx.user.id,
+        slug,
         name: input.name,
         websiteUrl: input.website ?? null,
         targetAudience: input.targetAudience ?? null,
