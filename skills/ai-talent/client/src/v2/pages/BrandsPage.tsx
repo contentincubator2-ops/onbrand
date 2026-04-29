@@ -21,6 +21,7 @@ import {
   Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Skeleton, Tabs, Tab,
+  Input, Select, SelectItem, CheckboxGroup, Checkbox,
 } from "@heroui/react";
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
@@ -37,6 +38,7 @@ import {
   faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
   faFolderOpen, faUserPlus, faCrown,
   faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
+  faWandSparkles,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
@@ -53,6 +55,15 @@ const BRAND_ASSET_SUBNAV: SubNavItem[] = [
   { id: "asset:logo",   label: "標誌",     group: "visuals" },
   { id: "asset:colors", label: "顏色",     group: "visuals" },
   { id: "asset:fonts",  label: "字型",     group: "visuals" },
+];
+
+// Event-specific subnav additions (CJ direction 2026-04-29):
+// - settings page lets user edit metadata (brand / name / period /
+//   productIds) post-creation — previously only set at create time.
+// - 視覺資產 deferred to a later round (event posters / videos go through
+//   MediaGenFlow per the visual-step rule, not stored as static assets).
+const EVENT_SETTINGS_SUBNAV: SubNavItem[] = [
+  { id: "settings", label: "設定（品牌 / 期間 / 產品）", group: "settings" },
 ];
 
 // Tile colors (HeroUI semantic-100 backgrounds + matching tone)
@@ -117,6 +128,11 @@ export default function BrandsPage() {
         items.push(a);
       }
     }
+    if (scopeMode === "event") {
+      for (const a of EVENT_SETTINGS_SUBNAV) {
+        items.push(a);
+      }
+    }
     return items;
   }, [scopeMode, segments]);
 
@@ -171,8 +187,20 @@ export default function BrandsPage() {
 
   const onTileClick = (t: Tile) => setSection(t.id);
 
-  // ── Pipeline (research mode) — scope-aware (brand 14 steps / product 5) ─
+  // ── Pipeline (research mode) — scope-aware (brand 14 / product 5 / event 11) ─
   const pipelineSteps: PipelineStepSpec[] = pipelineFor(scopeMode);
+
+  // Read positioning at top level (deduped by React Query — same key as
+  // PositioningEditor's query). Used to surface SMP value in the
+  // checkpoint card without requiring user to click into the SMP segment.
+  const topScopeActive = (trpc as any).scope?.active?.useQuery
+    ? (trpc as any).scope.active.useQuery(
+        { brandId: scope?.brandId, productId: scope?.productId, eventId: scope?.eventId },
+        { enabled: scopeMode !== "none", refetchOnWindowFocus: false, staleTime: 30_000 },
+      )
+    : { data: null };
+  const topPositioning = (topScopeActive.data as any)?.[scopeMode]?.positioning ?? null;
+  const smpData = topPositioning?.smp ?? null;
 
   // Persist pipeline state per (kind, id) so page refresh resumes mid-run.
   const pipelineKey = scopeMode !== "none" && (scope?.brandId ?? scope?.productId ?? scope?.eventId)
@@ -283,6 +311,19 @@ export default function BrandsPage() {
         setLiveThinking(null);
         return;
       }
+      // SMP checkpoint gate (event scope only). Server marks the segment
+      // with _wizardMeta.smp.requiresUserApproval=true after writing; we
+      // pause here so user must press 繼續 before steps 7-11 fire.
+      if (scopeMode === "event" && step.segmentId === "smp") {
+        setPipeline((p) => ({
+          ...p,
+          status: "paused",
+          completed: [...p.completed, step.id],
+        }));
+        setSmpCheckpointActive(true);
+        setLiveThinking(null);
+        return;
+      }
       setPipeline((p) => ({
         ...p,
         cursor: p.cursor + 1,
@@ -369,7 +410,18 @@ export default function BrandsPage() {
 
   const startPipeline = () => {
     setFailedStepIds([]); // reset error trail on fresh start
+    setSmpCheckpointActive(false); // clear stale SMP gate
     setPipeline({ status: "running", cursor: 0, completed: [] });
+  };
+  // SMP checkpoint resume — fired when user presses 繼續 on the gate card.
+  // Resume = clear gate flag + advance cursor + flip pipeline back to running.
+  const resumeAfterSmp = () => {
+    setSmpCheckpointActive(false);
+    setPipeline((p) => ({
+      ...p,
+      status: "running",
+      cursor: p.cursor + 1,
+    }));
   };
   const pausePipeline  = () => setPipeline((p) => ({ ...p, status: "paused" }));
   const resumePipeline = () => setPipeline((p) => ({ ...p, status: "running" }));
@@ -392,6 +444,12 @@ export default function BrandsPage() {
   // as a banner so user can spot which segments need rerun. Cleared on
   // pipeline restart.
   const [failedStepIds, setFailedStepIds] = useState<number[]>([]);
+  // SMP checkpoint state — when event scope's SMP step completes, server
+  // marks _wizardMeta.smp.requiresUserApproval=true. We pause the runner
+  // here and surface a confirmation card; user clicks 繼續 to resume.
+  // Per CJ direction 2026-04-29: SMP is the campaign's highest principle,
+  // user must commit before steps 7-11 (messaging/creative/...) fire.
+  const [smpCheckpointActive, setSmpCheckpointActive] = useState(false);
   const runSegmentAutoFill = (segmentId: string) => {
     if (scopeMode === "none" || pipelineSteps.length === 0) return;
     const targetIdx = pipelineSteps.findIndex((s) => s.segmentId === segmentId);
@@ -535,6 +593,51 @@ export default function BrandsPage() {
               onStop={stopPipeline}
             />
           )}
+          {/* SMP checkpoint card — gates auto-advance after event Step 6.
+              User reviews the auto-generated SMP, edits the segment if
+              needed, then presses 繼續 to fire steps 7-11. Per CJ rule
+              2026-04-29: SMP is highest creative principle, can't auto-pass. */}
+          {smpCheckpointActive && (
+            <div className="mt-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-small font-semibold text-primary-800">
+                    🛑 SMP Checkpoint — 請確認單一核心命題
+                  </p>
+                  <p className="text-tiny text-default-600 mt-1">
+                    SMP 是這次活動的最高創意準則，後面 5 個 step（訊息架構、創意概念、規範、管道、旅程）都會圍繞它展開。先確認再繼續。
+                  </p>
+                  {smpData?.singleMindedProposition && (
+                    <div className="mt-2 p-2 rounded bg-white border border-divider">
+                      <p className="text-small font-medium text-foreground">
+                        「{smpData.singleMindedProposition}」
+                      </p>
+                      {smpData.rationale && (
+                        <p className="text-tiny text-default-500 mt-1 leading-relaxed">
+                          {smpData.rationale}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    <button
+                      className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90"
+                      onClick={resumeAfterSmp}
+                    >
+                      ▶ 繼續（跑 step 7-11）
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded-md border border-divider text-tiny hover:bg-default-50"
+                      onClick={() => setSection("seg:smp")}
+                    >
+                      編輯 SMP
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Failure trail — shows step ids that errored or returned empty
               conclusion so user knows which segments to rerun (CJ caught
               2026-04-29: product step 3-5 silently empty after step 2). */}
@@ -561,6 +664,8 @@ export default function BrandsPage() {
               assetKey={section.slice("asset:".length) as AssetKey}
               brandId={(scope?.brandId ?? brandId)!}
             />
+          ) : section === "settings" && scopeMode === "event" && scope?.eventId ? (
+            <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
           ) : section === "card" || section === "prompts" || section.startsWith("seg:") ? (
             <PositioningPanel
               section={section}
@@ -896,5 +1001,181 @@ function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) 
         <p className="text-small font-medium text-foreground">{tile.label}</p>
       </div>
     </Card>
+  );
+}
+
+/* ─────────────────────── Event Settings Panel ───────────────────────
+ * CJ direction 2026-04-29: post-creation event editing — brand picker,
+ * name, period, linked productIds (m:n via event_products). All metadata
+ * that previously could only be set at create time. Lives as the
+ * "settings" sub-nav entry under event scope.
+ */
+function EventSettingsPanel({
+  eventId, brands,
+}: { eventId: number; brands: any[] }) {
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const eventQuery = (trpc as any).event?.get?.useQuery
+    ? (trpc as any).event.get.useQuery({ id: eventId }, { refetchOnWindowFocus: false })
+    : { data: null, isLoading: false };
+  const event = eventQuery.data as any;
+
+  const [name, setName] = React.useState("");
+  const [brandId, setBrandId] = React.useState<number | null>(null);
+  const [startAt, setStartAt] = React.useState("");
+  const [endAt, setEndAt]     = React.useState("");
+  const [productIds, setProductIds] = React.useState<number[]>([]);
+  const [savedAt, setSavedAt] = React.useState<string | null>(null);
+  const [err, setErr] = React.useState<string | null>(null);
+
+  // Hydrate from server data once it arrives.
+  React.useEffect(() => {
+    if (!event) return;
+    setName(event.name ?? "");
+    setBrandId(event.brandId ?? null);
+    const fmt = (d: any): string => {
+      if (!d) return "";
+      try {
+        const s = String(d);
+        return s.split("T")[0] ?? s;
+      } catch { return ""; }
+    };
+    setStartAt(fmt(event.startAt));
+    setEndAt(fmt(event.endAt));
+    setProductIds(Array.isArray(event.productIds) ? event.productIds : []);
+  }, [event]);
+
+  // Candidate products from the picked brand (so user can re-link if
+  // brand changes). Same query the create-modal uses.
+  const productsQuery = (trpc as any).product?.list?.useQuery
+    ? (trpc as any).product.list.useQuery(
+        { brandId: brandId ?? undefined },
+        { enabled: !!brandId, refetchOnWindowFocus: false },
+      )
+    : { data: [] };
+  const candidateProducts: any[] = (productsQuery.data as any[]) ?? [];
+
+  const upsert = (trpc as any).event?.upsert?.useMutation?.() ?? null;
+
+  const onSave = async () => {
+    if (!upsert) { setErr("event.upsert not available"); return; }
+    if (!name.trim()) { setErr("名稱不能為空"); return; }
+    if (!brandId) { setErr("必須綁定品牌"); return; }
+    setErr(null);
+    try {
+      await upsert.mutateAsync({
+        id: eventId,
+        brandId,
+        slug: event?.slug ?? "",
+        name: name.trim(),
+        startAt: startAt || undefined,
+        endAt: endAt || undefined,
+        productIds, // replace full set per upsert contract
+      });
+      setSavedAt(new Date().toLocaleTimeString());
+      utils?.event?.get?.invalidate?.();
+      utils?.scope?.options?.invalidate?.();
+      utils?.scope?.active?.invalidate?.();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  };
+
+  if (eventQuery.isLoading) {
+    return <p className="text-small text-default-500">載入中…</p>;
+  }
+  if (!event) {
+    return (
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="py-16 items-center text-center">
+          <p className="text-medium font-medium">找不到此活動</p>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 max-w-3xl">
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="px-5 py-4 gap-1">
+          <p className="text-tiny text-default-500 uppercase tracking-wider">EVENT · 設定</p>
+          <h2 className="text-xl font-semibold tracking-tight">{event.name}</h2>
+          <p className="text-small text-default-500">
+            slug: <code className="text-tiny">{event.slug}</code>
+          </p>
+        </CardBody>
+      </Card>
+
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="p-5 gap-4">
+          <Input
+            label="活動名稱（必填）"
+            labelPlacement="outside"
+            variant="bordered" size="sm" radius="md"
+            value={name}
+            onValueChange={setName}
+            isRequired
+          />
+          <Select
+            label="所屬品牌（必選）"
+            labelPlacement="outside"
+            variant="bordered" size="sm" radius="md"
+            selectedKeys={brandId ? new Set([String(brandId)]) : new Set()}
+            onSelectionChange={(keys) => {
+              const k = Array.from(keys as Set<string>)[0];
+              setBrandId(k ? Number(k) : null);
+            }}
+            isRequired
+          >
+            {brands.map((b: any) => (
+              <SelectItem key={String(b.id)}>{b.name}</SelectItem>
+            ))}
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="開始日期" labelPlacement="outside"
+              variant="bordered" size="sm" radius="md" type="date"
+              value={startAt} onValueChange={setStartAt}
+            />
+            <Input
+              label="結束日期" labelPlacement="outside"
+              variant="bordered" size="sm" radius="md" type="date"
+              value={endAt} onValueChange={setEndAt}
+            />
+          </div>
+          <div>
+            <p className="text-small font-medium mb-1">關聯產品（可多選）</p>
+            <p className="text-tiny text-default-500 mb-2">
+              選 0 個 = 品牌層級活動；2+ 個 = 跨產品活動。改變綁定的品牌後產品清單會更新。
+            </p>
+            {candidateProducts.length === 0 ? (
+              <p className="text-tiny text-default-500">此品牌尚無產品。</p>
+            ) : (
+              <CheckboxGroup
+                value={productIds.map(String)}
+                onValueChange={(vals) => setProductIds((vals as string[]).map((v) => Number(v)))}
+                classNames={{ wrapper: "gap-1.5" }}
+              >
+                {candidateProducts.map((p: any) => (
+                  <Checkbox key={p.id} value={String(p.id)} size="sm">
+                    <span className="text-small">{p.name}</span>
+                  </Checkbox>
+                ))}
+              </CheckboxGroup>
+            )}
+          </div>
+          {err && <p className="text-tiny text-danger">{err}</p>}
+          <div className="flex items-center gap-3">
+            <Button
+              color="primary" size="sm"
+              isLoading={upsert?.isPending ?? false}
+              onPress={onSave}
+            >
+              儲存
+            </Button>
+            {savedAt && <span className="text-tiny text-success">已儲存 · {savedAt}</span>}
+          </div>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

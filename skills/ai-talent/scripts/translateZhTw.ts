@@ -3,7 +3,7 @@
  *
  * Reads rows where the *_zh column is NULL, sends batched payloads to
  * Azure Foundry gpt-4o-mini, parses JSON, writes back. Also normalizes
- * 簡中 → 繁中 (e.g., 渠道→通路, 网→網) and removes mid-sentence English
+ * 簡中 → 繁中 (e.g., 渠道→管道, 网→網) and removes mid-sentence English
  * fragments per the design rule that zh-TW UI shouldn't mix raw English.
  *
  * Targets:
@@ -56,7 +56,7 @@ const SYSTEM_PROMPT = `You are a localization editor for a Taiwanese SaaS market
 Translate input rows into clean **繁體中文 (zh-TW)** suitable for Taiwan users.
 
 Rules:
-- Output Traditional Chinese only — convert any 简体 (e.g., 渠道→通路, 网→網, 视频→影片, 优化→最佳化, 数据→數據, 内容→內容).
+- Output Traditional Chinese only — convert any 简体 (e.g., 渠道→管道, 网→網, 视频→影片, 优化→最佳化, 数据→數據, 内容→內容).
 - Keep widely-known English terms untranslated: FB, IG, LinkedIn, YouTube, TikTok, SEO, B2B, B2C, KPI, ROI, JTBD, STP, AARRR, OKR, GPT, AI, ML, API, SaaS, CRM, KOL, UGC, PR, OMO. Otherwise translate.
 - Be concise. Do not pad. Do not add quotes / brackets. Do not echo the input.
 - Maintain the requested character limit for each field.

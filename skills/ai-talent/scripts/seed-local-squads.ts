@@ -552,8 +552,8 @@ async function main() {
           { step: 1, title: "Squad Lead Intake：上市目標確認", description: "釐清上市時程、預算、目標市場與成功指標，分配各 Agent 任務", owner: "squad_lead", output: "上市 Brief", duration_hint: "15 分鐘" },
           { step: 2, title: "市場機會掃描", description: "分析市場規模、切入時機、目標族群現有選擇與痛點", owner: "market_researcher", output: "市場機會報告", duration_hint: "25 分鐘" },
           { step: 3, title: "競品上市案例研究", description: "研究競品上市策略、媒體計畫、定價與效果", owner: "competitor_analyst", output: "競品案例分析", duration_hint: "20 分鐘" },
-          { step: 4, title: "上市訊息策略", description: "制定核心訊息、不同渠道的訊息變體、發布節奏", owner: "brand_copywriter", output: "訊息策略文件", duration_hint: "20 分鐘" },
-          { step: 5, title: "通路與媒體規劃", description: "規劃付費、自然、口碑渠道配比，設定各渠道 KPI", owner: "channel_strategist", output: "媒體計畫書", duration_hint: "20 分鐘" },
+          { step: 4, title: "上市訊息策略", description: "制定核心訊息、不同管道的訊息變體、發布節奏", owner: "brand_copywriter", output: "訊息策略文件", duration_hint: "20 分鐘" },
+          { step: 5, title: "通路與媒體規劃", description: "規劃付費、自然、口碑管道配比，設定各管道 KPI", owner: "channel_strategist", output: "媒體計畫書", duration_hint: "20 分鐘" },
           { step: 6, title: "Squad Lead QA + 風險評估", description: "審核整體上市計畫的邏輯性，識別執行風險與備案", owner: "squad_lead", output: "風險備忘錄", duration_hint: "10 分鐘" },
           { step: 7, title: "Squad Lead 交付：上市計畫書", description: "整合成完整上市計畫書，含甘特圖與執行 Checklist", owner: "squad_lead", output: "品牌上市計畫書", duration_hint: "15 分鐘" },
         ],
@@ -564,11 +564,11 @@ async function main() {
         name: "內容策略規劃",
         description: "為品牌制定系統化的內容策略與執行計畫",
         steps: [
-          { step: 1, title: "Squad Lead Intake：內容目標確認", description: "確認品牌聲量目標、主要渠道、內容預算與產出頻率，brief 成員", owner: "squad_lead", output: "內容策略 Brief", duration_hint: "15 分鐘" },
+          { step: 1, title: "Squad Lead Intake：內容目標確認", description: "確認品牌聲量目標、主要管道、內容預算與產出頻率，brief 成員", owner: "squad_lead", output: "內容策略 Brief", duration_hint: "15 分鐘" },
           { step: 2, title: "受眾內容偏好研究", description: "分析 TA 在各平台的內容消費習慣、喜好格式與互動模式", owner: "consumer_researcher", output: "受眾洞察報告", duration_hint: "20 分鐘" },
           { step: 3, title: "競品內容分析", description: "拆解競品內容策略、爆款規律、話題切入角度", owner: "competitor_analyst", output: "競品內容報告", duration_hint: "20 分鐘" },
           { step: 4, title: "內容支柱設計", description: "建立 3-5 個品牌內容支柱，每個支柱的主題、格式、KPI", owner: "content_strategist", output: "內容支柱框架", duration_hint: "20 分鐘" },
-          { step: 5, title: "內容月曆規劃", description: "制定 30-90 天內容發布日曆，含話題、格式、渠道配比", owner: "content_planner", output: "內容月曆草稿", duration_hint: "20 分鐘" },
+          { step: 5, title: "內容月曆規劃", description: "制定 30-90 天內容發布日曆，含話題、格式、管道配比", owner: "content_planner", output: "內容月曆草稿", duration_hint: "20 分鐘" },
           { step: 6, title: "Squad Lead QA：策略一致性審核", description: "確保內容策略與品牌定位一致，評估資源可行性", owner: "squad_lead", output: "QA 備忘", duration_hint: "10 分鐘" },
           { step: 7, title: "Squad Lead 交付：內容策略報告", description: "完成可執行的內容策略報告，含 KPI 追蹤框架", owner: "squad_lead", output: "內容策略報告", duration_hint: "15 分鐘" },
         ],
@@ -732,9 +732,9 @@ async function main() {
           { step: 1, title: "Squad Lead Intake：活動目標確認", description: "確認活動類型、目標受眾、預算、地點/平台、成功指標", owner: "squad_lead", output: "活動 Brief", duration_hint: "10 分鐘" },
           { step: 2, title: "目標受眾研究", description: "研究目標受眾的活動參與動機、偏好格式、報名決策因素", owner: "consumer_researcher", output: "受眾洞察", duration_hint: "15 分鐘" },
           { step: 3, title: "競品活動案例研究", description: "研究類似活動的宣傳策略、報名轉換方法、活動後行銷", owner: "competitor_analyst", output: "案例分析報告", duration_hint: "15 分鐘" },
-          { step: 4, title: "活動傳播策略", description: "規劃活動前/中/後的傳播節奏、媒體渠道、內容類型", owner: "event_strategist", output: "傳播計畫", duration_hint: "20 分鐘" },
+          { step: 4, title: "活動傳播策略", description: "規劃活動前/中/後的傳播節奏、媒體管道、內容類型", owner: "event_strategist", output: "傳播計畫", duration_hint: "20 分鐘" },
           { step: 5, title: "活動文案創作", description: "撰寫活動標題、宣傳文案、報名頁文案、Email 邀請函", owner: "event_copywriter", output: "活動文案包", duration_hint: "25 分鐘" },
-          { step: 6, title: "Squad Lead QA：吸引力審核", description: "評估活動定位的吸引力，確認各渠道訊息一致性", owner: "squad_lead", output: "QA 回饋", duration_hint: "10 分鐘" },
+          { step: 6, title: "Squad Lead QA：吸引力審核", description: "評估活動定位的吸引力，確認各管道訊息一致性", owner: "squad_lead", output: "QA 回饋", duration_hint: "10 分鐘" },
           { step: 7, title: "Squad Lead 交付：活動行銷包", description: "整合傳播計畫、文案包、Checklist 為完整活動行銷方案", owner: "squad_lead", output: "活動行銷包", duration_hint: "10 分鐘" },
         ],
       },
@@ -1188,7 +1188,7 @@ async function main() {
         assignAgentToStep({ step: 2, title: "受眾資料收集與分析（Survey Analysis）", description: "Data Analyst 使用 Madison Research Agents 進行 survey analysis 與二手資料收集，建立受眾基本資料集（人口統計、行為、購買動機）", owner: "data_analyst", output: "受眾資料集（Audience Dataset）", tools: ["Madison: Research Agents – Survey Analysis", "Madison: Research Agents – Secondary Research"], requiredSkills: ["icp", "b2b", "scoring-model", "data-analysis", "segmentation"] }, m4Info),
         assignAgentToStep({ step: 3, title: "合成 Persona 開發（Synthetic Persona Development）", description: "Persona Developer 使用 Madison 的 Synthetic Persona Development 與 Preference Modeling 建立 3-5 個資料驅動的 Persona，超越傳統「拍腦袋 Persona」", owner: "persona_developer", output: "合成 Persona 卡片（Data-Driven Personas）", tools: ["Madison: Synthetic Persona Development", "Madison: Preference Modeling"], requiredSkills: ["persona", "consumer-insights", "qualitative-research", "behavioral-analysis"] }, m3Info),
         assignAgentToStep({ step: 4, title: "ICP 評分與優先排序（A/B/C/D Fit Scoring）", description: "ICP Scoring PMM 使用 marketing-strategy-pmm ICP Scoring 框架，對每個 Persona 進行 A/B/C/D Fit 評分（Firmographic / Technographic / Psychographic / Economic Buyer），確定最優先攻佔的客群", owner: "icp_scoring_pmm", output: "ICP 評分表（Priority Segment Matrix）", tools: ["marketing-strategy-pmm: ICP Scoring A/B/C/D", "marketing-strategy-pmm: Buyer Persona Templates"], requiredSkills: ["positioning", "brand-strategy", "pmm", "messaging"] }, leadInfo),
-        assignAgentToStep({ step: 5, title: "各分群差異化定位與個人化訊息開發", description: "Personalization Strategist 針對每個 A-grade ICP 開發專屬的定位訊息、觸達渠道策略、個人化廣告素材方向", owner: "personalization_strategist", output: "分眾定位訊息矩陣（Segment × Positioning Message）", tools: ["Madison: Preference Modeling"], requiredSkills: ["channel-strategy", "personalization", "audience-targeting", "media-planning"] }, m5Info),
+        assignAgentToStep({ step: 5, title: "各分群差異化定位與個人化訊息開發", description: "Personalization Strategist 針對每個 A-grade ICP 開發專屬的定位訊息、觸達管道策略、個人化廣告素材方向", owner: "personalization_strategist", output: "分眾定位訊息矩陣（Segment × Positioning Message）", tools: ["Madison: Preference Modeling"], requiredSkills: ["channel-strategy", "personalization", "audience-targeting", "media-planning"] }, m5Info),
         assignAgentToStep({ step: 6, title: "Squad Lead QA & 分眾定位矩陣交付", description: "Squad Lead 確認各分群定位的差異化與協同性，輸出完整分眾定位矩陣與執行建議", owner: "squad_lead", output: "分眾定位矩陣（Segmentation Positioning Playbook）", tools: [] }, null),
       ];
 
@@ -1266,8 +1266,8 @@ async function main() {
         assignAgentToStep({ step: 2, title: "競品即時數據監控（Real-time Competitor Tracking）", description: "Competitor Monitor 使用 octolens 對目標競品進行即時網頁資料抽取，收集官網定位訊息、廣告文案、定價頁面、PR 發稿等資料", owner: "competitor_monitor", output: "競品原始資料集（Competitor Raw Data）", tools: ["octolens: Competitor Monitoring & Web Data Extraction"], requiredSkills: ["market-research", "positioning", "competitive-analysis", "brand-strategy"] }, leadInfo),
         assignAgentToStep({ step: 3, title: "市場情報深度分析（MarketMind Research）", description: "Market Intelligence Analyst 使用 Madison Intelligence Agents 的 MarketMind Research 模組，進行 reputation monitoring、trend analysis 與市場二手資料研究，補充 octolens 原始數據的深度解讀", owner: "market_intelligence_analyst", output: "市場情報分析報告", tools: ["Madison: Intelligence Agents – MarketMind Research", "Madison: Intelligence Agents – Reputation Monitoring", "Madison: Intelligence Agents – Trend Analysis"], requiredSkills: ["data-visualization", "analysis", "competitive-analysis", "reporting"] }, m4Info),
         assignAgentToStep({ step: 4, title: "感知地圖繪製（Perceptual Map Construction）", description: "Data Visualization Specialist 使用 marketing-strategy-pmm Competitive Positioning Map 框架，根據研究結果選定最具區分度的 2 個維度軸，繪製品牌 vs 競品的二維感知定位圖", owner: "data_visualization_specialist", output: "競爭感知地圖（Perceptual Map）", tools: ["marketing-strategy-pmm: Competitive Positioning Map Construction", "marketing-strategy-pmm: positioning-frameworks.md"], requiredSkills: ["market-research", "positioning", "strategy", "competitive-analysis"] }, leadInfo),
-        assignAgentToStep({ step: 5, title: "白空間識別與定位機會建議", description: "Positioning Strategist 分析感知地圖，識別競品尚未佔據的白空間，評估品牌進入白空間的可行性，提出 2-3 個差異化定位方向及對應的廣告策略、渠道策略、定價建議", owner: "positioning_strategist", output: "白空間機會分析 + 定位方向建議書", tools: ["marketing-strategy-pmm: Whitespace Analysis"], requiredSkills: ["brand-strategy", "positioning", "gtm", "ad-targeting"] }, m5Info),
-        assignAgentToStep({ step: 6, title: "Squad Lead QA & 感知定位報告交付", description: "Squad Lead 整合感知地圖 + 白空間分析 + 定位建議，輸出完整競爭感知定位報告，直接用於廣告策略、渠道規劃、定價決策", owner: "squad_lead", output: "競爭感知定位報告（Competitive Perceptual Positioning Report）", tools: [] }, null),
+        assignAgentToStep({ step: 5, title: "白空間識別與定位機會建議", description: "Positioning Strategist 分析感知地圖，識別競品尚未佔據的白空間，評估品牌進入白空間的可行性，提出 2-3 個差異化定位方向及對應的廣告策略、管道策略、定價建議", owner: "positioning_strategist", output: "白空間機會分析 + 定位方向建議書", tools: ["marketing-strategy-pmm: Whitespace Analysis"], requiredSkills: ["brand-strategy", "positioning", "gtm", "ad-targeting"] }, m5Info),
+        assignAgentToStep({ step: 6, title: "Squad Lead QA & 感知定位報告交付", description: "Squad Lead 整合感知地圖 + 白空間分析 + 定位建議，輸出完整競爭感知定位報告，直接用於廣告策略、管道規劃、定價決策", owner: "squad_lead", output: "競爭感知定位報告（Competitive Perceptual Positioning Report）", tools: [] }, null),
       ];
 
       await upsertWorkflow(conn, {
@@ -1280,7 +1280,7 @@ async function main() {
       await upsertSquad(conn, {
         slug,
         name: "競爭感知定位小組",
-        description: "系統繪製品牌 vs 競品雙軸感知地圖，識別市場白空間。整合 octolens 即時競品監控、Madison Intelligence Agents MarketMind Research、marketing-strategy-pmm 定位框架，直接指導廣告策略、渠道規劃與定價決策。",
+        description: "系統繪製品牌 vs 競品雙軸感知地圖，識別市場白空間。整合 octolens 即時競品監控、Madison Intelligence Agents MarketMind Research、marketing-strategy-pmm 定位框架，直接指導廣告策略、管道規劃與定價決策。",
         industryKey: "general",
         missionType: taskType,
         workspace: ["brand-positioning"],
@@ -3026,7 +3026,7 @@ async function main() {
       const steps = [
         assignAgentToStep({ order: 1, name: "內容盤點與分發機會識別", description: "盤點現有內容資產，為每篇高價值內容識別 5-10 個適合的分發管道：Reddit 社群、Quora 問答、Medium、LinkedIn 原生文章", tool: "internal", outputType: "content_distribution_inventory", requiredSkills: ["content-repurposing"] }, leadInfo),
         assignAgentToStep({ order: 2, name: "平台原生格式改編", description: "把每篇高價值內容改寫為各平台的原生格式：LinkedIn 貼文 = 條列重點，Quora = 詳細解答，Reddit = 真誠問題回覆", tool: "internal", outputType: "platform_native_content", requiredSkills: ["content-marketing"] }, m2Info),
-        assignAgentToStep({ order: 3, name: "分發執行排程", description: "建立 30 天分發執行排程：每天把 1-2 篇重新格式化的內容發布到不同管道，建立全渠道品牌觸點", tool: "internal", outputType: "distribution_execution_schedule", requiredSkills: ["cross-channel-analytics"] }, m3Info),
+        assignAgentToStep({ order: 3, name: "分發執行排程", description: "建立 30 天分發執行排程：每天把 1-2 篇重新格式化的內容發布到不同管道，建立全管道品牌觸點", tool: "internal", outputType: "distribution_execution_schedule", requiredSkills: ["cross-channel-analytics"] }, m3Info),
         assignAgentToStep({ order: 4, name: "分發效益追蹤優化", description: "追蹤每個分發管道帶來的流量、潛客、品牌提及，識別 ROI 最高的分發組合並集中資源", tool: "internal", outputType: "distribution_roi_report", requiredSkills: ["marketing-analytics"] }, m3Info),
         assignAgentToStep({ order: 5, name: "長青內容更新再分發", description: "識別 6-12 個月前的高效分發內容，更新數據和洞察後重新分發，讓長青內容持續創造價值", tool: "internal", outputType: "evergreen_republishing_plan", requiredSkills: ["content-repurposing"] }, leadInfo),
       ];
@@ -3217,17 +3217,17 @@ async function main() {
       const m3Info = await getAgentInfo(conn, m3Id);
       const steps = [
         assignAgentToStep({ order: 1, name: "受眾情報深度研究", description: "應用 Sparktoro 方法研究受眾：他們看哪些 YouTube、聽哪些 Podcast、追蹤哪些 Instagram、分享哪些主題，在哪裡接受資訊", tool: "internal", outputType: "audience_intelligence_report", requiredSkills: ["market-research-agent"] }, leadInfo),
-        assignAgentToStep({ order: 2, name: "受眾影響渠道地圖", description: "繪製目標受眾的「影響渠道地圖」：列出 Top 20 個影響他們的媒體、KOL、社群、Podcast，這些是內容分發的最高優先渠道", tool: "internal", outputType: "influence_channel_map", requiredSkills: ["social-media-marketing"] }, m3Info),
+        assignAgentToStep({ order: 2, name: "受眾影響管道地圖", description: "繪製目標受眾的「影響管道地圖」：列出 Top 20 個影響他們的媒體、KOL、社群、Podcast，這些是內容分發的最高優先管道", tool: "internal", outputType: "influence_channel_map", requiredSkills: ["social-media-marketing"] }, m3Info),
         assignAgentToStep({ order: 3, name: "受眾語言與關心主題建立", description: "研究受眾如何描述他們的問題（真實語言），以此撰寫內容標題和描述，確保內容能被受眾「一眼認出是為我寫的」", tool: "internal", outputType: "audience_language_guide", requiredSkills: ["content-marketing"] }, m2Info),
-        assignAgentToStep({ order: 4, name: "渠道優先內容策略", description: "依影響渠道地圖設計內容策略：在受眾常去的渠道發布內容，而非只在自己的管道等受眾來", tool: "internal", outputType: "channel_first_content_strategy", requiredSkills: ["marketing-strategy-pmm"] }, m2Info),
+        assignAgentToStep({ order: 4, name: "管道優先內容策略", description: "依影響管道地圖設計內容策略：在受眾常去的管道發布內容，而非只在自己的管道等受眾來", tool: "internal", outputType: "channel_first_content_strategy", requiredSkills: ["marketing-strategy-pmm"] }, m2Info),
       ];
       const agentMembers = [
         { agent_id: leadId, is_lead: true, role: "受眾情報師", order: 1 },
         { agent_id: m2Id, is_lead: false, role: "受眾導向內容師", order: 2 },
-        { agent_id: m3Id, is_lead: false, role: "渠道地圖師", order: 3 },
+        { agent_id: m3Id, is_lead: false, role: "管道地圖師", order: 3 },
       ].filter(a => a.agent_id);
       await upsertWorkflow(conn, { missionType: taskType, name: "Rand Fishkin Sparktoro 受眾情報驅動內容策略", description: "Source: Rand Fishkin（Sparktoro 創辦人）2019 年開創受眾情報驅動行銷方法。Sparktoro 分析 1.4 億社群帳號的受眾行為", steps });
-      await upsertSquad(conn, { slug, name: "Rand Fishkin Sparktoro 受眾情報內容小隊", description: "先了解受眾在哪裡、受誰影響、用什麼語言，再決定做什麼內容、在哪裡分發。Rand Fishkin 的受眾情報驅動框架：情報在前，內容在後", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Rand Fishkin – Audience Intelligence Research (Sparktoro, 2019)", agents: agentMembers, tags: ["content-marketing", "audience-research", "channel-strategy", "data"], useCases: ["內容策略制定", "目標受眾研究", "渠道分發優化"], outputFormats: ["受眾情報報告", "影響渠道地圖", "受眾語言指南", "渠道優先策略"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Sparktoro 自身（Rand Fishkin 創辦）", description: "應用自創受眾情報方法建立 Sparktoro 品牌，完全依靠有機內容行銷成長", result: "Sparktoro 在沒有付費廣告的情況下，年 ARR 超過 $300 萬", source: "Rand Fishkin 公開財務數據 2022 / SparkToro.com" }, { company: "Moz（Rand Fishkin 創辦）", description: "應用受眾情報研究制定 Moz Blog 的內容策略", result: "Moz Blog 成為 SEO 業界最被引用的內容資源，月流量超過 300 萬，被 iContact 以 $67.5M 收購", source: "Moz.com / TechCrunch 報導 2021" }] });
+      await upsertSquad(conn, { slug, name: "Rand Fishkin Sparktoro 受眾情報內容小隊", description: "先了解受眾在哪裡、受誰影響、用什麼語言，再決定做什麼內容、在哪裡分發。Rand Fishkin 的受眾情報驅動框架：情報在前，內容在後", industryKey: "marketing", missionType: taskType, workspace: ["strategy"], methodology: "Rand Fishkin – Audience Intelligence Research (Sparktoro, 2019)", agents: agentMembers, tags: ["content-marketing", "audience-research", "channel-strategy", "data"], useCases: ["內容策略制定", "目標受眾研究", "管道分發優化"], outputFormats: ["受眾情報報告", "影響管道地圖", "受眾語言指南", "管道優先策略"], requiredIntegrations: [], token: 55000, showcases: [{ company: "Sparktoro 自身（Rand Fishkin 創辦）", description: "應用自創受眾情報方法建立 Sparktoro 品牌，完全依靠有機內容行銷成長", result: "Sparktoro 在沒有付費廣告的情況下，年 ARR 超過 $300 萬", source: "Rand Fishkin 公開財務數據 2022 / SparkToro.com" }, { company: "Moz（Rand Fishkin 創辦）", description: "應用受眾情報研究制定 Moz Blog 的內容策略", result: "Moz Blog 成為 SEO 業界最被引用的內容資源，月流量超過 300 萬，被 iContact 以 $67.5M 收購", source: "Moz.com / TechCrunch 報導 2021" }] });
     }
 
     // E7: Mark Schaefer — Content Shock Differentiation (The Content Code, 2015)
@@ -4780,7 +4780,7 @@ async function main() {
         { step: 1, title: "輿情風險早期識別", description: "設定高風險關鍵字警示閾值；即時監測社群、新聞、論壇的異常提及量", owner: "squad_lead", output: "風險預警警報" },
         { step: 2, title: "危機評級與影響評估", description: "依據擴散速度、情感強度、媒體等級評定危機等級（1-5級）；估算潛在影響範圍", owner: "risk_analyst", output: "危機評估報告" },
         { step: 3, title: "應對聲明起草", description: "依危機等級準備對應的品牌聲明、媒體回應、社群貼文草案", owner: "pr_copywriter", output: "聲明草稿（多版本）" },
-        { step: 4, title: "多渠道危機溝通執行", description: "按優先序在新聞媒體、社群、官網、客服同步發布回應；監測輿情反應", owner: "community_manager", output: "危機溝通執行紀錄" },
+        { step: 4, title: "多管道危機溝通執行", description: "按優先序在新聞媒體、社群、官網、客服同步發布回應；監測輿情反應", owner: "community_manager", output: "危機溝通執行紀錄" },
         { step: 5, title: "危機後輿情回復追蹤", description: "持續監測負評消退速度；追蹤品牌信任度回復指標；輸出事後檢討報告", owner: "squad_lead", output: "危機後復原報告" },
       ];
       const agentMembers = [
@@ -4791,7 +4791,7 @@ async function main() {
       ].filter(a => a.agent_id);
       await upsertWorkflow(conn, { missionType: taskType, name: "危機預警與應變框架", description: "即時偵測輿情風險，快速評級並啟動標準化危機溝通流程，降低品牌聲譽損失。", steps });
       await upsertSquad(conn, {
-        slug, name: "危機預警與應變組", description: "24/7 輿情風險偵測，結合危機評級、聲明起草、多渠道溝通的端到端危機應對小組，降低負面輿情對品牌的長期傷害。",
+        slug, name: "危機預警與應變組", description: "24/7 輿情風險偵測，結合危機評級、聲明起草、多管道溝通的端到端危機應對小組，降低負面輿情對品牌的長期傷害。",
         industryKey: "marketing", missionType: taskType,
         workspace: ["monitoring", "pr"],
         methodology: "Early Warning → Crisis Rating → Response Drafting → Multi-channel Communication → Recovery Tracking",
@@ -4901,7 +4901,7 @@ async function main() {
       const m3Id   = await findAgent(conn, ["data analyst", "statistics", "dashboard", "reporting"], [leadId ?? 0, m2Id ?? 0]);
       const m4Id   = await findAgent(conn, ["customer success", "CRM", "retention", "churn"], [leadId ?? 0, m2Id ?? 0, m3Id ?? 0]);
       const steps = [
-        { step: 1, title: "NPS 問卷設計與觸發點設定", description: "設計關係型 NPS（年度/季度）與交易型 NPS（購買後 3 天）；設定多渠道觸發邏輯（Email、App in-app、SMS）", owner: "squad_lead", output: "NPS 問卷 + 觸發設定文件" },
+        { step: 1, title: "NPS 問卷設計與觸發點設定", description: "設計關係型 NPS（年度/季度）與交易型 NPS（購買後 3 天）；設定多管道觸發邏輯（Email、App in-app、SMS）", owner: "squad_lead", output: "NPS 問卷 + 觸發設定文件" },
         { step: 2, title: "Promoters / Passives / Detractors 分群", description: "依分數分類（9-10=P, 7-8=Pa, 0-6=D）；設計自動化跟進流程：推薦者邀請口碑、中立者促進加深、批評者立即客服升級", owner: "cx_analyst", output: "三分群行動流程圖" },
         { step: 3, title: "根因分析（Verbatim Mining）", description: "NLP 分析開放式回答，歸納低分主因（前 5 大痛點）；與產品/服務/行銷團隊交叉比對", owner: "data_analyst", output: "NPS 根因報告" },
         { step: 4, title: "Closed-Loop Follow-up 執行", description: "對批評者 24 小時內主動聯繫；記錄解決方案；追蹤改善後分數回升情況", owner: "customer_success", output: "Closed-Loop 處理紀錄" },
@@ -6420,18 +6420,18 @@ async function main() {
       if (m3Id) { usedIds.push(m3Id); await assignSkillsToAgent(conn, m3Id, ["attribution-modeling", "omnichannel-attribution"]); }
       const m3Info = await getAgentInfo(conn, m3Id);
       const steps = [
-        assignAgentToStep({ order: 1, name: "OMO 機會地圖繪製", description: "繪製品牌的 OMO（Online-Merge-Offline）機會地圖：在哪些消費者旅程節點，數位和實體的融合能創造超越單一渠道的價值？識別高優先 OMO 機會", tool: "internal", outputType: "omo_opportunity_map", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
+        assignAgentToStep({ order: 1, name: "OMO 機會地圖繪製", description: "繪製品牌的 OMO（Online-Merge-Offline）機會地圖：在哪些消費者旅程節點，數位和實體的融合能創造超越單一管道的價值？識別高優先 OMO 機會", tool: "internal", outputType: "omo_opportunity_map", requiredSkills: ["marketing-strategy-pmm"] }, leadInfo),
         assignAgentToStep({ order: 2, name: "數據打通設計", description: "設計線上線下數據統一方案：消費者 ID 統一（會員卡+App+微信）、消費記錄整合、行為數據融合，讓每個實體接觸點都能識別數位消費者", tool: "internal", outputType: "data_unification_design", requiredSkills: ["marketing-ops"] }, m2Info),
         assignAgentToStep({ order: 3, name: "OMO 場景設計", description: "設計具體的 OMO 場景：手機掃碼取貨、App 預約試穿、線上購線下退、門市掃碼延伸資訊，讓數位和實體無縫切換", tool: "internal", outputType: "omo_scenario_design", requiredSkills: ["campaign-orchestrator"] }, m2Info),
-        assignAgentToStep({ order: 4, name: "全渠道歸因追蹤", description: "建立 OMO 全渠道歸因追蹤：哪些線上行為驅動了實體消費、哪些實體體驗促進了線上購買，計算 OMO 策略的真實 ROI", tool: "internal", outputType: "omnichannel_attribution_report", requiredSkills: ["attribution-modeling"] }, m3Info),
+        assignAgentToStep({ order: 4, name: "全管道歸因追蹤", description: "建立 OMO 全管道歸因追蹤：哪些線上行為驅動了實體消費、哪些實體體驗促進了線上購買，計算 OMO 策略的真實 ROI", tool: "internal", outputType: "omnichannel_attribution_report", requiredSkills: ["attribution-modeling"] }, m3Info),
       ];
       const agentMembers = [
         { agent_id: leadId, is_lead: true, role: "OMO 策略師", order: 1 },
         { agent_id: m2Id, is_lead: false, role: "數位整合師", order: 2 },
-        { agent_id: m3Id, is_lead: false, role: "全渠道分析師", order: 3 },
+        { agent_id: m3Id, is_lead: false, role: "全管道分析師", order: 3 },
       ].filter(a => a.agent_id);
-      await upsertWorkflow(conn, { missionType: taskType, name: "Alibaba OMO Online-Merge-Offline 全渠道零售策略", description: "Source: Alibaba 集團 Jack Ma 2016 年提出「新零售」OMO 戰略，盒馬鮮生、天貓超市等落地實踐。OMO 取代 O2O 成為新世代零售典範", steps });
-      await upsertSquad(conn, { slug, name: "Alibaba OMO 全渠道新零售小隊", description: "應用阿里巴巴的 OMO 框架：線上數據 + 線下體驗完全融合，讓消費者在任何渠道都獲得無縫體驗，讓品牌獲得完整的消費者全旅程數據", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Alibaba Group – OMO New Retail Strategy (2016)", agents: agentMembers, tags: ["instore", "omo", "omnichannel", "new-retail"], useCases: ["品牌OMO策略規劃", "線上線下數據整合", "全渠道消費體驗設計"], outputFormats: ["OMO機會地圖", "數據打通方案", "OMO場景設計", "全渠道歸因報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "盒馬鮮生（Alibaba OMO 旗艦案例）", description: "盒馬是 Alibaba OMO 新零售的最完整落地：線上App點餐+線下門市取貨+30分鐘配送+線下體驗", result: "盒馬門市平均線上業務占比超過 60%，坪效（每平方米銷售額）是傳統超市的 3-5 倍", source: "Alibaba Annual Report 2022 / Forbes 新零售報導" }, { company: "無印良品（MUJI）台灣 OMO 實踐", description: "應用 OMO 框架整合線上會員數據和線下消費行為，個人化門市體驗", result: "會員 LTV 提升 35%，線上線下交叉購買率達 40%，整體銷售增長 20%", source: "無印良品台灣年報 / 電商研究中心 2021" }] });
+      await upsertWorkflow(conn, { missionType: taskType, name: "Alibaba OMO Online-Merge-Offline 全管道零售策略", description: "Source: Alibaba 集團 Jack Ma 2016 年提出「新零售」OMO 戰略，盒馬鮮生、天貓超市等落地實踐。OMO 取代 O2O 成為新世代零售典範", steps });
+      await upsertSquad(conn, { slug, name: "Alibaba OMO 全管道新零售小隊", description: "應用阿里巴巴的 OMO 框架：線上數據 + 線下體驗完全融合，讓消費者在任何管道都獲得無縫體驗，讓品牌獲得完整的消費者全旅程數據", industryKey: "marketing", missionType: taskType, workspace: ["instore"], methodology: "Alibaba Group – OMO New Retail Strategy (2016)", agents: agentMembers, tags: ["instore", "omo", "omnichannel", "new-retail"], useCases: ["品牌OMO策略規劃", "線上線下數據整合", "全管道消費體驗設計"], outputFormats: ["OMO機會地圖", "數據打通方案", "OMO場景設計", "全管道歸因報告"], requiredIntegrations: [], token: 60000, showcases: [{ company: "盒馬鮮生（Alibaba OMO 旗艦案例）", description: "盒馬是 Alibaba OMO 新零售的最完整落地：線上App點餐+線下門市取貨+30分鐘配送+線下體驗", result: "盒馬門市平均線上業務占比超過 60%，坪效（每平方米銷售額）是傳統超市的 3-5 倍", source: "Alibaba Annual Report 2022 / Forbes 新零售報導" }, { company: "無印良品（MUJI）台灣 OMO 實踐", description: "應用 OMO 框架整合線上會員數據和線下消費行為，個人化門市體驗", result: "會員 LTV 提升 35%，線上線下交叉購買率達 40%，整體銷售增長 20%", source: "無印良品台灣年報 / 電商研究中心 2021" }] });
     }
 
     // IS6: Ron Johnson — Apple Store Experience Design (2001)
