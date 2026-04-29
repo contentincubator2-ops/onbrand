@@ -134,6 +134,7 @@ export const brandRouter = router({
       const slug = `${slugBase}-${Math.random().toString(36).slice(2, 7)}`;
       const result = await (db.insert(brands) as any).values({
         userId: ctx.user.id,
+        createdBy: ctx.user.id,
         slug,
         name: input.name,
         websiteUrl: input.website ?? null,
