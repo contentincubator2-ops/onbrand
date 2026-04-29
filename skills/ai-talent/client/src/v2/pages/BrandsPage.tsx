@@ -288,6 +288,17 @@ export default function BrandsPage() {
     const advance = () => {
       if (cancelled) return;
       utils?.scope?.active?.invalidate?.();
+      // If single-segment auto-fill: halt after this step.
+      if (autoFillStopAt !== null && pipeline.cursor === autoFillStopAt) {
+        setPipeline((p) => ({
+          ...p,
+          status: "done",
+          completed: [...p.completed, step.id],
+        }));
+        setAutoFillStopAt(null);
+        setLiveThinking(null);
+        return;
+      }
       setPipeline((p) => ({
         ...p,
         cursor: p.cursor + 1,
@@ -368,6 +379,22 @@ export default function BrandsPage() {
     }));
   };
   const stopPipeline = () => setPipeline({ status: "idle", cursor: 0, completed: [] });
+
+  // "自動填寫" — single-segment auto-fill. Track a stop-cursor so the
+  // runner halts after the requested segment finishes (vs the full
+  // Wizard which runs all 14 steps).
+  const [autoFillStopAt, setAutoFillStopAt] = useState<number | null>(null);
+  const runSegmentAutoFill = (segmentId: string) => {
+    if (scopeMode !== "brand" || pipelineSteps.length === 0) return;
+    const targetIdx = pipelineSteps.findIndex((s) => s.segmentId === segmentId);
+    if (targetIdx < 0) return;
+    setAutoFillStopAt(targetIdx); // halt after this step's index
+    setPipeline({
+      status: "running",
+      cursor: targetIdx,
+      completed: pipelineSteps.slice(0, targetIdx).map((s) => s.id),
+    });
+  };
 
   const pipelineThinking =
     pipeline.status === "running" && pipelineSteps[pipeline.cursor] && liveThinking !== null
@@ -508,6 +535,7 @@ export default function BrandsPage() {
                   ? pipelineThinking
                   : null
               }
+              onAutoFill={runSegmentAutoFill}
             />
           ) : visibleTiles.length === 0 ? (
             <Card shadow="none" className="border-2 border-dashed border-divider">
@@ -565,7 +593,7 @@ interface PipelineThinking {
 function PositioningPanel({
   section, scopeMode, scopeName,
   scopeBrandId, scopeProductId, scopeEventId,
-  pipelineThinking,
+  pipelineThinking, onAutoFill,
 }: {
   section: string;
   scopeMode: "brand" | "product" | "event" | "none";
@@ -574,6 +602,7 @@ function PositioningPanel({
   scopeProductId: number | null;
   scopeEventId: number | null;
   pipelineThinking?: PipelineThinking | null;
+  onAutoFill?: (segmentId: string) => void;
 }) {
   if (scopeMode === "none") {
     return (
@@ -598,12 +627,13 @@ function PositioningPanel({
       productId={scopeProductId}
       eventId={scopeEventId}
       pipelineThinking={pipelineThinking ?? null}
+      onAutoFill={onAutoFill}
     />
   );
 }
 
 function PositioningEditor({
-  section, scopeMode, scopeName, brandId, productId, eventId, pipelineThinking,
+  section, scopeMode, scopeName, brandId, productId, eventId, pipelineThinking, onAutoFill,
 }: {
   section: string;
   scopeMode: "brand" | "product" | "event";
@@ -612,6 +642,7 @@ function PositioningEditor({
   productId: number | null;
   eventId: number | null;
   pipelineThinking: PipelineThinking | null;
+  onAutoFill?: (segmentId: string) => void;
 }) {
   const segments: SegmentSpec[] = SCOPE_SEGMENTS[scopeMode] ?? [];
   const segmentId = section.startsWith("seg:") ? section.slice(4) : null;
@@ -715,10 +746,7 @@ function PositioningEditor({
         spec={activeSegment}
         value={draft[activeSegment.id] ?? null}
         onChange={(next) => onDraftChange({ ...draft, [activeSegment.id]: next })}
-        onRunAgent={(slug) => {
-          // eslint-disable-next-line no-alert
-          alert(`Phase 6 will run agent: ${slug} for segment ${activeSegment.id}`);
-        }}
+        onRunAgent={() => onAutoFill?.(activeSegment.id)}
         research={(draft._research as any)?.[activeSegment.id] ?? null}
         wizardMeta={(draft._wizardMeta as any)?.[activeSegment.id] ?? null}
       />

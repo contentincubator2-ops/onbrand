@@ -196,10 +196,24 @@ ${input.budget.minUrls === 0 && input.budget.minChars === 0 ? "→ 此步驟為�
 
 注意：直接 raw JSON，不要 \`\`\`json 圍籬，不要 prose 前綴。conclusion 不能是空 object。`;
 
+      // Strip server-side metadata before exposing context to LLM —
+      // otherwise LLM may copy origin's research sources/URLs into its
+      // own sources[] (CJ caught this: every segment showed origin's
+      // 7524 chars). Only segment-level positioning content goes through.
+      const cleanContext = (() => {
+        const out: any = { ...positioning };
+        delete out._research;     // research evidence — not for LLM
+        delete out._wizardMeta;   // bookkeeping
+        delete out._meta;         // create-time metadata
+        return out;
+      })();
+
       const user = `${taskPrompt}
 
-【已有 positioning context（如有）】
-${JSON.stringify(positioning, null, 2).slice(0, 6000)}
+【已有 positioning context（前面步驟的 conclusion）】
+${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}
+
+注意：上面只是其他段落的結論，不要當成本步驟的 sources。本步驟的 sources[] 必須是你自己 web_search 抓到的新 URL，不可複製其他段落的引用清單。
 
 請直接以合法 JSON 回應，conclusion 結構嚴格依系統訊息中的範例。`;
 
