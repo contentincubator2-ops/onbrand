@@ -19,6 +19,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
+import { dispatchGenerate, checkJob, type GenOptions } from "../_core/mediaGen";
 
 // ── Step 1 — design direction proposal (LLM, no media gen) ───────────────
 export const mediaRouter = router({
@@ -120,24 +121,69 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       }
     }),
 
-  // ── Step 3 — actual media generation (model-aware dispatch) ─────────────
-  // For Phase 1 we only wire the existing imageRouter / videoRouter paths.
-  // Phase 2 adds Hailuo / fal.ai flux / Veo direct adapters.
+  // ── Step 3 — real media generation via dispatchGenerate ────────────────
   generate: protectedProcedure
     .input(z.object({
       kind: z.enum(["image", "video"]),
       modelId: z.string(),
       promptEn: z.string().min(2).max(8000),
       brandId: z.number().nullable().optional(),
+      aspectRatio: z.enum(["1:1", "4:3", "3:4", "16:9", "9:16"]).optional(),
+      size: z.enum(["1024x1024", "1024x1536", "1536x1024", "1024x1792", "1792x1024"]).optional(),
+      imageUrl: z.string().optional(),
+      quality: z.enum(["low", "medium", "high"]).optional(),
     }))
     .mutation(async ({ input }) => {
-      // Stub — actual provider dispatch is Phase 2. For now return
-      // a sentinel so the UI can render "尚未實作此 provider" gracefully.
-      return {
-        ok: false,
-        modelId: input.modelId,
-        message: `Phase 2 will wire ${input.modelId} provider. Prompt copied to clipboard for manual use; UI will add per-model adapters next.`,
-        promptEn: input.promptEn,
+      const opts: GenOptions = {
+        prompt: input.promptEn,
+        aspectRatio: input.aspectRatio,
+        size: input.size,
+        imageUrl: input.imageUrl,
+        quality: input.quality,
+        brandId: input.brandId ?? null,
       };
+      try {
+        const res = await dispatchGenerate(input.modelId, opts);
+        return {
+          ok: res.status === "ready",
+          status: res.status,
+          modelId: res.modelId,
+          url: res.url,
+          taskId: res.taskId,
+          message: res.errorMsg ??
+            (res.status === "ready"   ? "生成完成"
+            : res.status === "submitted" ? "已提交，等候生成（請稍後輪詢）"
+            : "生成失敗"),
+        };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }),
+
+  /** Poll an async generation (video) by taskId. */
+  checkJob: protectedProcedure
+    .input(z.object({
+      modelId: z.string(),
+      taskId: z.string(),
+    }))
+    .query(async ({ input }) => {
+      try {
+        const res = await checkJob(input.modelId, input.taskId);
+        return {
+          ok: res.status === "ready",
+          status: res.status,
+          url: res.url,
+          taskId: res.taskId,
+          message: res.errorMsg ?? "",
+        };
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
     }),
 });
