@@ -29,7 +29,7 @@ import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
-import { BRAND_FULL_PIPELINE, type PipelineStepSpec } from "../lib/positioningPipeline";
+import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChevronDown, faPlus, faCloudArrowUp, faShapes,
@@ -171,8 +171,8 @@ export default function BrandsPage() {
 
   const onTileClick = (t: Tile) => setSection(t.id);
 
-  // ── Pipeline (research mode) — only for brand scope right now ─────────
-  const pipelineSteps: PipelineStepSpec[] = scopeMode === "brand" ? BRAND_FULL_PIPELINE : [];
+  // ── Pipeline (research mode) — scope-aware (brand 14 steps / product 5) ─
+  const pipelineSteps: PipelineStepSpec[] = pipelineFor(scopeMode);
 
   // Persist pipeline state per (kind, id) so page refresh resumes mid-run.
   const pipelineKey = scopeMode !== "none" && (scope?.brandId ?? scope?.productId ?? scope?.eventId)
@@ -369,10 +369,10 @@ export default function BrandsPage() {
   // Wizard which runs all 14 steps).
   const [autoFillStopAt, setAutoFillStopAt] = useState<number | null>(null);
   const runSegmentAutoFill = (segmentId: string) => {
-    if (scopeMode !== "brand" || pipelineSteps.length === 0) return;
+    if (scopeMode === "none" || pipelineSteps.length === 0) return;
     const targetIdx = pipelineSteps.findIndex((s) => s.segmentId === segmentId);
     if (targetIdx < 0) return;
-    setAutoFillStopAt(targetIdx); // halt after this step's index
+    setAutoFillStopAt(targetIdx);
     setPipeline({
       status: "running",
       cursor: targetIdx,
@@ -495,10 +495,15 @@ export default function BrandsPage() {
 
         {/* Right: scope-aware content pane */}
         <div className="flex-1 min-w-0 px-6 py-6 overflow-y-auto flex flex-col gap-4">
-          {scopeMode === "brand" && pipelineSteps.length > 0 && (
+          {scopeMode !== "none" && pipelineSteps.length > 0 && (
             <PipelineRunner
               steps={pipelineSteps}
               state={pipeline}
+              title={
+                scopeMode === "product" ? "產品定位分析"
+                : scopeMode === "event" ? "活動定位分析"
+                : "品牌定位分析"
+              }
               onStart={startPipeline}
               onPause={pausePipeline}
               onResume={resumePipeline}

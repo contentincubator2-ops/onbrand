@@ -24,6 +24,8 @@ export interface PipelineState {
 interface PipelineRunnerProps {
   steps: PipelineStepSpec[];
   state: PipelineState;
+  /** Title shown next to the spark icon — varies by scope. */
+  title?: string;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -32,7 +34,7 @@ interface PipelineRunnerProps {
 }
 
 export default function PipelineRunner({
-  steps, state, onStart, onPause, onResume, onSkip, onStop,
+  steps, state, title = "品牌定位分析", onStart, onPause, onResume, onSkip, onStop,
 }: PipelineRunnerProps) {
   const total = steps.length;
   const current = steps[state.cursor];
@@ -54,7 +56,7 @@ export default function PipelineRunner({
             <span className="flex items-center justify-center w-7 h-7 rounded-full bg-default-100 border border-divider">
               <FontAwesomeIcon icon={faWandSparkles} className="text-default-600 text-tiny" />
             </span>
-            <p className="text-small font-medium">品牌定位分析</p>
+            <p className="text-small font-medium">{title}</p>
             {state.status === "paused" && (
               <Chip size="sm" variant="flat" color="warning">已暫停</Chip>
             )}

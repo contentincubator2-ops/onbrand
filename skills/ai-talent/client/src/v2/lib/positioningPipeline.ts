@@ -470,3 +470,202 @@ export const BRAND_FULL_PIPELINE = [
   BRAND_PIPELINE_TRENDS,
   BRAND_PIPELINE_FINAL,
 ];
+
+// ── Product pipeline (5 steps per CJ 2026-04-29 spec) ────────────────────
+export const PRODUCT_FULL_PIPELINE: PipelineStepSpec[] = [
+  {
+    id: 1,
+    title: "Step 1 — 產品深度調研（4P + JTBD + Design Principles）",
+    segmentTarget: "seg:core",
+    segmentId: "core",
+    agent: "product-strategist",
+    researchBudget: { minUrls: 4, minChars: 12000 },
+    promptTemplate: `分析產品「{brand_name}」（產業：{industry}）的深度資訊。
+
+輸入：
+- 產品名稱：{brand_name}
+- 描述：{description}
+- 若有官網或文件可 web_search 抓取最新資料
+
+請使用三個方法論交叉分析：
+1. 4P 分析（Product / Price / Place / Promotion）— 各 50-80 字
+2. Jobs to be Done — 從「使用情境」推「期望成果」推「深層需求」
+3. Design Principles — 列 3-5 條設計原則
+
+最後蒸餾出：
+- name（產品名）
+- zhTagline / enTagline（中英文標語）
+- coreStatement（核心定位 100-150 字）
+- oneLineValueProp（一句話價值主張，模板：「為 [audience] 提供基於 [USP] 的解決方案」）
+
+依範例結構輸出 conclusion，包含 4P / JTBD / Design Principles 巢狀資訊供後續步驟使用。`,
+    mockThinking: "從產品名 + 描述 + 官網爬取，跑 4P + JTBD + 設計原則三方交叉分析…",
+    mockConclusion: {
+      name: "（mock）產品名稱",
+      zhTagline: "（mock）中文標語",
+      enTagline: "（mock）English Tagline",
+      coreStatement: "（mock）這個產品為 X 用戶提供 Y 解決方案。",
+      oneLineValueProp: "（mock）為 [新世代專業人士] 提供基於 [主動選股] 的產品解決方案。",
+      fourPAnalysis: "Product / Price / Place / Promotion 四項各一段。",
+      jtbd: "用戶在 X 情境下，想完成 Y 工作，最終獲得 Z 成果。",
+      designPrinciples: ["原則 1", "原則 2", "原則 3"],
+    },
+  },
+  {
+    id: 2,
+    title: "Step 2 — 競爭對手分析（直接 + 替代 + 市場空白）",
+    segmentTarget: "seg:competition",
+    segmentId: "competition",
+    agent: "competitive-intel",
+    researchBudget: { minUrls: 5, minChars: 15000 },
+    promptTemplate: `分析產品「{brand_name}」的競爭環境。
+
+請識別：
+1. 直接競爭者（同類型產品 / 服務）3-5 個 — 每個含 name + position
+2. 替代方案（不同產品但解決同問題）2-3 個
+3. 市場空白點（受眾 / 通路 / 價格 / 推廣 — 4 個面向）— 每個 60-100 字描述空白與機會
+
+從前面的 4P / JTBD 結果，找出競爭差異化角度。
+
+依範例結構輸出 conclusion：
+- competitors: [{name, position}]
+- uniqueUsp（獨家賣點）
+- rareUsp（少數競品也說的賣點）
+- commonUsp（多數競爭者都說的賣點）
+- marketGaps: {customer, channel, price, promotion} — 四個面向的空白`,
+    mockThinking: "搜尋同類型產品 + 替代方案，識別 3-5 個直接競爭者，找出市場空白…",
+    mockConclusion: {
+      competitors: [
+        { name: "（mock）競品 A", position: "產業領導者" },
+        { name: "（mock）競品 B", position: "細分市場龍頭" },
+      ],
+      uniqueUsp: "（mock）獨家賣點：X 是只有我們有的能力。",
+      rareUsp: "（mock）少數競品也有 Y。",
+      commonUsp: "（mock）多數人都做的 Z。",
+      marketGaps: {
+        customer: "（mock）某類客群尚未被覆蓋。",
+        channel:  "（mock）某通路尚無競品深耕。",
+        price:    "（mock）中間價位有空白。",
+        promotion: "（mock）某傳播角度無人佔據。",
+      },
+    },
+  },
+  {
+    id: 3,
+    title: "Step 3 — 目標客群分析（Persona + MOT）",
+    segmentTarget: "seg:audience",
+    segmentId: "audience",
+    agent: "persona-architect",
+    researchBudget: { minUrls: 3, minChars: 10000 },
+    promptTemplate: `為產品「{brand_name}」識別目標客群。
+
+請聚焦 2-3 個最核心受眾。每個受眾需含：
+- 人口統計（年齡、性別、收入、教育、職業）— 字串敘述
+- 心理特徵（價值觀、生活方式、興趣）— 字串敘述
+- 行為模式（購買習慣、媒體使用、決策過程）— 字串敘述
+- 痛點（pains）3-5 條
+- 期望獲得（needs）3-5 條
+- 消費者關鍵時刻（MOT - Moment of Truth）— 該受眾「決定買 / 不買」的瞬間 + 我們可以介入的點
+
+依範例結構輸出 conclusion：
+- primary: 主受眾敘事（含完整 demographics/psychographics/behaviors）
+- secondary: 次受眾敘事
+- pains: 共通痛點陣列
+- needs: 共通期望陣列
+- mots: [{audience: 受眾名, mot: 關鍵時刻描述}] 陣列`,
+    mockThinking: "推論 2-3 個核心受眾，建構 Persona 並識別 MOT 關鍵時刻…",
+    mockConclusion: {
+      primary: "（mock）25-44 歲、月收 X-Y 萬、職業 Z；重視 W；活躍 在 IG / FB；痛點 1, 2, 3。",
+      secondary: "（mock）35-50 歲、家庭主婦或自由工作者；尋求 W。",
+      pains: ["（mock）痛點 1", "（mock）痛點 2", "（mock）痛點 3"],
+      needs: ["（mock）需求 1", "（mock）需求 2", "（mock）需求 3"],
+      mots: [
+        { audience: "（mock）主受眾", mot: "（mock）在某一刻，他們決定 X，我們可以在這時介入。" },
+        { audience: "（mock）次受眾", mot: "（mock）某情境出現 Y 訊號時，他們會搜尋產品。" },
+      ],
+    },
+  },
+  {
+    id: 4,
+    title: "Step 4 — 功能價值分析（USP 精煉 + 三層差異化）",
+    segmentTarget: "seg:value",
+    segmentId: "value",
+    agent: "product-value-mapper",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `為產品「{brand_name}」精煉功能與情緒價值。
+
+從 Step 1（4P/JTBD）+ Step 2（競品）+ Step 3（受眾痛點）整合：
+1. 功能價值 vs 情緒價值分類
+2. USP 精煉 — 3-5 條核心差異化
+3. 差異化服務線分層：
+   - 獨家：只有我們有的
+   - 少數競品也說的
+   - 多數競爭者都說的
+
+依範例結構輸出 conclusion：
+- coreFunctions: 核心功能陣列（3-5 條）
+- features: 產品特色陣列（3-5 條）
+- advantages: 產品優勢陣列（3-5 條）
+- primaryEmotion: 主要情緒價值（一段敘述）
+- personality: 品牌個性
+- userFeeling: 使用者使用後的感受`,
+    mockThinking: "整合 Step 1-3 結果，分類功能 / 情緒價值，精煉 3-5 條 USP，三層差異化…",
+    mockConclusion: {
+      coreFunctions: ["（mock）核心功能 1", "（mock）核心功能 2", "（mock）核心功能 3"],
+      features: ["（mock）特色 1", "（mock）特色 2", "（mock）特色 3"],
+      advantages: ["（mock）優勢 1", "（mock）優勢 2", "（mock）優勢 3"],
+      primaryEmotion: "（mock）主要情緒價值：使用者感受到 X 與 Y。",
+      personality: "（mock）產品個性：敏捷、前瞻、可靠。",
+      userFeeling: "（mock）使用後感受：聰明的策略家、主動掌握。",
+    },
+  },
+  {
+    id: 5,
+    title: "Step 5 — 定位方案生成（情感 + 功能雙方向）",
+    segmentTarget: "seg:strategy",
+    segmentId: "strategy",
+    agent: "gtm-architect",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `為產品「{brand_name}」生成最終定位方案。
+
+整合 Step 1-4 的所有結果，輸出：
+1. 產品定位策略（positioning）100-150 字
+2. 定價策略（pricing）— 中價位 / 高端 / 滲透 等的選擇與理由
+3. 通路策略（channel）— 證券 / 數位 / 實體 / 多元
+4. 推廣策略（promotion）— 列 3-5 條
+5. 生命週期階段（lifecycleStage）— 引入 / 成長 / 成熟 / 衰退
+6. 發展策略（developmentStrategy）— 此階段該做的事
+7. 市場空白缺口（marketGap / channelGap / priceGap / promotionGap）— 從 Step 2 的市場空白展開
+
+最後生成 2 個定位方案（情緒導向 / 功能導向）+ 各 5 個標語選項，
+但本步驟只 commit 「主要選定方案」到 strategy.positioning 欄位，標語選項列在 strategy.taglineOptions 供使用者挑選。`,
+    mockThinking: "整合 Step 1-4 全部分析，生成 2 個定位方案（情感 / 功能）+ 各 5 個標語選項…",
+    mockConclusion: {
+      positioning: "（mock）採取「升級選擇」策略 — 不比低價，比績效。建立「領先者」品牌形象。",
+      pricing: "（mock）中價位策略 — 反映主動管理成本，但透過結構優化 TER。",
+      channel: "（mock）證券通路為主 + 數位理財平台。",
+      promotion: ["（mock）KOL 實測", "（mock）社群口碑", "（mock）專業論壇"],
+      lifecycleStage: "（mock）成長期",
+      developmentStrategy: "（mock）持續展現績效穩定度，將短期 Alpha 轉化為長期穩健獲利的品牌認可。",
+      marketGap: "（mock）受眾缺口描述",
+      channelGap: "（mock）通路缺口描述",
+      priceGap: "（mock）價格缺口描述",
+      promotionGap: "（mock）推廣缺口描述",
+      taglineOptions: {
+        emotional: ["（mock）情緒標語 1", "（mock）情緒標語 2", "（mock）情緒標語 3"],
+        functional: ["（mock）功能標語 1", "（mock）功能標語 2", "（mock）功能標語 3"],
+      },
+    },
+  },
+];
+
+// ── Event pipeline placeholder (build when CJ shares spec) ───────────────
+export const EVENT_FULL_PIPELINE: PipelineStepSpec[] = [];
+
+/** Pick the right pipeline for a scope mode. */
+export function pipelineFor(scopeMode: "brand" | "product" | "event" | "none"): PipelineStepSpec[] {
+  if (scopeMode === "brand")   return BRAND_FULL_PIPELINE;
+  if (scopeMode === "product") return PRODUCT_FULL_PIPELINE;
+  if (scopeMode === "event")   return EVENT_FULL_PIPELINE;
+  return [];
+}
