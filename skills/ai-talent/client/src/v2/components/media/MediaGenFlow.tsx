@@ -21,7 +21,7 @@ import {
   faPenNib, faRotate, faForward,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  modelsByKind, type MediaKind, type MediaModel,
+  availableModels, type MediaKind, type MediaModel,
 } from "../../lib/mediaModels";
 
 interface MediaGenFlowProps {
@@ -35,6 +35,21 @@ interface MediaGenFlowProps {
   kind?: MediaKind;
   /** Brand id for downstream generate dispatch. */
   brandId?: number | null;
+  /**
+   * Render inline (no Modal wrapper). Used by squad-runner when the active
+   * step's outputKind is image/video — the 3-step flow takes over the middle
+   * preview pane instead of popping a modal. `onClose` becomes a back/exit
+   * affordance the caller controls.
+   */
+  inline?: boolean;
+  /**
+   * Tags from squad/agent.preferredModelTags. Models matching any of these
+   * tags are floated to the top of the picker with a "推薦" chip. Empty/null
+   * → all available models, default order.
+   */
+  preferredModelTags?: string[];
+  /** Called when generation completes successfully (squad-runner uses this to attach the media URL to the active step). */
+  onComplete?: (result: { url: string; modelId: string; promptEn: string }) => void;
 }
 
 type Phase = "input" | "directions" | "prompt" | "model";
@@ -53,7 +68,7 @@ interface Direction {
 
 export default function MediaGenFlow({
   open, onClose, initialBrief = "", brandContext, audienceContext,
-  kind = "image", brandId,
+  kind = "image", brandId, inline = false, preferredModelTags, onComplete,
 }: MediaGenFlowProps) {
   const [phase, setPhase] = React.useState<Phase>("input");
   const [brief, setBrief] = React.useState(initialBrief);
@@ -155,64 +170,103 @@ export default function MediaGenFlow({
         message: res?.message ?? (res?.ok ? "生成完成" : "Phase 2 將接入此 provider"),
         url: res?.url,
       });
+      // Notify the squad-runner so it can attach the URL to the active step.
+      if (res?.ok && res?.url && onComplete) {
+        onComplete({ url: String(res.url), modelId: m.id, promptEn });
+      }
     } catch (e: any) {
       setGenResult({ ok: false, message: e?.message ?? String(e) });
     } finally { setBusy(false); }
   };
 
-  const models = modelsByKind(kind);
+  // Available models, with preferred-tag matches floated to the top.
+  // Each model gets a derived `_recommended` flag for the chip.
+  const models = React.useMemo(() => {
+    const all = availableModels(kind);
+    if (!preferredModelTags?.length) return all.map((m) => ({ ...m, _recommended: false }));
+    const tagSet = new Set(preferredModelTags.map((t) => t.toLowerCase()));
+    const score = (m: MediaModel) => {
+      const ts = (m.tags ?? []).map((t) => t.toLowerCase());
+      let n = 0;
+      for (const t of ts) if (tagSet.has(t)) n++;
+      return n;
+    };
+    return all
+      .map((m) => ({ ...m, _recommended: score(m) > 0 }))
+      .sort((a, b) => score(b) - score(a));
+  }, [kind, preferredModelTags]);
+
+  const body = (
+    <>
+      {phase === "input" && (
+        <InputPhase
+          brief={brief} setBrief={setBrief}
+          onPropose={onProposeDirections}
+          onSkip={onSkipToPrompt}
+        />
+      )}
+      {phase === "directions" && (
+        <DirectionsPhase
+          directions={directions}
+          kind={kind}
+          onPick={onPickDirection}
+          onRefresh={onProposeDirections}
+          onSkip={onSkipToPrompt}
+          busy={busy}
+        />
+      )}
+      {phase === "prompt" && (
+        <PromptPhase
+          promptEn={promptEn} setPromptEn={setPromptEn}
+          summaryZh={summaryZh}
+          direction={pickedDir}
+          onProceed={() => setPhase("model")}
+          onBackToDirections={() => directions.length > 0 ? setPhase("directions") : setPhase("input")}
+        />
+      )}
+      {phase === "model" && (
+        <ModelPhase
+          models={models}
+          promptEn={promptEn}
+          pickedModel={pickedModel}
+          onPick={onPickModel}
+          genResult={genResult}
+          busy={busy}
+        />
+      )}
+      {busy && <div className="flex items-center gap-2 text-tiny text-default-500"><Spinner size="sm" /> 處理中…</div>}
+      {err && <p className="text-tiny text-danger">{err}</p>}
+    </>
+  );
+
+  const header = (
+    <>
+      <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider self-start"
+        startContent={<FontAwesomeIcon icon={kind === "video" ? faVideo : faImage} className="text-tiny ml-1" />}>
+        {kind === "video" ? "影片生成" : "圖像生成"}
+      </Chip>
+      <h2 className="text-medium font-semibold">3-step 視覺產出流程</h2>
+      <PhaseStepper phase={phase} />
+    </>
+  );
+
+  // Inline mode — no Modal wrapper, render straight into parent layout.
+  // Squad-runner uses this in the middle preview pane.
+  if (inline) {
+    if (!open) return null;
+    return (
+      <div className="flex flex-col gap-3 p-4 w-full max-w-3xl mx-auto">
+        <div className="flex flex-col gap-1">{header}</div>
+        <div className="flex flex-col gap-3">{body}</div>
+      </div>
+    );
+  }
 
   return (
     <Modal isOpen={open} onClose={onClose} size="3xl" scrollBehavior="inside">
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">
-          <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider self-start"
-            startContent={<FontAwesomeIcon icon={kind === "video" ? faVideo : faImage} className="text-tiny ml-1" />}>
-            {kind === "video" ? "影片生成" : "圖像生成"}
-          </Chip>
-          <h2 className="text-medium font-semibold">3-step 視覺產出流程</h2>
-          <PhaseStepper phase={phase} />
-        </ModalHeader>
-        <ModalBody className="gap-3">
-          {phase === "input" && (
-            <InputPhase
-              brief={brief} setBrief={setBrief}
-              onPropose={onProposeDirections}
-              onSkip={onSkipToPrompt}
-            />
-          )}
-          {phase === "directions" && (
-            <DirectionsPhase
-              directions={directions}
-              kind={kind}
-              onPick={onPickDirection}
-              onRefresh={onProposeDirections}
-              onSkip={onSkipToPrompt}
-              busy={busy}
-            />
-          )}
-          {phase === "prompt" && (
-            <PromptPhase
-              promptEn={promptEn} setPromptEn={setPromptEn}
-              summaryZh={summaryZh}
-              direction={pickedDir}
-              onProceed={() => setPhase("model")}
-              onBackToDirections={() => directions.length > 0 ? setPhase("directions") : setPhase("input")}
-            />
-          )}
-          {phase === "model" && (
-            <ModelPhase
-              models={models}
-              promptEn={promptEn}
-              pickedModel={pickedModel}
-              onPick={onPickModel}
-              genResult={genResult}
-              busy={busy}
-            />
-          )}
-          {busy && <div className="flex items-center gap-2 text-tiny text-default-500"><Spinner size="sm" /> 處理中…</div>}
-          {err && <p className="text-tiny text-danger">{err}</p>}
-        </ModalBody>
+        <ModalHeader className="flex flex-col gap-1">{header}</ModalHeader>
+        <ModalBody className="gap-3">{body}</ModalBody>
         <ModalFooter>
           <Button variant="light" onPress={onClose}>關閉</Button>
         </ModalFooter>
@@ -374,7 +428,7 @@ function PromptPhase({
 function ModelPhase({
   models, promptEn, pickedModel, onPick, genResult, busy,
 }: {
-  models: MediaModel[];
+  models: Array<MediaModel & { _recommended?: boolean }>;
   promptEn: string;
   pickedModel: MediaModel | null;
   onPick: (m: MediaModel) => void;
@@ -400,7 +454,14 @@ function ModelPhase({
             >
               <CardBody className="p-3 gap-1">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-small font-medium">{m.name}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-small font-medium">{m.name}</p>
+                    {m._recommended && (
+                      <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
+                        ⭐ 推薦
+                      </Chip>
+                    )}
+                  </div>
                   {m.status === "ready" && <Chip size="sm" variant="flat" color="success">可用</Chip>}
                   {m.status === "manual" && <Chip size="sm" variant="flat" color="warning">手動複製</Chip>}
                   {m.status === "soon" && <Chip size="sm" variant="flat" color="default">尚未串接</Chip>}

@@ -659,6 +659,34 @@ async function main() {
       console.log("[migrate] agents.modelStack: already exists, skipped");
     }
 
+    // ── 9b. preferredModelTags — drives the squad-runner media picker ─────────
+    // When a step's outputKind is image|video, the runner asks mediaModels.ts
+    // `modelsForTag()` for each tag in this array and pre-selects the union as
+    // recommended models in MediaGenFlow Step 3. Examples:
+    //   ["logo", "vector"]              → Ideogram v3, Recraft v3, GPT Image 1
+    //   ["cinematic", "ad-film"]        → Runway Gen-4, Veo 3
+    //   ["i2v", "kv-animate"]           → Kling v1.6 i2v
+    //   ["lipsync", "spokesperson"]     → Hedra Character 3
+    //   ["asian-face", "chinese-style"] → Kling v2 master, Hailuo image
+    // Empty / null = runner falls back to all `availableModels(kind)`.
+    // agents + squads only — skills are an embedded JSON column on agents,
+    // not their own table. Squad-runner reads either source.
+    for (const table of ["agents", "squads"] as const) {
+      const [tagCol] = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '${table}' AND COLUMN_NAME = 'preferredModelTags'
+      `) as any;
+      if ((tagCol as any[]).length === 0) {
+        // agents uses camelCase; squads (raw-SQL table) uses snake_case
+        // historically but Drizzle migration above shows quoted ident is fine.
+        // Use camelCase consistently — MySQL is case-insensitive on identifiers.
+        await conn.execute(`ALTER TABLE \`${table}\` ADD COLUMN preferredModelTags JSON NULL`);
+        console.log(`[migrate] ${table}.preferredModelTags: added`);
+      } else {
+        console.log(`[migrate] ${table}.preferredModelTags: already exists, skipped`);
+      }
+    }
+
     // ─── 10. skill_catalog — harvested skill registry (anthropic + GLM + tools) ──
     // Source of truth for orphan-agent skill assignment. Each row binds a skill
     // to a provider so the skill cannot be moved across model families.

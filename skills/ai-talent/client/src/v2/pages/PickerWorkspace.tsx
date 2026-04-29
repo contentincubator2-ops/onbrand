@@ -29,6 +29,7 @@ import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMoc
 import { searchAndRankSquads } from "../lib/searchSquads";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
+import MediaGenFlow from "../components/media/MediaGenFlow";
 import { TaskChip } from "../components/TaskChip";
 import { AgentAvatar } from "../components/AgentAvatar";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
@@ -1162,20 +1163,48 @@ function SquadDetailPanel({
     return stepsArr.length; // all done
   }, [stepsArr, progressByOrd]);
 
-  // Auto-trigger first step if mission just launched and no progress yet
+  // ── Step-execution error surfacing ────────────────────────────────────
+  // Previously the auto-trigger swallowed errors with `.catch(() => {})`,
+  // which meant if the LLM call failed (e.g. all providers down) the launch
+  // appeared to "hang" — mission row was created, but no draft ever appeared
+  // and the user got zero feedback. Now we capture the message into local
+  // state and render an Alert so failures are visible + retryable.
+  const [stepError, setStepError] = useState<string | null>(null);
+  const [autoTriggered, setAutoTriggered] = useState(false);
+
+  // Reset error + auto-trigger flag whenever the mission changes
+  useEffect(() => {
+    setStepError(null);
+    setAutoTriggered(false);
+  }, [missionId]);
+
+  // Auto-trigger first step if mission just launched and no progress yet.
+  // Uses `autoTriggered` (not stepProgressList.length) as the guard so a
+  // failed first attempt doesn't infinite-retry on every poll tick.
   useEffect(() => {
     if (!missionId) return;
-    if (stepProgressList.length > 0) return;
+    if (autoTriggered) return;
+    if (stepProgressList.length > 0) { setAutoTriggered(true); return; }
     if (stepExecute.isPending) return;
-    stepExecute.mutateAsync({
-      missionId,
-      squadSlug: squad.slug,
-      stepOrder: 1,
-      mode: "run",
-      userInput: "",
-    }).catch(() => {});
+    setAutoTriggered(true);
+    setStepError(null);
+    stepExecute
+      .mutateAsync({
+        missionId,
+        squadSlug: squad.slug,
+        stepOrder: 1,
+        mode: "run",
+        userInput: "",
+      })
+      .then(() => progressQuery.refetch?.())
+      .catch((e: any) => {
+        const msg = e?.message ?? String(e);
+        setStepError(`第一步啟動失敗：${msg}`);
+        // Allow retry
+        setAutoTriggered(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionId, stepProgressList.length]);
+  }, [missionId, autoTriggered, stepProgressList.length]);
 
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
@@ -1365,6 +1394,55 @@ function SquadDetailPanel({
                   />
                 );
               }
+              // ── Visual step: 3-step MediaGenFlow inline (CJ rule 2026-04-29)
+              // Image / video output MUST go through 設計方向 → AI prompt →
+              // 模型選擇. The agent's text draft becomes the initialBrief; the
+              // squad/agent's preferredModelTags pre-rank the model picker.
+              if ((kind === "image" || kind === "video") && prog?.status !== "pending") {
+                const draft: string = (prog?.agentOutput ?? prog?.agent_output ?? "").toString().trim();
+                const tags: string[] =
+                  (squad.preferredModelTags as string[] | null) ??
+                  (activeStep.preferredModelTags as string[] | null) ??
+                  (activeStep.assignedAgent?.preferredModelTags as string[] | null) ??
+                  [];
+                return (
+                  <div className="w-full">
+                    <div className="text-center mb-3">
+                      <Chip size="sm" variant="flat" color="primary" className="uppercase tracking-wider">
+                        {kind === "video" ? "🎬 影片素材步驟" : "🖼️ 視覺素材步驟"}
+                      </Chip>
+                      <p className="text-tiny text-default-500 mt-2">
+                        此步驟產出的是{kind === "video" ? "影片" : "圖像"}，請依下列 3 步驟產生素材
+                      </p>
+                    </div>
+                    <MediaGenFlow
+                      open
+                      inline
+                      kind={kind}
+                      initialBrief={draft || `${activeStep.name ?? ""}\n${activeStep.description ?? ""}`.trim()}
+                      brandContext={brandName ?? undefined}
+                      brandId={null}
+                      preferredModelTags={tags}
+                      onClose={() => { /* inline mode — close is no-op */ }}
+                      onComplete={async ({ url, modelId, promptEn }) => {
+                        // Persist the generated media URL back onto the step
+                        // as the confirmed output so the next step picks it
+                        // up via the chain context.
+                        if (!missionId) return;
+                        const payload = `__media_url__: ${url}\n__model__: ${modelId}\n__prompt__: ${promptEn}\n\n${draft}`;
+                        await stepExecute.mutateAsync({
+                          missionId,
+                          squadSlug: squad.slug,
+                          stepOrder: activeStepOrder,
+                          mode: "run",
+                          userInput: payload,
+                        }).catch(() => {});
+                        await progressQuery.refetch?.();
+                      }}
+                    />
+                  </div>
+                );
+              }
               // content step: fall through to platform mockup
             }
             const live = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
@@ -1452,6 +1530,8 @@ function SquadDetailPanel({
             {(() => {
               const confirmedCount = Array.from(progressByOrd.values()).filter((p: any) => p?.status === "confirmed").length;
               const pct = steps.length ? (confirmedCount / steps.length) * 100 : 0;
+              const inFlight = stepExecute.isPending;
+              const noProgressYet = stepProgressList.length === 0;
               return (
                 <>
                   <div className="flex items-center justify-between text-tiny">
@@ -1460,12 +1540,52 @@ function SquadDetailPanel({
                       {confirmedCount} / {steps.length} 已確認
                     </span>
                   </div>
-                  <Progress size="sm" value={pct} color={pct === 100 ? "success" : "secondary"} aria-label="pipeline progress" />
+                  <Progress
+                    size="sm"
+                    value={pct}
+                    color={pct === 100 ? "success" : "secondary"}
+                    isIndeterminate={inFlight && noProgressYet}
+                    aria-label="pipeline progress"
+                  />
                   <p className="text-tiny text-default-500 text-center">
                     {pct === 100
                       ? "✓ 所有步驟完成"
-                      : `現在輪到：${stepsArr[activeStepOrder - 1]?.name ?? `Step ${activeStepOrder}`}`}
+                      : inFlight && noProgressYet
+                        ? "⚙ AI 專員正在思考第一步…（首次啟動可能需要 10–30 秒）"
+                        : `現在輪到：${stepsArr[activeStepOrder - 1]?.name ?? `Step ${activeStepOrder}`}`}
                   </p>
+                  {stepError && (
+                    <Alert
+                      color="danger"
+                      variant="flat"
+                      title="執行卡住了"
+                      description={stepError}
+                      endContent={
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="danger"
+                          isLoading={stepExecute.isPending}
+                          onPress={() => {
+                            if (!missionId) return;
+                            setStepError(null);
+                            stepExecute
+                              .mutateAsync({
+                                missionId,
+                                squadSlug: squad.slug,
+                                stepOrder: activeStepOrder,
+                                mode: "run",
+                                userInput: "",
+                              })
+                              .then(() => progressQuery.refetch?.())
+                              .catch((e: any) => setStepError(`重試失敗：${e?.message ?? String(e)}`));
+                          }}
+                        >
+                          重試
+                        </Button>
+                      }
+                    />
+                  )}
                 </>
               );
             })()}

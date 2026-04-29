@@ -331,8 +331,218 @@ async function pollVeo3(taskId: string): Promise<GenResult> {
   return { status: "ready", modelId: "google/veo-3", url: localUrl, taskId };
 }
 
+// ── 8. PiAPI unified aggregator (Kling / Runway / Pika / Ideogram / FLUX / Hedra) ─
+//
+// PiAPI exposes one POST /api/v1/task endpoint that takes {model, task_type, input}
+// and returns {data: {task_id, status}}. We poll GET /api/v1/task/{task_id} until
+// status === "completed" (or "failed"). Auth via x-api-key header.
+//
+// Image task_types finish in seconds (we await in-line). Video task_types can
+// take 1–3 min so we return "submitted" + taskId for the client to poll via
+// media.checkJob.
+const PIAPI_BASE = process.env.PIAPI_BASE_URL ?? "https://api.piapi.ai/api/v1";
+
+interface PiapiSpec {
+  /** PiAPI "model" field (vendor namespace). */
+  model: string;
+  /** PiAPI "task_type" field (operation within vendor). */
+  task_type: string;
+  /** Output is sync (image) — adapter waits inline; or async (video) — returns submitted. */
+  sync: boolean;
+  /** Build the input object from GenOptions. */
+  buildInput: (opts: GenOptions) => Record<string, any>;
+}
+
+const PIAPI_MAP: Record<string, PiapiSpec> = {
+  "piapi/flux-pro": {
+    model: "Qubico/flux1-pro",
+    task_type: "txt2img",
+    sync: true,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      width:  o.aspectRatio === "9:16" ? 768  : o.aspectRatio === "16:9" ? 1344 : 1024,
+      height: o.aspectRatio === "9:16" ? 1344 : o.aspectRatio === "16:9" ? 768  : 1024,
+    }),
+  },
+  "piapi/flux-realism": {
+    model: "Qubico/flux1-dev",
+    task_type: "txt2img-lora",
+    sync: true,
+    buildInput: (o) => ({ prompt: o.prompt, lora_settings: [{ lora_type: "realism", lora_strength: 1.0 }] }),
+  },
+  "piapi/ideogram-v3": {
+    model: "ideogram",
+    task_type: "txt2img",
+    sync: true,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      aspect_ratio: o.aspectRatio ?? "1:1",
+      style_type: "AUTO",
+      magic_prompt_option: "AUTO",
+    }),
+  },
+  "piapi/sd-3-5-large": {
+    model: "stability-ai",
+    task_type: "txt2img",
+    sync: true,
+    buildInput: (o) => ({ prompt: o.prompt, model: "sd3.5-large", aspect_ratio: o.aspectRatio ?? "1:1" }),
+  },
+  "piapi/kling-v2-master": {
+    model: "kling",
+    task_type: "video_generation",
+    sync: false,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      duration: 5,
+      aspect_ratio: o.aspectRatio ?? "16:9",
+      version: "2.0-master",
+      mode: "pro",
+    }),
+  },
+  "piapi/kling-v1-6-i2v": {
+    model: "kling",
+    task_type: "video_generation",
+    sync: false,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      image_url: o.imageUrl,            // i2v requires source image
+      duration: 5,
+      aspect_ratio: o.aspectRatio ?? "16:9",
+      version: "1.6",
+      mode: "std",
+    }),
+  },
+  "piapi/runway-gen-4": {
+    model: "runway",
+    task_type: "video_generation",
+    sync: false,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      version: "gen4",
+      duration: 5,
+      aspect_ratio: o.aspectRatio ?? "16:9",
+    }),
+  },
+  "piapi/runway-gen-4-turbo": {
+    model: "runway",
+    task_type: "video_generation",
+    sync: false,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      version: "gen4-turbo",
+      duration: 5,
+      aspect_ratio: o.aspectRatio ?? "16:9",
+    }),
+  },
+  "piapi/pika-v2": {
+    model: "pika",
+    task_type: "video_generation",
+    sync: false,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      version: "2.0",
+      duration: 5,
+      aspect_ratio: o.aspectRatio ?? "16:9",
+    }),
+  },
+  "piapi/hedra-character-3": {
+    model: "hedra",
+    task_type: "character",
+    sync: false,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      image_url: o.imageUrl,            // photo of the spokesperson
+      // audio_url is optional — caller passes via opts.meta if present
+    }),
+  },
+};
+
+async function piapiSubmit(modelId: string, opts: GenOptions): Promise<{ taskId: string }> {
+  const key = process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY ?? "";
+  if (!key) throw new Error("PIAPI_KEY missing");
+  const spec = PIAPI_MAP[modelId];
+  if (!spec) throw new Error(`PiAPI: unknown modelId ${modelId}`);
+  const resp = await fetch(`${PIAPI_BASE}/task`, {
+    method: "POST",
+    headers: { "x-api-key": key, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: spec.model, task_type: spec.task_type, input: spec.buildInput(opts) }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`PiAPI submit ${resp.status}: ${t.slice(0, 300)}`);
+  }
+  const data: any = await resp.json();
+  const taskId = data?.data?.task_id ?? data?.task_id;
+  if (!taskId) throw new Error(`PiAPI: no task_id in response: ${JSON.stringify(data).slice(0, 200)}`);
+  return { taskId };
+}
+
+async function piapiPoll(modelId: string, taskId: string): Promise<GenResult> {
+  const key = process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY ?? "";
+  if (!key) throw new Error("PIAPI_KEY missing");
+  const resp = await fetch(`${PIAPI_BASE}/task/${taskId}`, {
+    headers: { "x-api-key": key },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`PiAPI poll ${resp.status}: ${t.slice(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  const inner = data?.data ?? data;
+  const status = String(inner?.status ?? "").toLowerCase();
+  if (status === "completed" || status === "success") {
+    // Output shape varies — try common keys
+    const out = inner?.output ?? inner?.result ?? {};
+    const remoteUrl =
+      out?.image_url ?? out?.image?.url ??
+      out?.video_url ?? out?.video?.url ??
+      (Array.isArray(out?.images) ? out.images[0]?.url ?? out.images[0] : null) ??
+      (Array.isArray(out?.videos) ? out.videos[0]?.url ?? out.videos[0] : null) ??
+      out?.url;
+    if (!remoteUrl) {
+      return { status: "failed", modelId, taskId, errorMsg: `PiAPI: no output url. body=${JSON.stringify(inner).slice(0, 200)}` };
+    }
+    const isVideo = modelId.includes("kling") || modelId.includes("runway") || modelId.includes("pika") || modelId.includes("hedra");
+    const localUrl = await downloadAndSave(remoteUrl, isVideo ? "vid" : "img");
+    return { status: "ready", modelId, url: localUrl, taskId, meta: { remoteUrl } };
+  }
+  if (status === "failed" || status === "error") {
+    return { status: "failed", modelId, taskId, errorMsg: inner?.error?.message ?? inner?.error ?? "PiAPI task failed" };
+  }
+  return { status: "submitted", modelId, taskId, meta: { progressStatus: status } };
+}
+
+/** Sync image: submit + inline-poll up to 90s. Async video: just submit. */
+async function genPiapi(modelId: string, opts: GenOptions): Promise<GenResult> {
+  const spec = PIAPI_MAP[modelId];
+  if (!spec) return { status: "failed", modelId, errorMsg: `PiAPI: unknown modelId ${modelId}` };
+  const { taskId } = await piapiSubmit(modelId, opts);
+  if (!spec.sync) return { status: "submitted", modelId, taskId, meta: { provider: "piapi" } };
+  // Inline-poll for sync image (image gen finishes in 5–15s)
+  const start = Date.now();
+  while (Date.now() - start < 120_000) {
+    await new Promise((r) => setTimeout(r, 2500));
+    const r = await piapiPoll(modelId, taskId);
+    if (r.status !== "submitted") return r;
+  }
+  return { status: "failed", modelId, taskId, errorMsg: "PiAPI image timed out (>120s)" };
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────
 export async function dispatchGenerate(modelId: string, opts: GenOptions): Promise<GenResult> {
+  // PiAPI catch-all (10 models) — handle before the explicit switch
+  if (modelId.startsWith("piapi/")) return genPiapi(modelId, opts);
+  // Atlas Cloud — registered in mediaModels but endpoint not yet wired
+  if (modelId.startsWith("atlas/")) {
+    return {
+      status: "failed",
+      modelId,
+      errorMsg: "Atlas Cloud media adapter not yet wired. Run scripts/verify-piapi.ts first to confirm endpoint shape.",
+    };
+  }
+
   switch (modelId) {
     case "openai/gpt-image-1":     return genOpenAIImage(opts);
     case "azure/gpt-image-2":      return genAzureImage2(opts);
@@ -370,6 +580,7 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
 }
 
 export async function checkJob(modelId: string, taskId: string): Promise<GenResult> {
+  if (modelId.startsWith("piapi/")) return piapiPoll(modelId, taskId);
   if (modelId.startsWith("hailuo/")) return pollHailuoVideo(taskId);
   if (modelId.startsWith("google/veo-3")) return pollVeo3(taskId);
   return {

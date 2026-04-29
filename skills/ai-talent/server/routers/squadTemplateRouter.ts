@@ -1461,14 +1461,56 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
 
       // ── run: produce the draft for this step ─────────────────────────────────
       // Detect output kind from outputType keywords so we can give targeted guidance.
+      // Explicit `outputKind` on the step or its assigned agent wins over keyword regex.
+      const explicitKind = String((step as any).outputKind ?? (step as any).assignedAgent?.outputKind ?? "").toLowerCase();
       const ot = (outputType || "").toLowerCase();
-      const isContent =
-        /caption|post|copy|hook|hashtag|tag\b|tags|article|newsletter|tweet|script|carousel|reel|story|thumbnail|title|headline|description|email|edm|video|short|長文|貼文|文案|hashtag|腳本|標題|簡介|文/i.test(ot)
-        || /caption|post|copy|hook|hashtag|article|新聞稿|長文|貼文|文案|腳本|標題/i.test(stepName);
-      const isStrategic =
+      // Visual steps: detect first so we don't mis-label as content.
+      const isVisual = explicitKind === "image" || explicitKind === "video"
+        || /\b(image|visual|kv|banner|thumbnail|cover|carousel|poster|logo|illustration|video|reel|short|tvc|footage|clip|i2v|t2v|motion|spokesperson)\b/i.test(`${ot} ${stepName}`)
+        || /(圖像|視覺|主視覺|封面|縮圖|海報|插畫|圖卡|圖文|圖示|影片|短片|短影音|動畫|動態)/.test(`${ot} ${stepName}`);
+      const isContent = !isVisual && (
+        /caption|post|copy|hook|hashtag|tag\b|tags|article|newsletter|tweet|script|story|title|headline|description|email|edm|長文|貼文|文案|hashtag|腳本|標題|簡介|文/i.test(ot)
+        || /caption|post|copy|hook|hashtag|article|新聞稿|長文|貼文|文案|腳本|標題/i.test(stepName)
+      );
+      const isStrategic = !isVisual && !isContent &&
         /swot|persona|icp|research|analysis|brand|context|interview|competitor|strategy|plan|brief|outline|framework|insight|positioning|methodology|doc|report|matrix|mapping|journey|研究|分析|策略|框架|計畫|報告|訪談|競品|定位|脈絡|洞察|矩陣|藍圖/i.test(`${ot} ${stepName}`);
 
-      const outputGuide = isContent
+      // ── Visual step short-circuit: agent produces the visual BRIEF only.
+      // The actual image/video is generated client-side via the 3-step
+      // MediaGenFlow (設計方向 → AI prompt → 模型選擇) — server must NOT
+      // call image APIs here, that violates CJ's rule "由用戶在 Step 3 挑模型".
+      // Detect a "media completion" payload coming back via userInput when
+      // MediaGenFlow finishes — that arrives as `__media_url__: ...` and we
+      // store as-is so subsequent steps can reference it.
+      if (isVisual && /^__media_url__:/m.test(input.userInput || "")) {
+        // Persist the media completion as the confirmed output for this step.
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, user_input, agent_output, agent_id, agent_name)
+          VALUES
+            (${input.missionId}, ${input.stepOrder}, 'drafted',
+             ${input.userInput}, ${input.userInput},
+             ${assignedId ?? null}, ${agentName})
+          ON DUPLICATE KEY UPDATE
+            status = 'drafted',
+            user_input = VALUES(user_input),
+            agent_output = VALUES(agent_output)
+        `);
+        return {
+          ok: true, status: "drafted" as const,
+          agentName, agentTitle, agentSkill, stepName, stepDesc, outputType,
+          output: input.userInput,
+        };
+      }
+
+      const outputGuide = isVisual
+        ? `這是「視覺素材類」交付物 — 你的工作是寫出【視覺 brief】，不是真的生成圖像 / 影片。
+- 用繁體中文描述這個畫面 / 影片要呈現什麼：主體、構圖、色彩、情緒、風格參考
+- 如果是影片，再加上分鏡（每個鏡頭的時長 / 鏡頭運動 / 主體動作）
+- 不要寫「我會這樣做」，直接寫「這個畫面是…」、「鏡頭一：…」
+- 寫 3-6 句即可。後面用戶會看著這個 brief，在 3-step 流程裡進一步選方向、寫 AI prompt、挑模型生成
+- 禁止輸出 Markdown code block 或 prompt template；就是純自然語言 brief`
+        : isContent
         ? `這是「內容類」交付物 — 你交出的東西要可以直接複製貼上發出去。
 - 不要寫「我會...」、「先...再...」、「Step 1 / Step 2」這種說明流程
 - 直接寫成品本身（caption / hashtag / 圖片描述 / 影片腳本 / 標題等）

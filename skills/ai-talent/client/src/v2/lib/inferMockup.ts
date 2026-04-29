@@ -277,7 +277,20 @@ export function getVariantsForPlatform(platform: Platform): MockupVariant[] {
  * "content" (caption / image / hashtag — should render as the
  * platform mockup).
  */
-export type StepKind = "strategic" | "content";
+/**
+ * Step kind taxonomy:
+ *   - "strategic"  → SWOT / persona / framework / report. Renders as DocMockup.
+ *   - "content"    → caption / hashtag / hook / title. Feeds PlatformMockup.
+ *   - "image"      → KV / banner / cover / thumbnail / carousel image.
+ *                    Routes through MediaGenFlow (3-step) instead of plain LLM.
+ *   - "video"      → reel / short / TVC / spokesperson clip.
+ *                    Routes through MediaGenFlow (3-step) for video models.
+ *
+ * Per CJ direction 2026-04-29: any image/video output MUST go through the
+ * 3-step flow (設計方向 → AI prompt → 模型選擇), so squad-runner detects
+ * visual steps here and swaps the middle preview to MediaGenFlow inline.
+ */
+export type StepKind = "strategic" | "content" | "image" | "video";
 
 const STRATEGIC_KEYWORDS = [
   "research", "researcher", "analysis", "analyst", "audit",
@@ -290,6 +303,20 @@ const STRATEGIC_KEYWORDS = [
   "研究", "分析", "策略", "框架", "計畫", "計劃", "報告",
   "訪談", "競品", "定位", "脈絡", "洞察", "矩陣", "藍圖",
   "規劃", "盤點", "稽核",
+];
+
+// Visual-output keywords. Order matters: video patterns are checked first
+// so that "reel video" doesn't fall through to "image".
+const VIDEO_KEYWORDS = [
+  "video", "reel", "short", "tvc", "footage", "clip",
+  "i2v", "t2v", "motion", "animation", "spokesperson",
+  "影片", "短片", "短影音", "腳本影片", "動畫", "動態",
+];
+const IMAGE_KEYWORDS = [
+  "image", "visual", "kv", "banner", "thumbnail", "cover",
+  "carousel", "poster", "logo", "illustration", "graphic",
+  "圖像", "視覺", "主視覺", "封面", "縮圖", "海報",
+  "插畫", "圖卡", "圖文", "圖示",
 ];
 
 /**
@@ -348,6 +375,9 @@ export function aggregateMockupFields(
     const p = progressByOrd.get(ord);
     const body: string = (p?.agentOutput ?? p?.agent_output ?? "").toString().trim();
     if (!body) continue;
+    // Visual + strategic steps don't feed mockup text fields. Visual steps
+    // produce a media URL via MediaGenFlow; strategic steps render in the
+    // DocMockup. Only "content" body text feeds caption / hashtags / etc.
     if (inferStepKind(step) !== "content") continue;
 
     const haystack = [step.outputType, step.output, step.name, step.title]
@@ -373,6 +403,13 @@ export function aggregateMockupFields(
 
 export function inferStepKind(step: any): StepKind {
   if (!step) return "content";
+  // Explicit declaration wins over heuristics. Agents/skills that produce
+  // visual assets should set `outputKind` directly so we don't depend on
+  // keyword regex.
+  const explicit = String(step.outputKind ?? step.assignedAgent?.outputKind ?? "").toLowerCase();
+  if (explicit === "image" || explicit === "video" || explicit === "strategic" || explicit === "content") {
+    return explicit as StepKind;
+  }
   const haystack = [
     step.outputType, step.output, step.name, step.title,
     step.skill, step.assignedAgentName, step.role,
@@ -380,5 +417,9 @@ export function inferStepKind(step: any): StepKind {
     Array.isArray(step.requiredSkills) ? step.requiredSkills.join(" ") : "",
   ].filter(Boolean).join(" ").toLowerCase();
   if (!haystack) return "content";
+  // Visual checks run BEFORE strategic — a "visual brand book" step is a
+  // visual delivery, not a strategy doc.
+  if (VIDEO_KEYWORDS.some((kw) => haystack.includes(kw))) return "video";
+  if (IMAGE_KEYWORDS.some((kw) => haystack.includes(kw))) return "image";
   return STRATEGIC_KEYWORDS.some((kw) => haystack.includes(kw)) ? "strategic" : "content";
 }
