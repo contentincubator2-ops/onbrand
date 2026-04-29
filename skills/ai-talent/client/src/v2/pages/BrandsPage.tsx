@@ -27,6 +27,7 @@ import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
 import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
+import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { BRAND_FULL_PIPELINE, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -46,8 +47,8 @@ type SectionId = string;
 
 interface SubNavItem { id: SectionId; label: string; badge?: string; group?: string; }
 
-// Brand has both positioning segments AND visual/asset tiles.
-// Product / event have only positioning segments + card + prompts.
+// Brand has positioning segments + visual/asset entries (some manual-fill,
+// 圖像/圖示/圖表 removed per CJ direction).
 const BRAND_ASSET_SUBNAV: SubNavItem[] = [
   { id: "asset:all",         label: "所有資產",  group: "visuals" },
   { id: "asset:guidelines",  label: "準則",       group: "visuals" },
@@ -56,9 +57,6 @@ const BRAND_ASSET_SUBNAV: SubNavItem[] = [
   { id: "asset:colors",      label: "顏色",       group: "visuals" },
   { id: "asset:fonts",       label: "字型",       group: "visuals" },
   { id: "asset:photos",      label: "照片",       group: "visuals" },
-  { id: "asset:images",      label: "圖像",       group: "visuals" },
-  { id: "asset:icons",       label: "圖示",       group: "visuals" },
-  { id: "asset:charts",      label: "圖表",       group: "visuals" },
 ];
 
 // Tile colors (HeroUI semantic-100 backgrounds + matching tone)
@@ -170,16 +168,13 @@ export default function BrandsPage() {
   const cnt = (cat: string) => brainEntries[cat]?.length ?? 0;
 
   // Brand asset tiles (visuals — non-positioning). Positioning content
-  // (品牌口吻 / 品牌定位 / 目標受眾 / 競品洞察) lives in the segments now.
+  // lives in the segments now. 圖像/圖示/圖表 dropped per CJ direction.
   const TILES: Tile[] = [
     { id: "asset:templates", label: "品牌範本", icon: faFolderOpen, tone: "default", ready: false },
-    { id: "asset:logo",      label: "標誌",     icon: faPenNib,     tone: "default", ready: false },
-    { id: "asset:colors",    label: "顏色",     icon: faPalette,    tone: "default", ready: false },
-    { id: "asset:fonts",     label: "字型",     icon: faFont,       tone: "default", ready: false },
+    { id: "asset:logo",      label: "標誌",     icon: faPenNib,     tone: "default", ready: true },
+    { id: "asset:colors",    label: "顏色",     icon: faPalette,    tone: "default", ready: true },
+    { id: "asset:fonts",     label: "字型",     icon: faFont,       tone: "default", ready: true },
     { id: "asset:photos",    label: "照片",     icon: faImages,     tone: "default", ready: false },
-    { id: "asset:images",    label: "圖像",     icon: faImage,      tone: "default", ready: false },
-    { id: "asset:icons",     label: "圖示",     icon: faIcons,      tone: "default", ready: false },
-    { id: "asset:charts",    label: "圖表",     icon: faChartPie,   tone: "default", ready: false },
   ];
 
   const visibleTiles =
@@ -522,7 +517,12 @@ export default function BrandsPage() {
               onStop={stopPipeline}
             />
           )}
-          {section === "card" || section === "prompts" || section.startsWith("seg:") ? (
+          {section.startsWith("asset:") && section !== "asset:all" && scopeMode === "brand" && (scope?.brandId ?? brandId) ? (
+            <BrandAssetPanel
+              assetKey={section.slice("asset:".length) as AssetKey}
+              brandId={(scope?.brandId ?? brandId)!}
+            />
+          ) : section === "card" || section === "prompts" || section.startsWith("seg:") ? (
             <PositioningPanel
               section={section}
               scopeMode={scopeMode}
@@ -750,6 +750,60 @@ function PositioningEditor({
         research={(draft._research as any)?.[activeSegment.id] ?? null}
         wizardMeta={(draft._wizardMeta as any)?.[activeSegment.id] ?? null}
       />
+    </div>
+  );
+}
+
+/* ─────────────────────────── BrandAssetPanel ───────────────────────── */
+// Manual-fill panel for non-positioning brand assets (logo/colors/fonts/...).
+// Reads scope.active.brand.positioning._assets[assetKey], writes via
+// scope.savePositioning with debounced (800ms) auto-save.
+function BrandAssetPanel({ assetKey, brandId }: { assetKey: AssetKey; brandId: number }) {
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const scopeActive = (trpc as any).scope?.active?.useQuery
+    ? (trpc as any).scope.active.useQuery(
+        { brandId, productId: null, eventId: null },
+        { refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: null };
+  const positioning = (scopeActive.data as any)?.brand?.positioning ?? {};
+  const initialValue = (positioning._assets as any)?.[assetKey] ?? null;
+
+  const [draft, setDraft] = useState<any>(initialValue);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  React.useEffect(() => { setDraft(initialValue); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [JSON.stringify(initialValue)]);
+
+  const saveMutation = (trpc as any).scope?.savePositioning?.useMutation
+    ? (trpc as any).scope.savePositioning.useMutation({
+        onSuccess: () => { setSaveState("saved"); utils?.scope?.active?.invalidate?.(); },
+        onError: () => setSaveState("error"),
+      })
+    : null;
+
+  const timerRef = React.useRef<any>(null);
+  const onChange = (next: any) => {
+    setDraft(next);
+    if (!saveMutation) return;
+    setSaveState("saving");
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      const nextAssets = { ...(positioning._assets ?? {}), [assetKey]: next };
+      const nextPositioning = { ...positioning, _assets: nextAssets };
+      saveMutation.mutate({ kind: "brand", id: brandId, positioning: nextPositioning });
+    }, 800);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="px-5 py-3 flex-row items-center justify-between flex-wrap">
+          <p className="text-small text-default-500">
+            這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets
+          </p>
+          <SaveIndicator state={saveState} hasTarget={true} />
+        </CardBody>
+      </Card>
+      <BrandAssetEditor assetKey={assetKey} value={draft} onChange={onChange} />
     </div>
   );
 }

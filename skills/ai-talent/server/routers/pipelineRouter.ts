@@ -239,13 +239,18 @@ ${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}
       const parsed = parseAgentResponse(raw);
 
       // Persist conclusion + sources + wizard meta scoped to entity id.
-      // Only mark wizard meta + write conclusion when parse succeeded —
-      // otherwise we'd flag a segment as "Wizard 自動產出" with empty
-      // fields, which is exactly the bug CJ caught (Step 7 stuck).
+      // Only mark wizard meta + write conclusion when parse succeeded.
+      // CJ-caught bug: audience has 3 steps (6/7/8) writing same segment;
+      // last step's narrow conclusion ({matrix:...}) was overwriting
+      // earlier {primary,secondary,...}. MERGE instead of replace so
+      // each step augments the segment.
       const nextPositioning = { ...positioning };
       const conclusionSaved = parsed.conclusion != null && Object.keys(parsed.conclusion).length > 0;
       if (conclusionSaved) {
-        nextPositioning[input.segmentId] = parsed.conclusion;
+        const existing = (nextPositioning[input.segmentId] as any) ?? {};
+        // Shallow merge — top-level keys from new step overwrite, others
+        // preserved. Good for additive (matrix on top of primary/secondary).
+        nextPositioning[input.segmentId] = { ...existing, ...parsed.conclusion };
         const meta = (nextPositioning._wizardMeta as any) ?? {};
         meta[input.segmentId] = {
           wroteAt: new Date().toISOString(),
