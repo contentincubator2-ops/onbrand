@@ -86,30 +86,15 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
 
   const onCheck = async () => {
     if (!kind || !name.trim()) { setErr("請輸入名稱"); return; }
+    if (!website.trim() && !facebook.trim() && !description.trim()) {
+      setErr("請至少提供官網、Facebook 或描述其中一項，系統才能驗證");
+      return;
+    }
     setErr(null);
     setStep("checking");
-
-    const buildSelfCandidate = (): Candidate[] => {
-      // If user gave us a website, synthesize a "self" candidate from
-      // their input so they always have something concrete to confirm.
-      const url = website.trim() || facebook.trim();
-      if (!url && !description.trim()) return [];
-      return [{
-        name: name.trim(),
-        url: url || "",
-        description: description.trim() || "（你輸入的資料）",
-        confidence: 100,
-      }];
-    };
-
     if (!disambiguate) {
-      const self = buildSelfCandidate();
-      setCandidates(self);
-      setSummary(self.length
-        ? "系統未連接 web_search — 以下是你輸入的資料。"
-        : "系統未連接 web_search，將直接以你輸入的資料建立。");
-      setPicked(self.length ? 0 : -1);
-      setStep("confirm");
+      setErr("系統暫時無法驗證（gateway 未連接）");
+      setStep("input");
       return;
     }
     try {
@@ -121,28 +106,19 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
         description: description.trim() || undefined,
       });
       const cands = (res?.candidates as Candidate[]) ?? [];
-      // If gateway returned nothing but user provided URL/desc, fall
-      // back to a self-candidate so 0-candidate UX has something to pick.
-      const finalCands = cands.length > 0 ? cands : buildSelfCandidate();
-      setCandidates(finalCands);
-      setSummary(String(res?.summary ?? "") || (cands.length === 0
-        ? "系統沒找到外部候選 — 你可以選下方「以你輸入的資料建立」直接進下一步。"
-        : ""));
-      // Auto-pick: top candidate if confident, else "都不是" so the
-      // 建立 button is immediately enabled and user can proceed.
-      if (finalCands.length > 0 && (finalCands[0]?.confidence ?? 0) >= 70) {
+      setCandidates(cands);
+      setSummary(String(res?.summary ?? ""));
+      // Auto-pick top candidate if confident; else null so 建立 button stays disabled
+      // until user explicitly confirms — we don't want silent acceptance of unverified data.
+      if (cands.length > 0 && (cands[0]?.confidence ?? 0) >= 80) {
         setPicked(0);
       } else {
-        setPicked(-1);
+        setPicked(null);
       }
       setStep("confirm");
     } catch (e: any) {
-      // Gateway error — fall back to self-candidate so user isn't blocked
-      const self = buildSelfCandidate();
-      setCandidates(self);
-      setSummary(`系統驗證失敗：${e?.message ?? String(e)}。可直接以你輸入的資料建立。`);
-      setPicked(self.length ? 0 : -1);
-      setStep("confirm");
+      setErr(`驗證失敗：${e?.message ?? String(e)}`);
+      setStep("input");
     }
   };
 
@@ -197,7 +173,8 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
                 facebook:    facebook.trim() || undefined,
                 description: finalDescription || undefined,
                 candidate:   chosen ?? undefined,
-                createdVia:  chosen ? "disambiguated" : "manual",
+                verified:    !!chosen,             // false when user picked 都不是
+                createdVia:  chosen ? "disambiguated" : "forced-unverified",
                 createdAt:   new Date().toISOString(),
               },
             },
@@ -287,6 +264,7 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
                   <Button
                     color="primary"
                     isLoading={busy}
+                    isDisabled={picked === null}
                     onPress={onSubmit}
                   >
                     建立{meta.label}
@@ -404,22 +382,33 @@ function ConfirmStep({
         <p className="text-small text-default-500">系統沒找到候選 — 可直接以你輸入的資料建立。</p>
       )}
 
-      <Card
-        shadow="none"
-        isPressable
-        onPress={() => onPick(-1)}
-        className={`border ${picked === -1 ? "border-primary bg-primary-50" : "border-divider hover:bg-default-50"} transition`}
-      >
-        <CardBody className="px-4 py-3 flex-row items-center gap-3">
-          <span className={`flex items-center justify-center w-7 h-7 rounded-full border ${picked === -1 ? "border-primary text-primary" : "border-divider text-default-400"}`}>
-            {picked === -1 && <FontAwesomeIcon icon={faCheck} className="text-tiny" />}
-          </span>
-          <div>
-            <p className="text-small font-medium">都不是 — 直接建立新{kind === "brand" ? "品牌" : kind === "product" ? "產品" : "活動"}</p>
-            <p className="text-tiny text-default-500">使用你剛才輸入的名稱、官網、描述為基礎</p>
-          </div>
-        </CardBody>
-      </Card>
+      {candidates.length === 0 ? (
+        <Card shadow="none" className="border-2 border-dashed border-warning-200 bg-warning-50">
+          <CardBody className="px-4 py-4 gap-2">
+            <p className="text-small font-medium text-warning-700">需要更多資訊才能驗證</p>
+            <p className="text-tiny text-default-600 leading-relaxed">
+              系統實際抓取你提供的 URL 後沒找到可信內容。請按「← 上一步」補上正確的官網 / Facebook / 描述，再驗證一次。
+            </p>
+          </CardBody>
+        </Card>
+      ) : (
+        <Card
+          shadow="none"
+          isPressable
+          onPress={() => onPick(-1)}
+          className={`border-2 border-dashed ${picked === -1 ? "border-warning bg-warning-50" : "border-divider hover:bg-default-50"} transition`}
+        >
+          <CardBody className="px-4 py-3 flex-row items-center gap-3">
+            <span className={`flex items-center justify-center w-7 h-7 rounded-full border ${picked === -1 ? "border-warning text-warning" : "border-divider text-default-400"}`}>
+              {picked === -1 && <FontAwesomeIcon icon={faCheck} className="text-tiny" />}
+            </span>
+            <div>
+              <p className="text-small font-medium">都不是 — 強制以我輸入的名稱建立（未驗證）</p>
+              <p className="text-tiny text-default-500">系統會在 _meta 標記 verified=false，未來資料品質可能受影響</p>
+            </div>
+          </CardBody>
+        </Card>
+      )}
     </>
   );
 }

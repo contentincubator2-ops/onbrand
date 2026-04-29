@@ -267,13 +267,12 @@ export const scopeRouter = router({
     }),
 
   /**
-   * disambiguate — given a name + optional URLs + description, ask
-   * OpenClaw gateway (web_search baked in) to surface 1-3 candidate
-   * matches so the user can confirm "是不是同名同姓的別的牌子" before
-   * the scope row is created. Returns { candidates[], summary }.
-   *
-   * Stateless — no DB write. The caller passes the picked candidate
-   * back to brand.create / product.upsert / event.upsert.
+   * disambiguate — server fetches the provided URL(s) for real content
+   * (title / og:meta / description / first heading), and asks OpenClaw
+   * gateway (web_search baked in) for additional candidates. Each
+   * candidate is grounded in REAL scraped data, not the user's typed
+   * input. Returns { candidates[], summary, evidence[] } so the user
+   * can verify "is this the brand I mean".
    */
   disambiguate: protectedProcedure
     .input(z.object({
@@ -284,23 +283,82 @@ export const scopeRouter = router({
       description: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
+      // ── 1. Server-side fetch of provided URLs to extract real metadata ──
+      const evidence: { url: string; title: string; description: string; ogImage?: string; charCount: number; excerpt: string }[] = [];
+
+      const tryFetch = async (raw: string) => {
+        if (!raw) return;
+        let url = raw.trim();
+        if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+        try {
+          const resp = await fetch(url, {
+            method: "GET",
+            redirect: "follow",
+            signal: AbortSignal.timeout(15_000),
+            headers: { "User-Agent": "Mozilla/5.0 SoWork-MarketingOS-Verifier/1.0" },
+          });
+          if (!resp.ok) return;
+          const html = await resp.text();
+          // Extract title + meta description + og tags + first h1 + first chunk of body text
+          const pick = (re: RegExp): string => {
+            const m = html.match(re);
+            return m?.[1]?.trim() ?? "";
+          };
+          const title = pick(/<title[^>]*>([^<]+)<\/title>/i);
+          const desc =
+            pick(/<meta\s+(?:name|property)=["']?(?:description|og:description)["']?\s+content=["']([^"']+)["']/i) ||
+            pick(/<meta\s+content=["']([^"']+)["']\s+(?:name|property)=["']?(?:description|og:description)["']?/i);
+          const ogTitle = pick(/<meta\s+(?:property|name)=["']?og:title["']?\s+content=["']([^"']+)["']/i);
+          const ogImage = pick(/<meta\s+(?:property|name)=["']?og:image["']?\s+content=["']([^"']+)["']/i);
+          const h1 = pick(/<h1[^>]*>([^<]{3,200})<\/h1>/i);
+          // Strip tags for excerpt (very rough)
+          const text = html
+            .replace(/<script[\s\S]*?<\/script>/gi, " ")
+            .replace(/<style[\s\S]*?<\/style>/gi, " ")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          const excerpt = text.slice(0, 1500);
+          const finalTitle = (ogTitle || title || h1 || "").slice(0, 200);
+          const finalDesc  = (desc || excerpt).slice(0, 400);
+          evidence.push({
+            url,
+            title: finalTitle || url,
+            description: finalDesc,
+            ogImage: ogImage || undefined,
+            charCount: text.length,
+            excerpt,
+          });
+        } catch { /* tolerate any fetch error */ }
+      };
+
+      await Promise.all([tryFetch(input.website ?? ""), tryFetch(input.facebook ?? "")]);
+
+      // ── 2. Ask gateway with REAL scraped evidence as context ──
       const GATEWAY_HTTP  = process.env.OPENCLAW_GATEWAY_HTTP  ?? "http://localhost:18790";
       const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? "mos-pm-claw-2026";
 
+      const evidenceBlock = evidence.length
+        ? evidence.map((e, i) =>
+            `[${i + 1}] ${e.url}\n  title: ${e.title}\n  description: ${e.description}\n  body excerpt (first 1500 chars): ${e.excerpt.slice(0, 500)}…`
+          ).join("\n\n")
+        : "（使用者未提供任何 URL）";
+
+      const kindLabel = input.kind === "brand" ? "品牌" : input.kind === "product" ? "產品" : "活動";
       const sys = `你是 SoWork 品牌驗證助手。`
-        + `任務：使用者要新增 ${input.kind === "brand" ? "品牌" : input.kind === "product" ? "產品" : "活動"}「${input.name}」。`
-        + `請使用 web_search 找出可能的同名候選（最多 3 個），讓使用者確認是否選對。\n\n`
-        + `補充資訊：`
-        + (input.website     ? `\n- 官網：${input.website}`     : "")
-        + (input.facebook    ? `\n- Facebook：${input.facebook}` : "")
-        + (input.description ? `\n- 描述：${input.description}`  : "")
-        + `\n\n嚴格回傳 JSON：`
-        + `\n{"candidates":[{"name":"...","url":"...","description":"50-100 字摘要","confidence":0-100}],"summary":"找到 N 個候選..."}`
-        + `\n如果使用者已提供官網 / Facebook，第一個候選應該就是該來源。`
-        + `\nconfidence 越高表示越像同一個 ${input.kind === "brand" ? "品牌" : input.kind}。`
+        + `\n任務：使用者要新增 ${kindLabel}「${input.name}」。`
+        + `\n伺服器已實際 fetch 使用者提供的 URL，下方是抓到的真實內容；請只根據這些證據 + 你 web_search 的結果產出 candidates。`
+        + `\n禁止憑空臆測或單純複述使用者輸入；每個 candidate 都必須有可驗證的 URL 與摘要。`
+        + `\n\n【已抓取的證據】\n${evidenceBlock}`
+        + (input.description ? `\n\n【使用者描述】${input.description}` : "")
+        + `\n\n【輸出規則】嚴格回傳 JSON：`
+        + `\n{"candidates":[{"name":"...","url":"...","description":"50-150 字基於證據的摘要","confidence":0-100,"evidenceIdx":1}],"summary":"找到 N 個候選 / 評估說明"}`
+        + `\n- 若已抓到的證據明確就是這個 ${kindLabel}，confidence 必須 ≥ 80 並 evidenceIdx 指到該編號。`
+        + `\n- 若你 web_search 發現同名其他品牌（例如 sowork.tw vs sowork.com），各列為獨立 candidate。`
+        + `\n- 若沒任何證據可驗證，candidates 可為空陣列，summary 說明「找不到可信來源，請補充官網或描述」。`
         + `\n語言：繁體中文（zh-TW）。`;
 
-      const user = `請幫我找出「${input.name}」的可能候選，特別注意是否有同名的不同品牌（例如 sowork.tw vs sowork.com）。`;
+      const user = `請驗證「${input.name}」並列出 candidates。`;
 
       let raw = "";
       try {
@@ -321,25 +379,47 @@ export const scopeRouter = router({
           const data: any = await resp.json();
           raw = data?.choices?.[0]?.message?.content ?? "";
         }
-      } catch {
-        // gateway unavailable — fall back to empty result
-      }
+      } catch { /* ignore */ }
 
-      // Parse JSON response (strip markdown fences)
+      // ── 3. Parse + ground candidates back to evidence ──
       const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
       let parsed: any = { candidates: [], summary: "" };
       try { parsed = JSON.parse(cleaned); } catch { /* ignore */ }
 
-      const candidates = Array.isArray(parsed?.candidates) ? parsed.candidates.slice(0, 3).map((c: any) => ({
+      const llmCandidates = Array.isArray(parsed?.candidates) ? parsed.candidates.slice(0, 3).map((c: any) => ({
         name: String(c?.name ?? ""),
         url: String(c?.url ?? ""),
-        description: String(c?.description ?? "").slice(0, 400),
+        description: String(c?.description ?? "").slice(0, 600),
         confidence: Math.max(0, Math.min(100, Number(c?.confidence ?? 0))),
+        evidenceIdx: Number.isFinite(Number(c?.evidenceIdx)) ? Number(c?.evidenceIdx) : null,
       })) : [];
+
+      // If gateway returned nothing but we DO have scraped evidence,
+      // build candidates directly from evidence (verified real content).
+      let candidates = llmCandidates;
+      if (candidates.length === 0 && evidence.length > 0) {
+        candidates = evidence.map((e) => ({
+          name: e.title.replace(/\s*[|｜\-—].*$/, "").trim() || input.name,
+          url: e.url,
+          description: e.description,
+          confidence: 90, // we DID fetch the URL, content is real
+          evidenceIdx: null,
+        }));
+      }
+
+      const summary = String(parsed?.summary ?? "") || (
+        candidates.length === 0
+          ? "找不到可信來源 — 請在上一步補充官網 / Facebook / 描述後再試。"
+          : `已實際抓取 ${evidence.length} 個 URL 並比對，列出 ${candidates.length} 個候選。`
+      );
 
       return {
         candidates,
-        summary: String(parsed?.summary ?? "（系統無回應，可直接以你輸入的資料建立）"),
+        summary,
+        evidence: evidence.map((e) => ({
+          url: e.url, title: e.title, description: e.description,
+          ogImage: e.ogImage, charCount: e.charCount,
+        })),
       };
     }),
 
