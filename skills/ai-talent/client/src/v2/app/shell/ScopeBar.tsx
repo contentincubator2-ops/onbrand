@@ -1,10 +1,21 @@
 /**
  * ScopeBar — global brand × product × event scope picker.
  *
- * Lives in ShellLayout's top-right header. Choose-one rule: user can pick
- * one of (brand | product | event) as the active scope; the other two
- * show "—" by default. The intake agent / orchestrator reads the active
- * scope before kicking off any squad pipeline.
+ * Lives in ShellLayout's top-right header. Hierarchical scope rule
+ * (CJ direction 2026-04-29):
+ *   - Brand is the root. Products & events ALWAYS belong to one brand.
+ *   - Picking a product → auto-sets parent brand (stays visible).
+ *   - Picking an event → auto-sets parent brand + parent product (if any).
+ *     Events may span multiple products (Pokemon Go 五月活動 等); when
+ *     event.productId is null the product picker shows "—" with the brand
+ *     still locked in.
+ *   - Picking a brand → switches brand and clears product/event (they're
+ *     children of a different brand now).
+ *
+ * The intake agent / orchestrator reads scope.brandId for brand brain
+ * context regardless of whether product/event is also set; it reads the
+ * MOST SPECIFIC level (event > product > brand) to know which positioning
+ * JSON to thread through the squad.
  *
  * State is persisted to localStorage AND mirrored to the URL hash so
  * deep links / refresh keep the scope.
@@ -76,12 +87,52 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
   const product = products.find((p: any) => p.id === scope.productId) ?? null;
   const event = events.find((e: any) => e.id === scope.eventId) ?? null;
 
-  // Choose-one rule helper: picking one clears the other two
+  // Hierarchical scope picker. Picking a product / event resolves its
+  // parent brand from the FK column on the row (server-side scope.options
+  // returns products.brandId, events.brandId, events.productId).
   const pick = (which: "brand" | "product" | "event", id: number | null) => {
-    if (which === "brand")   setScope({ brandId: id, productId: null, eventId: null });
-    if (which === "product") setScope({ brandId: null, productId: id, eventId: null });
-    if (which === "event")   setScope({ brandId: null, productId: null, eventId: id });
+    if (which === "brand") {
+      // Switching brand always clears product/event — they belong to
+      // a different brand now.
+      setScope({ brandId: id, productId: null, eventId: null });
+      return;
+    }
+    if (which === "product") {
+      if (id == null) {
+        // Clearing product keeps brand (user wants brand-level scope back).
+        setScope({ brandId: scope.brandId, productId: null, eventId: null });
+        return;
+      }
+      const p = products.find((x: any) => x.id === id);
+      const parentBrandId: number | null = p?.brandId ?? scope.brandId ?? null;
+      // Picking a product clears any event (events are below products).
+      setScope({ brandId: parentBrandId, productId: id, eventId: null });
+      return;
+    }
+    if (which === "event") {
+      if (id == null) {
+        // Clearing event keeps brand + product (user steps back one level).
+        setScope({ brandId: scope.brandId, productId: scope.productId, eventId: null });
+        return;
+      }
+      const e = events.find((x: any) => x.id === id);
+      const parentBrandId: number | null = e?.brandId ?? scope.brandId ?? null;
+      // events.productId is single-FK today; future m:n via event_products
+      // join table will set productId only when the event scopes to one
+      // product (else null = "spans multiple products").
+      const parentProductId: number | null = e?.productId ?? null;
+      setScope({ brandId: parentBrandId, productId: parentProductId, eventId: id });
+    }
   };
+
+  // Filter children to the active brand so the picker shows coherent options.
+  // When no brand is set, show everything (user is browsing all scopes).
+  const filteredProducts = scope.brandId
+    ? products.filter((p: any) => p.brandId === scope.brandId)
+    : products;
+  const filteredEvents = scope.brandId
+    ? events.filter((e: any) => e.brandId === scope.brandId)
+    : events;
 
   const [createKind, setCreateKind] = React.useState<CreateScopeKind | null>(null);
 
@@ -100,19 +151,19 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
         icon={faBox}
         label="產品"
         current={product?.name ?? null}
-        items={products.map((p: any) => ({ id: p.id, name: p.name }))}
+        items={filteredProducts.map((p: any) => ({ id: p.id, name: p.name }))}
         onPick={(id) => pick("product", id)}
         onCreate={() => setCreateKind("product")}
-        emptyHint="尚未建立產品"
+        emptyHint={scope.brandId ? "此品牌尚未有產品" : "尚未建立產品"}
       />
       <ScopePicker
         icon={faCalendarDay}
         label="活動"
         current={event?.name ?? null}
-        items={events.map((e: any) => ({ id: e.id, name: e.name }))}
+        items={filteredEvents.map((e: any) => ({ id: e.id, name: e.name }))}
         onPick={(id) => pick("event", id)}
         onCreate={() => setCreateKind("event")}
-        emptyHint="尚未建立活動"
+        emptyHint={scope.brandId ? "此品牌尚未有活動" : "尚未建立活動"}
       />
       <CreateScopeModal
         kind={createKind}

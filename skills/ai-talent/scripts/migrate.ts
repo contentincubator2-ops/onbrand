@@ -799,6 +799,23 @@ async function main() {
     `);
     console.log("[migrate] events: OK");
 
+    // event_products — many-to-many join (CJ direction 2026-04-29:
+    // 活動可以隸屬於品牌或多個產品). The single events.productId column
+    // stays for backward compat — when an event scopes to exactly ONE
+    // product, both columns agree; when it spans multiple, productId stays
+    // NULL and links live in this join table.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS event_products (
+        eventId    INT NOT NULL,
+        productId  INT NOT NULL,
+        createdAt  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (eventId, productId),
+        INDEX idx_event   (eventId),
+        INDEX idx_product (productId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] event_products (m:n): OK");
+
     // brands.positioning JSON column (full brand positioning book + cards)
     const [bp]: any = await conn.execute(`
       SELECT COLUMN_NAME FROM information_schema.COLUMNS
