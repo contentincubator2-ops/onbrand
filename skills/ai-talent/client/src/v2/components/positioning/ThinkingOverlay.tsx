@@ -78,6 +78,11 @@ export default function ThinkingOverlay({
 
   const elapsedSec = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
 
+  // Strip step-numbering prefix (e.g., "Step 11.5 — " or "最後 — ") from
+  // titles when displaying — CJ wants only the content title, not the
+  // numbering chrome (counter chip is already gone).
+  const cleanTitle = stepTitle?.replace(/^(?:Step\s+\S+|最後)\s*[—\-]\s*/u, "") ?? "";
+
   return (
     <Card
       shadow="none"
@@ -88,13 +93,8 @@ export default function ThinkingOverlay({
           <span className="flex items-center justify-center w-7 h-7 rounded-full bg-content1 border border-divider">
             <FontAwesomeIcon icon={faRobot} className="text-default-600 text-tiny" />
           </span>
-          {stepNum && stepTotal && (
-            <Chip size="sm" variant="flat" color="default">
-              {stepNum} / {stepTotal}
-            </Chip>
-          )}
-          {stepTitle && (
-            <span className="text-small font-medium truncate">{stepTitle}</span>
+          {cleanTitle && (
+            <span className="text-small font-medium truncate">{cleanTitle}</span>
           )}
           <div className="ml-auto flex items-center gap-2">
             {phase === "loading" && (

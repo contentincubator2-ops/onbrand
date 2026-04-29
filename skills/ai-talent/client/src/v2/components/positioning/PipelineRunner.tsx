@@ -39,6 +39,9 @@ export default function PipelineRunner({
   const pct = state.status === "done"
     ? 100
     : Math.round((state.completed.length / total) * 100);
+  // Strip "Step 11.5 — " / "最後 — " prefix from titles (CJ direction).
+  const cleanTitle = (s?: string) =>
+    s?.replace(/^(?:Step\s+\S+|最後)\s*[—\-]\s*/u, "") ?? "";
 
   return (
     <Card
@@ -54,7 +57,7 @@ export default function PipelineRunner({
             <p className="text-small font-medium">品牌定位分析</p>
             {state.status === "running" && (
               <Chip size="sm" variant="flat" color="primary">
-                Step {state.completed.length + 1} / {total}
+                {state.completed.length + 1} / {total}
               </Chip>
             )}
             {state.status === "paused" && (
@@ -112,7 +115,7 @@ export default function PipelineRunner({
             />
             {current && state.status !== "done" && (
               <p className="text-tiny text-default-500 truncate">
-                目前：{current.title}
+                目前：{cleanTitle(current.title)}
               </p>
             )}
           </>
