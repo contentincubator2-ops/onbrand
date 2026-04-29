@@ -190,20 +190,12 @@ export const IMAGE_MODELS: MediaModel[] = [
     formats: ["1024×1024"],
     tags: ["stylized", "lora", "anime"],
   },
-  // ── Atlas Cloud aggregator (apikey-aa7918…) ──
-  {
-    id: "atlas/recraft-v3",
-    name: "Recraft v3",
-    vendor: "Recraft via Atlas Cloud",
-    provider: "atlas-cloud",
-    kind: "image",
-    status: "soon", // Atlas Cloud is primarily an LLM aggregator — image-gen endpoint TBD; flip to "ready" after verify-piapi script confirms.
-    strengths: "向量風格 / 扁平插畫 / 品牌設計系統，可輸出 SVG-friendly",
-    costEstimateUsd: 0.04,
-    durationSecEstimate: 10,
-    formats: ["1024×1024", "1024×1792"],
-    tags: ["vector", "flat-illustration", "brand-system"],
-  },
+  // Atlas Cloud entry retired — probe-atlas.ts confirmed 2026-04-29 that
+  // Atlas exposes /v1/models (LLM list incl. DeepSeek-V3) but
+  // /v1/images/generations returns 400 "not found". Atlas is LLM-only.
+  // Image-gen via Atlas should be considered out of scope; for Recraft v3
+  // we'll route through PiAPI if/when they add it. Atlas key stays in
+  // .env for future llmRouter integration.
   {
     id: "midjourney/v7",
     name: "Midjourney v7",
