@@ -85,8 +85,12 @@ jobs:
               echo "✗ PIAPI_KEY (from secret PI_API_KEY) is empty. Verify GitHub secret is set."
               exit 0
             fi
-            echo "✓ PIAPI_KEY present (length=${#PIAPI_KEY}, prefix=${PIAPI_KEY:0:8}…)"
-            echo "✓ ATLAS_CLOUD_API present (length=${#ATLAS_CLOUD_API}, prefix=${ATLAS_CLOUD_API:0:8}…)"
+            PIAPI_LEN=${#PIAPI_KEY}
+            ATLAS_LEN=${#ATLAS_CLOUD_API}
+            echo "✓ PIAPI_KEY present (length=$PIAPI_LEN, prefix=${PIAPI_KEY:0:4}…, suffix=…${PIAPI_KEY: -3})"
+            echo "✓ ATLAS_CLOUD_API present (length=$ATLAS_LEN, prefix=${ATLAS_CLOUD_API:0:8}…, suffix=…${ATLAS_CLOUD_API: -3})"
+            # Per CJ's PiAPI dashboard screenshot 2026-04-29 the key starts
+            # with "62a" and ends with "399". Echo confirms secret matches.
             # Sanity: PiAPI keys are UUID-like (hex), Atlas keys start with "apikey-".
             # If secrets are swapped, every PiAPI request will 401.
             case "$PIAPI_KEY" in
