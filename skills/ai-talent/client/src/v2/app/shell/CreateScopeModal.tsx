@@ -88,10 +88,27 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
     if (!kind || !name.trim()) { setErr("請輸入名稱"); return; }
     setErr(null);
     setStep("checking");
+
+    const buildSelfCandidate = (): Candidate[] => {
+      // If user gave us a website, synthesize a "self" candidate from
+      // their input so they always have something concrete to confirm.
+      const url = website.trim() || facebook.trim();
+      if (!url && !description.trim()) return [];
+      return [{
+        name: name.trim(),
+        url: url || "",
+        description: description.trim() || "（你輸入的資料）",
+        confidence: 100,
+      }];
+    };
+
     if (!disambiguate) {
-      // gateway unavailable — skip to confirm with empty candidates
-      setCandidates([]);
-      setSummary("（系統未連接 web_search，將直接以你輸入的資料建立）");
+      const self = buildSelfCandidate();
+      setCandidates(self);
+      setSummary(self.length
+        ? "系統未連接 web_search — 以下是你輸入的資料。"
+        : "系統未連接 web_search，將直接以你輸入的資料建立。");
+      setPicked(self.length ? 0 : -1);
       setStep("confirm");
       return;
     }
@@ -103,12 +120,29 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
         facebook: facebook.trim() || undefined,
         description: description.trim() || undefined,
       });
-      setCandidates((res?.candidates as Candidate[]) ?? []);
-      setSummary(String(res?.summary ?? ""));
+      const cands = (res?.candidates as Candidate[]) ?? [];
+      // If gateway returned nothing but user provided URL/desc, fall
+      // back to a self-candidate so 0-candidate UX has something to pick.
+      const finalCands = cands.length > 0 ? cands : buildSelfCandidate();
+      setCandidates(finalCands);
+      setSummary(String(res?.summary ?? "") || (cands.length === 0
+        ? "系統沒找到外部候選 — 你可以選下方「以你輸入的資料建立」直接進下一步。"
+        : ""));
+      // Auto-pick: top candidate if confident, else "都不是" so the
+      // 建立 button is immediately enabled and user can proceed.
+      if (finalCands.length > 0 && (finalCands[0]?.confidence ?? 0) >= 70) {
+        setPicked(0);
+      } else {
+        setPicked(-1);
+      }
       setStep("confirm");
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
-      setStep("input");
+      // Gateway error — fall back to self-candidate so user isn't blocked
+      const self = buildSelfCandidate();
+      setCandidates(self);
+      setSummary(`系統驗證失敗：${e?.message ?? String(e)}。可直接以你輸入的資料建立。`);
+      setPicked(self.length ? 0 : -1);
+      setStep("confirm");
     }
   };
 
@@ -117,10 +151,14 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
     setBusy(true);
     setErr(null);
     try {
-      // If user picked a candidate, fold its info into our payload
+      // If user picked a candidate, fold its info into our payload.
+      // picked === -1 → "都不是" / picked === null → defaults to "以輸入資料建立"
       const chosen = picked != null && picked >= 0 ? candidates[picked] : null;
-      const finalDescription = description.trim() || chosen?.description || "";
-      const finalWebsite     = website.trim()     || chosen?.url         || "";
+      // For self-candidates (matching the user's own input), we don't
+      // override the user's typed values with chosen.description/url.
+      const isSelf = chosen?.confidence === 100 && chosen?.name === name.trim();
+      const finalDescription = description.trim() || (isSelf ? "" : chosen?.description) || "";
+      const finalWebsite     = website.trim()     || (isSelf ? "" : chosen?.url)         || "";
 
       let newId = 0;
       if (kind === "brand") {
