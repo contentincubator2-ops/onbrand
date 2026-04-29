@@ -85,8 +85,22 @@ jobs:
               echo "✗ PIAPI_KEY (from secret PI_API_KEY) is empty. Verify GitHub secret is set."
               exit 0
             fi
-            echo "✓ PIAPI_KEY present (length=${#PIAPI_KEY})"
-            echo "✓ ATLAS_CLOUD_API present (length=${#ATLAS_CLOUD_API})"
+            echo "✓ PIAPI_KEY present (length=${#PIAPI_KEY}, prefix=${PIAPI_KEY:0:8}…)"
+            echo "✓ ATLAS_CLOUD_API present (length=${#ATLAS_CLOUD_API}, prefix=${ATLAS_CLOUD_API:0:8}…)"
+            # Sanity: PiAPI keys are UUID-like (hex), Atlas keys start with "apikey-".
+            # If secrets are swapped, every PiAPI request will 401.
+            case "$PIAPI_KEY" in
+              apikey-*)
+                echo "⚠ WARNING: PI_API_KEY secret looks like an Atlas Cloud key (starts with 'apikey-')."
+                echo "  The two secrets are likely swapped. Move the values in GitHub secrets:"
+                echo "  PI_API_KEY     ← should be UUID-format (e.g. 62a5ff21-...)"
+                echo "  ATLAS_CLOUD_API ← should be 'apikey-...'"
+                ;;
+            esac
+            case "$ATLAS_CLOUD_API" in
+              apikey-*)  echo "✓ ATLAS_CLOUD_API format looks correct (apikey-...)" ;;
+              *)         echo "⚠ ATLAS_CLOUD_API does not start with 'apikey-' — verify it's the right key" ;;
+            esac
 
             echo ""
             echo "===== 5a. Probe PiAPI auth schemes ====="
