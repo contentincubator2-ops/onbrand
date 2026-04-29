@@ -136,6 +136,38 @@ export const squadTemplateRouter = router({
   // Phase 1 (2026-04-25) consolidated workflow steps into `squads.steps`
   // (canonical shape). The legacy `squad_workflow_templates` table was
   // backfilled into squads.steps and dropped — no more LEFT JOIN needed.
+  // ── listForFront ─────────────────────────────────────────────────────────
+  // CJ direction 2026-04-30: every squad must pass approval before
+  // appearing in user-facing pickers. ALL front-stage squad loaders
+  // (BrandsPage / PickerWorkspace / MissionsHome / BoardroomPage / etc.)
+  // should call THIS procedure. is_approved=0 squads stay invisible
+  // until CJ flips them.
+  //
+  // Internal admin views that need to see drafts can call listAll
+  // (separate procedure, gated by admin role — TODO).
+  //
+  // This is the canonical filter; existing listByBrand is kept for
+  // back-compat but new callers should use listForFront.
+  listForFront: protectedProcedure
+    .input(z.object({
+      brandId: z.number().optional(),
+      includeUnapproved: z.boolean().default(false), // admin-only escape hatch
+    }).optional())
+    .query(async ({ input }) => {
+      const filter = input?.includeUnapproved
+        ? "s.is_active = 1"
+        : "s.is_active = 1 AND s.is_approved = 1";
+      const [rows] = await localPool.execute(
+        `SELECT s.id, s.slug, s.name, s.description,
+                s.tier, s.strategy_layer, s.is_approved
+           FROM squads s
+          WHERE ${filter}
+          ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
+          LIMIT 1000`
+      ) as any[];
+      return (rows as any[]) ?? [];
+    }),
+
   listByBrand: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async () => {
@@ -145,9 +177,10 @@ export const squadTemplateRouter = router({
                 s.hero_image_url, s.source, s.ingest_source_url, s.workspace, s.tags,
                 s.use_cases, s.output_formats,
                 s.task_label_zh, s.task_label_en,
-                s.mockup_platform, s.mockup_format, s.output_kind
+                s.mockup_platform, s.mockup_format, s.output_kind,
+                s.is_approved
            FROM squads s
-          WHERE s.is_active = 1
+          WHERE s.is_active = 1 AND s.is_approved = 1
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
           LIMIT 1000`
       ) as any[];

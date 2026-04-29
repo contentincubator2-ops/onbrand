@@ -1,0 +1,102 @@
+name: Admin — backfill agents.skills JSON from assignments
+
+# CJ caught 2026-04-30 in data consistency audit:
+#   16,095 total agents
+#    5,167 have agents.skills JSON populated (mostly seed-time mixed text)
+#   10,928 have empty JSON (UI display layer can't show their skills)
+#
+# But ~20 sample rows confirm: many of the empty-JSON agents DO have
+# rows in agent_skill_assignments (with slug → skill_catalog.name).
+#
+# Strategy: leave the 5,167 filled rows alone (they have richer mixed
+# content from seed scripts). For empty-JSON agents that have assignments,
+# synthesize JSON from skill_catalog.name JOIN, giving display layer
+# something to render. Idempotent — only writes where skills IS NULL.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set +e
+            cd /opt/marketing-os/app/skills/ai-talent 2>/dev/null || cd /opt/marketing-os/skills/ai-talent
+            set -a
+            [ -f .env ] && . .env
+            [ -f /opt/marketing-os/.env ] && . /opt/marketing-os/.env
+            set +a
+            DB_HOST_V=${DB_HOST:-127.0.0.1}
+            DB_USER_V=${DB_USER:-root}
+            DB_NAME_V=${DB_NAME:-mos_db}
+            run_sql() { MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST_V" -u"$DB_USER_V" "$DB_NAME_V" -t "$@"; }
+
+            echo "===== BEFORE: skills JSON state by category ====="
+            run_sql -e "
+              SELECT
+                CASE
+                  WHEN skills IS NULL OR JSON_LENGTH(skills) = 0 THEN 'json_empty'
+                  ELSE 'json_filled'
+                END AS state,
+                COUNT(*) AS n
+              FROM agents GROUP BY state;"
+
+            echo ""
+            echo "===== Of empty-JSON agents: how many have assignments rows? ====="
+            run_sql -e "
+              SELECT
+                CASE WHEN asgmt_count > 0 THEN 'has_assignments' ELSE 'no_assignments' END AS state,
+                COUNT(*) AS n
+              FROM (
+                SELECT a.id,
+                       (SELECT COUNT(*) FROM agent_skill_assignments asa WHERE asa.agentId = a.id) AS asgmt_count
+                  FROM agents a
+                 WHERE a.skills IS NULL OR JSON_LENGTH(a.skills) = 0
+              ) AS sub
+              GROUP BY state;"
+
+            echo ""
+            echo "===== APPLY BACKFILL ====="
+            # JOIN assignments → skill_catalog.name, aggregate as JSON array
+            # per agent. Only WRITE where current skills is null/empty AND
+            # there exist assignments. JSON_ARRAYAGG with DISTINCT to dedup.
+            run_sql -e "
+              UPDATE agents a
+                 JOIN (
+                   SELECT asa.agentId,
+                          JSON_ARRAYAGG(
+                            COALESCE(sc.name, asa.skillSlug)
+                          ) AS synthesized_skills
+                     FROM agent_skill_assignments asa
+                LEFT JOIN skill_catalog sc ON sc.slug = asa.skillSlug
+                    GROUP BY asa.agentId
+                 ) j ON j.agentId = a.id
+                  SET a.skills = j.synthesized_skills
+                WHERE a.skills IS NULL OR JSON_LENGTH(a.skills) = 0;"
+
+            echo ""
+            echo "===== AFTER: skills JSON state by category ====="
+            run_sql -e "
+              SELECT
+                CASE
+                  WHEN skills IS NULL OR JSON_LENGTH(skills) = 0 THEN 'json_empty'
+                  ELSE 'json_filled'
+                END AS state,
+                COUNT(*) AS n
+              FROM agents GROUP BY state;"
+
+            echo ""
+            echo "===== Sample backfilled agents (60001-60005) ====="
+            run_sql -e "
+              SELECT id, name, JSON_PRETTY(skills) AS skills
+                FROM agents WHERE id BETWEEN 60001 AND 60005;"
+
+            echo ""
+            echo "===== Done ====="

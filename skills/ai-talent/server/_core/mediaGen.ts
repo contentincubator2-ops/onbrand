@@ -549,9 +549,9 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
   switch (modelId) {
     case "openai/gpt-image-1":     return genOpenAIImage(opts);
     case "azure/gpt-image-2":      return genAzureImage2(opts);
-    // Imagen 3 → Imagen 4 (real model on account)
-    case "google/imagen-3":
-    case "google/imagen-4":
+    // Imagen 4 (real model on account). Removed legacy imagen-3 /
+    // imagen-4 alias cases 2026-04-30 — client registry uses explicit
+    // -default / -fast / -ultra suffixes only.
     case "google/imagen-4-default": return genImagen4(opts, "default");
     case "google/imagen-4-fast":    return genImagen4(opts, "fast");
     case "google/imagen-4-ultra":   return genImagen4(opts, "ultra");

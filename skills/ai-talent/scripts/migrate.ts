@@ -725,6 +725,54 @@ async function main() {
       console.log("[migrate] mission_step_progress.canonical_message: already exists, skipped");
     }
 
+    // ── 9d. squads governance columns (is_approved + approval audit) ────────
+    // CJ direction 2026-04-30: every squad must be CJ-reviewed before
+    // appearing in front-stage pickers. is_approved=1 means audited &
+    // released. Default 0 = drafted, won't show until flipped.
+    // listForFront procedure (added in squadTemplateRouter) filters
+    // is_active=1 AND is_approved=1.
+    for (const col of [
+      { name: "is_approved",   def: "TINYINT NOT NULL DEFAULT 0" },
+      { name: "approved_by",   def: "INT NULL" },
+      { name: "approved_at",   def: "TIMESTAMP NULL" },
+    ]) {
+      const [exists]: any = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'squads'
+          AND COLUMN_NAME = '${col.name}'
+      `);
+      if ((exists as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE squads ADD COLUMN ${col.name} ${col.def}`);
+        console.log(`[migrate] squads.${col.name}: added`);
+      } else {
+        console.log(`[migrate] squads.${col.name}: already exists, skipped`);
+      }
+    }
+    // Index for the listForFront filter — most common query.
+    await conn.execute(`
+      CREATE INDEX IF NOT EXISTS idx_squads_active_approved
+        ON squads (is_active, is_approved)
+    `).catch(() => { /* MySQL 5.7 doesn't support IF NOT EXISTS on CREATE INDEX */ });
+
+    // ── One-time: mark existing 688 squads as approved ─────────────────────
+    // Pre-2026-04-30 squads were curated by hand; they're all "approved"
+    // de-facto. New squads created after this point default is_approved=0
+    // and require explicit approval before front-stage visibility.
+    // Idempotent: only flips squads still at default 0 with no approved_at.
+    const [seedRes]: any = await conn.execute(`
+      UPDATE squads
+         SET is_approved = 1, approved_at = NOW()
+       WHERE is_approved = 0
+         AND approved_at IS NULL
+    `);
+    const affected = (seedRes as any)?.affectedRows ?? 0;
+    if (affected > 0) {
+      console.log(`[migrate] squads: marked ${affected} existing rows as is_approved=1 (one-time seed)`);
+    } else {
+      console.log("[migrate] squads: no rows needed approval seed (all already flagged)");
+    }
+
     // ─── 10. skill_catalog — harvested skill registry (anthropic + GLM + tools) ──
     // Source of truth for orphan-agent skill assignment. Each row binds a skill
     // to a provider so the skill cannot be moved across model families.
