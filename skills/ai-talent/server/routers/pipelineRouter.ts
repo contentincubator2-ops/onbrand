@@ -208,16 +208,132 @@ ${input.budget.minUrls === 0 && input.budget.minChars === 0 ? "→ 此步驟為�
         return out;
       })();
 
-      // Event scope Step 2/3: inject award_frameworks + creative_cases
-      // (RAG style — DB grounded, mirrors sowork-ai-v2 pattern).
+      // ── Event scope: extra context injections ────────────────────────────
+      // CJ direction 2026-04-29 — 11-step event pipeline needs 3 distinct
+      // injection types depending on which segment is running:
+      //
+      //   1. brief       → inject parent brand + (multi) product positioning
+      //                    so intake agent has full strategic context
+      //   2. awards      → inject award_frameworks + recent creative_cases (RAG)
+      //   3. creative    → inject award_frameworks + Grand Prix / Gold cases (RAG)
+      //   4. guidelines  → inject brand visual + voice + website tone signals
+      let parentBrandProductBlock = "";
+      let brandAssetsBlock = "";
+
+      if (input.kind === "event" && (input.segmentId === "brief" || input.segmentId === "context"
+                                  || input.segmentId === "audience" || input.segmentId === "objectives"
+                                  || input.segmentId === "smp" || input.segmentId === "messaging"
+                                  || input.segmentId === "creative" || input.segmentId === "guidelines"
+                                  || input.segmentId === "channels" || input.segmentId === "journey")) {
+        try {
+          // Parent brand: events.brandId → brands.positioning
+          const [evRows]: any = await localPool.execute(
+            `SELECT brandId, productId FROM events WHERE id = ? AND userId = ? LIMIT 1`,
+            [input.id, ctx.user!.id],
+          );
+          const ev = (evRows as any[])?.[0];
+          const parts: string[] = [];
+          if (ev?.brandId) {
+            const [bRows]: any = await localPool.execute(
+              `SELECT name, industry, description, positioning FROM brands WHERE id = ? LIMIT 1`,
+              [ev.brandId],
+            );
+            const brand = (bRows as any[])?.[0];
+            if (brand) {
+              const bPos = (typeof brand.positioning === "string"
+                ? (() => { try { return JSON.parse(brand.positioning); } catch { return {}; } })()
+                : (brand.positioning ?? {}));
+              const cleanBrand = { ...bPos };
+              delete cleanBrand._research;
+              delete cleanBrand._wizardMeta;
+              delete cleanBrand._meta;
+              parts.push(`【父品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}\n${(brand.description ?? "").slice(0, 500)}\n品牌定位 JSON：\n${JSON.stringify(cleanBrand, null, 2).slice(0, 4000)}`);
+            }
+          }
+          // Linked products: prefer m:n event_products, fall back to single productId
+          const [epRows]: any = await localPool.execute(
+            `SELECT productId FROM event_products WHERE eventId = ?`,
+            [input.id],
+          );
+          const productIds: number[] = (epRows as any[]).map((r) => Number(r.productId));
+          if (productIds.length === 0 && ev?.productId) productIds.push(Number(ev.productId));
+          for (const pid of productIds.slice(0, 4)) { // cap at 4 for context size
+            const [pRows]: any = await localPool.execute(
+              `SELECT name, positioning FROM products WHERE id = ? LIMIT 1`,
+              [pid],
+            );
+            const prod = (pRows as any[])?.[0];
+            if (prod) {
+              const pPos = (typeof prod.positioning === "string"
+                ? (() => { try { return JSON.parse(prod.positioning); } catch { return {}; } })()
+                : (prod.positioning ?? {}));
+              const cleanProd = { ...pPos };
+              delete cleanProd._research;
+              delete cleanProd._wizardMeta;
+              delete cleanProd._meta;
+              parts.push(`【對應產品】${prod.name}\n產品定位 JSON：\n${JSON.stringify(cleanProd, null, 2).slice(0, 2500)}`);
+            }
+          }
+          if (parts.length > 0) {
+            parentBrandProductBlock = `\n\n${parts.join("\n\n")}`;
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[pipeline] parent brand/product injection failed:", e);
+        }
+      }
+
+      // Step 9 guidelines: pull brand visual + voice + website tone signals
+      if (input.kind === "event" && input.segmentId === "guidelines") {
+        try {
+          const [evRows]: any = await localPool.execute(
+            `SELECT brandId FROM events WHERE id = ? AND userId = ? LIMIT 1`,
+            [input.id, ctx.user!.id],
+          );
+          const ev = (evRows as any[])?.[0];
+          if (ev?.brandId) {
+            const [bRows]: any = await localPool.execute(
+              `SELECT positioning FROM brands WHERE id = ? LIMIT 1`,
+              [ev.brandId],
+            );
+            const brand = (bRows as any[])?.[0];
+            const bPos = (typeof brand?.positioning === "string"
+              ? (() => { try { return JSON.parse(brand.positioning); } catch { return {}; } })()
+              : (brand?.positioning ?? {}));
+            // Look for known visual / voice segment keys (brand schema:
+            // visual_assets / tone_voice). Be permissive about key naming
+            // since brand schema has evolved.
+            const visualSegment = bPos.visual_assets ?? bPos.visualAssets ?? bPos.visual ?? null;
+            const voiceSegment  = bPos.tone_voice ?? bPos.toneVoice ?? bPos.voice ?? null;
+            const visualText = visualSegment ? JSON.stringify(visualSegment, null, 2) : "（未填寫）";
+            const voiceText  = voiceSegment ? JSON.stringify(voiceSegment, null, 2) : "（未填寫）";
+            const sparseWarning = (
+              (!visualSegment || JSON.stringify(visualSegment).length < 300) &&
+              (!voiceSegment  || JSON.stringify(voiceSegment).length  < 300)
+            ) ? "\n⚠ 注意：品牌視覺 + 聲音語氣資料稀疏（合計不足 300 字）。請在 conclusion.sourceWarning 提示用戶先完成品牌定位 step 9（聲音語氣）+ step 13（視覺資產）再 rerun。"
+              : "";
+            brandAssetsBlock = `\n\n【父品牌視覺資產】\n${visualText}\n\n【父品牌聲音語氣】\n${voiceText}${sparseWarning}`;
+            // Note: brand website tone fetch is intentionally skipped in
+            // server-side fetch here — gateway agent's web_search will pull
+            // it via the brief.relatedSites URLs naturally.
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[pipeline] guidelines brand assets injection failed:", e);
+        }
+      }
+
+      // Event scope award injection: now triggered on `awards` (step 5)
+      // and `creative` (step 8 — replaces old `solution` segId).
       let awardContextBlock = "";
-      if (input.kind === "event" && (input.segmentId === "awards" || input.segmentId === "solution")) {
+      if (input.kind === "event" && (input.segmentId === "awards" || input.segmentId === "creative")) {
         try {
           const [frameworks]: any = await localPool.execute(
             `SELECT name, category, description, suitableFor FROM award_frameworks ORDER BY id ASC`
           );
-          // For Step 2: pull recent cases per award (3 each)
-          // For Step 3: pull Grand Prix / Gold benchmark cases
+          // For step 5 (awards segment):  pull recent cases per award (3 each)
+          // For step 8 (creative segment): pull Grand Prix / Gold benchmark
+          // (Old segIds: "awards" / "solution" — new: "awards" / "creative")
           const isStep2 = input.segmentId === "awards";
           const namePatterns = (frameworks as any[]).map((f) => f.name);
           let casesByAward: Record<string, any[]> = {};
@@ -253,7 +369,7 @@ ${input.budget.minUrls === 0 && input.budget.minChars === 0 ? "→ 此步驟為�
       const user = `${taskPrompt}
 
 【已有 positioning context（前面步驟的 conclusion）】
-${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}${awardContextBlock}
+${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}${parentBrandProductBlock}${brandAssetsBlock}${awardContextBlock}
 
 注意：上面只是其他段落的結論，不要當成本步驟的 sources。本步驟的 sources[] 必須是你自己 web_search 抓到的新 URL，不可複製其他段落的引用清單。
 
@@ -299,6 +415,12 @@ ${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}${awardContextBlock}
           stepId: input.stepId,
           agent: input.agent,
           title: input.title,
+          // SMP step is a checkpoint — UI uses this flag to gate
+          // auto-advance and force the user to confirm before steps
+          // 7-11 fire. Cleared (set to false) when user confirms.
+          ...(input.kind === "event" && input.segmentId === "smp"
+            ? { requiresUserApproval: true }
+            : {}),
         };
         nextPositioning._wizardMeta = meta;
       }

@@ -215,11 +215,11 @@ JSON key 保持英文（如 directCompetitors、name、type、tagline、position
 
 注意：demographics、psychographics、behaviors 必須是字符串，不能是對象。
 
-conclusion 結構：primary 主受眾敘事 + secondary 次受眾敘事。請把 3 個族群整合敘述，主受眾 = 第一優先 + 完整 demographics/psychographics/behaviors/痛點/情緒需求/渠道，次受眾 = 第二與第三族群摘要。`,
+conclusion 結構：primary 主受眾敘事 + secondary 次受眾敘事。請把 3 個族群整合敘述，主受眾 = 第一優先 + 完整 demographics/psychographics/behaviors/痛點/情緒需求/管道，次受眾 = 第二與第三族群摘要。`,
     mockThinking: "從候選族群中聚焦 3 個核心 TA，分析人口/心理/行為…",
     mockConclusion: {
       primary: "（mock）主受眾：25-44 歲、月收 X-Y 萬、職業 Z；重視 W；活躍 在 IG / FB；痛點 1, 2, 3；情緒需求：成就感、歸屬感。",
-      secondary: "（mock）次受眾：35-50 歲、家庭主婦或自由工作者；尋求 W；偏好渠道 LINE 群組。",
+      secondary: "（mock）次受眾：35-50 歲、家庭主婦或自由工作者；尋求 W；偏好管道 LINE 群組。",
     },
   },
   {
@@ -659,11 +659,316 @@ export const PRODUCT_FULL_PIPELINE: PipelineStepSpec[] = [
   },
 ];
 
-// ── Event pipeline (3 steps mirroring sowork-ai-v2 campaign positioning) ─
-// Architecture differs from brand/product: Step 2 + 3 use DB-injected
-// award case context (RAG) to ground the LLM. server/pipelineRouter
-// detects scopeMode==="event" and injects awards + creative_cases.
+// ── Event pipeline (11 steps — CJ direction 2026-04-29) ─────────────────
+// 1:1 with EVENT_SEGMENTS. Architecture:
+//   - Step 1 (brief)      : intake reads brand + product positioning;
+//                           server-side injects them as system context.
+//   - Step 5 (awards)     : DB-RAG (award_frameworks + creative_cases).
+//   - Step 6 (smp)        : checkpoint — UI gates auto-advance, user must
+//                           explicitly confirm before step 7-11 fire.
+//   - Step 8 (creative)   : DB-RAG (Grand Prix / Gold benchmark cases).
+//   - Step 9 (guidelines) : server injects brand visual + voice + website
+//                           tone signals; warns if brand positioning sparse.
+//   - All steps           : researchBudget parity with BRAND_FULL_PIPELINE
+//                           (heavy strategy 4-5 URLs / 12000-15000 chars;
+//                           internal distillation 0/0).
 export const EVENT_FULL_PIPELINE: PipelineStepSpec[] = [
+  {
+    id: 1,
+    title: "Step 1 — 戰略 Brief（intake 自動產出活動類型 + 角色 + 摘要）",
+    segmentTarget: "seg:brief",
+    segmentId: "brief",
+    agent: "intake-agent",
+    researchBudget: { minUrls: 3, minChars: 5000 },
+    promptTemplate: `你是資深整合行銷策略 intake agent。基於下方注入的【品牌定位】+【產品定位】+【活動名稱/期間】，自動填寫活動戰略 brief。
+
+判斷依據：
+- eventType（brand / growth / conversion / hybrid）：依品牌目前所處階段（初創期重 brand、產品成熟期重 growth、急需訂單重 conversion、跨年度活動 hybrid）
+- roleThisRound：根據品牌當前最大挑戰，挑「品牌升維 / 新市場切入 / 認知建立 / 轉換衝刺」之一
+- briefSummary（200 字）：活動為什麼存在、面對誰、要做到什麼、跟品牌長期定位的銜接點
+- relatedProducts：對應的產品名稱陣列（從 scope 已選的 productIds 帶入；若分析發現需擴充再補充）
+
+參考 web 上該品牌近 6 個月的活動 / 媒體聲量做 sanity check。依範例結構輸出 conclusion。`,
+    mockThinking: "讀入品牌 + 產品定位，分析活動類型與角色...",
+    mockConclusion: {
+      eventType: "（mock）brand",
+      roleThisRound: "（mock）品牌升維",
+      briefSummary: "（mock）此活動旨在...",
+      relatedProducts: ["（mock）產品 A"],
+    },
+  },
+  {
+    id: 2,
+    title: "Step 2 — 背景與問題（商業背景 / 行銷現況 / 核心問題 / 根本原因）",
+    segmentTarget: "seg:context",
+    segmentId: "context",
+    agent: "business-diagnostician",
+    researchBudget: { minUrls: 5, minChars: 10000 },
+    promptTemplate: `你是資深品牌策略顧問。基於 Step 1 brief + 品牌/產品定位，深入診斷此活動面對的市場 context 與核心問題。
+
+請輸出：
+- businessBackground: 公司 / 品牌目前處於什麼狀態（產業位置、營收結構、最近動向）
+- marketingStatus: 在市場上被怎麼認知（媒體聲量 / 競爭對位 / 心理佔位）
+- coreProblem: 1 句話講清楚這次活動要解的核心問題
+- rootCause: 為什麼會發生（深層原因，不是表象）
+
+可 web_search 該品牌 / 產業近 3 個月新聞 + 競品動態。依範例結構輸出 conclusion。`,
+    mockThinking: "分析品牌 / 產業現況，挖掘核心問題...",
+    mockConclusion: {
+      businessBackground: "（mock）品牌目前處於成長期...",
+      marketingStatus: "（mock）市場認知偏理性 / 工具導向...",
+      coreProblem: "（mock）品牌訊息與情感共鳴斷層。",
+      rootCause: "（mock）長期以數據邏輯為主，缺感性連結。",
+    },
+  },
+  {
+    id: 3,
+    title: "Step 3 — 目標受眾（核心 / 次要 / 關鍵洞察）",
+    segmentTarget: "seg:audience",
+    segmentId: "audience",
+    agent: "audience-strategist",
+    researchBudget: { minUrls: 5, minChars: 12000 },
+    promptTemplate: `你是 TA 研究員。基於 Step 1-2 + 品牌定位中的 audience 段落，拆解此活動的目標受眾三層。
+
+每層需含：
+- 人群輪廓（產業 / 階段 / 身份）
+- 行為特徵（怎麼決策 / 看什麼內容 / 在哪些平台）
+- 心理洞察（最關鍵 — 他們真正在意什麼）
+
+輸出：
+- primaryAudience: 核心受眾（含三層描述）
+- secondaryAudience: 次要受眾（含三層描述）
+- keyInsight: 關鍵洞察（一句話，要有「不是缺 X，而是缺 Y」這種 reframe）
+
+參考社群討論 / 論壇貼文 / 同類活動受眾數據。依範例結構輸出 conclusion。`,
+    mockThinking: "拆解三層受眾，找出心理 reframe...",
+    mockConclusion: {
+      primaryAudience: "（mock）核心：30-45 都會專業者...",
+      secondaryAudience: "（mock）次要：學生與初入職場者...",
+      keyInsight: "（mock）他們不是缺工具，而是缺「敢做決定的確定感」。",
+    },
+  },
+  {
+    id: 4,
+    title: "Step 4 — 活動目標（商業 / 行銷 / 用戶行為三層）",
+    segmentTarget: "seg:objectives",
+    segmentId: "objectives",
+    agent: "campaign-objectives",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是行銷負責人。基於 Step 1-3，拆解此活動三層目標 — 不能模糊。
+
+- businessGoal: 商業目標（營收 / 訂單 / 開拓市場 — 連結到 P&L）
+- marketingGoal: 行銷目標（建立什麼品牌認知 / 改變什麼市場印象）
+- userActionGoal: 用戶行為目標（要他們具體做什麼 — 註冊 / 留下名單 / 完成體驗 / 分享）
+- kpis: 3-5 個可量化 KPI（依目標選對應指標）
+
+依範例結構輸出 conclusion。`,
+    mockThinking: "從三層拆解避免目標模糊與團隊誤解...",
+    mockConclusion: {
+      businessGoal: "（mock）帶動 SoWork 摘星服務需求，9 週內新增 30 件詢問。",
+      marketingGoal: "（mock）建立「摘星 = 陪伴型數據顧問」認知。",
+      userActionGoal: "（mock）完成星圖生成 + 留下聯絡資料。",
+      kpis: ["（mock）詢問轉換率 8%", "（mock）品牌情緒共鳴度 +25%", "（mock）UGC 100 篇"],
+    },
+  },
+  {
+    id: 5,
+    title: "Step 5 — 獎項匹配（DB-RAG 注入近期得獎案例）",
+    segmentTarget: "seg:awards",
+    segmentId: "awards",
+    agent: "award-matcher",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是頂尖廣告創意策略師，精通主要國際 / 大中華區廣告獎項的子類別與評審標準。
+
+任務：根據 Step 1-4（特別注意 eventType — brand / growth / conversion / hybrid 對應不同獎項偏好）+ 注入的近期案例，推薦 3 個最適合的「子獎項」。
+
+eventType 對應的獎項偏好：
+- brand: 偏 PR Lions / Brand Experience & Activation Lions / D&AD Impact
+- growth: 偏 Direct Lions / Digital Craft Lions / Effie Crisis Response
+- conversion: 偏 Effie / Creative Effectiveness Lions（強調 ROI）
+- hybrid: 3 個獎項分散在不同類型，平衡 brand + 短期成效
+
+重要：必須具體到子獎項層級，不可只說大獎名（例：要說「坎城創意節 - PR Lions」，不要只說「坎城創意節」）。
+
+依範例結構輸出 conclusion (selectedAwards 陣列，3 個 entries)。每個 matchReason 必須引用注入的近期案例精神。`,
+    mockThinking: "依 eventType 匹配獎項偏好，從注入案例中找對應...",
+    mockConclusion: {
+      selectedAwards: [
+        { name: "（mock）坎城 - PR Lions", parentAward: "坎城", subCategory: "PR Lions", matchScore: 92, matchReason: "（mock）依 brand-type 偏 PR..." },
+        { name: "（mock）D&AD - Impact", parentAward: "D&AD", subCategory: "Impact", matchScore: 85, matchReason: "（mock）..." },
+        { name: "（mock）金鼠標 - 整合行銷類", parentAward: "金鼠標", subCategory: "整合行銷類", matchScore: 80, matchReason: "（mock）..." },
+      ],
+    },
+  },
+  {
+    id: 6,
+    title: "Step 6 — 單一核心命題 SMP（整個活動唯一一句）",
+    segmentTarget: "seg:smp",
+    segmentId: "smp",
+    agent: "smp-architect",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是頂尖戰略顧問。基於 Step 1-5（含獎項偏好），萃取出此活動的【唯一單一核心命題】。
+
+SMP 規則：
+- 一句話，不能超過 18 字
+- 必須是品牌可長期擁有的命題（不是 tagline，是命題）
+- 同時涵蓋：問題 + 受眾期待 + 品牌可給的轉化
+- 不能用空泛詞（「致力於」「讓世界更好」這類絕對禁用）
+- 例：「SoWork 幫助你把不確定，變成可以前進的方向」
+
+輸出：
+- singleMindedProposition: SMP（一句話）
+- rationale: 為什麼是這句（200 字內 — 連結到 Step 1-5）
+
+⚠ 此 step 完成後 UI 會強制 user 確認 — 不可 auto-advance。`,
+    mockThinking: "從問題 / 受眾 / 品牌交集找出 18 字以內的命題...",
+    mockConclusion: {
+      singleMindedProposition: "（mock）SoWork 幫你把不確定，變成可以前進的方向。",
+      rationale: "（mock）對應 audience 的「敢做決定的確定感」洞察 + 品牌「陪伴型顧問」定位...",
+    },
+  },
+  {
+    id: 7,
+    title: "Step 7 — 訊息架構（核心 + 支撐 + 證據）",
+    segmentTarget: "seg:messaging",
+    segmentId: "messaging",
+    agent: "messaging-architect",
+    researchBudget: { minUrls: 3, minChars: 6000 },
+    promptTemplate: `你是文案戰略架構師。基於 Step 6 SMP，建立支撐 SMP 的訊息架構。
+
+輸出：
+- coreMessage: 核心訊息（活動主視覺 / 開場文案的最高指導）
+- supportingPoints: 3-5 條支撐訊息（每條 1 句話，環繞 SMP 不同切角）
+- proofs: 證據陣列（案例 / 數據 / 使用者故事 — 每條要可被 fact-check）
+
+可 web_search 找品牌過往可用的證據素材。依範例結構輸出 conclusion。`,
+    mockThinking: "從 SMP 推導三層訊息結構...",
+    mockConclusion: {
+      coreMessage: "（mock）數據不是答案，是導航。",
+      supportingPoints: ["（mock）每個決策都有路徑", "（mock）成長可以被看見", "（mock）你不孤單，有摘星陪你"],
+      proofs: ["（mock）2025 客戶 X 的星圖案例", "（mock）平台累計生成 5000 張星圖", "（mock）User story Y"],
+    },
+  },
+  {
+    id: 8,
+    title: "Step 8 — 創意概念（DB-RAG 注入 Grand Prix / Gold 標竿案例）",
+    segmentTarget: "seg:creative",
+    segmentId: "creative",
+    agent: "creative-architect",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是頂尖創意總監。基於 Step 5 推薦的 3 個獎項（已注入 Grand Prix / Gold 標竿案例）+ Step 6 SMP，產出活動創意概念。
+
+每個創意必須圍繞 SMP，不能脫離。
+
+輸出：
+- creativeTheme: 創意主題（活動 big idea，例：摘星者的星際航圖）
+- coreMetaphor: 核心比喻（市場/事件對應為何 metaphor，例：市場 = 宇宙）
+- coreTranslation: 核心轉譯（一句話 hook，連結 SMP 與 creativeTheme）
+- referenceCases: 引用注入的 Grand Prix / Gold 案例（含 brand / awardLevel / year / description）— 用來 ground 創意，不抄案例
+
+依範例結構輸出 conclusion。`,
+    mockThinking: "從 SMP + Grand Prix 案例精神中萃取活動 big idea...",
+    mockConclusion: {
+      creativeTheme: "（mock）摘星者的星際航圖",
+      coreMetaphor: "（mock）市場 = 宇宙；數據 = 星圖；品牌 = 導航員",
+      coreTranslation: "（mock）每一次決定，都是一次摘星。",
+      referenceCases: [
+        { brand: "（mock）品牌 X", awardLevel: "Grand Prix", year: "2024", description: "（mock）案例描述..." },
+      ],
+    },
+  },
+  {
+    id: 9,
+    title: "Step 9 — 創意與內容規範（從品牌視覺 + 聲音 + 官網 tone 萃取）",
+    segmentTarget: "seg:guidelines",
+    segmentId: "guidelines",
+    agent: "guideline-architect",
+    researchBudget: { minUrls: 3, minChars: 4000 },
+    promptTemplate: `你是品牌規範架構師。基於以下注入的品牌資產（已由系統前端 / 後端拉取）：
+- 品牌視覺（logo / 色彩 / 字型 / 攝影風格）
+- 品牌聲音語氣（tone-of-voice 段落）
+- 品牌官網 tone signals（首頁 hero copy / about / blog 三篇 — 由系統爬取）
+- Step 8 創意概念
+
+產出此活動的創意與內容規範：
+- visualLanguage: 視覺語言（基於品牌視覺擴展，加入活動 metaphor 的視覺方向）
+- toneOfVoice: 語氣（基於品牌聲音，根據 audience 心理洞察微調）
+- mustHaveElements: 必須出現元素（5-8 條，含品牌標誌 / 必用色 / 必用字 / metaphor 元素）
+- forbiddenElements: 禁用元素（5-8 條，例：不可像顧問報告 / 不用 KPI/ROI 語言 / 要有陪伴感）
+
+⚠ 若注入的品牌視覺 / 聲音資料稀疏（不到 1500 字），sourceWarning 欄位必須警告 user 先完成品牌定位再 rerun 此 step。
+
+依範例結構輸出 conclusion。`,
+    mockThinking: "從品牌資產 + 創意概念萃取規範與禁用清單...",
+    mockConclusion: {
+      visualLanguage: "（mock）基於品牌深藍 + 暖橘色系，加入星空 metaphor 的點狀構圖...",
+      toneOfVoice: "（mock）陪伴 + 引導，不訓誡、不販售焦慮...",
+      mustHaveElements: ["（mock）品牌標誌", "（mock）星圖元素", "（mock）暖色 CTA", "（mock）親近第二人稱"],
+      forbiddenElements: ["（mock）顧問報告排版", "（mock）KPI/ROI 商業詞彙", "（mock）冷色 / 銳利幾何"],
+      sourceWarning: "",
+    },
+  },
+  {
+    id: 10,
+    title: "Step 10 — 內容與管道策略（階段 × 管道 × 內容型態）",
+    segmentTarget: "seg:channels",
+    segmentId: "channels",
+    agent: "channel-architect",
+    researchBudget: { minUrls: 3, minChars: 4000 },
+    promptTemplate: `你是整合行銷管道規劃師。基於 Step 1-9，產出活動的階段 × 管道 × 內容型態策略表。
+
+輸出 phases 陣列，至少 3 個階段（如 認知 → 引路 → 閃耀），每個階段：
+- stage: 階段名稱（含時間 anchor，如「W1-W3 認知期」）
+- channels: 該階段使用的管道（IG / FB / YT / TikTok / EDM / LP / KOL …）
+- contentTypes: 該階段的內容型態（短影音 / Carousel / 長文 / Reels / Email …）
+- rationale: 為什麼這配置（連結 audience 行為特徵 + funnel 階段）
+
+可 web_search 同類活動的管道組合作為參考。依範例結構輸出 conclusion。
+
+⚠ 用詞：台灣稱「管道」不稱「管道」。`,
+    mockThinking: "依 funnel 階段拆分管道組合...",
+    mockConclusion: {
+      phases: [
+        { stage: "W1-W3 迷航期（認知）", channels: ["IG", "TikTok"], contentTypes: ["情緒短影音"], rationale: "（mock）TA 在這兩個平台...", },
+        { stage: "W4-W6 引路期（共鳴）", channels: ["IG Carousel", "Medium 長文"], contentTypes: ["案例拆解", "決策故事"], rationale: "（mock）..." },
+        { stage: "W7-W9 閃耀期（轉換）", channels: ["LP", "社群活動"], contentTypes: ["星圖生成", "UGC 召集"], rationale: "（mock）..." },
+      ],
+    },
+  },
+  {
+    id: 11,
+    title: "Step 11 — 用戶旅程（5 step：情緒 / 接觸點 / 期望反應）",
+    segmentTarget: "seg:journey",
+    segmentId: "journey",
+    agent: "journey-architect",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `你是 UX 旅程設計師。基於 Step 3 audience + Step 10 channels，產出 5 步驟用戶旅程。
+
+每一步含：
+- step: 旅程節點名稱（看到內容 → 共鳴 → 互動 → 進入工具 → 轉換）
+- emotion: 此刻的情緒狀態（好奇 / 動搖 / 認同 / 行動）
+- touchpoint: 接觸點（哪個 channel + 什麼 content）
+- outcome: 期望反應（具體可觀察的行為）
+
+依範例結構輸出 conclusion。`,
+    mockThinking: "從接觸點到轉換綁起 5 步驟旅程...",
+    mockConclusion: {
+      journey: [
+        { step: "看到內容", emotion: "好奇", touchpoint: "IG Reels - 情緒短影音", outcome: "停留 3 秒以上" },
+        { step: "共鳴", emotion: "認同", touchpoint: "IG Carousel - 案例", outcome: "留言或分享" },
+        { step: "互動", emotion: "好奇升級", touchpoint: "活動 LP", outcome: "點擊 CTA" },
+        { step: "進入工具", emotion: "投入", touchpoint: "星圖生成器", outcome: "完成生成" },
+        { step: "轉換", emotion: "信任", touchpoint: "註冊 / 留資 / 詢問", outcome: "完成 lead form" },
+      ],
+    },
+  },
+];
+
+// ── Old 3-step pipeline kept as deprecated reference ────────────────────
+// Retired 2026-04-29 in favor of 11-step expansion above. Kept for one
+// release in case rollback is needed; remove on next cleanup.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _RETIRED_EVENT_3STEP_PIPELINE: PipelineStepSpec[] = [
   {
     id: 1,
     title: "Step 1 — 業務診斷（核心問題 / 根本原因 / 機會點 / 策略方向）",
@@ -743,7 +1048,7 @@ export const EVENT_FULL_PIPELINE: PipelineStepSpec[] = [
 - positioningStatement: 活動定位陳述
 - contentAngles: 4-6 個內容切角
 - influencerFit: 適合的 KOL 輪廓
-- channels: 渠道清單
+- channels: 管道清單
 - kpiFramework: KPI 框架敘述
 - referenceCases: 引用注入的標竿案例（含 brand / awardLevel / year / description / sourceUrl）
 

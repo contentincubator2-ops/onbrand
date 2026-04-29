@@ -4,7 +4,7 @@
  * Three scope-specific layouts:
  *   brand   → 5 Whys 深層動機 + 競爭對手矩陣 + 目標受眾細分矩陣
  *   product → 產品核心價值 (tagline / value prop / USP) + 市場與競爭分析
- *   event   → 活動核心摘要 (定位陳述 / 標語 / 渠道 / KOL / 內容 / KPI / 亮點)
+ *   event   → 活動核心摘要 (定位陳述 / 標語 / 管道 / KOL / 內容 / KPI / 亮點)
  *
  * Pure read-only render. Edits happen on the per-segment editor pages.
  * Missing fields render as "—" so the layout doesn't break.
@@ -244,13 +244,27 @@ function ProductSpeedCard({ scopeName, data }: { scopeName: string; data: any })
 }
 
 /* ─────────────────────────── Event ─────────────────────────── */
+// Reads new 11-segment schema (CJ direction 2026-04-29). Falls back to
+// old segIds (overview/solution) so events created before the schema
+// rewrite still render something instead of going completely blank.
 function EventSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
+  // New schema segments
+  const brief      = data?.brief      ?? {};
+  const context    = data?.context    ?? {};
+  const audience   = data?.audience   ?? {};
+  const objectives = data?.objectives ?? {};
+  const smp        = data?.smp        ?? {};
+  const creative   = data?.creative   ?? {};
+  const channelsSeg= data?.channels   ?? {};
+  // Legacy fallback segments (pre-2026-04-29)
   const overview = data?.overview ?? {};
   const solution = data?.solution ?? {};
-  const channels: string[]      = Array.isArray(solution?.channels)      ? solution.channels      : [];
-  const contentAngles: string[] = Array.isArray(solution?.contentAngles) ? solution.contentAngles : [];
-  const kpis: string[]          = Array.isArray(solution?.kpis)          ? solution.kpis          : [];
-  const highlights: string[]    = Array.isArray(solution?.highlights)    ? solution.highlights    : [];
+
+  const phases: any[] = Array.isArray(channelsSeg?.phases) ? channelsSeg.phases : [];
+  const kpis: string[] = Array.isArray(objectives?.kpis)
+    ? objectives.kpis
+    : Array.isArray(solution?.kpis) ? solution.kpis : [];
+  const supporting: string[] = Array.isArray(data?.messaging?.supportingPoints) ? data.messaging.supportingPoints : [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -258,40 +272,65 @@ function EventSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faRocket} title="活動核心摘要" sub="活動定位陳述 + 標語 + 概念" />
-          <Pair label="活動名稱">{overview?.name ?? dash}</Pair>
-          <Pair label="選定策略方案">{solution?.conceptName ?? dash}</Pair>
-          <Pair label="核心概念">{solution?.coreConcept ?? dash}</Pair>
-          <Pair label="活動定位陳述">{overview?.positioningStatement ?? dash}</Pair>
-          <Pair label="活動標語">{overview?.zhTagline ?? dash}<span className="text-default-500"> / </span>{overview?.enTagline ?? dash}</Pair>
+          <SubHeader icon={faRocket} title="戰略 Brief" sub="intake 自動產出（活動類型 / 角色 / 摘要）" />
+          <Pair label="活動類型">{brief?.eventType ?? dash}</Pair>
+          <Pair label="本次角色">{brief?.roleThisRound ?? dash}</Pair>
+          <Pair label="活動定位摘要">{brief?.briefSummary ?? overview?.positioningStatement ?? dash}</Pair>
         </CardBody>
       </Card>
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faMessage} title="渠道 / KOL / 內容 / KPI" sub="活動執行藍圖" />
+          <SubHeader icon={faMessage} title="背景與受眾" sub="商業現況 + 核心問題 + 受眾洞察" />
+          <Pair label="商業背景">{context?.businessBackground ?? dash}</Pair>
+          <Pair label="核心問題">{context?.coreProblem ?? dash}</Pair>
+          <Pair label="關鍵洞察">{audience?.keyInsight ?? dash}</Pair>
+        </CardBody>
+      </Card>
 
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="p-6 gap-4">
+          <SubHeader icon={faRocket} title="SMP 單一核心命題" sub="整個活動最高指導原則" />
+          <Pair label="SMP">{smp?.singleMindedProposition ?? dash}</Pair>
+          <Pair label="為什麼是這句">{smp?.rationale ?? dash}</Pair>
+        </CardBody>
+      </Card>
+
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="p-6 gap-4">
+          <SubHeader icon={faMessage} title="創意 + 訊息" sub="創意主題 + 支撐訊息" />
+          <Pair label="創意主題">{creative?.creativeTheme ?? solution?.conceptName ?? dash}</Pair>
+          <Pair label="核心比喻">{creative?.coreMetaphor ?? solution?.coreConcept ?? dash}</Pair>
+          <Pair label="一句話 hook">{creative?.coreTranslation ?? dash}</Pair>
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">渠道策略</Chip>
-            {channels.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
-              <div className="flex gap-2 flex-wrap">
-                {channels.map((c, i) => <Chip key={i} size="sm" variant="flat" color="default">{c}</Chip>)}
-              </div>
+            <Chip size="sm" variant="flat" className="mb-2">支撐訊息</Chip>
+            {supporting.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
+              <ul className="list-disc list-inside text-small text-default-700 space-y-1">
+                {supporting.map((s, i) => <li key={i}>{s}</li>)}
+              </ul>
             )}
           </div>
+        </CardBody>
+      </Card>
 
-          <Pair label="KOL / 網紅適配建議">{solution?.kolFit ?? dash}</Pair>
-
-          <Divider />
+      <Card shadow="none" className="border border-divider">
+        <CardBody className="p-6 gap-4">
+          <SubHeader icon={faMessage} title="管道 / 旅程 / KPI" sub="活動執行藍圖" />
 
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">內容切角</Chip>
-            {contentAngles.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
+            <Chip size="sm" variant="flat" className="mb-2">階段 × 管道 × 內容型態</Chip>
+            {phases.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
               <ol className="list-decimal list-inside text-small text-default-700 space-y-1">
-                {contentAngles.map((c, i) => <li key={i}>{c}</li>)}
+                {phases.map((p: any, i) => (
+                  <li key={i}>
+                    <strong>{p?.stage ?? "—"}</strong> · {p?.channels ?? "—"} · {p?.contentTypes ?? "—"}
+                  </li>
+                ))}
               </ol>
             )}
           </div>
+
+          <Divider />
 
           <div>
             <Chip size="sm" variant="flat" className="mb-2">KPI 成效指標</Chip>
@@ -299,17 +338,6 @@ function EventSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
               <div className="flex gap-2 flex-wrap">
                 {kpis.map((k, i) => <Chip key={i} size="sm" variant="flat" color="default" startContent={<FontAwesomeIcon icon={faChartLine} className="text-tiny ml-1" />}>{k}</Chip>)}
               </div>
-            )}
-          </div>
-
-          <Divider />
-
-          <div>
-            <Chip size="sm" variant="flat" className="mb-2">策略亮點</Chip>
-            {highlights.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
-              <ul className="list-disc list-inside text-small text-default-700 space-y-1">
-                {highlights.map((h, i) => <li key={i}>{h}</li>)}
-              </ul>
             )}
           </div>
         </CardBody>

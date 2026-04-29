@@ -357,7 +357,7 @@ export async function generateCampaignPositioning(opts: {
   const result = await invokeLLMWithBilling({
     messages: [
       { role: 'system', content: `你是資深整合行銷顧問。以 ${contentLanguage} 輸出 JSON 格式的 Campaign 定位方案。` },
-      { role: 'user', content: `品牌：${brandName}\n目標：${campaignGoal}\n受眾：${targetAudience}\n渠道：${channels.join('、')}` },
+      { role: 'user', content: `品牌：${brandName}\n目標：${campaignGoal}\n受眾：${targetAudience}\n管道：${channels.join('、')}` },
     ],
     provider: 'openrouter',
     model: 'anthropic/claude-sonnet-4-6',

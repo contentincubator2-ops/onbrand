@@ -111,7 +111,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     title: "目標受眾",
     agent: "persona-architect",
     fields: [
-      { key: "primary",   label: "主受眾（人口統計 / 心理 / 情感需求 / 痛點 / 偏好渠道）", type: "textarea" },
+      { key: "primary",   label: "主受眾（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道）", type: "textarea" },
       { key: "secondary", label: "次受眾",                                                  type: "textarea" },
       { key: "matrix",    label: "情感需求評分矩陣", type: "tableRows", columns: [
         { key: "dim",     label: "需求維度",      type: "text" },
@@ -281,38 +281,76 @@ export const PRODUCT_SEGMENTS: SegmentSpec[] = [
   },
 ];
 
-// ── Event (3 segments) ───────────────────────────────────────────────────
+// ── Event (11 segments — CJ direction 2026-04-29) ────────────────────────
+//
+// Schema mirrors the 10 user-facing campaign sections (背景 → 受眾 → 目標 →
+// SMP → 訊息 → 創意 → 規範 → 管道 → 旅程) plus an upfront `brief` segment
+// auto-filled by the intake agent (eventType / roleThisRound) and the
+// `awards` segment which sits between objectives and SMP and is grounded in
+// DB-injected creative_cases (RAG).
+//
+// NOTE on backward compat: old events have segId in
+// {overview, diagnosis, awards, solution}. New schema reuses `awards` and
+// retires the others. Old data stays in JSON but the new UI won't render
+// it; user must re-run the pipeline to repopulate. Migration script TBD.
 export const EVENT_SEGMENTS: SegmentSpec[] = [
   {
-    id: "overview",
+    // 1. Strategic brief — filled automatically by intake agent reading
+    // brand + product positioning. User can edit afterwards.
+    id: "brief",
     num: "1",
-    title: "活動概述",
-    agent: "campaign-architect",
+    title: "戰略 Brief（intake 自動填寫）",
+    agent: "intake-agent",
     fields: [
-      { key: "name",          label: "活動名稱",         type: "text" },
-      { key: "startAt",       label: "開始日期",         type: "text" },
-      { key: "endAt",         label: "結束日期",         type: "text" },
-      { key: "positioningStatement", label: "活動定位陳述（速查卡）", type: "textarea" },
-      { key: "zhTagline",     label: "活動標語（中）",     type: "text" },
-      { key: "enTagline",     label: "活動標語（英）",     type: "text" },
+      { key: "eventType",       label: "活動類型（brand / growth / conversion / hybrid）", type: "text" },
+      { key: "roleThisRound",   label: "本次角色（品牌升維 / 新市場切入 / 認知建立 / 轉換衝刺）", type: "text" },
+      { key: "briefSummary",    label: "活動定位摘要（200 字）", type: "textarea" },
+      { key: "relatedProducts", label: "對應產品（從 ScopeBar 自動帶入；可能多個）", type: "array" },
     ],
   },
   {
-    id: "diagnosis",
+    // 2. Background & problem — user section 2
+    id: "context",
     num: "2",
-    title: "業務診斷",
+    title: "背景與問題",
     agent: "business-diagnostician",
     fields: [
-      { key: "coreProblem",       label: "核心問題",       type: "textarea" },
-      { key: "rootCause",         label: "根本原因",       type: "textarea" },
-      { key: "opportunity",       label: "機會點",         type: "textarea" },
-      { key: "strategyDirection", label: "策略方向",       type: "textarea" },
+      { key: "businessBackground", label: "商業背景（公司 / 品牌目前狀態）", type: "textarea" },
+      { key: "marketingStatus",    label: "當前行銷現況（被市場怎麼認知）", type: "textarea" },
+      { key: "coreProblem",        label: "核心問題（1 句話）",            type: "textarea" },
+      { key: "rootCause",          label: "根本原因（為什麼會發生）",       type: "textarea" },
     ],
   },
   {
+    // 3. Audience — three layers
+    id: "audience",
+    num: "3",
+    title: "目標受眾",
+    agent: "audience-strategist",
+    fields: [
+      { key: "primaryAudience",   label: "核心受眾（人群輪廓 / 行為特徵 / 心理洞察）", type: "textarea" },
+      { key: "secondaryAudience", label: "次要受眾",                                  type: "textarea" },
+      { key: "keyInsight",        label: "關鍵洞察（一句話）",                        type: "textarea" },
+    ],
+  },
+  {
+    // 4. Objectives — three tiers (business / marketing / user-action)
+    id: "objectives",
+    num: "4",
+    title: "活動目標（三層）",
+    agent: "campaign-objectives",
+    fields: [
+      { key: "businessGoal",  label: "商業目標（Business）",        type: "textarea" },
+      { key: "marketingGoal", label: "行銷目標（Marketing / Brand）", type: "textarea" },
+      { key: "userActionGoal",label: "用戶行為目標（User Action）",   type: "textarea" },
+      { key: "kpis",          label: "可量化 KPI 指標",              type: "array" },
+    ],
+  },
+  {
+    // 5. Award matching (DB-RAG retained from previous schema)
     id: "awards",
-    num: "2.5",
-    title: "獎項匹配",
+    num: "5",
+    title: "獎項匹配（DB-RAG）",
     agent: "award-matcher",
     fields: [
       { key: "selectedAwards", label: "推薦子獎項", type: "tableRows", columns: [
@@ -324,30 +362,87 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     ],
   },
   {
-    id: "solution",
-    num: "3",
-    title: "選定方案",
-    agent: "campaign-architect",
+    // 6. Single-Minded Proposition — the highest creative principle
+    id: "smp",
+    num: "6",
+    title: "單一核心命題（SMP）",
+    agent: "smp-architect",
     fields: [
-      { key: "conceptName",     label: "方案名稱",          type: "text" },
-      { key: "coreConcept",     label: "核心概念",          type: "textarea" },
-      { key: "executionPhases", label: "執行階段",           type: "tableRows", columns: [
-        { key: "phase",  label: "階段",   type: "text" },
-        { key: "weeks",  label: "週期",   type: "text" },
-        { key: "action", label: "動作",   type: "textarea" },
+      { key: "singleMindedProposition", label: "SMP（一句話）",          type: "textarea" },
+      { key: "rationale",               label: "為什麼是這句（200 字內）", type: "textarea" },
+    ],
+  },
+  {
+    // 7. Messaging framework
+    id: "messaging",
+    num: "7",
+    title: "訊息架構",
+    agent: "messaging-architect",
+    fields: [
+      { key: "coreMessage",      label: "核心訊息（Core Message）",        type: "textarea" },
+      { key: "supportingPoints", label: "支撐訊息（3-5 條）",              type: "array" },
+      { key: "proofs",           label: "證據（案例 / 數據 / 使用者故事）", type: "array" },
+    ],
+  },
+  {
+    // 8. Creative concept — uses Grand Prix / Gold cases as RAG benchmark
+    id: "creative",
+    num: "8",
+    title: "創意概念",
+    agent: "creative-architect",
+    fields: [
+      { key: "creativeTheme",   label: "創意主題（活動 big idea）",        type: "textarea" },
+      { key: "coreMetaphor",    label: "核心比喻（市場/事件對應為何 metaphor）", type: "textarea" },
+      { key: "coreTranslation", label: "核心轉譯（一句話 hook）",         type: "textarea" },
+      { key: "referenceCases",  label: "參考案例（注入的 Grand Prix / Gold）", type: "tableRows", columns: [
+        { key: "brand",       label: "品牌",       type: "text" },
+        { key: "awardLevel",  label: "獎項層級",   type: "text" },
+        { key: "year",        label: "年份",       type: "text" },
+        { key: "description", label: "案例描述",   type: "textarea" },
       ]},
-      { key: "fitReason",       label: "適合原因",          type: "textarea" },
-      { key: "highlights",      label: "方案亮點",          type: "array" },
-      { key: "awardFramework",  label: "推薦獎項框架",       type: "textarea" },
-      { key: "channels",        label: "渠道策略",          type: "array" },
-      { key: "kolFit",          label: "KOL 適配建議",       type: "textarea" },
-      { key: "contentAngles",   label: "內容切角",           type: "array" },
-      { key: "kpis",            label: "KPI 成效指標",       type: "array" },
-      { key: "proposals",       label: "完整提案陣列（含對應獎項 + 標竿案例）", type: "tableRows", columns: [
-        { key: "name",         label: "提案名稱",   type: "text" },
-        { key: "awardName",    label: "對應獎項",   type: "text" },
-        { key: "coreConcept",  label: "核心概念",   type: "textarea" },
-        { key: "kpiFramework", label: "KPI 框架",   type: "textarea" },
+    ],
+  },
+  {
+    // 9. Creative & content guidelines — pulled from brand visual + voice
+    id: "guidelines",
+    num: "9",
+    title: "創意與內容規範",
+    agent: "guideline-architect",
+    fields: [
+      { key: "visualLanguage",     label: "視覺語言（Visual System）",       type: "textarea" },
+      { key: "toneOfVoice",        label: "語氣（Tone of Voice）",           type: "textarea" },
+      { key: "mustHaveElements",   label: "必須出現元素（Must-have）",        type: "array" },
+      { key: "forbiddenElements",  label: "禁用元素（Don't）",                type: "array" },
+      { key: "sourceWarning",      label: "資料完整度警告（系統自動填）",      type: "textarea" },
+    ],
+  },
+  {
+    // 10. Content & channel strategy — Taiwan term: 管道, not 渠道
+    id: "channels",
+    num: "10",
+    title: "內容與管道策略",
+    agent: "channel-architect",
+    fields: [
+      { key: "phases", label: "階段 + 管道 + 內容型態", type: "tableRows", columns: [
+        { key: "stage",        label: "階段",         type: "text" },
+        { key: "channels",     label: "管道（逗號分隔）",   type: "text" },
+        { key: "contentTypes", label: "內容型態（逗號分隔）", type: "text" },
+        { key: "rationale",    label: "為何這配置",    type: "textarea" },
+      ]},
+    ],
+  },
+  {
+    // 11. User journey — 5 step Awareness → Conversion arc
+    id: "journey",
+    num: "11",
+    title: "用戶旅程",
+    agent: "journey-architect",
+    fields: [
+      { key: "journey", label: "旅程（每步：情緒 / 接觸點 / 期望反應）", type: "tableRows", columns: [
+        { key: "step",       label: "步驟",     type: "text" },
+        { key: "emotion",    label: "情緒狀態", type: "text" },
+        { key: "touchpoint", label: "接觸點",   type: "text" },
+        { key: "outcome",    label: "預期反應", type: "textarea" },
       ]},
     ],
   },

@@ -312,7 +312,7 @@ export const EVENT_PROMPTS: PromptTemplate[] = [
 推廣對象：{推廣對象}
 核心概念：{核心概念}
 活動標語：{活動標語}
-目標渠道：{目標渠道}
+目標管道：{目標管道}
 
 提供 3 種風格：
 1. 故事型
@@ -320,7 +320,7 @@ export const EVENT_PROMPTS: PromptTemplate[] = [
 3. 互動型
 
 每則含正文（200 字內）+ 3-5 hashtag + 配圖方向。繁體中文。`,
-    variables: ["活動名稱", "推廣對象", "核心概念", "活動標語", "目標渠道"],
+    variables: ["活動名稱", "推廣對象", "核心概念", "活動標語", "目標管道"],
     llms: ["chatgpt", "claude", "gemini"],
   },
   {
@@ -494,7 +494,7 @@ export function buildVariableMap(scopeMode: "brand" | "product" | "event", posit
       "核心概念": p.solution?.coreConcept ?? "",
       "活動標語": tagline,
       "活動定位陳述": p.overview?.positioningStatement ?? "",
-      "目標渠道": channels,
+      "目標管道": channels,
     };
   }
   return {};
