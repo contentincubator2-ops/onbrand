@@ -189,9 +189,58 @@ export default function BrandsPage() {
 
   // ── Pipeline (research mode) — only for brand scope right now ─────────
   const pipelineSteps: PipelineStepSpec[] = scopeMode === "brand" ? BRAND_FULL_PIPELINE : [];
-  const [pipeline, setPipeline] = useState<PipelineState>({
-    status: "idle", cursor: 0, completed: [],
+
+  // Persist pipeline state per (kind, id) so page refresh resumes mid-run.
+  const pipelineKey = scopeMode !== "none" && (scope?.brandId ?? scope?.productId ?? scope?.eventId)
+    ? `sowork.pipeline.${scopeMode}.${scope?.brandId ?? scope?.productId ?? scope?.eventId}`
+    : null;
+  const [pipeline, setPipeline] = useState<PipelineState>(() => {
+    if (!pipelineKey) return { status: "idle", cursor: 0, completed: [] };
+    try {
+      const raw = localStorage.getItem(pipelineKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        // Auto-resume if previous run was paused; running runs become paused
+        // (user must hit ▶ continue to actually fire) so we don't surprise
+        // them with an LLM call on cold load.
+        if (saved && (saved.status === "running" || saved.status === "paused")) {
+          return { status: "paused", cursor: saved.cursor ?? 0, completed: saved.completed ?? [] };
+        }
+      }
+    } catch { /* ignore */ }
+    return { status: "idle", cursor: 0, completed: [] };
   });
+  React.useEffect(() => {
+    if (!pipelineKey) return;
+    try {
+      if (pipeline.status === "done" || pipeline.status === "idle") {
+        localStorage.removeItem(pipelineKey);
+      } else {
+        localStorage.setItem(pipelineKey, JSON.stringify(pipeline));
+      }
+    } catch { /* ignore */ }
+  }, [pipelineKey, pipeline]);
+  // Reset pipeline state when scope changes (user picks a different brand)
+  const lastKeyRef = React.useRef<string | null>(pipelineKey);
+  React.useEffect(() => {
+    if (lastKeyRef.current === pipelineKey) return;
+    lastKeyRef.current = pipelineKey;
+    if (!pipelineKey) {
+      setPipeline({ status: "idle", cursor: 0, completed: [] });
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(pipelineKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved?.status === "running" || saved?.status === "paused") {
+          setPipeline({ status: "paused", cursor: saved.cursor ?? 0, completed: saved.completed ?? [] });
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+    setPipeline({ status: "idle", cursor: 0, completed: [] });
+  }, [pipelineKey]);
 
   const targetId =
     scopeMode === "brand" ? (scope?.brandId ?? brandId)
@@ -638,6 +687,8 @@ function PositioningEditor({
           // eslint-disable-next-line no-alert
           alert(`Phase 6 will run agent: ${slug} for segment ${activeSegment.id}`);
         }}
+        research={(draft._research as any)?.[activeSegment.id] ?? null}
+        wizardMeta={(draft._wizardMeta as any)?.[activeSegment.id] ?? null}
       />
     </div>
   );

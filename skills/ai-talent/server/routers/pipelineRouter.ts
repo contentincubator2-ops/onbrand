@@ -199,11 +199,21 @@ export const pipelineRouter = router({
 
       const parsed = parseAgentResponse(raw);
 
-      // Persist conclusion + sources scoped to entity id.
+      // Persist conclusion + sources + wizard meta scoped to entity id.
       const nextPositioning = { ...positioning };
       if (parsed.conclusion != null) {
         nextPositioning[input.segmentId] = parsed.conclusion;
       }
+      // Track which segments were written by the wizard (vs manually edited)
+      // so the UI can badge them with "🤖 Wizard 自動產出".
+      const meta = (nextPositioning._wizardMeta as any) ?? {};
+      meta[input.segmentId] = {
+        wroteAt: new Date().toISOString(),
+        stepId: input.stepId,
+        agent: input.agent,
+        title: input.title,
+      };
+      nextPositioning._wizardMeta = meta;
       const nextResearch = { ...research };
       const segResearch = (nextResearch[input.segmentId] as any) ?? { sources: [], totalUrls: 0, totalChars: 0 };
       const mergedSources = [...(segResearch.sources ?? []), ...parsed.sources]

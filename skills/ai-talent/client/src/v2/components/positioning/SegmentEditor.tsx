@@ -12,8 +12,9 @@
 import React from "react";
 import { Card, CardBody, CardHeader, Button, Input, Textarea, Chip, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRobot, faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faRobot, faPlus, faXmark, faWandSparkles } from "@fortawesome/free-solid-svg-icons";
 import type { SegmentSpec, FieldSpec } from "../../lib/positioningSchema";
+import SourceViewer from "./SourceViewer";
 
 export interface SegmentEditorProps {
   spec: SegmentSpec;
@@ -21,32 +22,62 @@ export interface SegmentEditorProps {
   onChange: (next: any) => void;
   /** Called when user clicks the "由 agent 幫我填寫" button. */
   onRunAgent?: (agentSlug: string) => void;
+  /** positioning._research[segmentId] — sources collected by pipeline. */
+  research?: any;
+  /** positioning._wizardMeta[segmentId] — set if wizard wrote this segment. */
+  wizardMeta?: { wroteAt?: string; stepId?: number; agent?: string } | null;
 }
 
-export default function SegmentEditor({ spec, value, onChange, onRunAgent }: SegmentEditorProps) {
+export default function SegmentEditor({
+  spec, value, onChange, onRunAgent, research, wizardMeta,
+}: SegmentEditorProps) {
   const v = value ?? {};
   const setField = (key: string, next: any) => onChange({ ...v, [key]: next });
+  const wizardWrote = !!wizardMeta?.wroteAt;
 
   return (
     <Card shadow="none" className="border border-divider">
-      <CardHeader className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
+      <CardHeader className="flex items-center justify-between gap-3 px-5 pt-5 pb-2 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <Chip size="sm" variant="flat" color="default" className="shrink-0">
             {spec.num}
           </Chip>
           <h3 className="text-medium font-semibold truncate">{spec.title}</h3>
+          {wizardWrote && (
+            <Tooltip
+              content={`由 ${wizardMeta?.agent ?? "wizard"} 於 ${
+                wizardMeta?.wroteAt
+                  ? new Date(wizardMeta.wroteAt).toLocaleString("zh-TW")
+                  : "—"
+              } 自動產出`}
+              placement="top"
+            >
+              <Chip
+                size="sm"
+                variant="flat"
+                color="success"
+                startContent={<FontAwesomeIcon icon={faWandSparkles} className="text-tiny ml-1" />}
+                className="shrink-0"
+              >
+                Wizard 自動產出
+              </Chip>
+            </Tooltip>
+          )}
         </div>
-        <Tooltip content={`由 ${spec.agent} 幫我填寫`} placement="top">
-          <Button
-            size="sm"
-            variant="bordered"
-            radius="full"
-            startContent={<FontAwesomeIcon icon={faRobot} className="text-tiny" />}
-            onPress={() => onRunAgent?.(spec.agent)}
-          >
-            自動填寫
-          </Button>
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          <SourceViewer research={research} segmentTitle={`${spec.num} ${spec.title}`} />
+          <Tooltip content={`由 ${spec.agent} 幫我填寫`} placement="top">
+            <Button
+              size="sm"
+              variant="bordered"
+              radius="full"
+              startContent={<FontAwesomeIcon icon={faRobot} className="text-tiny" />}
+              onPress={() => onRunAgent?.(spec.agent)}
+            >
+              自動填寫
+            </Button>
+          </Tooltip>
+        </div>
       </CardHeader>
       <CardBody className="px-5 pb-5 pt-2 gap-4">
         {spec.fields.map((f) => (
