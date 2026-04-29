@@ -1,0 +1,54 @@
+name: Admin — Deploy to VM (self-hosted runner)
+
+# Self-hosted-runner version of admin-deploy.yml. Runs directly on the
+# VM (no SSH wrapper, no docker container, no GH-hosted minutes consumed).
+# Once verified, the original admin-deploy.yml can be deprecated.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 30
+    steps:
+      - name: Pull latest main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          APP=/opt/marketing-os/app
+          cd "$APP"
+          REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+          git remote set-url origin "$REPO"
+          git fetch origin main
+          git reset --hard origin/main
+          echo "Commit: $(git log --oneline -1)"
+
+      - name: Server install + DB migrations
+        run: |
+          set -e
+          APP=/opt/marketing-os/app
+          AI=$APP/skills/ai-talent
+          cd "$AI"
+          npm install --legacy-peer-deps 2>&1 | tail -5
+          npx tsx scripts/migrate.ts 2>&1 | tail -30 || {
+            echo "[deploy] migrations failed — continuing anyway"
+          }
+
+      - name: Client build
+        run: |
+          set -e
+          APP=/opt/marketing-os/app
+          AI=$APP/skills/ai-talent
+          cd "$AI/client"
+          npm install --legacy-peer-deps 2>&1 | tail -5
+          npm run build 2>&1 | tail -10
+          stat -c '%y %s bytes' "$AI/public/index.html"
+
+      - name: Restart pm2
+        run: |
+          set -e
+          pm2 restart marketing-os --update-env 2>&1 | tail -5 || \
+            pm2 restart all --update-env 2>&1 | tail -5
+          pm2 save
