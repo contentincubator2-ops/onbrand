@@ -123,19 +123,20 @@ async function genAzureImage2(opts: GenOptions): Promise<GenResult> {
   return { status: "ready", modelId: "azure/gpt-image-2", url: saveB64(b64, "img") };
 }
 
-// ── 3. Google Imagen 3 ────────────────────────────────────────────────────
-async function genImagen3(opts: GenOptions): Promise<GenResult> {
+// ── 3. Google Imagen 4 (current available model on the account) ──────────
+async function genImagen4(opts: GenOptions, variant: "fast" | "default" | "ultra" = "default"): Promise<GenResult> {
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
   if (!key) throw new Error("GEMINI_API_KEY missing");
-  // Imagen 3 via Gemini Predict API
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${key}`;
-  const aspect = opts.aspectRatio ?? "1:1";
+  const model = variant === "fast" ? "imagen-4.0-fast-generate-001"
+              : variant === "ultra" ? "imagen-4.0-ultra-generate-001"
+              : "imagen-4.0-generate-001";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${key}`;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       instances: [{ prompt: opts.prompt }],
-      parameters: { sampleCount: 1, aspectRatio: aspect },
+      parameters: { sampleCount: 1 },
     }),
     signal: AbortSignal.timeout(120_000),
   });
@@ -146,7 +147,7 @@ async function genImagen3(opts: GenOptions): Promise<GenResult> {
   const data: any = await resp.json();
   const b64 = data?.predictions?.[0]?.bytesBase64Encoded;
   if (!b64) throw new Error("Imagen no b64");
-  return { status: "ready", modelId: "google/imagen-3", url: saveB64(b64, "img") };
+  return { status: "ready", modelId: `google/imagen-4-${variant}`, url: saveB64(b64, "img") };
 }
 
 // ── 4. Hailuo / MiniMax image ────────────────────────────────────────────
@@ -277,23 +278,81 @@ async function pollHailuoVideo(taskId: string): Promise<GenResult> {
   return { status: "submitted", modelId: "hailuo/video", taskId, meta: { progressStatus: status } };
 }
 
+// ── 7. Google Veo 3 (async-poll via Gemini long-running operations) ─────
+async function submitVeo3(opts: GenOptions, fast = false): Promise<GenResult> {
+  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
+  if (!key) throw new Error("GEMINI_API_KEY missing");
+  const model = fast ? "veo-3.0-fast-generate-001" : "veo-3.0-generate-001";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predictLongRunning?key=${key}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      instances: [{ prompt: opts.prompt, ...(opts.imageUrl ? { image: { imageUri: opts.imageUrl } } : {}) }],
+      parameters: { aspectRatio: opts.aspectRatio === "9:16" ? "9:16" : "16:9" },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`Veo submit ${resp.status}: ${t.slice(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  const opName = data?.name; // operations/<id>
+  if (!opName) throw new Error("Veo: no operation name");
+  return { status: "submitted", modelId: `google/veo-3${fast ? "-fast" : ""}`, taskId: opName, meta: { model } };
+}
+
+async function pollVeo3(taskId: string): Promise<GenResult> {
+  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
+  if (!key) throw new Error("GEMINI_API_KEY missing");
+  const url = `https://generativelanguage.googleapis.com/v1beta/${taskId}?key=${key}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`Veo poll ${resp.status}: ${t.slice(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  if (!data?.done) {
+    return { status: "submitted", modelId: "google/veo-3", taskId };
+  }
+  if (data?.error) {
+    return { status: "failed", modelId: "google/veo-3", taskId, errorMsg: JSON.stringify(data.error).slice(0, 200) };
+  }
+  const videoUri = data?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
+    ?? data?.response?.predictions?.[0]?.video?.uri
+    ?? data?.response?.predictions?.[0]?.uri;
+  if (!videoUri) {
+    return { status: "failed", modelId: "google/veo-3", taskId, errorMsg: "no videoUri in response" };
+  }
+  // videoUri usually requires the API key appended for auth download
+  const downloadUrl = videoUri.includes("?") ? `${videoUri}&key=${key}` : `${videoUri}?key=${key}`;
+  const localUrl = await downloadAndSave(downloadUrl, "vid");
+  return { status: "ready", modelId: "google/veo-3", url: localUrl, taskId };
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────
 export async function dispatchGenerate(modelId: string, opts: GenOptions): Promise<GenResult> {
   switch (modelId) {
     case "openai/gpt-image-1":     return genOpenAIImage(opts);
     case "azure/gpt-image-2":      return genAzureImage2(opts);
-    case "google/imagen-3":        return genImagen3(opts);
+    // Imagen 3 → Imagen 4 (real model on account)
+    case "google/imagen-3":
+    case "google/imagen-4":
+    case "google/imagen-4-default": return genImagen4(opts, "default");
+    case "google/imagen-4-fast":    return genImagen4(opts, "fast");
+    case "google/imagen-4-ultra":   return genImagen4(opts, "ultra");
     case "hailuo/image":           return genHailuoImage(opts);
     case "fal/flux-dev":           return genFalFlux(opts);
     case "hailuo/t2v":             return submitHailuoVideo(opts, "t2v");
     case "hailuo/i2v":             return submitHailuoVideo(opts, "i2v");
+    case "google/veo-3":           return submitVeo3(opts, false);
+    case "google/veo-3-fast":      return submitVeo3(opts, true);
     case "fal/seedance-v1-5-lite":
-    case "google/veo-3":
-      // Phase 2.5 — wire Seedance + Veo. For now return informative not-ready.
       return {
         status: "failed",
         modelId,
-        errorMsg: `${modelId} adapter: Phase 2.5 in progress (existing videoService runs Seedance via different path).`,
+        errorMsg: "Seedance routed via existing videoService.ts; mediaGen Phase 2.5 will unify.",
       };
     case "midjourney/v7":
       return {
@@ -312,6 +371,7 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
 
 export async function checkJob(modelId: string, taskId: string): Promise<GenResult> {
   if (modelId.startsWith("hailuo/")) return pollHailuoVideo(taskId);
+  if (modelId.startsWith("google/veo-3")) return pollVeo3(taskId);
   return {
     status: "failed",
     modelId,
