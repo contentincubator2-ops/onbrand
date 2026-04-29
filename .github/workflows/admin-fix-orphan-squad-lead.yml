@@ -8,7 +8,7 @@ name: Admin — fix squad with lead_agent_id but empty members JSON
 # at least 1 entry. Skips squads that already have non-empty agents JSON.
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   fix:
