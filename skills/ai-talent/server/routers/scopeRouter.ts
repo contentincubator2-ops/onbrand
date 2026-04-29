@@ -19,6 +19,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
+import { callLLM } from "../_core/llmRouter";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function safeJson(s: any): any {
@@ -334,10 +335,7 @@ export const scopeRouter = router({
 
       await Promise.all([tryFetch(input.website ?? ""), tryFetch(input.facebook ?? "")]);
 
-      // ── 2. Ask gateway with REAL scraped evidence as context ──
-      const GATEWAY_HTTP  = process.env.OPENCLAW_GATEWAY_HTTP  ?? "http://localhost:18790";
-      const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? "mos-pm-claw-2026";
-
+      // ── 2. Ask LLM with cross-provider fallback ──
       const evidenceBlock = evidence.length
         ? evidence.map((e, i) =>
             `[${i + 1}] ${e.url}\n  title: ${e.title}\n  description: ${e.description}\n  body excerpt (first 1500 chars): ${e.excerpt.slice(0, 500)}…`
@@ -362,24 +360,9 @@ export const scopeRouter = router({
 
       let raw = "";
       try {
-        const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${GATEWAY_TOKEN}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "openclaw/pm",
-            messages: [
-              { role: "system", content: sys },
-              { role: "user",   content: user },
-            ],
-            stream: false,
-          }),
-          signal: AbortSignal.timeout(120_000),
-        });
-        if (resp.ok) {
-          const data: any = await resp.json();
-          raw = data?.choices?.[0]?.message?.content ?? "";
-        }
-      } catch { /* ignore */ }
+        const result = await callLLM({ system: sys, user, maxTokens: 3000, timeoutMs: 120_000 });
+        raw = result.text;
+      } catch { /* swallow — fall through to evidence-only candidates */ }
 
       // ── 3. Parse + ground candidates back to evidence ──
       const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");

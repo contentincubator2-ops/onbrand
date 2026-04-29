@@ -261,7 +261,12 @@ export default function BrandsPage() {
   // shows the returned thinking via ThinkingOverlay typewriter, then
   // advances. Mock fallback remains if mutation isn't available yet.
   const runStepMutation = (trpc as any).pipeline?.runStep?.useMutation
-    ? (trpc as any).pipeline.runStep.useMutation()
+    ? (trpc as any).pipeline.runStep.useMutation({
+        // Invalidate as soon as the server has written; the segment editor's
+        // draft will refresh while the typewriter is still animating, so by
+        // the time it finishes the user sees the fields already populated.
+        onSuccess: () => utils?.scope?.active?.invalidate?.(),
+      })
     : null;
   const [liveThinking, setLiveThinking] = useState<string | null>(null);
 
@@ -318,11 +323,26 @@ export default function BrandsPage() {
       if (realThinking) {
         setLiveThinking(realThinking); // restart typewriter with real text
       }
-      // Wait for typewriter to roughly finish + 1.5s write hold.
+      // Phase 6: typewriter + 'fill fields' moment + hold + advance.
+      // User wants to SEE the conclusion populate the segment fields.
+      // Sequence:
+      //   typingMs   typewriter animates
+      //   +500ms    fade thinking, fields are already populated by
+      //             the runStep mutation's onSuccess invalidate, so
+      //             clearing liveThinking reveals filled fields
+      //   +2500ms   hold on filled fields (user notices "啊，欄位填好了")
+      //   advance() jump to next segment
       const cps = 35;
       const text = realThinking ?? step.mockThinking;
       const typingMs = (text.length / cps) * 1000;
-      setTimeout(advance, typingMs + 1500);
+      setTimeout(() => {
+        if (cancelled) return;
+        setLiveThinking(null); // hide overlay → reveal populated fields
+        setTimeout(() => {
+          if (cancelled) return;
+          advance();
+        }, 2500);
+      }, typingMs + 500);
     })();
 
     return () => { cancelled = true; };

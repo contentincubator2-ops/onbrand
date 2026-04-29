@@ -15,31 +15,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
-
-// ── OpenClaw gateway (same env as orchestratorWorker) ────────────────────
-const GATEWAY_HTTP = process.env.OPENCLAW_GATEWAY_HTTP ?? "http://localhost:18790";
-const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? "mos-pm-claw-2026";
-
-async function callGateway(
-  agentSlug: string,
-  messages: { role: string; content: string }[],
-): Promise<string> {
-  const resp = await fetch(`${GATEWAY_HTTP}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${GATEWAY_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: agentSlug, messages, stream: false }),
-    signal: AbortSignal.timeout(180_000),
-  });
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`Gateway ${resp.status}: ${t.slice(0, 300)}`);
-  }
-  const data: any = await resp.json();
-  return data?.choices?.[0]?.message?.content ?? "";
-}
+import { callLLM } from "../_core/llmRouter";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 async function readPositioning(
@@ -176,24 +152,22 @@ export const pipelineRouter = router({
         + `\n生成符合 segment "${input.segmentId}" 結構的 conclusion JSON。`
         + `\n推理過程必須詳細（thinking ≥ 500 字），讓使用者看到分析邏輯。`;
 
-      // Call gateway. Agent may or may not exist as openclaw/<slug>; fall
-      // back to openclaw/pm which is the generic research agent.
-      const slugCandidates = [`openclaw/${input.agent}`, "openclaw/pm"];
+      // LLM call with cross-provider fallback (Anthropic → Azure Foundry
+      // → Azure OpenAI → OpenRouter). Single provider failure won't block.
       let raw = "";
-      let lastErr: any = null;
-      for (const slug of slugCandidates) {
-        try {
-          raw = await callGateway(slug, [
-            { role: "system", content: sys },
-            { role: "user",   content: user },
-          ]);
-          if (raw) break;
-        } catch (e) { lastErr = e; }
+      try {
+        const result = await callLLM({ system: sys, user, maxTokens: 4000 });
+        raw = result.text;
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `LLM call failed: ${e instanceof Error ? e.message : String(e)}`,
+        });
       }
       if (!raw) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Gateway call failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+          message: "LLM returned empty response",
         });
       }
 
