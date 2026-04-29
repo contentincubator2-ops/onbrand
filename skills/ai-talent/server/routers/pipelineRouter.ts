@@ -65,23 +65,50 @@ interface StepResult {
  * Falls back to {thinking: raw, conclusion: null, sources: []} if parse fails.
  */
 function parseAgentResponse(raw: string): StepResult {
-  // Strip markdown code fences if present
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
-  try {
-    const obj = JSON.parse(cleaned);
-    return {
-      thinking: String(obj?.thinking ?? ""),
-      conclusion: obj?.conclusion ?? null,
-      sources: Array.isArray(obj?.sources) ? obj.sources.map((s: any) => ({
-        url: String(s?.url ?? ""),
-        title: String(s?.title ?? ""),
-        charCount: Number(s?.charCount ?? 0),
-        excerpt: String(s?.excerpt ?? "").slice(0, 800),
-      })).filter((s: ResearchSource) => s.url) : [],
-    };
-  } catch {
-    return { thinking: raw, conclusion: null, sources: [] };
+  // Try several extraction strategies — LLMs sometimes wrap the JSON
+  // in prose ("Here's the analysis: { ... }") even when told otherwise.
+  const candidates: string[] = [];
+  // 1) Whole response, stripping markdown code fences
+  candidates.push(raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, ""));
+  // 2) Code-fenced JSON block
+  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenceMatch?.[1]) candidates.push(fenceMatch[1].trim());
+  // 3) Largest balanced { ... } in the response (greedy)
+  const firstBrace = raw.indexOf("{");
+  const lastBrace  = raw.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(raw.slice(firstBrace, lastBrace + 1));
   }
+
+  for (const c of candidates) {
+    try {
+      const obj = JSON.parse(c);
+      // Some agents return the conclusion fields at top level (no
+      // "conclusion" wrapper). Fall back to the whole object.
+      const conclusion = obj?.conclusion ?? (
+        // detect: if the object has "thinking" and other domain keys,
+        // assume the non-thinking/sources keys form the conclusion
+        Object.keys(obj).some((k) => k !== "thinking" && k !== "sources" && k !== "conclusion")
+          ? Object.fromEntries(Object.entries(obj).filter(([k]) => k !== "thinking" && k !== "sources"))
+          : null
+      );
+      return {
+        thinking: String(obj?.thinking ?? ""),
+        conclusion: conclusion ?? null,
+        sources: Array.isArray(obj?.sources) ? obj.sources.map((s: any) => ({
+          url: String(s?.url ?? ""),
+          title: String(s?.title ?? ""),
+          charCount: Number(s?.charCount ?? 0),
+          excerpt: String(s?.excerpt ?? "").slice(0, 800),
+        })).filter((s: ResearchSource) => s.url) : [],
+      };
+    } catch { /* try next candidate */ }
+  }
+
+  // All candidates failed to parse — log diagnostic
+  // eslint-disable-next-line no-console
+  console.warn(`[pipeline] LLM returned non-JSON response (${raw.length} chars):`, raw.slice(0, 500));
+  return { thinking: raw, conclusion: null, sources: [] };
 }
 
 function totalCharCount(sources: ResearchSource[]): number {
@@ -103,13 +130,16 @@ export const pipelineRouter = router({
       id: z.number(),
       stepId: z.number(),
       segmentId: z.string(),
-      agent: z.string(),               // openclaw gateway agent slug
+      agent: z.string(),
       title: z.string(),
-      systemHint: z.string().optional(), // optional override
+      systemHint: z.string().optional(),
       budget: z.object({
         minUrls:  z.number().min(0),
         minChars: z.number().min(0),
       }),
+      /** Sample conclusion structure — pinned to the LLM prompt so it
+       *  returns exactly the right JSON shape for this segment. */
+      schemaHint: z.any().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -132,25 +162,46 @@ export const pipelineRouter = router({
       const entityName = String(rows[0].name ?? "");
       const industry   = String(rows[0].industry ?? "");
 
-      // Build the prompt. Agent is on OpenClaw gateway with web_search.
-      const sys = `你是 SoWork 品牌定位分析師。`
-        + `任務：${input.title}\n`
-        + `對象：${entityName}（${input.kind}，產業：${industry}）\n\n`
-        + (input.systemHint ?? "")
-        + `\n\n【研究預算（OR 邏輯，滿足任一即可）】`
-        + `\n- minUrls=${input.budget.minUrls}（至少抓 ${input.budget.minUrls} 個 URL）`
-        + `\n- minChars=${input.budget.minChars}（或累積 ${input.budget.minChars} 字內容）`
-        + (input.budget.minUrls === 0 && input.budget.minChars === 0
-            ? `\n→ 此步驟為內部分析，不需 web_search，直接基於既有 context 蒸餾。`
-            : `\n→ 使用 web_search 工具直到滿足任一條件，記錄每個來源 URL / 標題 / charCount / excerpt。`)
-        + `\n\n【已有 positioning context】\n${JSON.stringify(positioning, null, 2).slice(0, 8000)}\n`
-        + `\n\n【輸出格式】嚴格回傳 JSON：`
-        + `\n{"thinking":"完整推理過程（500-2000 字）","conclusion":{<符合 segment "${input.segmentId}" 的結構化資料>},"sources":[{"url":"...","title":"...","charCount":N,"excerpt":"..."}]}`
-        + `\n語言：繁體中文（zh-TW）。conclusion JSON key 保持英文，value 用中文。`;
+      // Substitute placeholders in the CJ-spec promptTemplate
+      // ({brand_name} / {industry} / {description}) with real entity data.
+      const description = (() => {
+        const meta = (positioning as any)?._meta;
+        return String(meta?.description ?? "（無補充描述）");
+      })();
+      const taskPrompt = (input.systemHint ?? input.title)
+        .replace(/\{brand_name\}/g, entityName)
+        .replace(/\{industry\}/g, industry || "未指定")
+        .replace(/\{description\}/g, description);
 
-      const user = `請為 ${entityName}（${industry} 產業）執行：${input.title}。`
-        + `\n生成符合 segment "${input.segmentId}" 結構的 conclusion JSON。`
-        + `\n推理過程必須詳細（thinking ≥ 500 字），讓使用者看到分析邏輯。`;
+      const schemaExample = input.schemaHint != null
+        ? JSON.stringify(input.schemaHint, null, 2)
+        : "{}";
+
+      // System: enforce strict JSON output. User: the actual CJ-spec task.
+      const sys = `你是 SoWork 品牌定位分析師（zh-TW）。請依照使用者訊息中的任務指示執行分析。
+
+【輸出格式 — 嚴格 JSON，不要任何前綴/後綴/markdown code fence】
+你的回應**必須**是合法 JSON 字串，三個 top-level keys：
+- "thinking" (string, 500-2000 字推理過程)
+- "conclusion" (object, 結構必須完全符合下方範例的 keys)
+- "sources" (array of {url,title,charCount,excerpt}，可空陣列)
+
+conclusion 範例（segment "${input.segmentId}"，依此 keys 填入真實內容；欄位 key 保持英文，value 用繁體中文）：
+${schemaExample}
+
+研究預算（OR 邏輯，滿足任一即可）：
+- minUrls=${input.budget.minUrls}
+- minChars=${input.budget.minChars}
+${input.budget.minUrls === 0 && input.budget.minChars === 0 ? "→ 此步驟為內部蒸餾，不需 web 資訊，基於既有 context 推理。" : "→ 可參考 web 資訊；如有來源請列在 sources[]。"}
+
+注意：直接 raw JSON，不要 \`\`\`json 圍籬，不要 prose 前綴。conclusion 不能是空 object。`;
+
+      const user = `${taskPrompt}
+
+【已有 positioning context（如有）】
+${JSON.stringify(positioning, null, 2).slice(0, 6000)}
+
+請直接以合法 JSON 回應，conclusion 結構嚴格依系統訊息中的範例。`;
 
       // LLM call with cross-provider fallback (Anthropic → Azure Foundry
       // → Azure OpenAI → OpenRouter). Single provider failure won't block.
@@ -174,20 +225,22 @@ export const pipelineRouter = router({
       const parsed = parseAgentResponse(raw);
 
       // Persist conclusion + sources + wizard meta scoped to entity id.
+      // Only mark wizard meta + write conclusion when parse succeeded —
+      // otherwise we'd flag a segment as "Wizard 自動產出" with empty
+      // fields, which is exactly the bug CJ caught (Step 7 stuck).
       const nextPositioning = { ...positioning };
-      if (parsed.conclusion != null) {
+      const conclusionSaved = parsed.conclusion != null && Object.keys(parsed.conclusion).length > 0;
+      if (conclusionSaved) {
         nextPositioning[input.segmentId] = parsed.conclusion;
+        const meta = (nextPositioning._wizardMeta as any) ?? {};
+        meta[input.segmentId] = {
+          wroteAt: new Date().toISOString(),
+          stepId: input.stepId,
+          agent: input.agent,
+          title: input.title,
+        };
+        nextPositioning._wizardMeta = meta;
       }
-      // Track which segments were written by the wizard (vs manually edited)
-      // so the UI can badge them with "🤖 Wizard 自動產出".
-      const meta = (nextPositioning._wizardMeta as any) ?? {};
-      meta[input.segmentId] = {
-        wroteAt: new Date().toISOString(),
-        stepId: input.stepId,
-        agent: input.agent,
-        title: input.title,
-      };
-      nextPositioning._wizardMeta = meta;
       const nextResearch = { ...research };
       const segResearch = (nextResearch[input.segmentId] as any) ?? { sources: [], totalUrls: 0, totalChars: 0 };
       const mergedSources = [...(segResearch.sources ?? []), ...parsed.sources]

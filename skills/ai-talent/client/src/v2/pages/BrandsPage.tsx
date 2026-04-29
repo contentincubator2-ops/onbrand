@@ -305,6 +305,8 @@ export default function BrandsPage() {
           agent: step.agent,
           title: step.title,
           budget: step.researchBudget,
+          systemHint: step.promptTemplate, // CJ-spec prompt per step
+          schemaHint: step.mockConclusion, // canonical JSON shape for this segment
         });
         return res?.thinking ?? null;
       } catch (e) {

@@ -1,22 +1,21 @@
 /**
- * positioningPipeline — 11-step research flow for brand positioning.
+ * positioningPipeline — 14-step brand positioning research flow.
  *
  * Each step targets one segment in the editor (via setSection). The runner
  * streams a "thinking" payload, then writes a structured conclusion to the
  * targeted segment's fields. UI auto-jumps the sub-nav as the pipeline
  * advances — there's no separate wizard modal.
  *
- * Phase 5e uses mock streams + canned conclusions so we can validate the
- * UX. Phase 6 will wire each step's `runner` to a real squad / LLM agent.
+ * Each step's promptTemplate is the EXACT prompt CJ specified
+ * (5 Whys / 競品識別 / TA 定義 / 差異化矩陣 / 標語 / 個性 / etc.).
+ * Placeholders {brand_name} / {industry} / {description} are substituted
+ * by the server from DB before the LLM call. The mockConclusion is also
+ * pinned to the system prompt as the canonical JSON shape so the model
+ * returns exactly the right structure.
  */
 
 export type PipelineStatus = "idle" | "running" | "paused" | "done" | "error";
 
-/**
- * Per-step research budget. OR semantics — runner stops scraping once
- * EITHER threshold is satisfied. Set both to 0 to skip web research
- * entirely (purely internal analysis steps like differentiation).
- */
 export interface ResearchBudget {
   minUrls: number;
   minChars: number;
@@ -24,26 +23,17 @@ export interface ResearchBudget {
 
 export interface PipelineStepSpec {
   id: number;
-  /** Display title shown in the runner control. */
   title: string;
-  /** Sub-nav id this step writes to (e.g., "seg:origin"). */
   segmentTarget: string;
-  /** Schema segment id the conclusion belongs to (e.g., "origin"). */
   segmentId: string;
-  /** Recommended agent slug (Phase 6 will use this to dispatch). */
   agent: string;
-  /**
-   * Phase 6 runner uses this to scrape web until OR threshold met. All
-   * sources stored under positioning._research[segmentId] scoped to
-   * the active brand/product/event id.
-   */
   researchBudget: ResearchBudget;
-  /** Mock streaming text shown during analysis (Phase 5e only). */
+  promptTemplate: string;
   mockThinking: string;
-  /** Mock conclusion written into the segment (Phase 5e only). */
   mockConclusion: any;
 }
 
+// ── Brand pipeline (14 steps) ────────────────────────────────────────────
 export const BRAND_PIPELINE: PipelineStepSpec[] = [
   {
     id: 1,
@@ -52,46 +42,85 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentId: "origin",
     agent: "brand-storyteller",
     researchBudget: { minUrls: 3, minChars: 5000 },
+    promptTemplate: `分析品牌「{brand_name}」的深層創立動機。
+
+輸入：
+- 品牌描述：{description}
+- 產業：{industry}
+
+第一部分：5 Whys 分析
+請使用 5 Whys 方法逐層追問品牌創立動機（每一層需比上一層更深入、更貼近情緒本質）：
+- 第一層：為什麼創立這個品牌？（表面動機） → 精簡描述，約 20-50 字
+- 第二層：為什麼這個問題很重要？（問題意識） → 約 20-50 字
+- 第三層：為什麼選擇這個解決方式？（方法選擇） → 約 20-50 字
+- 第四層：為什麼相信這件事能成功？（信念基礎）→ 約 20-50 字
+- 第五層：最深層的情緒動機是什麼？（核心動機） → 僅輸出「1 個」最本質的情緒動機（一句話，具抽象性與普世性）
+
+第二部分：情緒價值展開
+根據核心情緒動機，延伸 5 個情緒價值元素：
+- 純粹情感導向：不得出現功能性描述（如賺錢、簡化流程等）
+- 每一項代表不同情緒維度（懷舊、減少焦慮、設計美學等）
+- 不可重複或換句話說
+
+輸出 conclusion 必須符合範例結構（story = 整體敘事段、belief5Layers = 5 層深挖陣列）。`,
     mockThinking: `讀入品牌描述、產業，準備 5 Whys 推理…
-第一層：為什麼創立？→ 表面動機。
-第二層：問題為何重要？→ 提出問題意識。
-第三層：為何選此解法？→ 方法選擇邏輯。
-第四層：相信能成功的理由？→ 信念基礎。
-第五層：最深層的情緒動機 → 蒸餾 1 句普世情感。
-最後展開 5 個情緒價值元素，避開功能性敘述。`,
+第一層：為什麼創立？→ 表面動機
+第二層：問題為何重要？→ 問題意識
+第三層：為何選此解法？→ 方法選擇
+第四層：相信能成功的理由？→ 信念基礎
+第五層：最深層情緒動機 → 蒸餾 1 句普世情感
+最後展開 5 個情緒價值元素。`,
     mockConclusion: {
-      story: "（mock）在資訊噪音裡，幫每位拓荒者找到自己的星——這就是品牌存在的理由。",
+      story: "（mock）整段品牌敘事：在 X 領域為了 Y 的人，提供 Z 的價值。",
       belief5Layers: [
-        { layer: "1 表面動機", body: "（mock）為新世代創業者解決決策孤獨感。" },
-        { layer: "2 問題意識", body: "（mock）孤獨會耗盡野心；數據能成為夥伴。" },
-        { layer: "3 方法選擇", body: "（mock）以陪伴式分析取代冷冰冰報告。" },
-        { layer: "4 信念基礎", body: "（mock）每個人骨子裡都有想出走的渴望。" },
-        { layer: "5 核心情緒動機", body: "（mock）讓每個人都有資格擁有「值得期待的明天」。" },
+        { layer: "1 表面動機", body: "（mock）為新世代解決 X 痛點。" },
+        { layer: "2 問題意識", body: "（mock）X 為何重要。" },
+        { layer: "3 方法選擇", body: "（mock）以 Y 取代 Z。" },
+        { layer: "4 信念基礎", body: "（mock）相信 W 是普世真理。" },
+        { layer: "5 核心情緒動機", body: "（mock）讓每個人都有資格擁有 V。" },
       ],
     },
   },
   {
     id: 2,
     title: "Step 2 — 價值元素分析（功能 + 情緒）",
-    segmentTarget: "seg:origin", // stays here, internal cache
+    segmentTarget: "seg:origin",
     segmentId: "_valueElements",
     agent: "value-architect",
-    researchBudget: { minUrls: 0, minChars: 0 }, // internal analysis
-    mockThinking: "盤點 Bain 30 個功能價值 + 情緒價值，挑出最相關 5+5。",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `分析品牌「{brand_name}」的價值元素，包括功能價值和情緒價值。
+
+輸入：
+- Bain 30 個功能價值元素清單：節省時間 / 簡化流程 / 降低成本 / 降低風險 / 連結 / 整合 / 提供品質 / 提供多樣性 / 提供洞察 / 訊息 / 提供品牌價值 / 設計與美學 / 治療價值 / 健康 / 提供希望 / 自我實現 / 賺錢 / 減少擔憂 / 獎勵 / 隸屬與歸屬 / 教育 / 自由與彈性 / 重要性 / 自我超越 ...
+- 情緒價值元素：信任 / 歸屬感 / 安心 / 成就感 / 賦能 / 自由感 / 希望 / 驕傲 / 喜悅 / 共鳴 ...
+
+請從上述元素中識別品牌「{brand_name}」最相關的：
+- 5 個功能價值（按重要性排序，1-10 分）
+- 5 個情緒價值（按重要性排序，1-10 分）
+
+請依範例結構輸出 conclusion。`,
+    mockThinking: "盤點 Bain 30 + 情緒價值，挑出最相關 5+5 並評分。",
     mockConclusion: {
       functionalValues: ["節省時間", "簡化流程", "降低風險", "提供洞察", "可整合"],
       emotionalValues: ["安心", "歸屬", "成就感", "自由感", "希望"],
     },
   },
   {
-    id: 28, // ← 2.5 (renumbered as 28 to avoid collision)
+    id: 28,
     title: "Step 2.5 — 品牌核心價值觀（從信念蒸餾 4 條）",
     segmentTarget: "seg:values",
     segmentId: "values",
     agent: "brand-values-coach",
-    researchBudget: { minUrls: 0, minChars: 0 }, // distillation
-    mockThinking:
-      "從 Step 1 的 5 Whys 信念基礎 + Step 2 的價值元素，蒸餾出 4 條最不可複製的品牌核心價值觀。",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `從 Step 1 的 5 Whys 信念基礎 + Step 2 的價值元素，蒸餾出品牌「{brand_name}」最不可複製的 4 條核心價值觀。
+
+要求：
+- 每一條都是「品牌做事方式」的本質宣言，不是行銷話術
+- 4 條彼此互補、不重複
+- 每條 label = 2-4 字標籤，body = 50-80 字說明
+
+依範例結構輸出 conclusion (items 陣列，4 個 entries)。`,
+    mockThinking: "從信念基礎 + 價值元素推 4 條核心價值觀。",
     mockConclusion: {
       items: [
         { label: "（mock）真實",   body: "拒絕過度包裝，展示真實的汗水與掙扎。" },
@@ -108,17 +137,41 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentId: "competition",
     agent: "competitive-intel",
     researchBudget: { minUrls: 5, minChars: 15000 },
+    promptTemplate: `分析品牌「{brand_name}」的競爭環境。
+
+品牌信息：
+- 品牌名稱：{brand_name}
+- 產業類別：{industry}
+- 品牌描述：{description}
+
+要求：
+請選擇 3-5 個最重要的直接競爭對手（同類型產品/服務）。
+
+請根據品牌的產業類別和業務描述，識別：
+1. 直接競爭對手 (同產業、同類型產品/服務)
+2. 間接競爭對手 (不同產業但提供替代方案)
+3. 潛在競爭對手 (新興威脅)
+
+重要：請確保競爭對手與品牌的產業類別一致：
+- 教育服務 → 其他教育機構
+- 餐飲服務 → 其他餐廳
+- 電商平台 → 其他電商平台
+
+每個競品必須填寫 tagline、positioning、strengths（≥2 項）、weaknesses（≥2 項）。
+JSON key 保持英文（如 directCompetitors、name、type、tagline、positioning、strengths、weaknesses），value 使用繁體中文。
+
+依範例結構輸出 conclusion。`,
     mockThinking: `搜尋同產業 3-5 個直接競爭對手…
 分析它們的標語、定位、強項、弱項…
 歸納間接替代方案 + 新興威脅…`,
     mockConclusion: {
-      intensity: "（mock）競爭強度：高 — 市場前兩名合計佔 60%+。",
+      intensity: "（mock）競爭強度：高 / 中 / 低 — 一句說明。",
       direct: [
-        { name: "（mock）World Gym", position: "市佔最高", tone: "自由探索", weakness: "強迫推銷負面印象", ourEdge: "我們販賣信仰，不販賣服務" },
-        { name: "（mock）健身工廠", position: "上市連鎖", tone: "標準化美式",  weakness: "情感連結薄弱",     ourEdge: "兄弟情誼不可複製" },
+        { name: "（mock）競品 A", position: "市場第一", tone: "標準化大眾", weakness: "客製能力弱", ourEdge: "我們提供 X" },
+        { name: "（mock）競品 B", position: "細分龍頭", tone: "專業導向",   weakness: "服務深度不足", ourEdge: "我們提供 Y" },
       ],
       indirect: [
-        { name: "（mock）國民運動中心", threat: "中高", response: "強調文化溢價，非基礎設施" },
+        { name: "（mock）替代方案", threat: "中", response: "強調 X 不可替代性" },
       ],
     },
   },
@@ -129,10 +182,17 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentId: "competition",
     agent: "competitive-intel",
     researchBudget: { minUrls: 3, minChars: 8000 },
-    mockThinking: "對每個競品在 5 功能 + 5 情緒元素打 1-10 分，找出市場空白…",
+    promptTemplate: `評估「{brand_name}」競爭對手在功能價值和情緒價值上的表現。
+
+對 Step 3 識別的每個競爭對手，在 Step 2 的功能價值 + 情緒價值元素上進行 1-10 分評分。
+- 列出每個競品在每個元素的分數
+- 算 overallFunctionalScore / overallEmotionalScore（平均）
+- 識別 marketGapAnalysis：哪些功能 / 情緒空白沒人佔據？這個空白帶來的機會描述
+
+依範例結構輸出 conclusion（合併進 competition.map 等欄位）。`,
+    mockThinking: "對每個競品在功能 + 情緒元素打 1-10 分，找市場空白…",
     mockConclusion: {
-      // Appended to existing competition data
-      map: "（mock）情感連結 × 硬派專業 象限目前無對手。",
+      map: "（mock）象限分析：高情感 × 硬派專業 此象限目前無對手，是我們的戰略要塞。",
     },
   },
   {
@@ -142,10 +202,24 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentId: "audience",
     agent: "persona-architect",
     researchBudget: { minUrls: 4, minChars: 12000 },
+    promptTemplate: `定義品牌「{brand_name}」的目標族群。
+
+要求：
+請選擇 3 個最核心的目標族群，深度聚焦於他們的需求。
+
+請識別：
+1. 人口統計特徵 (年齡、性別、收入、教育、職業)
+2. 心理特徵 (價值觀、生活方式、興趣)
+3. 行為模式 (購買習慣、媒體使用、決策過程)
+4. painPoints / coreEmotionalNeeds / preferredChannels
+
+注意：demographics、psychographics、behaviors 必須是字符串，不能是對象。
+
+conclusion 結構：primary 主受眾敘事 + secondary 次受眾敘事。請把 3 個族群整合敘述，主受眾 = 第一優先 + 完整 demographics/psychographics/behaviors/痛點/情緒需求/渠道，次受眾 = 第二與第三族群摘要。`,
     mockThinking: "從候選族群中聚焦 3 個核心 TA，分析人口/心理/行為…",
     mockConclusion: {
-      primary: "（mock）25-44 歲進階健身愛好者，月收 4-8 萬，重視紀律與成果，社群活躍。",
-      secondary: "（mock）25-40 歲女性自主訓練族，尋求安全自在的訓練空間。",
+      primary: "（mock）主受眾：25-44 歲、月收 X-Y 萬、職業 Z；重視 W；活躍 在 IG / FB；痛點 1, 2, 3；情緒需求：成就感、歸屬感。",
+      secondary: "（mock）次受眾：35-50 歲、家庭主婦或自由工作者；尋求 W；偏好渠道 LINE 群組。",
     },
   },
   {
@@ -155,9 +229,19 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentId: "audience",
     agent: "persona-architect",
     researchBudget: { minUrls: 3, minChars: 10000 },
+    promptTemplate: `深入研究「{brand_name}」目標族群（Step 6 的 audiences）的需求和痛點。
+
+請分析：
+1. Gain Points (期望獲得的好處)
+2. Pain Points (面臨的痛點問題)
+3. 5 Whys (深層動機分析)
+4. 核心價值元素需求（FunctionalNeeds + emotionalNeeds，從 Step 2 的價值元素中挑）
+
+把分析結果合併進 audience.primary 與 audience.secondary 文字敘述，補足痛點 / 需求 / 動機段落（覆蓋 Step 6 的內容、不要刪除原資料）。`,
     mockThinking: "深挖每個 TA 的 painPoints / gainPoints / 5 Whys / 功能需求 / 情緒需求…",
     mockConclusion: {
-      // appended; we'll merge — primary text gets stronger detail
+      primary: "（mock）主受眾：25-44 歲、月收 X-Y 萬、職業 Z。痛點：1) 找不到專業環境；2) 對品牌真實性渴望。Gains：成就感、歸屬感、身份認同。5 Whys 揭示核心動機 = 對抗生活無力感。",
+      secondary: "（mock）次受眾：尋求安全自在訓練空間。痛點：被注視壓力、缺乏夥伴。Gains：身心放鬆、賦能感。",
     },
   },
   {
@@ -166,15 +250,24 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:audience",
     segmentId: "audience",
     agent: "audience-emotion-mapper",
-    researchBudget: { minUrls: 0, minChars: 0 }, // internal scoring
-    mockThinking: "為每個 TA 對 5 情緒元素的需求強度打分（1-10）…",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `評估「{brand_name}」目標族群對功能價值和情緒價值的需求強度（1-10 分）。
+
+對每個 audience（從 Step 6 / 7 取得），對 Step 2 的每個情緒元素打分：
+- functionalNeeds 對每個功能元素 1-10
+- emotionalNeeds 對每個情緒元素 1-10
+- overallFunctionalNeed / overallEmotionalNeed = 該族群的平均
+- marketSize / purchasingPower / growthPotential 1-10
+
+用 audience.matrix 陣列結構輸出（dim, primary 主受眾分數, fan 第二族群分數, weight 重要性 ★）。請至少列出 5-8 個關鍵情緒維度。`,
+    mockThinking: "為每個 TA 對情緒元素的需求強度打分（1-10）…",
     mockConclusion: {
       matrix: [
-        { dim: "真實",     primary: 10, fan: 10, weight: "★★★★★" },
-        { dim: "歸屬感",   primary: 10, fan: 10, weight: "★★★★★" },
-        { dim: "成就感",   primary: 10, fan:  7, weight: "★★★★★" },
-        { dim: "賦能",     primary: 10, fan:  9, weight: "★★★★★" },
-        { dim: "身份認同", primary: 10, fan: 10, weight: "★★★★★" },
+        { dim: "（mock）真實",     primary: 10, fan: 10, weight: "★★★★★" },
+        { dim: "（mock）歸屬感",   primary: 10, fan: 10, weight: "★★★★★" },
+        { dim: "（mock）成就感",   primary: 10, fan:  7, weight: "★★★★★" },
+        { dim: "（mock）賦能",     primary: 10, fan:  9, weight: "★★★★★" },
+        { dim: "（mock）身份認同", primary: 10, fan: 10, weight: "★★★★★" },
       ],
     },
   },
@@ -184,8 +277,33 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:differentiation",
     segmentId: "differentiation",
     agent: "differentiation-strategist",
-    researchBudget: { minUrls: 0, minChars: 0 }, // internal analysis
-    mockThinking: "比對「TA 需求 × 競品佔據 × 品牌能力」，找 1-3 個高差異化元素…",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `為品牌「{brand_name}」進行定位分析。
+
+基於三方資料：
+- 目標族群（Step 6/7/8）
+- 競爭對手（Step 3/5）
+- 價值元素（Step 2 功能 + 情緒）
+
+任務：比對「消費者需求 × 競爭者佔據 × 品牌能力」，找出最具差異化潛力的 1-3 個情緒價值元素 + 1-3 個功能價值元素。
+
+篩選邏輯（必須同時滿足）：
+- 消費者對該價值有高度需求（Step 8 分數高）
+- 多數競爭者未有效佔據或表現弱（Step 5 分數低）
+- 品牌在該價值上具備明確優勢
+
+每個差異化元素需輸出：
+- valueElement（價值元素名稱）
+- type（functional / emotional）
+- consumerDemand (1-100)
+- brandStrength (1-100)
+- competitorSaturation (1-100)
+- differentiationScore（綜合）
+- insight (50-100 字，為什麼是機會)
+- strategicImplication (50-100 字，怎麼用在定位)
+
+把分析整合到 differentiation.emotional / functional / summary 三個欄位（emotional / functional 各 100-200 字描述差異化主軸，summary 是品牌定位總結句）。`,
+    mockThinking: "比對 TA 需求 × 競品佔據 × 品牌能力，找 1-3 個高差異化元素…",
     mockConclusion: {
       emotional:  "（mock）情感差異化：歸屬認同 — 兄弟社群 + 領袖 IP，連鎖品牌無法複製。",
       functional: "（mock）功能差異化：頂級自由重量 + 專業格鬥 + 24 小時，融合式硬派生態系。",
@@ -198,34 +316,69 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:tagline",
     segmentId: "tagline",
     agent: "brand-tagline-writer",
-    researchBudget: { minUrls: 2, minChars: 3000 }, // competitor taglines
+    researchBudget: { minUrls: 2, minChars: 3000 },
+    promptTemplate: `為品牌「{brand_name}」生成標語。
+
+任務：請生成 2 組策略方向（A / B），每組各 5 個標語選項。每一組方案只能對應「1 個價值元素」，不可混用。
+
+從 Step 9 結果中，分別取出：
+- 情緒差異化元素清單（N_emotional 個）
+- 功能差異化元素清單（N_functional 個）
+
+方案 A（情緒導向）：
+- 生成 5 個標語
+- 必須涵蓋全部 N_emotional 個元素
+- 每個標語標注對應的元素名稱
+
+方案 B（功能導向）：
+- 生成 5 個標語
+- 必須涵蓋全部 N_functional 個元素
+
+每個標語都會經過六步驟驗證：獨特性 / 相關性 / 清晰度 / 記憶度 / 情緒共鳴 / 一致性。
+
+把最終選定的「主標語」寫入 tagline 結構：
+- zhTagline / enTagline = 主標語中 / 英
+- type = 標語類型（如「四字單句、直擊核心」）
+- scenes = 應用場景陣列（3-5 個）
+- competitorDiff = 與競品的標語差異
+- story = 標語背後的品牌故事（150-300 字）`,
     mockThinking: "依差異化元素生成 2 組（A 情感 / B 功能）共 10 個標語選項…",
     mockConclusion: {
-      zhTagline: "征服軟弱",
-      enTagline: "Conquer Your Weakness",
-      type: "四字單句、直擊核心",
-      scenes: ["健身房正門大型燈箱", "格鬥區牆面", "品牌影片開場"],
-      competitorDiff: "競品強調放鬆與環境舒適；唯有我們強調與自我的殘酷對抗。",
-      story: "（mock）在深夜的城市邊緣，當世界都在沉睡，你選擇在鐵片碰撞聲中甦醒…",
+      zhTagline: "（mock）主標語",
+      enTagline: "（mock）Main Tagline",
+      type: "（mock）四字單句、直擊核心",
+      scenes: ["（mock）門面燈箱", "（mock）品牌影片開場", "（mock）社群封面"],
+      competitorDiff: "（mock）競品強調 X；唯有我們強調 Y。",
+      story: "（mock）標語背後的場景與情緒：在 X 時刻，當 Y 發生，我們選擇 Z…",
     },
   },
   {
-    id: 105, // 10.5 — score the picked tagline
+    id: 105,
     title: "Step 10.5 — 標語評分（6 維度驗證）",
     segmentTarget: "seg:taglineScore",
     segmentId: "taglineScore",
     agent: "brand-tagline-scorer",
-    researchBudget: { minUrls: 0, minChars: 0 }, // internal scoring
-    mockThinking:
-      "對 Step 10 選定的主標語在 6 維度（清晰度/相關性/獨特性/一致性/記憶度/情緒共鳴）打 1-100 分，輸出總分。",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `對 Step 10 選定的「{brand_name}」主標語進行 6 維度評分（1-100 分）：
+1. 清晰度 (Clarity) — 是否一目了然
+2. 相關性 (Relevance) — 是否扣準目標族群
+3. 獨特性 (Uniqueness) — 是否難以替換
+4. 一致性 (Consistency) — 與品牌名稱 / 調性是否吻合
+5. 記憶度 (Memorability) — 是否朗朗上口
+6. 情緒共鳴 (Emotional Resonance) — 是否觸發內在反應
+
+每維度給分 + 30-60 字評析，最後加總得 total（0-100）。
+
+依範例結構輸出 conclusion（rows 陣列 + total）。`,
+    mockThinking: "對主標語在 6 維度（清晰度/相關性/獨特性/一致性/記憶度/情緒共鳴）打 1-100 分。",
     mockConclusion: {
       rows: [
-        { dim: "清晰度",     code: "Clarity",            score: 90, comment: "（mock）直接傳達克服自身不足的價值主張。" },
-        { dim: "相關性",     code: "Relevance",          score: 85, comment: "（mock）緊扣進階健身愛好者的核心痛點。" },
-        { dim: "獨特性",     code: "Uniqueness",         score: 85, comment: "（mock）結合「成吉思汗」征服者形象，難以替換。" },
-        { dim: "一致性",     code: "Consistency",        score: 90, comment: "（mock）與品牌名稱征服意象高度一致。" },
-        { dim: "記憶度",     code: "Memorability",       score: 80, comment: "（mock）簡短有力，口語傳播潛力高。" },
-        { dim: "情緒共鳴",   code: "Emotional Resonance", score: 88, comment: "（mock）激發中壯年男性對生活無力感的反抗。" },
+        { dim: "清晰度",     code: "Clarity",            score: 90, comment: "（mock）直接傳達核心價值。" },
+        { dim: "相關性",     code: "Relevance",          score: 85, comment: "（mock）扣準目標族群痛點。" },
+        { dim: "獨特性",     code: "Uniqueness",         score: 85, comment: "（mock）難以被競品替換。" },
+        { dim: "一致性",     code: "Consistency",        score: 90, comment: "（mock）與品牌名稱意象一致。" },
+        { dim: "記憶度",     code: "Memorability",       score: 80, comment: "（mock）簡短有力，傳播潛力高。" },
+        { dim: "情緒共鳴",   code: "Emotional Resonance", score: 88, comment: "（mock）觸發內在反應。" },
       ],
       total: 86,
     },
@@ -236,64 +389,79 @@ export const BRAND_PIPELINE: PipelineStepSpec[] = [
     segmentTarget: "seg:voice",
     segmentId: "voice",
     agent: "brand-voice-coach",
-    researchBudget: { minUrls: 0, minChars: 0 }, // distillation
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `分析品牌「{brand_name}」的品牌個性與溝通態度。
+
+請識別：
+1. 品牌原型：從 12 個經典原型中選擇主 + 次（英雄 / 智者 / 創造者 / 照顧者 / 探險家 / 反叛者 / 魔法師 / 一般人 / 戀人 / 弄臣 / 統治者 / 純真者）
+2. 品牌特質：3-5 個核心特質（如：創新、可靠、溫暖等）
+3. 溝通語調：4-6 個關鍵詞（如：直接、有力、真實、挑釁）
+4. 溝通禁區：3-5 個應避免的語氣
+5. 溝通範例對比：3-4 組「一般說法 vs 我們的說法」
+
+依範例結構輸出 conclusion（archetypes 陣列 + tone 陣列 + forbidden 陣列 + samples 對照陣列）。`,
     mockThinking: "從 12 經典原型挑主 + 次原型，定義特質 / 語調 / 態度…",
     mockConclusion: {
-      archetypes: ["英雄（主）", "反叛者（次）"],
+      archetypes: ["（mock）英雄（主）", "（mock）反叛者（次）"],
       tone: ["直接", "有力", "真實", "挑釁"],
       forbidden: ["過度溫柔", "商業促銷語", "舒適化敘事", "完美身材廣告"],
       samples: [
-        { generic: "歡迎來體驗我們舒適的訓練環境！", ours: "你來這裡不是為了舒服，你來這裡是為了變強。" },
-        { generic: "健身讓你更健康快樂！",           ours: "征服今天的重量，才能征服明天的生活。" },
+        { generic: "（mock）歡迎來體驗舒適的環境", ours: "（mock）你來這裡是為了變強，不是為了舒服。" },
+        { generic: "（mock）讓你更健康快樂",       ours: "（mock）征服今天的重量，才能征服明天的生活。" },
       ],
     },
   },
 ];
 
-/**
- * Trends step — scans industry / market reports for favorable trends +
- * risks. Inserted before the final goldenCircle distillation.
- */
 export const BRAND_PIPELINE_TRENDS: PipelineStepSpec = {
-  id: 115, // 11.5
+  id: 115,
   title: "Step 11.5 — 市場趨勢與機會",
   segmentTarget: "seg:trends",
   segmentId: "trends",
   agent: "trend-radar",
   researchBudget: { minUrls: 4, minChars: 12000 },
-  mockThinking:
-    "搜尋產業近期報告 + 觀察社群論壇 + 分析消費者行為轉變，盤點 3-4 個有利趨勢與 2-3 個需關注的風險。",
+  promptTemplate: `分析「{brand_name}」（產業：{industry}）所處的市場趨勢與機會。
+
+請輸出：
+- favorable: 3-4 個有利趨勢（每個含 name + body 60-120 字說明，可引用近期報告 / 數據）
+- risks: 2-3 個需關注的風險（每個含 name + body 60-120 字應對方向）
+
+優先用 web_search 找最新（2025-2026）的產業報告 / 消費者行為 / 競爭動態。`,
+  mockThinking: "搜尋產業近期報告 + 觀察社群論壇 + 分析消費者行為轉變…",
   mockConclusion: {
     favorable: [
-      { name: "（mock）健身身份認同化",   body: "約 50% 規律健身者把「健身」視為核心身份。" },
-      { name: "（mock）真實性信任危機",   body: "消費者對過度商業包裝品牌信任度持續下滑。" },
-      { name: "（mock）力量訓練主流化",   body: "全球健身場館重訓區域佔比已升至 42%。" },
-      { name: "（mock）市場分眾化",       body: "從大型連鎖轉向更具品牌特色的場域。" },
+      { name: "（mock）有利趨勢 1", body: "（mock）50% 規律健身者把「健身」視為核心身份，本品牌的征服者敘事完美承接。" },
+      { name: "（mock）有利趨勢 2", body: "（mock）真實性信任危機，消費者對過度包裝品牌信任度下滑。" },
+      { name: "（mock）有利趨勢 3", body: "（mock）力量訓練主流化，全球場館重訓區佔比升至 42%。" },
     ],
     risks: [
-      { name: "（mock）IP 依賴風險",     body: "需逐步建立去人格化的品牌資產，降低單點風險。" },
-      { name: "（mock）女性市場開拓",     body: "現有調性以男性為主，擴張時需平衡核心精神。" },
-      { name: "（mock）數位健身替代",     body: "AI 個人化訓練普及，需強化實體社群價值。" },
+      { name: "（mock）風險 1", body: "（mock）IP 依賴 — 需逐步建立去人格化的品牌資產。" },
+      { name: "（mock）風險 2", body: "（mock）女性市場開拓難度 — 調性以男性為主，擴張需平衡核心精神。" },
     ],
   },
 };
 
-/**
- * Distillation step — derives goldenCircle (Why/How/What) from the
- * already-collected origin + differentiation + voice. Final write.
- */
 export const BRAND_PIPELINE_FINAL: PipelineStepSpec = {
   id: 12,
   title: "最後 — 蒸餾品牌黃金圈",
   segmentTarget: "seg:goldenCircle",
   segmentId: "goldenCircle",
   agent: "brand-archetype-positioning",
-  researchBudget: { minUrls: 0, minChars: 0 }, // distillation
+  researchBudget: { minUrls: 0, minChars: 0 },
+  promptTemplate: `從前面所有步驟（Step 1 5 Whys / Step 9 差異化 / Step 11 個性）蒸餾出「{brand_name}」的品牌黃金圈：
+
+- WHY (品牌願景) = 我們相信什麼？為什麼存在？50-100 字
+- HOW (品牌使命) = 我們怎麼做？方法 / 過程 50-100 字
+- WHAT (品牌產品 / 服務) = 我們提供什麼具體東西 50-100 字
+
+WHY 應呼應 Step 1 第五層核心情緒動機。HOW 應呼應 Step 9 差異化方法。WHAT 應描述具體 offerings。
+
+依範例結構輸出 conclusion（why / how / what 三段）。`,
   mockThinking: "從 5 Whys 核心動機 + 差異化 + 聲音蒸餾出 Why / How / What…",
   mockConclusion: {
-    why:  "（mock）相信每個人骨子裡都藏著不服輸的狠勁。",
-    how:  "（mock）透過高強度訓練、格鬥文化與兄弟社群，鍛造個人意志。",
-    what: "（mock）全台頂級自由重量區、格鬥擂台、24 小時訓練空間、戰士社群。",
+    why:  "（mock）相信每個人骨子裡都藏著未被看見的潛力。",
+    how:  "（mock）透過 X 文化 + Y 系統 + Z 社群，把潛力鍛造成具體成就。",
+    what: "（mock）提供 A / B / C 三個產品線 + D 社群空間。",
   },
 };
 
