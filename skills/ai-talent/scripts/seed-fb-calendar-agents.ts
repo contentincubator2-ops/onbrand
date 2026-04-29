@@ -240,9 +240,9 @@ async function insertAgent(a: AgentSpec, avatarUrl: string): Promise<number> {
        methodology, aiModel,
        name_zh, title_zh, bio_zh,
        preferredModelTags,
-       isAvailable, isFeatured, reviewStatus, hireCount, taskEarnCount, totalEarned, token,
+       isAvailable, isFeatured, reviewStatus, hireCount, taskEarnCount, totalEarned,
        creatorUserId
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 'approved', 0, 0, 0, 0, NULL)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 'approved', 0, 0, 0, NULL)`,
     [
       a.slug, a.name, a.englishName, a.title, a.englishTitle, a.layer,
       avatarUrl, a.bio, a.specialty, JSON.stringify(a.skills), a.primarySkill,
