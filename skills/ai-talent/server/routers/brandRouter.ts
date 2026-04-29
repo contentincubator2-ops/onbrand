@@ -149,6 +149,21 @@ export const brandRouter = router({
       });
       const brandId = (result as any)[0]?.insertId ?? (result as any).insertId;
 
+      // Auto-add creator to brand_members as owner — without this, the
+      // listByMember query (used by CreateScopeModal etc.) filters this
+      // brand out and the user can't see their own brand in pickers.
+      // CJ caught the bug 2026-04-30: Pokemon GO event create modal had
+      // empty brand picker because every brand created via this endpoint
+      // had no corresponding brand_members row.
+      try {
+        await db.execute(
+          sql`INSERT INTO brand_members (brandId, userId, role, addedBy)
+              VALUES (${brandId}, ${ctx.user.id}, 'owner', ${ctx.user.id})`
+        );
+      } catch (err) {
+        console.error('[brand.create] brand_members seed failed:', err);
+      }
+
       // Auto-seed 6 onboarding missions for this brand
       const ONBOARDING_MISSIONS = [
         { workspace: 'strategy', title: '品牌定位',    isRecurring: false, recurringSchedule: null,     squadSlug: 'tw-b2b-saas-gtm' },

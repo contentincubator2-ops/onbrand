@@ -78,10 +78,14 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
   const [eventProductIds, setEventProductIds] = React.useState<number[]>([]);
 
   // Brand list for the in-modal brand selector (product / event creation).
-  const brandsQuery = (trpc as any).brand?.listByMember?.useQuery
-    ? (trpc as any).brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false })
-    : { data: [] };
-  const brandsList: any[] = (brandsQuery.data as any[]) ?? [];
+  // Uses scope.options (same source as ScopeBar) — NOT brand.listByMember,
+  // because the latter requires brand_members rows which historically
+  // weren't auto-inserted on brand.create. Bug caught 2026-04-30: Pokemon
+  // GO event create showed empty brand picker even though brands existed.
+  const scopeOptionsQuery = (trpc as any).scope?.options?.useQuery
+    ? (trpc as any).scope.options.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: null };
+  const brandsList: any[] = ((scopeOptionsQuery.data as any)?.brands as any[]) ?? [];
 
   // Pull candidate products for the picked brand. CheckboxGroup displays
   // them so user can optionally link 1+ products to this event.
