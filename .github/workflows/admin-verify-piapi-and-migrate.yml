@@ -16,11 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: appleboy/ssh-action@v1.0.3
+        env:
+          PIAPI_KEY: ${{ secrets.PI_API_KEY }}
+          ATLAS_CLOUD_API: ${{ secrets.ATLAS_CLOUD_API }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 600s
+          envs: PIAPI_KEY,ATLAS_CLOUD_API
           script: |
             set +e
             cd /opt/marketing-os/app/skills/ai-talent || cd /opt/marketing-os/skills/ai-talent
@@ -52,21 +56,45 @@ jobs:
             " 2>&1
 
             echo ""
-            echo "===== 3. PIAPI_KEY presence ====="
-            if [ -z "$PIAPI_KEY" ] && [ -z "$PIAPI_API_KEY" ]; then
-              echo "✗ PIAPI_KEY / PIAPI_API_KEY not in env. Skipping verify-piapi."
-              echo "  Add it to /opt/marketing-os/.env (or app/skills/ai-talent/.env) and re-run this workflow."
+            echo "===== 3. Persist PIAPI_KEY + ATLAS_CLOUD_API to VM .env ====="
+            # The keys come in via the SSH action's `envs:` passthrough.
+            # We write them to BOTH common .env locations so the running server
+            # picks them up after the next restart, and the verify script below
+            # can read them inline.
+            for envfile in /opt/marketing-os/.env /opt/marketing-os/app/skills/ai-talent/.env /opt/marketing-os/skills/ai-talent/.env; do
+              [ -d "$(dirname $envfile)" ] || continue
+              # Idempotent upsert: remove existing line, append fresh value
+              if [ -n "$PIAPI_KEY" ]; then
+                sudo sed -i '/^PIAPI_KEY=/d;/^PI_API_KEY=/d' "$envfile" 2>/dev/null
+                echo "PIAPI_KEY=$PIAPI_KEY" | sudo tee -a "$envfile" >/dev/null
+              fi
+              if [ -n "$ATLAS_CLOUD_API" ]; then
+                sudo sed -i '/^ATLAS_CLOUD_API=/d;/^ATLAS_CLOUD_API_KEY=/d' "$envfile" 2>/dev/null
+                echo "ATLAS_CLOUD_API=$ATLAS_CLOUD_API" | sudo tee -a "$envfile" >/dev/null
+              fi
+              echo "  upserted into $envfile"
+            done
+            # Restart server so the new keys are picked up
+            sudo systemctl restart marketing-os 2>&1 | head -3 || \
+              pm2 restart marketing-os 2>&1 | head -3 || \
+              echo "  (no systemd / pm2 service found — manual restart may be needed)"
+
+            echo ""
+            echo "===== 4. PIAPI_KEY presence check ====="
+            if [ -z "$PIAPI_KEY" ]; then
+              echo "✗ PIAPI_KEY (from secret PI_API_KEY) is empty. Verify GitHub secret is set."
               exit 0
             fi
-            echo "✓ PiAPI key found in env (length=${#PIAPI_KEY}${#PIAPI_API_KEY})"
+            echo "✓ PIAPI_KEY present (length=${#PIAPI_KEY})"
+            echo "✓ ATLAS_CLOUD_API present (length=${#ATLAS_CLOUD_API})"
 
             echo ""
-            echo "===== 4. Run verify-piapi.ts ====="
+            echo "===== 5. Run verify-piapi.ts ====="
             # 8-min cap — Kling video can take 3-4 min
-            timeout 480 npx tsx scripts/verify-piapi.ts 2>&1 | tail -60
+            timeout 480 env PIAPI_KEY="$PIAPI_KEY" npx tsx scripts/verify-piapi.ts 2>&1 | tail -80
 
             echo ""
-            echo "===== 5. Output files ====="
+            echo "===== 6. Output files ====="
             ls -lh /tmp/piapi-*.* 2>&1 | head -10
 
             echo ""
