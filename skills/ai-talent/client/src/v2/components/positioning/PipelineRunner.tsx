@@ -55,11 +55,6 @@ export default function PipelineRunner({
               <FontAwesomeIcon icon={faWandSparkles} className="text-default-600 text-tiny" />
             </span>
             <p className="text-small font-medium">品牌定位分析</p>
-            {state.status === "running" && (
-              <Chip size="sm" variant="flat" color="primary">
-                {state.completed.length + 1} / {total}
-              </Chip>
-            )}
             {state.status === "paused" && (
               <Chip size="sm" variant="flat" color="warning">已暫停</Chip>
             )}
