@@ -1,0 +1,200 @@
+name: Admin - match agents for FB calendar squad
+on:
+  workflow_dispatch:
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set -a
+            [ -f /opt/marketing-os/.env ] && . /opt/marketing-os/.env
+            [ -f /opt/marketing-os/app/skills/ai-talent/.env ] && . /opt/marketing-os/app/skills/ai-talent/.env
+            set +a
+            DB_HOST_V=${DB_HOST:-127.0.0.1}
+            DB_USER_V=${DB_USER:-root}
+            DB_NAME_V=${DB_NAME:-mos_db}
+            run_sql() { MYSQL_PWD="$DB_PASSWORD" mysql -h"$DB_HOST_V" -u"$DB_USER_V" "$DB_NAME_V" -t "$@"; }
+
+            echo "================================================================"
+            echo "ROLE 1: Content Strategy Lead (squad lead)"
+            echo "  Skills: content-strategy / content-marketing / brand-strategy"
+            echo "  Model:  claude-opus-4 (depth) / Layer: strategy"
+            echo "================================================================"
+            run_sql -e "
+              SELECT a.id, a.name, a.title, a.layer, a.aiModel,
+                     CAST(
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'content-strategy') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'content-marketing') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'brand-strategy') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%內容策略%') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%品牌策略%') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN a.layer = 'strategy' THEN 1 ELSE 0 END) +
+                       (CASE WHEN a.aiModel LIKE '%claude%opus%' OR a.aiModel LIKE '%opus%' THEN 2 ELSE 0 END)
+                       AS UNSIGNED) AS score
+                FROM agents a
+               WHERE (
+                 JSON_SEARCH(a.skills, 'all', 'content-strategy') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'content-marketing') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'brand-strategy') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%內容策略%') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%品牌策略%') IS NOT NULL
+               )
+               ORDER BY score DESC, a.id ASC
+               LIMIT 5;"
+
+            echo ""
+            echo "================================================================"
+            echo "ROLE 2: Audience Insight Researcher"
+            echo "  Skills: audience-strategy / social-listening / web-research"
+            echo "  Model:  claude-opus-4 + web_search / Layer: strategy"
+            echo "================================================================"
+            run_sql -e "
+              SELECT a.id, a.name, a.title, a.layer, a.aiModel,
+                     CAST(
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'audience-strategy') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'social-listening') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'audience-research') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'persona') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%受眾%') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%社群洞察%') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN a.aiModel LIKE '%opus%' THEN 2 ELSE 0 END)
+                       AS UNSIGNED) AS score
+                FROM agents a
+               WHERE (
+                 JSON_SEARCH(a.skills, 'all', 'audience-strategy') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'social-listening') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'audience-research') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'persona') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%受眾%') IS NOT NULL
+               )
+               ORDER BY score DESC, a.id ASC
+               LIMIT 5;"
+
+            echo ""
+            echo "================================================================"
+            echo "ROLE 3: Content Pillar Architect"
+            echo "  Skills: content-pillar-design / topic-clustering / content-marketing"
+            echo "  Model:  claude-opus-4 / Layer: strategy"
+            echo "================================================================"
+            run_sql -e "
+              SELECT a.id, a.name, a.title, a.layer, a.aiModel,
+                     CAST(
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'content-pillar') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'topic-clustering') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'content-marketing') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'editorial-strategy') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%內容架構%') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%主題支柱%') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN a.aiModel LIKE '%opus%' THEN 1 ELSE 0 END)
+                       AS UNSIGNED) AS score
+                FROM agents a
+               WHERE (
+                 JSON_SEARCH(a.skills, 'all', 'content-pillar') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'topic-clustering') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'content-marketing') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'editorial-strategy') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%內容架構%') IS NOT NULL
+               )
+               ORDER BY score DESC, a.id ASC
+               LIMIT 5;"
+
+            echo ""
+            echo "================================================================"
+            echo "ROLE 4: Editorial Calendar Architect"
+            echo "  Skills: editorial-calendar / social-media-planning / facebook"
+            echo "  Model:  gpt-5 (JSON mode) / Layer: execution"
+            echo "================================================================"
+            run_sql -e "
+              SELECT a.id, a.name, a.title, a.layer, a.aiModel,
+                     CAST(
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'editorial-calendar') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'content-calendar') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'social-media-planning') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'facebook') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'meta-ads') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%社群行事曆%') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%月曆%') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%排程%') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN a.aiModel LIKE '%gpt%' OR a.aiModel LIKE '%4o%' OR a.aiModel LIKE '%5%' THEN 2 ELSE 0 END)
+                       AS UNSIGNED) AS score
+                FROM agents a
+               WHERE (
+                 JSON_SEARCH(a.skills, 'all', 'editorial-calendar') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'content-calendar') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'social-media-planning') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%社群行事曆%') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%月曆%') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%排程%') IS NOT NULL
+               )
+               ORDER BY score DESC, a.id ASC
+               LIMIT 5;"
+
+            echo ""
+            echo "================================================================"
+            echo "ROLE 5: FB Brief Writer"
+            echo "  Skills: fb-copywriting / hook-writing / brand-voice"
+            echo "  Model:  claude-sonnet (cost batch) / Layer: execution"
+            echo "================================================================"
+            run_sql -e "
+              SELECT a.id, a.name, a.title, a.layer, a.aiModel,
+                     CAST(
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'copywriting') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'fb-copywriting') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'hook-writing') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'social-copy') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'brand-voice') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%文案%') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%貼文%') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%hook%') IS NOT NULL THEN 3 ELSE 0 END) +
+                       (CASE WHEN a.aiModel LIKE '%sonnet%' THEN 2 ELSE 0 END) +
+                       (CASE WHEN a.layer = 'execution' THEN 1 ELSE 0 END)
+                       AS UNSIGNED) AS score
+                FROM agents a
+               WHERE (
+                 JSON_SEARCH(a.skills, 'all', 'copywriting') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'fb-copywriting') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'hook-writing') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%文案%') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%貼文%') IS NOT NULL
+               )
+               ORDER BY score DESC, a.id ASC
+               LIMIT 5;"
+
+            echo ""
+            echo "================================================================"
+            echo "ROLE 6: Visual Direction Strategist"
+            echo "  Skills: visual-direction / art-direction / brand-visual-system"
+            echo "  Model:  claude-opus-4 / Layer: strategy"
+            echo "================================================================"
+            run_sql -e "
+              SELECT a.id, a.name, a.title, a.layer, a.aiModel,
+                     CAST(
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'visual-direction') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'art-direction') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'creative-direction') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'brand-visual') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', 'graphic-design') IS NOT NULL THEN 2 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%視覺%') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%藝術指導%') IS NOT NULL THEN 5 ELSE 0 END) +
+                       (CASE WHEN JSON_SEARCH(a.skills, 'all', '%創意總監%') IS NOT NULL THEN 4 ELSE 0 END) +
+                       (CASE WHEN a.aiModel LIKE '%opus%' THEN 1 ELSE 0 END)
+                       AS UNSIGNED) AS score
+                FROM agents a
+               WHERE (
+                 JSON_SEARCH(a.skills, 'all', 'visual-direction') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'art-direction') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'creative-direction') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', 'graphic-design') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%視覺%') IS NOT NULL OR
+                 JSON_SEARCH(a.skills, 'all', '%藝術指導%') IS NOT NULL
+               )
+               ORDER BY score DESC, a.id ASC
+               LIMIT 5;"
+
+            echo "Done"
