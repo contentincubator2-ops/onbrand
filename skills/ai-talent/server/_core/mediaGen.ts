@@ -371,7 +371,9 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     buildInput: (o) => ({ prompt: o.prompt, lora_settings: [{ lora_type: "realism", lora_strength: 1.0 }] }),
   },
   "piapi/ideogram-v3": {
-    model: "ideogram",
+    // PiAPI namespaces Ideogram under Qubico (verified 2026-04-29 — bare
+    // "ideogram" returns 400 invalid model).
+    model: "Qubico/ideogram",
     task_type: "txt2img",
     sync: true,
     buildInput: (o) => ({
@@ -382,10 +384,11 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     }),
   },
   "piapi/sd-3-5-large": {
-    model: "stability-ai",
+    // PiAPI uses Qubico namespace for Stability AI as well.
+    model: "Qubico/sdxl",
     task_type: "txt2img",
     sync: true,
-    buildInput: (o) => ({ prompt: o.prompt, model: "sd3.5-large", aspect_ratio: o.aspectRatio ?? "1:1" }),
+    buildInput: (o) => ({ prompt: o.prompt, aspect_ratio: o.aspectRatio ?? "1:1" }),
   },
   "piapi/kling-v2-master": {
     model: "kling",

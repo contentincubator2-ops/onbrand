@@ -74,7 +74,7 @@ async function pickUrl(out: any): Promise<string> {
   // ── Test 1: Ideogram v3 (image, fast) ─────────────────────────────
   console.log("\n[1/2] Ideogram v3 — image / sync");
   try {
-    const { taskId } = await submit("ideogram", "txt2img", {
+    const { taskId } = await submit("Qubico/ideogram", "txt2img", {
       prompt: "minimal black-and-white logo for a marketing technology brand named 'Marketing OS', sans-serif wordmark",
       aspect_ratio: "1:1",
     });
