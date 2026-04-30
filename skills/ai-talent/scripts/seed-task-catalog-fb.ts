@@ -49,7 +49,7 @@ const TASKS: Task[] = [
     workspace: "facebook",
     category: "planning",
     impl_kind: "squad",
-    squad_slug: "fb-monthly-calendar",  // squad #726
+    squad_slug: "fb-monthly-calendar-pulizzi",  // squad #726
     status: "active",
     bypassable: true,
     search_keywords: "月行事曆,行事曆,monthly,calendar,排程,FB,Facebook,內容支柱,pillar",
