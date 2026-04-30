@@ -38,17 +38,24 @@ const FORMAT_LABEL: Record<PostBrief["format"], string> = {
   "story":     "📱 Story",
 };
 
-export function FBPostBriefMockup({ data, readOnly = false, onChange }: Props) {
+export function FBPostBriefMockup({ data, readOnly = false, isActive = false, onChange }: Props) {
   const briefs = data?.briefs ?? [];
 
   return (
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
-        <SectionHeader
-          icon="✍"
-          eyebrow="STEP 5 · POST BRIEFS"
-          title={`${briefs.length} 篇 brief`}
-        />
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <SectionHeader
+            icon="✍"
+            eyebrow="STEP 5 · POST BRIEFS"
+            title={`${briefs.length} 篇 brief`}
+          />
+          {isActive && (
+            <Chip size="sm" variant="flat" color="primary" className="self-start">
+              ● Aiden Hsu 撰寫中…（{briefs.length}/16-20 篇）
+            </Chip>
+          )}
+        </div>
         {briefs.length === 0 ? (
           <EmptyHint>Step 5 跑完才會有 brief</EmptyHint>
         ) : (

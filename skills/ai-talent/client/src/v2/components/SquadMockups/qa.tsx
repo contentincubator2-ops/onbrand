@@ -63,7 +63,7 @@ const STATUS_ICON = {
   fail:    "✗",
 } as const;
 
-export function QAReportMockup({ data, readOnly = false, onAccept, onReject }: Props) {
+export function QAReportMockup({ data, readOnly = false, isActive = false, onAccept, onReject }: Props) {
   if (!data) {
     return (
       <NotionCard>
@@ -78,7 +78,14 @@ export function QAReportMockup({ data, readOnly = false, onAccept, onReject }: P
     <div className="flex flex-col gap-3 max-w-4xl">
       {/* Section 1: Overall verdict */}
       <NotionCard>
-        <SectionHeader icon="🛡" eyebrow="STEP 6 · QA REPORT" title="Squad Lead 終審" />
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <SectionHeader icon="🛡" eyebrow="STEP 6 · QA REPORT" title="Squad Lead 終審" />
+          {isActive && (
+            <Chip size="sm" variant="flat" color="primary" className="self-start">
+              ● Claire Hsu 審核中…
+            </Chip>
+          )}
+        </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <Chip size="lg" variant="flat" color={v.color}>{v.label}</Chip>
           <div className="flex items-center gap-2">

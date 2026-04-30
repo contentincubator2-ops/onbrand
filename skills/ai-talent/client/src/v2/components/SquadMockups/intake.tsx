@@ -39,10 +39,15 @@ export interface IntakeFormData {
   };
   // bucket B — user input (form values)
   userInput?: {
-    target_month?: string;        // YYYY-MM-DD (1st of month)
+    // CJ correction 2026-04-30: date range, NOT just month — users may
+    // calculate "month" differently (e.g. 5/15 → 6/14 instead of 5/1 → 5/31).
+    target_date_start?: string;   // YYYY-MM-DD
+    target_date_end?: string;     // YYYY-MM-DD
     tilt_override?: string;
     pillar_count?: "3" | "4" | "5";
-    posting_cadence?: "3" | "4" | "5";
+    // Replaces posting_cadence — total post count is more direct;
+    // calendar architect derives cadence from total ÷ days.
+    total_posts?: number;         // 8 ~ 30 typical range
     kpi_focus?: "reach" | "saves" | "shares" | "convert";
     event_focus?: string[];       // ["SMP", "messaging", "creative", "all"]
     date_locks?: Array<{ date: string; theme: string }>;
@@ -58,7 +63,7 @@ interface Props extends SquadMockupCommonProps {
   onSubmit?: () => void;
 }
 
-export function IntakeFormMockup({ data = {}, readOnly = false, onChange, onSubmit }: Props) {
+export function IntakeFormMockup({ data = {}, readOnly = false, isActive = false, onChange, onSubmit }: Props) {
   const sys = data.systemData ?? {};
   const web = data.webSummary ?? {};
   const ui  = data.userInput  ?? {};
@@ -69,19 +74,27 @@ export function IntakeFormMockup({ data = {}, readOnly = false, onChange, onSubm
   };
 
   const requiredFilled = !!(
-    ui.target_month && ui.tilt_override && ui.pillar_count
-    && ui.posting_cadence && ui.kpi_focus
+    ui.target_date_start && ui.target_date_end
+    && ui.tilt_override && ui.pillar_count
+    && ui.total_posts && ui.kpi_focus
   );
 
   return (
     <div className="flex flex-col gap-4 max-w-3xl">
       {/* ── 📦 系統已有 ─────────────────────────────────────────── */}
       <NotionCard>
-        <SectionHeader
-          icon="📦"
-          eyebrow="BUCKET A · 系統已有（自動撈）"
-          title="這次 squad 不需要再問你的"
-        />
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <SectionHeader
+            icon="📦"
+            eyebrow="BUCKET A · 系統已有（自動撈）"
+            title="這次 squad 不需要再問你的"
+          />
+          {isActive && (
+            <Chip size="sm" variant="flat" color="primary" className="self-start">
+              ● Claire Hsu 蒐集中…
+            </Chip>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           <DataChip label="品牌"     value={sys.brandName} />
           <DataChip label="產業"     value={sys.industry} />
@@ -125,9 +138,17 @@ export function IntakeFormMockup({ data = {}, readOnly = false, onChange, onSubm
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input
             size="sm" radius="md" variant="bordered" type="date"
-            label="規劃月份" labelPlacement="outside"
-            value={ui.target_month ?? ""}
-            onValueChange={(v) => update({ target_month: v })}
+            label="規劃起始日（年月日）" labelPlacement="outside"
+            value={ui.target_date_start ?? ""}
+            onValueChange={(v) => update({ target_date_start: v })}
+            isRequired
+            isReadOnly={readOnly}
+          />
+          <Input
+            size="sm" radius="md" variant="bordered" type="date"
+            label="規劃結束日（年月日）" labelPlacement="outside"
+            value={ui.target_date_end ?? ""}
+            onValueChange={(v) => update({ target_date_end: v })}
             isRequired
             isReadOnly={readOnly}
           />
@@ -147,22 +168,16 @@ export function IntakeFormMockup({ data = {}, readOnly = false, onChange, onSubm
               <SelectItem key={n}>{n} 個 pillar</SelectItem>
             ))}
           </Select>
-          <Select
-            size="sm" radius="md" variant="bordered"
-            label="Posting Cadence" labelPlacement="outside"
-            placeholder="每週幾篇"
-            selectedKeys={ui.posting_cadence ? new Set([ui.posting_cadence]) : new Set()}
-            onSelectionChange={(keys) => {
-              const k = Array.from(keys as Set<string>)[0] as "3" | "4" | "5";
-              update({ posting_cadence: k });
-            }}
+          <Input
+            size="sm" radius="md" variant="bordered" type="number"
+            label="總篇數（這段期間總共要發幾篇）" labelPlacement="outside"
+            placeholder="例：16"
+            value={ui.total_posts != null ? String(ui.total_posts) : ""}
+            onValueChange={(v) => update({ total_posts: Number(v) || undefined })}
+            min={4} max={60}
             isRequired
-            isDisabled={readOnly}
-          >
-            {["3", "4", "5"].map((n) => (
-              <SelectItem key={n}>每週 {n} 篇</SelectItem>
-            ))}
-          </Select>
+            isReadOnly={readOnly}
+          />
           <Select
             size="sm" radius="md" variant="bordered"
             label="KPI Focus" labelPlacement="outside"

@@ -16,6 +16,10 @@ export interface PillarRow {
   ratio: number;        // 0-100
   target_kpi: string;
   sample_topics: string[];
+  // CJ direction 2026-04-30: each pillar must declare visual direction
+  // so step 5 brief writer + step 5 visual director have a consistent
+  // reference for image_brief generation per pillar.
+  visualDirection: string;
 }
 
 interface Props extends SquadMockupCommonProps {
@@ -26,7 +30,7 @@ interface Props extends SquadMockupCommonProps {
 // Functional pillar colors — index-based, max 5
 const PILLAR_COLORS = ["#7c5dfa", "#10b981", "#f59e0b", "#3b82f6", "#ec4899"] as const;
 
-export function PillarTableMockup({ data, readOnly = false, onChange }: Props) {
+export function PillarTableMockup({ data, readOnly = false, isActive = false, onChange }: Props) {
   const pillars = data?.pillars ?? [];
   const ratioTotal = pillars.reduce((s, p) => s + (p.ratio || 0), 0);
   const ratioOk = ratioTotal === 100;
@@ -39,11 +43,18 @@ export function PillarTableMockup({ data, readOnly = false, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3 max-w-4xl">
       <NotionCard>
-        <SectionHeader
-          icon="🏛"
-          eyebrow="STEP 3 · CONTENT PILLARS"
-          title={data?.tilt ? `Tilt: ${data.tilt}` : "Pillars 定義"}
-        />
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <SectionHeader
+            icon="🏛"
+            eyebrow="STEP 3 · CONTENT PILLARS"
+            title={data?.tilt ? `Tilt: ${data.tilt}` : "Pillars 定義"}
+          />
+          {isActive && (
+            <Chip size="sm" variant="flat" color="primary" className="self-start">
+              ● Vincent Shen 思考中…
+            </Chip>
+          )}
+        </div>
 
         {pillars.length === 0 ? (
           <EmptyHint>尚未產出 pillar — Step 3 跑完才會填</EmptyHint>
@@ -145,6 +156,17 @@ function PillarRowCard({
           {(pillar.sample_topics ?? []).length === 0 && <EmptyHint>無</EmptyHint>}
         </div>
       </div>
+
+      <Textarea
+        size="sm" radius="md" variant="bordered"
+        label="🎨 視覺方向（這 pillar 的 image_brief 一致參考）"
+        labelPlacement="outside"
+        minRows={2}
+        placeholder="例：使用扁平向量、藍金色系、玩家小卡感"
+        value={pillar.visualDirection ?? ""}
+        onValueChange={(v) => onChange({ visualDirection: v })}
+        isReadOnly={readOnly}
+      />
     </div>
   );
 }

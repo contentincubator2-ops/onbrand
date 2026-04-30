@@ -1,17 +1,27 @@
 /**
- * CalendarGridMockup — squad step 4 output: monthly calendar grid.
+ * CalendarGridMockup — squad step 4 output: monthly calendar.
  *
- * 5 weeks × 7 days. Each cell:
- *   - date number
- *   - pillar color dot
- *   - format icon (📝 文 / 🎬 reel / 🖼 carousel / 📊 long-text)
- *   - red flag if event peak
- *   - dim/hidden if off-month
+ * Redesigned 2026-04-30 per CJ feedback: original 5×7 grid felt too
+ * different from other Notion-style mockups. New layout = weekly card
+ * list (one card per week), matching Notion / Buffer / Hootsuite content
+ * calendar conventions adapted to SoWork's design system:
  *
- * Drag-drop hint when hovering an entry. Pillar legend bottom.
+ *   ┌─ WEEK 1 (5/4 — 5/10) · 4 篇 ─────────────────────┐
+ *   │ [date] [pillar bar] [format] [topic] [event ⭐] │ ← post card per row
+ *   │ [date] [pillar bar] [format] [topic]            │
+ *   │ ...                                              │
+ *   └──────────────────────────────────────────────────┘
+ *
+ * Layout discipline:
+ *   - Pillar = colored left-edge stripe (per project_design_system.md
+ *     "color is functional only")
+ *   - Date column tabular-nums for alignment
+ *   - Format icon as Chip
+ *   - Event peak as warning/danger Chip
+ *   - Hover/click reveals details (topic + tooltip; phase 2 expands edit)
  */
 import React from "react";
-import { Chip, Tooltip } from "@heroui/react";
+import { Card, CardBody, Chip, Tooltip } from "@heroui/react";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface CalendarEntry {
@@ -25,7 +35,8 @@ export interface CalendarEntry {
 
 interface Props extends SquadMockupCommonProps {
   data?: {
-    targetMonth: string;     // YYYY-MM-01
+    targetDateStart: string; // YYYY-MM-DD
+    targetDateEnd: string;   // YYYY-MM-DD
     entries: CalendarEntry[];
     pillars?: Array<{ name: string; ratio: number }>;
   };
@@ -33,42 +44,51 @@ interface Props extends SquadMockupCommonProps {
 
 const PILLAR_COLORS = ["#7c5dfa", "#10b981", "#f59e0b", "#3b82f6", "#ec4899"] as const;
 
-const FORMAT_ICONS: Record<CalendarEntry["format"], string> = {
-  "post":      "📝",
-  "reel":      "🎬",
-  "carousel":  "🖼",
-  "long-text": "📊",
-  "story":     "📱",
+const FORMAT_LABEL: Record<CalendarEntry["format"], string> = {
+  "post":      "📝 圖文",
+  "reel":      "🎬 Reel",
+  "carousel":  "🖼 Carousel",
+  "long-text": "📊 長文",
+  "story":     "📱 Story",
 };
 
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+const WEEKDAY_ZH = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"];
 
-function buildMonthGrid(targetMonthStr: string): Array<Array<{ date: string; iso: string; isOffMonth: boolean }>> {
-  const target = new Date(targetMonthStr);
-  if (isNaN(target.getTime())) return [];
-  const year = target.getFullYear();
-  const month = target.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const startWeekday = firstDay.getDay(); // 0 = Sun
-  const startDate = new Date(year, month, 1 - startWeekday); // back-fill to Sunday
-  const grid: Array<Array<{ date: string; iso: string; isOffMonth: boolean }>> = [];
-  for (let week = 0; week < 5; week++) {
-    const row: Array<{ date: string; iso: string; isOffMonth: boolean }> = [];
-    for (let day = 0; day < 7; day++) {
-      const d = new Date(startDate);
-      d.setDate(startDate.getDate() + week * 7 + day);
-      row.push({
-        date: String(d.getDate()),
-        iso: d.toISOString().split("T")[0]!,
-        isOffMonth: d.getMonth() !== month,
-      });
-    }
-    grid.push(row);
-  }
-  return grid;
+interface WeekBucket {
+  weekStart: Date;
+  weekEnd: Date;
+  entries: CalendarEntry[];
 }
 
-export function CalendarGridMockup({ data, readOnly = false }: Props) {
+/** Group entries into weekly buckets, Sunday-anchored. */
+function groupByWeek(entries: CalendarEntry[], rangeStart: string, rangeEnd: string): WeekBucket[] {
+  const start = new Date(rangeStart);
+  const end = new Date(rangeEnd);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
+  const buckets: WeekBucket[] = [];
+  // Backfill to Sunday of week containing start
+  const cursor = new Date(start);
+  cursor.setDate(start.getDate() - start.getDay());
+  while (cursor <= end) {
+    const weekStart = new Date(cursor);
+    const weekEnd = new Date(cursor);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const inWeek = entries.filter((e) => {
+      const d = new Date(e.date);
+      return !isNaN(d.getTime()) && d >= weekStart && d <= weekEnd;
+    });
+    inWeek.sort((a, b) => a.date.localeCompare(b.date));
+    buckets.push({ weekStart: new Date(weekStart), weekEnd: new Date(weekEnd), entries: inWeek });
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return buckets;
+}
+
+function fmtMD(d: Date): string {
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+export function CalendarGridMockup({ data, readOnly = false, isActive = false }: Props) {
   if (!data) {
     return (
       <NotionCard>
@@ -78,82 +98,41 @@ export function CalendarGridMockup({ data, readOnly = false }: Props) {
     );
   }
 
-  const grid = buildMonthGrid(data.targetMonth);
-  // Map date → entries (multiple posts per day possible)
-  const entriesByDate = new Map<string, CalendarEntry[]>();
-  for (const e of data.entries) {
-    const list = entriesByDate.get(e.date) ?? [];
-    list.push(e);
-    entriesByDate.set(e.date, list);
-  }
+  const buckets = groupByWeek(data.entries, data.targetDateStart, data.targetDateEnd);
+  const totalPosts = data.entries.length;
 
-  const monthLabel = (() => {
-    const d = new Date(data.targetMonth);
-    if (isNaN(d.getTime())) return data.targetMonth;
-    return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`;
+  const rangeLabel = (() => {
+    const s = new Date(data.targetDateStart);
+    const e = new Date(data.targetDateEnd);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+      return `${data.targetDateStart} → ${data.targetDateEnd}`;
+    }
+    return `${s.getFullYear()}/${s.getMonth() + 1}/${s.getDate()} → ${e.getFullYear()}/${e.getMonth() + 1}/${e.getDate()}`;
   })();
 
   return (
-    <div className="flex flex-col gap-3 max-w-5xl">
+    <div className="flex flex-col gap-3 max-w-3xl">
+      {/* Header card with summary + isActive indicator */}
       <NotionCard>
-        <SectionHeader icon="📅" eyebrow="STEP 4 · CALENDAR" title={`${monthLabel} 月度排程`} />
-
-        {/* Weekday header */}
-        <div className="grid grid-cols-7 text-tiny text-default-500 font-medium border-b border-divider pb-1.5">
-          {WEEKDAYS.map((d) => (
-            <div key={d} className="px-2">{d}</div>
-          ))}
-        </div>
-
-        {/* 5-week grid */}
-        <div className="grid grid-cols-7 gap-px bg-divider">
-          {grid.flat().map((cell, i) => {
-            const list = entriesByDate.get(cell.iso) ?? [];
-            return (
-              <div
-                key={i}
-                className={[
-                  "min-h-[88px] p-1.5 bg-content1 flex flex-col gap-1",
-                  cell.isOffMonth ? "opacity-30" : "",
-                ].join(" ")}
-              >
-                <div className="text-tiny text-default-500 tabular-nums">{cell.date}</div>
-                <div className="flex flex-col gap-0.5">
-                  {list.map((entry, j) => (
-                    <Tooltip
-                      key={j}
-                      content={
-                        <div className="px-1 py-1 max-w-[260px]">
-                          <p className="text-tiny font-medium">{entry.pillarName}</p>
-                          {entry.topic && <p className="text-tiny text-default-500">{entry.topic}</p>}
-                          {entry.eventAnchor && (
-                            <p className="text-tiny text-danger mt-1">📍 {entry.eventAnchor}</p>
-                          )}
-                        </div>
-                      }
-                      placement="top"
-                      delay={150}
-                    >
-                      <div
-                        className="text-tiny rounded px-1.5 py-0.5 bg-default-50 border border-divider flex items-center gap-1 cursor-pointer hover:bg-default-100"
-                        style={{ borderLeft: `3px solid ${PILLAR_COLORS[entry.pillarIndex % 5]}` }}
-                      >
-                        <span>{FORMAT_ICONS[entry.format]}</span>
-                        <span className="truncate text-foreground">{entry.topic ?? entry.pillarName}</span>
-                        {entry.eventAnchor && <span className="text-danger ml-auto">⭐</span>}
-                      </div>
-                    </Tooltip>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <SectionHeader
+              icon="📅"
+              eyebrow="STEP 4 · EDITORIAL CALENDAR"
+              title={`${rangeLabel} · ${totalPosts} 篇`}
+            />
+          </div>
+          {isActive && (
+            <Chip size="sm" variant="flat" color="primary" className="self-start">
+              ● Phoebe Yang 編排中…
+            </Chip>
+          )}
         </div>
 
         {/* Pillar legend */}
         {data.pillars && data.pillars.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2 items-center">
-            <span className="text-tiny text-default-500 mr-1">Pillar 圖例：</span>
+          <div className="flex flex-wrap gap-2 items-center mt-1">
+            <span className="text-tiny text-default-500 mr-1">Pillar：</span>
             {data.pillars.map((p, i) => (
               <Chip
                 key={i}
@@ -172,13 +151,90 @@ export function CalendarGridMockup({ data, readOnly = false }: Props) {
             ))}
           </div>
         )}
-
-        {!readOnly && (
-          <p className="text-tiny text-default-400 mt-2">
-            💡 拖拽切換日期、點擊單格編輯內容（drag-drop 互動 phase 2 接）
-          </p>
-        )}
       </NotionCard>
+
+      {/* Weekly buckets */}
+      {buckets.map((bucket, bi) => (
+        <Card key={bi} shadow="none" className="border border-divider">
+          <CardBody className="p-4 gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-tiny text-default-500 uppercase tracking-wider font-medium">
+                Week {bi + 1} · {fmtMD(bucket.weekStart)} – {fmtMD(bucket.weekEnd)}
+              </p>
+              <span className="text-tiny text-default-500 tabular-nums">
+                {bucket.entries.length} 篇
+              </span>
+            </div>
+
+            {bucket.entries.length === 0 ? (
+              <EmptyHint>本週無排程</EmptyHint>
+            ) : (
+              <div className="flex flex-col">
+                {bucket.entries.map((entry, ei) => (
+                  <PostRow key={ei} entry={entry} />
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      ))}
     </div>
+  );
+}
+
+function PostRow({ entry }: { entry: CalendarEntry }) {
+  const color = PILLAR_COLORS[entry.pillarIndex % 5]!;
+  const d = new Date(entry.date);
+  const weekday = !isNaN(d.getTime()) ? WEEKDAY_ZH[d.getDay()] : "";
+  const dateLabel = !isNaN(d.getTime()) ? `${d.getMonth() + 1}/${d.getDate()}` : entry.date;
+
+  return (
+    <Tooltip
+      content={
+        <div className="px-1 py-1 max-w-[280px]">
+          <p className="text-tiny font-medium">{entry.pillarName}</p>
+          {entry.topic && <p className="text-tiny text-default-700 mt-0.5">{entry.topic}</p>}
+          {entry.eventAnchor && (
+            <p className="text-tiny text-danger mt-1">⭐ {entry.eventAnchor}</p>
+          )}
+        </div>
+      }
+      placement="right"
+      delay={250}
+    >
+      <div
+        className="flex items-center gap-3 py-2 px-2 rounded-md hover:bg-default-50 cursor-pointer border-l-[3px] mt-1"
+        style={{ borderLeftColor: color }}
+      >
+        {/* Date column */}
+        <div className="w-12 shrink-0 text-tiny text-default-500 tabular-nums">
+          <div className="font-semibold text-foreground">{dateLabel}</div>
+          <div className="text-default-400">{weekday}</div>
+        </div>
+
+        {/* Pillar chip */}
+        <Chip size="sm" variant="flat" className="shrink-0 max-w-[110px]"
+          classNames={{ content: "truncate" }}>
+          {entry.pillarName}
+        </Chip>
+
+        {/* Format chip */}
+        <Chip size="sm" variant="flat" color="default" className="shrink-0">
+          {FORMAT_LABEL[entry.format]}
+        </Chip>
+
+        {/* Topic */}
+        <div className="text-small text-foreground truncate flex-1 min-w-0">
+          {entry.topic ?? <span className="text-default-400">—</span>}
+        </div>
+
+        {/* Event anchor */}
+        {entry.eventAnchor && (
+          <Chip size="sm" variant="flat" color="danger" className="shrink-0">
+            ⭐ {entry.eventAnchor}
+          </Chip>
+        )}
+      </div>
+    </Tooltip>
   );
 }

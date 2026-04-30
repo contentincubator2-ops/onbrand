@@ -65,19 +65,22 @@ const STEPS = [
     outputKind: "decision",
     storageTarget: "missions.taskUnits.brief",
     mockupVariant: "IntakeFormMockup",
+    // CJ correction 2026-04-30: date is a date RANGE, not just month;
+    // total_posts replaces posting_cadence (was redundant);
+    // pillar definitions must include visualDirection (added in step 3).
     userInputFields: [
-      { key: "target_month",    label: "規劃月份",       type: "date",          required: true },
-      { key: "tilt_override",   label: "Tilt 確認/編輯", type: "textarea",      required: true },
-      { key: "pillar_count",    label: "Pillar 數量",     type: "select",        required: true,
+      { key: "target_date_start", label: "規劃起始日（年月日）",   type: "date", required: true },
+      { key: "target_date_end",   label: "規劃結束日（年月日）",   type: "date", required: true },
+      { key: "tilt_override",     label: "Tilt 確認/編輯",          type: "textarea", required: true },
+      { key: "pillar_count",      label: "Pillar 數量",              type: "select", required: true,
         options: ["3", "4", "5"] },
-      { key: "posting_cadence", label: "Posting Cadence (篇/週)", type: "select", required: true,
-        options: ["3", "4", "5"] },
-      { key: "kpi_focus",       label: "KPI focus",      type: "select",        required: true,
+      { key: "total_posts",       label: "總篇數（這段期間總共幾篇）", type: "number", required: true },
+      { key: "kpi_focus",         label: "KPI focus",                type: "select", required: true,
         options: ["reach", "saves", "shares", "convert"] },
-      { key: "event_focus",     label: "活動強調方向（每活動）", type: "checkboxGroup", required: false,
+      { key: "event_focus",       label: "活動強調方向（每活動）",   type: "checkboxGroup", required: false,
         options: ["SMP", "messaging", "creative", "all"] },
-      { key: "date_locks",      label: "特定日期主題鎖定（選填）", type: "datelist", required: false },
-      { key: "fb_oauth_token",  label: "FB OAuth 授權（選填，掃描已發貼文）", type: "text", required: false },
+      { key: "date_locks",        label: "特定日期主題鎖定（選填）",  type: "datelist", required: false },
+      { key: "fb_oauth_token",    label: "FB OAuth 授權（選填）",   type: "text", required: false },
     ],
     dataRequirements: { minUrls: 0, minChars: 0 },
     aiModel: "n/a", // UI step
@@ -100,8 +103,8 @@ const STEPS = [
   // ── Step 3: N Pillars definition ────────────────────────────────────────
   {
     order: 3,
-    name: "N Pillars 定義（含比例 + sample 主題）",
-    description: "把 step 2 research distill 成 N 根 pillar，每根含：name / hypothesis / ratio% / target KPI / 5 個 sample 主題。N 由用戶在 step 1 選定（3/4/5）。",
+    name: "N Pillars 定義（含比例 + sample 主題 + 視覺方向）",
+    description: "把 step 2 research distill 成 N 根 pillar，每根含：name / hypothesis / ratio% / target KPI / 5 個 sample 主題 / 視覺方向（image_brief 一致參考）。N 由用戶在 step 1 選定（3/4/5）。視覺方向欄位給 step 5 brief writer + visual director 一致基準。",
     assignedAgentId: AGENT.pillarArchitect,
     assignedAgentName: NAME[AGENT.pillarArchitect],
     reviewerAgentId: AGENT.squadLead,
