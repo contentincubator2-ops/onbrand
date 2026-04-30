@@ -72,14 +72,37 @@ async function main() {
   if (!brand) { console.error(`brand "${BRAND_NAME}" not found`); await pool.end(); process.exit(1); }
   console.log(`Brand: ${brand.name} (#${brand.id})`);
 
-  // Resolve event
-  const [eRows] = await pool.execute(
-    `SELECT id, name, brandId, startAt, endAt, positioning
-       FROM events WHERE name = ? LIMIT 1`,
-    [EVENT_NAME],
-  ) as any[];
-  const ev = (eRows as any[])?.[0];
-  if (!ev) { console.error(`event "${EVENT_NAME}" not found`); await pool.end(); process.exit(1); }
+  // Resolve event — exact, then fuzzy LIKE %term% on first 3 chars chunks
+  let ev: any = null;
+  {
+    const [eRows] = await pool.execute(
+      `SELECT id, name, brandId, startAt, endAt, positioning FROM events WHERE name = ? LIMIT 1`,
+      [EVENT_NAME],
+    ) as any[];
+    ev = (eRows as any[])?.[0];
+  }
+  if (!ev) {
+    // Fuzzy: pick longest distinctive substring
+    const term = EVENT_NAME.replace(/\s+/g, "").slice(0, 8);
+    const [eRows] = await pool.execute(
+      `SELECT id, name, brandId, startAt, endAt, positioning FROM events WHERE name LIKE ? AND brandId = ? ORDER BY startAt DESC LIMIT 5`,
+      [`%${term}%`, brand.id],
+    ) as any[];
+    const list = eRows as any[];
+    if (list.length === 0) {
+      // Last resort — list all events for the brand
+      const [allRows] = await pool.execute(
+        `SELECT id, name, startAt FROM events WHERE brandId = ? ORDER BY startAt DESC LIMIT 10`,
+        [brand.id],
+      ) as any[];
+      console.error(`event "${EVENT_NAME}" not found. Brand "${brand.name}" has these events:`);
+      for (const r of (allRows as any[])) console.error(`  #${r.id}  ${r.name}  (${r.startAt})`);
+      await pool.end();
+      process.exit(1);
+    }
+    ev = list[0];
+    console.log(`(fuzzy match: "${term}" → ${ev.name})`);
+  }
   console.log(`Event: ${ev.name} (#${ev.id})`);
 
   // Build context exactly like stepExecute would
