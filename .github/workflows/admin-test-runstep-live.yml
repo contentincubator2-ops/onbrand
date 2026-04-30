@@ -1,0 +1,62 @@
+name: Admin — test runStepLive end-to-end
+
+# Calls callLLM on prod VM with the EXACT prompt squadTemplateRouter
+# would build. Lets us verify squad execution before asking CJ to retry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      squad_id:
+        description: "Squad ID (default 726 = FB monthly calendar)"
+        required: false
+        default: "726"
+      step_index:
+        description: "Step index 0-based (default 1 = pillar 受眾×競品)"
+        required: false
+        default: "1"
+      scope_kind:
+        description: "Scope kind: brand | product | event"
+        required: false
+        default: "brand"
+      scope_id:
+        description: "Scope ID (brand/product/event id)"
+        required: false
+        default: "0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          SQUAD_ID: ${{ github.event.inputs.squad_id }}
+          STEP_INDEX: ${{ github.event.inputs.step_index }}
+          SCOPE_KIND: ${{ github.event.inputs.scope_kind }}
+          SCOPE_ID: ${{ github.event.inputs.scope_id }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          envs: SQUAD_ID,STEP_INDEX,SCOPE_KIND,SCOPE_ID
+          script: |
+            set +e
+            cd /opt/marketing-os && git pull --ff-only 2>&1 | tail -3
+            cd /opt/marketing-os/app/skills/ai-talent 2>/dev/null || cd /opt/marketing-os/skills/ai-talent
+            set -a
+            [ -f .env ] && . .env
+            [ -f /opt/marketing-os/app/skills/ai-talent/.env ] && . /opt/marketing-os/app/skills/ai-talent/.env
+            [ -f /opt/marketing-os/skills/ai-talent/.env ] && . /opt/marketing-os/skills/ai-talent/.env
+            set +a
+
+            echo "===== Env presence (no values) ====="
+            [ -n "$ANTHROPIC_API_KEY" ] && echo "✓ ANTHROPIC_API_KEY (len=${#ANTHROPIC_API_KEY})" || echo "✗ ANTHROPIC_API_KEY missing"
+            [ -n "$ANTHROPIC_API_KEY_BACKUP_1" ] && echo "✓ ANTHROPIC_API_KEY_BACKUP_1" || echo "  (no backup_1)"
+            [ -n "$AZURE_FOUNDRY_API_KEY" ] && echo "✓ AZURE_FOUNDRY_API_KEY" || echo "  (no foundry)"
+            [ -n "$AZURE_OPENAI_ENDPOINT" ] && echo "✓ AZURE_OPENAI_ENDPOINT" || echo "  (no openai)"
+            [ -n "$OPENROUTER_API_KEY" ] && echo "✓ OPENROUTER_API_KEY" || echo "  (no openrouter)"
+
+            echo ""
+            echo "===== Test runStepLive squad=$SQUAD_ID step=$STEP_INDEX scope=$SCOPE_KIND/$SCOPE_ID ====="
+            timeout 120 env SQUAD_ID=$SQUAD_ID STEP_INDEX=$STEP_INDEX SCOPE_KIND=$SCOPE_KIND SCOPE_ID=$SCOPE_ID \
+              npx tsx scripts/test-runstep-live.ts 2>&1
