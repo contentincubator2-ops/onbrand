@@ -148,6 +148,96 @@ export const squadTemplateRouter = router({
   //
   // This is the canonical filter; existing listByBrand is kept for
   // back-compat but new callers should use listForFront.
+  // ── Admin procedures (CJ direction 2026-04-30) ──────────────────────────
+  // /admin/squads SquadLabPage uses these. No role gate yet — any logged-in
+  // user can see drafts; tighten when role system lands.
+  listForAdmin: protectedProcedure
+    .input(z.object({
+      status: z.enum(["draft", "approved", "all"]).default("all"),
+      tier: z.enum(["core", "defer", "kill", "all"]).default("all"),
+      search: z.string().max(80).optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const where: string[] = ["s.is_active = 1"];
+      const params: any[] = [];
+      if (input?.status === "draft") where.push("s.is_approved = 0");
+      else if (input?.status === "approved") where.push("s.is_approved = 1");
+      if (input?.tier && input.tier !== "all") {
+        where.push("s.tier = ?");
+        params.push(input.tier);
+      }
+      if (input?.search) {
+        where.push("(s.name LIKE ? OR s.slug LIKE ? OR s.methodology LIKE ?)");
+        const term = `%${input.search}%`;
+        params.push(term, term, term);
+      }
+      const [rows] = await localPool.execute(
+        `SELECT s.id, s.slug, s.name, s.description, s.methodology,
+                s.tier, s.strategy_layer, s.workspace, s.tags,
+                s.lead_agent_id, s.is_approved, s.approved_at, s.approved_by,
+                s.created_at, s.updated_at,
+                JSON_LENGTH(s.steps)  AS step_count,
+                JSON_LENGTH(s.agents) AS agent_count
+           FROM squads s
+          WHERE ${where.join(" AND ")}
+          ORDER BY s.is_approved ASC, s.updated_at DESC
+          LIMIT 500`,
+        params,
+      ) as any[];
+      return (rows as any[]) ?? [];
+    }),
+
+  // Get single squad with full step + agent detail for the lab detail pane.
+  getForAdmin: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const [rows] = await localPool.execute(
+        `SELECT * FROM squads WHERE id = ? LIMIT 1`,
+        [input.id],
+      ) as any[];
+      const row = (rows as any[])?.[0];
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: `squad ${input.id} not found` });
+      // Hydrate referenced agents
+      const agentsRaw = safeJsonParse<any[]>(row.agents, []);
+      const stepsRaw  = safeJsonParse<any[]>(row.steps, []);
+      const ids = new Set<number>();
+      for (const a of agentsRaw) if (a?.id) ids.add(Number(a.id));
+      for (const s of stepsRaw)  if (s?.assignedAgentId) ids.add(Number(s.assignedAgentId));
+      if (row.lead_agent_id) ids.add(Number(row.lead_agent_id));
+      const agentMap: Record<number, any> = {};
+      if (ids.size > 0) {
+        const placeholders = [...ids].map(() => "?").join(",");
+        const [aRows] = await localPool.execute(
+          `SELECT id, slug, name, englishName, title, layer, aiModel, avatarUrl
+             FROM agents WHERE id IN (${placeholders})`,
+          [...ids],
+        ) as any[];
+        for (const a of (aRows as any[])) agentMap[Number(a.id)] = a;
+      }
+      return { ...row, agents: agentsRaw, steps: stepsRaw, agentMap };
+    }),
+
+  approve: protectedProcedure
+    .input(z.object({ id: z.number(), note: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await localPool.execute(
+        `UPDATE squads SET is_approved = 1, approved_at = NOW(), approved_by = ? WHERE id = ?`,
+        [ctx.user!.id, input.id],
+      );
+      return { ok: true, approvedBy: ctx.user!.id, note: input.note };
+    }),
+
+  /** Soft reject — flips is_approved=0, leaves squad active so admin can edit. */
+  reject: protectedProcedure
+    .input(z.object({ id: z.number(), reason: z.string().max(500).optional() }))
+    .mutation(async ({ input }) => {
+      await localPool.execute(
+        `UPDATE squads SET is_approved = 0, approved_at = NULL, approved_by = NULL WHERE id = ?`,
+        [input.id],
+      );
+      return { ok: true, reason: input.reason };
+    }),
+
   listForFront: protectedProcedure
     .input(z.object({
       brandId: z.number().optional(),

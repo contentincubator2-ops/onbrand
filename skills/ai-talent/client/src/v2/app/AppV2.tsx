@@ -43,6 +43,7 @@ import QuickTasksPage from "../pages/QuickTasksPage";
 import BoardroomPage from "../pages/BoardroomPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
+import SquadLabPage from "../pages/admin/SquadLabPage";
 
 export default function AppV2() {
   return (
@@ -95,6 +96,7 @@ export default function AppV2() {
           <Route path="/templates" element={<MethodologyCatalog />} />
           <Route path="/templates/:slug" element={<MethodologyDetail />} />
           <Route path="/squad-mockups" element={<SquadMockupsGalleryPage />} />
+          <Route path="/admin/squads" element={<SquadLabPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
