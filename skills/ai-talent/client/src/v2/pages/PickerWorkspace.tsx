@@ -1133,6 +1133,10 @@ function SquadDetailPanel({
   missionId: number | null;
   onMissionEnd: () => void;
 }) {
+  // ── Active scope (brand × product × event) — same hook ShellLayout uses,
+  // backed by localStorage. Lets stepExecute carry the right context so
+  // agents read event positioning, not just brand. (CJ correction 2026-04-30)
+  const [scope] = useScopeState();
   // ── Live progress polling (post-launch) ──────────────────────────────
   const progressQuery: any = (trpc.squad as any).stepGetProgress?.useQuery
     ? (trpc.squad as any).stepGetProgress.useQuery(
@@ -1143,6 +1147,22 @@ function SquadDetailPanel({
   const stepExecute: any = (trpc.squad as any).stepExecute?.useMutation
     ? (trpc.squad as any).stepExecute.useMutation()
     : { mutateAsync: async () => null, isPending: false };
+
+  // Scope-injecting wrapper — every stepExecute call needs to carry the
+  // active ScopeBar state so the agent reads brand + product + event
+  // positioning, not just the mission's brandId. (CJ correction 2026-04-30:
+  // squad was answering with generic Snorlax content because event
+  // positioning never reached the prompt.)
+  const stepExecuteWithScope = useMemo(() => ({
+    ...stepExecute,
+    mutateAsync: (args: any) =>
+      stepExecute.mutateAsync({
+        ...args,
+        scopeBrandId:   scope.brandId   ?? null,
+        scopeProductId: scope.productId ?? null,
+        scopeEventId:   scope.eventId   ?? null,
+      }),
+  }), [stepExecute, scope.brandId, scope.productId, scope.eventId]);
 
   const stepProgressList: any[] =
     (progressQuery.data?.steps ?? progressQuery.data ?? []) as any[];
@@ -1434,7 +1454,7 @@ function SquadDetailPanel({
                         // up via the chain context.
                         if (!missionId) return;
                         const payload = `__media_url__: ${url}\n__model__: ${modelId}\n__prompt__: ${promptEn}\n\n${draft}`;
-                        await stepExecute.mutateAsync({
+                        await stepExecuteWithScope.mutateAsync({
                           missionId,
                           squadSlug: squad.slug,
                           stepOrder: activeStepOrder,
@@ -1621,14 +1641,14 @@ function SquadDetailPanel({
                 onConfirmAndAdvance={async () => {
                   if (!missionId) return;
                   // Mark this step confirmed
-                  await stepExecute.mutateAsync({
+                  await stepExecuteWithScope.mutateAsync({
                     missionId, squadSlug: squad.slug, stepOrder: ord,
                     mode: "confirm", userInput: "",
                   });
                   // Auto-trigger next step if any
                   const next = ord + 1;
                   if (next <= steps.length) {
-                    await stepExecute.mutateAsync({
+                    await stepExecuteWithScope.mutateAsync({
                       missionId, squadSlug: squad.slug, stepOrder: next,
                       mode: "run", userInput: "",
                     });
@@ -1637,7 +1657,7 @@ function SquadDetailPanel({
                 }}
                 onRedo={async () => {
                   if (!missionId) return;
-                  await stepExecute.mutateAsync({
+                  await stepExecuteWithScope.mutateAsync({
                     missionId, squadSlug: squad.slug, stepOrder: ord,
                     mode: "run", userInput: "",
                   });
@@ -1645,7 +1665,7 @@ function SquadDetailPanel({
                 }}
                 onAsk={async (q: string) => {
                   if (!missionId || !q.trim()) return;
-                  await stepExecute.mutateAsync({
+                  await stepExecuteWithScope.mutateAsync({
                     missionId, squadSlug: squad.slug, stepOrder: ord,
                     mode: "ask", userInput: q.trim(),
                   });
@@ -1653,6 +1673,7 @@ function SquadDetailPanel({
                 }}
                 isMutating={stepExecute.isPending}
                 onClick={() => setActiveStepIdx(i)}
+                onAfterEdit={() => { progressQuery.refetch?.(); }}
               />
             );
           })}
@@ -1814,7 +1835,7 @@ function AgentLiveCard({
   step, idx, isOrchestrator, tone, hasNote,
   liveStatus, liveOutput, liveAgentName, isActive,
   missionId, squadSlug,
-  onConfirmAndAdvance, onRedo, onAsk, isMutating, onClick,
+  onConfirmAndAdvance, onRedo, onAsk, isMutating, onClick, onAfterEdit,
 }: {
   step: any; idx: number; isOrchestrator: boolean; tone: any; hasNote?: boolean;
   liveStatus: string; liveOutput: string | null; liveAgentName: string | null;
@@ -1825,6 +1846,7 @@ function AgentLiveCard({
   onAsk: (q: string) => Promise<void>;
   isMutating: boolean;
   onClick?: () => void;
+  onAfterEdit?: () => void;
 }) {
   const title = step.name ?? step.title ?? `Step ${idx}`;
   const agent = liveAgentName ?? step.assignedAgentName ?? step.owner ?? null;
@@ -1844,6 +1866,29 @@ function AgentLiveCard({
 
   const [chatInput, setChatInput] = useState("");
   const expanded = isActive && (liveStatus === "drafted" || liveStatus === "running" || !!liveOutput);
+
+  // Inline edit — CJ direction 2026-04-30: 「我想要逐字修改，沒地方改」
+  // Click pencil → textarea + save/cancel. Save calls stepEditOutput
+  // (which pushes the previous version into history so undo still works).
+  const [editing, setEditing] = useState(false);
+  const [editBuffer, setEditBuffer] = useState("");
+  const editMutation: any = (trpc.squad as any).stepEditOutput?.useMutation
+    ? (trpc.squad as any).stepEditOutput.useMutation()
+    : { mutateAsync: async () => null, isPending: false };
+  const beginEdit = () => {
+    setEditBuffer(liveOutput ?? "");
+    setEditing(true);
+  };
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditBuffer("");
+  };
+  const saveEdit = async () => {
+    if (!missionId) return;
+    await editMutation.mutateAsync({ missionId, stepOrder: idx, output: editBuffer });
+    setEditing(false);
+    onAfterEdit?.();
+  };
 
   return (
     <Card
@@ -1951,10 +1996,51 @@ function AgentLiveCard({
               <div className="flex items-start gap-2">
                 <AgentAvatar seed={agent ?? `step${idx}`} size={32} className="rounded-full shrink-0" />
                 <div className="flex-1 bg-content1 border border-divider rounded-2xl rounded-tl-sm px-3 py-2">
-                  <p className="text-tiny text-default-500 mb-1">{agent ?? "agent"}</p>
-                  <ScrollShadow className="max-h-64">
-                    <pre className="text-small leading-relaxed font-sans whitespace-pre-wrap">{liveOutput}</pre>
-                  </ScrollShadow>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-tiny text-default-500">{agent ?? "agent"}</p>
+                    {!editing && liveOutput && (
+                      <Button
+                        size="sm"
+                        variant="light"
+                        className="h-6 min-w-0 px-2 text-tiny"
+                        onPress={beginEdit}
+                        startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny" />}
+                      >
+                        編輯
+                      </Button>
+                    )}
+                  </div>
+                  {editing ? (
+                    <div className="flex flex-col gap-2">
+                      <Textarea
+                        size="sm"
+                        variant="bordered"
+                        value={editBuffer}
+                        onValueChange={setEditBuffer}
+                        minRows={6}
+                        maxRows={20}
+                        classNames={{ input: "text-small leading-relaxed font-sans whitespace-pre-wrap" }}
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="light" onPress={cancelEdit} isDisabled={editMutation.isPending}>
+                          取消
+                        </Button>
+                        <Button
+                          size="sm"
+                          color="primary"
+                          onPress={saveEdit}
+                          isLoading={editMutation.isPending}
+                          isDisabled={editBuffer === (liveOutput ?? "")}
+                        >
+                          儲存修改
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <ScrollShadow className="max-h-64">
+                      <pre className="text-small leading-relaxed font-sans whitespace-pre-wrap">{liveOutput}</pre>
+                    </ScrollShadow>
+                  )}
                 </div>
               </div>
             ) : null}

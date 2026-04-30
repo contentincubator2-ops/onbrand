@@ -1843,6 +1843,13 @@ ${agentCtx.systemPromptPrefix}`;
       stepOrder:  z.number(),
       mode:       z.enum(["ask", "run", "confirm", "skip", "unskip"]),
       userInput:  z.string().max(4000).optional().default(""),
+      // CJ correction 2026-04-30: agents must read product + event positioning,
+      // not just brand. Picker passes the active ScopeBar state through here
+      // so prompts include the right Pokemon GO Dragon Community Day context
+      // instead of generic Snorlax examples.
+      scopeBrandId:   z.number().nullable().optional(),
+      scopeProductId: z.number().nullable().optional(),
+      scopeEventId:   z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -1960,27 +1967,66 @@ ${agentCtx.systemPromptPrefix}`;
         ? `任務：${mission.title}${mission.description ? ` · ${mission.description}` : ""}`
         : "";
 
-      // Brand context — auto-injected so every step inherits brand voice.
-      // Pulled from the mission's bound brand (mission.create captures
-      // brandId from the picker's brand switcher).
-      let brandContext = "";
-      if (mission?.brandId) {
+      // Scope context — brand + product + event positioning, all injected.
+      // CJ feedback 2026-04-30: agent only had brand context, so when user
+      // bound 「2026年五月單首龍經典社群日」 the post text still talked about
+      // generic 野生卡比獸 instead of Dragon Community Day. Now we resolve
+      // and inject all three layers when present, with explicit cascade
+      // (event > product > brand) so the LLM knows which is the focus.
+      const scopeBrandId   = input.scopeBrandId   ?? mission?.brandId ?? null;
+      const scopeProductId = input.scopeProductId ?? null;
+      const scopeEventId   = input.scopeEventId   ?? null;
+      const contextParts: string[] = [];
+      if (scopeBrandId) {
         const [bRows] = await db.execute(sql`
-          SELECT name, industry, description, positioningSummary
-            FROM brands WHERE id = ${mission.brandId} LIMIT 1
+          SELECT name, industry, description, positioningSummary, positioning
+            FROM brands WHERE id = ${scopeBrandId} LIMIT 1
         `) as any[];
         const brand = (bRows as any[])?.[0];
         if (brand) {
-          const parts: string[] = [];
-          parts.push(`【品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}`);
-          if (brand.positioningSummary) {
-            parts.push(`定位：${String(brand.positioningSummary).slice(0, 600)}`);
-          } else if (brand.description) {
-            parts.push(`描述：${String(brand.description).slice(0, 400)}`);
+          const sub: string[] = [`【品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}`];
+          if (brand.positioningSummary) sub.push(`品牌定位：${String(brand.positioningSummary).slice(0, 600)}`);
+          else if (brand.description)   sub.push(`品牌描述：${String(brand.description).slice(0, 400)}`);
+          else if (brand.positioning) {
+            const pos = typeof brand.positioning === "string" ? brand.positioning : JSON.stringify(brand.positioning);
+            sub.push(`品牌定位（JSON）：${pos.slice(0, 800)}`);
           }
-          brandContext = parts.join("\n");
+          contextParts.push(sub.join("\n"));
         }
       }
+      if (scopeProductId) {
+        const [pRows] = await localPool.execute(
+          `SELECT name, positioning FROM products WHERE id = ? LIMIT 1`,
+          [scopeProductId],
+        ) as any[];
+        const product = (pRows as any[])?.[0];
+        if (product) {
+          const pos = typeof product.positioning === "string" ? product.positioning : (product.positioning ? JSON.stringify(product.positioning) : "");
+          contextParts.push(`【產品】${product.name}${pos ? `\n產品定位：${pos.slice(0, 800)}` : ""}`);
+        }
+      }
+      if (scopeEventId) {
+        const [eRows] = await localPool.execute(
+          `SELECT name, startAt, endAt, positioning FROM events WHERE id = ? LIMIT 1`,
+          [scopeEventId],
+        ) as any[];
+        const ev = (eRows as any[])?.[0];
+        if (ev) {
+          const period = ev.startAt
+            ? `${String(ev.startAt).split("T")[0]} ~ ${String(ev.endAt ?? "").split("T")[0]}`
+            : "（無日期）";
+          const pos = typeof ev.positioning === "string" ? ev.positioning : (ev.positioning ? JSON.stringify(ev.positioning) : "");
+          contextParts.push(
+            `【活動】${ev.name}（期間 ${period}）\n` +
+            (pos ? `活動定位（11-segment）：${pos.slice(0, 1500)}` : "活動定位：（未填）"),
+          );
+          // Strong scope-anchor: tell the LLM the event is the FOCUS, brand is supporting.
+          contextParts.push(
+            `【重要】此 mission 的執行 scope 是上面這個「活動」。所有舉例、產品、受眾、主題、行動呼籲都必須緊扣這個活動本身（時間、主題、目標族群），禁止用品牌的通用範例（例如野生寶可夢一般介紹）取代活動的特定內容。如果你產出的內容換到品牌的其他活動也說得通，就是失敗。`,
+          );
+        }
+      }
+      const brandContext = contextParts.join("\n\n");
 
       const stepName = step.name ?? step.title ?? `Step ${input.stepOrder}`;
       const stepDesc = step.description ?? "";
@@ -2081,11 +2127,21 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
 - 寫 3-6 句即可。後面用戶會看著這個 brief，在 3-step 流程裡進一步選方向、寫 AI prompt、挑模型生成
 - 禁止輸出 Markdown code block 或 prompt template；就是純自然語言 brief`
         : isContent
-        ? `這是「內容類」交付物 — 你交出的東西要可以直接複製貼上發出去。
-- 不要寫「我會...」、「先...再...」、「Step 1 / Step 2」這種說明流程
-- 直接寫成品本身（caption / hashtag / 圖片描述 / 影片腳本 / 標題等）
-- 文案類加 emoji、CTA、換行；hashtag 類就純列 #tag
-- 如果產出是「圖文」、「視覺」、「縮圖」等視覺素材，請寫具體的圖片描述（讓 AI 繪圖工具可以根據此描述產圖）`
+        ? `這是「內容類」交付物 — 你交出的東西要可以直接複製貼上到平台發出去。
+
+【嚴格禁止 — 違反任一條都算失敗】
+✗ 禁止 markdown 標題符號（# ## ### 等）— 用戶會直接複製到 Facebook 貼文，井字號是雜訊
+✗ 禁止內部標籤 / 步驟名稱（例如「Jab 1: 教育型貼文文案」、「Step 3 文案」、「貼文 1：...」）— 那是內部使用，不該出現在貼文內
+✗ 禁止前言 / 解釋 / 開場白（「以下是...」、「我會這樣寫：」、「這篇貼文的目的是...」）— 直接交付貼文本體
+✗ 禁止 markdown 條列符號（- *）混在文案中 — 用 emoji 或編號，不要 markdown 語法
+✗ 禁止 hashtag 出現在貼文上半段 — 結尾才放，純 #tag 列表
+
+【正確輸出 — 直接是 Facebook / IG / TikTok 用戶看到的那行字】
+✓ 第一行就是 hook（吸睛句）+ emoji
+✓ 中段：產品/活動賣點 + 受眾為什麼在乎
+✓ 結尾：CTA + 連結佔位符 + 3-5 個 hashtag
+✓ 換行用真實換行符（\\n），不是 <br> 也不是 markdown
+✓ 如果產出是「圖文」、「視覺」、「縮圖」等視覺素材，請寫具體的圖片描述（讓 AI 繪圖工具可以根據此描述產圖）`
         : isStrategic
         ? `這是「策略 / 文件類」交付物 — 寫出完整的成品文件，不是「我會這樣做」的說明。
 - 用 markdown 結構（## 大標 / - 條列）
@@ -2116,7 +2172,8 @@ ${brandContext ? `\n${brandContext}\n` : ""}
 ${prevOutputs ? `\n上游步驟成果（直接接續使用，不要重述）：\n${prevOutputs}` : ""}
 ${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
 
-請直接交付【成品內容】 — 不是「我會這樣做」的說明。所有舉例必須來自上面這個品牌的真實產品 / 受眾 / 產業情境。`;
+請直接交付【成品內容】 — 不是「我會這樣做」的說明。所有舉例必須來自上面這個 scope（活動 > 產品 > 品牌 cascade）的真實內容；如果有【活動】，舉例必須緊扣此活動的時間 / 主題 / TA / 商品 / CTA，不要拿品牌的其他活動或泛用例子代替。
+若產出類型是貼文文案：禁止 markdown 標題符號（#）、禁止內部標籤（Jab 1: / Step 1:）、禁止前言。直接從第一句開始寫貼文本體。`;
 
       // Cross-provider fallback — Azure-only invokeLLM throws DeploymentNotFound
       // when the deployment name drifts. callLLM falls back to Anthropic /
@@ -2127,7 +2184,24 @@ ${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
         maxTokens: 3000,
         timeoutMs: 35_000,
       });
-      const output = llm.text;
+      const rawOutput = llm.text;
+
+      // Defensive cleanup for content-type outputs — strip markdown headers
+      // and internal section labels even when the LLM ignores the prompt.
+      // Strategic / brief outputs keep their markdown structure intact.
+      const stripContentArtifacts = (s: string): string => {
+        return s
+          // Drop "Jab 1: ...", "Step 3: ...", "貼文 1：..." style internal labels
+          // appearing as their own line at the start.
+          .replace(/^\s*(?:#\s*)?(?:Jab|Step|貼文|Post)\s*\d+\s*[:：][^\n]*\n+/gi, "")
+          // Strip leading markdown headers that snuck into a content post
+          // (#, ##, ### at the start of a line).
+          .replace(/^#{1,6}\s+/gm, "")
+          // Strip "以下是..." / "這是..." / "我會..." prefaces on the first line.
+          .replace(/^(?:以下(?:是|為)|這(?:是|篇是)|我(?:會|將)|這篇貼文(?:的目的)?是)[^\n]*\n+/m, "")
+          .trim();
+      };
+      const output = isContent ? stripContentArtifacts(rawOutput) : rawOutput;
 
       // Push the previous draft (if any) into history so the user can undo.
       // history is a JSON array of { output, userInput, ts }.
@@ -2238,6 +2312,56 @@ ${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
          WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
       `);
       return { ok: true, output: String(last.output ?? "") };
+    }),
+
+  // ── stepEditOutput ───────────────────────────────────────────────────────────
+  // Manual user edit of agent_output. Pushes the previous version into history
+  // (so undo still works). CJ direction 2026-04-30: 用戶要能逐字修改 agent
+  // 寫的貼文文案，不能只是看著沒辦法改。
+  stepEditOutput: protectedProcedure
+    .input(z.object({
+      missionId: z.number(),
+      stepOrder: z.number(),
+      output:    z.string().max(20_000),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+      // Push current output into history before overwriting (so 上一版 keeps working)
+      const [rows] = await db.execute(sql`
+        SELECT agent_output, user_input, history FROM mission_step_progress
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder} LIMIT 1
+      `) as any[];
+      const row = (rows as any[])?.[0];
+      if (!row) {
+        // No row yet → create it as a manual draft
+        await db.execute(sql`
+          INSERT INTO mission_step_progress
+            (mission_id, step_order, status, agent_output, agent_name, history)
+          VALUES
+            (${input.missionId}, ${input.stepOrder}, 'drafted',
+             ${input.output}, '使用者手動編輯', '[]')
+          ON DUPLICATE KEY UPDATE
+            status = 'drafted',
+            agent_output = VALUES(agent_output),
+            history = VALUES(history)
+        `);
+        return { ok: true, output: input.output };
+      }
+      const prevHist = safeJsonParse<any[]>(row.history, []);
+      const nextHistory = row.agent_output
+        ? [...prevHist, { output: row.agent_output, userInput: row.user_input, ts: new Date().toISOString(), source: "pre-edit" }].slice(-10)
+        : prevHist;
+
+      await db.execute(sql`
+        UPDATE mission_step_progress
+           SET agent_output = ${input.output},
+               history      = ${JSON.stringify(nextHistory)},
+               status       = 'drafted'
+         WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+      `);
+      return { ok: true, output: input.output };
     }),
 
   // ── askMary ──────────────────────────────────────────────────────────────────
