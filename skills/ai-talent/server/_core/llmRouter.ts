@@ -23,9 +23,9 @@ interface CallArgs {
   maxTokens?: number;
   /** Default 180s per provider. */
   timeoutMs?: number;
-  /** Total wall-clock budget across ALL providers. Default 50s — nginx
-   *  kills upstream at 60s and returns HTML, which tRPC then fails to
-   *  parse as JSON. Stop trying before that happens. */
+  /** Total wall-clock budget across ALL providers. Default 55s — nginx
+   *  default upstream timeout is ~60s. Stop trying before nginx returns
+   *  HTML (which tRPC then fails to parse as JSON). */
   budgetMs?: number;
 }
 
@@ -183,11 +183,11 @@ async function callOpenRouter(args: CallArgs): Promise<string> {
 export async function callLLM(args: CallArgs): Promise<{ text: string; attempts: ProviderAttempt[] }> {
   const attempts: ProviderAttempt[] = [];
   const startedAt = Date.now();
-  const budgetMs = args.budgetMs ?? 50_000;
-  // Per-provider timeout: default to whichever is smaller — caller's
-  // timeoutMs, or remaining budget. Each attempt also gets a hard cap
-  // of 25s so any one hang doesn't burn the whole budget.
-  const perProviderCap = 25_000;
+  const budgetMs = args.budgetMs ?? 55_000;
+  // Per-provider cap: 45s. Anthropic Sonnet 4.5 generates ~80 tok/s,
+  // so 3000-token outputs (text_strategic) need ~35-40s end-to-end.
+  // 25s was too aggressive — caused systematic timeout on real workloads.
+  const perProviderCap = 45_000;
 
   const remainingBudget = () => Math.max(0, budgetMs - (Date.now() - startedAt));
 
@@ -224,6 +224,11 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
           callAnthropic(ANTHROPIC_KEYS[i]!, { ...args, timeoutMs: t }),
         );
         if (text) return { text, attempts };
+        // Backup keys help against auth/billing failures, NOT timeouts.
+        // A slow request on Anthropic infra won't get faster on key-2.
+        // Bail to next provider after first timeout.
+        const last = attempts[attempts.length - 1];
+        if (last?.error?.toLowerCase().includes("timeout") || last?.error?.toLowerCase().includes("aborted")) break;
         if (remainingBudget() < 2000) break;
       }
     } else if (provider === "azure-foundry") {
