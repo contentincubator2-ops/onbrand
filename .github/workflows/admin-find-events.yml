@@ -1,0 +1,31 @@
+name: Admin — find events for brand
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_name:
+        required: false
+        default: "Pokémon GO"
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_NAME: ${{ github.event.inputs.brand_name }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: BRAND_NAME
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; [ -f .env ] && . .env; set +a
+            MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
+              SELECT e.id, e.name, e.startAt, e.endAt
+                FROM events e JOIN brands b ON b.id = e.brandId
+               WHERE b.name = '$BRAND_NAME'
+               ORDER BY e.startAt DESC LIMIT 20;
+            "
