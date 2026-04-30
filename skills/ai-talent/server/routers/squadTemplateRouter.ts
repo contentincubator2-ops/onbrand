@@ -27,6 +27,7 @@ import { getDb } from "../db";
 import localPool from "../localDb";
 import { sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
+import { callLLM } from "../_core/llmRouter";
 import { randomBytes } from "crypto";
 import { loadAgentContext } from "../agentContextLoader";
 import { getSquadRequirements } from "../_core/squadRequirements";
@@ -423,23 +424,20 @@ ${outputKindGuide(step.outputKind, step.mockupVariant)}
         "請依 outputKind 規則產出此 step 的 conclusion (JSON)。",
       ].filter(Boolean).join("\n\n");
 
-      // 4. Call LLM (cross-provider fallback via existing invokeLLM)
+      // 4. Call LLM with cross-provider fallback (Anthropic → Azure Foundry
+      //    → Azure OpenAI → OpenRouter). Single-provider failure (e.g.
+      //    Azure DeploymentNotFound 404) doesn't kill the run.
       const t0 = Date.now();
       let rawText = "";
       let attempts = 1;
       try {
-        const llm = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user",   content: userPrompt },
-          ],
-          // model could be honored via opts but invokeLLM auto-picks — keep simple
-        });
-        rawText = String(llm?.choices?.[0]?.message?.content ?? "");
+        const result = await callLLM({ system: systemPrompt, user: userPrompt, maxTokens: 4000 });
+        rawText = result.text;
+        attempts = result.attempts?.length ?? 1;
       } catch (e) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `LLM call failed: ${e instanceof Error ? e.message : String(e)}`,
+          message: `LLM call failed (all providers): ${e instanceof Error ? e.message : String(e)}`,
         });
       }
       const durationMs = Date.now() - t0;
