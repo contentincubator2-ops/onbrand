@@ -23,6 +23,10 @@ interface CallArgs {
   maxTokens?: number;
   /** Default 180s per provider. */
   timeoutMs?: number;
+  /** Total wall-clock budget across ALL providers. Default 50s — nginx
+   *  kills upstream at 60s and returns HTML, which tRPC then fails to
+   *  parse as JSON. Stop trying before that happens. */
+  budgetMs?: number;
 }
 
 type Provider = "anthropic" | "azure-foundry" | "azure-openai" | "openrouter";
@@ -178,15 +182,29 @@ async function callOpenRouter(args: CallArgs): Promise<string> {
  */
 export async function callLLM(args: CallArgs): Promise<{ text: string; attempts: ProviderAttempt[] }> {
   const attempts: ProviderAttempt[] = [];
+  const startedAt = Date.now();
+  const budgetMs = args.budgetMs ?? 50_000;
+  // Per-provider timeout: default to whichever is smaller — caller's
+  // timeoutMs, or remaining budget. Each attempt also gets a hard cap
+  // of 25s so any one hang doesn't burn the whole budget.
+  const perProviderCap = 25_000;
+
+  const remainingBudget = () => Math.max(0, budgetMs - (Date.now() - startedAt));
 
   const tryProvider = async (
     provider: Provider,
     keyLabel: string,
-    fn: () => Promise<string>,
+    fn: (timeoutMs: number) => Promise<string>,
   ): Promise<string | null> => {
+    const remaining = remainingBudget();
+    if (remaining < 2000) {
+      attempts.push({ provider, key: keyLabel, ok: false, durationMs: 0, error: "skipped: budget exhausted" });
+      return null;
+    }
+    const perProviderTimeout = Math.min(args.timeoutMs ?? perProviderCap, perProviderCap, remaining);
     const t0 = Date.now();
     try {
-      const text = await fn();
+      const text = await fn(perProviderTimeout);
       attempts.push({ provider, key: keyLabel, ok: true, durationMs: Date.now() - t0 });
       return text;
     } catch (e) {
@@ -199,19 +217,23 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
   };
 
   for (const provider of PROVIDER_ORDER) {
+    if (remainingBudget() < 2000) break;
     if (provider === "anthropic") {
       for (let i = 0; i < ANTHROPIC_KEYS.length; i++) {
-        const text = await tryProvider("anthropic", `key-${i + 1}`, () => callAnthropic(ANTHROPIC_KEYS[i]!, args));
+        const text = await tryProvider("anthropic", `key-${i + 1}`, (t) =>
+          callAnthropic(ANTHROPIC_KEYS[i]!, { ...args, timeoutMs: t }),
+        );
         if (text) return { text, attempts };
+        if (remainingBudget() < 2000) break;
       }
     } else if (provider === "azure-foundry") {
-      const text = await tryProvider("azure-foundry", "default", () => callAzureFoundry(args));
+      const text = await tryProvider("azure-foundry", "default", (t) => callAzureFoundry({ ...args, timeoutMs: t }));
       if (text) return { text, attempts };
     } else if (provider === "azure-openai") {
-      const text = await tryProvider("azure-openai", "default", () => callAzureOpenAI(args));
+      const text = await tryProvider("azure-openai", "default", (t) => callAzureOpenAI({ ...args, timeoutMs: t }));
       if (text) return { text, attempts };
     } else if (provider === "openrouter") {
-      const text = await tryProvider("openrouter", "default", () => callOpenRouter(args));
+      const text = await tryProvider("openrouter", "default", (t) => callOpenRouter({ ...args, timeoutMs: t }));
       if (text) return { text, attempts };
     }
   }
