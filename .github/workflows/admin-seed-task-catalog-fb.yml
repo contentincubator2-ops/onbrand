@@ -1,0 +1,57 @@
+name: Admin — migrate + seed task_catalog (FB first batch)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
+            set -a
+            [ -f "$AI/.env" ] && . "$AI/.env"
+            set +a
+
+            echo "===== 1. Run migrate.ts (creates task_catalog if missing) ====="
+            npx tsx scripts/migrate.ts 2>&1 | tail -20
+
+            echo ""
+            echo "===== 2. Audit DDL ====="
+            MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
+              SELECT COLUMN_NAME, DATA_TYPE
+                FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_catalog'
+               ORDER BY ORDINAL_POSITION;
+            "
+
+            echo ""
+            echo "===== 3. Seed FB first batch ====="
+            npx tsx scripts/seed-task-catalog-fb.ts
+
+            echo ""
+            echo "===== 4. Final listing ====="
+            MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
+              SELECT id, slug, status, impl_kind,
+                     IFNULL(squad_id, '') AS sq, IFNULL(agent_id, '') AS ag,
+                     bypassable, estimated_minutes
+                FROM task_catalog
+               WHERE workspace = 'facebook'
+               ORDER BY status, category, name_zh;
+            "

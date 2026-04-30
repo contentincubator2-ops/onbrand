@@ -993,6 +993,40 @@ async function main() {
     `);
     console.log("[migrate] award_frameworks seed: OK");
 
+    // ── task_catalog (CJ direction 2026-05-01) ─────────────────────────────
+    // Curated list of REAL deliverables agency actually sells. Replaces
+    // raw squad-search as the front-door — picker hits this first, only
+    // falls back to squads when catalog is empty. Lets us hide ~4000
+    // generic auto-generated squads behind status='archived' until they
+    // get reviewed.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS task_catalog (
+        id            INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        slug          VARCHAR(120) NOT NULL UNIQUE,
+        name_zh       VARCHAR(255) NOT NULL,
+        name_en       VARCHAR(255) NULL,
+        description   TEXT         NOT NULL,
+        workspace     VARCHAR(50)  NOT NULL,
+        category      VARCHAR(50)  NOT NULL,
+        impl_kind     ENUM('atomic','squad') NOT NULL,
+        squad_id      INT          NULL,
+        agent_id      INT          NULL,
+        status        ENUM('active','coming_soon','archived') NOT NULL DEFAULT 'coming_soon',
+        bypassable    BOOLEAN      NOT NULL DEFAULT TRUE,
+        search_keywords TEXT       NULL,
+        estimated_minutes INT      NULL,
+        upvotes       INT          NOT NULL DEFAULT 0,
+        created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        approved_at   TIMESTAMP    NULL,
+        approved_by   INT          NULL,
+        KEY idx_status (status),
+        KEY idx_workspace_status (workspace, status),
+        KEY idx_category_status (category, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] task_catalog: created (or already existed)");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
