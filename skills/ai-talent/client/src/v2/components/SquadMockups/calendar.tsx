@@ -112,11 +112,12 @@ function buildMonthGrid(targetStart: string, targetEnd: string, entries: Calenda
 export function CalendarGridMockup({ data, readOnly = false, isActive = false }: Props) {
   const [selectedIso, setSelectedIso] = React.useState<string | null>(null);
 
-  if (!data) {
+  // Guard partial data — LLM may return {} or missing required fields
+  if (!data || !data.targetDateStart || !data.targetDateEnd || !Array.isArray(data.entries)) {
     return (
       <NotionCard>
         <SectionHeader icon="📅" eyebrow="STEP 4 · CALENDAR" title="月度排程" />
-        <EmptyHint>Step 4 跑完才有 calendar</EmptyHint>
+        <EmptyHint>{!data ? "Step 4 跑完才有 calendar" : "資料不完整 — 缺 targetDateStart / targetDateEnd / entries"}</EmptyHint>
       </NotionCard>
     );
   }

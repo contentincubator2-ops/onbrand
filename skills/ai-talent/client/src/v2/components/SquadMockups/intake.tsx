@@ -63,11 +63,14 @@ interface Props extends SquadMockupCommonProps {
   onSubmit?: () => void;
 }
 
-export function IntakeFormMockup({ data = {}, readOnly = false, isActive = false, onChange, onSubmit }: Props) {
-  const sys = data.systemData ?? {};
-  const web = data.webSummary ?? {};
-  const ui  = data.userInput  ?? {};
-  const gaps = data.gaps ?? [];
+export function IntakeFormMockup({ data, readOnly = false, isActive = false, onChange, onSubmit }: Props) {
+  // Null-safe — `data = {}` default doesn't apply when explicit null
+  // is passed (only undefined). Live mode passes null until LLM returns.
+  const safe = data ?? {};
+  const sys = safe.systemData ?? {};
+  const web = safe.webSummary ?? {};
+  const ui  = safe.userInput  ?? {};
+  const gaps = safe.gaps ?? [];
 
   const update = (patch: Partial<NonNullable<IntakeFormData["userInput"]>>) => {
     onChange?.({ ...ui, ...patch });

@@ -31,7 +31,25 @@ export interface SquadMockupProps {
   onSubmit?: () => void;
 }
 
+/** Empty placeholder rendered when data is null/undefined (e.g. live mode
+ *  before LLM result arrives). Centralizes the null-check so individual
+ *  variant components don't all need defensive guards. */
+function EmptyStateForVariant({ variant, isActive }: { variant: SquadMockupVariant; isActive?: boolean }) {
+  const label = isActive ? "等待 LLM 回應…" : "尚未產出 — 點擊 Run Live 真實執行";
+  return (
+    <div className="rounded-md border border-dashed border-divider p-6 text-center bg-default-50">
+      <p className="text-tiny text-default-500 uppercase tracking-wider">{variant}</p>
+      <p className="text-small text-default-700 mt-1">{label}</p>
+    </div>
+  );
+}
+
 export function SquadMockup({ variant, data, readOnly, isActive, onChange, onSubmit }: SquadMockupProps) {
+  // Centralized null guard — every variant gets an empty state instead
+  // of crashing when data is null/undefined.
+  if (data == null) {
+    return <EmptyStateForVariant variant={variant} isActive={isActive} />;
+  }
   switch (variant) {
     case "IntakeFormMockup":
       return <IntakeFormMockup data={data as IntakeFormData} readOnly={readOnly} isActive={isActive} onChange={onChange} onSubmit={onSubmit} />;

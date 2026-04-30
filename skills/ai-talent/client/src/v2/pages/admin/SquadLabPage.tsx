@@ -25,8 +25,7 @@ import {
 import { trpc } from "../../../lib/trpc";
 import { resolveAvatarUrl } from "../../lib/avatarUrl";
 import {
-  IntakeFormMockup, PillarTableMockup, CalendarGridMockup,
-  FBPostBriefMockup, QAReportMockup, ResearchPanelMockup,
+  SquadMockup,
   type SquadMockupVariant,
 } from "../../components/SquadMockups";
 
@@ -471,17 +470,13 @@ function SquadPreviewModal({
     }
   };
 
+  // Use the centralized dispatcher — it handles null data with a graceful
+  // empty state, so we never crash on missing live mockupData.
   const renderMockup = (variant: SquadMockupVariant | string, data: any, isActive: boolean) => {
-    switch (variant) {
-      case "IntakeFormMockup":   return <IntakeFormMockup data={data} readOnly isActive={isActive} />;
-      case "PillarTableMockup":  return <PillarTableMockup data={data} readOnly isActive={isActive} />;
-      case "CalendarGridMockup": return <CalendarGridMockup data={data} readOnly isActive={isActive} />;
-      case "FBPostBriefMockup":  return <FBPostBriefMockup data={data} readOnly isActive={isActive} />;
-      case "QAReportMockup":     return <QAReportMockup data={data} readOnly isActive={isActive} />;
-      case "ResearchPanelMockup":return <ResearchPanelMockup data={data} readOnly isActive={isActive} />;
-      default:
-        return <p className="text-tiny text-default-500 p-4">⚠ 此 step 沒指定 mockupVariant 或 variant 不認得：{variant ?? "(none)"}</p>;
+    if (!variant) {
+      return <p className="text-tiny text-default-500 p-4">⚠ 此 step 沒指定 mockupVariant</p>;
     }
+    return <SquadMockup variant={variant as SquadMockupVariant} data={data} readOnly isActive={isActive} />;
   };
 
   const live = liveResults[stepIdx];

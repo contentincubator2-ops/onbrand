@@ -64,15 +64,20 @@ const STATUS_ICON = {
 } as const;
 
 export function QAReportMockup({ data, readOnly = false, isActive = false, onAccept, onReject }: Props) {
-  if (!data) {
+  if (!data || !data.verdict) {
     return (
       <NotionCard>
         <SectionHeader icon="🛡" eyebrow="STEP 6 · QA REPORT" title="Squad Lead QA" />
-        <EmptyHint>Step 6 跑完才會有 QA 報告</EmptyHint>
+        <EmptyHint>{!data ? "Step 6 跑完才會有 QA 報告" : "資料不完整 — 缺 verdict"}</EmptyHint>
       </NotionCard>
     );
   }
-  const v = VERDICT_CHIP[data.verdict];
+  // Guard each list with default — LLM may omit some sections
+  const pillarChecks = Array.isArray(data.pillarChecks) ? data.pillarChecks : [];
+  const eventChecks  = Array.isArray(data.eventChecks)  ? data.eventChecks  : [];
+  const itemChecklist = Array.isArray(data.itemChecklist) ? data.itemChecklist : [];
+  const overallScore = typeof data.overallScore === "number" ? data.overallScore : 0;
+  const v = VERDICT_CHIP[data.verdict] ?? VERDICT_CHIP.pending;
 
   return (
     <div className="flex flex-col gap-3 max-w-4xl">
@@ -90,13 +95,13 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
           <Chip size="lg" variant="flat" color={v.color}>{v.label}</Chip>
           <div className="flex items-center gap-2">
             <span className="text-tiny text-default-500">總分</span>
-            <span className="text-large font-bold tabular-nums">{data.overallScore} / 100</span>
+            <span className="text-large font-bold tabular-nums">{overallScore} / 100</span>
           </div>
         </div>
         <Progress
           size="sm"
-          value={data.overallScore}
-          color={data.overallScore >= 80 ? "success" : data.overallScore >= 60 ? "warning" : "danger"}
+          value={overallScore}
+          color={overallScore >= 80 ? "success" : overallScore >= 60 ? "warning" : "danger"}
           aria-label="overall score"
         />
       </NotionCard>
@@ -105,7 +110,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
       <NotionCard>
         <SectionHeader eyebrow="PILLAR CHECKS" title="比例與內容多樣性" />
         <div className="flex flex-col gap-3">
-          {data.pillarChecks.map((p, i) => {
+          {pillarChecks.map((p, i) => {
             const ratioOk = p.actualRatio === p.expectedRatio;
             return (
               <div key={i} className="flex flex-col gap-1">
@@ -127,11 +132,11 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
       </NotionCard>
 
       {/* Section 3: Per-event */}
-      {data.eventChecks.length > 0 && (
+      {eventChecks.length > 0 && (
         <NotionCard>
           <SectionHeader eyebrow="EVENT CHECKS" title="活動整合度" />
           <div className="flex flex-col gap-2">
-            {data.eventChecks.map((e, i) => (
+            {eventChecks.map((e, i) => (
               <div
                 key={i}
                 className="flex items-start justify-between gap-3 p-2 rounded-md border border-divider"
@@ -158,7 +163,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
       <NotionCard>
         <SectionHeader eyebrow="ITEM CHECKLIST" title="逐項審核清單" />
         <div className="flex flex-col gap-2">
-          {data.itemChecklist.map((item) => (
+          {itemChecklist.map((item) => (
             <div
               key={item.id}
               className="flex items-start justify-between gap-3 p-2 rounded-md border border-divider"
