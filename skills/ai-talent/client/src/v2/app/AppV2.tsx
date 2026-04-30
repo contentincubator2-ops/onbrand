@@ -42,6 +42,7 @@ import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
 import BoardroomPage from "../pages/BoardroomPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
+import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
 
 export default function AppV2() {
   return (
@@ -93,6 +94,7 @@ export default function AppV2() {
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
           <Route path="/templates" element={<MethodologyCatalog />} />
           <Route path="/templates/:slug" element={<MethodologyDetail />} />
+          <Route path="/squad-mockups" element={<SquadMockupsGalleryPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

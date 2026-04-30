@@ -1,0 +1,184 @@
+/**
+ * QAReportMockup — squad step 6: Squad Lead QA report.
+ *
+ * Renders 3 sections:
+ *   1. Overall verdict + score
+ *   2. Per-pillar score bars (does ratio match? content variety?)
+ *   3. Per-event integration check (was each event peak covered correctly?)
+ *   4. Per-item checklist with accept / 退回 button
+ */
+import React from "react";
+import { Chip, Progress, Button } from "@heroui/react";
+import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
+
+export type QAVerdict = "pending" | "needs_revision" | "approved";
+
+export interface QAReport {
+  verdict: QAVerdict;
+  overallScore: number;       // 0-100
+  pillarChecks: Array<{
+    pillarName: string;
+    expectedRatio: number;
+    actualRatio: number;
+    score: number;            // 0-100
+    notes: string;
+  }>;
+  eventChecks: Array<{
+    eventName: string;
+    posts: number;
+    expectedPosts: number;
+    score: number;
+    notes: string;
+  }>;
+  itemChecklist: Array<{
+    id: string;
+    label: string;
+    status: "pass" | "warning" | "fail";
+    detail: string;
+  }>;
+}
+
+interface Props extends SquadMockupCommonProps {
+  data?: QAReport;
+  onAccept?: (itemId: string) => void;
+  onReject?: (itemId: string) => void;
+  onRetryStep?: (stepOrder: number) => void;
+}
+
+const VERDICT_CHIP: Record<QAVerdict, { label: string; color: "success" | "warning" | "default" }> = {
+  pending:        { label: "等待審核",     color: "default" },
+  needs_revision: { label: "需要修訂",     color: "warning" },
+  approved:       { label: "✓ 已通過",     color: "success" },
+};
+
+const STATUS_COLOR = {
+  pass:    "success",
+  warning: "warning",
+  fail:    "danger",
+} as const;
+
+const STATUS_ICON = {
+  pass:    "✓",
+  warning: "⚠",
+  fail:    "✗",
+} as const;
+
+export function QAReportMockup({ data, readOnly = false, onAccept, onReject }: Props) {
+  if (!data) {
+    return (
+      <NotionCard>
+        <SectionHeader icon="🛡" eyebrow="STEP 6 · QA REPORT" title="Squad Lead QA" />
+        <EmptyHint>Step 6 跑完才會有 QA 報告</EmptyHint>
+      </NotionCard>
+    );
+  }
+  const v = VERDICT_CHIP[data.verdict];
+
+  return (
+    <div className="flex flex-col gap-3 max-w-4xl">
+      {/* Section 1: Overall verdict */}
+      <NotionCard>
+        <SectionHeader icon="🛡" eyebrow="STEP 6 · QA REPORT" title="Squad Lead 終審" />
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Chip size="lg" variant="flat" color={v.color}>{v.label}</Chip>
+          <div className="flex items-center gap-2">
+            <span className="text-tiny text-default-500">總分</span>
+            <span className="text-large font-bold tabular-nums">{data.overallScore} / 100</span>
+          </div>
+        </div>
+        <Progress
+          size="sm"
+          value={data.overallScore}
+          color={data.overallScore >= 80 ? "success" : data.overallScore >= 60 ? "warning" : "danger"}
+          aria-label="overall score"
+        />
+      </NotionCard>
+
+      {/* Section 2: Per-pillar */}
+      <NotionCard>
+        <SectionHeader eyebrow="PILLAR CHECKS" title="比例與內容多樣性" />
+        <div className="flex flex-col gap-3">
+          {data.pillarChecks.map((p, i) => {
+            const ratioOk = p.actualRatio === p.expectedRatio;
+            return (
+              <div key={i} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between text-tiny">
+                  <span className="font-medium text-foreground">{p.pillarName}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={ratioOk ? "text-success" : "text-warning"}>
+                      實際 {p.actualRatio}% / 預期 {p.expectedRatio}%
+                    </span>
+                    <span className="font-semibold tabular-nums">{p.score}/100</span>
+                  </div>
+                </div>
+                <Progress size="sm" value={p.score} color={p.score >= 80 ? "success" : "warning"} aria-label="pillar score" />
+                {p.notes && <p className="text-tiny text-default-500">{p.notes}</p>}
+              </div>
+            );
+          })}
+        </div>
+      </NotionCard>
+
+      {/* Section 3: Per-event */}
+      {data.eventChecks.length > 0 && (
+        <NotionCard>
+          <SectionHeader eyebrow="EVENT CHECKS" title="活動整合度" />
+          <div className="flex flex-col gap-2">
+            {data.eventChecks.map((e, i) => (
+              <div
+                key={i}
+                className="flex items-start justify-between gap-3 p-2 rounded-md border border-divider"
+              >
+                <div className="min-w-0">
+                  <p className="text-small font-medium">⭐ {e.eventName}</p>
+                  <p className="text-tiny text-default-500">{e.notes}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-tiny text-default-500">
+                    覆蓋 {e.posts} / 期望 {e.expectedPosts} 篇
+                  </span>
+                  <Chip size="sm" variant="flat" color={e.score >= 80 ? "success" : "warning"}>
+                    {e.score}
+                  </Chip>
+                </div>
+              </div>
+            ))}
+          </div>
+        </NotionCard>
+      )}
+
+      {/* Section 4: Item-level checklist */}
+      <NotionCard>
+        <SectionHeader eyebrow="ITEM CHECKLIST" title="逐項審核清單" />
+        <div className="flex flex-col gap-2">
+          {data.itemChecklist.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-start justify-between gap-3 p-2 rounded-md border border-divider"
+            >
+              <div className="flex items-start gap-2 min-w-0">
+                <Chip size="sm" variant="flat" color={STATUS_COLOR[item.status]}>
+                  {STATUS_ICON[item.status]}
+                </Chip>
+                <div className="min-w-0">
+                  <p className="text-small font-medium">{item.label}</p>
+                  <p className="text-tiny text-default-500">{item.detail}</p>
+                </div>
+              </div>
+              {!readOnly && (
+                <div className="flex gap-1 shrink-0">
+                  <Button size="sm" variant="flat" color="success" onPress={() => onAccept?.(item.id)}>
+                    Accept
+                  </Button>
+                  <Button size="sm" variant="flat" color="warning" onPress={() => onReject?.(item.id)}>
+                    退回
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </NotionCard>
+    </div>
+  );
+}
