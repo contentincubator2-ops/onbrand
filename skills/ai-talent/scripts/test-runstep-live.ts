@@ -84,7 +84,11 @@ async function main() {
   if (!step) { console.error(`step ${STEP_INDEX} not found`); process.exit(1); }
 
   console.log(`Squad: ${squad.name} (#${SQUAD_ID})`);
-  console.log(`Step ${STEP_INDEX}: ${step.name}`);
+  console.log(`\n--- All steps ---`);
+  steps.forEach((s, i) => {
+    console.log(`  [${i}] ${s.name} (${s.outputKind}/${s.mockupVariant ?? "—"}/${s.aiModel ?? "—"})`);
+  });
+  console.log(`\nTesting Step ${STEP_INDEX}: ${step.name}`);
   console.log(`  outputKind=${step.outputKind} mockup=${step.mockupVariant} aiModel=${step.aiModel}`);
 
   // Resolve scope
