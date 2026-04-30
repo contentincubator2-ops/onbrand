@@ -38,7 +38,60 @@ import {
 type Status = "draft" | "approved" | "all";
 type Tier = "core" | "defer" | "kill" | "all";
 
-export default function SquadLabPage() {
+/* ────────────── ErrorBoundary ──────────────
+ * Without this, any thrown render error in SquadDetailPane / Modal /
+ * mockup components blanks the entire page (React unmounts the tree).
+ * Catch + show the message so we get actionable feedback in prod
+ * instead of "空白頁面".
+ */
+class PageErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // eslint-disable-next-line no-console
+    console.error("[SquadLabPage] render error:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-8">
+          <div className="max-w-2xl w-full">
+            <div className="border border-danger-200 bg-danger-50 rounded-lg p-6">
+              <p className="text-tiny text-danger uppercase tracking-wider">RENDER ERROR</p>
+              <h2 className="text-medium font-semibold mt-1">Squad Lab 頁面渲染失敗</h2>
+              <p className="text-small text-default-700 mt-2">
+                {this.state.error.message}
+              </p>
+              <pre className="text-tiny bg-content1 border border-divider rounded-md p-3 mt-3 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap">
+                {this.state.error.stack}
+              </pre>
+              <div className="flex gap-2 mt-3">
+                <button
+                  className="text-small px-3 py-1.5 rounded-md bg-primary text-primary-foreground"
+                  onClick={() => { this.setState({ error: null }); }}
+                >
+                  重試渲染
+                </button>
+                <button
+                  className="text-small px-3 py-1.5 rounded-md border border-divider"
+                  onClick={() => { window.location.href = "/"; }}
+                >
+                  回首頁
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children as any;
+  }
+}
+
+function SquadLabPageInner() {
   const [params, setParams] = useSearchParams();
   const selectedId = Number(params.get("squad")) || null;
   const [status, setStatus] = React.useState<Status>("draft");
@@ -193,6 +246,14 @@ export default function SquadLabPage() {
         squad={squad}
       />
     </div>
+  );
+}
+
+export default function SquadLabPage() {
+  return (
+    <PageErrorBoundary>
+      <SquadLabPageInner />
+    </PageErrorBoundary>
   );
 }
 
