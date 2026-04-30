@@ -406,8 +406,10 @@ function SquadPreviewModal({
   const [stepIdx, setStepIdx] = React.useState(0);
   // Per-step live result cache: stepIdx → { mockupData, rawText, parsed, durationMs, ok }
   const [liveResults, setLiveResults] = React.useState<Record<number, any>>({});
-  // Brand picker for runtime context
-  const [pickedBrandId, setPickedBrandId] = React.useState<number | null>(null);
+  // Scope picker for runtime context — supports brand / product / event
+  // (CJ correction 2026-04-30: not just brand)
+  const [scopeKind, setScopeKind] = React.useState<"brand" | "product" | "event">("brand");
+  const [scopeId, setScopeId] = React.useState<number | null>(null);
   // Mode: 'mock' (sample data) vs 'live' (real LLM)
   const [mode, setMode] = React.useState<"mock" | "live">("mock");
 
@@ -419,10 +421,18 @@ function SquadPreviewModal({
     }
   }, [open]);
 
-  const brandsQuery = (trpc as any).brand?.listByMember?.useQuery
-    ? (trpc as any).brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false })
-    : { data: [] };
-  const brands: any[] = (brandsQuery.data as any[]) ?? [];
+  // scope.options returns { brands, products, events } — same source as ScopeBar
+  const scopeOptionsQuery = (trpc as any).scope?.options?.useQuery
+    ? (trpc as any).scope.options.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: null };
+  const opts = scopeOptionsQuery.data as { brands: any[]; products: any[]; events: any[] } | null;
+  const scopeChoices = (() => {
+    if (!opts) return [] as any[];
+    if (scopeKind === "brand") return opts.brands ?? [];
+    if (scopeKind === "product") return opts.products ?? [];
+    if (scopeKind === "event") return opts.events ?? [];
+    return [];
+  })();
 
   const runLive = (trpc as any).squad?.runStepLive?.useMutation?.() ?? null;
 
@@ -460,13 +470,19 @@ function SquadPreviewModal({
       const res = await runLive.mutateAsync({
         squadId: squad.id,
         stepIndex: idx,
-        brandId: pickedBrandId ?? undefined,
+        scopeKind,
+        scopeId: scopeId ?? undefined,
         userInput: liveResults[1]?.parsed ?? undefined, // step 1 = user checkpoint
         upstreamOutputs: upstreamForStep(idx),
       });
       setLiveResults((prev) => ({ ...prev, [idx]: res }));
     } catch (e: any) {
-      setLiveResults((prev) => ({ ...prev, [idx]: { ok: false, error: e?.message ?? String(e) } }));
+      const raw = e?.message ?? String(e);
+      // Friendlier message for known failure modes
+      const friendly = raw.includes("Unexpected token") || raw.includes("<html>")
+        ? "後端連線中斷或超時 — 通常是 LLM 回應太久被代理層 502。請重試，或在 server log 看 callLLM attempts。"
+        : raw;
+      setLiveResults((prev) => ({ ...prev, [idx]: { ok: false, error: friendly, rawError: raw } }));
     }
   };
 
@@ -494,22 +510,38 @@ function SquadPreviewModal({
           <p className="text-tiny text-default-500 uppercase tracking-wider">PREVIEW RUN</p>
           <h2 className="text-medium font-semibold">{squad.name}</h2>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
-            {/* Brand picker */}
+            {/* Scope picker — kind + id */}
             <div className="flex items-center gap-2">
-              <span className="text-tiny text-default-500">綁定品牌（live 模式必選）:</span>
+              <span className="text-tiny text-default-500">綁定 scope（live 必選）:</span>
               <Select
                 size="sm"
-                aria-label="brand picker"
-                placeholder="選一個品牌"
-                selectedKeys={pickedBrandId ? new Set([String(pickedBrandId)]) : new Set()}
+                aria-label="scope kind"
+                selectedKeys={new Set([scopeKind])}
+                onSelectionChange={(keys) => {
+                  const k = Array.from(keys as Set<string>)[0] as "brand" | "product" | "event";
+                  setScopeKind(k);
+                  setScopeId(null);
+                }}
+                className="min-w-[110px]"
+              >
+                <SelectItem key="brand">品牌</SelectItem>
+                <SelectItem key="product">產品</SelectItem>
+                <SelectItem key="event">活動</SelectItem>
+              </Select>
+              <Select
+                size="sm"
+                aria-label="scope target"
+                placeholder={scopeChoices.length === 0 ? `沒有${scopeKind === "brand" ? "品牌" : scopeKind === "product" ? "產品" : "活動"}` : `選一個${scopeKind === "brand" ? "品牌" : scopeKind === "product" ? "產品" : "活動"}`}
+                selectedKeys={scopeId ? new Set([String(scopeId)]) : new Set()}
                 onSelectionChange={(keys) => {
                   const k = Array.from(keys as Set<string>)[0];
-                  setPickedBrandId(k ? Number(k) : null);
+                  setScopeId(k ? Number(k) : null);
                 }}
-                className="min-w-[200px]"
+                className="min-w-[220px]"
+                isDisabled={scopeChoices.length === 0}
               >
-                {brands.map((b: any) => (
-                  <SelectItem key={String(b.id)}>{b.name}</SelectItem>
+                {scopeChoices.map((c: any) => (
+                  <SelectItem key={String(c.id)}>{c.name}</SelectItem>
                 ))}
               </Select>
             </div>
@@ -561,13 +593,13 @@ function SquadPreviewModal({
                     size="sm"
                     color="success"
                     isLoading={runLive?.isPending}
-                    isDisabled={!pickedBrandId || step.aiModel === "n/a"}
+                    isDisabled={!scopeId || step.aiModel === "n/a"}
                     onPress={() => onRunLive(stepIdx)}
                   >
                     🔴 Run Live（真實 LLM）
                   </Button>
-                  {!pickedBrandId && (
-                    <span className="text-tiny text-warning">先選品牌</span>
+                  {!scopeId && (
+                    <span className="text-tiny text-warning">先選 scope</span>
                   )}
                   {step.aiModel === "n/a" && (
                     <span className="text-tiny text-default-500">UI step 不打 LLM</span>

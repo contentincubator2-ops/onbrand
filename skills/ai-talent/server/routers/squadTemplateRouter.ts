@@ -52,6 +52,42 @@ function escapeLike(s: string): string {
 
 // ── Live-run helpers (used by squad.runStepLive) ────────────────────────
 
+/** Parse a positioning JSON column (string or object) safely. */
+function parseJsonField(val: any): any {
+  if (val == null) return {};
+  if (typeof val === "object") return val;
+  try { return JSON.parse(String(val)); } catch { return {}; }
+}
+
+/** Format positioning JSON into a context block, stripping noise keys. */
+function formatPositioningContext(positioning: any, description: any, label = "品牌定位"): string {
+  const cleaned = { ...(positioning ?? {}) };
+  delete cleaned._research;
+  delete cleaned._wizardMeta;
+  delete cleaned._meta;
+  const parts: string[] = [];
+  if (description) parts.push(`【描述】${String(description).slice(0, 500)}`);
+  if (Object.keys(cleaned).length > 0) {
+    parts.push(`【${label}】\n${JSON.stringify(cleaned, null, 2).slice(0, 3000)}`);
+  }
+  return parts.join("\n");
+}
+
+/** Per-outputKind LLM maxTokens — bigger steps need more; small steps
+ *  shouldn't waste tokens (also reduces server timeout risk). */
+function maxTokensForOutputKind(outputKind: string): number {
+  switch (outputKind) {
+    case "text_strategic":   return 3000;
+    case "structured_table": return 3500;
+    case "text_content":     return 6000;  // batch briefs (16-20 篇)
+    case "qa_review":        return 2500;
+    case "image_brief":
+    case "video_brief":      return 1500;
+    case "decision":         return 1500;
+    default:                 return 2000;
+  }
+}
+
 /** 3-strategy parser: whole / fenced ```json / greedy {…} */
 function tryParseJson(raw: string): any | null {
   if (!raw) return null;
@@ -352,6 +388,11 @@ export const squadTemplateRouter = router({
     .input(z.object({
       squadId: z.number(),
       stepIndex: z.number().int().min(0).max(20),
+      // Scope binding — accepts brand / product / event (CJ correction
+      // 2026-04-30: not just brand). Backward-compat: brandId still
+      // accepted standalone if scopeKind is omitted.
+      scopeKind: z.enum(["brand", "product", "event"]).optional(),
+      scopeId: z.number().optional(),
       brandId: z.number().nullable().optional(),
       userInput: z.record(z.string(), z.any()).optional(),
       upstreamOutputs: z.record(z.string(), z.any()).optional(),
@@ -381,18 +422,68 @@ export const squadTemplateRouter = router({
         };
       }
 
-      // 2. Optional: brand context for substitution
-      let brand: any = null;
-      if (input.brandId) {
-        const [bRows] = await localPool.execute(
-          `SELECT id, name, industry, description, positioning FROM brands WHERE id = ? LIMIT 1`,
-          [input.brandId],
-        ) as any[];
-        brand = (bRows as any[])?.[0] ?? null;
+      // 2. Resolve scope context (brand / product / event)
+      // Pri: explicit scopeKind+scopeId. Fallback: legacy brandId.
+      const scopeKind = input.scopeKind ?? (input.brandId ? "brand" : undefined);
+      const scopeId   = input.scopeId   ?? input.brandId   ?? undefined;
+      let scopeLabel = "未綁定 scope";
+      let scopeContext = "";
+      let resolvedBrandId: number | null = null;
+      if (scopeKind && scopeId) {
+        if (scopeKind === "brand") {
+          const [r] = await localPool.execute(
+            `SELECT id, name, industry, description, positioning FROM brands WHERE id = ? LIMIT 1`,
+            [scopeId],
+          ) as any[];
+          const row = (r as any[])?.[0];
+          if (row) {
+            resolvedBrandId = Number(row.id);
+            scopeLabel = `品牌：${row.name}${row.industry ? `（${row.industry}）` : ""}`;
+            const pos = parseJsonField(row.positioning);
+            scopeContext = formatPositioningContext(pos, row.description);
+          }
+        } else if (scopeKind === "product") {
+          const [r] = await localPool.execute(
+            `SELECT p.id, p.name, p.brandId, p.positioning, b.name AS brandName, b.industry, b.description AS brandDescription, b.positioning AS brandPositioning
+               FROM products p
+          LEFT JOIN brands b ON b.id = p.brandId
+              WHERE p.id = ? LIMIT 1`,
+            [scopeId],
+          ) as any[];
+          const row = (r as any[])?.[0];
+          if (row) {
+            resolvedBrandId = row.brandId ? Number(row.brandId) : null;
+            scopeLabel = `產品：${row.name}（隸屬品牌「${row.brandName ?? "—"}」）`;
+            const productPos = parseJsonField(row.positioning);
+            const brandPos = parseJsonField(row.brandPositioning);
+            scopeContext = [
+              formatPositioningContext(brandPos, row.brandDescription, "父品牌定位"),
+              formatPositioningContext(productPos, null, "產品定位"),
+            ].filter(Boolean).join("\n\n");
+          }
+        } else if (scopeKind === "event") {
+          const [r] = await localPool.execute(
+            `SELECT e.id, e.name, e.brandId, e.startAt, e.endAt, e.positioning,
+                    b.name AS brandName, b.industry, b.description AS brandDescription, b.positioning AS brandPositioning
+               FROM events e
+          LEFT JOIN brands b ON b.id = e.brandId
+              WHERE e.id = ? LIMIT 1`,
+            [scopeId],
+          ) as any[];
+          const row = (r as any[])?.[0];
+          if (row) {
+            resolvedBrandId = row.brandId ? Number(row.brandId) : null;
+            const period = row.startAt ? `${String(row.startAt).split("T")[0]} ~ ${String(row.endAt ?? "").split("T")[0]}` : "（無日期）";
+            scopeLabel = `活動：${row.name}（隸屬品牌「${row.brandName ?? "—"}」，期間 ${period}）`;
+            const eventPos = parseJsonField(row.positioning);
+            const brandPos = parseJsonField(row.brandPositioning);
+            scopeContext = [
+              formatPositioningContext(brandPos, row.brandDescription, "父品牌定位"),
+              formatPositioningContext(eventPos, null, "活動定位（11-segment）"),
+            ].filter(Boolean).join("\n\n");
+          }
+        }
       }
-      const brandPositioning = brand?.positioning && typeof brand.positioning === "string"
-        ? (() => { try { return JSON.parse(brand.positioning); } catch { return {}; } })()
-        : (brand?.positioning ?? {});
 
       // 3. Build prompts
       const userInputs = input.userInput ?? {};
@@ -410,11 +501,8 @@ ${outputKindGuide(step.outputKind, step.mockupVariant)}
 【強制】輸出必須是合法 JSON 物件（不是陣列頂層）。沒有前言、不要 \`\`\`json 圍籬。`;
 
       const userPrompt = [
-        brand ? `【目標品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}` : null,
-        brand?.description ? `【品牌描述】${String(brand.description).slice(0, 600)}` : null,
-        Object.keys(brandPositioning).length > 0
-          ? `【品牌定位 (摘要)】\n${JSON.stringify(brandPositioning, null, 2).slice(0, 2500)}`
-          : null,
+        `【執行 Scope】${scopeLabel}`,
+        scopeContext || null,
         Object.keys(userInputs).length > 0
           ? `【用戶在 step 1 填的 brief】\n${JSON.stringify(userInputs, null, 2)}`
           : null,
@@ -430,14 +518,20 @@ ${outputKindGuide(step.outputKind, step.mockupVariant)}
       const t0 = Date.now();
       let rawText = "";
       let attempts = 1;
+      const maxTokens = maxTokensForOutputKind(step.outputKind);
       try {
-        const result = await callLLM({ system: systemPrompt, user: userPrompt, maxTokens: 4000 });
+        const result = await callLLM({ system: systemPrompt, user: userPrompt, maxTokens });
         rawText = result.text;
         attempts = result.attempts?.length ?? 1;
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Common failure modes: nginx 502 HTML, provider 5xx, all providers down
+        const friendly = msg.includes("Unexpected token") || msg.includes("<html>")
+          ? "LLM provider 回傳 HTML（可能 5xx 或 timeout）。請降低 maxTokens 或重試。"
+          : msg;
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `LLM call failed (all providers): ${e instanceof Error ? e.message : String(e)}`,
+          message: `LLM call failed (all providers): ${friendly}`,
         });
       }
       const durationMs = Date.now() - t0;
