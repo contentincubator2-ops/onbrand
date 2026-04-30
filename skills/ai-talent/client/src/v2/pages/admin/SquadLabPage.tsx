@@ -26,7 +26,8 @@ import { trpc } from "../../../lib/trpc";
 import { resolveAvatarUrl } from "../../lib/avatarUrl";
 import {
   IntakeFormMockup, PillarTableMockup, CalendarGridMockup,
-  FBPostBriefMockup, QAReportMockup, type SquadMockupVariant,
+  FBPostBriefMockup, QAReportMockup, ResearchPanelMockup,
+  type SquadMockupVariant,
 } from "../../components/SquadMockups";
 
 // Sample data lookup (matches gallery — for preview-run mode)
@@ -401,10 +402,32 @@ function StepRow({ step, agentMap }: { step: any; agentMap: Record<number, any> 
 function SquadPreviewModal({
   open, onClose, squad,
 }: { open: boolean; onClose: () => void; squad: any }) {
-  if (!squad) return null;
-  const steps: any[] = Array.isArray(squad.steps) ? squad.steps : [];
+  // Hooks must run unconditionally — early-return below.
+  const steps: any[] = squad && Array.isArray(squad.steps) ? squad.steps : [];
   const [stepIdx, setStepIdx] = React.useState(0);
-  React.useEffect(() => { if (open) setStepIdx(0); }, [open]);
+  // Per-step live result cache: stepIdx → { mockupData, rawText, parsed, durationMs, ok }
+  const [liveResults, setLiveResults] = React.useState<Record<number, any>>({});
+  // Brand picker for runtime context
+  const [pickedBrandId, setPickedBrandId] = React.useState<number | null>(null);
+  // Mode: 'mock' (sample data) vs 'live' (real LLM)
+  const [mode, setMode] = React.useState<"mock" | "live">("mock");
+
+  React.useEffect(() => {
+    if (open) {
+      setStepIdx(0);
+      setLiveResults({});
+      setMode("mock");
+    }
+  }, [open]);
+
+  const brandsQuery = (trpc as any).brand?.listByMember?.useQuery
+    ? (trpc as any).brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const brands: any[] = (brandsQuery.data as any[]) ?? [];
+
+  const runLive = (trpc as any).squad?.runStepLive?.useMutation?.() ?? null;
+
+  if (!squad) return null;
   const step = steps[stepIdx];
 
   // Sample-data picker by mockupVariant — uses the same fixtures as gallery.
@@ -415,7 +438,43 @@ function SquadPreviewModal({
       case "CalendarGridMockup": return SAMPLE_CALENDAR;
       case "FBPostBriefMockup":  return { briefs: SAMPLE_BRIEFS };
       case "QAReportMockup":     return SAMPLE_QA;
+      case "ResearchPanelMockup":
+        // Provide a minimal sample for research mode
+        return {
+          conclusion: "（樣本）寶可夢玩家三層痛點：(1) 找熱點 → (2) 配招決策 → (3) 活動倒數恐懼。三大競品 pillar 均偏官方公告，台灣同好群偏地圖共享 → 「教學深度」是空白。",
+          sources: [
+            { url: "https://www.ptt.cc/bbs/PokemonGO/", title: "PTT Pokemon GO 板", charCount: 3200, excerpt: "玩家討論抓寶與配招" },
+            { url: "https://www.dcard.tw/f/pokemongo", title: "Dcard 寶可夢專版", charCount: 2800, excerpt: "新手到進階轉型痛點" },
+          ],
+          budget: { minUrls: 8, minChars: 12000 },
+        };
       default: return null;
+    }
+  };
+
+  // For live mode, gather upstream outputs (live results from prior steps)
+  const upstreamForStep = (idx: number): Record<string, any> => {
+    const out: Record<string, any> = {};
+    for (let i = 0; i < idx; i++) {
+      if (liveResults[i]?.parsed) out[`step${i}`] = liveResults[i].parsed;
+    }
+    return out;
+  };
+
+  const onRunLive = async (idx: number) => {
+    if (!runLive) return;
+    setMode("live");
+    try {
+      const res = await runLive.mutateAsync({
+        squadId: squad.id,
+        stepIndex: idx,
+        brandId: pickedBrandId ?? undefined,
+        userInput: liveResults[1]?.parsed ?? undefined, // step 1 = user checkpoint
+        upstreamOutputs: upstreamForStep(idx),
+      });
+      setLiveResults((prev) => ({ ...prev, [idx]: res }));
+    } catch (e: any) {
+      setLiveResults((prev) => ({ ...prev, [idx]: { ok: false, error: e?.message ?? String(e) } }));
     }
   };
 
@@ -426,68 +485,162 @@ function SquadPreviewModal({
       case "CalendarGridMockup": return <CalendarGridMockup data={data} readOnly isActive={isActive} />;
       case "FBPostBriefMockup":  return <FBPostBriefMockup data={data} readOnly isActive={isActive} />;
       case "QAReportMockup":     return <QAReportMockup data={data} readOnly isActive={isActive} />;
+      case "ResearchPanelMockup":return <ResearchPanelMockup data={data} readOnly isActive={isActive} />;
       default:
         return <p className="text-tiny text-default-500 p-4">⚠ 此 step 沒指定 mockupVariant 或 variant 不認得：{variant ?? "(none)"}</p>;
     }
   };
 
+  const live = liveResults[stepIdx];
+  const dataForRender = mode === "live" && live?.mockupData
+    ? live.mockupData
+    : sampleFor(step?.mockupVariant ?? "");
+
   return (
     <Modal isOpen={open} onClose={onClose} size="5xl" scrollBehavior="inside">
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
-          <p className="text-tiny text-default-500 uppercase tracking-wider">PREVIEW RUN · 模擬執行</p>
+          <p className="text-tiny text-default-500 uppercase tracking-wider">PREVIEW RUN</p>
           <h2 className="text-medium font-semibold">{squad.name}</h2>
-          <p className="text-tiny text-default-500">使用 mock 樣本資料（Pokemon GO Deino CD）— 不會實際 call LLM 或寫 DB</p>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            {/* Brand picker */}
+            <div className="flex items-center gap-2">
+              <span className="text-tiny text-default-500">綁定品牌（live 模式必選）:</span>
+              <Select
+                size="sm"
+                aria-label="brand picker"
+                placeholder="選一個品牌"
+                selectedKeys={pickedBrandId ? new Set([String(pickedBrandId)]) : new Set()}
+                onSelectionChange={(keys) => {
+                  const k = Array.from(keys as Set<string>)[0];
+                  setPickedBrandId(k ? Number(k) : null);
+                }}
+                className="min-w-[200px]"
+              >
+                {brands.map((b: any) => (
+                  <SelectItem key={String(b.id)}>{b.name}</SelectItem>
+                ))}
+              </Select>
+            </div>
+            <Chip size="sm" variant="flat" color={mode === "live" ? "success" : "default"}>
+              {mode === "live" ? "🔴 LIVE 真實 LLM" : "⚪ MOCK 樣本資料"}
+            </Chip>
+          </div>
         </ModalHeader>
         <ModalBody className="gap-3">
           {/* Step navigator */}
           <div className="flex items-center gap-1 flex-wrap pb-2 border-b border-divider">
-            {steps.map((s, i) => (
-              <Button
-                key={i}
-                size="sm"
-                variant={i === stepIdx ? "solid" : "bordered"}
-                color={i === stepIdx ? "primary" : "default"}
-                onPress={() => setStepIdx(i)}
-                className="text-tiny"
-              >
-                {s.order ?? i} · {(s.name ?? "").slice(0, 16)}
-              </Button>
-            ))}
+            {steps.map((s, i) => {
+              const r = liveResults[i];
+              return (
+                <Button
+                  key={i}
+                  size="sm"
+                  variant={i === stepIdx ? "solid" : "bordered"}
+                  color={i === stepIdx ? "primary" : "default"}
+                  onPress={() => setStepIdx(i)}
+                  className="text-tiny"
+                  startContent={
+                    r?.ok === true ? <span className="text-success">●</span>
+                    : r?.ok === false ? <span className="text-danger">●</span>
+                    : null
+                  }
+                >
+                  {s.order ?? i} · {(s.name ?? "").slice(0, 16)}
+                </Button>
+              );
+            })}
           </div>
-          {/* Step detail + mockup */}
+
+          {/* Step detail + Run Live button */}
           {step && (
             <>
               <div className="flex items-start gap-3 px-1">
                 <div className="flex-1 min-w-0">
                   <p className="text-small font-semibold">{step.name}</p>
                   <p className="text-tiny text-default-500">{step.description}</p>
+                  <div className="flex items-center gap-1 flex-wrap mt-1">
+                    {step.outputKind && <Chip size="sm" variant="flat" className="h-4 text-tiny">{step.outputKind}</Chip>}
+                    {step.aiModel && step.aiModel !== "n/a" && <Chip size="sm" variant="flat" className="h-4 text-tiny">{step.aiModel}</Chip>}
+                    {step.aiModel === "n/a" && <Chip size="sm" variant="flat" color="warning" className="h-4 text-tiny">UI Step（無 LLM）</Chip>}
+                  </div>
                 </div>
-                <Chip size="sm" variant="flat" color="primary">● 模擬執行中</Chip>
+                <div className="flex flex-col gap-1 items-end">
+                  <Button
+                    size="sm"
+                    color="success"
+                    isLoading={runLive?.isPending}
+                    isDisabled={!pickedBrandId || step.aiModel === "n/a"}
+                    onPress={() => onRunLive(stepIdx)}
+                  >
+                    🔴 Run Live（真實 LLM）
+                  </Button>
+                  {!pickedBrandId && (
+                    <span className="text-tiny text-warning">先選品牌</span>
+                  )}
+                  {step.aiModel === "n/a" && (
+                    <span className="text-tiny text-default-500">UI step 不打 LLM</span>
+                  )}
+                </div>
               </div>
               <Divider />
-              {renderMockup(step.mockupVariant ?? "", sampleFor(step.mockupVariant ?? ""), true)}
+
+              {/* Result errors */}
+              {live?.ok === false && (
+                <Card shadow="none" className="border border-danger-200 bg-danger-50">
+                  <CardBody className="p-3">
+                    <p className="text-small font-medium text-danger">✗ Live 執行失敗</p>
+                    <p className="text-tiny text-danger-700 mt-1">{live.error}</p>
+                  </CardBody>
+                </Card>
+              )}
+
+              {/* Live execution metadata */}
+              {live?.ok === true && (
+                <Card shadow="none" className="border border-success-200 bg-success-50">
+                  <CardBody className="p-2 px-3 flex-row items-center gap-3">
+                    <Chip size="sm" variant="flat" color="success">✓ Live 完成</Chip>
+                    {live.durationMs != null && (
+                      <span className="text-tiny text-default-700">耗時 {(live.durationMs / 1000).toFixed(1)}s</span>
+                    )}
+                    {live.note && <span className="text-tiny text-default-700">· {live.note}</span>}
+                    {live.parsed == null && live.rawText && (
+                      <span className="text-tiny text-warning">⚠ JSON 解析失敗，僅顯示 raw 內容</span>
+                    )}
+                  </CardBody>
+                </Card>
+              )}
+
+              {/* Mockup rendering */}
+              {renderMockup(step.mockupVariant ?? "", dataForRender, mode === "live" && runLive?.isPending === true)}
+
+              {/* Raw output (live mode) */}
+              {mode === "live" && live?.rawText && (
+                <details className="px-1">
+                  <summary className="text-tiny text-default-500 cursor-pointer">View raw LLM output</summary>
+                  <pre className="text-tiny bg-default-50 border border-divider rounded-md p-3 mt-2 overflow-x-auto max-h-[260px] overflow-y-auto whitespace-pre-wrap">
+                    {live.rawText}
+                  </pre>
+                </details>
+              )}
             </>
           )}
         </ModalBody>
         <ModalFooter className="flex items-center justify-between">
           <p className="text-tiny text-default-500">
             Step {stepIdx + 1} / {steps.length}
+            {Object.keys(liveResults).length > 0 && (
+              <> · 已 live: {Object.keys(liveResults).length}</>
+            )}
           </p>
           <div className="flex gap-2">
             <Button size="sm" variant="light" onPress={onClose}>關閉</Button>
-            <Button
-              size="sm"
-              variant="bordered"
-              onPress={() => setStepIdx(Math.max(0, stepIdx - 1))}
-              isDisabled={stepIdx === 0}
-            >← 上一步</Button>
-            <Button
-              size="sm"
-              color="primary"
-              onPress={() => setStepIdx(Math.min(steps.length - 1, stepIdx + 1))}
-              isDisabled={stepIdx >= steps.length - 1}
-            >下一步 →</Button>
+            <Button size="sm" variant="bordered" onPress={() => setStepIdx(Math.max(0, stepIdx - 1))} isDisabled={stepIdx === 0}>
+              ← 上一步
+            </Button>
+            <Button size="sm" color="primary" onPress={() => setStepIdx(Math.min(steps.length - 1, stepIdx + 1))} isDisabled={stepIdx >= steps.length - 1}>
+              下一步 →
+            </Button>
           </div>
         </ModalFooter>
       </ModalContent>

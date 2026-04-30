@@ -49,6 +49,98 @@ function escapeLike(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
+// ── Live-run helpers (used by squad.runStepLive) ────────────────────────
+
+/** 3-strategy parser: whole / fenced ```json / greedy {…} */
+function tryParseJson(raw: string): any | null {
+  if (!raw) return null;
+  // 1) try whole
+  try { return JSON.parse(raw); } catch {}
+  // 2) try fenced
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    try { return JSON.parse(fenced[1]); } catch {}
+  }
+  // 3) greedy first {...} block
+  const greedy = raw.match(/\{[\s\S]*\}/);
+  if (greedy?.[0]) {
+    try { return JSON.parse(greedy[0]); } catch {}
+  }
+  return null;
+}
+
+/** Per-outputKind instruction added to the system prompt. */
+function outputKindGuide(outputKind: string, _mockupVariant: string): string {
+  switch (outputKind) {
+    case "text_strategic":
+      return `輸出 JSON: { thinking: string, conclusion: string, sources: [{ url, title, charCount, excerpt }] }
+- thinking 是推理軌跡（300-800 字）
+- conclusion 是策略結論（300-600 字 markdown）
+- sources 是 5-8 個真實 URL（你以 web_search 抓的）`;
+    case "structured_table":
+      // pillar table OR calendar — both expect array
+      return `輸出 JSON: { items: [...] }（陣列形式的結構化表格）。每個 item 含此 step 應有的欄位（pillar: name/hypothesis/ratio/target_kpi/sample_topics/visualDirection；calendar: date/pillarIndex/pillarName/format/topic/eventAnchor 等）。`;
+    case "text_content":
+      return `輸出 JSON: { briefs: [{ date, pillarIndex, pillarName, format, hook, copy, cta, imageDirection, eventAnchor? }] }（多篇貼文 brief）。`;
+    case "image_brief":
+    case "video_brief":
+      return `輸出 JSON: { brief: string, visualDirection: string, formatHints: string[] }`;
+    case "decision":
+      return `輸出 JSON: { eventType?: string, roleThisRound?: string, briefSummary?: string, gaps?: string[], confirmedFields?: object }`;
+    case "qa_review":
+      return `輸出 JSON: { verdict: "approved"|"needs_revision"|"pending", overallScore: number(0-100), pillarChecks: [...], eventChecks: [...], itemChecklist: [{id, label, status, detail}] }`;
+    default:
+      return `輸出 JSON: { conclusion: string }`;
+  }
+}
+
+/** Map parsed LLM JSON → mockup-component-shaped data per outputKind. */
+function mapToMockupData(parsed: any, outputKind: string, mockupVariant: string, rawText: string): any {
+  if (!parsed) {
+    // Fallback so mockup renders something rather than empty
+    return outputKind === "text_strategic"
+      ? { thinking: rawText.slice(0, 2000), conclusion: "", sources: [], budget: { minUrls: 8, minChars: 12000 } }
+      : null;
+  }
+  switch (outputKind) {
+    case "text_strategic":
+      return {
+        thinking: parsed.thinking ?? "",
+        conclusion: parsed.conclusion ?? "",
+        sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+        budget: { minUrls: 8, minChars: 12000 },
+      };
+    case "structured_table":
+      // Pillars vs Calendar — choose by mockup variant
+      if (mockupVariant === "PillarTableMockup") {
+        return { tilt: parsed.tilt ?? "", pillars: Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed.pillars) ? parsed.pillars : []) };
+      }
+      if (mockupVariant === "CalendarGridMockup") {
+        return {
+          targetDateStart: parsed.targetDateStart ?? "",
+          targetDateEnd:   parsed.targetDateEnd   ?? "",
+          pillars: parsed.pillars ?? [],
+          entries: Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed.entries) ? parsed.entries : []),
+        };
+      }
+      return parsed;
+    case "text_content":
+      return { briefs: Array.isArray(parsed.briefs) ? parsed.briefs : [] };
+    case "qa_review":
+      return parsed; // shape already matches QAReport
+    case "decision":
+      // For intake: stuff parsed into IntakeFormData.systemData/userInput so mockup renders
+      return {
+        systemData: { brandName: parsed.brandName },
+        userInput: parsed.confirmedFields ?? {},
+        gaps: Array.isArray(parsed.gaps) ? parsed.gaps : [],
+        webSummary: { audiencePainsPreview: parsed.briefSummary },
+      };
+    default:
+      return parsed;
+  }
+}
+
 // ── Workspace → tag keywords mapping ─────────────────────────────────────────
 
 const WORKSPACE_TAGS: Record<string, string[]> & { strategy: string[] } = {
@@ -236,6 +328,137 @@ export const squadTemplateRouter = router({
         [input.id],
       );
       return { ok: true, reason: input.reason };
+    }),
+
+  /**
+   * runStepLive — actually execute one squad step against the LLM.
+   *
+   * No DB writes (no mission_step_progress row). For admin lab "Test Run"
+   * mode where CJ wants to see real LLM output per step before approving.
+   *
+   * Caller passes:
+   *   - squadId + stepIndex → fetches step config (prompt, model, outputKind)
+   *   - brandId (optional) → for brand-context substitution
+   *   - userInput (optional) → step 1 checkpoint values feed downstream
+   *   - upstreamOutputs (optional) → outputs from prior steps in the run
+   *
+   * Returns:
+   *   - rawText (LLM raw response)
+   *   - parsed (best-effort JSON parse; null if LLM didn't comply)
+   *   - mockupData (per outputKind, shape ready for mockup component)
+   */
+  runStepLive: protectedProcedure
+    .input(z.object({
+      squadId: z.number(),
+      stepIndex: z.number().int().min(0).max(20),
+      brandId: z.number().nullable().optional(),
+      userInput: z.record(z.string(), z.any()).optional(),
+      upstreamOutputs: z.record(z.string(), z.any()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 1. Load squad + step
+      const [sqRows] = await localPool.execute(
+        `SELECT id, slug, name, methodology, steps, agents, lead_agent_id
+           FROM squads WHERE id = ? LIMIT 1`,
+        [input.squadId],
+      ) as any[];
+      const squad = (sqRows as any[])?.[0];
+      if (!squad) throw new TRPCError({ code: "NOT_FOUND", message: `squad ${input.squadId} not found` });
+      const steps = safeJsonParse<any[]>(squad.steps, []);
+      const step = steps[input.stepIndex];
+      if (!step) throw new TRPCError({ code: "NOT_FOUND", message: `step ${input.stepIndex} not found` });
+
+      // UI-only steps don't call LLM
+      if (step.aiModel === "n/a" || step.outputKind === "decision" && step.userInputFields?.length > 0) {
+        return {
+          ok: true,
+          step: { name: step.name, outputKind: step.outputKind, mockupVariant: step.mockupVariant },
+          rawText: "",
+          parsed: null,
+          mockupData: null,
+          note: "此 step 是 UI checkpoint，不打 LLM。請在前端填寫 userInput 後 run 下一步。",
+        };
+      }
+
+      // 2. Optional: brand context for substitution
+      let brand: any = null;
+      if (input.brandId) {
+        const [bRows] = await localPool.execute(
+          `SELECT id, name, industry, description, positioning FROM brands WHERE id = ? LIMIT 1`,
+          [input.brandId],
+        ) as any[];
+        brand = (bRows as any[])?.[0] ?? null;
+      }
+      const brandPositioning = brand?.positioning && typeof brand.positioning === "string"
+        ? (() => { try { return JSON.parse(brand.positioning); } catch { return {}; } })()
+        : (brand?.positioning ?? {});
+
+      // 3. Build prompts
+      const userInputs = input.userInput ?? {};
+      const upstream = input.upstreamOutputs ?? {};
+
+      const systemPrompt = `你是 ${step.assignedAgentName ?? "Squad Agent"}（步驟「${step.name}」負責人）。
+
+【方法論】${squad.methodology ?? "N/A"}
+【步驟描述】${step.description ?? ""}
+【產出 outputKind】${step.outputKind}
+
+【Output 規則】
+${outputKindGuide(step.outputKind, step.mockupVariant)}
+
+【強制】輸出必須是合法 JSON 物件（不是陣列頂層）。沒有前言、不要 \`\`\`json 圍籬。`;
+
+      const userPrompt = [
+        brand ? `【目標品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}` : null,
+        brand?.description ? `【品牌描述】${String(brand.description).slice(0, 600)}` : null,
+        Object.keys(brandPositioning).length > 0
+          ? `【品牌定位 (摘要)】\n${JSON.stringify(brandPositioning, null, 2).slice(0, 2500)}`
+          : null,
+        Object.keys(userInputs).length > 0
+          ? `【用戶在 step 1 填的 brief】\n${JSON.stringify(userInputs, null, 2)}`
+          : null,
+        Object.keys(upstream).length > 0
+          ? `【上游 step 已產出】\n${JSON.stringify(upstream, null, 2).slice(0, 4000)}`
+          : null,
+        "請依 outputKind 規則產出此 step 的 conclusion (JSON)。",
+      ].filter(Boolean).join("\n\n");
+
+      // 4. Call LLM (cross-provider fallback via existing invokeLLM)
+      const t0 = Date.now();
+      let rawText = "";
+      let attempts = 1;
+      try {
+        const llm = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user",   content: userPrompt },
+          ],
+          // model could be honored via opts but invokeLLM auto-picks — keep simple
+        });
+        rawText = String(llm?.choices?.[0]?.message?.content ?? "");
+      } catch (e) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `LLM call failed: ${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
+      const durationMs = Date.now() - t0;
+
+      // 5. Best-effort JSON parse
+      const parsed = tryParseJson(rawText);
+
+      // 6. Map parsed → mockup-shaped data per outputKind
+      const mockupData = mapToMockupData(parsed, step.outputKind, step.mockupVariant, rawText);
+
+      return {
+        ok: true,
+        step: { name: step.name, outputKind: step.outputKind, mockupVariant: step.mockupVariant, aiModel: step.aiModel },
+        rawText,
+        parsed,
+        mockupData,
+        durationMs,
+        attempts,
+      };
     }),
 
   listForFront: protectedProcedure

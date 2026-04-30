@@ -12,6 +12,7 @@ import { PillarTableMockup, type PillarRow } from "./pillar";
 import { CalendarGridMockup, type CalendarEntry } from "./calendar";
 import { FBPostBriefMockup, type PostBrief } from "./brief";
 import { QAReportMockup, type QAReport } from "./qa";
+import { ResearchPanelMockup, type ResearchData } from "./research";
 
 export { type SquadMockupVariant } from "./shared";
 export { IntakeFormMockup, type IntakeFormData } from "./intake";
@@ -19,6 +20,7 @@ export { PillarTableMockup, type PillarRow } from "./pillar";
 export { CalendarGridMockup, type CalendarEntry } from "./calendar";
 export { FBPostBriefMockup, type PostBrief } from "./brief";
 export { QAReportMockup, type QAReport } from "./qa";
+export { ResearchPanelMockup, type ResearchData } from "./research";
 
 export interface SquadMockupProps {
   variant: SquadMockupVariant;
@@ -42,10 +44,7 @@ export function SquadMockup({ variant, data, readOnly, isActive, onChange, onSub
     case "QAReportMockup":
       return <QAReportMockup data={data as QAReport} readOnly={readOnly} isActive={isActive} />;
     case "ResearchPanelMockup":
-      // Not implemented as a SquadMockup variant — squad runner should
-      // use the existing <ThinkingOverlay> + sources panel pattern (same
-      // as brand pipeline). Returning null so dispatcher doesn't crash.
-      return null;
+      return <ResearchPanelMockup data={data as ResearchData} readOnly={readOnly} isActive={isActive} />;
     default:
       // Exhaustive switch — TypeScript will flag missing variants
       const _exhaustive: never = variant;
