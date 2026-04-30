@@ -33,20 +33,24 @@ jobs:
           STEP_INDEX: ${{ github.event.inputs.step_index }}
           SCOPE_KIND: ${{ github.event.inputs.scope_kind }}
           SCOPE_ID: ${{ github.event.inputs.scope_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 300s
-          envs: SQUAD_ID,STEP_INDEX,SCOPE_KIND,SCOPE_ID
+          envs: SQUAD_ID,STEP_INDEX,SCOPE_KIND,SCOPE_ID,GH_TOKEN
           script: |
             set +e
-            cd /opt/marketing-os && git pull --ff-only 2>&1 | tail -3
-            cd /opt/marketing-os/app/skills/ai-talent 2>/dev/null || cd /opt/marketing-os/skills/ai-talent
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
             set -a
-            [ -f .env ] && . .env
-            [ -f /opt/marketing-os/app/skills/ai-talent/.env ] && . /opt/marketing-os/app/skills/ai-talent/.env
-            [ -f /opt/marketing-os/skills/ai-talent/.env ] && . /opt/marketing-os/skills/ai-talent/.env
+            [ -f "$AI/.env" ] && . "$AI/.env"
             set +a
 
             echo "===== Env presence (no values) ====="
