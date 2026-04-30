@@ -26,7 +26,6 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import localPool from "../localDb";
 import { sql } from "drizzle-orm";
-import { invokeLLM } from "../_core/llm";
 import { callLLM } from "../_core/llmRouter";
 import { randomBytes } from "crypto";
 import { loadAgentContext } from "../agentContextLoader";
@@ -1729,14 +1728,16 @@ ${agentCtx.systemPromptPrefix}`;
 語氣：專業但有溫度，像真正帶過品牌的行銷人。用繁體中文回應。
 長度：控制在 250 字內。${agentCtx.depthLabel}`;
 
-      const llmResult = await invokeLLM({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user",   content: userPrompt },
-        ],
+      // Cross-provider fallback (Anthropic → Azure → OpenRouter) — Azure
+      // alone returns DeploymentNotFound 404 when its deployment name is
+      // stale, killing the squad. callLLM survives single-provider failures.
+      const llmResult = await callLLM({
+        system: systemPrompt,
+        user: userPrompt,
+        maxTokens: 1500,
+        timeoutMs: 35_000,
       });
-      const replyContent = llmResult.choices?.[0]?.message?.content ?? "";
-      const reply = typeof replyContent === "string" ? replyContent : JSON.stringify(replyContent);
+      const reply = llmResult.text;
 
       await db.execute(sql`
         INSERT INTO chat_messages (userId, missionId, role, content, conversationTitle, createdAt)
@@ -1998,13 +1999,15 @@ ${brandContext}
 ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
 請只輸出問題本身，不要前言、不要編號以外的客套話。`;
 
-        const llm = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
+        // Cross-provider fallback (Anthropic → Azure → OpenRouter) so a stale
+        // Azure deployment can't single-handedly kill the squad.
+        const llm = await callLLM({
+          system: systemPrompt,
+          user: userPrompt,
+          maxTokens: 800,
+          timeoutMs: 35_000,
         });
-        const reply = String(llm.choices?.[0]?.message?.content ?? "");
+        const reply = llm.text;
 
         await db.execute(sql`
           INSERT INTO mission_step_progress
@@ -2115,13 +2118,16 @@ ${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
 
 請直接交付【成品內容】 — 不是「我會這樣做」的說明。所有舉例必須來自上面這個品牌的真實產品 / 受眾 / 產業情境。`;
 
-      const llm = await invokeLLM({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+      // Cross-provider fallback — Azure-only invokeLLM throws DeploymentNotFound
+      // when the deployment name drifts. callLLM falls back to Anthropic /
+      // OpenRouter / Foundry so a single bad provider can't block the squad.
+      const llm = await callLLM({
+        system: systemPrompt,
+        user: userPrompt,
+        maxTokens: 3000,
+        timeoutMs: 35_000,
       });
-      const output = String(llm.choices?.[0]?.message?.content ?? "");
+      const output = llm.text;
 
       // Push the previous draft (if any) into history so the user can undo.
       // history is a JSON array of { output, userInput, ts }.
@@ -2293,13 +2299,14 @@ ${progressLines || "(還沒有任何步驟產出)"}
 使用者的問題：
 ${input.question}`;
 
-      const llm = await invokeLLM({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+      // Cross-provider fallback so squad-lead Q&A survives single-provider outages.
+      const llm = await callLLM({
+        system: systemPrompt,
+        user: userPrompt,
+        maxTokens: 1500,
+        timeoutMs: 35_000,
       });
-      const answer = String(llm.choices?.[0]?.message?.content ?? "");
+      const answer = llm.text;
       return { ok: true, answer };
     }),
 
