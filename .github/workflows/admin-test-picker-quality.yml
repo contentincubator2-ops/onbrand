@@ -1,0 +1,55 @@
+name: Admin — test picker quality (event positioning + markdown)
+
+on:
+  workflow_dispatch:
+    inputs:
+      squad_slug:
+        description: "Squad slug (default fb-garyvee-jab-hook)"
+        required: false
+        default: "fb-garyvee-jab-hook"
+      brand_name:
+        description: "Brand name exact match"
+        required: false
+        default: "Pokémon GO"
+      event_name:
+        description: "Event name exact match"
+        required: false
+        default: "2026年五月單首龍經典社群日"
+      step_order:
+        description: "Step order (1-based, default 2 = first content step)"
+        required: false
+        default: "2"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          SQUAD_SLUG: ${{ github.event.inputs.squad_slug }}
+          BRAND_NAME: ${{ github.event.inputs.brand_name }}
+          EVENT_NAME: ${{ github.event.inputs.event_name }}
+          STEP_ORDER: ${{ github.event.inputs.step_order }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          envs: SQUAD_SLUG,BRAND_NAME,EVENT_NAME,STEP_ORDER,GH_TOKEN
+          script: |
+            set +e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
+            set -a
+            [ -f "$AI/.env" ] && . "$AI/.env"
+            set +a
+
+            timeout 120 env SQUAD_SLUG="$SQUAD_SLUG" BRAND_NAME="$BRAND_NAME" \
+              EVENT_NAME="$EVENT_NAME" STEP_ORDER="$STEP_ORDER" \
+              npx tsx scripts/test-picker-quality.ts 2>&1
