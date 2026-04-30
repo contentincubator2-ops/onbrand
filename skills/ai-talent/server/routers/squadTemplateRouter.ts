@@ -73,6 +73,93 @@ function formatPositioningContext(positioning: any, description: any, label = "�
   return parts.join("\n");
 }
 
+/** Concrete schema example per (outputKind, mockupVariant) so LLM has
+ *  a target shape for `conclusion`. Mirrors pipelineRouter's mockConclusion
+ *  pattern — specific keys converge faster than free-form. */
+function mockConclusionForStep(outputKind: string, mockupVariant?: string): any {
+  switch (outputKind) {
+    case "decision":
+      // Intake or user-checkpoint outputs
+      return {
+        eventType: "brand|growth|conversion|hybrid",
+        roleThisRound: "（一句話：本次 squad 對品牌的角色）",
+        briefSummary: "（200 字內活動策略摘要）",
+        gaps: ["（資料缺失項 1）", "（缺失項 2）"],
+        confirmedFields: { "（key）": "（value）" },
+      };
+    case "text_strategic":
+      // Research / context analysis
+      return {
+        keyFindings: ["（觀察 1）", "（觀察 2）", "（觀察 3）"],
+        audiencePains: ["（痛點 1）", "（痛點 2）"],
+        competitorGaps: ["（競品 pillar 空白 1）"],
+        platformSignals: "（FB prime time / 演算法觀察）",
+        strategyImplication: "（這些研究對 pillar 設計的啟發）",
+      };
+    case "structured_table":
+      if (mockupVariant === "PillarTableMockup") {
+        return {
+          tilt: "（一句話 content tilt）",
+          pillars: [{
+            name: "（pillar 名稱）",
+            hypothesis: "（為何這 pillar 適合）",
+            ratio: 35,
+            target_kpi: "saves|shares|reach|convert",
+            sample_topics: ["主題 1", "主題 2", "主題 3", "主題 4", "主題 5"],
+            visualDirection: "（這 pillar 的視覺方向，影響 image_brief）",
+          }],
+        };
+      }
+      if (mockupVariant === "CalendarGridMockup") {
+        return {
+          targetDateStart: "YYYY-MM-DD",
+          targetDateEnd:   "YYYY-MM-DD",
+          pillars: [{ name: "（pillar 名）", ratio: 35 }],
+          entries: [{
+            date: "YYYY-MM-DD",
+            pillarIndex: 0,
+            pillarName: "（pillar 名）",
+            format: "post|reel|carousel|long-text|story",
+            topic: "（主題）",
+            eventAnchor: "（活動名，無則省略此欄）",
+          }],
+        };
+      }
+      return { items: [{ "（key）": "（value）" }] };
+    case "text_content":
+      return {
+        briefs: [{
+          date: "YYYY-MM-DD",
+          pillarIndex: 0,
+          pillarName: "（pillar）",
+          format: "post|reel|carousel|long-text|story",
+          hook: "（開場一句吸引眼球）",
+          copy: "（200 字內主文）",
+          cta: "（行動呼籲）",
+          imageDirection: "（依該 pillar 的 visualDirection 寫的視覺方向）",
+          eventAnchor: "（活動，無則省略）",
+        }],
+      };
+    case "image_brief":
+    case "video_brief":
+      return {
+        brief: "（視覺/影片 brief）",
+        visualDirection: "（風格、色彩、構圖）",
+        formatHints: ["1:1", "9:16"],
+      };
+    case "qa_review":
+      return {
+        verdict: "approved|needs_revision|pending",
+        overallScore: 78,
+        pillarChecks: [{ pillarName: "（pillar）", expectedRatio: 35, actualRatio: 33, score: 85, notes: "..." }],
+        eventChecks: [{ eventName: "（活動）", posts: 4, expectedPosts: 4, score: 90, notes: "..." }],
+        itemChecklist: [{ id: "voice", label: "品牌語氣", status: "pass|warning|fail", detail: "..." }],
+      };
+    default:
+      return {};
+  }
+}
+
 /** Per-outputKind LLM maxTokens — bigger steps need more; small steps
  *  shouldn't waste tokens (also reduces server timeout risk). */
 function maxTokensForOutputKind(outputKind: string): number {
@@ -106,76 +193,83 @@ function tryParseJson(raw: string): any | null {
   return null;
 }
 
-/** Per-outputKind instruction added to the system prompt. */
-function outputKindGuide(outputKind: string, _mockupVariant: string): string {
-  switch (outputKind) {
-    case "text_strategic":
-      return `輸出 JSON: { thinking: string, conclusion: string, sources: [{ url, title, charCount, excerpt }] }
-- thinking 是推理軌跡（300-800 字）
-- conclusion 是策略結論（300-600 字 markdown）
-- sources 是 5-8 個真實 URL（你以 web_search 抓的）`;
-    case "structured_table":
-      // pillar table OR calendar — both expect array
-      return `輸出 JSON: { items: [...] }（陣列形式的結構化表格）。每個 item 含此 step 應有的欄位（pillar: name/hypothesis/ratio/target_kpi/sample_topics/visualDirection；calendar: date/pillarIndex/pillarName/format/topic/eventAnchor 等）。`;
-    case "text_content":
-      return `輸出 JSON: { briefs: [{ date, pillarIndex, pillarName, format, hook, copy, cta, imageDirection, eventAnchor? }] }（多篇貼文 brief）。`;
-    case "image_brief":
-    case "video_brief":
-      return `輸出 JSON: { brief: string, visualDirection: string, formatHints: string[] }`;
-    case "decision":
-      return `輸出 JSON: { eventType?: string, roleThisRound?: string, briefSummary?: string, gaps?: string[], confirmedFields?: object }`;
-    case "qa_review":
-      return `輸出 JSON: { verdict: "approved"|"needs_revision"|"pending", overallScore: number(0-100), pillarChecks: [...], eventChecks: [...], itemChecklist: [{id, label, status, detail}] }`;
-    default:
-      return `輸出 JSON: { conclusion: string }`;
-  }
-}
-
-/** Map parsed LLM JSON → mockup-component-shaped data per outputKind. */
-function mapToMockupData(parsed: any, outputKind: string, mockupVariant: string, rawText: string): any {
-  if (!parsed) {
+/** Map parsed LLM conclusion → mockup-component-shaped data per outputKind.
+ *  thinking + sources come from the envelope (not part of conclusion). */
+function mapToMockupData(
+  conclusion: any,
+  outputKind: string,
+  mockupVariant: string,
+  rawText: string,
+  thinking: string,
+  sources: any[],
+): any {
+  if (!conclusion) {
     // Fallback so mockup renders something rather than empty
     return outputKind === "text_strategic"
-      ? { thinking: rawText.slice(0, 2000), conclusion: "", sources: [], budget: { minUrls: 8, minChars: 12000 } }
+      ? { thinking: thinking || rawText.slice(0, 2000), conclusion: "", sources, budget: { minUrls: 8, minChars: 12000 } }
       : null;
   }
   switch (outputKind) {
     case "text_strategic":
+      // Research mockup wants: thinking + conclusion (string) + sources + budget
+      // conclusion may itself be a string OR an object with keyFindings etc.
       return {
-        thinking: parsed.thinking ?? "",
-        conclusion: parsed.conclusion ?? "",
-        sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+        thinking,
+        conclusion: typeof conclusion === "string"
+          ? conclusion
+          : (conclusion.strategyImplication ?? formatStrategicConclusion(conclusion)),
+        sources,
         budget: { minUrls: 8, minChars: 12000 },
       };
     case "structured_table":
-      // Pillars vs Calendar — choose by mockup variant
       if (mockupVariant === "PillarTableMockup") {
-        return { tilt: parsed.tilt ?? "", pillars: Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed.pillars) ? parsed.pillars : []) };
+        return {
+          tilt: conclusion.tilt ?? "",
+          pillars: Array.isArray(conclusion.pillars) ? conclusion.pillars
+                 : Array.isArray(conclusion.items)   ? conclusion.items
+                 : [],
+        };
       }
       if (mockupVariant === "CalendarGridMockup") {
         return {
-          targetDateStart: parsed.targetDateStart ?? "",
-          targetDateEnd:   parsed.targetDateEnd   ?? "",
-          pillars: parsed.pillars ?? [],
-          entries: Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed.entries) ? parsed.entries : []),
+          targetDateStart: conclusion.targetDateStart ?? "",
+          targetDateEnd:   conclusion.targetDateEnd   ?? "",
+          pillars: Array.isArray(conclusion.pillars) ? conclusion.pillars : [],
+          entries: Array.isArray(conclusion.entries) ? conclusion.entries
+                 : Array.isArray(conclusion.items)   ? conclusion.items
+                 : [],
         };
       }
-      return parsed;
+      return conclusion;
     case "text_content":
-      return { briefs: Array.isArray(parsed.briefs) ? parsed.briefs : [] };
+      return { briefs: Array.isArray(conclusion.briefs) ? conclusion.briefs : [] };
     case "qa_review":
-      return parsed; // shape already matches QAReport
+      return conclusion; // shape already matches QAReport
     case "decision":
-      // For intake: stuff parsed into IntakeFormData.systemData/userInput so mockup renders
+      // For intake: project conclusion into IntakeFormData
       return {
-        systemData: { brandName: parsed.brandName },
-        userInput: parsed.confirmedFields ?? {},
-        gaps: Array.isArray(parsed.gaps) ? parsed.gaps : [],
-        webSummary: { audiencePainsPreview: parsed.briefSummary },
+        systemData: {},
+        userInput: conclusion.confirmedFields ?? {},
+        gaps: Array.isArray(conclusion.gaps) ? conclusion.gaps : [],
+        webSummary: {
+          audiencePainsPreview: conclusion.briefSummary ?? "",
+        },
       };
     default:
-      return parsed;
+      return conclusion;
   }
+}
+
+/** When LLM returns rich strategic conclusion as object, render it readable. */
+function formatStrategicConclusion(c: any): string {
+  if (!c || typeof c !== "object") return "";
+  const lines: string[] = [];
+  if (c.keyFindings)        lines.push(`# 關鍵發現\n- ${(c.keyFindings as string[]).join("\n- ")}`);
+  if (c.audiencePains)      lines.push(`# 受眾痛點\n- ${(c.audiencePains as string[]).join("\n- ")}`);
+  if (c.competitorGaps)     lines.push(`# 競品空白\n- ${(c.competitorGaps as string[]).join("\n- ")}`);
+  if (c.platformSignals)    lines.push(`# 平台訊號\n${c.platformSignals}`);
+  if (c.strategyImplication)lines.push(`# 戰略意涵\n${c.strategyImplication}`);
+  return lines.join("\n\n");
 }
 
 // ── Workspace → tag keywords mapping ─────────────────────────────────────────
@@ -489,16 +583,27 @@ export const squadTemplateRouter = router({
       const userInputs = input.userInput ?? {};
       const upstream = input.upstreamOutputs ?? {};
 
-      const systemPrompt = `你是 ${step.assignedAgentName ?? "Squad Agent"}（步驟「${step.name}」負責人）。
+      // Pattern adopted from pipelineRouter (proven on 14-step brand pipeline):
+      // strict {thinking, conclusion, sources} envelope with a concrete
+      // schema example for `conclusion`. The example tells LLM exactly
+      // which keys to fill — converges faster + more parseable than free-form.
+      const schemaExample = JSON.stringify(mockConclusionForStep(step.outputKind, step.mockupVariant), null, 2);
+
+      const systemPrompt = `你是 ${step.assignedAgentName ?? "Squad Agent"}（zh-TW）。Squad「${squad.name}」步驟「${step.name}」負責人。
 
 【方法論】${squad.methodology ?? "N/A"}
-【步驟描述】${step.description ?? ""}
-【產出 outputKind】${step.outputKind}
+【步驟說明】${step.description ?? ""}
 
-【Output 規則】
-${outputKindGuide(step.outputKind, step.mockupVariant)}
+【輸出格式 — 嚴格 JSON，不要任何前綴/後綴/markdown code fence】
+你的回應**必須**是合法 JSON 字串，三個 top-level keys：
+- "thinking" (string, 200-600 字推理過程，繁中)
+- "conclusion" (object, 結構必須符合下方範例的 keys)
+- "sources" (array of {url,title,charCount,excerpt}，無研究時可空陣列)
 
-【強制】輸出必須是合法 JSON 物件（不是陣列頂層）。沒有前言、不要 \`\`\`json 圍籬。`;
+conclusion 範例（outputKind = "${step.outputKind}", mockup = "${step.mockupVariant ?? ""}"; 依此 keys 填入真實內容）：
+${schemaExample}
+
+注意：直接 raw JSON，不要 \`\`\`json 圍籬，不要 prose 前綴。conclusion 不能是空 object。`;
 
       const userPrompt = [
         `【執行 Scope】${scopeLabel}`,
@@ -507,9 +612,9 @@ ${outputKindGuide(step.outputKind, step.mockupVariant)}
           ? `【用戶在 step 1 填的 brief】\n${JSON.stringify(userInputs, null, 2)}`
           : null,
         Object.keys(upstream).length > 0
-          ? `【上游 step 已產出】\n${JSON.stringify(upstream, null, 2).slice(0, 4000)}`
+          ? `【上游 step 已產出】\n${JSON.stringify(upstream, null, 2).slice(0, 3000)}`
           : null,
-        "請依 outputKind 規則產出此 step 的 conclusion (JSON)。",
+        "請執行此步驟，輸出 thinking + conclusion + sources JSON。",
       ].filter(Boolean).join("\n\n");
 
       // 4. Call LLM with cross-provider fallback (Anthropic → Azure Foundry
@@ -520,9 +625,16 @@ ${outputKindGuide(step.outputKind, step.mockupVariant)}
       let attempts = 1;
       const maxTokens = maxTokensForOutputKind(step.outputKind);
       try {
-        const result = await callLLM({ system: systemPrompt, user: userPrompt, maxTokens });
+        // timeoutMs per provider — nginx default ~60s, must beat it.
+        // 35s × 3 anthropic keys = 105s worst case but first usually succeeds.
+        // Aborting fast lets us fall through providers before nginx 502s.
+        // eslint-disable-next-line no-console
+        console.log(`[runStepLive] squad=${input.squadId} step=${input.stepIndex} kind=${step.outputKind} maxTokens=${maxTokens} promptChars=${systemPrompt.length + userPrompt.length}`);
+        const result = await callLLM({ system: systemPrompt, user: userPrompt, maxTokens, timeoutMs: 35_000 });
         rawText = result.text;
         attempts = result.attempts?.length ?? 1;
+        // eslint-disable-next-line no-console
+        console.log(`[runStepLive] OK squad=${input.squadId} step=${input.stepIndex} attempts=${attempts} chars=${rawText.length}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         // Common failure modes: nginx 502 HTML, provider 5xx, all providers down
@@ -536,17 +648,29 @@ ${outputKindGuide(step.outputKind, step.mockupVariant)}
       }
       const durationMs = Date.now() - t0;
 
-      // 5. Best-effort JSON parse
-      const parsed = tryParseJson(rawText);
+      // 5. Best-effort JSON parse — expect {thinking, conclusion, sources}
+      //    envelope per pipelineRouter pattern.
+      const parsedRaw = tryParseJson(rawText);
+      const thinking: string = parsedRaw?.thinking ?? "";
+      const conclusion: any  = parsedRaw?.conclusion ?? (
+        // Fallback: if LLM returned conclusion fields at top level (no envelope)
+        parsedRaw && Object.keys(parsedRaw).some((k) => k !== "thinking" && k !== "sources" && k !== "conclusion")
+          ? Object.fromEntries(Object.entries(parsedRaw).filter(([k]) => k !== "thinking" && k !== "sources"))
+          : null
+      );
+      const sources: any[] = Array.isArray(parsedRaw?.sources) ? parsedRaw.sources : [];
 
-      // 6. Map parsed → mockup-shaped data per outputKind
-      const mockupData = mapToMockupData(parsed, step.outputKind, step.mockupVariant, rawText);
+      // 6. Map conclusion → mockup-shaped data per outputKind
+      const mockupData = mapToMockupData(conclusion, step.outputKind, step.mockupVariant, rawText, thinking, sources);
 
       return {
         ok: true,
         step: { name: step.name, outputKind: step.outputKind, mockupVariant: step.mockupVariant, aiModel: step.aiModel },
         rawText,
-        parsed,
+        parsed: parsedRaw,
+        thinking,
+        conclusion,
+        sources,
         mockupData,
         durationMs,
         attempts,
