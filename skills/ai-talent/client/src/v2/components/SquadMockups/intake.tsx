@@ -81,13 +81,13 @@ export function IntakeFormMockup({ data = {}, readOnly = false, isActive = false
 
   return (
     <div className="flex flex-col gap-4 max-w-3xl">
-      {/* ── 📦 系統已有 ─────────────────────────────────────────── */}
+      {/* ── 品牌資料（自動帶入）─────────────────────────────────── */}
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="📦"
-            eyebrow="BUCKET A · 系統已有（自動撈）"
-            title="這次 squad 不需要再問你的"
+            eyebrow="品牌資訊"
+            title="這些已從你的品牌定位自動帶入"
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
@@ -113,12 +113,12 @@ export function IntakeFormMockup({ data = {}, readOnly = false, isActive = false
         )}
       </NotionCard>
 
-      {/* ── 🌐 Web 摘要 ────────────────────────────────────────── */}
+      {/* ── 市場觀察（intake 已預跑）──────────────────────────── */}
       <NotionCard>
         <SectionHeader
           icon="🌐"
-          eyebrow="BUCKET C · Web 補強（intake agent 已預跑）"
-          title="先看一眼網路上目前的訊號"
+          eyebrow="市場觀察"
+          title="網路上目前的訊號（intake 已先預跑）"
         />
         <div className="flex flex-col gap-1.5 text-tiny text-default-700 leading-relaxed">
           <div><span className="text-default-500">受眾痛點預覽：</span>{web.audiencePainsPreview ?? <EmptyHint>跑 intake 才會有</EmptyHint>}</div>
@@ -127,12 +127,12 @@ export function IntakeFormMockup({ data = {}, readOnly = false, isActive = false
         </div>
       </NotionCard>
 
-      {/* ── 👤 用戶必填 ────────────────────────────────────────── */}
+      {/* ── 用戶決定的策略選擇 ──────────────────────────────── */}
       <NotionCard>
         <SectionHeader
           icon="👤"
-          eyebrow="BUCKET B · 用戶必填"
-          title="這 4 個你決定，AI 不該猜"
+          eyebrow="策略選擇"
+          title="這幾項由你決定（AI 不該替你猜）"
           color="primary"
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -242,10 +242,10 @@ export function IntakeFormMockup({ data = {}, readOnly = false, isActive = false
         </div>
       </NotionCard>
 
-      {/* ── ⚠ 缺口警告 ────────────────────────────────────────── */}
+      {/* ── 資料缺失提醒 ────────────────────────────────────── */}
       {gaps.length > 0 && (
         <NotionCard className="border-warning-200 bg-warning-50">
-          <SectionHeader icon="⚠" eyebrow="缺口警告" title="影響此 squad 品質的資料缺失" color="warning" />
+          <SectionHeader icon="⚠" eyebrow="提醒" title="這些資料還沒準備好，會影響輸出品質" color="warning" />
           <ul className="list-disc list-inside text-tiny text-warning-800 leading-relaxed space-y-1">
             {gaps.map((g, i) => <li key={i}>{g}</li>)}
           </ul>

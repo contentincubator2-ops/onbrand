@@ -439,15 +439,8 @@ function SquadPreviewModal({
       case "FBPostBriefMockup":  return { briefs: SAMPLE_BRIEFS };
       case "QAReportMockup":     return SAMPLE_QA;
       case "ResearchPanelMockup":
-        // Provide a minimal sample for research mode
-        return {
-          conclusion: "（樣本）寶可夢玩家三層痛點：(1) 找熱點 → (2) 配招決策 → (3) 活動倒數恐懼。三大競品 pillar 均偏官方公告，台灣同好群偏地圖共享 → 「教學深度」是空白。",
-          sources: [
-            { url: "https://www.ptt.cc/bbs/PokemonGO/", title: "PTT Pokemon GO 板", charCount: 3200, excerpt: "玩家討論抓寶與配招" },
-            { url: "https://www.dcard.tw/f/pokemongo", title: "Dcard 寶可夢專版", charCount: 2800, excerpt: "新手到進階轉型痛點" },
-          ],
-          budget: { minUrls: 8, minChars: 12000 },
-        };
+        // Empty initial state — research output only meaningful from live run
+        return { budget: { minUrls: 8, minChars: 12000 } };
       default: return null;
     }
   };
@@ -492,8 +485,11 @@ function SquadPreviewModal({
   };
 
   const live = liveResults[stepIdx];
-  const dataForRender = mode === "live" && live?.mockupData
-    ? live.mockupData
+  // Live mode: ONLY show live mockupData (never fall back to sample, so
+  // user can't confuse mock vs real). If LLM didn't return parseable
+  // data, show empty mockup + the raw output debug section.
+  const dataForRender = mode === "live"
+    ? (live?.mockupData ?? null)
     : sampleFor(step?.mockupVariant ?? "");
 
   return (
