@@ -57,7 +57,7 @@ import {
   faEnvelopeOpenText, faChartLine, faDiagramProject, faTriangleExclamation,
   faChartArea, faClipboardCheck, faBell, faRankingStar,
   faArrowLeft, faExpand, faCompress, faChevronLeft, faChevronRight,
-  faEnvelope,
+  faEnvelope, faCopy,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faInstagram, faFacebook, faLinkedin, faYoutube,
@@ -362,6 +362,30 @@ export default function PickerWorkspace() {
   useEffect(() => { setAgentNotes({}); }, [selectedSlug]);
 
   // ── Data ────────────────────────────────────────────────────────────
+  // Task catalog — curated front-door. CJ direction 2026-05-01: this
+  // takes precedence over raw squad search. Active tasks only.
+  const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const catalogTasks: any[] = (taskCatalogQuery.data as any[]) ?? [];
+
+  // Coming-soon tasks for the "🔮 即將推出" drawer.
+  const comingSoonQuery = (trpc as any).taskCatalog?.listComingSoon?.useQuery
+    ? (trpc as any).taskCatalog.listComingSoon.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const comingSoonTasks: any[] = (comingSoonQuery.data as any[]) ?? [];
+
+  const upvoteMutation = (trpc as any).taskCatalog?.upvote?.useMutation?.({
+    onSuccess: () => { comingSoonQuery.refetch?.(); },
+  }) ?? null;
+
+  const runAtomicMutation: any = (trpc as any).taskCatalog?.runAtomic?.useMutation?.()
+    ?? { mutateAsync: async () => null, isPending: false };
+
+  const [comingSoonOpen, setComingSoonOpen] = useState(false);
+  const [atomicResult, setAtomicResult] = useState<any | null>(null);
+  const [atomicError, setAtomicError] = useState<string | null>(null);
+
   const squadsQuery = (trpc.squad as any).listByBrand?.useQuery
     ? (trpc.squad as any).listByBrand.useQuery(
         { brandId: 0 },
@@ -428,6 +452,52 @@ export default function PickerWorkspace() {
       if (!aliases.some((a) => channelHaystack.includes(a))) return false;
     }
     return true;
+  };
+
+  // Catalog filter — naive substring match against name/keywords/description.
+  // Channel facet uses workspace field directly.
+  const filteredCatalog = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    return catalogTasks.filter((t: any) => {
+      // Channel facet
+      if (channelFilter !== "all") {
+        const aliases = CHANNEL_ALIASES[channelFilter] ?? [channelFilter];
+        if (!aliases.some((a) => String(t.workspace ?? "").toLowerCase().includes(a))) return false;
+      }
+      // Query
+      if (!ql) return true;
+      const hay = [
+        t.name_zh, t.name_en, t.description,
+        t.search_keywords, t.workspace, t.category,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(ql);
+    });
+  }, [catalogTasks, q, channelFilter]);
+
+  // Click handler — route by impl_kind. squad → existing flow.
+  // atomic → call taskCatalog.runAtomic with active scope, show result modal.
+  const onCatalogClick = async (t: any) => {
+    if (t.impl_kind === "squad" && t.squad_slug) {
+      setSelectedSlug(t.squad_slug);
+      return;
+    }
+    if (t.impl_kind === "atomic") {
+      setAtomicResult({ pending: true, task: t });
+      setAtomicError(null);
+      try {
+        const res = await runAtomicMutation.mutateAsync({
+          taskId: t.id,
+          scopeBrandId:   scope.brandId   ?? null,
+          scopeProductId: scope.productId ?? null,
+          scopeEventId:   scope.eventId   ?? null,
+          userInput: "",
+        });
+        setAtomicResult({ pending: false, task: t, ...res });
+      } catch (e: any) {
+        setAtomicError(e?.message ?? String(e));
+        setAtomicResult({ pending: false, task: t, ok: false });
+      }
+    }
   };
 
   // PR6 — score-based ranking using shared search lib.
@@ -784,6 +854,30 @@ export default function PickerWorkspace() {
               <div className="text-small text-default-500 py-6 text-center">載入中…</div>
             ) : (
               <>
+                {/* ── 0. 任務目錄 (新前門 — task_catalog active items) ── */}
+                <ThumbSection
+                  title={q ? `任務目錄符合（${filteredCatalog.length}）` : "任務目錄 — 精選"}
+                  onCta={comingSoonTasks.length > 0 ? () => setComingSoonOpen(true) : undefined}
+                  ctaLabel={comingSoonTasks.length > 0 ? `🔮 即將推出（${comingSoonTasks.length}）` : undefined}
+                >
+                  {filteredCatalog.length === 0 ? (
+                    <div className="text-tiny text-default-500 py-3 text-center">
+                      {q ? `目錄裡沒有「${q}」相關任務` : "此分類目前無啟用任務"}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredCatalog.map((t: any) => (
+                        <CatalogTaskCard
+                          key={`task-${t.id}`}
+                          task={t}
+                          active={t.impl_kind === "squad" && selectedSlug === t.squad_slug}
+                          onClick={() => onCatalogClick(t)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </ThumbSection>
+
                 {/* ── 1. 最近使用的方法論 (hidden while searching) ── */}
                 {!q && (() => {
                   const items = recentSquads.filter(passesFacets).slice(0, 4);
@@ -956,6 +1050,22 @@ export default function PickerWorkspace() {
           </Tooltip>
         )}
       </div>
+
+      {/* Coming-soon drawer — task_catalog status='coming_soon' rows */}
+      <ComingSoonDrawer
+        isOpen={comingSoonOpen}
+        onClose={() => setComingSoonOpen(false)}
+        tasks={comingSoonTasks}
+        onUpvote={(id) => upvoteMutation?.mutateAsync({ id })}
+      />
+
+      {/* Atomic-task result modal */}
+      <AtomicResultModal
+        isOpen={!!atomicResult}
+        onClose={() => { setAtomicResult(null); setAtomicError(null); }}
+        result={atomicResult}
+        error={atomicError}
+      />
     </div>
   );
 }
@@ -1009,6 +1119,211 @@ function ThumbSection({
       </div>
       {children}
     </div>
+  );
+}
+
+/* ─────────────────────────── Sub: CatalogTaskCard ─────────────────────────── */
+/**
+ * Front-door card for a curated task_catalog row. Shows:
+ *   - name + 1-line description
+ *   - impl_kind chip (squad / atomic) + estimated_minutes
+ *   - bypassable flag (一鍵跑) when true
+ *   - bound squad / agent name as secondary line
+ */
+function CatalogTaskCard({
+  task, active, onClick,
+}: {
+  task: any;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const isSquad = task.impl_kind === "squad";
+  const boundLabel = isSquad
+    ? (task.squad_name ?? `squad #${task.squad_id}`)
+    : (task.agent_name ?? `agent #${task.agent_id}`);
+  const disabled = !isSquad; // atomic flow not yet shipped
+  return (
+    <Card
+      isPressable={!disabled}
+      shadow="none"
+      radius="lg"
+      onPress={!disabled ? onClick : undefined}
+      className={`w-full text-left ${active ? "border-primary bg-primary-50" : "border-divider"} border ${disabled ? "opacity-60" : ""}`}
+    >
+      <CardBody className="p-3 gap-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-small font-semibold truncate">{task.name_zh}</span>
+              <Chip size="sm" variant="flat" color={isSquad ? "primary" : "secondary"} className="h-4 text-tiny">
+                {isSquad ? "squad" : "atomic"}
+              </Chip>
+              {task.bypassable && (
+                <Chip size="sm" variant="flat" color="success" className="h-4 text-tiny">
+                  一鍵跑
+                </Chip>
+              )}
+            </div>
+            <p className="text-tiny text-default-500 line-clamp-2 mt-0.5">{task.description}</p>
+            <div className="flex items-center gap-2 mt-1 text-tiny text-default-400">
+              <span>由 {boundLabel}</span>
+              {task.estimated_minutes && <span>· 約 {task.estimated_minutes} 分鐘</span>}
+              {disabled && <span className="text-warning">· 流程下個 deploy 上線</span>}
+            </div>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+/* ─────────────────────────── Sub: ComingSoonDrawer ─────────────────────────── */
+/**
+ * Modal showing coming_soon task_catalog items, sorted by upvotes desc.
+ * "+1 我也想要" button calls upvote mutation. CJ uses the upvote count
+ * as a priority signal for what to build next.
+ */
+function ComingSoonDrawer({
+  isOpen, onClose, tasks, onUpvote,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  tasks: any[];
+  onUpvote: (id: number) => void;
+}) {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" scrollBehavior="inside">
+      <ModalContent>
+        <ModalHeader className="flex flex-col gap-1">
+          <p className="text-tiny text-default-500 uppercase tracking-wider">即將推出</p>
+          <h2 className="text-medium font-semibold">🔮 候選任務 — 投票決定下一個做哪個</h2>
+          <p className="text-tiny text-default-500">
+            按 +1 表示你想要這個任務。SoWork 依得票數決定建立順序。
+          </p>
+        </ModalHeader>
+        <ModalBody className="gap-2">
+          {tasks.length === 0 ? (
+            <p className="text-small text-default-500 py-6 text-center">目前沒有候選任務</p>
+          ) : (
+            tasks.map((t: any) => (
+              <Card key={t.id} shadow="none" className="border border-divider">
+                <CardBody className="p-3 flex flex-row items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-small font-semibold">{t.name_zh}</span>
+                      <Chip size="sm" variant="flat" className="h-4 text-tiny">{t.workspace}</Chip>
+                      <Chip size="sm" variant="flat" className="h-4 text-tiny">{t.category}</Chip>
+                    </div>
+                    <p className="text-tiny text-default-500 mt-1">{t.description}</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="bordered"
+                      onPress={() => onUpvote(t.id)}
+                      className="min-w-0 px-2"
+                    >
+                      +1 我也想要
+                    </Button>
+                    <span className="text-tiny text-default-400">{t.upvotes ?? 0} 票</span>
+                  </div>
+                </CardBody>
+              </Card>
+            ))
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button size="sm" variant="light" onPress={onClose}>關閉</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+}
+
+/* ─────────────────────────── Sub: AtomicResultModal ─────────────────────────── */
+/**
+ * Result viewer for atomic-task runs. Shows the agent's output as
+ * editable text (so user can fix things on the spot before copying).
+ * Atomic tasks have no DB row — this is in-memory only. Closing
+ * discards.
+ */
+function AtomicResultModal({
+  isOpen, onClose, result, error,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  result: any | null;
+  error: string | null;
+}) {
+  const [editBuffer, setEditBuffer] = useState("");
+  React.useEffect(() => {
+    if (result?.output) setEditBuffer(result.output);
+  }, [result?.output]);
+  if (!result) return null;
+  const t = result.task ?? {};
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" scrollBehavior="inside">
+      <ModalContent>
+        <ModalHeader className="flex flex-col gap-1">
+          <p className="text-tiny text-default-500 uppercase tracking-wider">ATOMIC TASK</p>
+          <h2 className="text-medium font-semibold">{t.name_zh}</h2>
+          {result.agent && (
+            <p className="text-tiny text-default-500">
+              由 {result.agent.name}（{result.agent.title ?? ""}）交付
+              {result.durationMs != null && ` · ${(result.durationMs / 1000).toFixed(1)}s`}
+            </p>
+          )}
+        </ModalHeader>
+        <ModalBody className="gap-3">
+          {result.pending ? (
+            <div className="flex items-center gap-2 py-6 justify-center">
+              <Spinner size="sm" />
+              <span className="text-small text-default-500">agent 思考中…</span>
+            </div>
+          ) : error ? (
+            <Card shadow="none" className="border border-danger-200 bg-danger-50">
+              <CardBody className="p-3">
+                <p className="text-small font-medium text-danger">✗ 執行失敗</p>
+                <p className="text-tiny text-danger-700 mt-1">{error}</p>
+              </CardBody>
+            </Card>
+          ) : (
+            <>
+              <Textarea
+                size="sm"
+                variant="bordered"
+                value={editBuffer}
+                onValueChange={setEditBuffer}
+                minRows={10}
+                maxRows={24}
+                classNames={{ input: "text-small leading-relaxed font-sans whitespace-pre-wrap" }}
+              />
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => navigator.clipboard.writeText(editBuffer)}
+                  startContent={<FontAwesomeIcon icon={faCopy} />}
+                >
+                  複製到剪貼簿
+                </Button>
+                {result.rawText && (
+                  <details className="ml-auto">
+                    <summary className="text-tiny text-default-500 cursor-pointer">View raw（含被清掉的部分）</summary>
+                    <pre className="text-tiny bg-default-50 border border-divider rounded-md p-2 mt-1 max-h-[150px] overflow-auto whitespace-pre-wrap">
+                      {result.rawText}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            </>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button size="sm" variant="light" onPress={onClose}>關閉</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }
 

@@ -284,6 +284,25 @@ async function main() {
     }
   }
 
+  // Auto-approve squads bound to active catalog tasks. CJ direction:
+  // if a task is publicly surfaced as "active", its underlying squad
+  // must be is_approved=1 (otherwise stepExecute / runStepLive will
+  // fail or render the "🟡 reviewing" badge).
+  const [activeSquadRows]: any = await pool.execute(
+    `SELECT DISTINCT squad_id FROM task_catalog
+      WHERE status = 'active' AND impl_kind = 'squad' AND squad_id IS NOT NULL`,
+  );
+  const activeSquadIds = (activeSquadRows as any[]).map((r) => Number(r.squad_id)).filter(Boolean);
+  if (activeSquadIds.length > 0) {
+    const placeholders = activeSquadIds.map(() => "?").join(",");
+    const [r]: any = await pool.execute(
+      `UPDATE squads SET is_approved = 1, approved_at = NOW()
+        WHERE id IN (${placeholders}) AND is_approved = 0`,
+      activeSquadIds,
+    );
+    console.log(`\n[seed-task-catalog-fb] auto-approved ${(r as any)?.affectedRows ?? 0} squad(s) bound to active tasks: [${activeSquadIds.join(", ")}]`);
+  }
+
   console.log(`\n[seed-task-catalog-fb] done. inserted=${inserted} updated=${updated} skipped=${skipped}`);
   console.log(`\n=== Final state ===`);
   const [stateRows]: any = await pool.execute(
