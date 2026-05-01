@@ -162,17 +162,42 @@ export default function MissionsHome() {
   // ── Filters
   const [selectedLayer, setSelectedLayer] = useState<MosLayer | "ALL">("ALL");
   // 類型 (entity kind): squad / agent / skill — drives the dropdown
-  const [kindFilter, setKindFilter] = useState<"all" | "squad" | "agent" | "skill">("all");
+  const [kindFilter, setKindFilter] = useState<"all" | "task" | "squad" | "agent" | "skill">("all");
+
+  // Task catalog (CJ direction 2026-05-01) — front-door for curated tasks.
+  // Surfaced as a 4th entity kind alongside squad/agent/skill so users
+  // browsing 任務範本 see real deliverables (e.g. "FB 月行事曆") not
+  // raw squads.
+  const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const catalogEntities: any[] = useMemo(
+    () => ((taskCatalogQuery.data as any[]) ?? []).map((t: any) => ({
+      // Shape into the same envelope MissionsHome expects (kind+name+slug+strategyLayer)
+      id: `task-${t.id}`,
+      kind: "task",
+      slug: t.slug,
+      name: t.name_zh,
+      description: t.description,
+      strategyLayer: "L4",                 // tasks live at channel-execution layer
+      workspace: [t.workspace],
+      // Forward catalog-specific fields so cards can render impl_kind / bypassable
+      _task: t,
+    })),
+    [taskCatalogQuery.data],
+  );
 
   // Unified entity list (preferred path) — already comes pre-shaped from server.
   // Legacy squad list (fallback) — coerce to a near-compatible shape.
   const allEntities = useMemo<any[]>(() => {
-    if (entityQuery?.data) return entityQuery.data as any[];
-    const legacy = (squadsQuery.data as any[]) ?? [];
-    return legacy
-      .filter((s) => Array.isArray(s.steps) && s.steps.length > 0)
-      .map((s) => ({ ...s, kind: "squad" }));
-  }, [entityQuery?.data, squadsQuery.data]);
+    const baseEntities: any[] = entityQuery?.data
+      ? (entityQuery.data as any[])
+      : ((squadsQuery.data as any[]) ?? [])
+          .filter((s) => Array.isArray(s.steps) && s.steps.length > 0)
+          .map((s) => ({ ...s, kind: "squad" }));
+    // Catalog tasks first — they're the curated front-door
+    return [...catalogEntities, ...baseEntities];
+  }, [entityQuery?.data, squadsQuery.data, catalogEntities]);
 
   // Counts per layer (drives LayerNav badges)
   const layerCounts = useMemo(() => {
@@ -187,7 +212,7 @@ export default function MissionsHome() {
 
   // Counts per kind (drives 類型 dropdown labels)
   const kindCounts = useMemo(() => {
-    const c = { squad: 0, agent: 0, skill: 0 } as Record<string, number>;
+    const c = { task: 0, squad: 0, agent: 0, skill: 0 } as Record<string, number>;
     for (const e of allEntities) {
       const k = String(e.kind ?? "squad");
       if (k in c) c[k]++;
@@ -248,12 +273,14 @@ export default function MissionsHome() {
   // Type (kind) dropdown options
   const kindOptions = useMemo(() => ([
     { value: "all",   label: `任何類型 (${allEntities.length})` },
+    { value: "task",  label: `任務範本 (${kindCounts.task ?? 0})` },
     { value: "squad", label: `小組 (${kindCounts.squad ?? 0})` },
     { value: "agent", label: `Agent (${kindCounts.agent ?? 0})` },
     { value: "skill", label: `純技能 (${kindCounts.skill ?? 0})` },
   ]), [allEntities.length, kindCounts]);
   const kindLabelMap: Record<string, string> = {
     all:   "類型",
+    task:  "任務範本",
     squad: "小組",
     agent: "Agent",
     skill: "純技能",

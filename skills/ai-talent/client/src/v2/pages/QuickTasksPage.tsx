@@ -166,6 +166,15 @@ export default function QuickTasksPage() {
   }) ?? { data: [], isLoading: false };
 
   const tasks: TaskMeta[] = (tasksQuery.data as any[]) ?? [];
+
+  // Task catalog (CJ direction 2026-05-01) — surface curated catalog
+  // tasks here too. Different runtime model from quickTask (catalog
+  // tasks open in /picker, not inline run-panel), so we render them
+  // as a separate "從任務目錄選" section above the squads grid.
+  const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const catalogTasks: any[] = (taskCatalogQuery.data as any[]) ?? [];
   const [activeId, setActiveId] = useState<string | null>(null);
   const [prefilled, setPrefilled] = useState<Record<string, string | number>>({});
   const activeTask = useMemo(
@@ -248,6 +257,52 @@ export default function QuickTasksPage() {
         </section>
       ) : (
         <section className="px-8 mt-14">
+          {/* Catalog tasks — curated front-door, opens /picker for full flow */}
+          {catalogTasks.length > 0 && (
+            <div className="mb-12">
+              <div className="flex items-end justify-between mb-4">
+                <h2 className="font-semibold text-xl tracking-tight">從任務目錄選</h2>
+                <Chip size="sm" variant="flat" color="primary">
+                  {catalogTasks.length} 個精選任務
+                </Chip>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {catalogTasks.map((t) => (
+                  <Card
+                    key={`task-${t.id}`}
+                    isPressable
+                    shadow="sm"
+                    radius="lg"
+                    onPress={() => {
+                      // Catalog tasks navigate to /picker which has the
+                      // full intake + scope flow. Free-form input bar
+                      // above can also route there with prefill.
+                      const url = t.impl_kind === "squad" && t.squad_slug
+                        ? `/picker?workspace=${t.workspace}&slug=${t.squad_slug}`
+                        : `/picker?workspace=${t.workspace}`;
+                      window.location.href = url;
+                    }}
+                    className="border border-divider"
+                  >
+                    <CardBody className="p-4 gap-2">
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <span className="text-medium font-semibold flex-1 min-w-0 line-clamp-1">{t.name_zh}</span>
+                        <Chip size="sm" variant="flat" color={t.impl_kind === "squad" ? "primary" : "secondary"}>
+                          {t.impl_kind === "squad" ? "squad" : "atomic"}
+                        </Chip>
+                      </div>
+                      <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em]">{t.description}</p>
+                      <div className="flex items-center gap-2 text-tiny text-default-400 mt-1">
+                        {t.bypassable && <Chip size="sm" variant="flat" color="success" className="h-4 text-tiny">一鍵跑</Chip>}
+                        {t.estimated_minutes && <span>約 {t.estimated_minutes} 分鐘</span>}
+                        <span className="ml-auto text-primary">→ 開啟流程</span>
+                      </div>
+                    </CardBody>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex items-end justify-between mb-6">
             <h2 className="font-semibold text-2xl tracking-tight">所有 Squads</h2>
             <Chip size="sm" variant="flat">

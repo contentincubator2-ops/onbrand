@@ -100,7 +100,7 @@ function skillIcon(taskType?: string | null) {
   return SKILL_TASK_ICON[String(taskType ?? "").toLowerCase()] ?? faWandSparkles;
 }
 
-type Kind = "squad" | "agent" | "skill";
+type Kind = "task" | "squad" | "agent" | "skill";
 
 const KIND_TABS: Array<{ id: Kind; label: string; icon: any; description: string }> = [
   { id: "squad",  label: "方法論小組", icon: faUsers,  description: "預配好的 agent 編組，照工作流跑出產出" },
@@ -164,11 +164,33 @@ export default function MethodologyCatalog() {
       )
     : { data: [], isLoading: false };
 
-  const allEntities: any[] = entityQuery.data ?? [];
+  // Task catalog (CJ direction 2026-05-01) — curated front-door tasks
+  // surfaced in /templates as the 4th entity kind alongside squad/agent/skill.
+  const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 30_000 })
+    : { data: [] };
+  const catalogEntities: any[] = useMemo(
+    () => ((taskCatalogQuery.data as any[]) ?? []).map((t: any) => ({
+      id: `task-${t.id}`,
+      kind: "task",
+      slug: t.slug,
+      name: t.name_zh,
+      description: t.description,
+      strategyLayer: "L4",
+      workspace: [t.workspace],
+      _task: t,
+    })),
+    [taskCatalogQuery.data],
+  );
+
+  const allEntities: any[] = useMemo(
+    () => [...catalogEntities, ...((entityQuery.data ?? []) as any[])],
+    [catalogEntities, entityQuery.data],
+  );
 
   // Counts per kind
   const counts = useMemo(() => {
-    const c = { squad: 0, agent: 0, skill: 0 } as Record<Kind, number>;
+    const c = { task: 0, squad: 0, agent: 0, skill: 0 } as Record<Kind, number>;
     for (const e of allEntities) c[e.kind as Kind] = (c[e.kind as Kind] ?? 0) + 1;
     return c;
   }, [allEntities]);
