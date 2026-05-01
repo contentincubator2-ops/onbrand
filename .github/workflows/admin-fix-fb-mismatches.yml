@@ -1,0 +1,31 @@
+name: Admin — fix FB agent-fit mismatches
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
+            set -a; [ -f "$AI/.env" ] && . "$AI/.env"; set +a
+
+            echo "===== Patch FB mismatches ====="
+            npx tsx scripts/fix-fb-mismatches.ts
