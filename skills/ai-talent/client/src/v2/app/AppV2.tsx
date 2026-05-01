@@ -45,8 +45,57 @@ import PlaybooksPage from "../pages/PlaybooksPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
 import SquadLabPage from "../pages/admin/SquadLabPage";
 
+/**
+ * Top-level error boundary — catches any render-time exception that
+ * would otherwise blank the entire SPA. Shows the message + stack
+ * inline so a "空白畫面" report immediately becomes actionable.
+ */
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // eslint-disable-next-line no-console
+    console.error("[AppV2] render error:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ minHeight: "100vh", padding: 32, fontFamily: "system-ui, sans-serif" }}>
+          <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, border: "1px solid #fca5a5", background: "#fef2f2", borderRadius: 12 }}>
+            <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1 }}>RENDER ERROR</p>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>應用程式載入失敗</h2>
+            <p style={{ marginTop: 8, color: "#374151" }}>{this.state.error.message}</p>
+            <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
+              {this.state.error.stack}
+            </pre>
+            <div style={{ marginTop: 12 }}>
+              <button
+                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}
+                onClick={() => { this.setState({ error: null }); }}
+              >
+                重試渲染
+              </button>
+              <button
+                style={{ padding: "6px 12px", background: "white", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer" }}
+                onClick={() => { window.location.reload(); }}
+              >
+                重新整理頁面
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children as any;
+  }
+}
+
 export default function AppV2() {
   return (
+    <AppErrorBoundary>
     <LanguageProvider>
       <Routes>
         {/* Auth — unchanged */}
@@ -102,5 +151,6 @@ export default function AppV2() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </LanguageProvider>
+    </AppErrorBoundary>
   );
 }
