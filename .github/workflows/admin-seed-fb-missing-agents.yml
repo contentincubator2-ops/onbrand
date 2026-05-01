@@ -1,0 +1,44 @@
+name: Admin — seed missing FB specialist agents (crisis-comms + analyst)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
+            set -a; [ -f "$AI/.env" ] && . "$AI/.env"; set +a
+
+            echo "===== Seed missing agents ====="
+            timeout 240 npx tsx scripts/seed-fb-missing-agents.ts 2>&1 | tail -60
+
+            echo ""
+            echo "===== Verify on prod ====="
+            MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
+              SELECT id, slug, name, primarySkill, aiModel
+                FROM agents
+               WHERE slug IN ('fb-crisis-comms', 'fb-performance-analyst');
+            "
+            MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
+              SELECT t.id, t.slug, t.agent_id, a.name AS agent_name, a.primarySkill
+                FROM task_catalog t LEFT JOIN agents a ON a.id = t.agent_id
+               WHERE t.slug = 'fb-crisis-reply';
+            "
