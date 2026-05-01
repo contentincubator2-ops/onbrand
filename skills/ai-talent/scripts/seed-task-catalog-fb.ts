@@ -64,7 +64,7 @@ const TASKS: Task[] = [
     category: "content",
     impl_kind: "atomic",
     // agent_slug resolved at seed time — pick best fb-content-writer
-    agent_slug: "fb-copywriter",
+    agent_slug: "fb-content-brief-writer",  // Aiden Hsu — FB content specialist
     status: "active",
     bypassable: true,
     search_keywords: "貼文,文案,FB,Facebook,純文字,post,text,caption",
@@ -78,7 +78,7 @@ const TASKS: Task[] = [
     workspace: "facebook",
     category: "content",
     impl_kind: "atomic",
-    agent_slug: "fb-copywriter",  // upgrade later to a 2-agent team
+    agent_slug: "fb-content-brief-writer",  // Aiden Hsu — FB content specialist  // upgrade later to a 2-agent team
     status: "active",
     bypassable: true,
     search_keywords: "貼文,文案,FB,Facebook,配圖,單圖,image,visual,brief",
@@ -121,7 +121,7 @@ const TASKS: Task[] = [
     workspace: "facebook",
     category: "content",
     impl_kind: "atomic",
-    agent_slug: "fb-copywriter",
+    agent_slug: "fb-content-brief-writer",  // Aiden Hsu — FB content specialist
     status: "active",
     bypassable: true,
     search_keywords: "carousel,輪播,圖文,FB,Facebook,圖卡,sequential",
@@ -134,7 +134,7 @@ const TASKS: Task[] = [
     workspace: "facebook",
     category: "content",
     impl_kind: "atomic",
-    agent_slug: "fb-copywriter",
+    agent_slug: "fb-content-brief-writer",  // Aiden Hsu — FB content specialist
     status: "active",
     bypassable: true,
     search_keywords: "reels,短影音,FB,Facebook,腳本,script,影片,分鏡",
@@ -186,7 +186,7 @@ const TASKS: Task[] = [
     workspace: "facebook",
     category: "campaign",
     impl_kind: "atomic",
-    agent_slug: "fb-copywriter",
+    agent_slug: "fb-content-brief-writer",  // Aiden Hsu — FB content specialist
     status: "active",
     bypassable: true,
     search_keywords: "直播,livestream,預告,摘要,FB,Facebook,成對",
@@ -199,7 +199,7 @@ const TASKS: Task[] = [
     workspace: "facebook",
     category: "crisis",
     impl_kind: "atomic",
-    agent_slug: "fb-copywriter",  // TODO: dedicate crisis-comms agent later
+    agent_slug: "fb-content-brief-writer",  // Aiden Hsu — FB content specialist  // TODO: dedicate crisis-comms agent later
     status: "active",
     bypassable: false,  // needs the actual complaint text
     search_keywords: "負評,客訴,回覆,危機,crisis,reply,FB,Facebook,致歉",
