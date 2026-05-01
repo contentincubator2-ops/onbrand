@@ -1,0 +1,35 @@
+name: Admin — patch squad 557 mockups + re-audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          envs: GH_TOKEN
+          script: |
+            set +e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
+            set -a; [ -f "$AI/.env" ] && . "$AI/.env"; set +a
+
+            echo "===== Patch squad #557 ====="
+            npx tsx scripts/patch-squad-557-mockups.ts
+
+            echo ""
+            echo "===== Re-audit mockup coverage ====="
+            npx tsx scripts/audit-mockup-coverage.ts
