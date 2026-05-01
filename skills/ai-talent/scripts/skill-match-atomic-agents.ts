@@ -115,16 +115,30 @@ async function main() {
   }));
   console.log(`[skill-match] scoring ${tasks.length} tasks × ${agents.length} agents…\n`);
 
-  // Pre-compute "agents on FB-related squads" for the bonus
-  const [fbSquadAgents]: any = await pool.execute(
-    `SELECT DISTINCT JSON_EXTRACT(agents, '$[*].id') AS ids
-       FROM squads WHERE JSON_CONTAINS(workspace, '"facebook"')`,
-  );
+  // Pre-compute "agents on FB-related squads" for the bonus.
+  // Some legacy squads have malformed workspace JSON, so we use a safe
+  // text LIKE filter and tolerate parse errors row-by-row.
   const onFbSquad = new Set<number>();
-  for (const r of (fbSquadAgents as any[])) {
-    const ids = safeJsonArray(r.ids).map(Number).filter(Boolean);
-    for (const id of ids) onFbSquad.add(id);
+  try {
+    const [fbSquadAgents]: any = await pool.execute(
+      `SELECT agents FROM squads
+        WHERE workspace LIKE '%facebook%' OR tags LIKE '%facebook%'`,
+    );
+    for (const r of (fbSquadAgents as any[])) {
+      try {
+        const agentsArr = typeof r.agents === "string" ? JSON.parse(r.agents) : r.agents;
+        if (Array.isArray(agentsArr)) {
+          for (const a of agentsArr) {
+            const id = Number(a?.id);
+            if (Number.isFinite(id) && id > 0) onFbSquad.add(id);
+          }
+        }
+      } catch { /* skip rows with bad JSON */ }
+    }
+  } catch (e) {
+    console.warn(`[skill-match] FB-squad bonus disabled: ${e instanceof Error ? e.message : String(e)}`);
   }
+  console.log(`[skill-match] ${onFbSquad.size} agents on FB-related squads (for +5 score bonus)`);
 
   const updates: { taskId: number; oldAgent: number | null; newAgent: number; score: number; breakdown: string }[] = [];
 
