@@ -33,20 +33,19 @@ jobs:
             npx tsx scripts/migrate.ts 2>&1 | tail -20
 
             echo ""
-            echo "===== 2. Audit DDL ====="
-            MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
-              SELECT COLUMN_NAME, DATA_TYPE
-                FROM information_schema.COLUMNS
-               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_catalog'
-               ORDER BY ORDINAL_POSITION;
-            "
+            echo "===== 2. Seed 4 additional FB squads (countdown / reposition / quarterly / analytics) ====="
+            npx tsx scripts/seed-fb-additional-squads.ts 2>&1 | tail -25
 
             echo ""
-            echo "===== 3. Seed FB first batch ====="
+            echo "===== 3. Seed FB task catalog (binds squads to tasks) ====="
             npx tsx scripts/seed-task-catalog-fb.ts
 
             echo ""
-            echo "===== 4. Final listing ====="
+            echo "===== 4. Skill-match atomic-task agents (replace lazy fallback) ====="
+            npx tsx scripts/skill-match-atomic-agents.ts 2>&1 | tail -40
+
+            echo ""
+            echo "===== 5. Final listing ====="
             MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
               SELECT id, slug, status, impl_kind,
                      IFNULL(squad_id, '') AS sq, IFNULL(agent_id, '') AS ag,
