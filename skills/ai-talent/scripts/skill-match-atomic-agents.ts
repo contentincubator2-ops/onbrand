@@ -168,13 +168,21 @@ async function main() {
     }
   }
 
-  console.log(`\n[skill-match] ${updates.length} task(s) need re-binding`);
+  // Advisory-only by default — skill-match was producing weak winners
+  // (e.g. SEO agents for FB-post tasks). Seed's explicit agent_slug now
+  // wins. Set APPLY=1 to actually write the suggestions.
+  const apply = process.env.APPLY === "1";
+  console.log(`\n[skill-match] ${updates.length} task(s) have higher-scoring candidates ${apply ? "(applying)" : "(advisory only — set APPLY=1 to write)"}`);
   for (const u of updates) {
-    await pool.execute(
-      `UPDATE task_catalog SET agent_id = ? WHERE id = ?`,
-      [u.newAgent, u.taskId],
-    );
-    console.log(`  ✓ task ${u.taskId}: agent ${u.oldAgent ?? "null"} → ${u.newAgent}  (score=${u.score})`);
+    if (apply) {
+      await pool.execute(
+        `UPDATE task_catalog SET agent_id = ? WHERE id = ?`,
+        [u.newAgent, u.taskId],
+      );
+      console.log(`  ✓ task ${u.taskId}: agent ${u.oldAgent ?? "null"} → ${u.newAgent}  (score=${u.score})`);
+    } else {
+      console.log(`  · task ${u.taskId}: agent ${u.oldAgent ?? "null"} → ${u.newAgent} suggested  (score=${u.score})`);
+    }
   }
 
   // Final state
