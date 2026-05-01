@@ -38,6 +38,11 @@ export const missionRouter = router({
       // NOTE: missions + brands tables use camelCase column names (Drizzle
       // schema), squads table uses snake_case (created via raw SQL).
       // Don't "normalize" these — mixing is intentional and matches the DB.
+      // COLLATE coercion — `missions.squadSlug` (Drizzle, default
+      // utf8mb4_0900_ai_ci) and `squads.slug` (raw SQL, utf8mb4_unicode_ci
+      // or utf8mb4_general_ci) have mismatched collations. Without an
+      // explicit COLLATE on the JOIN, MySQL throws "Illegal mix of
+      // collations" and tRPC returns 500, leaving the missions page blank.
       const rows = await db.execute(sql`
         SELECT m.id, m.title, m.description, m.workspace, m.methodology,
                m.squadSlug AS squadSlug, m.brandId AS brandId,
@@ -48,7 +53,8 @@ export const missionRouter = router({
                s.steps AS squadSteps
           FROM missions m
           LEFT JOIN brands b ON b.id = m.brandId
-          LEFT JOIN squads s ON s.slug = m.squadSlug
+          LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
+                              = m.squadSlug COLLATE utf8mb4_unicode_ci
          WHERE m.userId = ${ctx.user.id}
          ORDER BY m.updatedAt DESC
          LIMIT 60

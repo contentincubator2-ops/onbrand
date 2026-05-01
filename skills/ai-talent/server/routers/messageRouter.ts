@@ -73,7 +73,8 @@ export const messageRouter = router({
         SELECT m.id, m.title, m.description, m.workspace, m.methodology, m.squadSlug,
                s.name AS squadName, s.description AS squadDesc
           FROM missions m
-          LEFT JOIN squads s ON s.slug = m.squadSlug
+          LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
+                              = m.squadSlug COLLATE utf8mb4_unicode_ci
          WHERE m.id=${input.missionId} AND m.userId=${ctx.user.id} LIMIT 1
       `);
       const mission = (missionRows as any[])?.[0];
