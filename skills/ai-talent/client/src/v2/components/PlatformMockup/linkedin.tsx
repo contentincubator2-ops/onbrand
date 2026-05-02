@@ -8,74 +8,193 @@
  *   - newsletter: Flowbite Blocks marketing/newsletter
  *   - poll:       Flowbite radio + animated progress bars
  *   - document:   Flowbite Carousel of PDF page thumbnails
+ *
+ * 2026-05-02: LIFeed visual overhaul — match Figma LinkedIn Social Post Mockup
+ *   • LinkedIn blue #0A66C2 top-bar + nav dots
+ *   • Authentic post chrome: degree badge, follow CTA, more-options (…)
+ *   • ImageGenSlot replaces static skeleton in image area (3-step visual flow)
  */
 import React from "react";
 import { Avatar, Button, Chip, Divider, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLinkedin } from "@fortawesome/free-brands-svg-icons";
 import {
-  faImages, faThumbsUp, faComment, faShareNodes, faPaperPlane,
+  faThumbsUp, faComment, faShareNodes, faPaperPlane,
   faFileLines, faNewspaper, faChartSimple, faCircle, faCircleDot,
+  faBell, faHome, faSearch, faBriefcase, faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { ImageGenSlot, type ImageGenPhase } from "../SquadMockups/ImageGenSlot";
 
 /* ─────────────── LI Feed ─────────────── */
 
-export function LIFeed({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc }: MockupFields) {
+/** Extra props for live image-gen phases, passed alongside MockupFields */
+export interface LIFeedImageGenProps {
+  imageGenPhase?: ImageGenPhase;
+  imageGenDesignDirection?: string;
+  imageGenAiPrompt?: string;
+  imageGenModelName?: string;
+  imageGenResultUrl?: string;
+  imageGenErrorMsg?: string;
+  onImageRetry?: () => void;
+}
+
+export function LIFeed({
+  title, brandName, variantLabel, liveCaption, liveHashtags,
+  imageGenPhase, imageGenDesignDirection, imageGenAiPrompt,
+  imageGenModelName, imageGenResultUrl, imageGenErrorMsg, onImageRetry,
+}: MockupFields & LIFeedImageGenProps) {
+  // LinkedIn blue per brand guidelines
+  const LI_BLUE = "#0A66C2";
+
   return (
-    <div className="w-full max-w-[540px] mx-auto">
+    <div className="w-full max-w-[548px] mx-auto font-sans">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
-      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <User
-            name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={
-              <span className="block">
-                <span className="text-tiny text-default-500">追蹤者 1,234 · 1 小時前 · 🌐</span>
+
+      {/* ── LinkedIn top-bar chrome ───────────────────────────────────── */}
+      <div
+        className="rounded-t-xl overflow-hidden shadow-sm border border-b-0 border-divider"
+        style={{ background: "#fff" }}
+      >
+        {/* Nav bar */}
+        <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: "1px solid #e0e0e0" }}>
+          {/* Logo */}
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="34" height="34" rx="4" fill={LI_BLUE} />
+            <path d="M8 13h4v13H8V13zm2-6.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM15 13h3.8v1.8h.05C19.38 13.73 20.9 13 22.7 13c4.1 0 4.85 2.7 4.85 6.2V26h-4v-6.1c0-1.45-.03-3.3-2.01-3.3-2.02 0-2.33 1.57-2.33 3.2V26H15V13z" fill="white"/>
+          </svg>
+          {/* Nav icons */}
+          <div className="flex items-center gap-5">
+            {[faHome, faSearch, faBriefcase, faUsers, faBell].map((ic, i) => (
+              <FontAwesomeIcon
+                key={i} icon={ic}
+                className={`text-lg ${i === 0 ? "" : "text-[#666]"}`}
+                style={i === 0 ? { color: LI_BLUE } : {}}
+              />
+            ))}
+          </div>
+          {/* Avatar */}
+          <Avatar src={dicebear(brandName ?? "brand")} size="sm" className="w-7 h-7" />
+        </div>
+      </div>
+
+      {/* ── Post card ──────────────────────────────────────────────────── */}
+      <div className="bg-white border border-t-0 border-divider rounded-b-xl overflow-hidden shadow-lg">
+
+        {/* Post header */}
+        <div className="px-4 pt-3 pb-2 flex items-start justify-between">
+          <div className="flex items-start gap-3">
+            {/* Avatar with connection ring */}
+            <div className="relative">
+              <Avatar
+                src={dicebear(brandName ?? "brand")}
+                size="md"
+                className="w-12 h-12"
+                style={{ border: `2px solid ${LI_BLUE}` }}
+              />
+              {/* LinkedIn badge overlay */}
+              <span
+                className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full flex items-center justify-center"
+                style={{ background: LI_BLUE }}
+              >
+                <FontAwesomeIcon icon={faLinkedin} className="text-white text-[9px]" />
               </span>
-            }
-            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
-          />
-          <span className="text-default-400 text-medium">⋯</span>
-        </div>
-        <div className="px-4 pb-3 space-y-2">
-          <p className="text-small">{title}</p>
-          {liveCaption ? (
-            <p className="text-small whitespace-pre-wrap line-clamp-8">{liveCaption}</p>
-          ) : (
-            <>
-              <Skeleton className="h-2.5 w-[92%] rounded" />
-              <Skeleton className="h-2.5 w-[85%] rounded" />
-              <Skeleton className="h-2.5 w-[60%] rounded" />
-            </>
-          )}
-          {liveHashtags && liveHashtags.length > 0 ? (
-            <p className="text-tiny text-primary mt-1">{liveHashtags.slice(0, 6).join(" ")}</p>
-          ) : (
-            <p className="text-tiny text-primary mt-1">#hashtag #等寫手</p>
-          )}
-        </div>
-        <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
-          <Skeleton className="absolute inset-0" />
-          <div className="text-center relative z-10 p-4">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny line-clamp-3">{liveImageDesc ?? "圖 / 文件 / 影片 · 等待 craft agent"}</p>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[14px] font-semibold text-[#191919] leading-tight">
+                  {brandName ?? "Your Brand"}
+                </span>
+                {/* 1st degree badge */}
+                <span className="text-[12px] font-medium" style={{ color: LI_BLUE }}>• 1st</span>
+              </div>
+              <p className="text-[12px] text-[#666] leading-tight">
+                行銷顧問 · 品牌策略師
+              </p>
+              <div className="flex items-center gap-1 text-[11px] text-[#666] mt-0.5">
+                <span>1 小時前</span>
+                <span>·</span>
+                <span>🌐</span>
+              </div>
+            </div>
+          </div>
+          {/* More options + Follow */}
+          <div className="flex items-center gap-2">
+            <button
+              className="text-[13px] font-semibold flex items-center gap-1"
+              style={{ color: LI_BLUE }}
+            >
+              + 追蹤
+            </button>
+            <span className="text-[#666] text-lg leading-none px-1">…</span>
           </div>
         </div>
-        <div className="px-4 py-2 flex items-center justify-between text-tiny text-default-500">
-          <span>👍❤️💡 1,234</span>
+
+        {/* Post body */}
+        <div className="px-4 pb-2 space-y-1.5">
+          {liveCaption ? (
+            <p className="text-[14px] text-[#191919] whitespace-pre-wrap leading-relaxed line-clamp-8">
+              {liveCaption}
+            </p>
+          ) : (
+            <div className="space-y-2 py-0.5">
+              <Skeleton className="h-3 w-[95%] rounded" />
+              <Skeleton className="h-3 w-[88%] rounded" />
+              <Skeleton className="h-3 w-[72%] rounded" />
+            </div>
+          )}
+          {/* Hashtags */}
+          {liveHashtags && liveHashtags.length > 0 ? (
+            <p className="text-[13px] mt-1" style={{ color: LI_BLUE }}>
+              {liveHashtags.slice(0, 5).join(" ")}
+            </p>
+          ) : (
+            <p className="text-[13px] mt-1" style={{ color: LI_BLUE }}>
+              #品牌行銷 #LinkedIn策略 #等寫手
+            </p>
+          )}
+        </div>
+
+        {/* ── Image area — ImageGenSlot replaces static skeleton ────── */}
+        <ImageGenSlot
+          phase={imageGenPhase ?? "idle"}
+          designDirection={imageGenDesignDirection}
+          aiPrompt={imageGenAiPrompt}
+          modelName={imageGenModelName}
+          resultUrl={imageGenResultUrl}
+          errorMsg={imageGenErrorMsg}
+          aspectRatio="16/9"
+          onRetry={onImageRetry}
+        />
+
+        {/* Reaction summary */}
+        <div
+          className="px-4 py-2 flex items-center justify-between text-[12px]"
+          style={{ color: "#666", borderBottom: "1px solid #e0e0e0" }}
+        >
+          <span className="flex items-center gap-1">
+            <span className="text-[15px]">👍</span>
+            <span className="text-[15px]">❤️</span>
+            <span className="text-[15px]">💡</span>
+            <span className="ml-1">1,234</span>
+          </span>
           <span>87 則留言 · 23 次轉發</span>
         </div>
-        <Divider />
-        <div className="px-2 py-1 flex items-center justify-around text-default-700 text-small">
+
+        {/* Action bar */}
+        <div className="px-1 py-0.5 flex items-center">
           {[
             { icon: faThumbsUp, label: "讚" },
             { icon: faComment, label: "留言" },
             { icon: faShareNodes, label: "轉發" },
             { icon: faPaperPlane, label: "傳送" },
           ].map((b, i) => (
-            <button key={i} className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
-              <FontAwesomeIcon icon={b.icon} /> {b.label}
+            <button
+              key={i}
+              className="flex-1 py-2 hover:bg-[#f3f2ef] rounded-lg flex items-center justify-center gap-1.5 text-[13px] font-medium text-[#666] transition"
+            >
+              <FontAwesomeIcon icon={b.icon} className="text-[#666]" />
+              {b.label}
             </button>
           ))}
         </div>
@@ -91,13 +210,7 @@ export function LIArticle({ title, brandName, variantLabel }: MockupFields) {
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="aspect-[3/1] bg-default-100 flex items-center justify-center relative">
-          <Skeleton className="absolute inset-0" />
-          <div className="relative z-10 text-center text-default-400">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">封面圖 · 等待 craft agent</p>
-          </div>
-        </div>
+        <ImageGenSlot phase="idle" aspectRatio="3/1" />
         <div className="px-8 py-6 space-y-3">
           <h2 className="text-2xl font-semibold leading-tight tracking-tight">{title}</h2>
           <div className="flex items-center gap-3 pt-1">
@@ -157,13 +270,7 @@ export function LINewsletter({ title, brandName, variantLabel }: MockupFields) {
           </div>
           <Button color="primary" size="sm" radius="full">訂閱</Button>
         </div>
-        <div className="aspect-[3/1] bg-default-100 flex items-center justify-center relative">
-          <Skeleton className="absolute inset-0" />
-          <div className="relative z-10 text-center text-default-400">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">本期封面 · 等待 craft agent</p>
-          </div>
-        </div>
+        <ImageGenSlot phase="idle" aspectRatio="3/1" />
         <div className="px-8 py-6 space-y-3">
           <p className="text-tiny text-default-500 uppercase tracking-wider">第 042 期 · 5 月 15 日</p>
           <h2 className="text-2xl font-semibold leading-tight tracking-tight">{title}</h2>
@@ -383,13 +490,7 @@ export function LIAd({ title, brandName, variantLabel }: MockupFields) {
           <p className="text-small">{title}</p>
           <Skeleton className="h-2.5 w-[90%] rounded" />
         </div>
-        <div className="aspect-[1.91/1] bg-default-100 flex items-center justify-center text-default-400 relative">
-          <Skeleton className="absolute inset-0" />
-          <div className="text-center relative z-10">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">廣告主圖 · 等待 craft agent</p>
-          </div>
-        </div>
+        <ImageGenSlot phase="idle" aspectRatio="1.91/1" />
         {/* CTA bar */}
         <div className="px-4 py-3 bg-default-50 border-y border-divider flex items-center justify-between">
           <div className="min-w-0">
@@ -414,13 +515,7 @@ export function LIEvent({ title, brief, brandName, variantLabel }: MockupFields)
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="aspect-[2.5/1] bg-default-100 flex items-center justify-center relative">
-          <Skeleton className="absolute inset-0" />
-          <div className="relative z-10 text-center text-default-400">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">活動封面 · 等待 craft agent</p>
-          </div>
-        </div>
+        <ImageGenSlot phase="idle" aspectRatio="2.5/1" />
         <div className="px-5 pt-4 pb-3 space-y-2">
           <Chip size="sm" variant="flat" color="primary" className="uppercase tracking-wider">
             線上活動

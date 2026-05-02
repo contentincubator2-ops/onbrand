@@ -151,6 +151,9 @@ interface FormatRule {
 }
 
 const FORMAT_RULES: FormatRule[] = [
+  // ── Calendar / monthly plan → feed (must be first so "article" in squad
+  //    description doesn't hijack a calendar squad to article format) ──────
+  { format: "feed", keywords: ["月行事曆", "monthly-calendar", "monthly calendar", "行事曆排程"], platforms: ["linkedin", "instagram", "facebook"] },
   // 9:16 vertical
   { format: "reel",         keywords: ["reel", "reels"],                       platforms: ["instagram", "facebook"] },
   { format: "shorts",       keywords: ["short", "shorts"],                     platforms: ["youtube"] },
