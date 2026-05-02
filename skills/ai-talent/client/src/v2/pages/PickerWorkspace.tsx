@@ -1682,7 +1682,7 @@ function SquadIntakeSidebar({
               <div className="space-y-1.5">
                 {members.slice(0, 5).map((m: any, i: number) => (
                   <div key={m.id ?? i} className="flex items-center gap-2">
-                    <AgentAvatar seed={m.id ?? m.name ?? `m${i}`} size={24} className="rounded-full shrink-0" />
+                    <AgentAvatar seed={m.id ?? m.name ?? `m${i}`} role={m.role ?? m.name ?? ""} size={24} className="rounded-full shrink-0" />
                     <span className="text-small text-default-700 truncate">{m.name ?? "—"}</span>
                     <span className="text-tiny text-default-400 ml-auto shrink-0">{m.role ?? ""}</span>
                   </div>

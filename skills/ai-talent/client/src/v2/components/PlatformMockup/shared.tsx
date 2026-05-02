@@ -33,10 +33,11 @@ export interface MockupFields {
 
 // Used only inside PlatformMockup/* (simulated FB/IG/LinkedIn posts where
 // the avatar represents a fake post author, not a real SoWork agent). Real
-// agent avatars use agents.avatarUrl per design system; never call dicebear
-// outside the mockup family.
+// agent avatars use AgentAvatar component (DiceBear notionists) per design system.
+// 2026-05-02: switched from avataaars → notionists to match the product-wide
+// "illustrated portrait, specialty-keyed background" avatar standard.
 export const dicebear = (name: string) =>
-  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || "anon")}`;
+  `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name || "anon")}&backgroundColor=4267B2&backgroundType=solid`;
 
 export const handleOf = (brandName: string | null, fallback = "your_brand") =>
   (brandName ?? fallback).toLowerCase().replace(/\s+/g, "_").slice(0, 30);

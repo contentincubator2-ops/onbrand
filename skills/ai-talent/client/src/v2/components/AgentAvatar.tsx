@@ -1,16 +1,29 @@
 /**
- * AgentAvatar — deterministic colorful flat avatar for agents.
+ * AgentAvatar — DiceBear "notionists" illustrated avatar for agents.
  *
- * Replaces DiceBear avataaars (api-call style) with react-nice-avatar
- * (same memoji-like flat style as vue-color-avatar). Render is pure
- * SVG, instant, no network round-trip.
+ * Style: DiceBear notionists (sketch/illustration style) with a solid
+ * background colour that reflects the agent's platform or specialty.
  *
- * Config is derived from a stable seed (agent.slug / id / name) via
- * a hash → fixed seed for genConfig, so the same agent always looks
- * the same.
+ * Background colour map:
+ *   Facebook / FB      → #4267B2 (Facebook blue)
+ *   Instagram / IG     → #C13584 (Instagram pink-purple)
+ *   LinkedIn / LI      → #0077B5 (LinkedIn blue)
+ *   YouTube / YT       → #FF0000 (YouTube red)
+ *   策略 / Strategy    → #6548C6 (indigo)
+ *   研究 / Research    → #0891B2 (teal)
+ *   文案 / Copy/Writer → #059669 (green)
+ *   視覺 / Visual      → #E11D48 (rose)
+ *   分析 / Analytics   → #D97706 (amber)
+ *   PR / 公關           → #7C3AED (violet)
+ *   (default)          → rotated from the full palette by seed hash
+ *
+ * Pass `src` to override with a pre-generated avatar URL (e.g. from
+ * agents.avatarUrl). Pass `role` to pick the right background colour.
+ *
+ * 2026-05-02 CJ direction: replace react-nice-avatar (memoji look) with
+ * DiceBear notionists + specialty-keyed background colours, consistent
+ * across the whole product.
  */
-import React, { useMemo } from "react";
-import Avatar, { genConfig, AvatarFullConfig } from "react-nice-avatar";
 
 /** djb2-style 32-bit hash — small, deterministic, no deps. */
 function hashSeed(input: string): number {
@@ -22,98 +35,101 @@ function hashSeed(input: string): number {
   return Math.abs(h);
 }
 
-/** Mulberry32 PRNG seeded by hash — gives genConfig a stable RNG. */
-function seededRandom(seed: number): () => number {
-  let t = seed >>> 0;
-  return () => {
-    t = (t + 0x6D2B79F5) >>> 0;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
+const PLATFORM_BG: Record<string, string> = {
+  facebook:  "4267B2",
+  instagram: "C13584",
+  linkedin:  "0077B5",
+  youtube:   "CC0000",
+  strategy:  "6548C6",
+  research:  "0891B2",
+  writer:    "059669",
+  visual:    "E11D48",
+  analytics: "D97706",
+  pr:        "7C3AED",
+  calendar:  "0369A1",
+  ads:       "B45309",
+};
+
+const PALETTE = Object.values(PLATFORM_BG);
+
+function bgFromHint(hint: string): string {
+  const h = hint.toLowerCase();
+  if (h.includes("facebook") || h.includes(" fb ") || h.startsWith("fb") || h.includes("粉絲"))
+    return PLATFORM_BG.facebook;
+  if (h.includes("instagram") || h.includes(" ig ") || h.startsWith("ig") || h.includes("ig "))
+    return PLATFORM_BG.instagram;
+  if (h.includes("linkedin") || h.includes(" li "))
+    return PLATFORM_BG.linkedin;
+  if (h.includes("youtube") || h.includes(" yt "))
+    return PLATFORM_BG.youtube;
+  if (h.includes("策略") || h.includes("strateg") || h.includes("brand"))
+    return PLATFORM_BG.strategy;
+  if (h.includes("研究") || h.includes("research") || h.includes("insight"))
+    return PLATFORM_BG.research;
+  if (h.includes("文案") || h.includes("writ") || h.includes("copy") || h.includes("content"))
+    return PLATFORM_BG.writer;
+  if (h.includes("視覺") || h.includes("visual") || h.includes("design") || h.includes("art"))
+    return PLATFORM_BG.visual;
+  if (h.includes("分析") || h.includes("analyt") || h.includes("data") || h.includes("kpi"))
+    return PLATFORM_BG.analytics;
+  if (h.includes("pr") || h.includes("公關") || h.includes("media"))
+    return PLATFORM_BG.pr;
+  if (h.includes("行事曆") || h.includes("calendar") || h.includes("pillar"))
+    return PLATFORM_BG.calendar;
+  if (h.includes("廣告") || h.includes("ads") || h.includes("ad "))
+    return PLATFORM_BG.ads;
+  // Deterministic fallback — rotate across palette by seed
+  return PALETTE[hashSeed(hint) % PALETTE.length]!;
 }
 
-/** Pick from an array deterministically using a seeded RNG. */
-function pick<T>(rng: () => number, arr: readonly T[]): T {
-  return arr[Math.floor(rng() * arr.length)];
-}
-
-/**
- * Build a deterministic AvatarFullConfig for a given seed string.
- * Mirrors react-nice-avatar's genConfig but uses our seeded RNG so
- * the same input always produces the same avatar.
- */
-function configFromSeed(seed: string): AvatarFullConfig {
-  const rng = seededRandom(hashSeed(seed));
-
-  // Option lists below are taken from react-nice-avatar's exported
-  // option pools (1.5.0). We keep the same allowed values so all
-  // assets render correctly.
-  const sex      = pick(rng, ["man", "woman"] as const);
-  const faceColor= pick(rng, ["#F9C9B6", "#AC6651"] as const);
-  const earSize  = pick(rng, ["small", "big"] as const);
-  const eyeStyle = pick(rng, ["circle", "oval", "smile"] as const);
-  const noseStyle= pick(rng, ["short", "long", "round"] as const);
-  const mouthStyle = pick(rng, ["laugh", "smile", "peace"] as const);
-  const shirtStyle = pick(rng, ["hoody", "short", "polo"] as const);
-  const glassesStyle = pick(rng, ["none", "round", "square"] as const);
-  const hairColor    = pick(rng, ["#000", "#77311D", "#FC909F", "#D2EFF3", "#506AF4", "#F48150"] as const);
-  const bgColor      = pick(rng, ["#E0DDFF", "#D2EFF3", "#FFEDEF", "#FFEBA4", "#506AF4", "#F48150", "#74D14C"] as const);
-  const shirtColor   = pick(rng, ["#9287FF", "#6BD9E9", "#FC909F", "#F4D150", "#77311D"] as const);
-
-  // Hair style depends on sex (matches lib's defaults)
-  const hairStyle = sex === "man"
-    ? pick(rng, ["normal", "thick", "mohawk"] as const)
-    : pick(rng, ["normal", "womanLong", "womanShort"] as const);
-
-  return {
-    sex,
-    faceColor,
-    earSize,
-    eyeStyle,
-    noseStyle,
-    mouthStyle,
-    shirtStyle,
-    glassesStyle,
-    hairColor,
-    hairStyle,
-    hatStyle: "none",
-    hatColor: "#fff",
-    eyeBrowStyle: "up",
-    bgColor,
-    shirtColor,
-    isGradient: false,
-  };
+/** Build a DiceBear notionists URL with the appropriate background colour. */
+export function agentAvatarUrl(seed: string | number, roleOrHint?: string): string {
+  const s = String(seed);
+  const bg = bgFromHint(roleOrHint ?? s);
+  return (
+    `https://api.dicebear.com/7.x/notionists/svg` +
+    `?seed=${encodeURIComponent(s)}` +
+    `&backgroundColor=${bg}` +
+    `&backgroundType=solid`
+  );
 }
 
 export interface AgentAvatarProps {
-  /** Stable identity — agent.slug / agent.id / agent.name, anything stringy */
+  /** Stable identity — agent.slug / agent.id / agent.name */
   seed: string | number;
+  /** Agent role / specialty / platform — drives background colour */
+  role?: string;
+  /** Pre-generated avatar image URL — overrides DiceBear when provided */
+  src?: string | null;
   size?: number;
-  /** Pass-through className for outer wrapper */
   className?: string;
-  /** When true, use the lib's random genConfig (NOT seeded). Default false. */
+  /** @deprecated no longer used; accepted for back-compat */
   random?: boolean;
 }
 
-export function AgentAvatar({ seed, size = 48, className, random }: AgentAvatarProps) {
-  const config = useMemo(() => {
-    if (random) return genConfig();
-    return configFromSeed(String(seed));
-  }, [seed, random]);
-
+export function AgentAvatar({ seed, role, src, size = 48, className }: AgentAvatarProps) {
+  const url = (src && src.trim()) ? src : agentAvatarUrl(seed, role ?? String(seed));
   return (
-    <Avatar
-      style={{ width: size, height: size }}
+    <img
+      src={url}
+      alt=""
+      width={size}
+      height={size}
+      style={{ width: size, height: size, objectFit: "cover" }}
       className={className}
-      {...config}
+      loading="lazy"
+      onError={(e) => {
+        // Fallback to DiceBear if custom src fails to load
+        const img = e.currentTarget;
+        if (img.src !== agentAvatarUrl(seed, role ?? String(seed))) {
+          img.src = agentAvatarUrl(seed, role ?? String(seed));
+        }
+      }}
     />
   );
 }
 
-/** Fallback URL for places that still need an `<img src>` (e.g. HeroUI Avatar with src prop).
- *  We can't easily inline an SVG into HeroUI's Avatar src; for those call-sites we keep
- *  using DiceBear via the existing helper, OR refactor them to render <AgentAvatar />. */
+/** Convenience: same URL for places that need a raw string (HeroUI Avatar src). */
 export function avatarSeedFor(input: any): string {
   if (!input) return "anon";
   if (typeof input === "string") return input;
