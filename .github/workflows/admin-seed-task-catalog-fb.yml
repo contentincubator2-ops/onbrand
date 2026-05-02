@@ -29,7 +29,7 @@ jobs:
             [ -f "$AI/.env" ] && . "$AI/.env"
             set +a
 
-            echo "===== 1. Run migrate.ts (creates task_catalog if missing) ====="
+            echo "===== 1. Run migrate.ts (creates task_catalog + task_category if missing) ====="
             npx tsx scripts/migrate.ts 2>&1 | tail -20
 
             echo ""
@@ -39,6 +39,10 @@ jobs:
             echo ""
             echo "===== 3. Seed FB task catalog (binds squads to tasks) ====="
             npx tsx scripts/seed-task-catalog-fb.ts
+
+            echo ""
+            echo "===== 3b. Seed FB task CATEGORIES + bind tasks to categories ====="
+            npx tsx scripts/seed-task-categories-fb.ts
 
             echo ""
             echo "===== 4. Skill-match atomic-task agents (replace lazy fallback) ====="
