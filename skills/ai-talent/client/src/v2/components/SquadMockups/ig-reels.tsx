@@ -1,19 +1,17 @@
 /**
- * IGReelsMockup — Instagram Reels script preview (9:16 short video).
+ * IGReelsMockup — squad-step renderer for IG Reels script.
  *
- * Differs from FBReelsMockup:
- *   - IG-specific chrome (heart / comment / paper-plane / bookmark
- *     stacked on right side; audio attribution at bottom-left)
- *   - Caption overlays directly on the video while playing
- *   - Audio source row (trending sound icon if applicable)
- *   - "Original audio" or "Trending" tag
- *   - Remix-eligible flag (do we want others to be able to use our audio)
+ * Wraps PlatformMockup's IGReels for the visual preview, then adds
+ * squad-mockup-specific sections: Hook/Hold/Build/Payoff/CTA shot list,
+ * audio attribution, remix flag, full caption.
  *
- * Same Hook/Hold/Build/Payoff/CTA beat structure as FBReels for
- * consistency — only chrome differs.
+ * Per CJ correction 2026-05-02: don't duplicate IG chrome — IGReels
+ * already handles the 9:16 phone-frame, action stack, audio bar.
  */
 import React from "react";
 import { Chip } from "@heroui/react";
+import { IGReels } from "../PlatformMockup/instagram";
+import type { MockupFields } from "../PlatformMockup/shared";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface ReelsShot {
@@ -30,8 +28,8 @@ export interface IGReelsScript {
   duration: 15 | 30 | 60 | 90;
   hookHypothesis: string;
   audioKind: "original" | "trending" | "licensed";
-  audioName?: string;        // e.g. "Trending: 周杰倫 - 稻香 (sped up)"
-  remixAllowed: boolean;     // can other creators use our audio?
+  audioName?: string;
+  remixAllowed: boolean;
   caption: string;
   hashtags: string[];
   shots: ReelsShot[];
@@ -56,6 +54,19 @@ const AUDIO_LABEL = {
   licensed:  "🎵 授權音樂",
 } as const;
 
+function toMockupFields(data: IGReelsScript): MockupFields {
+  const hook = data.shots.find((s) => s.beat === "hook") ?? data.shots[0];
+  return {
+    title: data.topic ?? "",
+    brief: data.hookHypothesis ?? "",
+    brandName: null,
+    liveCaption: data.caption,
+    liveHashtags: data.hashtags,
+    liveTitle: hook?.onScreenText ?? "",
+    liveVideoDesc: hook?.action ?? "",
+  };
+}
+
 export function IGReelsMockup({ data, isActive = false }: Props) {
   if (!data || !Array.isArray(data.shots) || data.shots.length === 0) {
     return (
@@ -66,7 +77,7 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
     );
   }
 
-  const hookShot = data.shots.find((s) => s.beat === "hook") ?? data.shots[0]!;
+  const fields = toMockupFields(data);
 
   return (
     <div className="flex flex-col gap-3 max-w-5xl">
@@ -78,12 +89,8 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
             title={data.topic || "IG Reels 腳本"}
           />
           <div className="flex items-center gap-1.5 self-start">
-            <Chip size="sm" variant="flat" className="h-5 text-tiny">
-              {data.duration ?? 30}s
-            </Chip>
-            <Chip size="sm" variant="flat" className="h-5 text-tiny">
-              {AUDIO_LABEL[data.audioKind] ?? "🎵"}
-            </Chip>
+            <Chip size="sm" variant="flat" className="h-5 text-tiny">{data.duration ?? 30}s</Chip>
+            <Chip size="sm" variant="flat" className="h-5 text-tiny">{AUDIO_LABEL[data.audioKind] ?? "🎵"}</Chip>
             {isActive && (
               <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
                 ● agent 思考中…
@@ -93,64 +100,26 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
         </div>
       </NotionCard>
 
-      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-3">
-        {/* Phone preview — IG-specific chrome */}
-        <NotionCard className="md:sticky md:top-2 md:self-start">
-          <SectionHeader eyebrow="PREVIEW" title="9:16 IG Reel" />
-          <div
-            className="relative mx-auto rounded-2xl border-4 border-default-300 bg-black overflow-hidden"
-            style={{ width: 200, aspectRatio: "9 / 16" }}
-          >
-            {/* Visual placeholder */}
-            <div className="absolute inset-0 flex items-center justify-center text-default-200 text-tiny px-2 text-center leading-relaxed opacity-50">
-              {hookShot.action || "（畫面動作未填）"}
-            </div>
-
-            {/* Top time badge */}
-            <div className="absolute top-2 left-2">
-              <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny bg-white/80">
-                {hookShot.timecode}
-              </Chip>
-            </div>
-
-            {/* Center hook overlay text */}
-            {hookShot.onScreenText && (
-              <div className="absolute left-2 right-12 top-1/2 -translate-y-1/2 text-center">
-                <span className="inline-block px-2 py-1 rounded-md bg-white/90 text-foreground text-medium font-bold leading-tight">
-                  {hookShot.onScreenText}
-                </span>
-              </div>
-            )}
-
-            {/* IG action stack on right */}
-            <div className="absolute right-2 top-1/2 -translate-y-1/4 flex flex-col gap-3 text-white text-medium">
-              <span>♡</span>
-              <span>💬</span>
-              <span>↗</span>
-              <span>🔖</span>
-              <span>⋯</span>
-            </div>
-
-            {/* Bottom: caption excerpt + audio attribution */}
-            <div className="absolute left-2 right-12 bottom-2 text-tiny text-white space-y-0.5">
-              <p className="line-clamp-2 leading-tight">{(data.caption ?? "").slice(0, 80)}</p>
-              <p className="text-white/80 flex items-center gap-1">
-                🎵 <span className="truncate">{data.audioName ?? "（音訊未指定）"}</span>
-              </p>
-            </div>
-          </div>
-          {data.hookHypothesis && (
-            <p className="text-tiny text-default-500 mt-2 leading-relaxed">
-              <span className="font-semibold">Hook 假設：</span>
-              {data.hookHypothesis}
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
+        {/* Visual preview — reuse PlatformMockup's IGReels chrome */}
+        <div className="md:sticky md:top-2 md:self-start space-y-2">
+          <IGReels {...fields} />
+          {data.audioName && (
+            <p className="text-tiny text-default-500 leading-relaxed px-1">
+              <span className="font-semibold">音訊：</span>{data.audioName}
             </p>
           )}
-          <p className="text-tiny text-default-500 mt-1">
+          <p className="text-tiny text-default-500 px-1">
             Remix 開放：{data.remixAllowed ? "✓ 是" : "✗ 否"}
           </p>
-        </NotionCard>
+          {data.hookHypothesis && (
+            <p className="text-tiny text-default-500 leading-relaxed px-1">
+              <span className="font-semibold">Hook 假設：</span>{data.hookHypothesis}
+            </p>
+          )}
+        </div>
 
-        {/* Shot list */}
+        {/* Shot list (squad-mockup-specific) */}
         <NotionCard>
           <SectionHeader eyebrow="SHOT LIST" title="逐秒分鏡" />
           <div className="flex flex-col">
@@ -170,18 +139,10 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
                     </Chip>
                   </div>
                   <div className="flex flex-col gap-1 min-w-0">
-                    {s.onScreenText && (
-                      <p className="text-small font-semibold leading-snug">💬 {s.onScreenText}</p>
-                    )}
-                    {s.voiceover && (
-                      <p className="text-tiny text-default-700 leading-relaxed">🎙 {s.voiceover}</p>
-                    )}
-                    {s.action && (
-                      <p className="text-tiny text-default-500 leading-relaxed">🎬 {s.action}</p>
-                    )}
-                    {s.bRoll && (
-                      <p className="text-tiny text-default-400 leading-relaxed">🎞 b-roll: {s.bRoll}</p>
-                    )}
+                    {s.onScreenText && <p className="text-small font-semibold leading-snug">💬 {s.onScreenText}</p>}
+                    {s.voiceover && <p className="text-tiny text-default-700 leading-relaxed">🎙 {s.voiceover}</p>}
+                    {s.action && <p className="text-tiny text-default-500 leading-relaxed">🎬 {s.action}</p>}
+                    {s.bRoll && <p className="text-tiny text-default-400 leading-relaxed">🎞 b-roll: {s.bRoll}</p>}
                   </div>
                 </div>
               );
@@ -189,23 +150,6 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
           </div>
         </NotionCard>
       </div>
-
-      {/* Caption + hashtags */}
-      <NotionCard>
-        <SectionHeader eyebrow="CAPTION" title="貼文文字（在 Reel 下方）" />
-        <pre className="text-small leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">
-          {data.caption || "（caption 未產出）"}
-        </pre>
-        {data.hashtags && data.hashtags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {data.hashtags.map((tag, i) => (
-              <Chip key={i} size="sm" variant="flat" color="primary" className="h-5 text-tiny">
-                {tag.startsWith("#") ? tag : `#${tag}`}
-              </Chip>
-            ))}
-          </div>
-        )}
-      </NotionCard>
     </div>
   );
 }

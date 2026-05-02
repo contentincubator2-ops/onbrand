@@ -1,47 +1,45 @@
 /**
- * IGStoryMockup — Instagram Story preview (24h vertical 9:16).
+ * IGStoryMockup — squad-step renderer for IG Story series.
  *
- * Renders a phone-frame stack with:
- *   - Top progress bars (one segment per story in the series)
- *   - Profile avatar / handle + ⋯ menu
- *   - 9:16 visual area with text + sticker overlays
- *   - Sticker zones (poll / question / quiz / link / countdown / music)
- *   - Bottom DM input + reaction icons
+ * Wraps PlatformMockup's IGStories for the visual preview, then adds
+ * squad-mockup-specific sections: per-slide timeline + sticker config.
  *
- * Designed for series mode — 3-7 stories that flow as a sequence (e.g.
- * 24h takeover, behind-the-scenes thread, AMA arc). Each story is a
- * separate "slide" in the data.
+ * Per CJ correction 2026-05-02: don't duplicate IG chrome. The phone-frame
+ * progress-bars + DM input + heart/share icons all live in IGStories
+ * (PlatformMockup/instagram.tsx).
  */
 import React from "react";
 import { Chip } from "@heroui/react";
+import { IGStories } from "../PlatformMockup/instagram";
+import type { MockupFields } from "../PlatformMockup/shared";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export type StickerKind = "poll" | "question" | "quiz" | "link" | "countdown" | "music" | "location" | "mention";
 
 export interface StorySticker {
   kind: StickerKind;
-  text: string;             // poll question / link CTA / etc.
-  options?: string[];       // poll/quiz options
+  text: string;
+  options?: string[];
   position?: "top" | "middle" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 }
 
 export interface IGStorySlide {
-  index: number;            // 1-based
-  durationSec: number;      // 5-15s typical; longer = video
-  title?: string;           // big text overlay (centered by default)
-  body?: string;            // sub-text
-  visualDirection: string;  // image / video brief
+  index: number;
+  durationSec: number;
+  title?: string;
+  body?: string;
+  visualDirection: string;
   bgKind: "image" | "video" | "boomerang" | "gradient";
   stickers: StorySticker[];
-  voiceover?: string;       // narrator if it's a video
+  voiceover?: string;
 }
 
 export interface IGStorySeries {
   brandHandle: string;
   brandAvatarUrl?: string | null;
-  arcSummary: string;       // 1-line story arc (e.g. "新品開箱 24h takeover")
+  arcSummary: string;
   slides: IGStorySlide[];
-  highlightCover?: string;  // optional: which slide becomes Highlight cover
+  highlightCover?: string;
 }
 
 interface Props extends SquadMockupCommonProps {
@@ -60,15 +58,15 @@ const STICKER_LABEL: Record<StickerKind, string> = {
   mention:   "@ 標註",
 };
 
-const POSITION_CLASS: Record<NonNullable<StorySticker["position"]>, string> = {
-  "top":          "top-12 left-1/2 -translate-x-1/2",
-  "middle":       "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
-  "bottom":       "bottom-20 left-1/2 -translate-x-1/2",
-  "top-left":     "top-12 left-3",
-  "top-right":    "top-12 right-3",
-  "bottom-left":  "bottom-20 left-3",
-  "bottom-right": "bottom-20 right-3",
-};
+function toMockupFields(data: IGStorySeries): MockupFields {
+  const first = data.slides[0];
+  return {
+    title: first?.title ?? data.arcSummary ?? "",
+    brief: first?.body ?? "",
+    brandName: data.brandHandle?.replace(/^@/, "") ?? null,
+    liveImageDesc: first?.visualDirection ?? "",
+  };
+}
 
 export function IGStoryMockup({ data, isActive = false }: Props) {
   if (!data || !Array.isArray(data.slides) || data.slides.length === 0) {
@@ -81,9 +79,7 @@ export function IGStoryMockup({ data, isActive = false }: Props) {
   }
 
   const slides = data.slides;
-  const handle = data.brandHandle?.replace(/^@/, "") ?? "your_brand";
-  // Use first slide for the phone preview
-  const preview = slides[0]!;
+  const fields = toMockupFields(data);
 
   return (
     <div className="flex flex-col gap-3 max-w-5xl">
@@ -103,85 +99,13 @@ export function IGStoryMockup({ data, isActive = false }: Props) {
         <p className="text-tiny text-default-500">敘事弧：{data.arcSummary || "（未填）"}</p>
       </NotionCard>
 
-      <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-3">
-        {/* Phone preview (9:16, first slide) */}
-        <NotionCard className="md:sticky md:top-2 md:self-start">
-          <SectionHeader eyebrow="PREVIEW" title={`Story 1 · ${preview.durationSec}s`} />
-          <div
-            className="relative mx-auto rounded-2xl border-4 border-default-300 bg-black overflow-hidden"
-            style={{ width: 200, aspectRatio: "9 / 16" }}
-          >
-            {/* Top progress bars — one per slide */}
-            <div className="absolute top-1.5 left-1.5 right-1.5 flex gap-0.5 z-10">
-              {slides.map((_, i) => (
-                <span
-                  key={i}
-                  className="flex-1 h-0.5 rounded-full bg-white/30 overflow-hidden"
-                >
-                  <span className={`block h-full ${i === 0 ? "bg-white w-1/3" : i < 0 ? "bg-white" : ""}`} />
-                </span>
-              ))}
-            </div>
-            {/* Profile row */}
-            <div className="absolute top-4 left-2 right-2 flex items-center gap-1.5 z-10">
-              <div
-                className="w-6 h-6 rounded-full border border-white text-tiny font-semibold flex items-center justify-center text-white shrink-0"
-                style={{
-                  background: data.brandAvatarUrl
-                    ? `url(${data.brandAvatarUrl}) center/cover`
-                    : "linear-gradient(45deg, #f09433, #dc2743, #bc1888)",
-                }}
-              >
-                {!data.brandAvatarUrl && handle[0]?.toUpperCase()}
-              </div>
-              <span className="text-tiny font-semibold text-white truncate">{handle}</span>
-              <span className="text-tiny text-white/70 ml-auto">⋯</span>
-              <span className="text-tiny text-white/70">×</span>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
+        {/* Visual preview — reuse PlatformMockup's IGStories chrome */}
+        <div className="md:sticky md:top-2 md:self-start">
+          <IGStories {...fields} />
+        </div>
 
-            {/* Visual placeholder */}
-            <div className="absolute inset-0 flex items-center justify-center text-default-200 text-tiny px-3 text-center leading-relaxed opacity-50">
-              {preview.visualDirection || "（視覺方向未填）"}
-            </div>
-
-            {/* Title / body overlay (centered if no position specified for stickers) */}
-            {preview.title && (
-              <div className="absolute top-1/2 left-2 right-2 -translate-y-1/2 text-center z-10">
-                <span className="inline-block px-2 py-1 rounded-md bg-white text-foreground text-medium font-bold leading-tight">
-                  {preview.title}
-                </span>
-              </div>
-            )}
-
-            {/* Stickers */}
-            {preview.stickers.map((s, i) => (
-              <div
-                key={i}
-                className={`absolute z-10 ${POSITION_CLASS[s.position ?? "bottom"]}`}
-                style={{ maxWidth: "85%" }}
-              >
-                <div className="px-2 py-1 rounded-md bg-white/95 border border-default-200 shadow text-tiny font-medium text-foreground leading-tight">
-                  <span className="text-tiny text-default-500 uppercase tracking-wider mr-1">{STICKER_LABEL[s.kind]}</span>
-                  <span>{s.text}</span>
-                </div>
-              </div>
-            ))}
-
-            {/* Bottom DM input */}
-            <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1 z-10">
-              <div className="flex-1 px-2 py-1 rounded-full border border-white/40 text-tiny text-white/70">
-                傳訊息…
-              </div>
-              <span className="text-white text-medium">♥</span>
-              <span className="text-white text-medium">↗</span>
-            </div>
-          </div>
-          <p className="text-tiny text-default-500 mt-2 leading-relaxed">
-            背景：{preview.bgKind === "video" ? "🎬 影片" : preview.bgKind === "boomerang" ? "🔁 Boomerang" : preview.bgKind === "gradient" ? "🌈 純漸層" : "🖼 靜態圖"}
-          </p>
-        </NotionCard>
-
-        {/* Series timeline */}
+        {/* Series timeline (squad-mockup-specific) */}
         <NotionCard>
           <SectionHeader eyebrow="STORY SERIES" title="連續腳本" />
           <div className="flex flex-col">

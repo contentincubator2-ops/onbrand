@@ -1,39 +1,39 @@
 /**
- * IGPostBriefMockup — Instagram single-post + carousel preview.
+ * IGPostBriefMockup — squad-step renderer for IG single-post / carousel.
  *
- * Differs from FBPostBriefMockup:
- *   - Square 1:1 image frame (FB allows landscape)
- *   - IG-specific chrome (heart / comment / paper-plane / bookmark)
- *   - Caption appears UNDER the image, NOT inside the post block
- *   - @ mentions and #hashtags get highlighted
- *   - Location pin row above the image
- *   - Carousel mode: dots indicator + slide counter
+ * ARCHITECTURE: wraps existing PlatformMockup chrome (IGFeed / IGCarousel)
+ * for the visual preview. Adds structured-data sections (slide list,
+ * full caption, hashtags, first-comment slot) that are SquadMockup-
+ * specific. Avoids duplicating IG chrome / icons / dicebear avatars.
  *
- * Usage: data.briefs is an array — single-post mode renders 1 card,
- * carousel mode (length > 1) renders the same UI with slide-counter.
+ * Per CJ correction 2026-05-02: 「mockup 都是參考原有的組件，對嗎」.
+ * Yes — this wraps IGFeed/IGCarousel from ../PlatformMockup/instagram
+ * rather than reinventing the IG post UI.
  */
 import React from "react";
 import { Chip } from "@heroui/react";
+import { IGFeed, IGCarousel } from "../PlatformMockup/instagram";
+import type { MockupFields } from "../PlatformMockup/shared";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface IGPostBrief {
-  index?: number;            // 1-based for carousel display
-  title?: string;            // optional headline (1st-line / on-image text)
-  body: string;              // visible-on-image copy / caption excerpt
-  visualDirection: string;   // image / illustration brief
-  altText?: string;          // accessibility alt text
+  index?: number;
+  title?: string;
+  body: string;
+  visualDirection: string;
+  altText?: string;
 }
 
 export interface IGPostData {
-  brandHandle: string;       // e.g. "@pokemon_go_tw"
+  brandHandle: string;
   brandAvatarUrl?: string | null;
-  location?: string;         // e.g. "台北市・大安森林公園"
+  location?: string;
   mode: "single" | "carousel";
-  briefs: IGPostBrief[];     // 1 for single, 2-10 for carousel
-  caption: string;           // full caption shown under the post
+  briefs: IGPostBrief[];
+  caption: string;
   hashtags: string[];
-  mentions?: string[];       // @other_brand collabs
-  firstComment?: string;     // optional auto-comment for hashtag bundling
+  mentions?: string[];
+  firstComment?: string;
 }
 
 interface Props extends SquadMockupCommonProps {
@@ -41,17 +41,17 @@ interface Props extends SquadMockupCommonProps {
   onChange?: (next: Partial<IGPostData>) => void;
 }
 
-function formatCaption(caption: string, hashtags: string[], mentions: string[] = []): React.ReactNode {
-  // Render with @mentions and #hashtags highlighted
-  const tokens = (caption || "").split(/(\s+|@\w+|#[\w一-龥]+)/g);
-  const out: React.ReactNode[] = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i] ?? "";
-    if (t.startsWith("@")) out.push(<span key={i} className="text-primary">{t}</span>);
-    else if (t.startsWith("#")) out.push(<span key={i} className="text-primary">{t}</span>);
-    else out.push(<React.Fragment key={i}>{t}</React.Fragment>);
-  }
-  return out;
+/** Project squad-mockup data into PlatformMockup's MockupFields shape. */
+function toMockupFields(data: IGPostData, idx = 0): MockupFields {
+  const slide = data.briefs[idx];
+  return {
+    title: slide?.title ?? "",
+    brief: slide?.body ?? "",
+    brandName: data.brandHandle?.replace(/^@/, "") ?? null,
+    liveCaption: data.caption,
+    liveHashtags: data.hashtags,
+    liveImageDesc: slide?.visualDirection ?? "",
+  };
 }
 
 export function IGPostBriefMockup({ data, isActive = false }: Props) {
@@ -66,10 +66,10 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
 
   const slides = data.briefs;
   const isCarousel = data.mode === "carousel" || slides.length > 1;
-  const handle = data.brandHandle?.replace(/^@/, "") ?? "your_brand";
+  const fields = toMockupFields(data, 0);
 
   return (
-    <div className="flex flex-col gap-3 max-w-md">
+    <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
@@ -83,85 +83,12 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
             </Chip>
           )}
         </div>
-
-        {/* IG post mockup — phone-feed-style card */}
-        <div className="bg-content1 border border-divider rounded-md overflow-hidden">
-          {/* Header: avatar + handle + location + ⋯ menu */}
-          <div className="flex items-center gap-2 px-3 py-2">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-tiny font-semibold text-white shrink-0"
-              style={{
-                background: data.brandAvatarUrl
-                  ? `url(${data.brandAvatarUrl}) center/cover`
-                  : "linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)",
-              }}
-            >
-              {!data.brandAvatarUrl && handle[0]?.toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-tiny font-semibold leading-tight truncate">{handle}</p>
-              {data.location && (
-                <p className="text-tiny text-default-500 leading-tight truncate">📍 {data.location}</p>
-              )}
-            </div>
-            <span className="text-default-400 text-medium leading-none">⋯</span>
-          </div>
-
-          {/* Square 1:1 image area */}
-          <div className="relative bg-default-100 border-y border-divider" style={{ aspectRatio: "1 / 1" }}>
-            <div className="absolute inset-0 flex items-center justify-center text-default-500 text-tiny px-6 text-center leading-relaxed">
-              <div>
-                <p className="text-default-400 uppercase tracking-wider mb-2">VISUAL</p>
-                <p className="text-foreground/80 whitespace-pre-wrap">{slides[0]!.visualDirection || "（視覺方向未填）"}</p>
-                {slides[0]!.title && (
-                  <p className="mt-3 text-default-700 font-semibold">{slides[0]!.title}</p>
-                )}
-              </div>
-            </div>
-            {isCarousel && (
-              <div className="absolute top-2 right-2">
-                <Chip size="sm" variant="flat" className="h-5 text-tiny bg-black/60 text-white">
-                  1/{slides.length}
-                </Chip>
-              </div>
-            )}
-          </div>
-
-          {/* Action row — IG icons */}
-          <div className="flex items-center gap-3 px-3 py-2 text-foreground">
-            <span className="text-medium">♡</span>
-            <span className="text-medium">💬</span>
-            <span className="text-medium">↗</span>
-            <span className="ml-auto text-medium">🔖</span>
-          </div>
-
-          {/* Carousel dots */}
-          {isCarousel && (
-            <div className="flex items-center justify-center gap-1 pb-1">
-              {slides.map((_, i) => (
-                <span
-                  key={i}
-                  className={`rounded-full ${i === 0 ? "bg-primary" : "bg-default-300"}`}
-                  style={{ width: 5, height: 5 }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Caption preview */}
-          <div className="px-3 pb-2">
-            <p className="text-tiny leading-relaxed">
-              <span className="font-semibold">{handle}</span>{" "}
-              <span className="text-foreground">
-                {formatCaption(data.caption?.slice(0, 200) || "", data.hashtags ?? [], data.mentions ?? [])}
-                {(data.caption?.length ?? 0) > 200 && <span className="text-default-500"> ...更多</span>}
-              </span>
-            </p>
-          </div>
-        </div>
+        {/* Reuse existing PlatformMockup IG chrome — same visual language as
+            picker live preview, no duplicated heart/comment/bookmark icons. */}
+        {isCarousel ? <IGCarousel {...fields} /> : <IGFeed {...fields} />}
       </NotionCard>
 
-      {/* Carousel slide list (when carousel) */}
+      {/* Carousel slide list (squad-mockup-specific structured editing) */}
       {isCarousel && (
         <NotionCard>
           <SectionHeader eyebrow="DECK" title="輪播每張卡片" />
@@ -182,7 +109,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
         </NotionCard>
       )}
 
-      {/* Full caption + hashtags */}
+      {/* Full caption + hashtags + first-comment (squad-mockup additions) */}
       <NotionCard>
         <SectionHeader eyebrow="CAPTION" title="完整貼文文字" />
         <pre className="text-small leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">

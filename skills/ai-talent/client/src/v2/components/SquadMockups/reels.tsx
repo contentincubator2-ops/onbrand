@@ -1,33 +1,31 @@
 /**
- * FBReelsMockup — atomic task fb-reels-script output.
+ * FBReelsMockup — squad-step renderer for FB Reels script.
  *
- * Renders a vertical 9:16 phone-frame preview + a Hook/Hold/Payoff
- * timeline showing per-second beat structure. Each row of the timeline
- * is a shot: timecode, on-screen text, voiceover/dialogue, action,
- * b-roll. This is the brief a video editor takes straight to shooting.
- *
- * Differs from FBPostBriefMockup (single static post) — this is a
- * time-axis script with multiple shots and overlay text per shot.
+ * Wraps PlatformMockup's FBReel for the visual preview, then adds
+ * squad-mockup-specific sections: Hook/Hold/Build/Payoff/CTA shot list,
+ * caption, hashtags. Avoids duplicating FB chrome.
  */
 import React from "react";
 import { Chip } from "@heroui/react";
+import { FBReel } from "../PlatformMockup/facebook";
+import type { MockupFields } from "../PlatformMockup/shared";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface ReelsShot {
-  timecode: string;          // e.g. "0-3s" / "3-7s"
+  timecode: string;
   beat: "hook" | "hold" | "build" | "payoff" | "cta";
-  onScreenText: string;      // what appears as caption/sticker on screen
-  voiceover: string;         // narrator / talent dialogue
-  action: string;            // what's physically happening (movement, gesture)
-  bRoll?: string;            // optional cutaway / supporting visual
+  onScreenText: string;
+  voiceover: string;
+  action: string;
+  bRoll?: string;
 }
 
 export interface ReelsScript {
   topic: string;
-  duration: 30 | 60;          // seconds
-  hookHypothesis: string;     // why the first 3 seconds will retain
+  duration: 30 | 60;
+  hookHypothesis: string;
   hashtags: string[];
-  caption: string;            // accompanying caption text (under the video)
+  caption: string;
   shots: ReelsShot[];
 }
 
@@ -44,6 +42,19 @@ const BEAT_TONE: Record<ReelsShot["beat"], { label: string; color: "primary" | "
   cta:    { label: "👉 CTA",    color: "default" },
 };
 
+function toMockupFields(data: ReelsScript): MockupFields {
+  const hook = data.shots.find((s) => s.beat === "hook") ?? data.shots[0];
+  return {
+    title: data.topic ?? "",
+    brief: data.hookHypothesis ?? "",
+    brandName: null,
+    liveCaption: data.caption,
+    liveHashtags: data.hashtags,
+    liveTitle: hook?.onScreenText ?? "",
+    liveVideoDesc: hook?.action ?? "",
+  };
+}
+
 export function FBReelsMockup({ data, isActive = false }: Props) {
   if (!data || !data.shots || data.shots.length === 0) {
     return (
@@ -54,22 +65,15 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
     );
   }
 
-  // First-shot is the hook — pluck for the phone-frame preview overlay
-  const hookShot = data.shots.find((s) => s.beat === "hook") ?? data.shots[0]!;
+  const fields = toMockupFields(data);
 
   return (
     <div className="flex flex-col gap-3 max-w-5xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader
-            icon="🎬"
-            eyebrow="ATOMIC · FB REELS"
-            title={data.topic || "FB Reels 腳本"}
-          />
+          <SectionHeader icon="🎬" eyebrow="ATOMIC · FB REELS" title={data.topic || "FB Reels 腳本"} />
           <div className="flex items-center gap-1.5 self-start">
-            <Chip size="sm" variant="flat" className="h-5 text-tiny">
-              {data.duration ?? 30}s
-            </Chip>
+            <Chip size="sm" variant="flat" className="h-5 text-tiny">{data.duration ?? 30}s</Chip>
             {isActive && (
               <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
                 ● agent 思考中…
@@ -79,49 +83,18 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
         </div>
       </NotionCard>
 
-      {/* Phone-frame preview + timeline grid (2-column on wide screens) */}
-      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-3">
-        {/* Phone preview (9:16 vertical with hook overlay) */}
-        <NotionCard className="md:sticky md:top-2 md:self-start">
-          <SectionHeader eyebrow="PREVIEW" title="9:16 直立" />
-          <div
-            className="relative mx-auto rounded-2xl border-4 border-default-300 bg-black overflow-hidden"
-            style={{ width: 200, aspectRatio: "9 / 16" }}
-          >
-            {/* Action area placeholder */}
-            <div className="absolute inset-0 flex items-center justify-center text-default-200 text-tiny px-2 text-center leading-relaxed opacity-50">
-              {hookShot.action || "（畫面動作未填）"}
-            </div>
-            {/* Top time badge */}
-            <div className="absolute top-2 left-2">
-              <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny bg-white/80">
-                {hookShot.timecode}
-              </Chip>
-            </div>
-            {/* Bottom hook overlay text */}
-            {hookShot.onScreenText && (
-              <div className="absolute left-2 right-2 bottom-12 text-center">
-                <span className="inline-block px-2 py-1 rounded-md bg-white text-foreground text-medium font-bold leading-tight" style={{ textShadow: "0 1px 0 rgba(0,0,0,0.05)" }}>
-                  {hookShot.onScreenText}
-                </span>
-              </div>
-            )}
-            {/* Bottom IG-like UI (heart/comment/share) */}
-            <div className="absolute right-2 bottom-2 flex flex-col gap-2 text-white text-tiny">
-              <span>♥</span>
-              <span>💬</span>
-              <span>↗</span>
-            </div>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
+        {/* Visual preview — reuse PlatformMockup's FBReel chrome */}
+        <div className="md:sticky md:top-2 md:self-start space-y-2">
+          <FBReel {...fields} />
           {data.hookHypothesis && (
-            <p className="text-tiny text-default-500 mt-2 leading-relaxed">
-              <span className="font-semibold">Hook 假設：</span>
-              {data.hookHypothesis}
+            <p className="text-tiny text-default-500 leading-relaxed px-1">
+              <span className="font-semibold">Hook 假設：</span>{data.hookHypothesis}
             </p>
           )}
-        </NotionCard>
+        </div>
 
-        {/* Timeline grid */}
+        {/* Shot list (squad-mockup-specific) */}
         <NotionCard>
           <SectionHeader eyebrow="SHOT LIST" title="逐秒分鏡" />
           <div className="flex flex-col">
@@ -132,7 +105,6 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
                   key={i}
                   className="grid grid-cols-[60px_1fr] gap-3 py-2 border-b border-divider last:border-0"
                 >
-                  {/* Timecode column */}
                   <div className="flex flex-col gap-1 items-start">
                     <span className="text-tiny font-mono font-semibold tabular-nums text-default-700">
                       {s.timecode}
@@ -141,28 +113,11 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
                       {beat.label}
                     </Chip>
                   </div>
-                  {/* Content column */}
                   <div className="flex flex-col gap-1 min-w-0">
-                    {s.onScreenText && (
-                      <p className="text-small font-semibold leading-snug">
-                        💬 {s.onScreenText}
-                      </p>
-                    )}
-                    {s.voiceover && (
-                      <p className="text-tiny text-default-700 leading-relaxed">
-                        🎙 {s.voiceover}
-                      </p>
-                    )}
-                    {s.action && (
-                      <p className="text-tiny text-default-500 leading-relaxed">
-                        🎬 {s.action}
-                      </p>
-                    )}
-                    {s.bRoll && (
-                      <p className="text-tiny text-default-400 leading-relaxed">
-                        🎞 b-roll: {s.bRoll}
-                      </p>
-                    )}
+                    {s.onScreenText && <p className="text-small font-semibold leading-snug">💬 {s.onScreenText}</p>}
+                    {s.voiceover && <p className="text-tiny text-default-700 leading-relaxed">🎙 {s.voiceover}</p>}
+                    {s.action && <p className="text-tiny text-default-500 leading-relaxed">🎬 {s.action}</p>}
+                    {s.bRoll && <p className="text-tiny text-default-400 leading-relaxed">🎞 b-roll: {s.bRoll}</p>}
                   </div>
                 </div>
               );
@@ -170,23 +125,6 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
           </div>
         </NotionCard>
       </div>
-
-      {/* Caption + hashtags */}
-      <NotionCard>
-        <SectionHeader eyebrow="POST CAPTION" title="發布時的文字描述" />
-        <pre className="text-small leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">
-          {data.caption || "（caption 未產出）"}
-        </pre>
-        {data.hashtags && data.hashtags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {data.hashtags.map((tag, i) => (
-              <Chip key={i} size="sm" variant="flat" className="h-5 text-tiny">
-                {tag.startsWith("#") ? tag : `#${tag}`}
-              </Chip>
-            ))}
-          </div>
-        )}
-      </NotionCard>
     </div>
   );
 }
