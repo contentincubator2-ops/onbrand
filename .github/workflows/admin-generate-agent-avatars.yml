@@ -1,59 +1,73 @@
-name: Admin — Generate agent avatars (Azure gpt-image-2)
+name: Admin — Generate agent avatars (DiceBear notionists)
+
+# Batch-generates DiceBear "notionists" PNG avatars for all agents.
+# Stores 4 size variants (64/128/256/512px) per agent on disk and
+# writes agents.avatarUrl to the database.
+#
+# Background colour is automatically keyed by agent platform/specialty:
+#   Facebook=#4267B2, Instagram=#C13584, LinkedIn=#0077B5, YouTube=#CC0000,
+#   Strategy=#6548C6, Research=#0891B2, Writer=#059669, Visual=#E11D48,
+#   Analytics=#D97706, PR=#7C3AED, Calendar=#0369A1, Ads=#B45309
+#
+# Uses DiceBear free public API — no API key required.
+# Throughput: ~0.8 agents/second (300ms delay per size variant).
+# 1000 agents ≈ 20 minutes.
 
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Type "true" to preview prompts only'
+        description: 'Type "true" to preview URLs only (no writes)'
         required: false
         default: 'false'
       reuse:
         description: 'Type "true" to skip agents already with avatarUrl'
         required: false
-        default: 'true'
+        default: 'false'
       limit:
-        description: 'Limit (blank = all)'
+        description: 'Max agents to process (blank = all)'
         required: false
       slug:
-        description: 'Only this agent slug'
+        description: 'Only process this agent slug'
         required: false
 
 jobs:
   generate:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 120
     steps:
-      - uses: appleboy/ssh-action@v1.0.3
+      - name: Pull latest main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          cd /opt/marketing-os/app
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+          git fetch origin main && git reset --hard origin/main
+          echo "Commit: $(git log --oneline -1)"
+
+      - name: Install deps
+        run: |
+          cd /opt/marketing-os/app/skills/ai-talent
+          npm install --legacy-peer-deps 2>&1 | tail -3
+
+      - name: Generate avatars
+        env:
           DRY:   ${{ github.event.inputs.dry_run }}
           REUSE: ${{ github.event.inputs.reuse }}
           LIMIT: ${{ github.event.inputs.limit }}
           SLUG:  ${{ github.event.inputs.slug }}
-          AZURE_IMAGE_API_KEY:  ${{ secrets.GPT }}
-          AZURE_IMAGE_ENDPOINT: "https://proj-claude-sweden-resource.cognitiveservices.azure.com"
-          AZURE_IMAGE_DEPLOYMENT: "gpt-image-2"
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 18000s
-          envs: GH_TOKEN,DRY,REUSE,LIMIT,SLUG,AZURE_IMAGE_API_KEY,AZURE_IMAGE_ENDPOINT,AZURE_IMAGE_DEPLOYMENT
-          script: |
-            set -e
-            APP=/opt/marketing-os/app
-            cd "$APP"
-            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
-            git fetch origin main && git reset --hard origin/main
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          mkdir -p /opt/marketing-os/covers
 
-            ENV_FILE=$APP/skills/ai-talent/.env
-            set -a; source "$ENV_FILE"; set +a
-            cd $APP/skills/ai-talent
-            mkdir -p /opt/marketing-os/covers || true
+          ARGS=""
+          [ "$DRY"   = "true" ] && ARGS="$ARGS --dry-run"
+          [ "$REUSE" = "true" ] && ARGS="$ARGS --reuse"
+          [ -n "$LIMIT" ]       && ARGS="$ARGS --limit=$LIMIT"
+          [ -n "$SLUG"  ]       && ARGS="$ARGS --slug=$SLUG"
 
-            ARGS=""
-            [ "$DRY" = "true" ]   && ARGS="$ARGS --dry-run"
-            [ "$REUSE" = "true" ] && ARGS="$ARGS --reuse"
-            [ -n "$LIMIT" ]       && ARGS="$ARGS --limit=$LIMIT"
-            [ -n "$SLUG" ]        && ARGS="$ARGS --slug=$SLUG"
-
-            ./node_modules/.bin/tsx scripts/generateAgentAvatars.ts $ARGS
+          echo "Running: generateAgentAvatars.ts $ARGS"
+          cd "$AI"
+          npx tsx scripts/generateAgentAvatars.ts $ARGS
