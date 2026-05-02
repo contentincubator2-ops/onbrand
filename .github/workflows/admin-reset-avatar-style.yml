@@ -73,10 +73,15 @@ jobs:
             echo "[dry-run] Would run: UPDATE agents SET avatarUrl = NULL WHERE avatarUrl IS NOT NULL"
             exit 0
           fi
-          npx tsx -e "
-            import pool from './server/localDb.js';
-            const [result] = await (pool as any).execute(\"UPDATE agents SET avatarUrl = NULL WHERE avatarUrl IS NOT NULL AND avatarUrl != ''\");
-            console.log('✓ Cleared avatarUrl for', (result as any).affectedRows, 'agents');
-            process.exit(0);
-          "
+          # Write temp script to avoid inline top-level-await issues
+          cat > /tmp/reset-avatars.mts << 'SCRIPT'
+          import pool from "/opt/marketing-os/app/skills/ai-talent/server/localDb.js";
+          const [result] = await (pool as any).execute(
+            "UPDATE agents SET avatarUrl = NULL WHERE avatarUrl IS NOT NULL AND avatarUrl != ''"
+          );
+          console.log("✓ Cleared avatarUrl for", (result as any).affectedRows, "agents");
+          await (pool as any).end?.();
+          process.exit(0);
+          SCRIPT
+          npx tsx /tmp/reset-avatars.mts
           echo "✓ avatarUrl reset complete — frontend will now show DiceBear notionists style"
