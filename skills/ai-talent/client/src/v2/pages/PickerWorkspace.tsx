@@ -108,9 +108,10 @@ const RAIL_TOP: RailItem[] = [
 ];
 
 const RAIL_BOTTOM: RailItem[] = [
-  { key: "brand",  label: "品牌", icon: faPalette,        kind: "global" },
-  { key: "recent", label: "我的", icon: faClockRotateLeft, kind: "global" },
-  { key: "upload", label: "上傳", icon: faUpload,         kind: "global" },
+  { key: "brand",   label: "品牌", icon: faPalette,        kind: "global" },
+  { key: "members", label: "成員", icon: faUserGroup,      kind: "global" },
+  { key: "recent",  label: "我的", icon: faClockRotateLeft, kind: "global" },
+  { key: "upload",  label: "上傳", icon: faUpload,         kind: "global" },
 ];
 
 /** Per-layer middle-band rail items. Keys for L4 use `L4-${channel}` format. */
@@ -771,6 +772,8 @@ export default function PickerWorkspace() {
               item={activeRailItem}
               onBackToTemplates={() => setActiveRailKey("templates")}
             />
+          ) : activeRailKey === "members" ? (
+            <MembersDrawer onBackToTemplates={() => setActiveRailKey("templates")} />
           ) : (
           <>
           {/* Search + AI generate */}
@@ -2998,6 +3001,132 @@ function LayerAssetDrawer({
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────── MembersDrawer ─────────────────────────────────────
+ * Left-rail "成員" global tab.
+ * Shows the agents that belong to the current workspace / squads —
+ * Canva analogy: the "Brand" panel that shows saved colours / fonts.
+ * Phase 1: agent roster from squads already loaded; invite CTA placeholder.
+ */
+function MembersDrawer({ onBackToTemplates }: { onBackToTemplates: () => void }) {
+  // Pull agents from the squads query via context — use trpc directly
+  const agentsQuery: any = (trpc.agent as any)?.list?.useQuery
+    ? (trpc.agent as any).list.useQuery(undefined, { staleTime: 60_000 })
+    : { data: null, isLoading: false };
+
+  const agents: any[] = agentsQuery.data ?? [];
+
+  // Role groupings for display
+  const ROLE_ORDER = ["Squad Lead", "Researcher", "Strategist", "Writer", "Visual", "Analyst", "Reviewer"];
+  const grouped = ROLE_ORDER.reduce<Record<string, any[]>>((acc, r) => {
+    const matched = agents.filter((a: any) =>
+      (a.primarySkill ?? a.role ?? "").toLowerCase().includes(r.toLowerCase())
+    );
+    if (matched.length) acc[r] = matched;
+    return acc;
+  }, {});
+  const ungrouped = agents.filter((a: any) =>
+    !ROLE_ORDER.some((r) => (a.primarySkill ?? a.role ?? "").toLowerCase().includes(r.toLowerCase()))
+  );
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
+        <div className="min-w-0">
+          <div className="text-tiny text-default-500">小組成員 / Members</div>
+          <div className="font-semibold text-medium text-foreground">
+            {agents.length > 0 ? `${agents.length} 位 AI Agent` : "成員"}
+          </div>
+        </div>
+        <Button
+          size="sm" variant="light" radius="sm"
+          onPress={onBackToTemplates}
+          className="text-tiny h-6 min-w-0 px-2 shrink-0 ml-2"
+        >
+          ← 範本
+        </Button>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
+        {agentsQuery.isLoading && (
+          <div className="space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-12 rounded-xl border border-divider bg-content1/60 px-3 flex items-center gap-3 animate-pulse">
+                <div className="w-8 h-8 rounded-full bg-divider/60 shrink-0" />
+                <div className="flex-1">
+                  <div className="h-2.5 w-2/3 rounded bg-divider/50 mb-1.5" />
+                  <div className="h-2 w-1/3 rounded bg-divider/40" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!agentsQuery.isLoading && agents.length === 0 && (
+          <Card shadow="none" radius="lg" className="border border-dashed border-divider bg-content2/40">
+            <CardBody className="p-5 text-center">
+              <div className="text-3xl mb-2 text-default-400">👥</div>
+              <div className="text-small font-semibold mb-1">尚無成員</div>
+              <div className="text-tiny text-default-500 leading-snug mb-4">
+                AI agent 小組成員會在這裡顯示。<br />你可以在方法論中看到每個 agent 的角色分工。
+              </div>
+              <Button size="sm" radius="full" color="primary" onPress={onBackToTemplates}>
+                從範本開始
+              </Button>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Grouped agent list */}
+        {Object.entries(grouped).map(([role, list]) => (
+          <div key={role} className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-default-400 uppercase tracking-wider px-1">{role}</p>
+            {list.map((a: any, i: number) => (
+              <AgentRow key={a.id ?? i} agent={a} />
+            ))}
+          </div>
+        ))}
+        {ungrouped.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-default-400 uppercase tracking-wider px-1">其他</p>
+            {ungrouped.map((a: any, i: number) => (
+              <AgentRow key={a.id ?? i} agent={a} />
+            ))}
+          </div>
+        )}
+
+        {/* Invite CTA — placeholder */}
+        <div className="pt-2 border-t border-divider">
+          <Button
+            size="sm" radius="full" variant="bordered"
+            className="w-full text-default-500"
+            isDisabled
+            startContent={<span>+</span>}
+          >
+            邀請成員（即將推出）
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentRow({ agent }: { agent: any }) {
+  const name = agent.name ?? agent.displayName ?? "—";
+  const role = agent.primarySkill ?? agent.role ?? "";
+  const platform = agent.workspace ?? agent.platform ?? "";
+  return (
+    <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-default-100 transition cursor-default">
+      <AgentAvatar seed={agent.id ?? name} size={32} className="rounded-full shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-small font-medium text-foreground truncate">{name}</p>
+        <p className="text-tiny text-default-500 truncate">{role}{platform ? ` · ${platform}` : ""}</p>
       </div>
     </div>
   );
