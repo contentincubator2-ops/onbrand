@@ -45,6 +45,16 @@ jobs:
             npx tsx scripts/seed-task-categories-fb.ts
 
             echo ""
+            echo "===== 3c. Seed monthly-calendar VARIANTS (sprint + product-promo) + rename tasks ====="
+            npx tsx scripts/seed-fb-calendar-variants.ts
+
+            echo ""
+            echo "===== 3d. Generate hero images for new variant squads ====="
+            timeout 300 npx tsx scripts/generate-squad-hero-images.ts \
+              --slugs=fb-monthly-calendar-sprint,fb-monthly-calendar-product-promo \
+              2>&1 | tail -20
+
+            echo ""
             echo "===== 4. Skill-match atomic-task agents (replace lazy fallback) ====="
             npx tsx scripts/skill-match-atomic-agents.ts 2>&1 | tail -40
 
