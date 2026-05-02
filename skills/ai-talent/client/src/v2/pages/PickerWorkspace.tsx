@@ -1913,13 +1913,39 @@ function SquadDetailPanel({
               // Any step with outputKind=decision/qa_review or mockupVariant=
               // IntakeFormMockup/QAReportMockup uses the document reader layout,
               // regardless of what inferStepKind returns.
-              const isDocStep =
-                ["decision", "qa_review", "qa"].includes(
+              const isIntakeStep =
+                ["decision", "intake"].includes(
                   String(activeStep.outputKind ?? "").toLowerCase()
-                ) ||
-                ["IntakeFormMockup", "QAReportMockup"].includes(
-                  activeStep.mockupVariant ?? ""
-                );
+                ) || activeStep.mockupVariant === "IntakeFormMockup";
+              const isDocStep = isIntakeStep ||
+                ["qa_review", "qa"].includes(String(activeStep.outputKind ?? "").toLowerCase()) ||
+                activeStep.mockupVariant === "QAReportMockup";
+
+              // Shared confirm/redo callbacks for all doc-style steps
+              const handleDocConfirm = async (editedContent: string) => {
+                if (!missionId) return;
+                await stepExecuteWithScope.mutateAsync({
+                  missionId, squadSlug: squad.slug, stepOrder: activeStepOrder,
+                  mode: "confirm", userInput: editedContent,
+                });
+                const next = activeStepOrder + 1;
+                if (next <= steps.length) {
+                  await stepExecuteWithScope.mutateAsync({
+                    missionId, squadSlug: squad.slug, stepOrder: next,
+                    mode: "run", userInput: "",
+                  });
+                }
+                await progressQuery.refetch?.();
+              };
+              const handleDocRedo = async () => {
+                if (!missionId) return;
+                await stepExecuteWithScope.mutateAsync({
+                  missionId, squadSlug: squad.slug, stepOrder: activeStepOrder,
+                  mode: "run", userInput: "",
+                });
+                await progressQuery.refetch?.();
+              };
+
               if (isDocStep) {
                 return (
                   <DocMockup
@@ -1930,6 +1956,10 @@ function SquadDetailPanel({
                     agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
                     body={prog?.agentOutput ?? prog?.agent_output ?? null}
                     status={prog?.status ?? "pending"}
+                    isEditable={isIntakeStep}
+                    onConfirm={handleDocConfirm}
+                    onRedo={handleDocRedo}
+                    isMutating={stepExecute.isPending}
                   />
                 );
               }
@@ -1944,6 +1974,9 @@ function SquadDetailPanel({
                     agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
                     body={prog?.agentOutput ?? prog?.agent_output ?? null}
                     status={prog?.status ?? "pending"}
+                    onConfirm={handleDocConfirm}
+                    onRedo={handleDocRedo}
+                    isMutating={stepExecute.isPending}
                   />
                 );
               }

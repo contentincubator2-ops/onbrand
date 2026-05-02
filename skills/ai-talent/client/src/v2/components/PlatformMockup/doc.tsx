@@ -1,18 +1,21 @@
 /**
- * DocMockup — Word/Notion-like document mockup for strategic steps.
+ * DocMockup — Word/Notion-like document mockup for strategic + intake steps.
  *
- * When a squad step is classified "strategic" (research / brand context /
- * persona / SWOT / framework etc), middle column renders this instead
- * of the platform mockup. The document body fills with the agent's
- * markdown output as it streams in.
+ * Used for:
+ *   - strategic steps  (research, brand context, SWOT, frameworks)
+ *   - intake/decision steps (agent pre-fills, user reviews & edits)
+ *   - QA review steps
  *
- * Pre-output state: skeleton lines + helpful "等待 agent 撰寫" copy.
+ * 2026-05-02 CJ direction:
+ *   • "✓ 滿意，下一步" button must be inline (not hidden in right panel)
+ *   • Intake steps (isEditable=true) show an editable textarea so users
+ *     can revise agent's pre-filled content before confirming
  */
-import React from "react";
-import { Avatar, Chip, Divider, ScrollShadow, Skeleton } from "@heroui/react";
+import React, { useState } from "react";
+import { Avatar, Button, Chip, Divider, ScrollShadow, Skeleton, Textarea } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faFileLines, faClock, faUser, faCheckCircle,
+  faFileLines, faClock, faUser, faCheckCircle, faRotateRight, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -27,20 +30,42 @@ interface DocMockupProps extends MockupFields {
   agentName?: string | null;
   /** Status: pending | running | drafted | confirmed */
   status?: string;
+  /** When true (intake steps), body is editable before confirm */
+  isEditable?: boolean;
+  /** Called when user clicks ✓ 滿意，下一步 — receives final text */
+  onConfirm?: (editedContent: string) => void;
+  /** Called when user clicks 重做 */
+  onRedo?: () => void;
+  /** Whether a mutation is in-flight */
+  isMutating?: boolean;
 }
 
 export function DocMockup({
   title, brief, brandName,
   body, stepName, agentName, status = "pending",
   variantLabel,
+  isEditable = false,
+  onConfirm, onRedo, isMutating = false,
 }: DocMockupProps) {
   const isWriting = status === "running" || (!body && status === "drafted");
   const isDone = status === "confirmed";
   const hasContent = !!(body && body.trim().length > 0);
+  const canAct = status === "drafted" && hasContent;
+
+  // Local edit state for intake steps
+  const [editedBody, setEditedBody] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Sync editedBody when body first arrives
+  React.useEffect(() => {
+    if (body && !editedBody) setEditedBody(body);
+  }, [body]);
+
+  const finalBody = isEditing ? editedBody : (body ?? "");
 
   return (
     <div className="w-full max-w-[760px] mx-auto">
-      <MockupHeader icon={faFileLines} label="策略文件" variantLabel={variantLabel ?? "策略文件"} />
+      <MockupHeader icon={faFileLines} label="策略文件" variantLabel={variantLabel ?? (isEditable ? "Intake 確認" : "策略文件")} />
 
       {/* Document paper */}
       <div className="bg-content1 border border-divider rounded-medium shadow-2xl overflow-hidden">
@@ -59,8 +84,8 @@ export function DocMockup({
                 撰寫中
               </Chip>
             )}
-            {status === "drafted" && hasContent && (
-              <Chip size="sm" variant="flat" color="warning">等待審查</Chip>
+            {canAct && !isDone && (
+              <Chip size="sm" variant="flat" color="warning">等待確認</Chip>
             )}
             {isDone && (
               <Chip size="sm" variant="flat" color="success"
@@ -68,12 +93,22 @@ export function DocMockup({
                 已確認
               </Chip>
             )}
+            {/* Edit toggle for editable intake docs */}
+            {isEditable && canAct && !isDone && onConfirm && (
+              <Button
+                size="sm" variant="light" radius="md"
+                startContent={<FontAwesomeIcon icon={faPenToSquare} />}
+                onPress={() => { setIsEditing((v) => !v); if (!isEditing) setEditedBody(body ?? ""); }}
+              >
+                {isEditing ? "預覽" : "編輯"}
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Page surface */}
-        <ScrollShadow className="max-h-[640px]">
-          <div className="px-12 py-12 sm:px-16 sm:py-16">
+        <ScrollShadow className="max-h-[560px]">
+          <div className="px-12 py-12 sm:px-16 sm:py-14">
             {/* Title block */}
             <h1 className="font-semibold text-3xl tracking-tight leading-tight">
               {stepName ?? title}
@@ -94,24 +129,33 @@ export function DocMockup({
 
             <Divider className="my-6" />
 
-            {/* Body */}
+            {/* Body — editable textarea OR rendered markdown */}
             {hasContent ? (
-              <article
-                className={[
-                  "prose prose-sm max-w-none",
-                  "prose-headings:tracking-tight prose-headings:font-semibold",
-                  "prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2",
-                  "prose-h3:text-medium prose-h3:mt-4",
-                  "prose-p:leading-relaxed prose-p:text-foreground",
-                  "prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5",
-                  "prose-strong:font-semibold",
-                  "prose-code:text-tiny prose-code:bg-default-100 prose-code:rounded prose-code:px-1",
-                ].join(" ")}
-              >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {body!}
-                </ReactMarkdown>
-              </article>
+              isEditing ? (
+                <Textarea
+                  variant="bordered" radius="md"
+                  minRows={10} maxRows={30}
+                  value={editedBody}
+                  onValueChange={setEditedBody}
+                  className="font-mono text-small"
+                  placeholder="編輯 agent 預填的內容…"
+                />
+              ) : (
+                <article
+                  className={[
+                    "prose prose-sm max-w-none",
+                    "prose-headings:tracking-tight prose-headings:font-semibold",
+                    "prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2",
+                    "prose-h3:text-medium prose-h3:mt-4",
+                    "prose-p:leading-relaxed prose-p:text-foreground",
+                    "prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5",
+                    "prose-strong:font-semibold",
+                    "prose-code:text-tiny prose-code:bg-default-100 prose-code:rounded prose-code:px-1",
+                  ].join(" ")}
+                >
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{finalBody}</ReactMarkdown>
+                </article>
+              )
             ) : isWriting ? (
               <div className="space-y-3">
                 <p className="text-tiny text-default-500 mb-4 flex items-center gap-2">
@@ -134,7 +178,7 @@ export function DocMockup({
             ) : (
               <div className="space-y-3">
                 <p className="text-small text-default-500 italic">
-                  {brief || "等待 agent 開始撰寫策略文件…"}
+                  {brief || "等待 agent 開始填寫…"}
                 </p>
                 <Skeleton className="h-3 w-[88%] rounded opacity-50" />
                 <Skeleton className="h-3 w-[72%] rounded opacity-50" />
@@ -143,12 +187,35 @@ export function DocMockup({
             )}
           </div>
         </ScrollShadow>
-      </div>
 
-      {/* Footer hint */}
-      <p className="text-tiny text-default-400 text-center mt-3">
-        策略文件即時填入 · 完成後可在右側 ✓ 滿意 解鎖下一步
-      </p>
+        {/* ── Inline action bar — always visible when step is drafted ── */}
+        {canAct && !isDone && (onConfirm || onRedo) && (
+          <div className="px-5 py-4 border-t border-divider bg-default-50 flex items-center gap-2">
+            {onConfirm && (
+              <Button
+                color="success" size="md" radius="lg"
+                className="flex-1 font-semibold"
+                isLoading={isMutating}
+                isDisabled={isMutating}
+                startContent={!isMutating && <FontAwesomeIcon icon={faCheckCircle} />}
+                onPress={() => onConfirm(isEditing ? editedBody : (body ?? ""))}
+              >
+                ✓ 確認，下一步
+              </Button>
+            )}
+            {onRedo && (
+              <Button
+                variant="bordered" size="md" radius="lg"
+                isDisabled={isMutating}
+                startContent={<FontAwesomeIcon icon={faRotateRight} />}
+                onPress={onRedo}
+              >
+                重做
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
