@@ -3117,7 +3117,7 @@ function PostsDrawer({ item, scope, onBack }: { item: RailItem; scope: any; onBa
         ))}
 
         <DrawerEmpty
-          icon={faFileLines}
+          icon={faNewspaper}
           headline="連結更多貼文紀錄"
           sub="完成的 Mission 產出會自動歸檔至此。也可授權平台 OAuth 匯入現有貼文。"
           cta="從範本建立貼文"
@@ -3137,7 +3137,7 @@ function AssetsDrawer({ item, scope, onBack }: { item: RailItem; scope: any; onB
     { id: 3, name: "產品介紹影片 15s",      type: "video", size: "8.4 MB", used: 3 },
     { id: 4, name: "品牌色票 brandkit.json",type: "json",  size: "4 KB",  used: 0 },
   ];
-  const typeIcon = (t: string) => t === "video" ? faVideo : t === "json" ? faFileLines : faImage;
+  const typeIcon = (t: string) => t === "video" ? faVideo : t === "json" ? faNewspaper : faImage;
 
   return (
     <DrawerShell icon={item.icon} categoryLabel="素材庫" title={meta.title} onBack={onBack}>
@@ -3312,7 +3312,7 @@ function BrandDrawer({ scope, onBackToTemplates }: { scope: any; onBackToTemplat
   const brand = brands.find((b: any) => b.id === scope.brandId);
 
   const BRAND_SECTIONS = [
-    { key: "voice",   label: "品牌語氣", icon: faFileLines,
+    { key: "voice",   label: "品牌語氣", icon: faNewspaper,
       value: brand?.positioning?.brandVoice ?? brand?.positioning?.voice ?? "尚未設定" },
     { key: "colors",  label: "品牌色票", icon: faPalette,
       value: brand?.positioning?.primaryColor ? `主色：${brand.positioning.primaryColor}` : "尚未設定" },
