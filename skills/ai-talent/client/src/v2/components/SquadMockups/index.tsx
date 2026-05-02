@@ -13,6 +13,9 @@ import { CalendarGridMockup, type CalendarEntry } from "./calendar";
 import { FBPostBriefMockup, type PostBrief } from "./brief";
 import { FBCarouselMockup, type CarouselDeck, type CarouselSlide } from "./carousel";
 import { FBReelsMockup, type ReelsScript, type ReelsShot } from "./reels";
+import { IGPostBriefMockup, type IGPostData, type IGPostBrief } from "./ig-post";
+import { IGStoryMockup, type IGStorySeries, type IGStorySlide, type StorySticker, type StickerKind } from "./ig-story";
+import { IGReelsMockup, type IGReelsScript } from "./ig-reels";
 import { QAReportMockup, type QAReport } from "./qa";
 import { ResearchPanelMockup, type ResearchData } from "./research";
 
@@ -23,6 +26,9 @@ export { CalendarGridMockup, type CalendarEntry } from "./calendar";
 export { FBPostBriefMockup, type PostBrief } from "./brief";
 export { FBCarouselMockup, type CarouselDeck, type CarouselSlide } from "./carousel";
 export { FBReelsMockup, type ReelsScript, type ReelsShot } from "./reels";
+export { IGPostBriefMockup, type IGPostData, type IGPostBrief } from "./ig-post";
+export { IGStoryMockup, type IGStorySeries, type IGStorySlide, type StorySticker, type StickerKind } from "./ig-story";
+export { IGReelsMockup, type IGReelsScript } from "./ig-reels";
 export { QAReportMockup, type QAReport } from "./qa";
 export { ResearchPanelMockup, type ResearchData } from "./research";
 
@@ -68,10 +74,11 @@ export function SquadMockup({ variant, data, readOnly, isActive, onChange, onSub
     case "FBReelsMockup":
       return <FBReelsMockup data={data as ReelsScript} readOnly={readOnly} isActive={isActive} onChange={onChange as any} />;
     case "IGPostBriefMockup":
+      return <IGPostBriefMockup data={data as IGPostData} readOnly={readOnly} isActive={isActive} onChange={onChange as any} />;
     case "IGStoryMockup":
+      return <IGStoryMockup data={data as IGStorySeries} readOnly={readOnly} isActive={isActive} onChange={onChange as any} />;
     case "IGReelsMockup":
-      // IG mockups built next sprint — fall through to empty state for now
-      return <EmptyStateForVariant variant={variant} isActive={isActive} />;
+      return <IGReelsMockup data={data as IGReelsScript} readOnly={readOnly} isActive={isActive} onChange={onChange as any} />;
     case "QAReportMockup":
       return <QAReportMockup data={data as QAReport} readOnly={readOnly} isActive={isActive} />;
     case "ResearchPanelMockup":

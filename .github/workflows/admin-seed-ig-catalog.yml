@@ -1,0 +1,48 @@
+name: Admin — seed IG catalog (squads + categories + tasks + heroes)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          envs: GH_TOKEN
+          script: |
+            set +e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
+            set -a; [ -f "$AI/.env" ] && . "$AI/.env"; set +a
+
+            echo "===== 1. Seed IG catalog (squad + categories + tasks) ====="
+            npx tsx scripts/seed-ig-catalog.ts
+
+            echo ""
+            echo "===== 2. Generate hero image for IG monthly-calendar squad ====="
+            timeout 300 npx tsx scripts/generate-squad-hero-images.ts \
+              --slugs=ig-monthly-calendar-pulizzi \
+              2>&1 | tail -20
+
+            echo ""
+            echo "===== 3. Final state ====="
+            MYSQL_PWD="$DB_PASSWORD" mysql -h"${DB_HOST:-127.0.0.1}" -u"${DB_USER:-root}" "${DB_NAME:-mos_db}" -t -e "
+              SELECT t.id, t.slug, t.status, t.impl_kind,
+                     IFNULL(t.squad_id, '') AS sq, IFNULL(t.agent_id, '') AS ag,
+                     t.estimated_minutes
+                FROM task_catalog t
+               WHERE t.workspace = 'instagram'
+               ORDER BY t.status, t.id;
+            "
