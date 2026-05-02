@@ -11,14 +11,18 @@ import { IntakeFormMockup, type IntakeFormData } from "./intake";
 import { PillarTableMockup, type PillarRow } from "./pillar";
 import { CalendarGridMockup, type CalendarEntry } from "./calendar";
 import { FBPostBriefMockup, type PostBrief } from "./brief";
+import { FBCarouselMockup, type CarouselDeck, type CarouselSlide } from "./carousel";
+import { FBReelsMockup, type ReelsScript, type ReelsShot } from "./reels";
 import { QAReportMockup, type QAReport } from "./qa";
 import { ResearchPanelMockup, type ResearchData } from "./research";
 
-export { type SquadMockupVariant } from "./shared";
+export { type SquadMockupVariant, type MockupCategory, VARIANT_CATEGORY } from "./shared";
 export { IntakeFormMockup, type IntakeFormData } from "./intake";
 export { PillarTableMockup, type PillarRow } from "./pillar";
 export { CalendarGridMockup, type CalendarEntry } from "./calendar";
 export { FBPostBriefMockup, type PostBrief } from "./brief";
+export { FBCarouselMockup, type CarouselDeck, type CarouselSlide } from "./carousel";
+export { FBReelsMockup, type ReelsScript, type ReelsShot } from "./reels";
 export { QAReportMockup, type QAReport } from "./qa";
 export { ResearchPanelMockup, type ResearchData } from "./research";
 
@@ -59,6 +63,15 @@ export function SquadMockup({ variant, data, readOnly, isActive, onChange, onSub
       return <CalendarGridMockup data={data} readOnly={readOnly} isActive={isActive} />;
     case "FBPostBriefMockup":
       return <FBPostBriefMockup data={data as { briefs: PostBrief[] }} readOnly={readOnly} isActive={isActive} onChange={onChange as any} />;
+    case "FBCarouselMockup":
+      return <FBCarouselMockup data={data as CarouselDeck} readOnly={readOnly} isActive={isActive} onChange={onChange as any} />;
+    case "FBReelsMockup":
+      return <FBReelsMockup data={data as ReelsScript} readOnly={readOnly} isActive={isActive} onChange={onChange as any} />;
+    case "IGPostBriefMockup":
+    case "IGStoryMockup":
+    case "IGReelsMockup":
+      // IG mockups built next sprint — fall through to empty state for now
+      return <EmptyStateForVariant variant={variant} isActive={isActive} />;
     case "QAReportMockup":
       return <QAReportMockup data={data as QAReport} readOnly={readOnly} isActive={isActive} />;
     case "ResearchPanelMockup":

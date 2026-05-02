@@ -49,7 +49,46 @@ const taskShape = z.object({
 });
 
 export const taskCatalogRouter = router({
-  /** Picker front-door — only active tasks, optionally filtered by workspace. */
+  /**
+   * Picker front-door — categories with their methods nested. CJ direction
+   * 2026-05-02: each deliverable kind is a category, multiple methods can
+   * sit under it. UI shows category cards first, drills into method choice.
+   */
+  listCategoriesForPicker: protectedProcedure
+    .input(z.object({ workspace: z.string().optional() }).optional())
+    .query(async ({ input }) => {
+      const wsFilter = input?.workspace ? "AND c.workspace = ?" : "";
+      const params: any[] = input?.workspace ? [input.workspace] : [];
+      const cats = await rowsAll<any>(
+        `SELECT c.id, c.slug, c.name_zh, c.name_en, c.description,
+                c.workspace, c.category_kind, c.default_mockup,
+                c.search_keywords, c.is_open_for_methods
+           FROM task_category c
+          WHERE c.status = 'active' ${wsFilter}
+          ORDER BY c.workspace ASC, c.category_kind ASC, c.name_zh ASC`,
+        params,
+      );
+      // Nested methods for each category
+      const out: any[] = [];
+      for (const c of cats) {
+        const methods = await rowsAll<any>(
+          `SELECT t.id, t.slug, t.name_zh, t.methodology_label,
+                  t.impl_kind, t.squad_id, s.slug AS squad_slug, s.name AS squad_name,
+                  t.agent_id, a.name AS agent_name, a.avatarUrl AS agent_avatar,
+                  t.bypassable, t.estimated_minutes
+             FROM task_catalog t
+        LEFT JOIN squads s ON s.id = t.squad_id
+        LEFT JOIN agents a ON a.id = t.agent_id
+            WHERE t.category_id = ? AND t.status = 'active'
+            ORDER BY t.id`,
+          [c.id],
+        );
+        out.push({ ...c, methods });
+      }
+      return out;
+    }),
+
+  /** Picker front-door (flat) — only active tasks, optionally filtered by workspace. */
   listForPicker: protectedProcedure
     .input(z.object({
       workspace: z.string().optional(),

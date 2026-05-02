@@ -14,7 +14,44 @@ export type SquadMockupVariant =
   | "PillarTableMockup"
   | "CalendarGridMockup"
   | "FBPostBriefMockup"
+  | "FBCarouselMockup"      // NEW (CJ 2026-05-02) — multi-slide deck preview
+  | "FBReelsMockup"         // NEW (CJ 2026-05-02) — 9:16 video script with hook/hold/payoff timeline
+  // IG variants — built next sprint
+  | "IGPostBriefMockup"
+  | "IGStoryMockup"
+  | "IGReelsMockup"
   | "QAReportMockup";
+
+/**
+ * Mockup category — broader bucket for picker UX. Multiple variants can
+ * share a category (e.g. FBPostBrief + FBCarousel + FBReels are all
+ * "post-preview" variants of FB content). Picker filters / theming use
+ * this when the specific variant doesn't matter.
+ */
+export type MockupCategory =
+  | "intake"
+  | "research"
+  | "strategy"        // pillars / positioning matrices
+  | "calendar"
+  | "post-preview"    // FB / IG single post / carousel / reel
+  | "video-script"    // Reels / TikTok storyboards
+  | "story-preview"   // 9:16 IG/FB story
+  | "analytics"
+  | "qa";
+
+export const VARIANT_CATEGORY: Record<SquadMockupVariant, MockupCategory> = {
+  IntakeFormMockup:    "intake",
+  ResearchPanelMockup: "research",
+  PillarTableMockup:   "strategy",
+  CalendarGridMockup:  "calendar",
+  FBPostBriefMockup:   "post-preview",
+  FBCarouselMockup:    "post-preview",
+  FBReelsMockup:       "video-script",
+  IGPostBriefMockup:   "post-preview",
+  IGStoryMockup:       "story-preview",
+  IGReelsMockup:       "video-script",
+  QAReportMockup:      "qa",
+};
 
 /** Shared props — every squad mockup may receive these. */
 export interface SquadMockupCommonProps {

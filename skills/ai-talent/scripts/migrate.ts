@@ -1027,6 +1027,56 @@ async function main() {
     `);
     console.log("[migrate] task_catalog: created (or already existed)");
 
+    // ── task_category (CJ direction 2026-05-02) ────────────────────────────
+    // Groups task_catalog rows by deliverable type. Lets multiple
+    // methodologies coexist for the same outcome, e.g.
+    //   category "FB 月行事曆" — methods:
+    //     - Joe Pulizzi 內容支柱法 (task_catalog row 1)
+    //     - GaryVee Jab Hook 法    (task_catalog row N)
+    //     - Latane Conant 法       (task_catalog row N+1)
+    // Picker shows categories first; user picks methodology after.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS task_category (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        slug            VARCHAR(120) NOT NULL UNIQUE,
+        name_zh         VARCHAR(255) NOT NULL,
+        name_en         VARCHAR(255) NULL,
+        description     TEXT         NOT NULL,
+        workspace       VARCHAR(50)  NOT NULL,
+        category_kind   VARCHAR(50)  NOT NULL,
+        default_mockup  VARCHAR(80)  NULL,
+        search_keywords TEXT         NULL,
+        status          ENUM('active','coming_soon','archived') NOT NULL DEFAULT 'active',
+        is_open_for_methods BOOLEAN  NOT NULL DEFAULT TRUE,
+        created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_workspace_status (workspace, status),
+        KEY idx_category_kind (category_kind)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] task_category: created (or already existed)");
+
+    // Add category_id + methodology_label to task_catalog (idempotent)
+    const [tcCols] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'task_catalog'
+         AND COLUMN_NAME IN ('category_id', 'methodology_label')
+    `) as any;
+    const haveCols = new Set((tcCols as any[]).map((r) => r.COLUMN_NAME));
+    if (!haveCols.has("category_id")) {
+      await conn.execute(`ALTER TABLE task_catalog ADD COLUMN category_id INT NULL,
+                                                   ADD KEY idx_category_id (category_id)`);
+      console.log("[migrate] task_catalog.category_id: added");
+    } else {
+      console.log("[migrate] task_catalog.category_id: already exists, skipped");
+    }
+    if (!haveCols.has("methodology_label")) {
+      await conn.execute(`ALTER TABLE task_catalog ADD COLUMN methodology_label VARCHAR(255) NULL`);
+      console.log("[migrate] task_catalog.methodology_label: added");
+    } else {
+      console.log("[migrate] task_catalog.methodology_label: already exists, skipped");
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
