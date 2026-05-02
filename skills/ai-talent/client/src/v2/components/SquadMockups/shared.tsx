@@ -9,48 +9,93 @@ import React from "react";
 import { Card, CardBody, Chip } from "@heroui/react";
 
 export type SquadMockupVariant =
+  // ── Universal ─────────────────────────────────────────────────────────────
   | "IntakeFormMockup"
-  | "ResearchPanelMockup"   // existing — uses ThinkingOverlay + SourceViewer
+  | "ResearchPanelMockup"
   | "PillarTableMockup"
   | "CalendarGridMockup"
+  | "QAReportMockup"
+  // ── Facebook ──────────────────────────────────────────────────────────────
   | "FBPostBriefMockup"
-  | "FBCarouselMockup"      // NEW (CJ 2026-05-02) — multi-slide deck preview
-  | "FBReelsMockup"         // NEW (CJ 2026-05-02) — 9:16 video script with hook/hold/payoff timeline
-  // IG variants — built next sprint
+  | "FBCarouselMockup"
+  | "FBReelsMockup"
+  // ── Instagram ─────────────────────────────────────────────────────────────
   | "IGPostBriefMockup"
   | "IGStoryMockup"
   | "IGReelsMockup"
-  | "QAReportMockup";
+  // ── LinkedIn ──────────────────────────────────────────────────────────────
+  | "LIFeedMockup"
+  | "LIArticleMockup"
+  | "LINewsletterMockup"
+  | "LIPollMockup"
+  | "LIDocumentMockup"
+  | "LINativeVideoMockup"
+  | "LIAdMockup"
+  | "LIEventMockup"
+  // ── YouTube ───────────────────────────────────────────────────────────────
+  | "YTVideoMockup"
+  | "YTShortsMockup"
+  | "YTCommunityMockup"
+  | "YTPremiereMockup"
+  | "YTLiveMockup"
+  // ── TikTok ────────────────────────────────────────────────────────────────
+  | "TTForYouMockup"
+  | "TTCarouselMockup"
+  | "TTLiveMockup";
 
 /**
- * Mockup category — broader bucket for picker UX. Multiple variants can
- * share a category (e.g. FBPostBrief + FBCarousel + FBReels are all
- * "post-preview" variants of FB content). Picker filters / theming use
- * this when the specific variant doesn't matter.
+ * Mockup category — broader bucket for picker UX / theming.
  */
 export type MockupCategory =
   | "intake"
   | "research"
   | "strategy"        // pillars / positioning matrices
   | "calendar"
-  | "post-preview"    // FB / IG single post / carousel / reel
-  | "video-script"    // Reels / TikTok storyboards
-  | "story-preview"   // 9:16 IG/FB story
+  | "post-preview"    // single post / carousel (FB/IG/LI)
+  | "video-script"    // Reels / Shorts / TikTok storyboards
+  | "story-preview"   // 9:16 story formats
+  | "article"         // long-form (LI Article, Blog)
+  | "newsletter"      // newsletter issues
+  | "ad"              // paid / sponsored content
+  | "event"           // event promotions
+  | "live"            // live stream run-of-show
   | "analytics"
   | "qa";
 
 export const VARIANT_CATEGORY: Record<SquadMockupVariant, MockupCategory> = {
+  // Universal
   IntakeFormMockup:    "intake",
   ResearchPanelMockup: "research",
   PillarTableMockup:   "strategy",
   CalendarGridMockup:  "calendar",
+  QAReportMockup:      "qa",
+  // Facebook
   FBPostBriefMockup:   "post-preview",
   FBCarouselMockup:    "post-preview",
   FBReelsMockup:       "video-script",
+  // Instagram
   IGPostBriefMockup:   "post-preview",
   IGStoryMockup:       "story-preview",
   IGReelsMockup:       "video-script",
-  QAReportMockup:      "qa",
+  // LinkedIn
+  LIFeedMockup:        "post-preview",
+  LIArticleMockup:     "article",
+  LINewsletterMockup:  "newsletter",
+  LIPollMockup:        "post-preview",
+  LIDocumentMockup:    "post-preview",
+  LINativeVideoMockup: "video-script",
+  LIAdMockup:          "ad",
+  LIEventMockup:       "event",
+  // YouTube
+  YTVideoMockup:       "video-script",
+  YTShortsMockup:      "video-script",
+  YTCommunityMockup:   "post-preview",
+  YTPremiereMockup:    "event",
+  YTLiveMockup:        "live",
+  // TikTok
+  TTForYouMockup:      "video-script",
+  TTCarouselMockup:    "post-preview",
+  TTLiveMockup:        "live",
 };
 
 /** Shared props — every squad mockup may receive these. */

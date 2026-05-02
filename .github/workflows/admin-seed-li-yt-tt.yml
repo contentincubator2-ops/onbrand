@@ -1,0 +1,57 @@
+name: Admin — seed LinkedIn / YouTube / TikTok catalogs
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Which platforms to seed (comma-separated: linkedin,youtube,tiktok)"
+        required: false
+        default: "linkedin,youtube,tiktok"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          envs: GH_TOKEN
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main 2>&1 | tail -3
+            git reset --hard origin/main 2>&1 | tail -3
+            cd "$AI"
+            set -a; [ -f "$AI/.env" ] && . "$AI/.env"; set +a
+
+            PLATFORMS="${{ github.event.inputs.platforms }}"
+
+            if echo "$PLATFORMS" | grep -q "linkedin"; then
+              echo "===== Seeding LinkedIn ====="
+              timeout 120 npx tsx scripts/seed-linkedin-catalog.ts 2>&1
+            fi
+
+            if echo "$PLATFORMS" | grep -q "youtube"; then
+              echo ""
+              echo "===== Seeding YouTube ====="
+              timeout 120 npx tsx scripts/seed-youtube-catalog.ts 2>&1
+            fi
+
+            if echo "$PLATFORMS" | grep -q "tiktok"; then
+              echo ""
+              echo "===== Seeding TikTok ====="
+              timeout 120 npx tsx scripts/seed-tiktok-catalog.ts 2>&1
+            fi
+
+            echo ""
+            echo "===== Coverage check ====="
+            timeout 120 npx tsx scripts/audit-coverage-report.ts 2>&1 | tail -20
+            cat /tmp/coverage-report.md 2>/dev/null | head -60

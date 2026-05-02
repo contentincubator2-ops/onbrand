@@ -18,6 +18,21 @@ import { IGStoryMockup, type IGStorySeries, type IGStorySlide, type StorySticker
 import { IGReelsMockup, type IGReelsScript } from "./ig-reels";
 import { QAReportMockup, type QAReport } from "./qa";
 import { ResearchPanelMockup, type ResearchData } from "./research";
+import {
+  LIFeedMockup, LIArticleMockup, LINewsletterMockup, LIPollMockup,
+  LIDocumentMockup, LINativeVideoMockup, LIAdMockup, LIEventMockup,
+  type LIPostData, type LIArticleData, type LINewsletterData, type LIPollData,
+  type LIDocumentData, type LINativeVideoData, type LIAdData, type LIEventData,
+} from "./linkedin";
+import {
+  YTVideoMockup, YTShortsMockup, YTCommunityMockup, YTPremiereMockup, YTLiveMockup,
+  type YTVideoScript, type YTShortsScript, type YTCommunityData,
+  type YTPremiereData, type YTLiveData,
+} from "./youtube";
+import {
+  TTForYouMockup, TTCarouselMockup, TTLiveMockup,
+  type TTVideoScript, type TTCarouselData, type TTLiveData,
+} from "./tiktok";
 
 export { type SquadMockupVariant, type MockupCategory, VARIANT_CATEGORY } from "./shared";
 export { IntakeFormMockup, type IntakeFormData } from "./intake";
@@ -31,6 +46,21 @@ export { IGStoryMockup, type IGStorySeries, type IGStorySlide, type StorySticker
 export { IGReelsMockup, type IGReelsScript } from "./ig-reels";
 export { QAReportMockup, type QAReport } from "./qa";
 export { ResearchPanelMockup, type ResearchData } from "./research";
+export {
+  LIFeedMockup, LIArticleMockup, LINewsletterMockup, LIPollMockup,
+  LIDocumentMockup, LINativeVideoMockup, LIAdMockup, LIEventMockup,
+  type LIPostData, type LIArticleData, type LINewsletterData, type LIPollData,
+  type LIDocumentData, type LINativeVideoData, type LIAdData, type LIEventData,
+} from "./linkedin";
+export {
+  YTVideoMockup, YTShortsMockup, YTCommunityMockup, YTPremiereMockup, YTLiveMockup,
+  type YTVideoScript, type YTShortsScript, type YTCommunityData,
+  type YTPremiereData, type YTLiveData,
+} from "./youtube";
+export {
+  TTForYouMockup, TTCarouselMockup, TTLiveMockup,
+  type TTVideoScript, type TTCarouselData, type TTLiveData,
+} from "./tiktok";
 
 export interface SquadMockupProps {
   variant: SquadMockupVariant;
@@ -83,6 +113,41 @@ export function SquadMockup({ variant, data, readOnly, isActive, onChange, onSub
       return <QAReportMockup data={data as QAReport} readOnly={readOnly} isActive={isActive} />;
     case "ResearchPanelMockup":
       return <ResearchPanelMockup data={data as ResearchData} readOnly={readOnly} isActive={isActive} />;
+    // ── LinkedIn ────────────────────────────────────────────────────────────
+    case "LIFeedMockup":
+      return <LIFeedMockup data={data as LIPostData} readOnly={readOnly} isActive={isActive} />;
+    case "LIArticleMockup":
+      return <LIArticleMockup data={data as LIArticleData} readOnly={readOnly} isActive={isActive} />;
+    case "LINewsletterMockup":
+      return <LINewsletterMockup data={data as LINewsletterData} readOnly={readOnly} isActive={isActive} />;
+    case "LIPollMockup":
+      return <LIPollMockup data={data as LIPollData} readOnly={readOnly} isActive={isActive} />;
+    case "LIDocumentMockup":
+      return <LIDocumentMockup data={data as LIDocumentData} readOnly={readOnly} isActive={isActive} />;
+    case "LINativeVideoMockup":
+      return <LINativeVideoMockup data={data as LINativeVideoData} readOnly={readOnly} isActive={isActive} />;
+    case "LIAdMockup":
+      return <LIAdMockup data={data as LIAdData} readOnly={readOnly} isActive={isActive} />;
+    case "LIEventMockup":
+      return <LIEventMockup data={data as LIEventData} readOnly={readOnly} isActive={isActive} />;
+    // ── YouTube ─────────────────────────────────────────────────────────────
+    case "YTVideoMockup":
+      return <YTVideoMockup data={data as YTVideoScript} readOnly={readOnly} isActive={isActive} />;
+    case "YTShortsMockup":
+      return <YTShortsMockup data={data as YTShortsScript} readOnly={readOnly} isActive={isActive} />;
+    case "YTCommunityMockup":
+      return <YTCommunityMockup data={data as YTCommunityData} readOnly={readOnly} isActive={isActive} />;
+    case "YTPremiereMockup":
+      return <YTPremiereMockup data={data as YTPremiereData} readOnly={readOnly} isActive={isActive} />;
+    case "YTLiveMockup":
+      return <YTLiveMockup data={data as YTLiveData} readOnly={readOnly} isActive={isActive} />;
+    // ── TikTok ──────────────────────────────────────────────────────────────
+    case "TTForYouMockup":
+      return <TTForYouMockup data={data as TTVideoScript} readOnly={readOnly} isActive={isActive} />;
+    case "TTCarouselMockup":
+      return <TTCarouselMockup data={data as TTCarouselData} readOnly={readOnly} isActive={isActive} />;
+    case "TTLiveMockup":
+      return <TTLiveMockup data={data as TTLiveData} readOnly={readOnly} isActive={isActive} />;
     default:
       // Exhaustive switch — TypeScript will flag missing variants
       const _exhaustive: never = variant;
