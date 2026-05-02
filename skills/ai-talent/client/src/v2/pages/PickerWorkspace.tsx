@@ -29,6 +29,7 @@ import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMoc
 import { searchAndRankSquads } from "../lib/searchSquads";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
+import { CalendarGridMockup } from "../components/SquadMockups/calendar";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { TaskChip } from "../components/TaskChip";
 import { AgentAvatar } from "../components/AgentAvatar";
@@ -1599,6 +1600,24 @@ function SquadDetailPanel({
     [mockupVariant.platform],
   );
 
+  // ── Detect primary output type from squad steps ───────────────────────
+  // If the squad's final meaningful step is a calendar/report/pillar table,
+  // show that mockup in the center instead of a single-post PlatformMockup.
+  // Priority: check last non-QA step's mockupVariant first.
+  const primaryOutputKind: "calendar" | "pillar" | "research" | "qa" | "post" = useMemo(() => {
+    const allVariants: string[] = stepsArr
+      .map((s: any) => s.mockupVariant ?? "")
+      .filter(Boolean);
+    if (allVariants.some((v: string) => v.includes("Calendar"))) return "calendar";
+    if (allVariants.some((v: string) => v.includes("Pillar")))   return "pillar";
+    if (allVariants.some((v: string) => v.includes("Research"))) return "research";
+    if (allVariants.every((v: string) => v.includes("QA") || v.includes("Intake"))) return "qa";
+    return "post";
+  }, [stepsArr]);
+
+  // Left-panel tab state (Canva-style: 詳情 / 方法論)
+  const [detailTab, setDetailTab] = useState<"detail" | "method">("detail");
+
   // Currently expanded agent card (Modal). null when closed.
   const [activeStepIdx, setActiveStepIdx] = useState<number | null>(null);
 
@@ -1617,108 +1636,201 @@ function SquadDetailPanel({
   return (
     <div className="h-full grid grid-cols-1 lg:grid-cols-[300px_1fr_360px] divide-x divide-divider">
 
-      {/* ─── LEFT: BRIEF ─────────────────────────────────────────────── */}
-      <aside className="overflow-y-auto px-5 py-5 space-y-4 bg-content1">
-        <Breadcrumbs size="sm">
-          <BreadcrumbItem>挑選方法論</BreadcrumbItem>
-          <BreadcrumbItem>{name}</BreadcrumbItem>
-        </Breadcrumbs>
+      {/* ─── LEFT: CANVA-STYLE DETAILS PANEL ────────────────────────── */}
+      <aside className="flex flex-col h-full bg-content1 overflow-hidden">
 
-        <div className="flex flex-wrap gap-1.5">
-          <Chip
-            size="sm" variant="flat"
-            startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}
-            style={{ background: `${tone.bg}1A`, color: tone.bg }}
+        {/* ── Top: back + squad identity ──────────────────────────────── */}
+        <div className="shrink-0 px-4 pt-4 pb-3 border-b border-divider space-y-3">
+          {/* Back to all methodologies — clear, always visible */}
+          <button
+            className="flex items-center gap-1.5 text-tiny text-default-500 hover:text-foreground transition group"
+            onClick={() => window.history.back()}
           >
-            {lk} · {tone.label}
-          </Chip>
-          {wsMeta && (
+            <span className="group-hover:-translate-x-0.5 transition-transform">←</span>
+            所有方法論
+          </button>
+
+          {/* Squad name */}
+          <h2 className="font-semibold text-[15px] leading-snug tracking-tight">{name}</h2>
+
+          {/* Platform + layer badges */}
+          <div className="flex flex-wrap gap-1.5">
+            {wsMeta && (
+              <Chip
+                size="sm" variant="flat" color="default"
+                startContent={<FontAwesomeIcon icon={wsMeta.icon} className="text-tiny ml-1" />}
+              >
+                {wsMeta.label}
+              </Chip>
+            )}
             <Chip
-              size="sm" variant="flat" color="default"
-              startContent={<FontAwesomeIcon icon={wsMeta.icon} className="text-tiny ml-1" />}
+              size="sm" variant="flat"
+              style={{ background: `${tone.bg}1A`, color: tone.bg }}
+              startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}
             >
-              {wsMeta.label}
+              {lk}
             </Chip>
-          )}
+            {(author || year) && (
+              <Chip
+                size="sm" variant="flat"
+                startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
+              >
+                {author ?? "—"}{year ? ` · ${year}` : ""}
+              </Chip>
+            )}
+          </div>
+
+          {/* Tab switcher: 詳情 / 方法論 */}
+          <Tabs
+            size="sm" radius="full" variant="solid"
+            selectedKey={detailTab}
+            onSelectionChange={(k) => setDetailTab(k as "detail" | "method")}
+            classNames={{ tabList: "bg-default-100 w-full", tab: "flex-1" }}
+          >
+            <Tab key="detail" title="詳情" />
+            <Tab key="method" title="方法論" />
+          </Tabs>
         </div>
 
-        <div>
-          <h1 className="font-semibold text-xl tracking-tight leading-tight">{name}</h1>
-          {description && (
-            <p className="text-tiny text-default-500 leading-relaxed mt-2 line-clamp-4">
-              {description}
-            </p>
+        {/* ── Scrollable body ─────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {detailTab === "detail" ? (
+            <>
+              {/* 任務名稱 */}
+              <Input
+                label="任務名稱"
+                labelPlacement="outside"
+                variant="bordered" radius="md" size="sm"
+                placeholder="幫這次任務取個名字"
+                value={missionTitle}
+                onValueChange={setMissionTitle}
+                isRequired
+                startContent={<FontAwesomeIcon icon={faBullseye} className="text-tiny text-default-400" />}
+              />
+
+              {/* 目標期間 — 月行事曆才顯示日期欄 */}
+              {primaryOutputKind === "calendar" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date" size="sm" variant="bordered" radius="md"
+                    label="開始日期" labelPlacement="outside"
+                    isReadOnly={!!missionId}
+                  />
+                  <Input
+                    type="date" size="sm" variant="bordered" radius="md"
+                    label="結束日期" labelPlacement="outside"
+                    isReadOnly={!!missionId}
+                  />
+                </div>
+              )}
+
+              {/* 說明 / 重點 */}
+              <Textarea
+                label="說明 / 重點（可選）"
+                labelPlacement="outside"
+                variant="bordered" radius="md" size="sm"
+                placeholder="這次想做什麼、給誰、為什麼？"
+                minRows={3} maxRows={6}
+                value={missionBrief}
+                onValueChange={setMissionBrief}
+              />
+
+              <Divider />
+
+              {/* 品牌 / 產品 / 活動 context */}
+              <div className="space-y-2">
+                <p className="text-tiny font-medium text-default-500 uppercase tracking-wider">
+                  內容來源
+                </p>
+                {brandName ? (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl border border-divider bg-default-50">
+                    <div className="w-8 h-8 rounded-full bg-default-200 flex items-center justify-center shrink-0">
+                      <FontAwesomeIcon icon={faBrain} className="text-default-500 text-sm" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-small font-semibold truncate">{brandName}</p>
+                      <p className="text-tiny text-default-400">品牌資料已自動帶入</p>
+                    </div>
+                    <Chip size="sm" color="success" variant="flat" className="shrink-0">已連結</Chip>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl border border-dashed border-default-300">
+                    <FontAwesomeIcon icon={faBrain} className="text-default-300" />
+                    <p className="text-tiny text-default-400">請先在上方選擇品牌 / 產品 / 活動</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 成員預覽 */}
+              {members.length > 0 && (
+                <>
+                  <Divider />
+                  <div className="space-y-2">
+                    <p className="text-tiny font-medium text-default-500 uppercase tracking-wider">
+                      小組成員
+                    </p>
+                    <div className="space-y-1.5">
+                      {members.slice(0, 5).map((m: any, i: number) => (
+                        <div key={m.id ?? i} className="flex items-center gap-2">
+                          <AgentAvatar seed={m.id ?? m.name ?? `m${i}`} size={24} className="rounded-full shrink-0" />
+                          <span className="text-small text-default-700 truncate">{m.name ?? "—"}</span>
+                          <span className="text-tiny text-default-400 ml-auto shrink-0">{m.role ?? ""}</span>
+                        </div>
+                      ))}
+                      {members.length > 5 && (
+                        <p className="text-tiny text-default-400">+{members.length - 5} 位成員</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            /* ── 方法論 tab ───────────────────────────────────────── */
+            <>
+              {description && (
+                <div className="space-y-1">
+                  <p className="text-tiny font-medium text-default-500 uppercase tracking-wider">說明</p>
+                  <p className="text-small text-default-700 leading-relaxed">{description}</p>
+                </div>
+              )}
+              <Divider />
+              <div className="space-y-2">
+                <p className="text-tiny font-medium text-default-500 uppercase tracking-wider">
+                  {steps.length} 個步驟
+                </p>
+                {steps.map((s: any, i: number) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-default-100 text-default-500 flex items-center justify-center text-[10px] shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-small font-medium text-default-700 leading-snug">
+                        {s.name ?? s.title ?? `Step ${i + 1}`}
+                      </p>
+                      {s.assignedAgentName && (
+                        <p className="text-tiny text-default-400 mt-0.5">{s.assignedAgentName}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
-
-        {(author || year) && (
-          <Chip
-            size="sm" variant="flat"
-            startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}
-          >
-            {author ?? "—"}{year ? ` · ${year}` : ""}
-          </Chip>
-        )}
-
-        <Divider />
-
-        <p className="text-tiny tracking-wider uppercase text-default-500 font-medium flex items-center gap-1.5">
-          <FontAwesomeIcon icon={faPenToSquare} /> BRIEF
-        </p>
-
-        <Input
-          label="任務標題"
-          labelPlacement="outside"
-          variant="bordered" radius="md" size="sm"
-          placeholder="幫這個任務取個名字"
-          value={missionTitle}
-          onValueChange={setMissionTitle}
-          isRequired
-          startContent={<FontAwesomeIcon icon={faBullseye} className="text-tiny text-default-400" />}
-        />
-
-        <Textarea
-          label="說明 / 重點"
-          labelPlacement="outside"
-          variant="bordered" radius="md"
-          placeholder="這次想做什麼、給誰、為什麼？（可選）"
-          minRows={4} maxRows={8}
-          value={missionBrief}
-          onValueChange={setMissionBrief}
-        />
-
-        {brandName && (
-          <Chip
-            size="md" variant="flat" color="default" radius="md"
-            className="w-full h-auto py-1.5 px-2"
-            startContent={<FontAwesomeIcon icon={faBrain} className="ml-1" />}
-            classNames={{ content: "flex items-center gap-1.5" }}
-          >
-            <span className="font-medium">{brandName}</span>
-            <span className="text-tiny text-default-500">brand brain 自動帶入</span>
-          </Chip>
-        )}
-
-        <Button
-          color="primary" size="lg" radius="lg"
-          className="w-full font-medium"
-          isLoading={busy}
-          isDisabled={!missionTitle.trim() && !seedTitleHint(squad, lang)}
-          onPress={onLaunch}
-          startContent={!busy && <FontAwesomeIcon icon={faRocket} />}
-        >
-          {busy ? "啟動中…" : `派出小組（${steps.length} 個步驟）`}
-        </Button>
 
         {error && (
-          <Alert color="danger" variant="flat" title={error} />
+          <div className="px-4 pb-2 shrink-0">
+            <Alert color="danger" variant="flat" title={error} />
+          </div>
         )}
       </aside>
 
       {/* ─── MIDDLE: PREVIEW ─────────────────────────────────────────── */}
       <section className="overflow-y-auto bg-default-50 flex flex-col">
-        {/* Variant switcher — only when platform has 2+ variants */}
-        {platformVariants.length > 1 && (
+        {/* Variant switcher — only for single-post squads with 2+ variants.
+            Hidden for calendar / pillar / research output squads. */}
+        {primaryOutputKind === "post" && platformVariants.length > 1 && (
           <div className="sticky top-0 z-10 bg-default-50/90 backdrop-blur-sm border-b border-divider px-4 py-2 flex items-center justify-between gap-2">
             <Tabs
               size="sm" radius="full" variant="solid" color="default"
@@ -1744,8 +1856,51 @@ function SquadDetailPanel({
             )}
           </div>
         )}
+
+        {/* Output label strip for non-post squads */}
+        {primaryOutputKind !== "post" && (
+          <div className="sticky top-0 z-10 bg-default-50/90 backdrop-blur-sm border-b border-divider px-4 py-2">
+            <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider text-default-500">
+              {primaryOutputKind === "calendar" ? "📅 月行事曆輸出"
+               : primaryOutputKind === "pillar"   ? "🏛 內容支柱輸出"
+               : primaryOutputKind === "research" ? "🔍 研究報告輸出"
+               : "📋 報告輸出"}
+            </Chip>
+          </div>
+        )}
+
         <div className="flex-1 flex items-start justify-center p-6 lg:p-10">
           {(() => {
+            // ── Calendar squad: always show CalendarGridMockup ────────
+            if (primaryOutputKind === "calendar") {
+              // Post-launch: try to parse calendar data from confirmed steps
+              const calendarStep = stepsArr.find((s: any) =>
+                (s.mockupVariant ?? "").includes("Calendar")
+              );
+              const calStepOrder = calendarStep ? (stepsArr.indexOf(calendarStep) + 1) : null;
+              const calProg = calStepOrder ? progressByOrd.get(calStepOrder) : null;
+              const calOutput = calProg?.agentOutput ?? calProg?.agent_output ?? null;
+
+              // Attempt to parse JSON calendar data from agent output
+              let calData: any = undefined;
+              if (calOutput) {
+                try {
+                  const match = String(calOutput).match(/```(?:json)?\s*([\s\S]*?)```/);
+                  if (match) calData = JSON.parse(match[1]);
+                } catch { /* not JSON — show empty state */ }
+              }
+
+              return (
+                <div className="w-full max-w-2xl">
+                  <CalendarGridMockup
+                    isActive={!!missionId && !calOutput}
+                    readOnly={!missionId}
+                    data={calData}
+                  />
+                </div>
+              );
+            }
+
             // Post-launch: switch middle based on active step kind
             if (missionId && stepsArr[activeStepOrder - 1]) {
               const activeStep = stepsArr[activeStepOrder - 1];
@@ -1765,9 +1920,6 @@ function SquadDetailPanel({
                 );
               }
               // ── Visual step: 3-step MediaGenFlow inline (CJ rule 2026-04-29)
-              // Image / video output MUST go through 設計方向 → AI prompt →
-              // 模型選擇. The agent's text draft becomes the initialBrief; the
-              // squad/agent's preferredModelTags pre-rank the model picker.
               if ((kind === "image" || kind === "video") && prog?.status !== "pending") {
                 const draft: string = (prog?.agentOutput ?? prog?.agent_output ?? "").toString().trim();
                 const tags: string[] =
@@ -1786,26 +1938,18 @@ function SquadDetailPanel({
                       </p>
                     </div>
                     <MediaGenFlow
-                      open
-                      inline
-                      kind={kind}
+                      open inline kind={kind}
                       initialBrief={draft || `${activeStep.name ?? ""}\n${activeStep.description ?? ""}`.trim()}
                       brandContext={brandName ?? undefined}
                       brandId={null}
                       preferredModelTags={tags}
-                      onClose={() => { /* inline mode — close is no-op */ }}
+                      onClose={() => {}}
                       onComplete={async ({ url, modelId, promptEn }) => {
-                        // Persist the generated media URL back onto the step
-                        // as the confirmed output so the next step picks it
-                        // up via the chain context.
                         if (!missionId) return;
                         const payload = `__media_url__: ${url}\n__model__: ${modelId}\n__prompt__: ${promptEn}\n\n${draft}`;
                         await stepExecuteWithScope.mutateAsync({
-                          missionId,
-                          squadSlug: squad.slug,
-                          stepOrder: activeStepOrder,
-                          mode: "run",
-                          userInput: payload,
+                          missionId, squadSlug: squad.slug,
+                          stepOrder: activeStepOrder, mode: "run", userInput: payload,
                         }).catch(() => {});
                         await progressQuery.refetch?.();
                       }}
@@ -1815,6 +1959,8 @@ function SquadDetailPanel({
               }
               // content step: fall through to platform mockup
             }
+
+            // Default: single-post PlatformMockup
             const live = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
             return (
               <PlatformMockup
