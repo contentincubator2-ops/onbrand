@@ -283,11 +283,11 @@ async function main() {
   console.log("1. Upserting LinkedIn categories…");
   for (const c of CATEGORIES) {
     await pool.execute(
-      `INSERT INTO task_category (slug, name_zh, name_en, description, category_kind, default_mockup_variant, search_keywords, workspace, is_open_for_methods)
+      `INSERT INTO task_category (slug, name_zh, name_en, description, category_kind, default_mockup, search_keywords, workspace, is_open_for_methods)
        VALUES (?,?,?,?,?,?,?,'linkedin',0)
        ON DUPLICATE KEY UPDATE
          name_zh=VALUES(name_zh), name_en=VALUES(name_en), description=VALUES(description),
-         category_kind=VALUES(category_kind), default_mockup_variant=VALUES(default_mockup_variant),
+         category_kind=VALUES(category_kind), default_mockup=VALUES(default_mockup),
          search_keywords=VALUES(search_keywords), workspace='linkedin'`,
       [c.slug, c.name_zh, c.name_en, c.description, c.category_kind, c.default_mockup, c.search_keywords],
     );
@@ -337,22 +337,20 @@ async function main() {
     await pool.execute(
       `INSERT INTO task_catalog
          (slug, name_zh, description, workspace, category_id, category, impl_kind,
-          status, estimated_minutes, methodology_label, mockup_hint, squad_id)
-       VALUES (?,?,?,'linkedin',?,?,?,?,?,?,?,?)
+          status, estimated_minutes, methodology_label, squad_id)
+       VALUES (?,?,?,'linkedin',?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE
          name_zh=VALUES(name_zh), description=VALUES(description),
          category_id=VALUES(category_id), category=VALUES(category),
          impl_kind=VALUES(impl_kind), status=VALUES(status),
          estimated_minutes=VALUES(estimated_minutes),
          methodology_label=VALUES(methodology_label),
-         mockup_hint=VALUES(mockup_hint),
          squad_id=COALESCE(VALUES(squad_id), squad_id)`,
       [
         t.slug, t.name_zh, t.description,
         catId, t.category_slug, t.impl_kind,
         t.status, t.estimated_minutes,
         t.methodology_label ?? null,
-        t.mockup_hint ?? null,
         squadId,
       ],
     );
