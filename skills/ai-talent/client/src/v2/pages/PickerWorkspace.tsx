@@ -311,16 +311,14 @@ export default function PickerWorkspace() {
   // ── Canva-style floating middle column ──────────────────────────────
   // Middle panel can be collapsed so the canvas reclaims that 380px.
   // Persisted across sessions.
-  const [middleCollapsed, setMiddleCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem("sowork.picker.middleCollapsed") === "1"; }
-    catch { return false; }
-  });
+  // Middle panel (squad list) defaults to EXPANDED — it's the template
+  // gallery and should always be visible like Canva's left panel.
+  // Collapse is a temporary "give me more canvas space" action only;
+  // we no longer persist it across page loads so users always start with
+  // the gallery visible. (CJ direction 2026-05-02: "保持有很多範本")
+  const [middleCollapsed, setMiddleCollapsed] = useState<boolean>(false);
   const toggleMiddle = () => {
-    setMiddleCollapsed((v) => {
-      const nv = !v;
-      try { localStorage.setItem("sowork.picker.middleCollapsed", nv ? "1" : "0"); } catch {}
-      return nv;
-    });
+    setMiddleCollapsed((v) => !v);
   };
 
   // ── Fullscreen mode (E) ─────────────────────────────────────────────
@@ -757,7 +755,7 @@ export default function PickerWorkspace() {
           style={{ left: 68, width: 380 }}
         >
           {/* Collapse handle on the right edge — Canva-style */}
-          <Tooltip content={middleCollapsed ? "展開（顯示方法論清單）" : "收合（讓出畫布空間）"} placement="right" radius="sm">
+          <Tooltip content={middleCollapsed ? "顯示方法論清單" : "暫時隱藏清單（讓出畫布空間）"} placement="right" radius="sm">
             <button
               onClick={toggleMiddle}
               aria-label={middleCollapsed ? "展開" : "收合"}
