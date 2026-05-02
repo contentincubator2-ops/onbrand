@@ -46,28 +46,47 @@ interface Step {
 }
 
 // ── LinkedIn Monthly Calendar Squad Steps ────────────────────────────────────
+//
+// Intake philosophy (2026-05-02 CJ direction):
+//   Lead agent reads brands.positioning FIRST and pre-drafts every field it
+//   can infer. User is only asked for the TWO things that cannot be inferred:
+//     1. li_account_url  — LinkedIn authorization (must be human-provided)
+//     2. target_month    — which month to plan (exact date, must be human-provided)
+//   Everything else (biz goal, industry, newsletter preference, pillar count,
+//   cadence, KPI focus) is drafted by the agent and presented for confirmation.
+//
 const LI_CALENDAR_STEPS: Step[] = [
   {
     order: 0,
-    name: "Intake：LinkedIn 帳號 + 業務目標 + 受眾行業",
-    description: "蒐集 LinkedIn 公司頁 URL / 個人帳號 / 月度業務目標 / 主攻受眾行業 / 是否要產 Newsletter。",
+    name: "Intake：授權帳號 + 目標月份（Lead 預填其餘）",
+    description: `Lead agent 先從品牌定位資料 (brands.positioning) 自動推斷並預填：
+月度業務目標、主攻受眾行業、是否包含 Newsletter、建議 pillar 數量、每週發文頻率、KPI 重心。
+用戶只需提供兩項必填：
+  ① LinkedIn 公司頁或個人帳號 URL（授權用）
+  ② 目標月份（例如「2026年6月」）
+Agent 輸出：一份已預填的 Brief 草稿，附上推斷依據說明，等待用戶在 Checkpoint 確認或修改。`,
     assignedAgentId: A.lead, assignedAgentName: NAME[A.lead],
     reviewerAgentId: null,
     outputKind: "decision", mockupVariant: "IntakeFormMockup",
     storageTarget: "mission_step_progress.canonical_message[step=0]",
-    userInputFields: ["li_company_url", "li_personal_url", "monthly_biz_goal", "target_industry", "include_newsletter"],
+    userInputFields: ["li_account_url", "target_month"],
     dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["brands.positioning"] },
     aiModel: "claude-opus-4-6",
   },
   {
     order: 1,
-    name: "🛑 Checkpoint：確認方向 + 填 tilt / pillar 數",
-    description: "用戶確認 B2B 方向，補關鍵欄位。UI step 不打 LLM。",
+    name: "🛑 Checkpoint：確認 / 修改 agent 預填的方向",
+    description: `用戶審閱 agent 在 Step 0 預填的所有欄位，可直接確認或修改：
+• 月度業務目標（agent 已依品牌定位推斷）
+• 主攻受眾行業（agent 已依品牌定位推斷）
+• 是否產 Newsletter（agent 建議 yes/no 並說明理由）
+• Pillar 數量 / 每週頻率 / KPI 重心（agent 已給建議值）
+UI step 不打 LLM，僅確認或覆寫。確認後，後續 step 使用最終值繼續執行。`,
     assignedAgentId: A.lead, assignedAgentName: NAME[A.lead],
     reviewerAgentId: null,
     outputKind: "decision", mockupVariant: "IntakeFormMockup",
     storageTarget: "mission_step_progress.canonical_message[step=1]",
-    userInputFields: ["pillar_count", "cadence_per_week", "kpi_focus"],
+    userInputFields: ["monthly_biz_goal", "target_industry", "include_newsletter", "pillar_count", "cadence_per_week", "kpi_focus"],
     dataRequirements: { minUrls: 0, minChars: 0 },
     aiModel: "n/a",
   },
