@@ -11,13 +11,146 @@
  * Two modes:
  *   - readOnly=true  → step 0 display (load + auto-derive only)
  *   - readOnly=false → step 1 (user edits before pipeline advances)
+ *
+ * 2026-05-02 CJ direction:
+ *   Context source is NOT always "brand positioning" — it depends on what the
+ *   user selected when launching the mission (brand / product / event).
+ *   The mockup must show a visible "正在讀取..." loading state while the agent
+ *   reads the selected context object, then populate the data once ready.
  */
 import React from "react";
 import {
   Input, Textarea, Select, SelectItem, CheckboxGroup, Checkbox,
-  Button, Chip,
+  Button, Chip, Spinner,
 } from "@heroui/react";
 import { SectionHeader, DataChip, EmptyHint, NotionCard, type SquadMockupCommonProps } from "./shared";
+
+// ── Context source types ──────────────────────────────────────────────────────
+
+export type ContextKind = "brand" | "product" | "event";
+
+export interface ContextSource {
+  kind: ContextKind;
+  id: number;
+  name: string;
+  /** Sub-entity: if brand was selected with a specific product */
+  productId?: number;
+  productName?: string;
+  /** Sub-entity: if brand was selected with a specific event */
+  eventId?: number;
+  eventName?: string;
+}
+
+/** Reading phases for the context banner */
+export type ContextReadPhase =
+  | "idle"      // mission not yet started
+  | "reading"   // agent is reading the context object
+  | "done"      // context loaded, data populated
+  | "error";    // failed to read
+
+const KIND_ICON: Record<ContextKind, string> = {
+  brand:   "🏢",
+  product: "📦",
+  event:   "🎪",
+};
+
+const KIND_LABEL: Record<ContextKind, string> = {
+  brand:   "品牌資料",
+  product: "產品資料",
+  event:   "活動資料",
+};
+
+// ── Context Reading Banner ────────────────────────────────────────────────────
+
+function ContextReadingBanner({
+  source,
+  phase,
+  agentName = "Lead agent",
+}: {
+  source: ContextSource;
+  phase: ContextReadPhase;
+  agentName?: string;
+}) {
+  const icon  = KIND_ICON[source.kind];
+  const label = KIND_LABEL[source.kind];
+
+  // Sub-entity tags (product / event attached to a brand selection)
+  const subTags: string[] = [];
+  if (source.productName) subTags.push(`產品：${source.productName}`);
+  if (source.eventName)   subTags.push(`活動：${source.eventName}`);
+
+  if (phase === "idle") return null;
+
+  return (
+    <div
+      className={`rounded-xl border px-4 py-3 flex items-start gap-3 transition-all
+        ${phase === "reading" ? "border-primary-200 bg-primary-50"
+        : phase === "done"    ? "border-success-200 bg-success-50"
+        : "border-danger-200 bg-danger-50"}`}
+    >
+      {/* Left: animated or static icon */}
+      <div className="mt-0.5 flex-shrink-0">
+        {phase === "reading" ? (
+          <Spinner size="sm" color="primary" />
+        ) : phase === "done" ? (
+          <span className="text-success text-lg">✓</span>
+        ) : (
+          <span className="text-danger text-lg">✗</span>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0 space-y-1">
+        {/* Title row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[13px] font-semibold">
+            {phase === "reading"
+              ? `${agentName} 正在讀取 ${icon} ${source.name} 的${label}…`
+              : phase === "done"
+              ? `${icon} ${source.name} ${label}已讀取完畢`
+              : `讀取 ${source.name} ${label}失敗`}
+          </span>
+          {phase === "reading" && (
+            <Chip size="sm" color="primary" variant="flat" className="h-4 text-[10px]">
+              #{source.id}
+            </Chip>
+          )}
+        </div>
+
+        {/* What's being read */}
+        {phase === "reading" && (
+          <div className="text-[11px] text-primary-600 space-y-0.5">
+            <ReadingRow label="基本資訊" phase="reading" />
+            <ReadingRow label={source.kind === "brand" ? "品牌定位 · 語氣 · 受眾" : source.kind === "product" ? "產品賣點 · 目標客群" : "活動目的 · 時間 · 地點"} phase="reading" />
+            {subTags.map((t, i) => <ReadingRow key={i} label={t} phase="reading" />)}
+          </div>
+        )}
+
+        {/* Done: what was found */}
+        {phase === "done" && subTags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {subTags.map((t, i) => (
+              <Chip key={i} size="sm" color="success" variant="flat" className="h-4 text-[10px]">{t}</Chip>
+            ))}
+          </div>
+        )}
+
+        {phase === "error" && (
+          <p className="text-[11px] text-danger-700">無法讀取資料，請確認品牌 / 產品 / 活動已正確建立後重試。</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Single animated row inside the reading state */
+function ReadingRow({ label, phase }: { label: string; phase: ContextReadPhase }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="w-1 h-1 rounded-full bg-primary-400 animate-pulse" />
+      <span>{label}</span>
+    </div>
+  );
+}
 
 export interface IntakeFormData {
   // bucket A — read-only system data
@@ -61,9 +194,21 @@ interface Props extends SquadMockupCommonProps {
   data?: IntakeFormData;
   onChange?: (next: IntakeFormData["userInput"]) => void;
   onSubmit?: () => void;
+  /** Which brand / product / event the user selected when launching this mission */
+  contextSource?: ContextSource;
+  /** Phase of agent reading the context object */
+  contextReadPhase?: ContextReadPhase;
+  /** Name of the assigned lead agent (shown in reading banner) */
+  agentName?: string;
 }
 
-export function IntakeFormMockup({ data, readOnly = false, isActive = false, onChange, onSubmit }: Props) {
+export function IntakeFormMockup({
+  data, readOnly = false, isActive = false,
+  onChange, onSubmit,
+  contextSource,
+  contextReadPhase = "idle",
+  agentName = "Lead agent",
+}: Props) {
   // Null-safe — `data = {}` default doesn't apply when explicit null
   // is passed (only undefined). Live mode passes null until LLM returns.
   const safe = data ?? {};
@@ -82,30 +227,72 @@ export function IntakeFormMockup({ data, readOnly = false, isActive = false, onC
     && ui.total_posts && ui.kpi_focus
   );
 
+  // Derive section header label from context source kind
+  const bucketAIcon  = contextSource ? KIND_ICON[contextSource.kind]  : "📦";
+  const bucketALabel = contextSource ? KIND_LABEL[contextSource.kind] : "系統資料";
+
   return (
     <div className="flex flex-col gap-4 max-w-3xl">
-      {/* ── 品牌資料（自動帶入）─────────────────────────────────── */}
+
+      {/* ── Context Reading Banner (shows while agent reads brand/product/event) ── */}
+      {contextSource && contextReadPhase !== "idle" && (
+        <ContextReadingBanner
+          source={contextSource}
+          phase={contextReadPhase}
+          agentName={agentName}
+        />
+      )}
+
+      {/* ── 系統資料（自動帶入）─────────────────────────────────── */}
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
-            icon="📦"
-            eyebrow="品牌資訊"
-            title="這些已從你的品牌定位自動帶入"
+            icon={bucketAIcon}
+            eyebrow={bucketALabel}
+            title={
+              contextReadPhase === "reading"
+                ? "正在讀取中，稍候自動填入…"
+                : contextReadPhase === "done"
+                ? `已從 ${contextSource?.name ?? "所選物件"} 自動帶入`
+                : "已從選擇的品牌 / 產品 / 活動自動帶入"
+            }
           />
-          {isActive && (
+          {/* Legacy active chip when no contextSource provided */}
+          {isActive && !contextSource && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● Claire Hsu 蒐集中…
+              ● {agentName} 蒐集中…
+            </Chip>
+          )}
+          {/* Reading spinner chip */}
+          {contextReadPhase === "reading" && (
+            <Chip size="sm" variant="flat" color="primary" className="self-start flex items-center gap-1">
+              <Spinner size="sm" className="scale-75" /> 讀取中
             </Chip>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <DataChip label="品牌"     value={sys.brandName} />
-          <DataChip label="產業"     value={sys.industry} />
-          <DataChip label="語氣"     value={sys.voice} />
-          <DataChip label="主受眾"   value={sys.audience} />
-          <DataChip label="當月活動" value={sys.eventsThisMonth?.length ?? 0} />
-          <DataChip label="關聯產品" value={sys.products?.length ?? 0} />
-        </div>
+
+        {/* Skeleton rows while reading */}
+        {contextReadPhase === "reading" ? (
+          <div className="flex flex-wrap gap-2">
+            {["品牌", "產業", "語氣", "主受眾", "當月活動", "關聯產品"].map((l) => (
+              <div
+                key={l}
+                className="h-6 rounded-full bg-default-200 animate-pulse"
+                style={{ width: `${48 + l.length * 10}px` }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <DataChip label="品牌"     value={sys.brandName} />
+            <DataChip label="產業"     value={sys.industry} />
+            <DataChip label="語氣"     value={sys.voice} />
+            <DataChip label="主受眾"   value={sys.audience} />
+            <DataChip label="當月活動" value={sys.eventsThisMonth?.length ?? 0} />
+            <DataChip label="關聯產品" value={sys.products?.length ?? 0} />
+          </div>
+        )}
+
         {sys.eventsThisMonth && sys.eventsThisMonth.length > 0 && (
           <div className="mt-2 text-tiny text-default-500">
             活動：{sys.eventsThisMonth.map((e) => `${e.name} (${e.startAt})`).join(" · ")}

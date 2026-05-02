@@ -51,7 +51,7 @@ const STEPS = [
     storageTarget: "mission_step_progress.canonical_message[step=0]",
     mockupVariant: "IntakeFormMockup",
     userInputFields: [],
-    dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["brands.positioning"] },
+    dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["context.brand", "context.product?", "context.event?"] },
     aiModel: "claude-opus-4-6",
   },
   // ── Step 1: User Checkpoint (UI gate, no LLM) ───────────────────────────

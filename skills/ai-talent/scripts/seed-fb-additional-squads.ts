@@ -117,7 +117,7 @@ const REPOSITION: SquadSeed = {
       outputKind: "decision", mockupVariant: "IntakeFormMockup",
       storageTarget: "mission_step_progress.canonical_message[step=0]",
       userInputFields: ["account_url", "competitor_urls", "reposition_pain", "reposition_goal"],
-      dataRequirements: { minUrls: 1, minChars: 0, requireBucketA: ["brands.positioning"] },
+      dataRequirements: { minUrls: 1, minChars: 0, requireBucketA: ["context.brand", "context.product?", "context.event?"] },
       aiModel: "claude-opus-4-6",
     },
     {
@@ -193,7 +193,7 @@ const QUARTERLY: SquadSeed = {
       outputKind: "decision", mockupVariant: "IntakeFormMockup",
       storageTarget: "mission_step_progress.canonical_message[step=0]",
       userInputFields: ["business_goal", "budget", "priority_events"],
-      dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["brands.positioning"] },
+      dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["context.brand", "context.product?", "context.event?"] },
       aiModel: "claude-opus-4-6",
     },
     {

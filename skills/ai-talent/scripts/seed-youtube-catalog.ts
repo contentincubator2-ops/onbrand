@@ -52,7 +52,7 @@ const YT_VIDEO_STEPS: Step[] = [
     outputKind: "decision", mockupVariant: "IntakeFormMockup",
     storageTarget: "mission_step_progress.canonical_message[step=0]",
     userInputFields: ["channel_url", "video_topic", "target_audience", "duration_min", "seo_keywords"],
-    dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["brands.positioning"] },
+    dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["context.brand", "context.product?", "context.event?"] },
     aiModel: "claude-opus-4-6",
   },
   {

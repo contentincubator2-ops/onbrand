@@ -70,7 +70,13 @@ Agent 輸出：一份已預填的 Brief 草稿，附上推斷依據說明，等�
     outputKind: "decision", mockupVariant: "IntakeFormMockup",
     storageTarget: "mission_step_progress.canonical_message[step=0]",
     userInputFields: ["li_account_url", "target_month"],
-    dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["brands.positioning"] },
+    dataRequirements: {
+      minUrls: 0, minChars: 0,
+      // Agent reads whichever context object the user selected when launching the mission.
+      // Priority: event (if eventId set) > product (if productId set) > brand (always required).
+      // UI shows "正在讀取 [name] 資料..." loading state while agent fetches.
+      requireBucketA: ["context.brand", "context.product?", "context.event?"],
+    },
     aiModel: "claude-opus-4-6",
   },
   {

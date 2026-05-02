@@ -59,7 +59,7 @@ const IG_CALENDAR_STEPS: Step[] = [
     outputKind: "decision", mockupVariant: "IntakeFormMockup",
     storageTarget: "mission_step_progress.canonical_message[step=0]",
     userInputFields: ["ig_handle", "primary_event", "story_vs_reels_focus", "month_palette"],
-    dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["brands.positioning"] },
+    dataRequirements: { minUrls: 0, minChars: 0, requireBucketA: ["context.brand", "context.product?", "context.event?"] },
     aiModel: "claude-opus-4-6",
   },
   {
