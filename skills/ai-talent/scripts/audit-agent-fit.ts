@@ -67,7 +67,7 @@ async function main() {
     `SELECT t.id, t.slug, t.name_zh, t.description, t.impl_kind,
             t.squad_id, t.agent_id, s.name AS squad_name, s.steps AS squad_steps
        FROM task_catalog t LEFT JOIN squads s ON s.id = t.squad_id
-      WHERE t.status = 'active' AND t.workspace = 'facebook'
+      WHERE t.status IN ('active','coming_soon') AND t.workspace IN ('facebook','instagram')
       ORDER BY t.impl_kind, t.id`,
   );
   const tasks = taskRows as any[];

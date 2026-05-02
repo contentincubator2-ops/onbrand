@@ -484,19 +484,27 @@ export default function MissionsHome() {
             {recentTasks.map((t: any) => {
               const isComingSoon = t.status === "coming_soon";
               const isSquad = t.impl_kind === "squad";
+              // Click only valid when we have a real underlying impl. Otherwise
+              // CJ-direction-2026-05-02 bug: clicking a coming_soon-without-
+              // squad falls through to /picker?workspace=X and picker auto-
+              // selects an unrelated legacy squad (e.g. EDM 活動小組).
+              const canRun = isSquad ? !!t.squad_slug : !!t.agent_id;
               return (
                 <Card
                   key={t.id}
-                  isPressable
+                  isPressable={canRun}
                   shadow="sm"
                   radius="lg"
-                  className="shrink-0 w-[280px] border border-divider"
+                  className={`shrink-0 w-[280px] border border-divider ${canRun ? "" : "opacity-70"}`}
                   style={{ scrollSnapAlign: "start" }}
-                  onPress={() => {
-                    const url = isSquad && t.squad_slug
-                      ? `/picker?workspace=${t.workspace}&slug=${t.squad_slug}`
-                      : `/picker?workspace=${t.workspace}`;
-                    navigate(url);
+                  onPress={!canRun ? undefined : () => {
+                    if (isSquad && t.squad_slug) {
+                      navigate(`/picker?workspace=${t.workspace}&slug=${t.squad_slug}`);
+                    } else if (!isSquad && t.agent_id) {
+                      // Atomic task — go to picker workspace where the
+                      // catalog rail has the dedicated runAtomic flow.
+                      navigate(`/picker?workspace=${t.workspace}&task=${t.slug}`);
+                    }
                   }}
                 >
                   <CardBody className="p-3 gap-1">
@@ -515,7 +523,9 @@ export default function MissionsHome() {
                     <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em]">{t.description}</p>
                     <div className="flex items-center justify-between text-tiny text-default-400 mt-1">
                       <span>{t.estimated_minutes ? `約 ${t.estimated_minutes} 分鐘` : "—"}</span>
-                      <span className="text-primary">→ 開啟</span>
+                      <span className={canRun ? "text-primary" : "text-default-400"}>
+                        {canRun ? "→ 開啟" : "尚未綁定 squad/agent"}
+                      </span>
                     </div>
                   </CardBody>
                 </Card>
