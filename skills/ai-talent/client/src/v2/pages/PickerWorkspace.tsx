@@ -58,7 +58,7 @@ import {
   faEnvelopeOpenText, faChartLine, faDiagramProject, faTriangleExclamation,
   faChartArea, faClipboardCheck, faBell, faRankingStar,
   faArrowLeft, faExpand, faCompress, faChevronLeft, faChevronRight,
-  faEnvelope, faCopy,
+  faEnvelope, faCopy, faFilter, faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faInstagram, faFacebook, faLinkedin, faYoutube,
@@ -768,8 +768,15 @@ export default function PickerWorkspace() {
           {activeRailItem?.kind === "layer" ? (
             <LayerAssetDrawer
               item={activeRailItem}
+              scope={scope}
               onBackToTemplates={() => setActiveRailKey("templates")}
             />
+          ) : activeRailKey === "brand" ? (
+            <BrandDrawer scope={scope} onBackToTemplates={() => setActiveRailKey("templates")} />
+          ) : activeRailKey === "recent" ? (
+            <RecentDrawer scope={scope} onBackToTemplates={() => setActiveRailKey("templates")} />
+          ) : activeRailKey === "upload" ? (
+            <UploadDrawer scope={scope} onBackToTemplates={() => setActiveRailKey("templates")} />
           ) : activeRailKey === "members" ? (
             <MembersDrawer onBackToTemplates={() => setActiveRailKey("templates")} />
           ) : (
@@ -2993,74 +3000,443 @@ const DRAWER_LABELS: Record<string, { title: string; blurb: string }> = {
   benchmarks:    { title: "對標",         blurb: "競品與產業基準。" },
 };
 
+/* ── Shared drawer shell ────────────────────────────────────────────────── */
+function DrawerShell({
+  icon, categoryLabel, title, onBack, children,
+}: {
+  icon: any;
+  categoryLabel: string;
+  title: string;
+  onBack: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
+        <Button size="sm" variant="light" radius="sm" onPress={onBack}
+          className="text-tiny h-6 min-w-0 px-2 shrink-0 text-default-500 hover:text-foreground">
+          ← 範本
+        </Button>
+        <div className="w-px h-4 bg-divider" />
+        <FontAwesomeIcon icon={icon} className="text-default-400 text-tiny" />
+        <div className="min-w-0 flex-1">
+          <div className="text-tiny text-default-400 leading-none">{categoryLabel}</div>
+          <div className="font-semibold text-small text-foreground truncate">{title}</div>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ── Empty state helper ─────────────────────────────────────────────────── */
+function DrawerEmpty({
+  icon, headline, sub, cta, onCta,
+}: {
+  icon: any; headline: string; sub: string; cta?: string; onCta?: () => void;
+}) {
+  return (
+    <div className="p-4">
+      <Card shadow="none" radius="lg" className="border border-dashed border-divider bg-content2/30">
+        <CardBody className="p-6 text-center">
+          <div className="text-3xl mb-3 text-default-300"><FontAwesomeIcon icon={icon} /></div>
+          <div className="text-small font-semibold mb-1">{headline}</div>
+          <div className="text-tiny text-default-500 leading-snug mb-4">{sub}</div>
+          {cta && onCta && (
+            <Button size="sm" radius="full" color="primary" onPress={onCta}>{cta}</Button>
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+/* ── Scope label helper ─────────────────────────────────────────────────── */
+function scopeLabel(scope: { brandId?: number | null; productId?: number | null; eventId?: number | null }, brands: any[], products: any[], events: any[]) {
+  if (scope.eventId) {
+    const e = events.find((x: any) => x.id === scope.eventId);
+    return e ? `活動：${e.name}` : "選定活動";
+  }
+  if (scope.productId) {
+    const p = products.find((x: any) => x.id === scope.productId);
+    return p ? `產品：${p.name}` : "選定產品";
+  }
+  if (scope.brandId) {
+    const b = brands.find((x: any) => x.id === scope.brandId);
+    return b ? `品牌：${b.name}` : "選定品牌";
+  }
+  return "所有品牌";
+}
+
+/* ── PostsDrawer: fb/li/ig/yt history ──────────────────────────────────── */
+function PostsDrawer({ item, scope, onBack }: { item: RailItem; scope: any; onBack: () => void }) {
+  const meta = (item.drawer ? DRAWER_LABELS[item.drawer] : undefined) ?? { title: item.label, blurb: "" };
+  const brands: any[] = (trpc as any).brand?.list?.useQuery
+    ? (trpc as any).brand.list.useQuery(undefined, { staleTime: 60_000 })?.data ?? []
+    : [];
+
+  // Stub missions query — real impl would filter by scope + platform
+  const STUB_POSTS = [
+    { id: 1, title: "春季新品上市 — 開箱體驗", date: "2026-04-18", platform: "FB", status: "published" },
+    { id: 2, title: "母親節限定優惠預告",       date: "2026-04-25", platform: "FB", status: "published" },
+    { id: 3, title: "五月主打內容：品牌故事",   date: "2026-05-01", platform: "FB", status: "draft" },
+  ];
+
+  return (
+    <DrawerShell icon={item.icon} categoryLabel="貼文歷史" title={meta.title} onBack={onBack}>
+      <div className="p-4 space-y-3">
+        {/* Scope badge */}
+        <div className="flex items-center gap-1.5 text-tiny text-default-500">
+          <FontAwesomeIcon icon={faFilter} className="text-tiny" />
+          <span>
+            {scope.eventId ? "活動貼文" : scope.productId ? "產品貼文" : scope.brandId ? "品牌貼文" : "全部貼文"}
+          </span>
+        </div>
+
+        {/* Stub post cards */}
+        {STUB_POSTS.map((p) => (
+          <Card key={p.id} shadow="none" radius="md"
+            className="border border-divider bg-content1 cursor-pointer hover:border-primary/50 hover:bg-content2 transition-colors">
+            <CardBody className="px-3 py-2.5 flex flex-row items-center gap-3">
+              <div className="w-9 h-9 rounded bg-default-100 flex items-center justify-center shrink-0">
+                <FontAwesomeIcon icon={item.icon} className="text-default-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-small font-medium truncate">{p.title}</div>
+                <div className="text-tiny text-default-400">{p.date}</div>
+              </div>
+              <Chip size="sm" variant="flat"
+                color={p.status === "published" ? "success" : "default"}
+                className="shrink-0 text-tiny">
+                {p.status === "published" ? "已發" : "草稿"}
+              </Chip>
+            </CardBody>
+          </Card>
+        ))}
+
+        <DrawerEmpty
+          icon={faFileLines}
+          headline="連結更多貼文紀錄"
+          sub="完成的 Mission 產出會自動歸檔至此。也可授權平台 OAuth 匯入現有貼文。"
+          cta="從範本建立貼文"
+          onCta={onBack}
+        />
+      </div>
+    </DrawerShell>
+  );
+}
+
+/* ── AssetsDrawer: fb/li/ig assets ─────────────────────────────────────── */
+function AssetsDrawer({ item, scope, onBack }: { item: RailItem; scope: any; onBack: () => void }) {
+  const meta = (item.drawer ? DRAWER_LABELS[item.drawer] : undefined) ?? { title: item.label, blurb: "" };
+  const STUB_ASSETS = [
+    { id: 1, name: "品牌 Logo 橫式.png",   type: "image", size: "240 KB", used: 12 },
+    { id: 2, name: "春季主視覺 1080x1080", type: "image", size: "1.2 MB", used: 5 },
+    { id: 3, name: "產品介紹影片 15s",      type: "video", size: "8.4 MB", used: 3 },
+    { id: 4, name: "品牌色票 brandkit.json",type: "json",  size: "4 KB",  used: 0 },
+  ];
+  const typeIcon = (t: string) => t === "video" ? faVideo : t === "json" ? faFileLines : faImage;
+
+  return (
+    <DrawerShell icon={item.icon} categoryLabel="素材庫" title={meta.title} onBack={onBack}>
+      <div className="p-4 space-y-3">
+        <div className="flex items-center gap-1.5 text-tiny text-default-500">
+          <FontAwesomeIcon icon={faFilter} className="text-tiny" />
+          <span>{scope.eventId ? "活動素材" : scope.productId ? "產品素材" : scope.brandId ? "品牌素材" : "所有素材"}</span>
+        </div>
+        {STUB_ASSETS.map((a) => (
+          <Card key={a.id} shadow="none" radius="md"
+            className="border border-divider bg-content1 cursor-pointer hover:border-primary/50 hover:bg-content2 transition-colors">
+            <CardBody className="px-3 py-2.5 flex flex-row items-center gap-3">
+              <div className="w-9 h-9 rounded bg-default-100 flex items-center justify-center shrink-0 text-default-400">
+                <FontAwesomeIcon icon={typeIcon(a.type)} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-small font-medium truncate">{a.name}</div>
+                <div className="text-tiny text-default-400">{a.size} · 使用 {a.used} 次</div>
+              </div>
+            </CardBody>
+          </Card>
+        ))}
+        <Button size="sm" radius="full" variant="bordered" className="w-full text-tiny">
+          上傳素材 +
+        </Button>
+      </div>
+    </DrawerShell>
+  );
+}
+
+/* ── CalendarDrawer: fb/li/ig/yt calendar ───────────────────────────────── */
+function CalendarDrawer({ item, scope, onBack }: { item: RailItem; scope: any; onBack: () => void }) {
+  const meta = (item.drawer ? DRAWER_LABELS[item.drawer] : undefined) ?? { title: item.label, blurb: "" };
+  const STUB_SCHEDULED = [
+    { id: 1, date: "2026-05-04", title: "母親節前哨 — 情感故事貼文",    status: "scheduled", pillar: "品牌溫度" },
+    { id: 2, date: "2026-05-09", title: "母親節當天 — 限量組合促銷",   status: "scheduled", pillar: "產品轉換" },
+    { id: 3, date: "2026-05-15", title: "週三深度文 — 選購指南",        status: "draft",     pillar: "知識教育" },
+    { id: 4, date: "2026-05-18", title: "UGC 用戶故事 repost",          status: "scheduled", pillar: "社群互動" },
+  ];
+  const MARKET_EVENTS = [
+    { date: "2026-05-09", name: "母親節", type: "holiday" },
+    { date: "2026-05-04", name: "Star Wars Day", type: "trend" },
+    { date: "2026-05-19", name: "519 光棍節 (TW)",  type: "trend" },
+    { date: "2026-05-31", name: "台灣天氣轉夏",     type: "insight" },
+  ];
+
+  return (
+    <DrawerShell icon={item.icon} categoryLabel="行事曆" title={meta.title} onBack={onBack}>
+      <div className="p-4 space-y-4">
+        {/* Scheduled items */}
+        <div>
+          <div className="text-tiny font-semibold text-default-500 uppercase tracking-wide mb-2">
+            已排程（{STUB_SCHEDULED.length}）
+          </div>
+          <div className="space-y-2">
+            {STUB_SCHEDULED.map((s) => (
+              <Card key={s.id} shadow="none" radius="md"
+                className="border border-divider bg-content1 cursor-pointer hover:border-primary/50 hover:bg-content2 transition-colors">
+                <CardBody className="px-3 py-2 flex flex-row items-start gap-2">
+                  <div className="text-tiny text-default-400 w-14 shrink-0 mt-0.5">{s.date.slice(5)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-small font-medium leading-snug truncate">{s.title}</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Chip size="sm" variant="flat" color={s.status === "scheduled" ? "primary" : "default"}
+                        className="text-tiny h-4">{s.status === "scheduled" ? "已排" : "草稿"}</Chip>
+                      <span className="text-tiny text-default-400">{s.pillar}</span>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        <Divider />
+
+        {/* Market events & holidays */}
+        <div>
+          <div className="text-tiny font-semibold text-default-500 uppercase tracking-wide mb-2">
+            市場節慶 &amp; 熱點
+          </div>
+          <div className="space-y-1.5">
+            {MARKET_EVENTS.map((e, i) => (
+              <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-medium hover:bg-content2 transition-colors cursor-default">
+                <Chip size="sm" variant="flat"
+                  color={e.type === "holiday" ? "warning" : e.type === "trend" ? "secondary" : "default"}
+                  className="text-tiny shrink-0">
+                  {e.date.slice(5)}
+                </Chip>
+                <span className="text-small text-foreground/90">{e.name}</span>
+                {e.type === "trend" && (
+                  <span className="ml-auto text-tiny text-default-400">熱點</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </DrawerShell>
+  );
+}
+
+/* ── AdsDrawer: fb-ads etc. ─────────────────────────────────────────────── */
+function AdsDrawer({ item, scope, onBack }: { item: RailItem; scope: any; onBack: () => void }) {
+  const meta = (item.drawer ? DRAWER_LABELS[item.drawer] : undefined) ?? { title: item.label, blurb: "" };
+  return (
+    <DrawerShell icon={item.icon} categoryLabel="廣告組" title={meta.title} onBack={onBack}>
+      <DrawerEmpty
+        icon={item.icon}
+        headline="廣告組管理即將推出"
+        sub="連結 Facebook / Google 廣告帳戶後，可在此檢視廣告組狀態、預算使用與受眾設定。"
+        cta="返回範本"
+        onCta={onBack}
+      />
+    </DrawerShell>
+  );
+}
+
+/* ── LayerAssetDrawer: dispatcher ───────────────────────────────────────── */
 function LayerAssetDrawer({
   item,
+  scope,
   onBackToTemplates,
 }: {
   item: RailItem;
+  scope: any;
   onBackToTemplates: () => void;
 }) {
-  const meta = (item.drawer ? DRAWER_LABELS[item.drawer] : undefined) ?? { title: item.label, blurb: "" };
+  const drawer = item.drawer ?? "";
+
+  // Route by drawer key suffix
+  if (drawer.endsWith("-history") || drawer.endsWith("-posts")) {
+    return <PostsDrawer item={item} scope={scope} onBack={onBackToTemplates} />;
+  }
+  if (drawer.endsWith("-assets") || drawer.endsWith("-reels")) {
+    return <AssetsDrawer item={item} scope={scope} onBack={onBackToTemplates} />;
+  }
+  if (drawer.endsWith("-calendar")) {
+    return <CalendarDrawer item={item} scope={scope} onBack={onBackToTemplates} />;
+  }
+  if (drawer.endsWith("-ads") || drawer.includes("ads")) {
+    return <AdsDrawer item={item} scope={scope} onBack={onBackToTemplates} />;
+  }
+
+  // Fallback for any other layer drawers (yt-videos, pr-media, etc.)
+  const meta = DRAWER_LABELS[drawer] ?? { title: item.label, blurb: "" };
   return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-        <div className="min-w-0">
-          <div className="text-tiny text-default-500">資產 / Assets</div>
-          <div className="font-semibold text-medium text-foreground truncate">{meta.title}</div>
-        </div>
-        <Button
-          size="sm"
-          variant="light"
-          radius="sm"
-          onPress={onBackToTemplates}
-          className="text-tiny h-6 min-w-0 px-2 shrink-0 ml-2"
-        >
-          ← 範本
+    <DrawerShell icon={item.icon} categoryLabel="資產庫" title={meta.title} onBack={onBackToTemplates}>
+      {meta.blurb && (
+        <p className="px-4 pt-4 text-small text-default-500 leading-relaxed">{meta.blurb}</p>
+      )}
+      <DrawerEmpty
+        icon={item.icon}
+        headline="尚未有資料"
+        sub="這個資產庫即將推出。目前可以先從範本開始一個 mission。"
+        cta="從範本開始"
+        onCta={onBackToTemplates}
+      />
+    </DrawerShell>
+  );
+}
+
+/* ─────────────────────── BrandDrawer ───────────────────────────────────────
+ * Left-rail "品牌" global tab.
+ * Shows brand guidelines relevant to the current scope: voice, color, logo rules.
+ */
+function BrandDrawer({ scope, onBackToTemplates }: { scope: any; onBackToTemplates: () => void }) {
+  const brandsQuery: any = (trpc as any).brand?.list?.useQuery
+    ? (trpc as any).brand.list.useQuery(undefined, { staleTime: 60_000 })
+    : { data: [], isLoading: false };
+  const brands: any[] = brandsQuery.data ?? [];
+  const brand = brands.find((b: any) => b.id === scope.brandId);
+
+  const BRAND_SECTIONS = [
+    { key: "voice",   label: "品牌語氣", icon: faFileLines,
+      value: brand?.positioning?.brandVoice ?? brand?.positioning?.voice ?? "尚未設定" },
+    { key: "colors",  label: "品牌色票", icon: faPalette,
+      value: brand?.positioning?.primaryColor ? `主色：${brand.positioning.primaryColor}` : "尚未設定" },
+    { key: "tagline", label: "核心主張", icon: faCircleCheck,
+      value: brand?.positioning?.tagline ?? brand?.positioning?.usp ?? "尚未設定" },
+    { key: "audience",label: "目標受眾", icon: faUsers,
+      value: brand?.positioning?.targetAudience ?? "尚未設定" },
+  ];
+
+  return (
+    <DrawerShell icon={faPalette} categoryLabel="品牌規範" title={brand?.name ?? "品牌"} onBack={onBackToTemplates}>
+      <div className="p-4 space-y-3">
+        {!scope.brandId ? (
+          <DrawerEmpty
+            icon={faPalette}
+            headline="請先選擇品牌"
+            sub="在上方 Scope Bar 選擇品牌後，即可查看品牌規範。"
+          />
+        ) : (
+          <>
+            {BRAND_SECTIONS.map((s) => (
+              <Card key={s.key} shadow="none" radius="md" className="border border-divider bg-content1">
+                <CardBody className="px-3 py-2.5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FontAwesomeIcon icon={s.icon} className="text-default-400 text-tiny" />
+                    <span className="text-tiny font-semibold text-default-500 uppercase tracking-wide">{s.label}</span>
+                  </div>
+                  <p className="text-small text-foreground/90 leading-relaxed line-clamp-3">{String(s.value)}</p>
+                </CardBody>
+              </Card>
+            ))}
+            <Button size="sm" radius="full" variant="bordered" className="w-full text-tiny">
+              編輯品牌規範 →
+            </Button>
+          </>
+        )}
+      </div>
+    </DrawerShell>
+  );
+}
+
+/* ─────────────────────── RecentDrawer ──────────────────────────────────────
+ * Left-rail "我的" global tab.
+ * Shows the current user's recent missions.
+ */
+function RecentDrawer({ scope, onBackToTemplates }: { scope: any; onBackToTemplates: () => void }) {
+  // Recent missions stub — real impl would call trpc.mission.listRecent
+  const STUB_MISSIONS = [
+    { id: 1, name: "5月 FB 月行事曆",        squad: "fb-monthly-calendar-pulizzi", updatedAt: "2026-05-01", status: "active" },
+    { id: 2, name: "母親節活動系列貼文",      squad: "fb-event-series",              updatedAt: "2026-04-28", status: "done" },
+    { id: 3, name: "Q2 LinkedIn 個人品牌",    squad: "li-thought-leadership",        updatedAt: "2026-04-20", status: "done" },
+    { id: 4, name: "春季新品 IG Reel 系列",   squad: "ig-reel-series",               updatedAt: "2026-04-15", status: "done" },
+  ];
+
+  return (
+    <DrawerShell icon={faClockRotateLeft} categoryLabel="我的任務" title="最近任務" onBack={onBackToTemplates}>
+      <div className="p-4 space-y-2">
+        {STUB_MISSIONS.map((m) => (
+          <Card key={m.id} shadow="none" radius="md"
+            className="border border-divider bg-content1 cursor-pointer hover:border-primary/50 hover:bg-content2 transition-colors">
+            <CardBody className="px-3 py-2.5 flex flex-row items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-small font-medium truncate">{m.name}</div>
+                <div className="text-tiny text-default-400 mt-0.5">{m.squad} · {m.updatedAt}</div>
+              </div>
+              <Chip size="sm" variant="flat"
+                color={m.status === "active" ? "primary" : "success"}
+                className="text-tiny shrink-0 mt-0.5">
+                {m.status === "active" ? "進行中" : "完成"}
+              </Chip>
+            </CardBody>
+          </Card>
+        ))}
+        <Button size="sm" radius="full" variant="bordered" className="w-full text-tiny mt-2">
+          查看全部任務 →
         </Button>
       </div>
+    </DrawerShell>
+  );
+}
 
-      {/* Body — placeholder shell */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        {meta.blurb && (
-          <p className="text-small text-foreground/80 leading-relaxed mb-4">{meta.blurb}</p>
-        )}
+/* ─────────────────────── UploadDrawer ──────────────────────────────────────
+ * Left-rail "上傳" global tab.
+ * Dropzone to upload brand assets into the scope's asset library.
+ */
+function UploadDrawer({ scope, onBackToTemplates }: { scope: any; onBackToTemplates: () => void }) {
+  const [dragging, setDragging] = React.useState(false);
 
-        {/* Empty-state card with primary action */}
-        <Card shadow="none" radius="lg" className="border border-dashed border-divider bg-content2/40">
-          <CardBody className="p-5 text-center">
-            <div className="text-3xl mb-2 text-default-400"><FontAwesomeIcon icon={item.icon} /></div>
-            <div className="text-small text-foreground font-semibold mb-1">尚未有資料</div>
-            <div className="text-tiny text-default-500 leading-snug mb-4">
-              這個資產庫即將推出。目前可以先上傳檔案或從範本開始一個 mission。
-            </div>
-            <div className="flex gap-2 justify-center">
-              <Button size="sm" radius="full" variant="bordered" isDisabled>新增 +</Button>
-              <Button size="sm" radius="full" color="primary" onPress={onBackToTemplates}>
-                從範本開始
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+  return (
+    <DrawerShell icon={faUpload} categoryLabel="上傳素材" title="新增素材" onBack={onBackToTemplates}>
+      <div className="p-4 space-y-4">
+        {/* Drop zone */}
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); }}
+          className={[
+            "border-2 border-dashed rounded-xl p-8 text-center transition-colors",
+            dragging ? "border-primary bg-primary/5" : "border-divider bg-content2/30 hover:bg-content2/60",
+          ].join(" ")}
+        >
+          <FontAwesomeIcon icon={faUpload} className="text-2xl text-default-300 mb-3" />
+          <p className="text-small font-semibold text-foreground/80">拖曳檔案至此上傳</p>
+          <p className="text-tiny text-default-400 mt-1">支援 PNG、JPG、MP4、PDF、JSON</p>
+          <Button size="sm" radius="full" color="primary" className="mt-4">
+            選擇檔案
+          </Button>
+        </div>
 
-        {/* Stub list — gives a hint of what this drawer will look like once
-            real data lands. Three muted skeleton rows. */}
-        <div className="mt-4 space-y-2">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-12 rounded-medium border border-divider bg-content1/60 px-3 flex items-center gap-3 opacity-50"
-            >
-              <div className="w-6 h-6 rounded bg-divider/60" />
-              <div className="flex-1">
-                <div className="h-2.5 w-1/2 rounded bg-divider/50 mb-1" />
-                <div className="h-2 w-1/3 rounded bg-divider/40" />
-              </div>
+        {/* Tips */}
+        <div className="space-y-1.5">
+          {[
+            "上傳品牌 Logo（建議 SVG 或 PNG 透明背景）",
+            "上傳視覺規範 PDF 或 brandkit.json",
+            "上傳過往高互動貼文截圖供 AI 參考",
+          ].map((tip, i) => (
+            <div key={i} className="flex items-start gap-2 text-tiny text-default-500">
+              <span className="mt-0.5 text-default-300">•</span>
+              <span>{tip}</span>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </DrawerShell>
   );
 }
 
