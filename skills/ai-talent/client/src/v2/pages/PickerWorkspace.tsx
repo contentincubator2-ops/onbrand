@@ -1528,6 +1528,37 @@ function SquadIntakeSidebar({
   // Platform authorization local state
   const [platformHandle, setPlatformHandle] = useState<string>("");
   const [platformAuthorized, setPlatformAuthorized] = useState<boolean>(false);
+  const [platformAccountId, setPlatformAccountId] = useState<string>("");
+  const [platformAuthBusy, setPlatformAuthBusy] = useState<boolean>(false);
+  const [platformAuthError, setPlatformAuthError] = useState<string | null>(null);
+
+  const getConnectToken = trpc.platformConnect.getConnectToken.useMutation();
+
+  async function handlePlatformAuth() {
+    if (!wsKey || !platformAuth) return;
+    setPlatformAuthBusy(true);
+    setPlatformAuthError(null);
+    try {
+      const { token, appSlug, projectId, env } = await getConnectToken.mutateAsync({
+        platform: wsKey as "facebook" | "instagram" | "linkedin" | "youtube",
+      });
+      // Dynamically import Pipedream SDK to keep bundle small
+      const { PipedreamClient } = await import("@pipedream/sdk");
+      const pd = new PipedreamClient({
+        projectEnvironment: env,
+        externalUserId: `sowork-user`,
+        tokenCallback: async () => token,
+      });
+      const account = await pd.connectAccount({ app: appSlug });
+      setPlatformAccountId((account as any).id ?? (account as any).external_id ?? "");
+      setPlatformHandle((account as any).name ?? (account as any).username ?? (account as any).id ?? platformAuth.label);
+      setPlatformAuthorized(true);
+      setPlatformAuthBusy(false);
+    } catch (e: any) {
+      setPlatformAuthError(e?.message ?? "無法取得授權憑證，請稍後再試");
+      setPlatformAuthBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1658,12 +1689,16 @@ function SquadIntakeSidebar({
                   <Button
                     size="sm" variant="bordered" radius="md"
                     color="primary" className="w-full text-tiny"
-                    isDisabled={!platformHandle.trim() || !!missionId}
-                    onPress={() => setPlatformAuthorized(true)}
-                    startContent={<FontAwesomeIcon icon={platformAuth.icon} />}
+                    isDisabled={!!missionId || platformAuthBusy}
+                    isLoading={platformAuthBusy}
+                    onPress={handlePlatformAuth}
+                    startContent={!platformAuthBusy && <FontAwesomeIcon icon={platformAuth.icon} />}
                   >
-                    {platformAuth.btnLabel}
+                    {platformAuthBusy ? "等待授權中…" : platformAuth.btnLabel}
                   </Button>
+                  {platformAuthError && (
+                    <p className="text-tiny text-danger text-center">{platformAuthError}</p>
+                  )}
                   <p className="text-tiny text-default-400 text-center">
                     或跳過（Agent 將使用品牌資料推導，不讀取平台數據）
                   </p>
