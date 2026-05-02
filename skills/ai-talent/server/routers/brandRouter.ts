@@ -12,6 +12,8 @@ import {
 import { getDb } from "../db";
 import { userApiKeys, missions } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { invokeLLM } from "../_core/llm";
+import { assertBrandOwner } from "../_core/brandAuth";
 
 // Helper to get user's API key
 async function getUserApiKey(userId: number): Promise<string> {
@@ -693,9 +695,6 @@ export const brandRouter = router({
 
       if (brand.tagline) return { skipped: true };
 
-      const endpoint = process.env.AZURE_OPENAI_ENDPOINT ?? "";
-      const apiKey = process.env.AZURE_OPENAI_KEY ?? "";
-      const deployment = "gpt-4o-mini";
       const prompt = `你是品牌策略專家。根據以下品牌資訊，推估品牌定位，用繁體中文回答，以 JSON 格式輸出。
 
 品牌名稱：${brand.name}
@@ -714,24 +713,18 @@ export const brandRouter = router({
   "functionalDiff": "功能差異化要素，20字內，功能層面的差異"
 }`;
 
-      const res = await fetch(
-        `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2024-02-01`,
-        {
-          method: "POST",
-          headers: { "api-key": apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 500,
-            response_format: { type: "json_object" },
-          }),
-        }
-      );
-      const data = await res.json() as any;
-      const content = data?.choices?.[0]?.message?.content;
-      if (!content) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "GPT 回應為空" });
+      const llmResult = await invokeLLM({
+        messages: [{ role: "user", content: prompt }],
+        maxTokens: 500,
+      });
+      const content = String(llmResult.choices[0]?.message?.content ?? "");
+      if (!content) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM 回應為空" });
 
       let parsed: any;
-      try { parsed = JSON.parse(content); } catch { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "GPT JSON 解析失敗" }); }
+      try {
+        const jsonStr = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        parsed = JSON.parse(jsonStr);
+      } catch { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM JSON 解析失敗" }); }
 
       await db.execute(
         sql`UPDATE brands SET

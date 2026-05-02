@@ -16,18 +16,9 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { runAuditAgent, type UpstreamDecision } from "../_core/auditAgent";
 import { loadDecisionFull } from "./decisionRouter";
+import { assertBrandOwner } from "../_core/brandAuth";
 
 const channel = z.enum(["fb", "ig", "linkedin", "youtube", "pr", "generic"]);
-
-async function assertBrandOwner(userId: number, brandId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-  const [rows] = (await db.execute(sql`
-    SELECT id FROM brands WHERE id = ${brandId} AND userId = ${userId} LIMIT 1
-  `)) as any;
-  if (!rows?.length)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
-}
 
 async function fetchUpstreamChain(
   decisionIds: number[]

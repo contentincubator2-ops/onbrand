@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { assertBrandOwner } from "../_core/brandAuth";
 
 const CONTENT_TYPES = [
   "fb-content",
@@ -18,16 +19,6 @@ const CONTENT_TYPES = [
   "youtube-content",
   "pr-content",
 ];
-
-async function assertBrandOwner(userId: number, brandId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-  const [rows] = (await db.execute(sql`
-    SELECT id FROM brands WHERE id = ${brandId} AND userId = ${userId} LIMIT 1
-  `)) as any;
-  if (!rows?.length)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
-}
 
 function dayKey(d: Date): string {
   const y = d.getUTCFullYear();

@@ -18,6 +18,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { assertBrandOwner } from "../_core/brandAuth";
 
 const decisionStatus = z.enum([
   "draft",
@@ -39,24 +40,6 @@ const evidenceSource = z.enum([
 ]);
 const evidenceStance = z.enum(["supports", "contradicts", "neutral"]);
 const outcomeVerdict = z.enum(["win", "loss", "push", "inconclusive"]);
-
-async function assertBrandOwner(userId: number, brandId: number): Promise<void> {
-  const db = await getDb();
-  if (!db)
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "DB unavailable",
-    });
-  const [rows] = (await db.execute(sql`
-    SELECT id FROM brands WHERE id = ${brandId} AND userId = ${userId} LIMIT 1
-  `)) as any;
-  if (!rows?.length) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Brand not found or not owned",
-    });
-  }
-}
 
 async function loadDecisionOwned(userId: number, id: number): Promise<any> {
   const db = await getDb();

@@ -43,6 +43,7 @@ import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
 import { pipelineRouter } from "./pipelineRouter";
 import { mediaRouter } from "./mediaRouter";
 import { taskCatalogRouter } from "./taskCatalogRouter";
+import { positioningRouter } from "./positioningRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -91,6 +92,7 @@ export const appRouter = router({
   pipeline:      pipelineRouter,
   media:         mediaRouter,
   taskCatalog:   taskCatalogRouter,
+  positioning:   positioningRouter,
 });
 
 export type AppRouter = typeof appRouter;

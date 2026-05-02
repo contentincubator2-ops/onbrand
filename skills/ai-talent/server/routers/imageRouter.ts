@@ -12,19 +12,10 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../_core/imageGen";
+import { assertBrandOwner } from "../_core/brandAuth";
 
 const channel = z.enum(["fb", "ig", "linkedin", "youtube", "pr"]);
 const size = z.enum(["1024x1024", "1024x1536", "1536x1024"]);
-
-async function assertBrandOwner(userId: number, brandId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-  const [rows] = (await db.execute(sql`
-    SELECT id FROM brands WHERE id = ${brandId} AND userId = ${userId} LIMIT 1
-  `)) as any;
-  if (!rows?.length)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
-}
 
 export const imageRouter = router({
   generate: protectedProcedure
