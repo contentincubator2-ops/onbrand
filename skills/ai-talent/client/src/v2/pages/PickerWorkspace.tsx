@@ -1452,11 +1452,21 @@ function SquadDetailPanel({
   // backed by localStorage. Lets stepExecute carry the right context so
   // agents read event positioning, not just brand. (CJ correction 2026-04-30)
   const [scope] = useScopeState();
+  // Right-pane baton-strip mode (CJ direction 2026-05-02): show compact
+  // agent baton by default, expand a single AgentLiveCard inline only
+  // when user clicks. Replaces the always-on per-step grid.
+  const [expandedStepIdx, setExpandedStepIdx] = useState<number | null>(null);
   // ── Live progress polling (post-launch) ──────────────────────────────
+  // CJ direction 2026-05-02: drop poll frequency from 2s → 10s. The
+  // user only needs to know "agents are passing the baton", not see
+  // every render frame. 5× backend load reduction (was 7000 reqs/s
+  // worst case at 14k users; now 1400). User-triggered actions
+  // (confirm / redo / edit) still call refetch() explicitly so the
+  // immediate feedback loop is preserved.
   const progressQuery: any = (trpc.squad as any).stepGetProgress?.useQuery
     ? (trpc.squad as any).stepGetProgress.useQuery(
         { missionId: missionId ?? 0 },
-        { enabled: !!missionId, refetchInterval: missionId ? 2000 : false, refetchOnWindowFocus: false },
+        { enabled: !!missionId, refetchInterval: missionId ? 10_000 : false, refetchOnWindowFocus: false },
       )
     : { data: null, refetch: () => Promise.resolve({}) };
   const stepExecute: any = (trpc.squad as any).stepExecute?.useMutation
@@ -1933,66 +1943,78 @@ function SquadDetailPanel({
 
         <Divider />
 
-        <div className="space-y-2">
-          {steps.map((step: any, i: number) => {
-            const ord = i + 1;
-            const prog = progressByOrd.get(ord);
-            const liveStatus = prog?.status ?? (missionId ? "pending" : "queued");
-            const isActive = !!missionId && ord === activeStepOrder;
-            return (
-              <AgentLiveCard
-                key={i}
-                step={step}
-                idx={ord}
-                isOrchestrator={i === steps.length - 1 && steps.length > 1}
-                tone={tone}
-                hasNote={!!agentNotes[i]?.trim()}
-                liveStatus={liveStatus}
-                liveOutput={prog?.agentOutput ?? prog?.agent_output ?? null}
-                liveAgentName={prog?.agentName ?? prog?.agent_name ?? null}
-                isActive={isActive}
-                missionId={missionId}
-                squadSlug={squad.slug}
-                onConfirmAndAdvance={async () => {
-                  if (!missionId) return;
-                  // Mark this step confirmed
+        {/* Baton strip — compact horizontal agent sequence (CJ 2026-05-02).
+         *  Default state: show only the strip. Click any avatar to expand
+         *  the full AgentLiveCard inline below. Cuts visual + cognitive
+         *  load while still surfacing "agents are passing the baton". */}
+        <AgentBatonStrip
+          steps={steps}
+          progressByOrd={progressByOrd}
+          activeStepOrder={activeStepOrder}
+          missionId={missionId}
+          expandedStepIdx={expandedStepIdx}
+          onClickStep={(idx) => setExpandedStepIdx(expandedStepIdx === idx ? null : idx)}
+        />
+
+        {/* Inline expansion: render AgentLiveCard ONLY for the clicked step */}
+        {expandedStepIdx != null && steps[expandedStepIdx] && (() => {
+          const i = expandedStepIdx;
+          const step = steps[i];
+          const ord = i + 1;
+          const prog = progressByOrd.get(ord);
+          const liveStatus = prog?.status ?? (missionId ? "pending" : "queued");
+          const isActive = !!missionId && ord === activeStepOrder;
+          return (
+            <AgentLiveCard
+              key={`expanded-${i}`}
+              step={step}
+              idx={ord}
+              isOrchestrator={i === steps.length - 1 && steps.length > 1}
+              tone={tone}
+              hasNote={!!agentNotes[i]?.trim()}
+              liveStatus={liveStatus}
+              liveOutput={prog?.agentOutput ?? prog?.agent_output ?? null}
+              liveAgentName={prog?.agentName ?? prog?.agent_name ?? null}
+              isActive={isActive}
+              missionId={missionId}
+              squadSlug={squad.slug}
+              onConfirmAndAdvance={async () => {
+                if (!missionId) return;
+                await stepExecuteWithScope.mutateAsync({
+                  missionId, squadSlug: squad.slug, stepOrder: ord,
+                  mode: "confirm", userInput: "",
+                });
+                const next = ord + 1;
+                if (next <= steps.length) {
                   await stepExecuteWithScope.mutateAsync({
-                    missionId, squadSlug: squad.slug, stepOrder: ord,
-                    mode: "confirm", userInput: "",
-                  });
-                  // Auto-trigger next step if any
-                  const next = ord + 1;
-                  if (next <= steps.length) {
-                    await stepExecuteWithScope.mutateAsync({
-                      missionId, squadSlug: squad.slug, stepOrder: next,
-                      mode: "run", userInput: "",
-                    });
-                  }
-                  await progressQuery.refetch?.();
-                }}
-                onRedo={async () => {
-                  if (!missionId) return;
-                  await stepExecuteWithScope.mutateAsync({
-                    missionId, squadSlug: squad.slug, stepOrder: ord,
+                    missionId, squadSlug: squad.slug, stepOrder: next,
                     mode: "run", userInput: "",
                   });
-                  await progressQuery.refetch?.();
-                }}
-                onAsk={async (q: string) => {
-                  if (!missionId || !q.trim()) return;
-                  await stepExecuteWithScope.mutateAsync({
-                    missionId, squadSlug: squad.slug, stepOrder: ord,
-                    mode: "ask", userInput: q.trim(),
-                  });
-                  await progressQuery.refetch?.();
-                }}
-                isMutating={stepExecute.isPending}
-                onClick={() => setActiveStepIdx(i)}
-                onAfterEdit={() => { progressQuery.refetch?.(); }}
-              />
-            );
-          })}
-        </div>
+                }
+                await progressQuery.refetch?.();
+              }}
+              onRedo={async () => {
+                if (!missionId) return;
+                await stepExecuteWithScope.mutateAsync({
+                  missionId, squadSlug: squad.slug, stepOrder: ord,
+                  mode: "run", userInput: "",
+                });
+                await progressQuery.refetch?.();
+              }}
+              onAsk={async (q: string) => {
+                if (!missionId || !q.trim()) return;
+                await stepExecuteWithScope.mutateAsync({
+                  missionId, squadSlug: squad.slug, stepOrder: ord,
+                  mode: "ask", userInput: q.trim(),
+                });
+                await progressQuery.refetch?.();
+              }}
+              isMutating={stepExecute.isPending}
+              onClick={() => setActiveStepIdx(i)}
+              onAfterEdit={() => { progressQuery.refetch?.(); }}
+            />
+          );
+        })()}
 
         {/* Mission control footer (post-launch) */}
         {missionId && (
@@ -2141,6 +2163,117 @@ function AgentQueueCard({
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+/* ─────────────── Sub: AgentBatonStrip (CJ 2026-05-02) ─────────── */
+/**
+ * Compact horizontal sequence of agents — the "baton strip".
+ *
+ * Replaces the always-on AgentLiveCard grid. Each avatar shows status
+ * via badge color + dot animation; current active agent is highlighted
+ * with a ring. Click any avatar to expand AgentLiveCard inline below.
+ *
+ * Why: 14k users polling every 2s would crush the backend; the
+ * per-step expanded card was overkill for 95% of use cases (user
+ * just wants to know "agents are working, results are landing in
+ * the middle preview"). This compresses to a single row with an
+ * opt-in drill-down.
+ */
+function AgentBatonStrip({
+  steps, progressByOrd, activeStepOrder, missionId, expandedStepIdx, onClickStep,
+}: {
+  steps: any[];
+  progressByOrd: Map<number, any>;
+  activeStepOrder: number;
+  missionId: number | null;
+  expandedStepIdx: number | null;
+  onClickStep: (idx: number) => void;
+}) {
+  const STATUS_DOT: Record<string, string> = {
+    confirmed: "bg-success",
+    drafted:   "bg-warning",
+    running:   "bg-secondary animate-pulse",
+    asking:    "bg-primary animate-pulse",
+    skipped:   "bg-default-300",
+    pending:   "bg-default-200",
+    queued:    "bg-default-200",
+  };
+  const STATUS_LABEL: Record<string, string> = {
+    confirmed: "已確認",
+    drafted:   "等審核",
+    running:   "工作中",
+    asking:    "詢問中",
+    skipped:   "已跳過",
+    pending:   "排隊中",
+    queued:    "排隊中",
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-tiny tracking-wider uppercase text-default-500 font-medium">
+          AGENT BATON
+        </p>
+        <span className="text-tiny text-default-400">點頭像看細節</span>
+      </div>
+      <div className="flex items-center gap-0">
+        {steps.map((step: any, i: number) => {
+          const ord = i + 1;
+          const prog = progressByOrd.get(ord);
+          const status = prog?.status ?? (missionId ? "pending" : "queued");
+          const isActive = !!missionId && ord === activeStepOrder;
+          const isExpanded = expandedStepIdx === i;
+          const seed = step.assignedAgentId ?? step.assignedAgentName ?? `step-${i}`;
+          const agentName = step.assignedAgentName ?? `Step ${ord}`;
+          const isLast = i === steps.length - 1;
+          return (
+            <React.Fragment key={i}>
+              <Tooltip
+                content={
+                  <div className="px-1 py-1 max-w-[240px]">
+                    <p className="text-small font-semibold leading-tight">
+                      {ord}. {step.name ?? `Step ${ord}`}
+                    </p>
+                    <p className="text-tiny text-default-500 mt-0.5">
+                      {agentName} · {STATUS_LABEL[status] ?? status}
+                    </p>
+                  </div>
+                }
+                placement="bottom"
+              >
+                <button
+                  type="button"
+                  onClick={() => onClickStep(i)}
+                  className={[
+                    "relative shrink-0 rounded-full transition-all",
+                    isActive ? "ring-2 ring-primary ring-offset-1" : "",
+                    isExpanded ? "ring-2 ring-secondary ring-offset-1" : "",
+                  ].join(" ")}
+                  aria-label={`step ${ord} ${agentName}`}
+                >
+                  <AgentAvatar seed={seed} size={36} className="rounded-full" />
+                  {/* Status dot */}
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-content1 ${STATUS_DOT[status] ?? "bg-default-200"}`}
+                  />
+                  {/* Step number bubble */}
+                  <span className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-content1 border border-divider text-[9px] flex items-center justify-center font-semibold tabular-nums">
+                    {ord}
+                  </span>
+                </button>
+              </Tooltip>
+              {!isLast && (
+                <span
+                  className={`flex-1 h-px mx-1 ${prog?.status === "confirmed" ? "bg-success" : "bg-divider"}`}
+                  style={{ minWidth: 12 }}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
