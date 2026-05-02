@@ -41,3 +41,11 @@ jobs:
             echo ""
             echo "===== Mockup-fit report ====="
             cat /tmp/mockup-fit-audit.md 2>/dev/null
+
+            echo ""
+            echo "===== 3. Coverage report (squad/agent/task three-way) ====="
+            timeout 120 npx tsx scripts/audit-coverage-report.ts 2>&1 | tail -10
+
+            echo ""
+            echo "===== Coverage report ====="
+            cat /tmp/coverage-report.md 2>/dev/null
