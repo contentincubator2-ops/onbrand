@@ -1907,6 +1907,33 @@ function SquadDetailPanel({
               const activeStep = stepsArr[activeStepOrder - 1];
               const kind = inferStepKind(activeStep);
               const prog = progressByOrd.get(activeStepOrder);
+
+              // ── Intake / Decision / QA steps → always DocMockup ──────
+              // CJ direction 2026-05-02: "一開始 intake 的時候，都用這個格式"
+              // Any step with outputKind=decision/qa_review or mockupVariant=
+              // IntakeFormMockup/QAReportMockup uses the document reader layout,
+              // regardless of what inferStepKind returns.
+              const isDocStep =
+                ["decision", "qa_review", "qa"].includes(
+                  String(activeStep.outputKind ?? "").toLowerCase()
+                ) ||
+                ["IntakeFormMockup", "QAReportMockup"].includes(
+                  activeStep.mockupVariant ?? ""
+                );
+              if (isDocStep) {
+                return (
+                  <DocMockup
+                    title={activeStep.name ?? activeStep.title ?? (missionTitle || name)}
+                    brief={missionBrief || (description ?? "")}
+                    brandName={brandName}
+                    stepName={activeStep.name ?? activeStep.title ?? `Step ${activeStepOrder}`}
+                    agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
+                    body={prog?.agentOutput ?? prog?.agent_output ?? null}
+                    status={prog?.status ?? "pending"}
+                  />
+                );
+              }
+
               if (kind === "strategic") {
                 return (
                   <DocMockup

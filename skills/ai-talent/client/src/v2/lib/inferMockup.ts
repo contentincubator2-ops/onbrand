@@ -293,7 +293,7 @@ export function getVariantsForPlatform(platform: Platform): MockupVariant[] {
  * 3-step flow (設計方向 → AI prompt → 模型選擇), so squad-runner detects
  * visual steps here and swaps the middle preview to MediaGenFlow inline.
  */
-export type StepKind = "strategic" | "content" | "image" | "video";
+export type StepKind = "strategic" | "content" | "image" | "video" | "intake" | "qa";
 
 const STRATEGIC_KEYWORDS = [
   "research", "researcher", "analysis", "analyst", "audit",
@@ -413,6 +413,12 @@ export function inferStepKind(step: any): StepKind {
   if (explicit === "image" || explicit === "video" || explicit === "strategic" || explicit === "content") {
     return explicit as StepKind;
   }
+  // Intake / checkpoint / QA steps → doc format (CJ direction 2026-05-02)
+  if (explicit === "decision" || explicit === "intake") return "intake";
+  if (explicit === "qa_review" || explicit === "qa") return "qa";
+  const mv = String(step.mockupVariant ?? "");
+  if (mv === "IntakeFormMockup") return "intake";
+  if (mv === "QAReportMockup") return "qa";
   const haystack = [
     step.outputType, step.output, step.name, step.title,
     step.skill, step.assignedAgentName, step.role,
