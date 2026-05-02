@@ -104,7 +104,8 @@ type RailItem = {
 // (was previously hand-typed unicode glyphs — replaced 2026-04-28).
 
 const RAIL_TOP: RailItem[] = [
-  { key: "templates", label: "範本", icon: faTableCells, kind: "global" },
+  { key: "templates", label: "範本", icon: faTableCells,      kind: "global" },
+  { key: "detail",    label: "詳情", icon: faClipboardCheck,  kind: "global" },
 ];
 
 const RAIL_BOTTOM: RailItem[] = [
@@ -547,6 +548,16 @@ export default function PickerWorkspace() {
     }
   }, [filtered, selectedSlug]);
 
+  // ── Auto-switch to "詳情" tab when a squad is selected ────────────────
+  // When user clicks a squad card, jump them straight to the intake form.
+  // Going back to "範本" (via ← 所有方法論) clears selectedSlug and returns
+  // the middle column to the squad list.
+  useEffect(() => {
+    if (selectedSlug) {
+      setActiveRailKey("detail");
+    }
+  }, [selectedSlug]);
+
   // ── Mission creation ────────────────────────────────────────────────
   const createMission = trpc.mission.create.useMutation();
   const [busy, setBusy] = useState(false);
@@ -790,7 +801,7 @@ export default function PickerWorkspace() {
             <UploadDrawer scope={scope} onBackToTemplates={() => setActiveRailKey("templates")} />
           ) : activeRailKey === "members" ? (
             <MembersDrawer onBackToTemplates={() => setActiveRailKey("templates")} />
-          ) : activeRailKey === "templates" && selectedSquad ? (
+          ) : (activeRailKey === "detail" || activeRailKey === "templates") && selectedSquad ? (
             <SquadIntakeSidebar
               squad={selectedSquad}
               lang={lang}
@@ -804,7 +815,7 @@ export default function PickerWorkspace() {
               error={error}
               missionId={activeMissionId}
               onLaunch={() => launchSquad(selectedSquad)}
-              onBack={() => setSelectedSlug(null)}
+              onBack={() => { setSelectedSlug(null); setActiveRailKey("templates"); }}
               primaryOutputKind={primaryOutputKind_outer}
             />
           ) : (
@@ -1443,6 +1454,45 @@ function SquadThumb({
  * Contains the intake form + sticky launch footer.
  */
 
+// Platform auth configs — what authorization each platform needs
+const PLATFORM_AUTH: Record<string, {
+  label: string; icon: any; fieldLabel: string;
+  placeholder: string; helpText: string; btnLabel: string;
+}> = {
+  facebook:  {
+    label: "Facebook 粉絲團",
+    icon: faFacebook,
+    fieldLabel: "粉絲團名稱或 Page ID",
+    placeholder: "例如：@YourBrand 或 123456789",
+    helpText: "Agent 需要讀取粉絲團的過往貼文與互動數據，才能產出量身定制的內容行事曆。",
+    btnLabel: "授權 Facebook 粉絲團 →",
+  },
+  instagram: {
+    label: "Instagram 帳號",
+    icon: faInstagram,
+    fieldLabel: "IG 帳號名稱",
+    placeholder: "例如：@yourbrand",
+    helpText: "Agent 需要讀取 IG 帳號的貼文歷史與互動率，才能優化內容策略。",
+    btnLabel: "授權 Instagram 帳號 →",
+  },
+  linkedin:  {
+    label: "LinkedIn 帳號",
+    icon: faLinkedin,
+    fieldLabel: "LinkedIn 個人或公司頁面 URL",
+    placeholder: "https://www.linkedin.com/in/yourname",
+    helpText: "Agent 需要分析你的 LinkedIn 現有貼文風格，才能維持一致的專業語氣。",
+    btnLabel: "授權 LinkedIn 帳號 →",
+  },
+  youtube:   {
+    label: "YouTube 頻道",
+    icon: faYoutube,
+    fieldLabel: "頻道名稱或 URL",
+    placeholder: "https://www.youtube.com/@yourchannel",
+    helpText: "Agent 需要讀取頻道數據與影片庫，才能規劃最優化的內容排程。",
+    btnLabel: "授權 YouTube 頻道 →",
+  },
+};
+
 function SquadIntakeSidebar({
   squad, lang, workspace,
   missionTitle, setMissionTitle,
@@ -1473,6 +1523,11 @@ function SquadIntakeSidebar({
   const members: any[] = Array.isArray(squad.members) ? squad.members : [];
   const wsKey = workspace ?? (Array.isArray(squad.workspace) ? squad.workspace[0] : squad.workspace) ?? null;
   const wsMeta = wsKey ? WORKSPACE_META[wsKey] : null;
+  const platformAuth = wsKey ? PLATFORM_AUTH[wsKey] : null;
+
+  // Platform authorization local state
+  const [platformHandle, setPlatformHandle] = useState<string>("");
+  const [platformAuthorized, setPlatformAuthorized] = useState<boolean>(false);
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1563,6 +1618,60 @@ function SquadIntakeSidebar({
             </div>
           )}
         </div>
+
+        {/* Platform authorization — shown when squad has a known platform workspace */}
+        {platformAuth && (
+          <>
+            <Divider />
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[11px] font-semibold text-default-400 uppercase tracking-widest">平台授權</p>
+                {!platformAuthorized && (
+                  <Chip size="sm" variant="flat" color="warning" className="text-tiny">必填</Chip>
+                )}
+              </div>
+              <p className="text-tiny text-default-500 leading-relaxed">{platformAuth.helpText}</p>
+              {platformAuthorized ? (
+                <div className="flex items-center gap-2.5 pl-3 pr-2.5 py-2 rounded-xl border-l-4 border-primary bg-primary-50/30">
+                  <FontAwesomeIcon icon={platformAuth.icon} className="text-primary text-sm shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-small font-semibold truncate">{platformHandle || platformAuth.label}</p>
+                    <p className="text-tiny text-default-400">已授權，Agent 可讀取數據</p>
+                  </div>
+                  <Button size="sm" variant="light" color="danger" className="text-tiny shrink-0 h-6 px-2"
+                    onPress={() => { setPlatformAuthorized(false); setPlatformHandle(""); }}>
+                    移除
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    size="sm" variant="bordered" radius="md"
+                    label={platformAuth.fieldLabel}
+                    labelPlacement="outside"
+                    placeholder={platformAuth.placeholder}
+                    value={platformHandle}
+                    onValueChange={setPlatformHandle}
+                    isReadOnly={!!missionId}
+                    startContent={<FontAwesomeIcon icon={platformAuth.icon} className="text-default-400 text-tiny" />}
+                  />
+                  <Button
+                    size="sm" variant="bordered" radius="md"
+                    color="primary" className="w-full text-tiny"
+                    isDisabled={!platformHandle.trim() || !!missionId}
+                    onPress={() => setPlatformAuthorized(true)}
+                    startContent={<FontAwesomeIcon icon={platformAuth.icon} />}
+                  >
+                    {platformAuth.btnLabel}
+                  </Button>
+                  <p className="text-tiny text-default-400 text-center">
+                    或跳過（Agent 將使用品牌資料推導，不讀取平台數據）
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* 小組成員 */}
         {members.length > 0 && (
