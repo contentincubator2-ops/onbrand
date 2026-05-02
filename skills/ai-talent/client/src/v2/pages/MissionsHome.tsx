@@ -164,13 +164,20 @@ export default function MissionsHome() {
   // 類型 (entity kind): squad / agent / skill — drives the dropdown
   const [kindFilter, setKindFilter] = useState<"all" | "task" | "squad" | "agent" | "skill">("all");
 
-  // Task catalog (CJ direction 2026-05-01) — front-door for curated tasks.
-  // Surfaced as a 4th entity kind alongside squad/agent/skill so users
-  // browsing 任務範本 see real deliverables (e.g. "FB 月行事曆") not
-  // raw squads.
+  // Task catalog (CJ direction 2026-05-02) — show BOTH active + coming_soon
+  // so just-built tasks are visible without an admin gate.
   const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
-    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false })
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(
+        { includeComingSoon: true },
+        { refetchOnWindowFocus: false },
+      )
     : { data: [] };
+
+  // Recently added — for the 🆕 banner rail
+  const recentTasksQuery = (trpc as any).taskCatalog?.listRecent?.useQuery
+    ? (trpc as any).taskCatalog.listRecent.useQuery({ limit: 30 }, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const recentTasks: any[] = (recentTasksQuery.data as any[]) ?? [];
   const catalogEntities: any[] = useMemo(
     () => ((taskCatalogQuery.data as any[]) ?? []).map((t: any) => ({
       // Shape into the same envelope MissionsHome expects (kind+name+slug+strategyLayer)
@@ -460,6 +467,63 @@ export default function MissionsHome() {
           </div>
         </div>
       </section>
+
+      {/* 🆕 Recently added catalog tasks rail (CJ direction 2026-05-02:
+       *  「我要能在前端直接測試」— 一條顯眼的橫向 rail 直接列出最近
+       *  剛 seed 完的 FB / IG tasks，不用再進子頁面找）*/}
+      {recentTasks.length > 0 && (
+        <section className="px-8 pt-8 pb-2 border-b border-divider bg-default-50/50">
+          <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
+            <h2 className="text-medium font-semibold flex items-center gap-2">
+              🆕 最近新增的任務
+              <Chip size="sm" variant="flat" color="primary">{recentTasks.length}</Chip>
+            </h2>
+            <p className="text-tiny text-default-500">點任一張卡 → 進 picker 直接測試</p>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
+            {recentTasks.map((t: any) => {
+              const isComingSoon = t.status === "coming_soon";
+              const isSquad = t.impl_kind === "squad";
+              return (
+                <Card
+                  key={t.id}
+                  isPressable
+                  shadow="sm"
+                  radius="lg"
+                  className="shrink-0 w-[280px] border border-divider"
+                  style={{ scrollSnapAlign: "start" }}
+                  onPress={() => {
+                    const url = isSquad && t.squad_slug
+                      ? `/picker?workspace=${t.workspace}&slug=${t.squad_slug}`
+                      : `/picker?workspace=${t.workspace}`;
+                    navigate(url);
+                  }}
+                >
+                  <CardBody className="p-3 gap-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-small font-semibold flex-1 min-w-0 line-clamp-1">{t.name_zh}</span>
+                      <Chip size="sm" variant="flat" color={isComingSoon ? "warning" : "success"} className="h-4 text-tiny">
+                        {isComingSoon ? "🟡 設計中" : "🟢 上線"}
+                      </Chip>
+                    </div>
+                    <Chip size="sm" variant="flat" className="h-4 text-tiny self-start">
+                      {t.workspace} · {isSquad ? "squad" : "atomic"}
+                    </Chip>
+                    {t.methodology_label && (
+                      <p className="text-tiny text-default-500 italic line-clamp-1">{t.methodology_label}</p>
+                    )}
+                    <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em]">{t.description}</p>
+                    <div className="flex items-center justify-between text-tiny text-default-400 mt-1">
+                      <span>{t.estimated_minutes ? `約 ${t.estimated_minutes} 分鐘` : "—"}</span>
+                      <span className="text-primary">→ 開啟</span>
+                    </div>
+                  </CardBody>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ─── Body sections ──────────────────────────────────────── */}
       <section className="px-8 py-10">

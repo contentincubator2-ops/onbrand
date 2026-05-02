@@ -88,39 +88,78 @@ export const taskCatalogRouter = router({
       return out;
     }),
 
-  /** Picker front-door (flat) — only active tasks, optionally filtered by workspace. */
+  /** Picker front-door (flat) — active tasks by default; pass
+   *  `includeComingSoon: true` to also include reviewing/coming-soon
+   *  rows so CJ can find anything just-built without an admin gate.
+   */
   listForPicker: protectedProcedure
     .input(z.object({
       workspace: z.string().optional(),
       query: z.string().optional(),
+      includeComingSoon: z.boolean().optional(),
     }).optional())
     .query(async ({ input }) => {
-      const conds: string[] = ["status = 'active'"];
-      const params: any[] = [];
+      // CJ direction 2026-05-02: 「我要能在前端直接測試 / 顯示 approved
+      // and reviewing」. Default surfaces both states so everything just-
+      // built is findable without admin steps. Archived stays hidden.
+      const statusList = input?.includeComingSoon === false
+        ? ["active"]
+        : ["active", "coming_soon"];
+      const placeholders = statusList.map(() => "?").join(",");
+      const conds: string[] = [`t.status IN (${placeholders})`];
+      const params: any[] = [...statusList];
       if (input?.workspace) {
-        conds.push("workspace = ?");
+        conds.push("t.workspace = ?");
         params.push(input.workspace);
       }
       if (input?.query?.trim()) {
-        conds.push("(name_zh LIKE ? OR name_en LIKE ? OR description LIKE ? OR search_keywords LIKE ?)");
+        conds.push("(t.name_zh LIKE ? OR t.name_en LIKE ? OR t.description LIKE ? OR t.search_keywords LIKE ? OR t.methodology_label LIKE ?)");
         const q = `%${input.query.trim()}%`;
-        params.push(q, q, q, q);
+        params.push(q, q, q, q, q);
       }
       // JOIN squads + agents so the client can navigate / display without
       // a second round-trip. squad_slug feeds picker's setSelectedSlug();
       // agent_name is shown on the task card.
       return rowsAll(
         `SELECT t.id, t.slug, t.name_zh, t.name_en, t.description,
-                t.workspace, t.category, t.impl_kind,
+                t.workspace, t.category, t.impl_kind, t.status,
                 t.squad_id, s.slug AS squad_slug, s.name AS squad_name,
                 t.agent_id, a.name AS agent_name, a.avatarUrl AS agent_avatar,
-                t.bypassable, t.estimated_minutes
+                t.bypassable, t.estimated_minutes,
+                t.methodology_label, t.created_at
            FROM task_catalog t
       LEFT JOIN squads s ON s.id = t.squad_id
       LEFT JOIN agents a ON a.id = t.agent_id
           WHERE ${conds.join(" AND ")}
-          ORDER BY t.workspace ASC, t.category ASC, t.name_zh ASC`,
+          ORDER BY
+            CASE t.status WHEN 'active' THEN 0 ELSE 1 END,
+            t.workspace ASC, t.category ASC, t.name_zh ASC`,
         params,
+      );
+    }),
+
+  /**
+   * Recently added tasks — sorted by created_at DESC, limited.
+   * Used by MissionsHome 最近新增 rail so CJ lands on the homepage
+   * and immediately sees what was just built.
+   */
+  listRecent: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(50).default(30) }).optional())
+    .query(async ({ input }) => {
+      const limit = input?.limit ?? 30;
+      return rowsAll(
+        `SELECT t.id, t.slug, t.name_zh, t.name_en, t.description,
+                t.workspace, t.category, t.impl_kind, t.status,
+                t.squad_id, s.slug AS squad_slug, s.name AS squad_name,
+                t.agent_id, a.name AS agent_name, a.avatarUrl AS agent_avatar,
+                t.bypassable, t.estimated_minutes,
+                t.methodology_label, t.created_at
+           FROM task_catalog t
+      LEFT JOIN squads s ON s.id = t.squad_id
+      LEFT JOIN agents a ON a.id = t.agent_id
+          WHERE t.status IN ('active', 'coming_soon')
+          ORDER BY t.created_at DESC
+          LIMIT ${limit}`,
       );
     }),
 

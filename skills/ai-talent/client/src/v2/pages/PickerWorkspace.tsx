@@ -362,10 +362,14 @@ export default function PickerWorkspace() {
   useEffect(() => { setAgentNotes({}); }, [selectedSlug]);
 
   // ── Data ────────────────────────────────────────────────────────────
-  // Task catalog — curated front-door. CJ direction 2026-05-01: this
-  // takes precedence over raw squad search. Active tasks only.
+  // Task catalog — curated front-door. CJ direction 2026-05-02:
+  // include both active AND coming_soon so anything just-built is
+  // findable in the picker (active = 一鍵跑, coming_soon = 預覽 / 投票).
   const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
-    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false })
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(
+        { includeComingSoon: true },
+        { refetchOnWindowFocus: false },
+      )
     : { data: [] };
   const catalogTasks: any[] = (taskCatalogQuery.data as any[]) ?? [];
 
@@ -1124,11 +1128,11 @@ function ThumbSection({
 
 /* ─────────────────────────── Sub: CatalogTaskCard ─────────────────────────── */
 /**
- * Front-door card for a curated task_catalog row. Shows:
- *   - name + 1-line description
- *   - impl_kind chip (squad / atomic) + estimated_minutes
- *   - bypassable flag (一鍵跑) when true
- *   - bound squad / agent name as secondary line
+ * Front-door card for a curated task_catalog row.
+ *
+ * CJ direction 2026-05-02: surface BOTH status='active' AND 'coming_soon'
+ * so just-built tasks are findable. coming_soon items are still clickable
+ * (CJ wants to test) but visibly badged so users know they're preview.
  */
 function CatalogTaskCard({
   task, active, onClick,
@@ -1138,10 +1142,14 @@ function CatalogTaskCard({
   onClick: () => void;
 }) {
   const isSquad = task.impl_kind === "squad";
+  const isComingSoon = task.status === "coming_soon";
   const boundLabel = isSquad
-    ? (task.squad_name ?? `squad #${task.squad_id}`)
-    : (task.agent_name ?? `agent #${task.agent_id}`);
-  const disabled = !isSquad; // atomic flow not yet shipped
+    ? (task.squad_name ?? (task.squad_id ? `squad #${task.squad_id}` : "（squad 未綁）"))
+    : (task.agent_name ?? (task.agent_id ? `agent #${task.agent_id}` : "（agent 未綁）"));
+  // Disable click ONLY when coming_soon AND has no underlying squad/agent
+  // (so we can't actually run anything). Otherwise let CJ click and test.
+  const canRun = isSquad ? !!task.squad_id : !!task.agent_id;
+  const disabled = !canRun;
   return (
     <Card
       isPressable={!disabled}
@@ -1155,20 +1163,33 @@ function CatalogTaskCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-small font-semibold truncate">{task.name_zh}</span>
+              {/* Status badge — active (上線) vs coming_soon (設計中) */}
+              {isComingSoon ? (
+                <Chip size="sm" variant="flat" color="warning" className="h-4 text-tiny">
+                  🟡 設計中
+                </Chip>
+              ) : (
+                <Chip size="sm" variant="flat" color="success" className="h-4 text-tiny">
+                  🟢 上線
+                </Chip>
+              )}
               <Chip size="sm" variant="flat" color={isSquad ? "primary" : "secondary"} className="h-4 text-tiny">
                 {isSquad ? "squad" : "atomic"}
               </Chip>
-              {task.bypassable && (
+              {task.bypassable && !isComingSoon && (
                 <Chip size="sm" variant="flat" color="success" className="h-4 text-tiny">
                   一鍵跑
                 </Chip>
               )}
             </div>
+            {task.methodology_label && (
+              <p className="text-tiny text-default-500 italic mt-0.5">方法論：{task.methodology_label}</p>
+            )}
             <p className="text-tiny text-default-500 line-clamp-2 mt-0.5">{task.description}</p>
             <div className="flex items-center gap-2 mt-1 text-tiny text-default-400">
               <span>由 {boundLabel}</span>
               {task.estimated_minutes && <span>· 約 {task.estimated_minutes} 分鐘</span>}
-              {disabled && <span className="text-warning">· 流程下個 deploy 上線</span>}
+              {disabled && <span className="text-warning">· squad/agent 尚未綁定</span>}
             </div>
           </div>
         </div>

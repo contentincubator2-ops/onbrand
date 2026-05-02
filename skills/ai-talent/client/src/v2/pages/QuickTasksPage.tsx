@@ -167,12 +167,14 @@ export default function QuickTasksPage() {
 
   const tasks: TaskMeta[] = (tasksQuery.data as any[]) ?? [];
 
-  // Task catalog (CJ direction 2026-05-01) — surface curated catalog
-  // tasks here too. Different runtime model from quickTask (catalog
-  // tasks open in /picker, not inline run-panel), so we render them
-  // as a separate "從任務目錄選" section above the squads grid.
+  // Task catalog (CJ direction 2026-05-02) — surface active + coming_soon
+  // so just-built tasks are findable. Catalog tasks deep-link into
+  // /picker for the full intake + scope flow.
   const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
-    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false })
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(
+        { includeComingSoon: true },
+        { refetchOnWindowFocus: false },
+      )
     : { data: [] };
   const catalogTasks: any[] = (taskCatalogQuery.data as any[]) ?? [];
   const [activeId, setActiveId] = useState<string | null>(null);

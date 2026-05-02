@@ -164,10 +164,13 @@ export default function MethodologyCatalog() {
       )
     : { data: [], isLoading: false };
 
-  // Task catalog (CJ direction 2026-05-01) — curated front-door tasks
-  // surfaced in /templates as the 4th entity kind alongside squad/agent/skill.
+  // Task catalog (CJ direction 2026-05-02) — show active + coming_soon
+  // so just-built items are findable in /templates without admin gate.
   const taskCatalogQuery = (trpc as any).taskCatalog?.listForPicker?.useQuery
-    ? (trpc as any).taskCatalog.listForPicker.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 30_000 })
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(
+        { includeComingSoon: true },
+        { refetchOnWindowFocus: false, staleTime: 30_000 },
+      )
     : { data: [] };
   const catalogEntities: any[] = useMemo(
     () => ((taskCatalogQuery.data as any[]) ?? []).map((t: any) => ({
