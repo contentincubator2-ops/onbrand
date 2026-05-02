@@ -52,15 +52,68 @@ const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/marketing-os/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
 mkdirSync(COVERS_DIR, { recursive: true });
 
-// ── Variable system for B&W line-art portraits ───────────────────────────
-// Style is FIXED (white bg + black line). Variety comes from facial features,
-// hair, accessories, pose. 6 × 10 × 5 × 6 × 7 × 4 = 50,400 combinations.
-const FACE_SHAPES   = ["oval", "round", "square", "heart-shaped", "long", "diamond"];
-const HAIR_STYLES   = ["short crop", "shoulder-length wavy", "high ponytail", "top knot", "curly afro", "long straight", "braided", "buzz cut", "bob cut", "dreadlocks"];
-const EYEWEAR       = ["no glasses", "round wire glasses", "square frames", "thin oval glasses", "minimal half-rim glasses"];
-const EXPRESSIONS   = ["subtle smile", "confident neutral", "calm focused", "thoughtful", "warm welcoming", "serene"];
-const OUTFITS       = ["collared shirt with simple tie", "open-collar shirt", "turtleneck sweater", "casual hoodie", "blazer over t-shirt", "minimal jumpsuit", "polo shirt"];
-const ANGLES        = ["front-facing", "three-quarter left turn", "three-quarter right turn", "subtle profile"];
+// ── Variable system — bold graphic novel portrait avatars ────────────────
+// Style: webtoon / graphic novel illustration with solid colored background.
+// Character rendered in black + white with thick bold outlines on a vivid
+// background that reflects the agent's platform or specialty.
+// Diversity: 6 × 10 × 5 × 6 × 7 × 4 = 50,400 combinations.
+
+const FACE_SHAPES = ["oval", "round", "square", "heart-shaped", "long", "diamond"];
+const HAIR_STYLES = ["short crop", "shoulder-length wavy", "high ponytail", "top knot",
+  "curly afro", "long straight", "braided", "buzz cut", "bob cut", "dreadlocks"];
+const EYEWEAR     = ["no glasses", "round wire-frame glasses", "square black frames",
+  "thin oval glasses", "minimal half-rim glasses"];
+const EXPRESSIONS = ["subtle confident smile", "calm focused", "thoughtful",
+  "warm welcoming", "serene professional", "quietly determined"];
+const OUTFITS     = ["collared shirt with simple tie", "open-collar shirt",
+  "turtleneck sweater", "casual hoodie", "blazer over t-shirt",
+  "minimal structured jacket", "polo shirt"];
+const ANGLES      = ["front-facing", "three-quarter left turn",
+  "three-quarter right turn", "subtle profile"];
+
+// Background colour per platform / specialty (CSS hex, no #)
+const SPECIALTY_COLORS: Record<string, string> = {
+  facebook:  "#4267B2",
+  instagram: "#C13584",
+  linkedin:  "#0077B5",
+  youtube:   "#CC0000",
+  strategy:  "#6548C6",
+  research:  "#0891B2",
+  writer:    "#059669",
+  visual:    "#E11D48",
+  analytics: "#D97706",
+  pr:        "#7C3AED",
+  calendar:  "#0369A1",
+  ads:       "#B45309",
+};
+const COLOR_PALETTE = Object.values(SPECIALTY_COLORS);
+
+function bgColorForAgent(agent: { slug: string; title: string | null; specialty: string | null }): string {
+  const hint = [agent.slug, agent.title, agent.specialty].join(" ").toLowerCase();
+  if (hint.includes("facebook") || hint.includes(" fb ")) return SPECIALTY_COLORS.facebook!;
+  if (hint.includes("instagram") || hint.includes(" ig "))  return SPECIALTY_COLORS.instagram!;
+  if (hint.includes("linkedin") || hint.includes(" li "))   return SPECIALTY_COLORS.linkedin!;
+  if (hint.includes("youtube") || hint.includes(" yt "))    return SPECIALTY_COLORS.youtube!;
+  if (hint.includes("strateg") || hint.includes("策略") || hint.includes("brand"))
+    return SPECIALTY_COLORS.strategy!;
+  if (hint.includes("research") || hint.includes("研究") || hint.includes("insight"))
+    return SPECIALTY_COLORS.research!;
+  if (hint.includes("writ") || hint.includes("copy") || hint.includes("文案") || hint.includes("content"))
+    return SPECIALTY_COLORS.writer!;
+  if (hint.includes("visual") || hint.includes("視覺") || hint.includes("design") || hint.includes("art"))
+    return SPECIALTY_COLORS.visual!;
+  if (hint.includes("analyt") || hint.includes("分析") || hint.includes("data") || hint.includes("kpi"))
+    return SPECIALTY_COLORS.analytics!;
+  if (hint.includes("pr") || hint.includes("公關") || hint.includes("media"))
+    return SPECIALTY_COLORS.pr!;
+  if (hint.includes("calendar") || hint.includes("行事曆") || hint.includes("pillar"))
+    return SPECIALTY_COLORS.calendar!;
+  if (hint.includes("ads") || hint.includes("廣告"))
+    return SPECIALTY_COLORS.ads!;
+  // Deterministic fallback — pick from palette by id hash
+  const h = createHash("sha256").update(agent.slug).digest();
+  return COLOR_PALETTE[h[0]! % COLOR_PALETTE.length]!;
+}
 
 // Deterministic hash → axis indexes
 function pickByHash(seed: string, axes: string[][]): string[] {
@@ -76,25 +129,26 @@ function buildAvatarPrompt(agent: { id: number; slug: string; name: string; titl
   const [face, hairStyle, eyewear, expression, outfit, angle] =
     pickByHash(seed, [FACE_SHAPES, HAIR_STYLES, EYEWEAR, EXPRESSIONS, OUTFITS, ANGLES]);
 
+  const bgColor = bgColorForAgent(agent);
+
   return [
-    // STYLE — fixed: black ink line drawing on pure white background
-    "single-line minimalist portrait illustration",
-    "pure black ink lines on solid pure white background",
-    "no color, no shading, no fills, no gradients, no halftones",
-    "thin clean continuous lines, vector-like quality",
-    "minimalist editorial portrait, gallery line art aesthetic",
-    // SUBJECT — variable. Half-body framing (waist-up, hands visible if natural)
-    // so the same image works as round avatar AND as larger card portrait.
-    `${angle} half-body portrait of a person, waist-up framing showing head, shoulders, and upper torso`,
+    // STYLE — bold graphic novel / webtoon character portrait
+    "bold graphic novel portrait illustration",
+    "thick clean black outlines, flat color fills, no gradients, no halftones",
+    "webtoon / indie comic book character design",
+    `solid ${bgColor} background, character in black and white with bold thick ink outlines`,
+    "high contrast, crisp edges, professionally illustrated avatar",
+    // SUBJECT — half-body waist-up framing for round avatar AND card portrait use
+    `${angle} half-body portrait of a person, waist-up showing head shoulders and upper torso`,
     `${face} face`,
     `${hairStyle} hair`,
     eyewear === "no glasses" ? "" : eyewear,
     `${expression} expression`,
     `wearing ${outfit}`,
-    "subject centered with generous space above head and below shoulders for safe cropping",
+    "subject centered with space above head and below shoulders for safe cropping",
     // CONSTRAINTS
-    "centered composition, balanced negative space, no text, no logos, no watermarks",
-  ].filter(Boolean).join(", ").slice(0, 800);
+    "no text, no logos, no watermarks, no background elements, clean avatar",
+  ].filter(Boolean).join(", ").slice(0, 900);
 }
 
 async function generateImage(prompt: string): Promise<Buffer> {
