@@ -45,6 +45,7 @@ import { mediaRouter } from "./mediaRouter";
 import { taskCatalogRouter } from "./taskCatalogRouter";
 import { positioningRouter } from "./positioningRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
+import { feedbackRouter } from "./feedbackRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -95,6 +96,7 @@ export const appRouter = router({
   taskCatalog:   taskCatalogRouter,
   positioning:   positioningRouter,
   platformConnect: platformConnectRouter,
+  feedback:        feedbackRouter,
 });
 
 export type AppRouter = typeof appRouter;

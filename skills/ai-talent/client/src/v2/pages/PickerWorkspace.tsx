@@ -28,6 +28,7 @@ import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMockupFields, type MockupVariant } from "../lib/inferMockup";
 import { searchAndRankSquads } from "../lib/searchSquads";
 import { useSemanticSearch } from "../lib/useSemanticSearch";
+import { IntakeChat } from "../components/IntakeChat";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import { CalendarGridMockup } from "../components/SquadMockups/calendar";
@@ -588,16 +589,17 @@ export default function PickerWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const launchSquad = async (sq: any) => {
+  // Streaming intake preview text (from IntakeChat.onPreviewChunk)
+  const [previewText, setPreviewText] = useState("");
+
+  const launchSquad = async (sq: any, intakeSummary?: string) => {
     setError(null);
     setBusy(true);
     try {
       const ws = (Array.isArray(sq.workspace) ? sq.workspace[0] : sq.workspace) || channelFilter || "";
 
-      // Build description: user brief + per-step agent notes appended as a
-      // markdown section so WorkflowRunner picks them up via the existing
-      // mission.description prompt path. No backend schema change needed.
-      const baseDesc = missionBrief.trim() || safeLocalizedText(sq.description, lang) || "";
+      // Build description: intake summary (from chat) + user brief + per-step agent notes.
+      const baseDesc = intakeSummary?.trim() || missionBrief.trim() || safeLocalizedText(sq.description, lang) || "";
       const steps: any[] = Array.isArray(sq.steps) ? sq.steps : [];
       const noteLines = steps
         .map((step, i) => {
@@ -827,21 +829,27 @@ export default function PickerWorkspace() {
           ) : activeRailKey === "members" ? (
             <MembersDrawer onBackToTemplates={() => setActiveRailKey("templates")} />
           ) : (activeRailKey === "detail" || activeRailKey === "templates") && selectedSquad ? (
-            <SquadIntakeSidebar
+            <IntakeChat
               squad={selectedSquad}
               lang={lang}
               workspace={effectiveChannel}
-              missionTitle={missionTitle}
-              setMissionTitle={setMissionTitle}
-              missionBrief={missionBrief}
-              setMissionBrief={setMissionBrief}
               brandName={brands.find((b: any) => b.id === brandId)?.name ?? null}
+              brandCtx={(() => {
+                const brand = brands.find((b: any) => b.id === brandId);
+                if (!brand) return "";
+                return [
+                  `品牌名稱：${brand.name ?? ""}`,
+                  brand.description ? `品牌描述：${brand.description}` : null,
+                  brand.industry   ? `產業：${brand.industry}`         : null,
+                  brand.tone       ? `語氣：${brand.tone}`             : null,
+                ].filter(Boolean).join("\n");
+              })()}
               busy={busy}
               error={error}
               missionId={activeMissionId}
-              onLaunch={() => launchSquad(selectedSquad)}
-              onBack={() => { setSelectedSlug(null); setActiveRailKey("templates"); }}
-              primaryOutputKind={primaryOutputKind_outer}
+              onLaunch={(intakeSummary) => launchSquad(selectedSquad, intakeSummary)}
+              onBack={() => { setSelectedSlug(null); setActiveRailKey("templates"); setPreviewText(""); }}
+              onPreviewChunk={(chunk) => setPreviewText((prev) => prev + chunk)}
             />
           ) : (
           <>
@@ -1084,8 +1092,10 @@ export default function PickerWorkspace() {
                 workspace={effectiveChannel}
                 brandName={brands.find((b: any) => b.id === brandId)?.name ?? null}
                 missionId={activeMissionId}
+                intakePreviewText={previewText}
                 onMissionEnd={() => {
                   setActiveMissionId(null);
+                  setPreviewText("");
                   const next = new URLSearchParams(params);
                   next.delete("mission");
                   setParams(next, { replace: true });
@@ -1801,6 +1811,9 @@ function FeedbackPanel({
   const [tab, setTab] = useState<"strategy" | "copy" | "visual">("strategy");
   const [input, setInput] = useState("");
   const [notes, setNotes] = useState<Array<{ tab: string; text: string; ts: string }>>([]);
+  const saveNote = (trpc as any).feedback?.saveNote?.useMutation
+    ? (trpc as any).feedback.saveNote.useMutation()
+    : { mutateAsync: async () => null };;
 
   const confirmedCount = Array.from(progressByOrd.values()).filter((p: any) => p?.status === "confirmed").length;
   const pct = steps.length ? (confirmedCount / steps.length) * 100 : 0;
@@ -1891,13 +1904,21 @@ function FeedbackPanel({
         <Button
           size="sm" radius="full" color="primary" className="w-full mt-2"
           isDisabled={!input.trim()}
-          onPress={() => {
+          onPress={async () => {
+            const text = input.trim();
             setNotes((prev) => [...prev, {
               tab,
-              text: input.trim(),
+              text,
               ts: new Date().toLocaleTimeString("zh-TW"),
             }]);
             setInput("");
+            if (missionId) {
+              saveNote.mutateAsync({
+                missionId,
+                category: tab,
+                text,
+              }).catch(() => { /* silent */ });
+            }
           }}
         >
           送出想法
@@ -1929,13 +1950,14 @@ const WORKSPACE_META: Record<string, { label: string; icon: any; brand?: any; mo
 function SquadDetailPanel({
   squad, lang,
   workspace, brandName,
-  missionId, onMissionEnd,
+  missionId, intakePreviewText, onMissionEnd,
 }: {
   squad: any;
   lang: "zh-TW" | "en";
   workspace: string | null;
   brandName: string | null;
   missionId: number | null;
+  intakePreviewText?: string;
   onMissionEnd: () => void;
 }) {
   // ── Active scope (brand × product × event) — same hook ShellLayout uses,
@@ -2275,6 +2297,20 @@ function SquadDetailPanel({
 
             // Default: single-post PlatformMockup
             const live = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
+            // Show streaming intake preview when agent is answering (pre-launch)
+            if (!missionId && intakePreviewText) {
+              return (
+                <div className="w-full h-full flex flex-col items-center justify-start pt-4 px-4">
+                  <div className="w-full max-w-sm rounded-2xl border border-secondary/30 bg-secondary/5 p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-secondary text-tiny font-semibold uppercase tracking-wide">
+                      <span className="w-2 h-2 rounded-full bg-secondary animate-pulse inline-block" />
+                      Agent 預覽草稿
+                    </div>
+                    <p className="text-small text-foreground leading-relaxed whitespace-pre-wrap">{intakePreviewText}</p>
+                  </div>
+                </div>
+              );
+            }
             return (
               <PlatformMockup
                 variant={previewVariant}
