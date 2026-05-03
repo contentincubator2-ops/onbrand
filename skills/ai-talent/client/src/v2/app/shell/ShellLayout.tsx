@@ -132,9 +132,25 @@ function Sidebar({
       className="fixed left-0 top-0 bottom-0 z-40 flex flex-col transition-[width] duration-200"
       style={{ width }}
     >
-      {/* Top: SO logo */}
-      <div className="h-14 flex items-center justify-center shrink-0">
+      {/* Top: SO logo + collapse toggle */}
+      <div className="h-14 flex items-center justify-center shrink-0 relative">
         <Avatar name="SO" size="sm" radius="md" color="primary" classNames={{ name: "font-bold text-xs" }} />
+        <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
+          <button
+            onClick={onToggle}
+            aria-label="切換側邊欄"
+            style={{
+              position: "absolute", top: 8, right: 6,
+              width: 28, height: 28, borderRadius: "50%", border: "none", background: "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "color 0.1s linear, background-color 0.1s linear",
+              fontSize: 11,
+            }}
+            className="text-default-300 hover:text-default-600 hover:bg-default-100"
+          >
+            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* CTA: + 建立 */}
@@ -206,25 +222,8 @@ function Sidebar({
         </Tooltip>
       </nav>
 
-      {/* ─── Bottom: collapse toggle + bell + avatar popup ─── */}
+      {/* ─── Bottom: bell + avatar popup ─── */}
       <div className={`shrink-0 pb-3 flex flex-col items-center gap-1 ${collapsed ? "px-2" : "px-3"}`}>
-        {/* Collapse toggle — 36×36px */}
-        <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
-          <button
-            onClick={onToggle}
-            aria-label="切換側邊欄"
-            style={{
-              width: 36, height: 36, borderRadius: "50%", border: "none", background: "none",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "color 0.1s linear, background-color 0.1s linear",
-              fontSize: 12,
-            }}
-            className="text-default-400 hover:text-default-700 hover:bg-default-100"
-          >
-            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
-          </button>
-        </Tooltip>
-
         {/* Notification bell — 36×36px hit area (Canva spec) */}
         <Tooltip content="通知" placement="right">
           <button
