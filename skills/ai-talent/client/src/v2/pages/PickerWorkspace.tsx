@@ -29,7 +29,7 @@ import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMoc
 import { searchAndRankSquads } from "../lib/searchSquads";
 import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { IntakeChat } from "../components/IntakeChat";
-import { useMissionStream } from "../lib/useMissionStream";
+import { useMissionStream, buildSlotMapFromProgress } from "../lib/useMissionStream";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import { CalendarGridMockup } from "../components/SquadMockups/calendar";
@@ -1983,7 +1983,7 @@ function SquadDetailPanel({
     : { mutateAsync: async () => null, isPending: false };
 
   // SSE streaming hook — replaces stepExecute for mode="run"
-  const { liveFields, stepStatus, isStreaming: isStepStreaming, streamError, startStep } = useMissionStream({
+  const { sseSlotMap, activeSlotKey: _activeSlotKey, stepStatus, isStreaming: isStepStreaming, streamError, startStep } = useMissionStream({
     onStepDone: (_ord, _output) => {
       // Refresh polling state after step completes so confirm/redo buttons appear
       progressQuery.refetch?.();
@@ -2017,6 +2017,17 @@ function SquadDetailPanel({
 
   // Active step = first step that's not 'confirmed' or 'skipped'.
   const stepsArr: any[] = Array.isArray(squad.steps) ? squad.steps : [];
+
+  // Session 6: build DB-backed slot map from completed step progress,
+  // then merge SSE live slots on top (SSE wins for the active slot).
+  const dbSlotMap = useMemo(
+    () => buildSlotMapFromProgress(stepsArr, progressByOrd),
+    [stepsArr, progressByOrd],
+  );
+  const fullSlotMap = useMemo(
+    () => ({ ...dbSlotMap, ...sseSlotMap }),
+    [dbSlotMap, sseSlotMap],
+  );
   const activeStepOrder: number = useMemo(() => {
     for (let i = 0; i < stepsArr.length; i++) {
       const ord = i + 1;
@@ -2169,16 +2180,33 @@ function SquadDetailPanel({
                 return (
                   <React.Fragment key={ord}>
                     {i > 0 && <span className="text-default-200 text-tiny shrink-0">→</span>}
-                    <div className={[
-                      "shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-tiny font-medium transition-all",
-                      isActive
-                        ? "bg-primary/10 text-primary border border-primary/30"
-                        : isConfirmed
-                        ? "bg-success/10 text-success border border-success/20"
-                        : isDone
-                        ? "bg-default-100 text-default-600 border border-default-200"
-                        : "text-default-400 border border-transparent",
-                    ].join(" ")}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (!missionId || isStepStreaming) return;
+                        startStep({
+                          missionId,
+                          squadSlug: squad.slug,
+                          stepOrder: ord,
+                          step: s,
+                          scopeBrandId:   scope.brandId   ?? null,
+                          scopeProductId: scope.productId ?? null,
+                          scopeEventId:   scope.eventId   ?? null,
+                        });
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.currentTarget.click(); }}
+                      className={[
+                        "shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-tiny font-medium transition-all",
+                        missionId && !isStepStreaming ? "cursor-pointer hover:opacity-80" : "cursor-default",
+                        isActive
+                          ? "bg-primary/10 text-primary border border-primary/30"
+                          : isConfirmed
+                          ? "bg-success/10 text-success border border-success/20"
+                          : isDone
+                          ? "bg-default-100 text-default-600 border border-default-200"
+                          : "text-default-400 border border-transparent",
+                      ].join(" ")}>
                       {isActive && (
                         <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
                       )}
@@ -2359,11 +2387,10 @@ function SquadDetailPanel({
             }
 
             // Default: single-post PlatformMockup
-            // Merge: SSE live fields (real-time) override DB-backed aggregated fields
+            // Session 6: pass fullSlotMap (DB + SSE merged) — SlotContent handles
+            // loading/filled/empty per slot. Legacy liveXxx props kept as fallback
+            // for mockup variants that haven't migrated to SlotContent yet.
             const dbLive = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
-            const live = isStepStreaming
-              ? { ...dbLive, ...liveFields }  // SSE wins when streaming
-              : dbLive;
             // Show streaming intake preview when agent is answering (pre-launch)
             if (!missionId && intakePreviewText) {
               return (
@@ -2385,13 +2412,14 @@ function SquadDetailPanel({
                 brief={description ?? ""}
                 brandName={brandName}
                 steps={steps}
-                liveCaption={live.caption}
-                liveHashtags={live.hashtags}
-                liveTitle={live.title}
-                liveDescription={live.description}
-                liveImageDesc={live.imageDesc}
-                liveVideoDesc={live.videoDesc}
-                liveCta={live.cta}
+                slotMap={missionId ? fullSlotMap : undefined}
+                liveCaption={dbLive.caption}
+                liveHashtags={dbLive.hashtags}
+                liveTitle={dbLive.title}
+                liveDescription={dbLive.description}
+                liveImageDesc={dbLive.imageDesc}
+                liveVideoDesc={dbLive.videoDesc}
+                liveCta={dbLive.cta}
               />
             );
           })()}
