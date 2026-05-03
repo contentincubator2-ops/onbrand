@@ -27,7 +27,7 @@ import { Avatar, Button, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles,
-  faMicrophone, faBookBookmark, faEllipsis,
+  faMicrophone, faBookBookmark, faEllipsis, faBell,
   faChevronLeft, faChevronRight, faPlus, faBars, faRightFromBracket,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -190,19 +190,21 @@ function Sidebar({
       {/* Primary CTA: + 建立 */}
       <div className={`shrink-0 ${collapsed ? "px-2 py-3" : "p-3"}`}>
         {collapsed ? (
-          <button
-            onClick={() => onNavigate("/")}
-            aria-label="建立任務"
-            style={{
-              background: "#F97316",
-              transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
-            }}
-            className="mx-auto flex items-center justify-center w-10 h-10 rounded-full text-white shadow-sm hover:shadow-md active:scale-95"
-            onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
-          >
-            <FontAwesomeIcon icon={faPlus} className="text-base" />
-          </button>
+          <Tooltip content="建立任務" placement="right">
+            <button
+              onClick={() => onNavigate("/")}
+              aria-label="建立任務"
+              style={{
+                background: "#F97316",
+                transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
+              }}
+              className="mx-auto flex items-center justify-center w-10 h-10 rounded-full text-white shadow-sm hover:shadow-md active:scale-95"
+              onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
+              onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
+            >
+              <FontAwesomeIcon icon={faPlus} className="text-base" />
+            </button>
+          </Tooltip>
         ) : (
           <Button
             variant="solid"
@@ -237,34 +239,63 @@ function Sidebar({
           );
         })}
 
-        {/* Show-more */}
-        {collapsed ? (
-          <button
-            aria-label="顯示更多"
-            className="w-full mt-1 flex flex-col items-center gap-0.5 py-2 rounded-xl text-default-500 hover:bg-default-100 transition-colors"
-          >
-            <FontAwesomeIcon icon={faEllipsis} className="text-sm" />
-            <span className="text-[9px] leading-tight">更多</span>
-          </button>
-        ) : (
-          <Button
-            variant="light"
-            fullWidth
-            aria-label="顯示更多"
-            className="mt-1 justify-start"
-            startContent={<FontAwesomeIcon icon={faEllipsis} />}
-          >
-            顯示更多
-          </Button>
-        )}
+        {/* Show-more — icon only */}
+        <Tooltip content="顯示更多" placement="right">
+          {collapsed ? (
+            <button
+              aria-label="顯示更多"
+              style={{ transition: "color 0.1s linear" }}
+              className="w-full mt-1 flex items-center justify-center py-2.5 rounded-xl text-default-400 hover:text-default-700"
+            >
+              <FontAwesomeIcon icon={faEllipsis} className="text-sm" />
+            </button>
+          ) : (
+            <Button
+              variant="light"
+              fullWidth
+              aria-label="顯示更多"
+              className="mt-1 justify-start"
+              startContent={<FontAwesomeIcon icon={faEllipsis} />}
+            >
+              顯示更多
+            </Button>
+          )}
+        </Tooltip>
       </nav>
 
-      {/* Bottom: collapse toggle */}
-      <div className="p-2 shrink-0">
+      {/* ─── Bottom: bell + avatar (Canva-style) ─── */}
+      <div className={`shrink-0 pb-3 flex flex-col items-center gap-1 ${collapsed ? "px-2" : "px-3"}`}>
+        {/* Collapse toggle */}
         <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
-          <Button isIconOnly size="sm" variant="light" fullWidth onPress={onToggle} aria-label="切換側邊欄">
-            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
-          </Button>
+          <button
+            onClick={onToggle}
+            aria-label="切換側邊欄"
+            style={{ transition: "color 0.1s linear" }}
+            className="w-full flex items-center justify-center py-2 rounded-xl text-default-400 hover:text-default-700"
+          >
+            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} className="text-xs" />
+          </button>
+        </Tooltip>
+
+        {/* Notification bell */}
+        <Tooltip content="通知" placement="right">
+          <button
+            aria-label="通知"
+            style={{ transition: "color 0.1s linear" }}
+            className="w-full flex items-center justify-center py-2 rounded-xl text-default-400 hover:text-default-700"
+          >
+            <FontAwesomeIcon icon={faBell} className="text-sm" />
+          </button>
+        </Tooltip>
+
+        {/* User avatar */}
+        <Tooltip content="帳號" placement="right">
+          <button
+            aria-label="帳號"
+            className="mt-1 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <Avatar name="S" size="sm" radius="full" color="primary" classNames={{ name: "font-bold text-xs" }} />
+          </button>
         </Tooltip>
       </div>
     </aside>
@@ -281,22 +312,21 @@ function SidebarNavLink({
 }) {
   if (collapsed) {
     return (
+      <Tooltip content={item.label} placement="right">
       <button
         onClick={onClick}
         aria-label={item.label}
         style={{ transition: "color 0.1s linear, transform 0.07s" }}
         className={[
-          "w-full mt-1 flex flex-col items-center gap-0.5 py-2 rounded-xl",
+          "w-full mt-1 flex items-center justify-center py-2.5 rounded-xl",
           active
             ? "text-[#F97316]"
             : "text-default-400 hover:text-default-700",
         ].join(" ")}
       >
         <span className={`leading-none ${active ? "text-base" : "text-sm"}`}>{item.icon}</span>
-        <span className={`text-[9px] leading-tight max-w-full px-0.5 text-center line-clamp-1 ${active ? "font-semibold" : "font-medium"}`}>
-          {item.label}
-        </span>
       </button>
+      </Tooltip>
     );
   }
 
