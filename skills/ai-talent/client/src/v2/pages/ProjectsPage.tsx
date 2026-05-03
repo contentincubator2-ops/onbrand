@@ -128,16 +128,22 @@ export default function ProjectsPage() {
   const isLoading = allQuery?.isLoading ?? fallbackQuery.isLoading;
 
   /* UI state */
-  const [subNav,       setSubNav]       = useState<SubNavKey>("all");
-  const [ownerFilter,  setOwnerFilter]  = useState<string>("all");
-  const [typeFilter,   setTypeFilter]   = useState<string>("all");
-  const [sortMode,     setSortMode]     = useState<"recent" | "asc" | "desc">("recent");
-  const [viewMode,     setViewMode]     = useState<"grid" | "list">("grid");
-  const [ownerSearch,  setOwnerSearch]  = useState("");
-  const [ownerOpen,    setOwnerOpen]    = useState(false);
-  const [typeOpen,     setTypeOpen]     = useState(false);
-  const [createSource, setCreateSource] = useState<SourceId | null>(null);
-  const [syncSource,   setSyncSource]   = useState<SyncSource | null>(null);
+  const [subNav,        setSubNav]        = useState<SubNavKey>("all");
+  const [ownerFilter,   setOwnerFilter]   = useState<string>("all");
+  const [typeFilter,    setTypeFilter]    = useState<string>("all");
+  const [categoryFilter,setCategoryFilter] = useState<string>("all");
+  const [dateFilter,    setDateFilter]    = useState<string>("all");
+  const [sortMode,      setSortMode]      = useState<"recent" | "asc" | "desc">("recent");
+  const [viewMode,      setViewMode]      = useState<"grid" | "list">("grid");
+  const [ownerSearch,   setOwnerSearch]   = useState("");
+  const [ownerOpen,     setOwnerOpen]     = useState(false);
+  const [typeOpen,      setTypeOpen]      = useState(false);
+  const [categoryOpen,  setCategoryOpen]  = useState(false);
+  const [dateOpen,      setDateOpen]      = useState(false);
+  const [foldersOpen,   setFoldersOpen]   = useState(true);
+  const [designsOpen,   setDesignsOpen]   = useState(true);
+  const [createSource,  setCreateSource]  = useState<SourceId | null>(null);
+  const [syncSource,    setSyncSource]    = useState<SyncSource | null>(null);
 
   /* Owner options */
   const ownerOptions = useMemo(() => {
@@ -161,6 +167,25 @@ export default function ProjectsPage() {
     ];
   }, [rows]);
 
+  /* Category options (strategy layer) */
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((m) => { const l = (m.squadLayer ?? "").toString().slice(0,2); if (l) set.add(l); });
+    return [
+      { value: "all", label: "任何類別" },
+      ...Array.from(set).sort().map(v => ({ value: v, label: `${v} 策略層` })),
+    ];
+  }, [rows]);
+
+  /* Date options */
+  const dateOptions = [
+    { value: "all",   label: "任何日期" },
+    { value: "today", label: "今天"     },
+    { value: "week",  label: "本週"     },
+    { value: "month", label: "本月"     },
+    { value: "year",  label: "今年"     },
+  ];
+
   /* Filtered + sorted rows */
   const filtered = useMemo(() => {
     let r = rows;
@@ -170,6 +195,14 @@ export default function ProjectsPage() {
     if (typeFilter !== "all") {
       r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
     }
+    if (categoryFilter !== "all") {
+      r = r.filter((m) => (m.squadLayer ?? "").toString().slice(0,2) === categoryFilter);
+    }
+    if (dateFilter !== "all") {
+      const ms: Record<string,number> = { today: 86_400_000, week: 604_800_000, month: 2_592_000_000, year: 31_536_000_000 };
+      const cutoff = ms[dateFilter];
+      if (cutoff) r = r.filter(m => m.updatedAt && (Date.now() - new Date(m.updatedAt).getTime()) <= cutoff);
+    }
     return [...r].sort((a, b) => {
       if (sortMode === "asc") return (a.title ?? "").localeCompare(b.title ?? "", "zh-TW");
       if (sortMode === "desc") return (b.title ?? "").localeCompare(a.title ?? "", "zh-TW");
@@ -177,7 +210,7 @@ export default function ProjectsPage() {
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return tb - ta;
     });
-  }, [rows, ownerFilter, typeFilter, sortMode]);
+  }, [rows, ownerFilter, typeFilter, categoryFilter, dateFilter, sortMode]);
 
   const recent = useMemo(() => filtered.slice(0, 12), [filtered]);
 
@@ -187,16 +220,18 @@ export default function ProjectsPage() {
     else navigate(`/m/${m.id}`);
   };
 
-  /* Nav label */
-  const navLabel = SUB_NAV.find(n => n.id === subNav)?.label ?? "所有專案";
+  /* Labels */
+  const navLabel      = SUB_NAV.find(n => n.id === subNav)?.label ?? "所有專案";
+  const ownerLabel    = ownerFilter    === "all" ? "擁有者"   : (ownerOptions.find(o=>o.value===ownerFilter)?.label ?? "擁有者");
+  const typeLabel     = typeFilter     === "all" ? "類型"     : (typeOptions.find(o=>o.value===typeFilter)?.label    ?? "類型");
+  const categoryLabel = categoryFilter === "all" ? "類別"     : (categoryOptions.find(o=>o.value===categoryFilter)?.label ?? "類別");
+  const dateLabel     = dateFilter     === "all" ? "已修改日期" : (dateOptions.find(o=>o.value===dateFilter)?.label ?? "已修改日期");
 
-  /* Active owner / type label */
-  const ownerLabel = ownerFilter === "all" ? "擁有者" : (ownerOptions.find(o => o.value === ownerFilter)?.label ?? "擁有者");
-  const typeLabel  = typeFilter  === "all" ? "任何類型" : (typeOptions.find(o => o.value === typeFilter)?.label ?? "任何類型");
+  const closeAllPills = () => { setOwnerOpen(false); setTypeOpen(false); setCategoryOpen(false); setDateOpen(false); };
 
   return (
     <div style={{
-      display: "flex", height: "100vh", overflow: "hidden",
+      display: "flex", height: "100%", minHeight: "100vh", overflow: "hidden",
       background: "rgb(252,251,254)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
     }}>
 
@@ -338,23 +373,69 @@ export default function ProjectsPage() {
       {/* ════════════════════════ MAIN COLUMN ════════════════════════ */}
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* ── Top: title + filter bar ── */}
-        <div style={{ flexShrink: 0, padding: "24px 32px 0" }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1A1A18", margin: "0 0 16px", letterSpacing: "-0.02em" }}>
+        {/* ── Hero zone: gradient bg + large title + search + filter pills ── */}
+        <div style={{
+          flexShrink: 0,
+          background: "linear-gradient(160deg, #EDE9FE 0%, #E0E7FF 40%, #F0F9FF 100%)",
+          padding: "36px 40px 24px",
+          textAlign: "center",
+        }}>
+          {/* Large centered title */}
+          <h1 style={{
+            fontSize: 36, fontWeight: 700, color: "#1A1A18",
+            margin: "0 0 20px", letterSpacing: "-0.03em",
+          }}>
             {navLabel}
           </h1>
 
-          {/* Filter bar — Canva-faithful pill style */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {/* Full-width search bar */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            background: "white", borderRadius: 28,
+            border: "1px solid rgba(0,0,0,0.10)",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            padding: "0 18px", height: 48, maxWidth: 680, margin: "0 auto",
+          }}>
+            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ color: "#9CA3AF", fontSize: 15, flexShrink: 0 }} />
+            <input
+              placeholder="搜尋所有內容"
+              style={{ flex: 1, border: "none", outline: "none", fontSize: 15, color: "#1A1A18", background: "transparent" }}
+            />
+          </div>
 
-            {/* 擁有者 pill */}
-            <PillDropdown
-              label={ownerLabel}
-              active={ownerFilter !== "all"}
-              open={ownerOpen}
-              onToggle={() => { setOwnerOpen(v => !v); setTypeOpen(false); }}
-              onClose={() => setOwnerOpen(false)}
-            >
+          {/* Filter pills row — centered below search */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 8, marginTop: 12, flexWrap: "wrap",
+          }}>
+            {/* 類型▾ */}
+            <PillDropdown label={typeLabel} active={typeFilter !== "all"} open={typeOpen}
+              onToggle={() => { setTypeOpen(v => !v); closeAllPills(); setTypeOpen(true); }}
+              onClose={() => setTypeOpen(false)}>
+              <div style={{ padding: "4px 4px 8px" }}>
+                {typeOptions.map(o => (
+                  <DropdownRow key={o.value} label={o.label} active={typeFilter === o.value}
+                    onClick={() => { setTypeFilter(o.value); setTypeOpen(false); }} />
+                ))}
+              </div>
+            </PillDropdown>
+
+            {/* 類別▾ */}
+            <PillDropdown label={categoryLabel} active={categoryFilter !== "all"} open={categoryOpen}
+              onToggle={() => { closeAllPills(); setCategoryOpen(v => !v); }}
+              onClose={() => setCategoryOpen(false)}>
+              <div style={{ padding: "4px 4px 8px" }}>
+                {categoryOptions.map(o => (
+                  <DropdownRow key={o.value} label={o.label} active={categoryFilter === o.value}
+                    onClick={() => { setCategoryFilter(o.value); setCategoryOpen(false); }} />
+                ))}
+              </div>
+            </PillDropdown>
+
+            {/* 擁有者▾ */}
+            <PillDropdown label={ownerLabel} active={ownerFilter !== "all"} open={ownerOpen}
+              onToggle={() => { closeAllPills(); setOwnerOpen(v => !v); }}
+              onClose={() => setOwnerOpen(false)}>
               <div style={{ padding: "8px 12px 4px" }}>
                 <div style={{
                   display: "flex", alignItems: "center", gap: 8,
@@ -372,80 +453,71 @@ export default function ProjectsPage() {
               </div>
               <div style={{ padding: "4px 4px 8px" }}>
                 {ownerOptions.filter(o => !ownerSearch || o.label.toLowerCase().includes(ownerSearch.toLowerCase())).map(o => (
-                  <DropdownRow
-                    key={o.value}
-                    label={o.label}
-                    active={ownerFilter === o.value}
-                    onClick={() => { setOwnerFilter(o.value); setOwnerOpen(false); setOwnerSearch(""); }}
-                  />
+                  <DropdownRow key={o.value} label={o.label} active={ownerFilter === o.value}
+                    onClick={() => { setOwnerFilter(o.value); setOwnerOpen(false); setOwnerSearch(""); }} />
                 ))}
               </div>
             </PillDropdown>
 
-            {/* 任何類型 pill */}
-            <PillDropdown
-              label={typeLabel}
-              active={typeFilter !== "all"}
-              open={typeOpen}
-              onToggle={() => { setTypeOpen(v => !v); setOwnerOpen(false); }}
-              onClose={() => setTypeOpen(false)}
-            >
+            {/* 已修改日期▾ */}
+            <PillDropdown label={dateLabel} active={dateFilter !== "all"} open={dateOpen}
+              onToggle={() => { closeAllPills(); setDateOpen(v => !v); }}
+              onClose={() => setDateOpen(false)}>
               <div style={{ padding: "4px 4px 8px" }}>
-                {typeOptions.map(o => (
-                  <DropdownRow
-                    key={o.value}
-                    label={o.label}
-                    active={typeFilter === o.value}
-                    onClick={() => { setTypeFilter(o.value); setTypeOpen(false); }}
-                  />
+                {dateOptions.map(o => (
+                  <DropdownRow key={o.value} label={o.label} active={dateFilter === o.value}
+                    onClick={() => { setDateFilter(o.value); setDateOpen(false); }} />
                 ))}
               </div>
             </PillDropdown>
-
-            {/* Sort toggle */}
-            <button
-              onClick={() => setSortMode(m => m === "recent" ? "asc" : m === "asc" ? "desc" : "recent")}
-              title={sortMode === "recent" ? "最近編輯" : sortMode === "asc" ? "名稱 A→Z" : "名稱 Z→A"}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 12px", borderRadius: 20,
-                border: "1.5px solid #E4E3E1",
-                background: sortMode !== "recent" ? "#F5F3FF" : "white",
-                cursor: "pointer", fontSize: 13, color: sortMode !== "recent" ? "#7C3AED" : "#374151",
-                fontWeight: sortMode !== "recent" ? 600 : 400, transition: "all 0.1s",
-              }}
-            >
-              <FontAwesomeIcon icon={sortMode === "desc" ? faArrowUpWideShort : faArrowDownWideShort} style={{ fontSize: 12 }} />
-              {sortMode === "recent" ? "最近編輯" : sortMode === "asc" ? "名稱 A→Z" : "名稱 Z→A"}
-            </button>
-
-            {/* Grid / List toggle */}
-            <div style={{ marginLeft: "auto", display: "flex", border: "1.5px solid #E4E3E1", borderRadius: 8, overflow: "hidden" }}>
-              {(["grid", "list"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setViewMode(m)}
-                  style={{
-                    width: 34, height: 32, border: "none", cursor: "pointer",
-                    background: viewMode === m ? "#1A1A18" : "white",
-                    color: viewMode === m ? "white" : "#6B7280",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 13, transition: "background 0.1s",
-                  }}
-                >
-                  <FontAwesomeIcon icon={m === "grid" ? faTableCells : faList} />
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
         {/* ── Scrollable content area ── */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 32px 40px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 40px 40px", background: "white" }}>
+
+          {/* Sort / view controls — right-aligned, above sections */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "flex-end",
+            gap: 8, padding: "16px 0 8px",
+          }}>
+            <button
+              onClick={() => setSortMode(m => m === "recent" ? "asc" : m === "asc" ? "desc" : "recent")}
+              title="排序"
+              style={{
+                width: 32, height: 32, borderRadius: 8, border: "1px solid #E4E3E1",
+                background: "white", cursor: "pointer", color: "#6B7280",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+              }}
+            >
+              <FontAwesomeIcon icon={sortMode === "desc" ? faArrowUpWideShort : faArrowDownWideShort} />
+            </button>
+            <button
+              onClick={() => setViewMode(v => v === "grid" ? "list" : "grid")}
+              title="切換檢視"
+              style={{
+                width: 32, height: 32, borderRadius: 8, border: "1px solid #E4E3E1",
+                background: "white", cursor: "pointer", color: "#6B7280",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+              }}
+            >
+              <FontAwesomeIcon icon={viewMode === "grid" ? faList : faTableCells} />
+            </button>
+            <button
+              onClick={() => setCreateSource("recommended")}
+              style={{
+                width: 32, height: 32, borderRadius: 8, border: "1px solid #E4E3E1",
+                background: "white", cursor: "pointer", color: "#6B7280",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 300,
+              }}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+            </button>
+          </div>
 
           {/* Loading skeleton */}
           {isLoading && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16, paddingTop: 8 }}>
               {Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} style={{ borderRadius: 8, overflow: "hidden" }}>
                   <Skeleton style={{ width: "100%", aspectRatio: "4/3", display: "block" }} />
@@ -463,81 +535,88 @@ export default function ProjectsPage() {
             <div style={{
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               padding: "80px 24px", textAlign: "center", gap: 12,
-              border: "2px dashed #E4E3E1", borderRadius: 12,
+              border: "2px dashed #E4E3E1", borderRadius: 12, marginTop: 8,
             }}>
               <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: 40, color: "#C8C7C3" }} />
               <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A18", margin: 0 }}>還沒有專案</p>
               <p style={{ fontSize: 14, color: "#6B6A66", margin: 0 }}>從首頁選個任務範本開始。</p>
-              <button
-                onClick={() => setCreateSource("recommended")}
-                style={{
-                  marginTop: 8, padding: "9px 20px", borderRadius: 20,
-                  background: "#1A1A18", color: "white", border: "none",
-                  cursor: "pointer", fontSize: 14, fontWeight: 600,
-                }}
-              >
-                建立第一個專案
-              </button>
+              <button onClick={() => setCreateSource("recommended")} style={{
+                marginTop: 8, padding: "9px 20px", borderRadius: 20,
+                background: "#1A1A18", color: "white", border: "none",
+                cursor: "pointer", fontSize: 14, fontWeight: 600,
+              }}>建立第一個專案</button>
             </div>
           )}
 
           {/* 最近的項目 */}
           {!isLoading && recent.length > 0 && (
-            <section style={{ marginBottom: 36 }}>
-              <SectionHeader
-                title="最近的項目"
-                count={recent.length}
-                onViewAll={() => {}}
-              />
-              {/* Horizontal scroll strip */}
-              <div style={{ overflowX: "auto", scrollbarWidth: "none", marginLeft: -4, paddingLeft: 4 }}>
-                <div style={{ display: "flex", gap: 12, paddingBottom: 4 }}>
-                  {recent.map(m => (
-                    <div key={m.id} style={{ width: 180, flexShrink: 0 }}>
-                      <MissionCard
-                        mission={m}
-                        onClick={() => goToMission(m)}
-                        onOpen={() => goToMission(m)}
-                      />
-                    </div>
-                  ))}
-                </div>
+            <section style={{ marginBottom: 28 }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#1A1A18", margin: "0 0 12px" }}>最近的項目</p>
+              <div style={{ overflowX: "auto", scrollbarWidth: "none", marginLeft: -4, paddingLeft: 4, display: "flex", gap: 12, paddingBottom: 4 }}>
+                {recent.map(m => (
+                  <div key={m.id} style={{ width: 178, flexShrink: 0 }}>
+                    <MissionCard mission={m} onClick={() => goToMission(m)} onOpen={() => goToMission(m)} />
+                  </div>
+                ))}
               </div>
             </section>
           )}
 
-          {/* 資料夾 */}
+          {/* ▼ 資料夾 — collapsible, list layout */}
           {!isLoading && (
-            <section style={{ marginBottom: 36 }}>
-              <SectionHeader title="資料夾" count={2} showViewAll={false} />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, maxWidth: 700 }}>
-                <FolderTile icon={faCloudArrowUp} label="上傳"    hint="尚未有資料" />
-                <FolderTile icon={faStar}         label="已加星號" hint="尚未有資料" />
-              </div>
+            <section style={{ marginBottom: 20 }}>
+              <button
+                onClick={() => setFoldersOpen(v => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "none", border: "none", cursor: "pointer",
+                  fontSize: 15, fontWeight: 700, color: "#1A1A18",
+                  padding: "0 0 12px",
+                }}
+              >
+                <span style={{
+                  display: "inline-block", fontSize: 10, transition: "transform 0.2s",
+                  transform: foldersOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                }}>▼</span>
+                資料夾
+              </button>
+              {foldersOpen && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                  <FolderListRow icon={faCloudArrowUp} label="上傳"    hint="—"     />
+                  <FolderListRow icon={faStar}         label="已加星號" hint="—"     />
+                </div>
+              )}
             </section>
           )}
 
-          {/* 設計 (all missions) */}
+          {/* ▼ 設計 — collapsible */}
           {!isLoading && filtered.length > 0 && (
             <section>
-              <SectionHeader title="設計" count={filtered.length} showViewAll={false} />
-              {viewMode === "grid" ? (
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                  gap: 16,
-                }}>
-                  {filtered.map(m => (
-                    <MissionCard
-                      key={m.id}
-                      mission={m}
-                      onClick={() => goToMission(m)}
-                      onOpen={() => goToMission(m)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <MissionListTable missions={filtered} onOpen={goToMission} />
+              <button
+                onClick={() => setDesignsOpen(v => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "none", border: "none", cursor: "pointer",
+                  fontSize: 15, fontWeight: 700, color: "#1A1A18",
+                  padding: "0 0 12px",
+                }}
+              >
+                <span style={{
+                  display: "inline-block", fontSize: 10, transition: "transform 0.2s",
+                  transform: designsOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                }}>▼</span>
+                設計
+              </button>
+              {designsOpen && (
+                viewMode === "grid" ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16 }}>
+                    {filtered.map(m => (
+                      <MissionCard key={m.id} mission={m} onClick={() => goToMission(m)} onOpen={() => goToMission(m)} />
+                    ))}
+                  </div>
+                ) : (
+                  <MissionListTable missions={filtered} onOpen={goToMission} />
+                )
               )}
             </section>
           )}
@@ -1053,6 +1132,38 @@ function DropdownRow({ label, active, onClick }: { label: string; active: boolea
       {!active && <div style={{ width: 6, height: 6, flexShrink: 0 }} />}
       {label}
     </button>
+  );
+}
+
+/* ──────────────────────── FolderListRow (list-layout folder row) ──── */
+function FolderListRow({ icon, label, hint }: { icon: any; label: string; hint: string }) {
+  const [hov, setHov] = React.useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+        background: hov ? "#F5F4F2" : "transparent",
+        transition: "background 0.12s",
+      }}
+    >
+      <div style={{
+        width: 36, height: 36, borderRadius: 6, flexShrink: 0,
+        background: hov ? "#EEECE9" : "#F2F1EF",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "background 0.12s",
+      }}>
+        <FontAwesomeIcon icon={icon} style={{ fontSize: 15, color: "#9B9990" }} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1A1A18", margin: 0 }}>{label}</p>
+        {hint && hint !== "—" && (
+          <p style={{ fontSize: 12, color: "#9B9990", margin: 0 }}>{hint}</p>
+        )}
+      </div>
+    </div>
   );
 }
 
