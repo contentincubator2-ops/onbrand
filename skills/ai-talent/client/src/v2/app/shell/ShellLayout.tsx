@@ -1,8 +1,9 @@
 /**
- * ShellLayout — Canva-style 70px icon-only sidebar, no top header.
+ * ShellLayout — Canva-faithful sidebar.
  *
- * Brand/product/event scope picker moved from top header → bottom
- * avatar popup (Canva pattern: account menu at bottom-left).
+ * Collapsed (70px): toggle icon at top, icon+12px label nav, bell+avatar at bottom.
+ * Expanded (280px): toggle at top-left, SoWork wordmark, full-width nav rows,
+ *   right-side panel showing starred brands + recent missions (Canva pattern).
  */
 import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -13,9 +14,12 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles,
   faMicrophone, faBookBookmark, faEllipsis, faBell,
-  faChevronLeft, faChevronRight, faPlus, faBars, faRightFromBracket,
-  faGear,
+  faChevronLeft, faChevronRight, faPlus, faRightFromBracket,
+  faGear, faStar, faClock, faTrash,
 } from "@fortawesome/free-solid-svg-icons";
+
+const COLLAPSED_W = 70;
+const EXPANDED_W  = 280;
 
 export default function ShellLayout() {
   const navigate = useNavigate();
@@ -46,24 +50,28 @@ export default function ShellLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.brandId]);
 
-  // Sidebar always 70px — clear any old expanded localStorage state
-  React.useEffect(() => {
-    try { localStorage.removeItem("sowork.sidebarCollapsed"); } catch {}
-  }, []);
-  const collapsed = true;
-  const toggleCollapsed = () => {};
+  const [collapsed, setCollapsed] = React.useState<boolean>(() => {
+    try { return localStorage.getItem("sowork.sidebar") !== "expanded"; }
+    catch { return true; }
+  });
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      const next = !v;
+      try { localStorage.setItem("sowork.sidebar", next ? "collapsed" : "expanded"); } catch {}
+      return next;
+    });
+  };
 
   const handleLogout = async () => {
     try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
     window.location.href = "/auth/login";
   };
 
-  const sidebarWidth = 70;
+  const sidebarWidth = collapsed ? COLLAPSED_W : EXPANDED_W;
 
   return (
     <div className="min-h-screen" style={{ background: "rgb(252,251,254)" }}>
       <Sidebar
-        width={sidebarWidth}
         collapsed={collapsed}
         onToggle={toggleCollapsed}
         currentPath={loc.pathname}
@@ -71,17 +79,17 @@ export default function ShellLayout() {
         scope={scope}
         setScope={setScope}
         onLogout={handleLogout}
+        brands={brands}
+        brandId={brandId}
       />
-
-      {/* Content area — no top header */}
-      <div style={{ paddingLeft: sidebarWidth }} className="transition-[padding] duration-200">
+      <div style={{ paddingLeft: sidebarWidth, transition: "padding-left 0.2s ease" }}>
         <Outlet context={{ brandId, setBrandId, brands, scope, setScope }} />
       </div>
     </div>
   );
 }
 
-/* ─────────────────────────── Sidebar ─────────────────────────── */
+/* ─────────────────────────── Nav items ─────────────────────────── */
 
 interface NavItem {
   to: string;
@@ -100,10 +108,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/playbooks", label: "成長方案", icon: <FontAwesomeIcon icon={faBookBookmark} /> },
 ];
 
+/* ─────────────────────────── Sidebar ─────────────────────────── */
+
 function Sidebar({
-  width, collapsed, onToggle, currentPath, onNavigate, scope, setScope, onLogout,
+  collapsed, onToggle, currentPath, onNavigate, scope, setScope, onLogout, brands, brandId,
 }: {
-  width: number;
   collapsed: boolean;
   onToggle: () => void;
   currentPath: string;
@@ -111,11 +120,18 @@ function Sidebar({
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
   onLogout: () => void;
+  brands: any[];
+  brandId: number | null;
 }) {
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 
-  // Close popup on outside click
+  // Recent missions for expanded panel
+  const recentQuery = (trpc as any).mission?.listAllForUser?.useQuery
+    ? (trpc as any).mission.listAllForUser.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: [] };
+  const recentMissions: any[] = ((recentQuery.data as any[]) ?? []).slice(0, 6);
+
   React.useEffect(() => {
     if (!avatarOpen) return;
     const handler = (e: MouseEvent) => {
@@ -127,72 +143,91 @@ function Sidebar({
     return () => document.removeEventListener("mousedown", handler);
   }, [avatarOpen]);
 
+  const width = collapsed ? COLLAPSED_W : EXPANDED_W;
+
   return (
     <aside
-      className="fixed left-0 top-0 bottom-0 z-40 flex flex-col transition-[width] duration-200"
-      style={{ width }}
+      className="fixed left-0 top-0 bottom-0 z-40 flex flex-col bg-white border-r border-default-100"
+      style={{ width, transition: "width 0.2s ease", overflow: "hidden" }}
     >
-      {/* Top: SO logo + collapse toggle */}
-      <div className="h-14 flex items-center justify-center shrink-0 relative">
-        <Avatar name="SO" size="sm" radius="md" color="primary" classNames={{ name: "font-bold text-xs" }} />
+      {/* ── Top row: toggle + wordmark ── */}
+      <div className="h-14 flex items-center shrink-0 px-3 gap-2">
+        {/* Toggle button — always visible, top-left */}
         <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
           <button
             onClick={onToggle}
             aria-label="切換側邊欄"
             style={{
-              position: "absolute", top: 8, right: 6,
-              width: 28, height: 28, borderRadius: "50%", border: "none", background: "none",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "color 0.1s linear, background-color 0.1s linear",
-              fontSize: 11,
+              width: 36, height: 36, borderRadius: 10, border: "none", background: "none",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              transition: "background-color 0.1s linear, color 0.1s linear",
+              fontSize: 14, color: "#9ca3af",
             }}
-            className="text-default-300 hover:text-default-600 hover:bg-default-100"
+            onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; e.currentTarget.style.color = "#374151"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#9ca3af"; }}
           >
             <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
           </button>
         </Tooltip>
+
+        {/* Wordmark — only when expanded */}
+        {!collapsed && (
+          <span
+            className="font-bold text-base tracking-tight whitespace-nowrap"
+            style={{ color: "#F97316", letterSpacing: "-0.02em" }}
+          >
+            SoWork
+          </span>
+        )}
       </div>
 
-      {/* CTA: + 建立 */}
-      <div className={`shrink-0 ${collapsed ? "px-2 py-3" : "p-3"}`}>
+      {/* ── 建立 button ── */}
+      <div className="shrink-0 px-3 pb-3">
         {collapsed ? (
           <Tooltip content="建立任務" placement="right">
             <button
               onClick={() => onNavigate("/")}
               aria-label="建立任務"
               style={{
-                background: "#F97316",
-                transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
+                width: 44, height: 44, borderRadius: "50%", border: "none",
+                background: "#F97316", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto", fontSize: 18, flexShrink: 0,
+                transition: "background-color 0.1s linear, box-shadow 0.1s linear, transform 0.07s",
+                boxShadow: "0 2px 8px rgba(249,115,22,0.35)",
               }}
-              className="mx-auto flex items-center justify-center w-7 h-7 rounded-full text-white shadow-sm hover:shadow-md active:scale-95"
               onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
               onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
             >
-              <FontAwesomeIcon icon={faPlus} className="text-base" />
+              <FontAwesomeIcon icon={faPlus} />
             </button>
           </Tooltip>
         ) : (
-          <Button
-            variant="solid"
-            onPress={() => onNavigate("/")}
-            fullWidth
-            aria-label="建立任務"
-            startContent={<FontAwesomeIcon icon={faPlus} />}
-            style={{ background: "#F97316", color: "#fff", transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s" }}
+          <button
+            onClick={() => onNavigate("/")}
+            style={{
+              width: "100%", height: 44, borderRadius: 12, border: "none",
+              background: "#F97316", color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              fontSize: 15, fontWeight: 600, cursor: "pointer",
+              transition: "background-color 0.1s linear, box-shadow 0.1s linear, transform 0.07s",
+              boxShadow: "0 2px 8px rgba(249,115,22,0.30)",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
           >
+            <FontAwesomeIcon icon={faPlus} />
             建立任務
-          </Button>
+          </button>
         )}
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto pb-3" style={{ paddingInline: collapsed ? "6px" : "8px" }}>
+      {/* ── Nav items ── */}
+      <nav className="flex-1 overflow-y-auto" style={{ paddingInline: collapsed ? 3 : 8 }}>
         {NAV_ITEMS.map((item) => {
           const isActive = item.matchPrefix
             ? currentPath.startsWith(item.matchPrefix)
-            : currentPath === item.to ||
-              (item.to === "/" && currentPath === "/") ||
-              (item.to !== "/" && currentPath.startsWith(item.to));
+            : (item.to === "/" ? currentPath === "/" : currentPath.startsWith(item.to));
           return (
             <SidebarNavLink
               key={item.to}
@@ -204,27 +239,153 @@ function Sidebar({
           );
         })}
 
+        {/* ── Expanded panel: starred brands + recent missions ── */}
+        {!collapsed && (
+          <>
+            {/* Starred brands */}
+            {brands.length > 0 && (
+              <div className="mt-4 mb-2">
+                <div className="flex items-center justify-between px-2 mb-1">
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    已加星號的品牌
+                  </span>
+                  <button style={{ background: "none", border: "none", color: "#9ca3af", fontSize: 13, cursor: "pointer", padding: "0 2px" }}>
+                    <FontAwesomeIcon icon={faPlus} />
+                  </button>
+                </div>
+                {brands.slice(0, 4).map((b: any) => (
+                  <button
+                    key={b.id}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10,
+                      padding: "6px 8px", borderRadius: 8, border: "none", background: "none",
+                      cursor: "pointer", textAlign: "left",
+                      transition: "background-color 0.1s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                  >
+                    <span style={{
+                      width: 28, height: 28, borderRadius: 6, background: "#f3f4f6",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 12, fontWeight: 700, color: "#6b7280", flexShrink: 0,
+                    }}>
+                      {(b.name ?? "B").slice(0, 1).toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 13, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {b.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Recent missions */}
+            {recentMissions.length > 0 && (
+              <div className="mt-3 mb-2">
+                <div className="flex items-center px-2 mb-1 gap-1.5">
+                  <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#9ca3af" }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    近期任務
+                  </span>
+                </div>
+                {recentMissions.map((m: any) => (
+                  <button
+                    key={m.id}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10,
+                      padding: "6px 8px", borderRadius: 8, border: "none", background: "none",
+                      cursor: "pointer", textAlign: "left",
+                      transition: "background-color 0.1s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                  >
+                    <span style={{
+                      width: 28, height: 28, borderRadius: 6, background: "#fff7ed",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11, fontWeight: 700, color: "#F97316", flexShrink: 0,
+                    }}>
+                      {(m.title ?? "M").slice(0, 1).toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 13, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {m.title}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => onNavigate("/")}
+                  style={{
+                    width: "100%", textAlign: "center", padding: "6px 8px", border: "none",
+                    background: "none", fontSize: 12, color: "#F97316", cursor: "pointer",
+                    fontWeight: 500,
+                  }}
+                >
+                  查看全部
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Show-more */}
-        <Tooltip content="顯示更多" placement="right">
-          {collapsed ? (
+        {collapsed ? (
+          <Tooltip content="顯示更多" placement="right">
             <button
               aria-label="顯示更多"
-              style={{ transition: "color 0.1s linear" }}
-              className="w-full mt-1 flex items-center justify-center py-2.5 rounded-xl text-default-400 hover:text-default-700"
+              style={{
+                width: 64, height: 36, margin: "2px auto 0", display: "flex",
+                alignItems: "center", justifyContent: "center",
+                background: "none", border: "none", color: "#9ca3af",
+                transition: "color 0.1s linear",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
+              onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
             >
-              <FontAwesomeIcon icon={faEllipsis} className="text-sm" />
+              <FontAwesomeIcon icon={faEllipsis} />
             </button>
-          ) : (
-            <Button variant="light" fullWidth aria-label="顯示更多" className="mt-1 justify-start" startContent={<FontAwesomeIcon icon={faEllipsis} />}>
-              顯示更多
-            </Button>
-          )}
-        </Tooltip>
+          </Tooltip>
+        ) : (
+          <button
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "6px 8px", borderRadius: 8, border: "none", background: "none",
+              cursor: "pointer", color: "#6b7280", fontSize: 14,
+              transition: "background-color 0.1s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          >
+            <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <FontAwesomeIcon icon={faEllipsis} />
+            </span>
+            顯示更多
+          </button>
+        )}
       </nav>
 
-      {/* ─── Bottom: bell + avatar popup ─── */}
-      <div className={`shrink-0 pb-3 flex flex-col items-center gap-1 ${collapsed ? "px-2" : "px-3"}`}>
-        {/* Notification bell — 36×36px hit area (Canva spec) */}
+      {/* ── Bottom: trash (expanded only) + bell + avatar ── */}
+      <div className="shrink-0 pb-3 flex flex-col items-center gap-1" style={{ paddingInline: collapsed ? 8 : 12 }}>
+        {/* Trash — expanded only, like Canva */}
+        {!collapsed && (
+          <button
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "6px 8px", borderRadius: 8, border: "none", background: "none",
+              cursor: "pointer", color: "#6b7280", fontSize: 14,
+              transition: "background-color 0.1s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          >
+            <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <FontAwesomeIcon icon={faTrash} style={{ fontSize: 15 }} />
+            </span>
+            垃圾桶
+          </button>
+        )}
+
+        {/* Bell */}
         <Tooltip content="通知" placement="right">
           <button
             aria-label="通知"
@@ -232,20 +393,25 @@ function Sidebar({
               width: 36, height: 36, borderRadius: "50%", border: "none", background: "none",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "color 0.1s linear, background-color 0.1s linear",
-              fontSize: 16,
+              fontSize: 16, color: "#9ca3af",
+              alignSelf: collapsed ? "center" : "flex-start",
             }}
-            className="text-default-400 hover:text-default-700 hover:bg-default-100"
+            onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; e.currentTarget.style.color = "#374151"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#9ca3af"; }}
           >
             <FontAwesomeIcon icon={faBell} />
           </button>
         </Tooltip>
 
-        {/* Avatar — 40×40px (Canva spec) */}
-        <div ref={avatarRef} className="relative mt-1 w-full flex justify-center">
+        {/* Avatar */}
+        <div ref={avatarRef} className="relative w-full flex" style={{ justifyContent: collapsed ? "center" : "flex-start" }}>
           <button
             aria-label="帳號與品牌切換"
             onClick={() => setAvatarOpen((v) => !v)}
-            style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: "none", padding: 0 }}
+            style={{
+              width: 40, height: 40, borderRadius: "50%", border: "none",
+              background: "none", padding: 0, cursor: "pointer",
+            }}
             className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F97316]"
           >
             <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold text-sm" }} />
@@ -254,10 +420,9 @@ function Sidebar({
           {/* Popup panel */}
           {avatarOpen && (
             <div
-              className="absolute bottom-full left-full mb-2 ml-2 w-80 rounded-2xl border border-divider bg-content1 shadow-xl z-50"
-              style={{ animation: "slideInUp 0.15s ease-out" }}
+              className="absolute bottom-full mb-2 w-80 rounded-2xl border border-divider bg-content1 shadow-xl z-50"
+              style={{ left: collapsed ? "calc(100% + 8px)" : 0, animation: "slideInUp 0.15s ease-out" }}
             >
-              {/* User info */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-divider">
                 <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold" }} />
                 <div className="min-w-0">
@@ -265,14 +430,10 @@ function Sidebar({
                   <p className="text-tiny text-default-500 truncate">sowork@sowork.tw</p>
                 </div>
               </div>
-
-              {/* Scope picker (brand / product / event) */}
               <div className="px-4 py-3 border-b border-divider">
                 <p className="text-tiny font-semibold text-default-500 uppercase tracking-wider mb-2">工作範圍</p>
                 <ScopeBar scope={scope} setScope={setScope} />
               </div>
-
-              {/* Actions */}
               <div className="p-2">
                 <button
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-small text-default-600 hover:bg-default-100 transition-colors text-left"
@@ -298,6 +459,8 @@ function Sidebar({
   );
 }
 
+/* ─────────────────────────── Nav link ─────────────────────────── */
+
 function SidebarNavLink({
   item, active, collapsed, onClick,
 }: {
@@ -312,23 +475,15 @@ function SidebarNavLink({
         onClick={onClick}
         aria-label={item.label}
         style={{
-          transition: "color 0.1s linear, transform 0.07s",
-          width: 64,
-          height: 52,
-          background: "none",
-          border: "none",
-          padding: 0,
-          margin: "2px auto 0",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 4,
-          color: active ? "#F97316" : undefined,
+          width: 64, height: 52, margin: "2px auto 0",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+          background: "none", border: "none", padding: 0, cursor: "pointer",
+          color: active ? "#F97316" : "#9ca3af",
+          transition: "color 0.1s linear",
         }}
-        className={active ? "" : "text-default-400 hover:text-default-700"}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.color = "#374151"; }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.color = "#9ca3af"; }}
       >
-        {/* 24×24 icon box — matches Canva's SVG slot */}
         <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1 }}>
           {item.icon}
         </span>
@@ -340,17 +495,25 @@ function SidebarNavLink({
   }
 
   return (
-    <Button
-      onPress={onClick}
-      variant="light"
-      fullWidth
-      aria-label={item.label}
-      className={`mt-1 justify-start transition-colors duration-100 ${active ? "text-[#F97316] font-semibold" : ""}`}
-      style={{ background: "rgba(0,0,0,0)" }}
-      startContent={item.icon}
+    <button
+      onClick={onClick}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "7px 8px", borderRadius: 8, border: "none",
+        background: active ? "#fff7ed" : "none",
+        cursor: "pointer", textAlign: "left",
+        color: active ? "#F97316" : "#374151",
+        fontWeight: active ? 600 : 400, fontSize: 14,
+        transition: "background-color 0.1s linear, color 0.1s linear",
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "none"; }}
     >
+      <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+        {item.icon}
+      </span>
       {item.label}
-    </Button>
+    </button>
   );
 }
 
