@@ -96,6 +96,70 @@ const QUICK_TILES: QuickTile[] = [
   { icon: faEllipsis,     label: "顯示更多", iconBg: "#9CA3AF", isMore: true                        },
 ];
 
+/**
+ * Sub-category tabs per workspace channel.
+ * These map to the content_type values in the DB (after migration).
+ * Shown as chips below the tile row when a channel is active.
+ */
+const CHANNEL_CONTENT_TYPES: Record<string, Array<{ value: string; label: string }>> = {
+  facebook:          [
+    { value: "calendar",  label: "行事曆" },
+    { value: "post",      label: "貼文文案" },
+    { value: "ad",        label: "廣告文案" },
+    { value: "campaign",  label: "活動企劃" },
+    { value: "report",    label: "成效報告" },
+  ],
+  instagram:         [
+    { value: "calendar",  label: "行事曆" },
+    { value: "post",      label: "貼文文案" },
+    { value: "visual",    label: "視覺圖文" },
+    { value: "campaign",  label: "活動企劃" },
+  ],
+  youtube:           [
+    { value: "script",    label: "影片腳本" },
+    { value: "visual",    label: "縮圖設計" },
+    { value: "campaign",  label: "活動企劃" },
+    { value: "report",    label: "成效報告" },
+  ],
+  tiktok:            [
+    { value: "script",    label: "影片腳本" },
+    { value: "visual",    label: "視覺方向" },
+    { value: "campaign",  label: "活動企劃" },
+  ],
+  "brand-positioning": [
+    { value: "positioning", label: "品牌定位" },
+    { value: "research",    label: "市場研究" },
+    { value: "campaign",    label: "活動企劃" },
+  ],
+  pr:                [
+    { value: "post",      label: "新聞稿" },
+    { value: "campaign",  label: "活動企劃" },
+    { value: "report",    label: "媒體報告" },
+  ],
+  audience:          [
+    { value: "research",  label: "用戶研究" },
+    { value: "report",    label: "分析報告" },
+  ],
+  email:             [
+    { value: "newsletter", label: "電子報" },
+    { value: "campaign",   label: "行銷活動" },
+  ],
+};
+
+/** Keywords for heuristic content_type filtering on mission rows (before DB migration) */
+const CT_KEYWORDS: Record<string, string[]> = {
+  calendar:    ["行事曆", "calendar", "月曆", "規劃"],
+  post:        ["貼文", "post", "文案", "caption"],
+  ad:          ["廣告", "ad", "cvo", "brief", "轉換"],
+  script:      ["腳本", "script", "影片", "video", "hook"],
+  visual:      ["視覺", "visual", "縮圖", "thumbnail", "圖文"],
+  campaign:    ["活動", "campaign", "launch", "倒數", "促銷"],
+  report:      ["報告", "report", "analytics", "成效", "分析"],
+  research:    ["研究", "research", "受眾", "audience", "insight"],
+  positioning: ["定位", "positioning", "品牌", "原型"],
+  newsletter:  ["電子報", "newsletter", "edm", "email"],
+};
+
 export default function MissionsHome() {
   const navigate = useNavigate();
   const { brandId, brands } = useOutletContext<ShellOutletCtx>();
@@ -247,6 +311,8 @@ export default function MissionsHome() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   /** Currently-selected channel tile — null means "全部" */
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  /** Currently-selected content_type sub-filter — resets when channel changes */
+  const [activeContentType, setActiveContentType] = useState<string | null>(null);
 
   const filteredRows = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
@@ -263,13 +329,22 @@ export default function MissionsHome() {
     if (activeCategory) {
       r = r.filter((m) => (m.workspace ?? "").toLowerCase() === activeCategory);
     }
+    // Content-type sub-filter (missions don't have content_type yet — future-ready)
+    // For now this filters on squadName / methodology as a heuristic until DB is migrated
+    if (activeContentType) {
+      const ct = activeContentType;
+      r = r.filter((m) => {
+        const name = ((m.squadName ?? "") + " " + (m.methodology ?? "") + " " + (m.title ?? "")).toLowerCase();
+        return CT_KEYWORDS[ct]?.some(kw => name.includes(kw)) ?? true;
+      });
+    }
     r = [...r].sort((a, b) => {
       const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return sortDesc ? tb - ta : ta - tb;
     });
     return r;
-  }, [rows, searchQ, sortDesc, activeCategory]);
+  }, [rows, searchQ, sortDesc, activeCategory, activeContentType]);
 
   // Type (kind) dropdown options
   const kindOptions = useMemo(() => ([
@@ -305,6 +380,7 @@ export default function MissionsHome() {
     // ── Channel filter tile: toggle activeCategory + scroll to grid
     if (t.filterWorkspace) {
       setActiveCategory(prev => prev === t.filterWorkspace ? null : (t.filterWorkspace ?? null));
+      setActiveContentType(null); // reset sub-filter when channel changes
       document.getElementById("missions-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
@@ -443,6 +519,37 @@ export default function MissionsHome() {
             ))}
           </div>
           </div>
+
+          {/* Sub-category chips — appear when a channel is active */}
+          {activeCategory && CHANNEL_CONTENT_TYPES[activeCategory] && (
+            <div
+              className="mt-3 flex items-center gap-2 flex-wrap justify-center"
+              style={{ animation: "slideInUp 0.18s ease-out" }}
+            >
+              {CHANNEL_CONTENT_TYPES[activeCategory].map(ct => {
+                const isActive = activeContentType === ct.value;
+                return (
+                  <button
+                    key={ct.value}
+                    onClick={() => setActiveContentType(v => v === ct.value ? null : ct.value)}
+                    style={{
+                      fontSize: 12, fontWeight: isActive ? 700 : 500,
+                      color: isActive ? "#F97316" : "#6b7280",
+                      background: isActive ? "rgba(249,115,22,0.10)" : "rgba(0,0,0,0.04)",
+                      border: isActive ? "1.5px solid rgba(249,115,22,0.35)" : "1.5px solid transparent",
+                      borderRadius: 20, padding: "4px 14px",
+                      cursor: "pointer", transition: "all 0.12s ease",
+                      whiteSpace: "nowrap",
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(0,0,0,0.07)"; }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
+                  >
+                    {ct.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
