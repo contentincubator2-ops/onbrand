@@ -34,6 +34,7 @@ import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import { CalendarGridMockup } from "../components/SquadMockups/calendar";
 import MediaGenFlow from "../components/media/MediaGenFlow";
+import ImageSlotFlow from "../components/media/ImageSlotFlow";
 import { TaskChip } from "../components/TaskChip";
 import { AgentAvatar } from "../components/AgentAvatar";
 import BrandSwitcher from "../app/shell/BrandSwitcher";
@@ -2346,44 +2347,10 @@ function SquadDetailPanel({
                   />
                 );
               }
-              // ── Visual step: 3-step MediaGenFlow inline (CJ rule 2026-04-29)
-              if ((kind === "image" || kind === "video") && prog?.status !== "pending") {
-                const draft: string = (prog?.agentOutput ?? prog?.agent_output ?? "").toString().trim();
-                const tags: string[] =
-                  (squad.preferredModelTags as string[] | null) ??
-                  (activeStep.preferredModelTags as string[] | null) ??
-                  (activeStep.assignedAgent?.preferredModelTags as string[] | null) ??
-                  [];
-                return (
-                  <div className="w-full">
-                    <div className="text-center mb-3">
-                      <Chip size="sm" variant="flat" color="primary" className="uppercase tracking-wider">
-                        {kind === "video" ? "🎬 影片素材步驟" : "🖼️ 視覺素材步驟"}
-                      </Chip>
-                      <p className="text-tiny text-default-500 mt-2">
-                        此步驟產出的是{kind === "video" ? "影片" : "圖像"}，請依下列 3 步驟產生素材
-                      </p>
-                    </div>
-                    <MediaGenFlow
-                      open inline kind={kind}
-                      initialBrief={draft || `${activeStep.name ?? ""}\n${activeStep.description ?? ""}`.trim()}
-                      brandContext={brandName ?? undefined}
-                      brandId={null}
-                      preferredModelTags={tags}
-                      onClose={() => {}}
-                      onComplete={async ({ url, modelId, promptEn }) => {
-                        if (!missionId) return;
-                        const payload = `__media_url__: ${url}\n__model__: ${modelId}\n__prompt__: ${promptEn}\n\n${draft}`;
-                        await stepExecuteWithScope.mutateAsync({
-                          missionId, squadSlug: squad.slug,
-                          stepOrder: activeStepOrder, mode: "run", userInput: payload,
-                        }).catch(() => {});
-                        await progressQuery.refetch?.();
-                      }}
-                    />
-                  </div>
-                );
-              }
+              // ── Visual step: Session 7 — ImageSlotFlow embedded in mockup image slot
+              // The 3-step flow (direction → prompt → model → generate) now lives
+              // INSIDE the IGFeed image slot, not as a floating wizard in the center pane.
+              // We fall through to PlatformMockup and pass imageSlotFlow as a prop.
               // content step: fall through to platform mockup
             }
 
@@ -2392,6 +2359,40 @@ function SquadDetailPanel({
             // loading/filled/empty per slot. Legacy liveXxx props kept as fallback
             // for mockup variants that haven't migrated to SlotContent yet.
             const dbLive = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
+
+            // Session 7: build imageSlotFlow node when active step is a visual step.
+            // Rendered INSIDE the mockup image slot, not as a floating wizard.
+            const activeStep = missionId ? stepsArr[activeStepOrder - 1] : null;
+            const activeKind = activeStep ? inferStepKind(activeStep) : null;
+            const isVisualStep = activeKind === "image" || activeKind === "video";
+            const activeProg = missionId ? progressByOrd.get(activeStepOrder) : null;
+            const visualBrief = activeProg
+              ? (activeProg.agentOutput ?? activeProg.agent_output ?? "").toString().trim()
+              : `${activeStep?.name ?? ""}\n${activeStep?.description ?? ""}`.trim();
+            const preferredTags: string[] =
+              (squad.preferredModelTags as string[] | null) ??
+              (activeStep?.preferredModelTags as string[] | null) ??
+              [];
+            const imageSlotFlowNode = missionId && isVisualStep ? (
+              <ImageSlotFlow
+                key={`${missionId}-step${activeStepOrder}`}
+                brief={visualBrief || description ?? ""}
+                brandContext={brandName ?? undefined}
+                kind={activeKind as "image" | "video"}
+                preferredModelTags={preferredTags}
+                brandId={scope.brandId ?? null}
+                onDone={async ({ url, modelId, promptEn }) => {
+                  if (!missionId) return;
+                  const payload = `__media_url__: ${url}\n__model__: ${modelId}\n__prompt__: ${promptEn}\n\n${visualBrief}`;
+                  await stepExecuteWithScope.mutateAsync({
+                    missionId, squadSlug: squad.slug,
+                    stepOrder: activeStepOrder, mode: "run", userInput: payload,
+                  }).catch(() => {});
+                  await progressQuery.refetch?.();
+                }}
+              />
+            ) : undefined;
+
             // Show streaming intake preview when agent is answering (pre-launch)
             if (!missionId && intakePreviewText) {
               return (
@@ -2414,6 +2415,7 @@ function SquadDetailPanel({
                 brandName={brandName}
                 steps={steps}
                 slotMap={missionId ? fullSlotMap : undefined}
+                imageSlotFlow={imageSlotFlowNode}
                 liveCaption={dbLive.caption}
                 liveHashtags={dbLive.hashtags}
                 liveTitle={dbLive.title}

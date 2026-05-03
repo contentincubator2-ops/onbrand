@@ -30,7 +30,7 @@ import {
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
-export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc, slotMap }: MockupFields) {
+export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc, slotMap, imageSlotFlow }: MockupFields) {
   const handle = handleOf(brandName);
 
   // Resolve caption: slotMap "caption" wins over legacy liveCaption prop
@@ -63,15 +63,21 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
           </Button>
         </div>
 
-        {/* Image slot — loading skeleton | filled (image desc) | empty placeholder */}
-        <div className="relative aspect-square bg-default-100">
-          {imageSlot?.status === "loading" ? (
+        {/* Image slot — Session 7: imageSlotFlow embedded | loading spinner | skeleton placeholder */}
+        <div className="relative aspect-square bg-default-100 overflow-hidden">
+          {imageSlotFlow ? (
+            // Session 7: 3-step media gen flow lives inside the slot
+            imageSlotFlow
+          ) : imageSlot?.status === "loading" ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center px-4">
                 <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-3" />
                 <p className="text-tiny text-primary/70">視覺 Agent 生成中…</p>
               </div>
             </div>
+          ) : imageSlot?.status === "filled" && typeof imageSlot.value === "string" && imageSlot.value.startsWith("http") ? (
+            // Filled with an actual image URL — show the image
+            <img src={imageSlot.value as string} alt="generated" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             <>
               <Skeleton className="absolute inset-0" />
