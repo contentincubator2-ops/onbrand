@@ -40,6 +40,9 @@ import {
   faBullseye, faBullhorn, faRocket, faUsers, faNewspaper, faEnvelope, faPlus, faCloudArrowUp,
   faStar, faPen,
   faF, // generic fallback letter icon
+  faArrowUpRightFromSquare, faCircleInfo, faCopy, faBookmark, faFolderOpen,
+  faDownload, faWifi, faShareNodes, faLink, faTrash,
+  faBolt, faCalendarDays,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok,
@@ -307,6 +310,7 @@ export default function MissionsHome() {
       })
       .slice(0, selectedLayer === "ALL" ? 12 : 24);
   }, [allEntities, kindFilter, selectedLayer, searchQ, semanticHits]);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
   const [sortDesc, setSortDesc] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -469,19 +473,18 @@ export default function MissionsHome() {
             </div>
           </div>
 
-          {/* Search bar — 800px max, 64px tall, orange glow (Canva spec) */}
-          <div
-            className="w-full"
-            style={{
-              maxWidth: 800,
-              borderRadius: 20,
-              boxShadow: [
-                "rgba(249,115,22,0.15) 6px 3px 12px 0px",
-                "rgba(234,88,12,0.15) -6px -3px 12px 0px",
-              ].join(", "),
-            }}
-          >
-            <div style={{ background: "white", borderRadius: 20, boxShadow: "rgb(255,220,180) 0px 6px 20px -4px" }}>
+          {/* Search bar — 800px max, 64px tall + focus filter row (Canva spec) */}
+          <div className="w-full" style={{ maxWidth: 800 }}>
+            {/* Outer glow wrapper */}
+            <div style={{
+              borderRadius: searchFocused ? 16 : 20,
+              boxShadow: searchFocused
+                ? "rgba(249,115,22,0.22) 0px 0px 0px 3px, rgba(249,115,22,0.08) 0px 8px 32px"
+                : ["rgba(249,115,22,0.15) 6px 3px 12px 0px", "rgba(234,88,12,0.15) -6px -3px 12px 0px"].join(", "),
+              transition: "border-radius 0.2s ease, box-shadow 0.2s ease",
+              background: "white",
+            }}>
+              {/* Search input */}
               <Input
                 size="lg"
                 radius="none"
@@ -490,11 +493,14 @@ export default function MissionsHome() {
                 onValueChange={setSearchQ}
                 isClearable
                 onClear={() => setSearchQ("")}
-                placeholder="搜尋方法論、任務、最近的工作"
+                placeholder="搜尋 Squad、Agent、任務…"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
                 classNames={{
-                  base: "rounded-[20px] overflow-hidden",
+                  base: `overflow-hidden ${searchFocused ? "rounded-t-[16px]" : "rounded-[20px]"}`,
                   inputWrapper: [
-                    "h-16 bg-white border-none shadow-none rounded-[20px]",
+                    "h-16 bg-white border-none shadow-none",
+                    searchFocused ? "rounded-t-[16px]" : "rounded-[20px]",
                     "data-[focus=true]:shadow-none",
                   ].join(" "),
                 }}
@@ -504,6 +510,44 @@ export default function MissionsHome() {
                     : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 18 }} />
                 }
               />
+
+              {/* Filter pill row — dynamically inserted when focused (Canva pattern) */}
+              {searchFocused && (
+                <div style={{
+                  display: "flex", gap: 8, padding: "10px 16px 12px",
+                  flexWrap: "wrap",
+                  animation: "slideDown 0.15s ease-out",
+                  borderTop: "1px solid rgba(249,115,22,0.1)",
+                }}>
+                  {QUICK_TILES.filter(t => t.filterWorkspace).map(t => (
+                    <button
+                      key={t.filterWorkspace}
+                      onMouseDown={() => setModalWorkspace(t.filterWorkspace!)}
+                      style={{
+                        borderRadius: 9999, background: "white",
+                        padding: "0 16px", height: 36,
+                        fontSize: 12, fontWeight: 500,
+                        color: "rgb(249,115,22)",
+                        boxShadow: "rgb(255,200,140) 0px 0px 0px 1px inset",
+                        border: "none", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: 6,
+                        transition: "color 0.15s ease-in-out, background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "rgba(249,115,22,0.06)";
+                        e.currentTarget.style.boxShadow = "rgb(249,115,22) 0px 0px 0px 1.5px inset";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "white";
+                        e.currentTarget.style.boxShadow = "rgb(255,200,140) 0px 0px 0px 1px inset";
+                      }}
+                    >
+                      <FontAwesomeIcon icon={t.icon} style={{ fontSize: 11 }} />
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -771,29 +815,55 @@ function CircleTile({
   active: boolean;
   onClick: () => void;
 }) {
+  const [hovered, setHovered] = React.useState(false);
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-2 w-[72px] py-2 px-1 min-w-0 group select-none"
-      style={{ background: "none", border: "none", cursor: "pointer" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+        width: 72, padding: "8px 4px", minWidth: 0,
+        background: "none", border: "none", cursor: "pointer", userSelect: "none",
+      }}
     >
+      {/* Circle — scale(1.05) on hover, 0.3s (exact Canva spec) */}
       <span
-        className="flex items-center justify-center w-12 h-12 rounded-full text-white transition-transform duration-100 group-hover:scale-105 group-active:scale-95"
         style={{
+          width: 48, height: 48, borderRadius: "50%",
           background: tile.iconBg ?? "#9CA3AF",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff", fontSize: 16, flexShrink: 0,
+          transform: hovered ? "scale(1.05)" : "scale(1)",
+          transition: "transform 0.3s, box-shadow 0.15s ease",
           boxShadow: active
             ? `0 0 0 3px #fff, 0 0 0 5px ${tile.iconBg ?? "#F97316"}`
             : "0 2px 8px rgba(0,0,0,0.15)",
-          transition: "box-shadow 0.15s ease",
         }}
       >
-        <FontAwesomeIcon icon={tile.icon} className="text-base" />
+        <FontAwesomeIcon icon={tile.icon} />
       </span>
-      <span
-        className="text-[11px] leading-tight text-center line-clamp-2"
-        style={{ fontWeight: active ? 700 : 500, color: active ? (tile.iconBg ?? "#F97316") : "#44403c" }}
-      >
+
+      {/* Label */}
+      <span style={{
+        fontSize: 11, fontWeight: active ? 700 : 500, lineHeight: 1.3,
+        textAlign: "center", color: active ? (tile.iconBg ?? "#F97316") : "#44403c",
+        overflow: "hidden", display: "-webkit-box",
+        WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+      }}>
         {tile.label}
+      </span>
+
+      {/* Subtitle — slides in on hover (Canva "查看全部" pattern) */}
+      <span style={{
+        fontSize: 10, color: "rgba(19,22,32,0.55)", textAlign: "center",
+        maxHeight: hovered ? 16 : 0,
+        opacity: hovered ? 1 : 0,
+        overflow: "hidden",
+        transition: "max-height 0.2s ease, opacity 0.15s ease-in-out",
+        whiteSpace: "nowrap",
+      }}>
+        {tile.filterWorkspace ? "查看全部" : tile.label === "自訂任務" ? "空白建立" : ""}
       </span>
     </button>
   );
@@ -809,19 +879,51 @@ function CircleTile({
  *   • Text: ONLY title (14px 600) + relative time (12px rgba grey) — 2 lines max
  *   • Hover: semi-transparent dark overlay + 3 action buttons (★ / ✏ / ⋯)
  */
+/** Canva-style ⋯ context menu for a mission card */
+const CARD_MENU_ITEMS = [
+  // ── 自主執行 (SoWork unique) ────────────────────────────────────────
+  { key: "run-once",     icon: faBolt,                    label: "立即自主執行",     accent: "#F97316", badge: null,    dividerAfter: false },
+  { key: "run-schedule", icon: faCalendarDays,           label: "排程自主執行",     accent: "#F97316", badge: null,    dividerAfter: true  },
+  // ── Canva-faithful items ────────────────────────────────────────────
+  { key: "open-tab",     icon: faArrowUpRightFromSquare,  label: "在新索引標籤中開啟", accent: null,      badge: null,    dividerAfter: false },
+  { key: "info",         icon: faCircleInfo,              label: "詳細資訊",         accent: null,      badge: null,    dividerAfter: false },
+  { key: "duplicate",    icon: faCopy,                    label: "建立複本",         accent: null,      badge: null,    dividerAfter: false },
+  { key: "star",         icon: faBookmark,                label: "加入已標記星號項目", accent: null,      badge: null,    dividerAfter: false },
+  { key: "move",         icon: faFolderOpen,              label: "移動",             accent: null,      badge: null,    dividerAfter: false },
+  { key: "download",     icon: faDownload,                label: "下載",             accent: null,      badge: null,    dividerAfter: false },
+  { key: "offline",      icon: faWifi,                    label: "設為可離線存取",    accent: null,      badge: "新功能", dividerAfter: false },
+  { key: "share",        icon: faShareNodes,              label: "分享",             accent: null,      badge: null,    dividerAfter: false },
+  { key: "copy-link",    icon: faLink,                    label: "複製連結",         accent: null,      badge: null,    dividerAfter: true  },
+  { key: "trash",        icon: faTrash,                   label: "移至垃圾桶",       accent: "#EF4444",  badge: null,    dividerAfter: false },
+] as const;
+
 function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
   const [hovered, setHovered] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
   const updatedTxt = formatRelative(mission.updatedAt);
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsIcon = WS_ICON[ws] ?? null;
   const heroLabel = mission.squadName ?? mission.title ?? "";
   const heroLetter = heroLabel.trim().slice(0, 1).toUpperCase() || "M";
 
+  // Close menu on outside click
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
   return (
     <div
-      style={{ cursor: "pointer" }}
+      style={{ cursor: "pointer", position: "relative" }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => { setHovered(false); }}
       onClick={onClick}
     >
       {/* ── Thumbnail — 4:3, pale neutral bg ── */}
@@ -830,16 +932,14 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
         width: "100%",
         aspectRatio: "4 / 3",
         borderRadius: 8,
-        background: "rgba(64,79,109,0.06)",
+        background: hovered || menuOpen ? "rgba(57,70,96,0.14)" : "rgba(64,79,109,0.06)",
         overflow: "hidden",
+        transition: "background-color 0.15s ease-in-out",
       }}>
         {/* Centered muted icon */}
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {wsIcon ? (
-            <FontAwesomeIcon
-              icon={wsIcon.icon}
-              style={{ fontSize: 52, color: wsIcon.bg, opacity: 0.28 }}
-            />
+            <FontAwesomeIcon icon={wsIcon.icon} style={{ fontSize: 52, color: wsIcon.bg, opacity: 0.28 }} />
           ) : (
             <span style={{ fontSize: 52, fontWeight: 800, color: "rgba(64,79,109,0.18)", lineHeight: 1, userSelect: "none" }}>
               {heroLetter}
@@ -847,38 +947,64 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
           )}
         </div>
 
-        {/* Hover overlay — dark scrim + 3 action buttons */}
+        {/* Top-left: checkbox (opacity 0→1 on hover) */}
         <div style={{
-          position: "absolute", inset: 0,
-          background: "rgba(0,0,0,0.30)",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          opacity: hovered ? 1 : 0,
-          transition: "opacity 0.15s ease",
-          pointerEvents: hovered ? "auto" : "none",
+          position: "absolute", top: 8, left: 8,
+          opacity: hovered || menuOpen ? 1 : 0,
+          transition: "opacity 0.15s ease-in-out",
+          pointerEvents: hovered || menuOpen ? "auto" : "none",
         }}>
-          {[
-            { icon: faStar,     title: "加入星號" },
-            { icon: faPen,      title: "重新命名" },
-            { icon: faEllipsis, title: "更多選項" },
-          ].map(action => (
-            <button
-              key={action.title}
-              title={action.title}
-              onClick={e => e.stopPropagation()}
-              style={{
-                width: 32, height: 32, borderRadius: "50%",
-                background: "rgba(255,255,255,0.92)",
-                border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, color: "#111827",
-                transition: "background 0.1s",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#fff")}
-              onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.92)")}
-            >
-              <FontAwesomeIcon icon={action.icon} />
-            </button>
-          ))}
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 18, height: 18, borderRadius: 4,
+              border: "2px solid rgba(255,255,255,0.85)",
+              background: "rgba(255,255,255,0.18)",
+              cursor: "pointer",
+            }}
+          />
+        </div>
+
+        {/* Top-right: ⭐ + ⋯ white square buttons (opacity 0→1 on hover) */}
+        <div style={{
+          position: "absolute", top: 6, right: 6,
+          display: "flex", gap: 4,
+          opacity: hovered || menuOpen ? 1 : 0,
+          transition: "opacity 0.15s ease-in-out",
+          pointerEvents: hovered || menuOpen ? "auto" : "none",
+        }}>
+          {/* Star */}
+          <button
+            title="加入星號"
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 32, height: 32, borderRadius: 8, background: "white",
+              border: "none", cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 13, color: "#374151",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.12)", transition: "background 0.1s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f3f4f6")}
+            onMouseLeave={e => (e.currentTarget.style.background = "white")}
+          >
+            <FontAwesomeIcon icon={faStar} />
+          </button>
+
+          {/* ⋯ opens dropdown */}
+          <button
+            title="更多選項"
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+            style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: menuOpen ? "#f3f4f6" : "white",
+              border: "none", cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 13, color: "#374151",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.12)", transition: "background 0.1s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f3f4f6")}
+            onMouseLeave={e => { if (!menuOpen) e.currentTarget.style.background = "white"; }}
+          >
+            <FontAwesomeIcon icon={faEllipsis} />
+          </button>
         </div>
       </div>
 
@@ -896,6 +1022,71 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
           {updatedTxt}
         </p>
       </div>
+
+      {/* ── Context dropdown menu ── */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "absolute", top: 44, right: 0, zIndex: 200,
+            background: "white", borderRadius: 12,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08)",
+            minWidth: 224, padding: "6px 0",
+            animation: "fadeInDown 0.12s ease-out",
+          }}
+        >
+          {/* Card header — title + edit icon */}
+          <div style={{ padding: "10px 16px 8px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {mission.title}
+              </span>
+              <FontAwesomeIcon icon={faPen} style={{ fontSize: 11, color: "#6B7280", cursor: "pointer" }} />
+            </div>
+            <p style={{ fontSize: 11, color: "#9CA3AF", margin: "2px 0 0" }}>
+              {updatedTxt}
+            </p>
+          </div>
+
+          {/* Menu items */}
+          {CARD_MENU_ITEMS.map(item => (
+            <React.Fragment key={item.key}>
+              <button
+                onClick={e => { e.stopPropagation(); setMenuOpen(false); }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 12,
+                  padding: "9px 16px", border: "none", background: "none",
+                  cursor: "pointer", textAlign: "left",
+                  transition: "background 0.08s",
+                  color: item.accent ?? "#111827",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.04)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "none")}
+              >
+                <FontAwesomeIcon
+                  icon={item.icon}
+                  style={{ fontSize: 14, width: 16, color: item.accent ?? "#6B7280", flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 13, flex: 1 }}>{item.label}</span>
+                {item.badge && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, color: "#7C3AED",
+                    background: "rgba(124,58,237,0.08)", borderRadius: 99,
+                    padding: "1px 7px",
+                  }}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+              {item.dividerAfter && (
+                <div style={{ height: 1, background: "rgba(0,0,0,0.07)", margin: "4px 0" }} />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
