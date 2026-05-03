@@ -1,16 +1,17 @@
 /**
- * ProjectsPage — Canva /projects clone (full-bleed, 3-column).
+ * ProjectsPage — Canva /projects pixel-faithful redesign.
  *
- * Layout (no max-w container — extends edge to edge):
- *   ┌──────────────────┬──────────────────────────────┬─────────────────────────┐
- *   │ Left rail 240px  │  Middle column (flex-1)      │ Right floating panel    │
- *   │ - sub-nav        │  - search + filter chips     │ 360px, sticky, elevated │
- *   │ - 已加星號標籤   │  - 最近的項目 (横向scroll)   │ - active preview /      │
- *   │ - 資料夾         │  - 資料夾                    │   featured project /    │
- *   │ - brand stripe   │  - 設計 grid                 │   quick actions card    │
- *   └──────────────────┴──────────────────────────────┴─────────────────────────┘
+ * Layout:
+ *   ┌────────────────────┬──────────────────────────────────────┐
+ *   │ Left rail 240px    │  Main column (flex-1, scrollable)    │
+ *   │ - sub-nav          │  - filter bar (擁有者▾ 類型▾ sort)    │
+ *   │ - 已加星號標籤     │  - 最近的項目 (横向scroll)           │
+ *   │ - 資料夾           │  - 資料夾 grid                       │
+ *   │ - 品牌             │  - 設計 grid / list                  │
+ *   └────────────────────┴──────────────────────────────────────┘
  *
- * Pure HeroUI tokens, no hex pins.
+ * Canva-faithful: raw divs + inline styles (no HeroUI layout wrappers).
+ * Color tokens from index.css :root.
  */
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
@@ -20,22 +21,23 @@ import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import ProjectSyncModal, { type SyncSource } from "../components/projects/ProjectSyncModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
-import {
-  Avatar, Button, ButtonGroup, Card, CardBody, CardHeader, Chip, Divider,
-  Dropdown, DropdownTrigger, DropdownMenu, DropdownSection, DropdownItem,
-  Input, Skeleton, Spinner, Tooltip,
-} from "@heroui/react";
+import { Avatar, Skeleton, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faMagnifyingGlass, faChevronDown, faPlus, faArrowDownWideShort,
-  faArrowUpWideShort, faTableCells, faList, faStar, faEllipsis, faBookmark,
-  faFolder, faCloudArrowUp, faGlobe, faCrown, faWandMagicSparkles, faFolderOpen,
-  faRocket, faClockRotateLeft, faShareNodes, faCloudArrowDown,
+  faMagnifyingGlass, faChevronDown, faPlus,
+  faArrowDownWideShort, faArrowUpWideShort,
+  faTableCells, faList, faStar, faEllipsis, faBookmark,
+  faCloudArrowUp, faGlobe, faWandMagicSparkles, faFolderOpen,
+  faRocket, faShareNodes, faCloudArrowDown,
+  faBolt, faCalendarDays,
+  faArrowUpRightFromSquare, faCircleInfo, faCopy, faFolderTree,
+  faDownload, faWifi, faShareAlt, faLink, faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faYoutube, faGoogleDrive, faMicrosoft, faDropbox,
 } from "@fortawesome/free-brands-svg-icons";
 
+/* ── Types ── */
 interface MissionRow {
   id: number;
   title: string;
@@ -48,31 +50,68 @@ interface MissionRow {
   brandName?: string | null;
   status?: string | null;
   updatedAt?: string;
+  thumbnailUrl?: string | null;
+  squadMockupImages?: string[];
 }
-
 type SubNavKey = "all" | "mine" | "shared" | "offline";
 
+/* ── Navigation items (Canva-faithful order) ── */
 const SUB_NAV: Array<{ id: SubNavKey; label: string; icon: any }> = [
-  { id: "all",     label: "所有專案",   icon: faFolderOpen        },
-  { id: "mine",    label: "你的專案",   icon: faRocket            },
-  { id: "shared",  label: "與你分享",   icon: faShareNodes        },
-  { id: "offline", label: "可離線使用", icon: faCloudArrowDown    },
+  { id: "all",     label: "所有專案",   icon: faFolderOpen     },
+  { id: "mine",    label: "你的專案",   icon: faRocket         },
+  { id: "shared",  label: "與你分享",   icon: faShareNodes     },
+  { id: "offline", label: "可離線使用", icon: faCloudArrowDown },
 ];
+
+/* ── Context-menu items on each card ── */
+const CARD_MENU_ITEMS = [
+  { key: "run-once",    icon: faBolt,                label: "立即自主執行",     accent: "#F97316", dividerAfter: false },
+  { key: "run-sched",   icon: faCalendarDays,        label: "排程自主執行",     accent: "#F97316", dividerAfter: true  },
+  { key: "open-tab",    icon: faArrowUpRightFromSquare, label: "在新索引標籤中開啟", accent: null,  dividerAfter: false },
+  { key: "info",        icon: faCircleInfo,          label: "詳細資訊",         accent: null,      dividerAfter: false },
+  { key: "duplicate",   icon: faCopy,                label: "建立複本",         accent: null,      dividerAfter: false },
+  { key: "star",        icon: faStar,                label: "加入星號",         accent: null,      dividerAfter: false },
+  { key: "move",        icon: faFolderTree,          label: "移動",             accent: null,      dividerAfter: false },
+  { key: "download",    icon: faDownload,            label: "下載",             accent: null,      dividerAfter: false },
+  { key: "offline",     icon: faWifi,                label: "設為可離線存取",   accent: null,      badge: "新功能",     dividerAfter: false },
+  { key: "share",       icon: faShareAlt,            label: "分享",             accent: null,      dividerAfter: false },
+  { key: "copy-link",   icon: faLink,                label: "複製連結",         accent: null,      dividerAfter: true  },
+  { key: "trash",       icon: faTrash,               label: "移至垃圾桶",       accent: "#EF4444", dividerAfter: false },
+] as const;
 
 const SYNC_SOURCES: Array<{ id: SyncSource; label: string; hint: string; icon: any }> = [
-  { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片",   icon: faFacebook    },
-  { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",         icon: faInstagram   },
-  { id: "youtube",      label: "YouTube 頻道",    hint: "抓影片清單、縮圖",     icon: faYoutube     },
-  { id: "website",      label: "官網 / 部落格",   hint: "抓品牌素材、文章",     icon: faGlobe       },
-  { id: "google-drive", label: "Google Drive",    hint: "同步整個資料夾",       icon: faGoogleDrive },
-  { id: "onedrive",     label: "OneDrive",        hint: "同步整個資料夾",       icon: faMicrosoft   },
-  { id: "dropbox",      label: "Dropbox",         hint: "同步整個資料夾",       icon: faDropbox     },
+  { id: "facebook",     label: "Facebook 粉絲團", hint: "抓貼文、圖片、影片", icon: faFacebook    },
+  { id: "instagram",    label: "Instagram 帳號",  hint: "抓圖文、限動",       icon: faInstagram   },
+  { id: "youtube",      label: "YouTube 頻道",    hint: "抓影片清單、縮圖",   icon: faYoutube     },
+  { id: "website",      label: "官網 / 部落格",   hint: "抓品牌素材、文章",   icon: faGlobe       },
+  { id: "google-drive", label: "Google Drive",    hint: "同步整個資料夾",     icon: faGoogleDrive },
+  { id: "onedrive",     label: "OneDrive",        hint: "同步整個資料夾",     icon: faMicrosoft   },
+  { id: "dropbox",      label: "Dropbox",         hint: "同步整個資料夾",     icon: faDropbox     },
 ];
 
+/* ── Helpers ── */
+function formatRelative(dateStr?: string): string {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins < 1)   return "剛剛";
+  if (mins < 60)  return `${mins} 分鐘前`;
+  if (hours < 24) return `${hours} 小時前`;
+  if (days === 1) return "1 天前編輯";
+  if (days < 30)  return `${days} 天前編輯`;
+  return new Date(dateStr).toLocaleDateString("zh-TW", { month: "short", day: "numeric" });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAGE COMPONENT
+══════════════════════════════════════════════════════════════════════ */
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { brandId, brands } = useOutletContext<ShellOutletCtx>();
 
+  /* Data */
   const allQuery = (trpc as any).mission?.listAllForUser?.useQuery
     ? (trpc as any).mission.listAllForUser.useQuery(undefined, { refetchOnWindowFocus: false })
     : null;
@@ -80,104 +119,67 @@ export default function ProjectsPage() {
     { brandId: brandId ?? 0 },
     { enabled: !allQuery && !!brandId, refetchOnWindowFocus: false }
   );
-
   const rows: MissionRow[] = useMemo(() => {
     if (allQuery?.data) return allQuery.data as MissionRow[];
     const fb = (fallbackQuery.data as any[]) ?? [];
     const brandName = brands.find((b) => b.id === brandId)?.name ?? null;
     return fb.map((m) => ({ ...m, brandName }));
   }, [allQuery?.data, fallbackQuery.data, brands, brandId]);
-
   const isLoading = allQuery?.isLoading ?? fallbackQuery.isLoading;
 
-  const [searchQ, setSearchQ] = useState("");
-  const [subNav, setSubNav] = useState<SubNavKey>("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [ownerFilter, setOwnerFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<string>("all");
-  const [sortDesc, setSortDesc] = useState(true);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  /* UI state */
+  const [subNav,       setSubNav]       = useState<SubNavKey>("all");
+  const [ownerFilter,  setOwnerFilter]  = useState<string>("all");
+  const [typeFilter,   setTypeFilter]   = useState<string>("all");
+  const [sortMode,     setSortMode]     = useState<"recent" | "asc" | "desc">("recent");
+  const [viewMode,     setViewMode]     = useState<"grid" | "list">("grid");
+  const [ownerSearch,  setOwnerSearch]  = useState("");
+  const [ownerOpen,    setOwnerOpen]    = useState(false);
+  const [typeOpen,     setTypeOpen]     = useState(false);
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
-  const [syncSource, setSyncSource] = useState<SyncSource | null>(null);
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [syncSource,   setSyncSource]   = useState<SyncSource | null>(null);
 
+  /* Owner options */
+  const ownerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    rows.forEach((m) => { if (m.brandName && m.brandId != null) map.set(String(m.brandId), m.brandName); });
+    return [
+      { value: "all",   label: "任何擁有者" },
+      { value: "mine",  label: "我的專案"   },
+      { value: "shared",label: "與我分享"   },
+      ...Array.from(map.entries()).map(([v, l]) => ({ value: v, label: l })),
+    ];
+  }, [rows]);
+
+  /* Type options */
   const typeOptions = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((m) => { if (m.workspace) set.add(m.workspace.toLowerCase()); });
     return [
-      { value: "all", label: "全部類型" },
+      { value: "all", label: "任何類型" },
       ...Array.from(set).sort().map((v) => ({ value: v, label: v })),
     ];
   }, [rows]);
 
-  const categoryOptions = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((m) => {
-      const lk = (m.squadLayer ?? "").toString().slice(0, 2);
-      if (lk) set.add(lk);
-    });
-    return [
-      { value: "all", label: "全部類別" },
-      ...Array.from(set).sort().map((v) => ({ value: v, label: `${v} 策略層` })),
-    ];
-  }, [rows]);
-
-  const ownerOptions = useMemo(() => {
-    const set = new Map<string, string>();
-    rows.forEach((m) => {
-      if (m.brandName && m.brandId != null) set.set(String(m.brandId), m.brandName);
-    });
-    return [
-      { value: "all", label: "全部擁有者" },
-      ...Array.from(set.entries()).map(([value, label]) => ({ value, label })),
-    ];
-  }, [rows]);
-
-  const dateOptions = [
-    { value: "all",    label: "全部時間" },
-    { value: "today",  label: "今天" },
-    { value: "week",   label: "本週" },
-    { value: "month",  label: "本月" },
-    { value: "year",   label: "今年" },
-  ];
-
+  /* Filtered + sorted rows */
   const filtered = useMemo(() => {
-    const q = searchQ.trim().toLowerCase();
     let r = rows;
-    if (q) {
-      r = r.filter((m) =>
-        (m.title ?? "").toLowerCase().includes(q) ||
-        (m.description ?? "").toLowerCase().includes(q) ||
-        (m.squadName ?? "").toLowerCase().includes(q) ||
-        (m.workspace ?? "").toLowerCase().includes(q)
-      );
+    if (ownerFilter !== "all" && ownerFilter !== "mine" && ownerFilter !== "shared") {
+      r = r.filter((m) => String(m.brandId) === ownerFilter);
     }
-    if (typeFilter !== "all") r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
-    if (categoryFilter !== "all") r = r.filter((m) => (m.squadLayer ?? "").toString().slice(0, 2) === categoryFilter);
-    if (ownerFilter !== "all") r = r.filter((m) => String(m.brandId) === ownerFilter);
-    if (dateFilter !== "all") {
-      const cutoff: Record<string, number> = { today: 86_400_000, week: 86_400_000 * 7, month: 86_400_000 * 30, year: 86_400_000 * 365 };
-      const ms = cutoff[dateFilter];
-      if (ms) {
-        const now = Date.now();
-        r = r.filter((m) => m.updatedAt && (now - new Date(m.updatedAt).getTime() <= ms));
-      }
+    if (typeFilter !== "all") {
+      r = r.filter((m) => (m.workspace ?? "").toLowerCase() === typeFilter);
     }
     return [...r].sort((a, b) => {
+      if (sortMode === "asc") return (a.title ?? "").localeCompare(b.title ?? "", "zh-TW");
+      if (sortMode === "desc") return (b.title ?? "").localeCompare(a.title ?? "", "zh-TW");
       const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return sortDesc ? tb - ta : ta - tb;
+      return tb - ta;
     });
-  }, [rows, searchQ, typeFilter, categoryFilter, ownerFilter, dateFilter, sortDesc, subNav]);
+  }, [rows, ownerFilter, typeFilter, sortMode]);
 
   const recent = useMemo(() => filtered.slice(0, 12), [filtered]);
-  const all = filtered;
-  const active = useMemo(() => all.find((m) => m.id === activeId) ?? all[0] ?? null, [all, activeId]);
-
-  useEffect(() => {
-    if (!activeId && all[0]) setActiveId(all[0].id);
-  }, [all, activeId]);
 
   const goToMission = (m: MissionRow) => {
     const ws = m.workspace || "_";
@@ -185,373 +187,468 @@ export default function ProjectsPage() {
     else navigate(`/m/${m.id}`);
   };
 
-  const labelFor = (opts: Array<{ value: string; label: string }>, v: string) =>
-    opts.find((o) => o.value === v)?.label ?? "";
+  /* Nav label */
+  const navLabel = SUB_NAV.find(n => n.id === subNav)?.label ?? "所有專案";
+
+  /* Active owner / type label */
+  const ownerLabel = ownerFilter === "all" ? "擁有者" : (ownerOptions.find(o => o.value === ownerFilter)?.label ?? "擁有者");
+  const typeLabel  = typeFilter  === "all" ? "任何類型" : (typeOptions.find(o => o.value === typeFilter)?.label ?? "任何類型");
 
   return (
-    <main className="flex flex-col h-full min-h-screen bg-content1">
-      {/* ─── Top header strip ─────────────────────────────────────── */}
-      <header className="px-6 pt-5 pb-3 border-b border-divider">
-        <div className="flex items-center gap-3">
-          <Chip variant="flat" size="sm" className="uppercase tracking-wider">PROJECTS</Chip>
-          <h1 className="text-3xl font-semibold tracking-tight">所有專案</h1>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="bordered"
-              radius="full"
-              size="sm"
-              onPress={() => navigate("/templates")}
-              startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
-            >
-              先看看任務範本
-            </Button>
-            <Button
-              color="primary"
-              radius="full"
-              size="sm"
-              onPress={() => setCreateSource("recommended")}
-              startContent={<FontAwesomeIcon icon={faCrown} />}
-            >
-              開始建立
-            </Button>
-            <CreateMenu
-              onNewMission={() => navigate("/templates")}
-              onSyncSource={(s) => setSyncSource(s as SyncSource)}
-            />
-          </div>
-        </div>
+    <div style={{
+      display: "flex", height: "100vh", overflow: "hidden",
+      background: "rgb(252,251,254)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+    }}>
 
-        <div className="mt-4 flex items-center gap-2 flex-wrap">
-          <div className="w-full max-w-[420px]">
-            <Input
-              size="sm"
-              radius="full"
-              variant="bordered"
-              value={searchQ}
-              onValueChange={setSearchQ}
-              placeholder="搜尋你的內容"
-              isClearable
-              onClear={() => setSearchQ("")}
-              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
-            />
-          </div>
-          <FilterDropdown
-            label={typeFilter === "all" ? "類型" : `類型：${labelFor(typeOptions, typeFilter)}`}
-            options={typeOptions} value={typeFilter} onSelect={setTypeFilter}
-          />
-          <FilterDropdown
-            label={categoryFilter === "all" ? "類別" : `類別：${labelFor(categoryOptions, categoryFilter)}`}
-            options={categoryOptions} value={categoryFilter} onSelect={setCategoryFilter}
-          />
-          <FilterDropdown
-            label={ownerFilter === "all" ? "擁有者" : `擁有者：${labelFor(ownerOptions, ownerFilter)}`}
-            options={ownerOptions} value={ownerFilter} onSelect={setOwnerFilter}
-          />
-          <FilterDropdown
-            label={dateFilter === "all" ? "已修改日期" : `修改：${labelFor(dateOptions, dateFilter)}`}
-            options={dateOptions} value={dateFilter} onSelect={setDateFilter}
-          />
+      {/* ════════════════════════ LEFT RAIL ════════════════════════ */}
+      <aside style={{
+        width: 240, flexShrink: 0,
+        borderRight: "1px solid #E4E3E1",
+        overflowY: "auto", padding: "20px 0 24px",
+        display: "flex", flexDirection: "column", gap: 0,
+      }}>
 
-          <div className="ml-auto flex items-center gap-2">
-            <Tooltip content={sortDesc ? "新到舊" : "舊到新"}>
-              <Button
-                size="sm" variant="light" radius="full"
-                onPress={() => setSortDesc((v) => !v)}
-                startContent={<FontAwesomeIcon icon={sortDesc ? faArrowDownWideShort : faArrowUpWideShort} />}
-              >
-                {sortDesc ? "新到舊" : "舊到新"}
-              </Button>
-            </Tooltip>
-            <ButtonGroup variant="flat" size="sm" radius="full">
-              <Tooltip content="格狀檢視">
-                <Button isIconOnly
-                  color={viewMode === "grid" ? "primary" : "default"}
-                  variant={viewMode === "grid" ? "solid" : "flat"}
-                  onPress={() => setViewMode("grid")} aria-label="格狀檢視"
-                ><FontAwesomeIcon icon={faTableCells} /></Button>
-              </Tooltip>
-              <Tooltip content="清單檢視">
-                <Button isIconOnly
-                  color={viewMode === "list" ? "primary" : "default"}
-                  variant={viewMode === "list" ? "solid" : "flat"}
-                  onPress={() => setViewMode("list")} aria-label="清單檢視"
-                ><FontAwesomeIcon icon={faList} /></Button>
-              </Tooltip>
-            </ButtonGroup>
-          </div>
-        </div>
-      </header>
-
-      {/* ─── 3-column body ────────────────────────────────────────── */}
-      <div className="flex-1 flex min-h-0">
-        {/* LEFT RAIL */}
-        <aside className="w-[240px] shrink-0 border-r border-divider px-4 py-6 overflow-y-auto">
-          <nav className="flex flex-col gap-1">
-            {SUB_NAV.map((n) => (
+        {/* Main nav */}
+        <nav style={{ padding: "0 8px", marginBottom: 4 }}>
+          {SUB_NAV.map(n => {
+            const active = subNav === n.id;
+            return (
               <button
                 key={n.id}
                 onClick={() => setSubNav(n.id)}
-                className={[
-                  "flex items-center gap-3 px-3 h-10 rounded-medium text-small transition text-left",
-                  subNav === n.id
-                    ? "bg-primary-100 text-primary-700 font-medium"
-                    : "text-default-700 hover:bg-default-100",
-                ].join(" ")}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 12px", borderRadius: 8, border: "none",
+                  textAlign: "left", cursor: "pointer",
+                  background: active ? "#EEF2FF" : "transparent",
+                  transition: "background 0.1s",
+                  marginBottom: 1,
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = active ? "#EEF2FF" : "transparent"; }}
               >
-                <FontAwesomeIcon icon={n.icon} className="w-4" />
-                <span>{n.label}</span>
+                <FontAwesomeIcon
+                  icon={n.icon}
+                  style={{ fontSize: 14, width: 16, flexShrink: 0, color: active ? "#4F46E5" : "#6B7280" }}
+                />
+                <span style={{ fontSize: 13.5, fontWeight: active ? 600 : 400, color: active ? "#4338CA" : "#374151" }}>
+                  {n.label}
+                </span>
               </button>
-            ))}
-          </nav>
+            );
+          })}
+        </nav>
 
-          <Divider className="my-4" />
+        {/* Divider */}
+        <div style={{ height: 1, background: "#E4E3E1", margin: "8px 0" }} />
 
-          <div className="px-3 mb-2 flex items-center justify-between">
-            <span className="text-tiny font-medium uppercase tracking-wider text-default-500">已加星號標籤</span>
-            <Button isIconOnly size="sm" variant="light" aria-label="新增標籤">
-              <FontAwesomeIcon icon={faPlus} className="text-tiny" />
-            </Button>
+        {/* 已加星號標籤 */}
+        <div style={{ padding: "0 20px", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9CA3AF" }}>
+              已加星號標籤
+            </span>
+            <button style={{ width: 20, height: 20, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#9CA3AF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.06)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+            </button>
           </div>
-          <p className="px-3 text-tiny text-default-400 leading-snug">
+          <p style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.5 }}>
             點擊任一專案的星號圖示，即可從這裡輕鬆找到。
           </p>
+        </div>
 
-          <Divider className="my-4" />
+        {/* Divider */}
+        <div style={{ height: 1, background: "#E4E3E1", margin: "8px 0" }} />
 
-          <div className="px-3 mb-2 flex items-center justify-between">
-            <span className="text-tiny font-medium uppercase tracking-wider text-default-500">資料夾</span>
-            <Button isIconOnly size="sm" variant="light" aria-label="新增資料夾">
-              <FontAwesomeIcon icon={faPlus} className="text-tiny" />
-            </Button>
+        {/* 資料夾 */}
+        <div style={{ padding: "0 20px 4px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9CA3AF" }}>
+              資料夾
+            </span>
+            <button style={{ width: 20, height: 20, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#9CA3AF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.06)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+            </button>
           </div>
-          <div className="flex flex-col gap-0.5">
-            <RailFolderRow icon={faCloudArrowUp} label="上傳" />
-            <RailFolderRow icon={faStar} label="已加星號" />
-          </div>
+        </div>
+        <div style={{ padding: "0 8px" }}>
+          {[
+            { icon: faCloudArrowUp, label: "上傳"    },
+            { icon: faStar,         label: "已加星號" },
+          ].map(f => (
+            <button key={f.label} style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "8px 12px", borderRadius: 8, border: "none",
+              textAlign: "left", cursor: "pointer", background: "transparent",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <FontAwesomeIcon icon={f.icon} style={{ fontSize: 13, width: 16, color: "#6B7280" }} />
+              <span style={{ fontSize: 13, color: "#374151" }}>{f.label}</span>
+            </button>
+          ))}
+        </div>
 
-          <Divider className="my-4" />
+        {/* Divider */}
+        <div style={{ height: 1, background: "#E4E3E1", margin: "8px 0" }} />
 
-          <div className="px-3 mb-2">
-            <span className="text-tiny font-medium uppercase tracking-wider text-default-500">品牌</span>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            {brands.slice(0, 6).map((b: any) => (
-              <button
-                key={b.id}
-                onClick={() => setOwnerFilter(String(b.id))}
-                className={[
-                  "flex items-center gap-2 px-3 h-9 rounded-medium text-small transition text-left",
-                  ownerFilter === String(b.id) ? "bg-default-100 font-medium" : "text-default-700 hover:bg-default-100",
-                ].join(" ")}
-              >
-                <Avatar size="sm" name={b.name} className="w-5 h-5 text-tiny" />
-                <span className="truncate">{b.name}</span>
-              </button>
-            ))}
-          </div>
-        </aside>
+        {/* 品牌 */}
+        <div style={{ padding: "0 20px 4px" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9CA3AF" }}>
+            品牌
+          </span>
+        </div>
+        <div style={{ padding: "0 8px" }}>
+          {brands.slice(0, 6).map((b: any) => (
+            <button
+              key={b.id}
+              onClick={() => setOwnerFilter(String(b.id))}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "7px 12px", borderRadius: 8, border: "none",
+                textAlign: "left", cursor: "pointer",
+                background: ownerFilter === String(b.id) ? "rgba(0,0,0,0.05)" : "transparent",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
+              onMouseLeave={e => { e.currentTarget.style.background = ownerFilter === String(b.id) ? "rgba(0,0,0,0.05)" : "transparent"; }}
+            >
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                background: stringToColor(b.name),
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 700, color: "#fff",
+              }}>
+                {(b.name ?? "?").slice(0, 1).toUpperCase()}
+              </div>
+              <span style={{ fontSize: 13, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {b.name}
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
 
-        {/* MIDDLE COLUMN */}
-        <section className="flex-1 min-w-0 overflow-y-auto px-8 py-6">
+      {/* ════════════════════════ MAIN COLUMN ════════════════════════ */}
+      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+        {/* ── Top: title + filter bar ── */}
+        <div style={{ flexShrink: 0, padding: "24px 32px 0" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1A1A18", margin: "0 0 16px", letterSpacing: "-0.02em" }}>
+            {navLabel}
+          </h1>
+
+          {/* Filter bar — Canva-faithful pill style */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+
+            {/* 擁有者 pill */}
+            <PillDropdown
+              label={ownerLabel}
+              active={ownerFilter !== "all"}
+              open={ownerOpen}
+              onToggle={() => { setOwnerOpen(v => !v); setTypeOpen(false); }}
+              onClose={() => setOwnerOpen(false)}
+            >
+              <div style={{ padding: "8px 12px 4px" }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  border: "1px solid #E4E3E1", borderRadius: 8,
+                  padding: "6px 10px", background: "#F9F8F6",
+                }}>
+                  <FontAwesomeIcon icon={faMagnifyingGlass} style={{ color: "#9CA3AF", fontSize: 11 }} />
+                  <input
+                    value={ownerSearch}
+                    onChange={e => setOwnerSearch(e.target.value)}
+                    placeholder="搜尋擁有者"
+                    style={{ border: "none", outline: "none", background: "transparent", fontSize: 13, flex: 1 }}
+                  />
+                </div>
+              </div>
+              <div style={{ padding: "4px 4px 8px" }}>
+                {ownerOptions.filter(o => !ownerSearch || o.label.toLowerCase().includes(ownerSearch.toLowerCase())).map(o => (
+                  <DropdownRow
+                    key={o.value}
+                    label={o.label}
+                    active={ownerFilter === o.value}
+                    onClick={() => { setOwnerFilter(o.value); setOwnerOpen(false); setOwnerSearch(""); }}
+                  />
+                ))}
+              </div>
+            </PillDropdown>
+
+            {/* 任何類型 pill */}
+            <PillDropdown
+              label={typeLabel}
+              active={typeFilter !== "all"}
+              open={typeOpen}
+              onToggle={() => { setTypeOpen(v => !v); setOwnerOpen(false); }}
+              onClose={() => setTypeOpen(false)}
+            >
+              <div style={{ padding: "4px 4px 8px" }}>
+                {typeOptions.map(o => (
+                  <DropdownRow
+                    key={o.value}
+                    label={o.label}
+                    active={typeFilter === o.value}
+                    onClick={() => { setTypeFilter(o.value); setTypeOpen(false); }}
+                  />
+                ))}
+              </div>
+            </PillDropdown>
+
+            {/* Sort toggle */}
+            <button
+              onClick={() => setSortMode(m => m === "recent" ? "asc" : m === "asc" ? "desc" : "recent")}
+              title={sortMode === "recent" ? "最近編輯" : sortMode === "asc" ? "名稱 A→Z" : "名稱 Z→A"}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 20,
+                border: "1.5px solid #E4E3E1",
+                background: sortMode !== "recent" ? "#F5F3FF" : "white",
+                cursor: "pointer", fontSize: 13, color: sortMode !== "recent" ? "#7C3AED" : "#374151",
+                fontWeight: sortMode !== "recent" ? 600 : 400, transition: "all 0.1s",
+              }}
+            >
+              <FontAwesomeIcon icon={sortMode === "desc" ? faArrowUpWideShort : faArrowDownWideShort} style={{ fontSize: 12 }} />
+              {sortMode === "recent" ? "最近編輯" : sortMode === "asc" ? "名稱 A→Z" : "名稱 Z→A"}
+            </button>
+
+            {/* Grid / List toggle */}
+            <div style={{ marginLeft: "auto", display: "flex", border: "1.5px solid #E4E3E1", borderRadius: 8, overflow: "hidden" }}>
+              {(["grid", "list"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setViewMode(m)}
+                  style={{
+                    width: 34, height: 32, border: "none", cursor: "pointer",
+                    background: viewMode === m ? "#1A1A18" : "white",
+                    color: viewMode === m ? "white" : "#6B7280",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 13, transition: "background 0.1s",
+                  }}
+                >
+                  <FontAwesomeIcon icon={m === "grid" ? faTableCells : faList} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Scrollable content area ── */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 32px 40px" }}>
+
+          {/* Loading skeleton */}
           {isLoading && (
-            <div className="flex items-center gap-3 text-small text-default-500">
-              <Spinner size="sm" /> 載入專案中…
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} style={{ borderRadius: 8, overflow: "hidden" }}>
+                  <Skeleton style={{ width: "100%", aspectRatio: "4/3", display: "block" }} />
+                  <div style={{ padding: "8px 2px" }}>
+                    <Skeleton style={{ height: 12, width: "80%", borderRadius: 6, marginBottom: 6 }} />
+                    <Skeleton style={{ height: 10, width: "50%", borderRadius: 6 }} />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
-          {!isLoading && all.length === 0 && (
-            <Card shadow="none" className="border-2 border-dashed border-divider">
-              <CardBody className="py-16 items-center text-center gap-3">
-                <FontAwesomeIcon icon={faFolderOpen} className="text-4xl text-default-300" />
-                <p className="text-medium font-medium">還沒有專案</p>
-                <p className="text-small text-default-500">
-                  從首頁選個任務範本，或從網路萃取一個全新的任務範本開始。
-                </p>
-                <Button color="primary" radius="full" className="mt-2" onPress={() => setCreateSource("recommended")}>
-                  建立第一個專案
-                </Button>
-              </CardBody>
-            </Card>
+          {/* Empty state */}
+          {!isLoading && filtered.length === 0 && (
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              padding: "80px 24px", textAlign: "center", gap: 12,
+              border: "2px dashed #E4E3E1", borderRadius: 12,
+            }}>
+              <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: 40, color: "#C8C7C3" }} />
+              <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A18", margin: 0 }}>還沒有專案</p>
+              <p style={{ fontSize: 14, color: "#6B6A66", margin: 0 }}>從首頁選個任務範本開始。</p>
+              <button
+                onClick={() => setCreateSource("recommended")}
+                style={{
+                  marginTop: 8, padding: "9px 20px", borderRadius: 20,
+                  background: "#1A1A18", color: "white", border: "none",
+                  cursor: "pointer", fontSize: 14, fontWeight: 600,
+                }}
+              >
+                建立第一個專案
+              </button>
+            </div>
           )}
 
+          {/* 最近的項目 */}
           {!isLoading && recent.length > 0 && (
-            <div className="mb-10">
-              <SectionHeader title="最近的項目" subtitle={`${recent.length} 個`} />
-              <div className="-mx-1 overflow-x-auto">
-                <div className="flex gap-3 px-1 pb-2">
-                  {recent.map((m) => (
-                    <div key={m.id} className="w-[200px] shrink-0">
+            <section style={{ marginBottom: 36 }}>
+              <SectionHeader
+                title="最近的項目"
+                count={recent.length}
+                onViewAll={() => {}}
+              />
+              {/* Horizontal scroll strip */}
+              <div style={{ overflowX: "auto", scrollbarWidth: "none", marginLeft: -4, paddingLeft: 4 }}>
+                <div style={{ display: "flex", gap: 12, paddingBottom: 4 }}>
+                  {recent.map(m => (
+                    <div key={m.id} style={{ width: 180, flexShrink: 0 }}>
                       <MissionCard
                         mission={m}
-                        active={m.id === active?.id}
-                        onClick={() => setActiveId(m.id)}
+                        onClick={() => goToMission(m)}
                         onOpen={() => goToMission(m)}
                       />
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
-          <div className="mb-10">
-            <SectionHeader title="資料夾" subtitle="2 個" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              <FolderTile icon={faCloudArrowUp} label="上傳" hint="尚未有資料" />
-              <FolderTile icon={faStar} label="已加星號" hint="尚未有資料" />
-            </div>
-          </div>
+          {/* 資料夾 */}
+          {!isLoading && (
+            <section style={{ marginBottom: 36 }}>
+              <SectionHeader title="資料夾" count={2} showViewAll={false} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, maxWidth: 700 }}>
+                <FolderTile icon={faCloudArrowUp} label="上傳"    hint="尚未有資料" />
+                <FolderTile icon={faStar}         label="已加星號" hint="尚未有資料" />
+              </div>
+            </section>
+          )}
 
-          {!isLoading && all.length > 0 && (
-            <div>
-              <SectionHeader title="設計" subtitle={`${all.length} 個`} />
+          {/* 設計 (all missions) */}
+          {!isLoading && filtered.length > 0 && (
+            <section>
+              <SectionHeader title="設計" count={filtered.length} showViewAll={false} />
               {viewMode === "grid" ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {all.map((m) => (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gap: 16,
+                }}>
+                  {filtered.map(m => (
                     <MissionCard
                       key={m.id}
                       mission={m}
-                      active={m.id === active?.id}
-                      onClick={() => setActiveId(m.id)}
+                      onClick={() => goToMission(m)}
                       onOpen={() => goToMission(m)}
                     />
                   ))}
                 </div>
               ) : (
-                <Card shadow="none" className="border border-divider overflow-hidden">
-                  <div className="flex flex-col divide-y divide-divider">
-                    {all.map((m) => (
-                      <MissionCardRow key={m.id} mission={m} onClick={() => goToMission(m)} />
-                    ))}
-                  </div>
-                </Card>
+                <MissionListTable missions={filtered} onOpen={goToMission} />
               )}
-            </div>
+            </section>
           )}
+        </div>
+      </main>
 
-          {isLoading && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mt-6">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <Card key={i} shadow="none" className="overflow-hidden">
-                  <Skeleton className="w-full" style={{ aspectRatio: "5 / 4" }} />
-                  <CardBody className="p-3 gap-1.5">
-                    <Skeleton className="h-3 w-4/5 rounded" />
-                    <Skeleton className="h-2 w-2/5 rounded" />
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* RIGHT FLOATING PANEL */}
-        <aside className="hidden xl:block w-[360px] shrink-0 px-5 py-6 overflow-y-auto">
-          <div className="sticky top-4 flex flex-col gap-4">
-            {active ? (
-              <PreviewCard mission={active} onOpen={() => goToMission(active)} />
-            ) : (
-              <EmptyPreviewCard onCreate={() => setCreateSource("recommended")} />
-            )}
-            <QuickActionsCard
-              onNewMission={() => navigate("/templates")}
-              onSync={(s) => setSyncSource(s)}
-            />
-          </div>
-        </aside>
-      </div>
-
+      {/* Modals */}
       <ProjectSyncModal
         open={syncSource !== null}
         source={syncSource}
         brandId={brandId}
         onClose={() => setSyncSource(null)}
       />
-
       <CreateMethodologyModal
         open={createSource !== null}
         initialSource={createSource ?? "recommended"}
         onClose={() => setCreateSource(null)}
-        onCreated={(slug) => {
-          setCreateSource(null);
-          navigate(`/templates/${slug}`);
-        }}
+        onCreated={(slug) => { setCreateSource(null); navigate(`/templates/${slug}`); }}
       />
-    </main>
-  );
-}
-
-/* ─────────────────────────── Section header ─────────────────────────── */
-
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="flex items-baseline justify-between mb-3">
-      <div className="flex items-baseline gap-2">
-        <h2 className="text-large font-semibold tracking-tight">{title}</h2>
-        {subtitle && <span className="text-tiny text-default-400">{subtitle}</span>}
-      </div>
-      <Button size="sm" variant="light">查看全部 →</Button>
     </div>
   );
 }
 
-/* ─────────────────────────── Rail folder row ────────────────────────── */
-
-function RailFolderRow({ icon, label }: { icon: any; label: string }) {
+/* ──────────────────────── Section header ──────────────────────────── */
+function SectionHeader({
+  title, count, onViewAll, showViewAll = true,
+}: { title: string; count: number; onViewAll?: () => void; showViewAll?: boolean }) {
+  const [hov, setHov] = React.useState(false);
   return (
-    <button className="flex items-center gap-2 px-3 h-9 rounded-medium text-small text-default-700 hover:bg-default-100 transition text-left">
-      <FontAwesomeIcon icon={icon} className="w-4 text-default-500" />
-      <span className="truncate">{label}</span>
-    </button>
-  );
-}
-
-/* ─────────────────────────── Folder tile ────────────────────────────── */
-
-function FolderTile({ icon, label, hint }: { icon: any; label: string; hint: string }) {
-  return (
-    <Card isPressable isHoverable shadow="sm" className="overflow-hidden">
-      <div
-        className="relative w-full flex items-center justify-center bg-default-100"
-        style={{ aspectRatio: "5 / 3" }}
-      >
-        <FontAwesomeIcon icon={icon} className="text-4xl text-default-500" />
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1A1A18", margin: 0 }}>{title}</h2>
+        <span style={{ fontSize: 12, color: "#9B9990" }}>{count} 個</span>
       </div>
-      <CardBody className="p-3 gap-0.5">
-        <p className="text-small font-medium leading-snug">{label}</p>
-        <p className="text-tiny text-default-400">{hint}</p>
-      </CardBody>
-    </Card>
+      {showViewAll && (
+        <button
+          onClick={onViewAll}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          style={{
+            fontSize: 13, fontWeight: 500, color: hov ? "#1A1A18" : "#6B6A66",
+            background: "none", border: "none", cursor: "pointer",
+            transition: "color 0.1s",
+          }}
+        >
+          查看全部 →
+        </button>
+      )}
+    </div>
   );
 }
 
-/* ─────────────────────────── MissionCard ──────────────────────────── */
+/* ──────────────────────── Folder tile ─────────────────────────────── */
+function FolderTile({ icon, label, hint }: { icon: any; label: string; hint: string }) {
+  const [hov, setHov] = React.useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        borderRadius: 8, overflow: "hidden", cursor: "pointer",
+        border: `1px solid ${hov ? "#C8C7C3" : "#E4E3E1"}`,
+        transition: "border-color 0.15s",
+        boxShadow: hov ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+      }}
+    >
+      <div style={{
+        width: "100%", aspectRatio: "4/3",
+        background: hov ? "#EEECE9" : "#F5F4F2",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "background 0.15s",
+      }}>
+        <FontAwesomeIcon icon={icon} style={{ fontSize: 32, color: "#9B9990" }} />
+      </div>
+      <div style={{ padding: "8px 10px 10px" }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", margin: "0 0 2px" }}>{label}</p>
+        <p style={{ fontSize: 12, color: "#9B9990", margin: 0 }}>{hint}</p>
+      </div>
+    </div>
+  );
+}
 
+/* ──────────────────────── MissionCard (grid) ───────────────────────── */
 function MissionCard({
-  mission, active, onClick, onOpen,
+  mission, onClick, onOpen,
 }: {
   mission: MissionRow;
-  active?: boolean;
   onClick: () => void;
   onOpen: () => void;
 }) {
-  const [hovered, setHovered] = React.useState(false);
-  const [imgIdx,  setImgIdx]  = React.useState(0);
+  const [hovered,  setHovered]  = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [imgIdx,   setImgIdx]   = React.useState(0);
+  const menuRef  = React.useRef<HTMLDivElement>(null);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const isLayerKnown = layerStr in LAYER_TOKENS;
-  const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
   const updatedTxt = formatRelative(mission.updatedAt);
+  const layerStr   = (mission.squadLayer ?? "").toString().slice(0, 2);
+  const lk         = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
+  const heroLabel  = mission.squadName ?? mission.title ?? "";
+  const heroLetter = heroLabel.trim().slice(0, 1).toUpperCase() || "M";
 
-  // Build image list (same priority as MissionsHome MissionCard)
-  const thumbnailUrl: string | null = (mission as any).thumbnailUrl ?? null;
-  const squadMockupImages: string[] = Array.isArray((mission as any).squadMockupImages)
-    ? (mission as any).squadMockupImages : [];
-  const allImages: string[] = thumbnailUrl
+  /* Images */
+  const thumbnailUrl: string | null    = mission.thumbnailUrl ?? null;
+  const squadMockupImages: string[]    = Array.isArray(mission.squadMockupImages) ? mission.squadMockupImages : [];
+  const allImages: string[]            = thumbnailUrl
     ? [thumbnailUrl, ...squadMockupImages.filter(u => u !== thumbnailUrl)]
     : squadMockupImages;
   const hasImages = allImages.length > 0;
 
+  /* Slideshow */
   React.useEffect(() => {
     if (hovered && allImages.length > 1) {
       timerRef.current = setInterval(() => setImgIdx(i => (i + 1) % allImages.length), 1400);
@@ -562,330 +659,410 @@ function MissionCard({
     return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
   }, [hovered, allImages.length]);
 
+  /* Close menu on outside click */
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [menuOpen]);
+
   return (
     <div
-      className="group relative"
+      style={{ cursor: "pointer", position: "relative" }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onDoubleClick={onOpen}
+      onClick={onClick}
     >
-      <Card
-        isPressable
-        isHoverable
-        onPress={onClick}
-        onDoubleClick={onOpen}
-        shadow="sm"
-        className={[
-          "overflow-hidden w-full transition",
-          active ? "ring-2 ring-primary ring-offset-2 ring-offset-content1" : "",
-        ].join(" ")}
-      >
-        <div className="relative w-full overflow-hidden bg-default-100" style={{ aspectRatio: "4 / 3" }}>
-          {hasImages ? (
-            <>
-              {allImages.map((url, i) => (
-                <div key={url} style={{
-                  position: "absolute", inset: 0,
-                  backgroundImage: `url(${url})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  opacity: i === imgIdx ? 1 : 0,
-                  transition: "opacity 0.4s ease-in-out",
-                }} />
-              ))}
-              <div style={{
+      {/* Thumbnail */}
+      <div style={{
+        position: "relative", width: "100%", aspectRatio: "4/3",
+        borderRadius: 8, overflow: "hidden",
+        background: hovered || menuOpen ? "rgba(57,70,96,0.14)" : "rgba(64,79,109,0.06)",
+        transition: "background-color 0.15s ease-in-out",
+      }}>
+        {/* Images or fallback */}
+        {hasImages ? (
+          <>
+            {allImages.map((url, i) => (
+              <div key={url} style={{
                 position: "absolute", inset: 0,
-                background: hovered ? "rgba(0,0,0,0.10)" : "transparent",
-                transition: "background 0.15s ease-in-out",
-                pointerEvents: "none",
+                backgroundImage: `url(${url})`,
+                backgroundSize: "cover", backgroundPosition: "center",
+                opacity: i === imgIdx ? 1 : 0,
+                transition: "opacity 0.4s ease-in-out",
               }} />
-              {allImages.length > 1 && hovered && (
-                <div style={{
-                  position: "absolute", bottom: 6, left: 0, right: 0,
-                  display: "flex", justifyContent: "center", gap: 4, pointerEvents: "none",
-                }}>
-                  {allImages.map((_, i) => (
-                    <div key={i} style={{
-                      width: i === imgIdx ? 14 : 5, height: 5, borderRadius: 3,
-                      background: i === imgIdx ? "white" : "rgba(255,255,255,0.5)",
-                      transition: "all 0.3s ease",
-                    }} />
-                  ))}
-                </div>
-              )}
-            </>
+            ))}
+            <div style={{
+              position: "absolute", inset: 0,
+              background: hovered ? "rgba(0,0,0,0.10)" : "transparent",
+              transition: "background 0.15s", pointerEvents: "none",
+            }} />
+            {allImages.length > 1 && hovered && (
+              <div style={{
+                position: "absolute", bottom: 6, left: 0, right: 0,
+                display: "flex", justifyContent: "center", gap: 4, pointerEvents: "none",
+              }}>
+                {allImages.map((_, i) => (
+                  <div key={i} style={{
+                    width: i === imgIdx ? 14 : 5, height: 5, borderRadius: 3,
+                    background: i === imgIdx ? "white" : "rgba(255,255,255,0.5)",
+                    transition: "all 0.3s ease",
+                  }} />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={52} />
+          </div>
+        )}
+
+        {/* Checkbox */}
+        <div style={{
+          position: "absolute", top: 8, left: 8,
+          opacity: hovered || menuOpen ? 1 : 0, transition: "opacity 0.15s",
+          pointerEvents: hovered || menuOpen ? "auto" : "none",
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: 18, height: 18, borderRadius: 4,
+            border: "2px solid rgba(255,255,255,0.85)",
+            background: "rgba(255,255,255,0.18)", cursor: "pointer",
+          }} />
+        </div>
+
+        {/* ⭐ + ⋯ buttons */}
+        <div style={{
+          position: "absolute", top: 6, right: 6, display: "flex", gap: 4,
+          opacity: hovered || menuOpen ? 1 : 0, transition: "opacity 0.15s",
+          pointerEvents: hovered || menuOpen ? "auto" : "none",
+        }}>
+          <HoverBtn icon={faStar}     title="加入星號" onClick={e => e.stopPropagation()} />
+          <HoverBtn icon={faEllipsis} title="更多選項" active={menuOpen}
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+          />
+        </div>
+      </div>
+
+      {/* Text */}
+      <div style={{ padding: "8px 2px 2px" }}>
+        <p style={{
+          fontSize: 13.5, fontWeight: 600, color: "#1A1A18", lineHeight: 1.35, margin: 0,
+          overflow: "hidden", display: "-webkit-box",
+          WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+        }}>
+          {mission.title}
+        </p>
+        <p style={{ fontSize: 11.5, color: "#6B6A66", marginTop: 3 }}>{updatedTxt}</p>
+      </div>
+
+      {/* Context menu */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "absolute", top: 44, right: 0, zIndex: 200,
+            background: "white", borderRadius: 12,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)",
+            minWidth: 200, padding: "6px 0", border: "1px solid rgba(0,0,0,0.07)",
+          }}
+        >
+          {CARD_MENU_ITEMS.map(item => (
+            <React.Fragment key={item.key}>
+              <button
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 14px", border: "none", background: "transparent",
+                  textAlign: "left", cursor: "pointer", fontSize: 13,
+                  color: item.accent ?? "#1A1A18",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <FontAwesomeIcon icon={item.icon} style={{ width: 14, color: item.accent ?? "#6B7280" }} />
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {"badge" in item && item.badge && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 10,
+                    background: "#ECFDF5", color: "#059669",
+                  }}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+              {item.dividerAfter && <div style={{ height: 1, background: "#F3F4F6", margin: "4px 0" }} />}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────── HoverBtn (square white button) ──────────── */
+function HoverBtn({ icon, title, active, onClick }: {
+  icon: any; title: string; active?: boolean; onClick: (e: React.MouseEvent) => void;
+}) {
+  const [hov, setHov] = React.useState(false);
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: 32, height: 32, borderRadius: 8,
+        background: active || hov ? "#f3f4f6" : "white",
+        border: "none", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 13, color: "#374151",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+      }}
+    >
+      <FontAwesomeIcon icon={icon} />
+    </button>
+  );
+}
+
+/* ──────────────────────── MissionListTable (list view) ─────────────── */
+function MissionListTable({ missions, onOpen }: { missions: MissionRow[]; onOpen: (m: MissionRow) => void }) {
+  return (
+    <div style={{ border: "1px solid #E4E3E1", borderRadius: 10, overflow: "hidden" }}>
+      {/* Table header */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "2fr 1fr 1fr 1fr",
+        padding: "10px 16px",
+        borderBottom: "1px solid #E4E3E1",
+        background: "#F9F8F6",
+      }}>
+        {["名稱", "擁有者", "類型", "最近一次編輯"].map(col => (
+          <span key={col} style={{ fontSize: 11.5, fontWeight: 600, color: "#9B9990", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            {col}
+          </span>
+        ))}
+      </div>
+      {/* Rows */}
+      {missions.map((m, idx) => (
+        <MissionCardRow
+          key={m.id}
+          mission={m}
+          isLast={idx === missions.length - 1}
+          onClick={() => onOpen(m)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ──────────────────────── MissionCardRow (list row) ────────────────── */
+function MissionCardRow({ mission, isLast, onClick }: {
+  mission: MissionRow; isLast: boolean; onClick: () => void;
+}) {
+  const [hov, setHov] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
+  const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [menuOpen]);
+
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      onClick={onClick}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "2fr 1fr 1fr 1fr",
+        alignItems: "center",
+        padding: "11px 16px",
+        background: hov ? "#F9F8F6" : "white",
+        borderBottom: isLast ? "none" : "1px solid #F3F2F0",
+        cursor: "pointer", position: "relative",
+        transition: "background 0.1s",
+      }}
+    >
+      {/* 名稱 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+          background: "#F2F1EF", overflow: "hidden",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {mission.thumbnailUrl ? (
+            <div style={{
+              width: "100%", height: "100%",
+              backgroundImage: `url(${mission.thumbnailUrl})`,
+              backgroundSize: "cover", backgroundPosition: "center",
+            }} />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={70} />
-            </div>
-          )}
-          {isLayerKnown && (
-            <Chip size="sm" variant="flat" className="absolute top-2 left-2 bg-content1/95 backdrop-blur-sm">
-              {lk}
-            </Chip>
+            <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={22} />
           )}
         </div>
-        <CardBody className="p-3 gap-1">
-          <p className="text-small font-medium leading-snug line-clamp-2 min-h-[2.4em]">
-            {mission.title}
-          </p>
-          <p className="text-tiny text-default-500 truncate">{updatedTxt}</p>
-        </CardBody>
-      </Card>
-
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <Tooltip content="收藏">
-          <Button isIconOnly size="sm" radius="full" variant="flat" aria-label="收藏" onClick={(e) => e.stopPropagation()}>
-            <FontAwesomeIcon icon={faBookmark} />
-          </Button>
-        </Tooltip>
-        <Tooltip content="更多">
-          <Button isIconOnly size="sm" radius="full" variant="flat" aria-label="更多" onClick={(e) => e.stopPropagation()}>
-            <FontAwesomeIcon icon={faEllipsis} />
-          </Button>
-        </Tooltip>
+        <span style={{ fontSize: 13.5, fontWeight: 500, color: "#1A1A18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {mission.title}
+        </span>
+      </div>
+      {/* 擁有者 */}
+      <span style={{ fontSize: 13, color: "#6B6A66" }}>{mission.brandName ?? "—"}</span>
+      {/* 類型 */}
+      <span style={{ fontSize: 13, color: "#6B6A66", textTransform: "capitalize" }}>
+        {mission.workspace ?? "—"}
+      </span>
+      {/* 最近一次編輯 */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, color: "#6B6A66" }}>{formatRelative(mission.updatedAt)}</span>
+        {/* Hover actions */}
+        {hov && (
+          <div style={{ display: "flex", gap: 4, position: "relative" }} onClick={e => e.stopPropagation()}>
+            <RowBtn icon={faStar}     title="加入星號" />
+            <RowBtn icon={faBookmark} title="收藏"     />
+            <RowBtn icon={faEllipsis} title="更多" onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }} />
+            {menuOpen && (
+              <div ref={menuRef} style={{
+                position: "absolute", top: 32, right: 0, zIndex: 200,
+                background: "white", borderRadius: 12,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                minWidth: 200, padding: "6px 0", border: "1px solid rgba(0,0,0,0.07)",
+              }}>
+                {CARD_MENU_ITEMS.map(item => (
+                  <React.Fragment key={item.key}>
+                    <button
+                      onClick={() => setMenuOpen(false)}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", gap: 10,
+                        padding: "8px 14px", border: "none", background: "transparent",
+                        textAlign: "left", cursor: "pointer", fontSize: 13,
+                        color: item.accent ?? "#1A1A18",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    >
+                      <FontAwesomeIcon icon={item.icon} style={{ width: 14, color: item.accent ?? "#6B7280" }} />
+                      <span>{item.label}</span>
+                    </button>
+                    {item.dividerAfter && <div style={{ height: 1, background: "#F3F4F6", margin: "4px 0" }} />}
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
-  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
-  const tone = LAYER_TOKENS[lk];
-  const ws = (mission.workspace ?? "").toLowerCase();
-  return (
-    <Card
-      isPressable
-      onPress={onClick}
-      shadow="none"
-      radius="none"
-      className="flex flex-row items-center gap-4 px-4 py-3 bg-transparent data-[hover=true]:bg-default-100 transition text-left w-full"
-    >
-      <div className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-default-100">
-        <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={36} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-small font-medium truncate">{mission.title}</p>
-        <div className="mt-0.5 flex items-center gap-2 text-tiny text-default-500">
-          <Chip size="sm" variant="flat">{lk}</Chip>
-          {ws && <span className="capitalize">{ws}</span>}
-          <span>·</span>
-          <span>{formatRelative(mission.updatedAt)}</span>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/* ─────────────────────────── Right preview card ─────────────────────── */
-
-function PreviewCard({ mission, onOpen }: { mission: MissionRow; onOpen: () => void }) {
-  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const isLayerKnown = layerStr in LAYER_TOKENS;
-  const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
-  const tone = LAYER_TOKENS[lk];
-
-  return (
-    <Card shadow="none" className="overflow-hidden border border-divider">
-      <CardHeader className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2">
-          <Chip size="sm" variant="flat">{lk}</Chip>
-          <Chip size="sm" variant="flat">預覽</Chip>
-        </div>
-        <Button isIconOnly size="sm" variant="light" aria-label="更多">
-          <FontAwesomeIcon icon={faEllipsis} />
-        </Button>
-      </CardHeader>
-      <div className="relative w-full bg-default-100" style={{ aspectRatio: "16 / 11" }}>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={120} />
-        </div>
-      </div>
-      <CardBody className="px-4 py-4 gap-2">
-        <p className="text-medium font-semibold leading-snug">{mission.title}</p>
-        {mission.description && (
-          <p className="text-small text-default-500 line-clamp-3">{mission.description}</p>
-        )}
-        <div className="mt-1 flex items-center gap-2 text-tiny text-default-500">
-          <FontAwesomeIcon icon={faClockRotateLeft} />
-          <span>{formatRelative(mission.updatedAt)}</span>
-          {mission.brandName && (<><span>·</span><span className="truncate">{mission.brandName}</span></>)}
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Button color="primary" radius="full" className="flex-1" onPress={onOpen}>
-            開啟任務
-          </Button>
-          <Tooltip content="收藏">
-            <Button isIconOnly variant="flat" radius="full" aria-label="收藏">
-              <FontAwesomeIcon icon={faBookmark} />
-            </Button>
-          </Tooltip>
-        </div>
-      </CardBody>
-    </Card>
-  );
-}
-
-function EmptyPreviewCard({ onCreate }: { onCreate: () => void }) {
-  return (
-    <Card shadow="lg" className="overflow-hidden border border-divider">
-      <CardBody className="py-10 px-5 items-center text-center gap-3">
-        <FontAwesomeIcon icon={faRocket} className="text-3xl text-primary" />
-        <p className="text-medium font-semibold">挑一個任務開始</p>
-        <p className="text-tiny text-default-500">點擊左側專案以在此預覽，或建立新任務。</p>
-        <Button color="primary" radius="full" className="mt-1" onPress={onCreate}>
-          建立任務
-        </Button>
-      </CardBody>
-    </Card>
-  );
-}
-
-function QuickActionsCard({
-  onNewMission, onSync,
-}: {
-  onNewMission: () => void;
-  onSync: (s: SyncSource) => void;
-}) {
-  return (
-    <Card shadow="sm" className="border border-divider">
-      <CardHeader className="px-4 pt-4 pb-1 text-tiny font-medium uppercase tracking-wider text-default-500">
-        快速動作
-      </CardHeader>
-      <CardBody className="px-3 pt-1 pb-3 gap-1">
-        <ActionRow icon={faWandMagicSparkles} label="從任務範本建立" onPress={onNewMission} />
-        <Divider className="my-1" />
-        {SYNC_SOURCES.slice(0, 4).map((s) => (
-          <ActionRow key={s.id} icon={s.icon} label={s.label} hint={s.hint} onPress={() => onSync(s.id)} />
-        ))}
-      </CardBody>
-    </Card>
-  );
-}
-
-function ActionRow({
-  icon, label, hint, onPress,
-}: { icon: any; label: string; hint?: string; onPress: () => void }) {
+function RowBtn({ icon, title, onClick }: { icon: any; title: string; onClick?: (e: React.MouseEvent) => void }) {
+  const [hov, setHov] = React.useState(false);
   return (
     <button
-      onClick={onPress}
-      className="flex items-center gap-3 px-2 h-11 rounded-medium hover:bg-default-100 transition text-left"
+      title={title}
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: 28, height: 28, borderRadius: 6, border: "none", cursor: "pointer",
+        background: hov ? "#EEECE9" : "transparent",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 12, color: "#6B7280", transition: "background 0.1s",
+      }}
     >
-      <span className="w-8 h-8 rounded-medium bg-default-100 flex items-center justify-center shrink-0">
-        <FontAwesomeIcon icon={icon} className="text-default-600" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-small font-medium truncate">{label}</p>
-        {hint && <p className="text-tiny text-default-400 truncate">{hint}</p>}
-      </div>
+      <FontAwesomeIcon icon={icon} />
     </button>
   );
 }
 
-/* ─────────────────────────── Filter dropdown ───────────────────────── */
-
-function FilterDropdown({
-  label, options, value, onSelect,
+/* ──────────────────────── Pill dropdown ───────────────────────────── */
+function PillDropdown({
+  label, active, open, onToggle, onClose, children,
 }: {
-  label: string;
-  options: Array<{ value: string; label: string }>;
-  value: string;
-  onSelect: (v: string) => void;
+  label: string; active: boolean; open: boolean;
+  onToggle: () => void; onClose: () => void;
+  children: React.ReactNode;
 }) {
-  const chevron = <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />;
-  return (
-    <Dropdown placement="bottom-start">
-      <DropdownTrigger>
-        <Button size="sm" radius="full" variant="bordered" endContent={chevron}>
-          {label}
-        </Button>
-      </DropdownTrigger>
-      <DropdownMenu
-        aria-label={label}
-        selectionMode="single"
-        selectedKeys={new Set([value])}
-        onAction={(k) => onSelect(String(k))}
-      >
-        {options.map((o) => (
-          <DropdownItem key={o.value}>{o.label}</DropdownItem>
-        ))}
-      </DropdownMenu>
-    </Dropdown>
-  );
-}
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open, onClose]);
 
-/* ─────────────────────────── Create menu ───────────────────────────── */
-
-function CreateMenu({
-  onNewMission, onSyncSource,
-}: {
-  onNewMission: () => void;
-  onSyncSource: (s: SyncSource) => void;
-}) {
   return (
-    <Dropdown placement="bottom-end">
-      <DropdownTrigger>
-        <Button isIconOnly variant="flat" radius="full" aria-label="新增項目">
-          <FontAwesomeIcon icon={faPlus} />
-        </Button>
-      </DropdownTrigger>
-      <DropdownMenu
-        aria-label="新增項目"
-        onAction={(key) => {
-          const k = String(key);
-          if (k === "new-mission") onNewMission();
-          else if (k.startsWith("sync:")) onSyncSource(k.replace("sync:", "") as SyncSource);
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={onToggle}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "6px 12px", borderRadius: 20, cursor: "pointer",
+          border: active ? "1.5px solid #7C3AED" : "1.5px solid #E4E3E1",
+          background: active ? "#F5F3FF" : "white",
+          fontSize: 13, fontWeight: active ? 600 : 400,
+          color: active ? "#7C3AED" : "#374151",
+          transition: "all 0.1s",
         }}
       >
-        <DropdownSection title="新增項目">
-          <DropdownItem key="new-folder" description="把任務分類（如客戶、季度）" isDisabled>
-            新增資料夾（即將推出）
-          </DropdownItem>
-          <DropdownItem key="new-mission" description="從任務範本型錄建立任務">
-            新任務
-          </DropdownItem>
-        </DropdownSection>
-
-        <DropdownSection title="上傳">
-          <DropdownItem key="upload-file" description="品牌素材、參考檔、簡報、圖片" isDisabled>
-            上傳檔案（即將推出）
-          </DropdownItem>
-          <DropdownItem key="upload-folder" description="批次上傳整個資料夾" isDisabled>
-            上傳資料夾（即將推出）
-          </DropdownItem>
-        </DropdownSection>
-
-        <DropdownSection title="從雲端 / 網路同步">
-          {SYNC_SOURCES.map((s) => (
-            <DropdownItem
-              key={`sync:${s.id}`}
-              description={s.hint}
-              startContent={<FontAwesomeIcon icon={s.icon} className="text-medium w-5" />}
-            >
-              {s.label}
-            </DropdownItem>
-          ))}
-        </DropdownSection>
-      </DropdownMenu>
-    </Dropdown>
+        {label}
+        <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 10, transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 100,
+          background: "white", borderRadius: 12, minWidth: 200,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)",
+          border: "1px solid rgba(0,0,0,0.07)",
+          animation: "slideDown 0.12s ease-out",
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
-/* ─────────────────────────── Helpers ────────────────────────────────── */
-
-function formatRelative(iso?: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  const diff = Date.now() - d.getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "剛剛編輯";
-  if (min < 60) return `${min} 分鐘前編輯`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h} 小時前編輯`;
-  const days = Math.floor(h / 24);
-  if (days < 30) return `${days} 天前編輯`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} 個月前編輯`;
-  return d.toLocaleDateString("zh-TW", { year: "numeric", month: "numeric", day: "numeric" });
+function DropdownRow({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  const [hov, setHov] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 8,
+        padding: "8px 12px", border: "none", background: hov ? "rgba(0,0,0,0.04)" : "transparent",
+        textAlign: "left", cursor: "pointer", fontSize: 13,
+        color: active ? "#7C3AED" : "#374151", fontWeight: active ? 600 : 400,
+      }}
+    >
+      {active && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7C3AED", flexShrink: 0 }} />}
+      {!active && <div style={{ width: 6, height: 6, flexShrink: 0 }} />}
+      {label}
+    </button>
+  );
 }
+
+/* ──────────────────────── Utilities ───────────────────────────────── */
+function stringToColor(s: string): string {
+  const palette = ["#6366F1","#EC4899","#F97316","#10B981","#3B82F6","#8B5CF6","#EF4444","#14B8A6"];
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  return palette[Math.abs(h) % palette.length];
+}
+
+// Legacy export aliases kept for router compatibility
+export { };
