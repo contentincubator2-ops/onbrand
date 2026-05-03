@@ -28,7 +28,7 @@ jobs:
       - name: Type check — server
         run: npm run lint --prefix skills/ai-talent
       - name: Type check — client
-        run: npx --prefix skills/ai-talent/client tsc --noEmit
+        run: cd skills/ai-talent/client && npx tsc --noEmit
       - name: Run tests
         run: npm run test --prefix skills/ai-talent
 

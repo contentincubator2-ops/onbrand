@@ -284,15 +284,16 @@ function SidebarNavLink({
       <button
         onClick={onClick}
         aria-label={item.label}
+        style={{ transition: "color 0.1s linear, transform 0.07s" }}
         className={[
-          "w-full mt-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-colors",
+          "w-full mt-1 flex flex-col items-center gap-0.5 py-2 rounded-xl",
           active
-            ? "bg-primary-50 text-primary"
-            : "text-default-500 hover:bg-default-100 hover:text-default-800",
+            ? "text-[#F97316]"
+            : "text-default-400 hover:text-default-700",
         ].join(" ")}
       >
-        <span className="text-sm leading-none">{item.icon}</span>
-        <span className="text-[9px] leading-tight font-medium max-w-full px-0.5 text-center line-clamp-1">
+        <span className={`leading-none ${active ? "text-base" : "text-sm"}`}>{item.icon}</span>
+        <span className={`text-[9px] leading-tight max-w-full px-0.5 text-center line-clamp-1 ${active ? "font-semibold" : "font-medium"}`}>
           {item.label}
         </span>
       </button>
@@ -302,11 +303,11 @@ function SidebarNavLink({
   return (
     <Button
       onPress={onClick}
-      variant={active ? "flat" : "light"}
-      color={active ? "primary" : "default"}
+      variant="light"
       fullWidth
       aria-label={item.label}
-      className="mt-1 justify-start"
+      className={`mt-1 justify-start transition-colors duration-100 ${active ? "text-[#F97316] font-semibold" : ""}`}
+      style={{ background: "rgba(0,0,0,0)" }}
       startContent={item.icon}
     >
       {item.label}
