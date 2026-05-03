@@ -27,6 +27,8 @@ export type Platform =
   | "web"
   | "press"
   | "deck"
+  // --- new platforms ---
+  | "xiaohongshu"
   | "generic";
 
 export type Format =
@@ -79,6 +81,10 @@ export type Format =
   | "press-release"   // news release
   // Deck
   | "slide"           // presentation deck
+  // Xiaohongshu / RED
+  | "note"             // 圖文筆記 (photo + text)
+  | "xhs-video"        // 影片筆記
+  | "xhs-search"       // 搜索結果卡片
   // fallback
   | "generic";
 
@@ -147,6 +153,10 @@ const VARIANT_LABELS: Record<string, string> = {
   // Deck
   "deck:slide":           "簡報 Deck",
   "generic:generic":      "通用輸出",
+  // Xiaohongshu
+  "xiaohongshu:note":       "小紅書 圖文筆記",
+  "xiaohongshu:xhs-video":  "小紅書 影片筆記",
+  "xiaohongshu:xhs-search": "小紅書 搜索筆記",
 };
 
 const labelOf = (p: Platform, f: Format) =>
@@ -195,6 +205,7 @@ const PLATFORM_KEYWORDS: Array<[Platform, string[]]> = [
   ["web",     ["website", "landing page", "官網", "落地頁", "網站", "landingpage", "blog", "部落格", "product page", "產品頁"]],
   ["press",   ["press release", "新聞稿", "公關稿", "pr release", "媒體稿", "媒體發布"]],
   ["deck",    ["deck", "slide", "slides", "簡報", "presentation", "ppt", "powerpoint", "pitch deck"]],
+  ["xiaohongshu", ["小紅書", "xhs", "xiaohongshu", "red note", "rednote", "小紅書筆記", "圖文筆記"]],
 ];
 
 function detectPlatform(haystack: string): Platform {
@@ -269,6 +280,10 @@ const FORMAT_RULES: FormatRule[] = [
   { format: "press-release", keywords: ["press release", "新聞稿", "公關稿", "media release"],      platforms: ["press"] },
   // Deck
   { format: "slide",        keywords: ["slide", "deck", "簡報", "presentation", "ppt"],             platforms: ["deck"] },
+  // Xiaohongshu
+  { format: "xhs-video",    keywords: ["影片筆記", "視頻", "xhs video", "小紅書影片"],               platforms: ["xiaohongshu"] },
+  { format: "xhs-search",   keywords: ["搜索", "search", "xhs search"],                             platforms: ["xiaohongshu"] },
+  { format: "note",         keywords: ["筆記", "note", "圖文"],                                      platforms: ["xiaohongshu"] },
 ];
 
 const PLATFORM_DEFAULT_FORMAT: Record<Platform, Format> = {
@@ -282,9 +297,10 @@ const PLATFORM_DEFAULT_FORMAT: Record<Platform, Format> = {
   twitter:   "tweet",
   line:      "broadcast",
   web:       "landing",
-  press:     "press-release",
-  deck:      "slide",
-  generic:   "generic",
+  press:        "press-release",
+  deck:         "slide",
+  xiaohongshu:  "note",
+  generic:      "generic",
 };
 
 function detectFormat(haystack: string, platform: Platform): Format {

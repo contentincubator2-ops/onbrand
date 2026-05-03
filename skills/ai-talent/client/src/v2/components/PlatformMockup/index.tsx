@@ -13,9 +13,10 @@
  *   twitter:   tweet, thread
  *   line:      broadcast, line-card, richmenu
  *   web:       landing, blog, product-page
- *   press:     press-release
- *   deck:      slide
- *   generic:   generic
+ *   press:        press-release
+ *   deck:         slide
+ *   xiaohongshu:  note, xhs-video, xhs-search
+ *   generic:      generic
  */
 import React from "react";
 import type { MockupVariant } from "../../lib/inferMockup";
@@ -41,6 +42,7 @@ import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
 import { WebLanding, WebBlog, WebProduct } from "./web";
 import { PressRelease, DeckMockup } from "./press";
 import { GenericMockup } from "./generic";
+import { XHSNote, XHSVideo, XHSSearch } from "./xiaohongshu";
 import { UnsupportedVariantPlaceholder } from "./unsupported";
 
 export interface PlatformMockupProps extends MockupFields {
@@ -124,6 +126,11 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
 
     // ── Deck / Presentation (1) ───────────────────────────────────────
     case "deck:slide": return <DeckMockup {...f} />;
+
+    // ── 小紅書 / Xiaohongshu (3) ──────────────────────────────────────
+    case "xiaohongshu:note":       return <XHSNote   {...f} />;
+    case "xiaohongshu:xhs-video":  return <XHSVideo  {...f} />;
+    case "xiaohongshu:xhs-search": return <XHSSearch {...f} />;
 
     // ── Generic ───────────────────────────────────────────────────────
     case "generic:generic": return <GenericMockup {...f} />;
