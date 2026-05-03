@@ -25,8 +25,10 @@ jobs:
         run: npm install --prefix skills/ai-talent
       - name: Install client dependencies
         run: npm install --prefix skills/ai-talent/client
-      - name: Type check
+      - name: Type check — server
         run: npm run lint --prefix skills/ai-talent
+      - name: Type check — client
+        run: npx --prefix skills/ai-talent/client tsc --noEmit
       - name: Run tests
         run: npm run test --prefix skills/ai-talent
 
@@ -56,43 +58,45 @@ jobs:
             git fetch origin main && git reset --hard origin/main
             echo "Latest commit: $(git log --oneline -1)"
 
-            echo "===== Install & build ====="
+            echo "===== Install backend ====="
             cd "$AI"
             npm install --legacy-peer-deps 2>&1 | tail -3
+
+            echo "===== Install frontend ====="
             cd "$AI/client"
             npm install --legacy-peer-deps 2>&1 | tail -3
 
-            # Build into a temp dir first, so the live public/ is never
-            # left in a broken state if the build times out mid-flight.
+            echo "===== Build frontend (atomic) ====="
+            # Build into a temp dir. The live public/ is never touched until
+            # the build succeeds — a timeout or TS error keeps old bundle intact.
             BUILD_TMP="$AI/public_build_tmp"
             rm -rf "$BUILD_TMP"
-            npx vite build --outDir "$BUILD_TMP" --emptyOutDir 2>&1 | tail -15 || true
+
+            # npm run build = "tsc && vite build"
+            # Pass --outDir via CLI so vite outputs to BUILD_TMP, not ../public.
+            # tsc still runs first and will catch type errors.
+            npm run build -- --outDir "$BUILD_TMP" --emptyOutDir 2>&1 | tail -20
 
             NEW_HASH=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$BUILD_TMP/index.html" 2>/dev/null | head -1)
             if [ -z "$NEW_HASH" ]; then
-              echo "❌ Build did not produce index.html — keeping existing public/ intact"
+              echo "❌ Build failed — index.html not produced. Keeping old public/ intact."
               rm -rf "$BUILD_TMP"
               exit 1
             fi
-            echo "✓ Built bundle: $NEW_HASH"
+            echo "✓ Built: $NEW_HASH"
 
-            # Atomically swap: remove old assets, move new bundle into place.
+            # Atomic swap: only now do we touch the live public/
             rm -rf "$AI/public/assets" "$AI/public/index.html"
             cp -a "$BUILD_TMP/." "$AI/public/"
             rm -rf "$BUILD_TMP"
-            echo "✓ public/ updated atomically"
+            echo "✓ public/ swapped"
 
-            echo "===== Restart (delete + start fresh) ====="
-            AI=/opt/marketing-os/app/skills/ai-talent
+            echo "===== Restart PM2 ====="
             TSX=$AI/node_modules/.bin/tsx
-
-            # Source .env into shell so PM2's forked process inherits real env
-            # vars. This avoids ESM import-hoisting race where env.ts runs
-            # before the top-level dotenvConfig() call in server/index.ts.
             set -a
             source "$AI/.env"
             set +a
-            echo "JWT_SECRET in shell: $([ -n "$JWT_SECRET" ] && echo YES || echo NO)"
+            echo "JWT_SECRET present: $([ -n "$JWT_SECRET" ] && echo YES || echo NO)"
 
             pm2 delete marketing-os 2>/dev/null || true
             pm2 start "$TSX" --name marketing-os --cwd "$AI" --update-env -- server/index.ts
@@ -103,5 +107,5 @@ jobs:
             pm2 list | head -5
             curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
 
-            echo "===== Error log (if still failing) ====="
+            echo "===== PM2 error log (last 20 lines) ====="
             tail -20 ~/.pm2/logs/marketing-os-error.log 2>/dev/null || true

@@ -36,7 +36,7 @@ import {
   faMagnifyingGlass, faChevronDown, faArrowDownWideShort, faArrowUpWideShort,
   faTableCells, faList, faBookmark, faEllipsis,
   faArrowRight, faWandSparkles,
-  faBullseye, faRocket, faUsers, faNewspaper, faEnvelope, faPlus, faCloudArrowUp,
+  faBullseye, faBullhorn, faRocket, faUsers, faNewspaper, faEnvelope, faPlus, faCloudArrowUp,
   faF, // generic fallback letter icon
 } from "@fortawesome/free-solid-svg-icons";
 import {
