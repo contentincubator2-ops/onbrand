@@ -358,7 +358,7 @@ export default function PickerWorkspace() {
   // Session 3 — server-side semantic search (debounced, 350 ms).
   // When the server returns hits, they override the client-side ranking.
   // Client-side searchAndRankSquads() still runs as immediate pre-result.
-  const { semanticHits, isSearching: isSemanticSearching } = useSemanticSearch(q);
+  const { semanticHits, isSearching: isSemanticSearching } = useSemanticSearch(q, "squad");
 
   // Mission brief — local state for the new 3-col detail panel.
   const [missionTitle, setMissionTitle] = useState<string>(seedTitle);

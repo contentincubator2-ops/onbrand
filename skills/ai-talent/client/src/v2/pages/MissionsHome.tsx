@@ -23,6 +23,7 @@ import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitiv
 import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { searchAndRankSquads } from "../lib/searchSquads";
+import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { SquadEntityCard } from "../components/SquadEntityCard";
 import { EntityStats } from "../components/EntityStats";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
@@ -229,8 +230,11 @@ export default function MissionsHome() {
 
   const [searchQ, setSearchQ] = useState("");
 
-  // Featured: filter by selected layer + searchQ, then sort, then slice
-  // PR6 — uses shared searchAndRankSquads for score-based ranking.
+  // Session 3 — server-side semantic search across squads + agents + skills.
+  const semanticKind = kindFilter === "all" ? "all" : kindFilter as any;
+  const { semanticHits, isSearching: isSemanticSearching } = useSemanticSearch(searchQ, semanticKind);
+
+  // Featured: semantic hits → keyword fallback → facet-only
   const featured = useMemo(() => {
     const layerOrder = ["L1", "L2", "L3", "L4", "L5", "L6"];
     const q = searchQ.trim();
@@ -239,21 +243,33 @@ export default function MissionsHome() {
       (selectedLayer === "ALL" || (s.strategyLayer ?? "").toString().slice(0, 2) === selectedLayer);
 
     if (q) {
-      // Score-ranked: best matches first
+      if (semanticHits && semanticHits.length > 0) {
+        const slugKindKey = (e: any) => `${e.kind}:${e.slug}`;
+        const entityMap = new Map(allEntities.map((e) => [slugKindKey(e), e]));
+        const semantic = semanticHits
+          .map((h) => entityMap.get(`${h.kind}:${h.slug}`) ?? h)
+          .filter(passesFacets);
+        const semanticSet = new Set(semanticHits.map((h) => `${h.kind}:${h.slug}`));
+        const overflow = searchAndRankSquads(
+          allEntities.filter((e) => !semanticSet.has(slugKindKey(e))).filter(passesFacets),
+          q
+        ).hits.map((h) => h.squad);
+        return [...semantic, ...overflow].slice(0, 24);
+      }
+      // Client-side keyword fallback (pre-result while server in-flight)
       const result = searchAndRankSquads(allEntities, q);
-      const ranked = result.hits.map((h) => h.squad).filter(passesFacets);
-      return ranked.slice(0, 24);
+      return result.hits.map((h) => h.squad).filter(passesFacets).slice(0, 24);
     }
-    // No query — facet-only filter, sorted by layer
-    const filtered = allEntities.filter(passesFacets);
-    return [...filtered]
+
+    // No query — facet-only, sorted by layer
+    return [...allEntities.filter(passesFacets)]
       .sort((a, b) => {
         const la = (a.strategyLayer ?? "L9").slice(0, 2);
         const lb = (b.strategyLayer ?? "L9").slice(0, 2);
         return layerOrder.indexOf(la) - layerOrder.indexOf(lb);
       })
       .slice(0, selectedLayer === "ALL" ? 12 : 24);
-  }, [allEntities, kindFilter, selectedLayer, searchQ]);
+  }, [allEntities, kindFilter, selectedLayer, searchQ, semanticHits]);
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
   const [sortDesc, setSortDesc] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -407,7 +423,11 @@ export default function MissionsHome() {
               isClearable
               onClear={() => setSearchQ("")}
               placeholder="搜尋方法論、任務、最近的工作"
-              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+              startContent={
+                isSemanticSearching
+                  ? <span className="w-4 h-4 rounded-full border-2 border-default-400 border-t-transparent animate-spin" />
+                  : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />
+              }
             />
 
             {/* Filter pills under search bar — Canva style */}

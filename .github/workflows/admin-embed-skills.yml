@@ -1,0 +1,62 @@
+name: Admin — Generate skill embeddings (semantic search)
+
+# Runs scripts/compute-skill-embeddings.ts on the VM to batch-embed
+# active skills using Azure text-embedding-3-large.
+#
+# Idempotent: skips skills that already have skills.embedding populated.
+# Use --force to re-embed all (e.g. after embedding model change).
+# Use --limit to test on a small sample first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Type "true" to re-embed all skills'
+        required: false
+        default: 'false'
+      limit:
+        description: 'Limit N skills (blank = all unembedded)'
+        required: false
+
+jobs:
+  embed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE:    ${{ github.event.inputs.force }}
+          LIMIT:    ${{ github.event.inputs.limit }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 7200s
+          envs: GH_TOKEN,FORCE,LIMIT
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main && git reset --hard origin/main
+
+            ENV_FILE=$APP/skills/ai-talent/.env
+            set -a; source "$ENV_FILE"; set +a
+            cd $APP/skills/ai-talent
+
+            ARGS=""
+            [ "$FORCE" = "true" ]  && ARGS="$ARGS --force"
+            [ -n "$LIMIT" ]        && ARGS="$ARGS --limit=$LIMIT"
+
+            echo "===== tsx scripts/compute-skill-embeddings.ts $ARGS ====="
+            ./node_modules/.bin/tsx scripts/compute-skill-embeddings.ts $ARGS
+
+            echo ""
+            echo "===== Coverage check ====="
+            mysql -u"$LOCAL_DB_USER" -p"$LOCAL_DB_PASSWORD" "$LOCAL_DB_NAME" \
+              -e "SELECT COUNT(*) AS total, SUM(embedding IS NOT NULL) AS embedded, ROUND(100*SUM(embedding IS NOT NULL)/COUNT(*),1) AS pct FROM skills WHERE is_active=1;"
+
+            echo ""
+            echo "===== PM2 restart to refresh skill embedding cache ====="
+            pm2 restart ai-talent --update-env || true

@@ -1,24 +1,27 @@
 /**
- * useSemanticSearch — debounced server-side semantic squad search.
+ * useSemanticSearch — debounced server-side semantic entity search.
  *
- * When query >= 3 chars, calls GET /api/squads/search?q= and returns
- * server-ranked results.  Falls back to the existing client-side
- * searchAndRankSquads() when:
- *   - query is short (< 3 chars)
- *   - server returns an error
- *   - server responds with 0 hits (client-side may still match)
+ * Calls GET /api/entity/search?q=&kind= and returns server-ranked hits.
+ * Falls back to null (→ caller uses client-side search) when:
+ *   - query < 3 chars
+ *   - server returns 0 hits
+ *   - server errors
  *
  * Usage:
- *   const { semanticHits, isSearching } = useSemanticSearch(q);
- *   const displaySquads = semanticHits ?? clientSideResults;
+ *   const { semanticHits, isSearching } = useSemanticSearch(q, "squad");
+ *   const { semanticHits, isSearching } = useSemanticSearch(q, "all");
  */
 
 import { useState, useEffect, useRef } from "react";
 
+export type SearchKind = "all" | "squad" | "agent" | "skill";
+
 export interface SemanticHit {
   id: number;
   slug: string;
-  name: string | { "zh-TW"?: string; en?: string };
+  kind: "squad" | "agent" | "skill";
+  // squad fields
+  name?: string | { "zh-TW"?: string; en?: string };
   description?: string | null;
   strategy_layer?: string | null;
   mockup_platform?: string | null;
@@ -29,6 +32,14 @@ export interface SemanticHit {
   is_curated?: number | null;
   workspace?: string | null;
   tags?: string | null;
+  // agent fields
+  title?: string | null;
+  specialty?: string | null;
+  primarySkill?: string | null;
+  // skill fields
+  task_type?: string | null;
+  quality_score?: number | null;
+  // score
   _score?: number;
 }
 
@@ -41,7 +52,11 @@ export interface SemanticSearchResult {
 const DEBOUNCE_MS = 350;
 const MIN_QUERY_LEN = 3;
 
-export function useSemanticSearch(query: string): {
+export function useSemanticSearch(
+  query: string,
+  kind: SearchKind = "all",
+  limitOverride?: number,
+): {
   semanticHits: SemanticHit[] | null;
   isSearching: boolean;
   searchMode: string | null;
@@ -53,7 +68,6 @@ export function useSemanticSearch(query: string): {
   const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    // Clear pending timer + in-flight request
     if (timerRef.current) clearTimeout(timerRef.current);
     controllerRef.current?.abort();
 
@@ -73,7 +87,8 @@ export function useSemanticSearch(query: string): {
       controllerRef.current = controller;
 
       try {
-        const url = `/api/squads/search?q=${encodeURIComponent(trimmed)}&limit=40`;
+        const limit = limitOverride ?? 40;
+        const url = `/api/entity/search?q=${encodeURIComponent(trimmed)}&kind=${kind}&limit=${limit}`;
         const resp = await fetch(url, { signal: controller.signal });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data: SemanticSearchResult = await resp.json();
@@ -81,7 +96,6 @@ export function useSemanticSearch(query: string): {
         setSearchMode(data.mode);
       } catch (e: any) {
         if (e?.name !== "AbortError") {
-          // Silently fall back to client-side search
           setSemanticHits(null);
           setSearchMode("client-fallback");
         }
@@ -94,7 +108,7 @@ export function useSemanticSearch(query: string): {
       if (timerRef.current) clearTimeout(timerRef.current);
       controllerRef.current?.abort();
     };
-  }, [query]);
+  }, [query, kind, limitOverride]);
 
   return { semanticHits, isSearching, searchMode };
 }

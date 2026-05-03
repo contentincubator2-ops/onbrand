@@ -15,6 +15,7 @@
  * default-100 / primary-100 / etc., not hex pins.
  */
 import React, { useMemo, useRef, useState } from "react";
+import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
@@ -153,6 +154,11 @@ export default function MethodologyCatalog() {
 
   const [activeKind, setActiveKind] = useState<Kind>("squad");
   const [searchQ, setSearchQ] = useState("");
+
+  // Semantic search — covers squads, agents, skills simultaneously.
+  // Kind maps to the active bottom-tab so results stay contextual.
+  const semanticKind = activeKind === "task" ? "all" : activeKind === "all" ? "all" : activeKind as any;
+  const { semanticHits, isSearching: isSemanticSearching } = useSemanticSearch(searchQ, semanticKind);
   const [layerFilter, setLayerFilter] = useState<string>("ALL");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
@@ -220,17 +226,43 @@ export default function MethodologyCatalog() {
   );
 
   // Grid filter (bottom Tabs section)
+  // Prefers server semantic hits when available; falls back to client substring.
   const gridFiltered = useMemo(() => {
+    const passesFacets = (e: any) =>
+      (activeKind === "all" || e.kind === activeKind) &&
+      (layerFilter === "ALL" || (e.strategyLayer ?? "").toString().slice(0, 2) === layerFilter);
+
     const q = searchQ.trim().toLowerCase();
-    return allEntities
-      .filter((e) => e.kind === activeKind)
-      .filter((e) => layerFilter === "ALL" ? true : e.strategyLayer === layerFilter)
-      .filter((e) => {
-        if (!q) return true;
+
+    if (q) {
+      if (semanticHits && semanticHits.length > 0) {
+        // Map semantic hits → full entity objects from allEntities (keeps all fields).
+        const slugKindKey = (e: any) => `${e.kind}:${e.slug}`;
+        const entityMap = new Map(allEntities.map((e) => [slugKindKey(e), e]));
+        const semantic = semanticHits
+          .map((h) => entityMap.get(`${h.kind}:${h.slug}`) ?? h)
+          .filter(passesFacets);
+        // Append client-side matches not already in semantic results as overflow
+        const semanticSet = new Set(semanticHits.map((h) => `${h.kind}:${h.slug}`));
+        const overflow = allEntities
+          .filter((e) => !semanticSet.has(slugKindKey(e)))
+          .filter(passesFacets)
+          .filter((e) => {
+            const hay = `${e.name ?? ""} ${e.subtitle ?? ""} ${e.description ?? ""} ${e.slug ?? ""}`.toLowerCase();
+            return hay.includes(q);
+          });
+        return [...semantic, ...overflow];
+      }
+      // Client-side substring fallback (pre-result while server is in-flight)
+      return allEntities.filter(passesFacets).filter((e) => {
         const hay = `${e.name ?? ""} ${e.subtitle ?? ""} ${e.description ?? ""} ${e.slug ?? ""}`.toLowerCase();
         return hay.includes(q);
       });
-  }, [allEntities, activeKind, layerFilter, searchQ]);
+    }
+
+    // No query — facet-only filter
+    return allEntities.filter(passesFacets);
+  }, [allEntities, activeKind, layerFilter, searchQ, semanticHits]);
 
   const layerLabel = LAYER_OPTIONS.find((o) => o.value === layerFilter)?.label ?? "全部層級";
 
@@ -286,7 +318,11 @@ export default function MethodologyCatalog() {
             placeholder="搜尋數百個範本"
             isClearable
             onClear={() => setSearchQ("")}
-            startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+            startContent={
+              isSemanticSearching
+                ? <span className="w-4 h-4 rounded-full border-2 border-default-400 border-t-transparent animate-spin" />
+                : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />
+            }
             className="max-w-[640px]"
           />
         </div>
