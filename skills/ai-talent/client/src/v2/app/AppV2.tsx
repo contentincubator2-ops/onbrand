@@ -138,7 +138,6 @@ export default function AppV2() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/quicktask" element={<QuickTasksPage />} />
-          <Route path="/ai" element={<Navigate to="/quicktask" replace />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
