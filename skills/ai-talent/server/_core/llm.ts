@@ -410,11 +410,12 @@ function detectLanguage(messages: Message[]): "zh" | "ja" | "ko" | "en" {
 // Verified-working Azure Foundry deployments (probed 2026-04-25):
 // gpt-4o (OpenAI), DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3, Kimi-K2.5
 // NOTE 2026-05-03: gpt-5-nano deployment removed from Foundry project.
-// Reverted zh to gpt-4o which is stable. Override with AZURE_FOUNDRY_MODEL_ZH if needed.
+// Using Kimi-K2.5 as default — confirmed deployed, strong Chinese support.
+// Override per-language via AZURE_FOUNDRY_MODEL_ZH / _JA / _KO / _EN env vars.
 const AZURE_MODEL_BY_LANG: Record<string, string> = {
-  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-4o",
-  ja: process.env.AZURE_FOUNDRY_MODEL_JA || "gpt-4o",
-  ko: process.env.AZURE_FOUNDRY_MODEL_KO || "gpt-4o",
+  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "Kimi-K2.5",
+  ja: process.env.AZURE_FOUNDRY_MODEL_JA || "Kimi-K2.5",
+  ko: process.env.AZURE_FOUNDRY_MODEL_KO || "Kimi-K2.5",
   en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4o",
 };
 
@@ -681,9 +682,11 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
       const foundryKey = (ENV as any).AZURE_FOUNDRY_API_KEY ?? (ENV as any).AZURE_AI_API_KEY ?? "";
       const foundryEndpoint = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT ?? "").replace(/\/$/, "");
       if (foundryKey && foundryEndpoint) {
-        console.warn("[invokeLLMStream] Anthropic failed → falling back to Azure Foundry gpt-4o");
-        // Build a minimal OpenAI-compatible streaming request to Azure Foundry
-        const fbModel = "gpt-4o";
+        // Fallback model: set AZURE_FOUNDRY_FALLBACK_MODEL env to any confirmed-deployed model.
+        // Confirmed as of 2026-04-25: gpt-4o, Kimi-K2.5, DeepSeek-V3.2, Mistral-Large-3
+        // gpt-5-nano was removed; use Kimi-K2.5 as default — strong model, handles zh well.
+        const fbModel = (ENV as any).AZURE_FOUNDRY_FALLBACK_MODEL ?? "Kimi-K2.5";
+        console.warn(`[invokeLLMStream] Anthropic failed → falling back to Azure Foundry ${fbModel}`);
         const fbUrl = `${foundryEndpoint}/openai/v1/chat/completions`;
         const fbPayload = {
           model: fbModel,
