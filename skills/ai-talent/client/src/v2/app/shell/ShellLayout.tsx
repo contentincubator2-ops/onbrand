@@ -192,6 +192,7 @@ function IconBar({
         background: "#fff",
         borderRight: "1px solid #f3f4f6",
         display: "flex", flexDirection: "column",
+        overflow: "hidden",   /* prevent any horizontal scrollbar from appearing */
       }}
     >
       {/* Toggle — topmost, always at same position */}
@@ -237,7 +238,7 @@ function IconBar({
       </div>
 
       {/* Nav icons */}
-      <nav style={{ flex: 1, overflowY: "auto", padding: "0 3px" }}>
+      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px" }}>
         {NAV_ITEMS.map((item) => {
           const isActive = item.matchPrefix
             ? currentPath.startsWith(item.matchPrefix)
