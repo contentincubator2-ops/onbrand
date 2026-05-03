@@ -420,61 +420,101 @@ export default function MissionsHome() {
   return (
     <main>
       {/* ─── Hero ─── */}
-      <section className="relative px-8 pt-10 pb-10 border-b border-divider bg-content1">
-        <div>
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <Chip variant="flat" color="default" size="sm" className="uppercase tracking-wider mb-2">
-                SoWork · Marketing OS
-              </Chip>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                今天，想將哪個策略付諸實現？
-              </h1>
-              <div className="mt-2 max-w-[640px] text-small text-default-500 leading-relaxed">
-                <EntityStats variant="inline" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                size="sm"
-                variant="bordered"
-                onPress={() => navigate("/templates")}
-                startContent={<FontAwesomeIcon icon={faWandSparkles} />}
-              >
-                瀏覽方法論型錄
-              </Button>
-              <Button
-                size="sm"
-                color="primary"
-                onPress={() => setCreateSource("recommended")}
-                endContent={<FontAwesomeIcon icon={faArrowRight} />}
-              >
-                立即開新任務
-              </Button>
+      <section
+        className="relative px-8 pt-12 pb-10 border-b border-divider overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 40%, #fed7aa 100%)",
+        }}
+      >
+        {/* Subtle overlay to lighten — Canva pattern */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "rgba(255,255,255,0.55)" }}
+        />
+
+        <div className="relative z-10">
+          {/* Top-right action buttons — capsule style */}
+          <div className="absolute top-0 right-0 flex items-center gap-2">
+            <button
+              onClick={() => navigate("/templates")}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-all"
+              style={{
+                borderColor: "#F97316",
+                color: "#F97316",
+                background: "transparent",
+                transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#fff7ed"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <FontAwesomeIcon icon={faWandSparkles} className="text-xs" />
+              瀏覽方法論型錄
+            </button>
+            <button
+              onClick={() => setCreateSource("recommended")}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium text-white"
+              style={{
+                background: "#F97316",
+                transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#ea6c0a"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(249,115,22,0.35)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#F97316"; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              立即開新任務
+              <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+            </button>
+          </div>
+
+          {/* Headline */}
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
+              SoWork · Marketing OS
+            </p>
+            <h1
+              className="font-semibold tracking-tight leading-none"
+              style={{
+                fontSize: "clamp(2rem, 4vw, 3rem)",
+                background: "linear-gradient(135deg, #F97316 0%, #E8631A 60%, #c2410c 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              今天，想將哪個策略付諸實現？
+            </h1>
+            <div className="mt-3 text-small text-default-500">
+              <EntityStats variant="inline" />
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="mt-7 max-w-[680px] mx-auto">
+          {/* Search bar — wider, radius-lg (Canva: 8px) */}
+          <div className="max-w-[744px] mx-auto">
             <Input
-              size="lg"
-              radius="full"
+              size="md"
+              radius="lg"
               variant="bordered"
               value={searchQ}
               onValueChange={setSearchQ}
               isClearable
               onClear={() => setSearchQ("")}
               placeholder="搜尋方法論、任務、最近的工作"
+              classNames={{
+                inputWrapper: [
+                  "h-10 bg-white border-default-200 shadow-sm",
+                  "data-[focus=true]:border-[#F97316]",
+                  "data-[focus=true]:shadow-[0_0_0_3px_rgba(249,115,22,0.15)]",
+                  "transition-all duration-100",
+                ].join(" "),
+              }}
               startContent={
                 isSemanticSearching
-                  ? <span className="w-4 h-4 rounded-full border-2 border-default-400 border-t-transparent animate-spin" />
-                  : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />
+                  ? <span className="w-4 h-4 rounded-full border-2 border-default-400 border-t-transparent animate-spin shrink-0" />
+                  : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" />
               }
             />
+          </div>
 
-            </div>
-
-          {/* Method / layer filter pills — compact row, below search */}
+          {/* Filter pills */}
           <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
             <FilterChip
               label={kindLabelMap[kindFilter] ?? "類型"}
@@ -500,8 +540,8 @@ export default function MissionsHome() {
             />
           </div>
 
-          {/* Monochrome quick-start tiles */}
-          <div className="mt-10 flex items-start justify-center gap-2 flex-wrap">
+          {/* Quick-start tiles */}
+          <div className="mt-8 flex items-start justify-center gap-2 flex-wrap">
             {QUICK_TILES.map((t) => (
               <CircleTile
                 key={t.label}
