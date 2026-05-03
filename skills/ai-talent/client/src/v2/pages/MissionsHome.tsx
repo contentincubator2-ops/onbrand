@@ -41,7 +41,7 @@ import {
   faF, // generic fallback letter icon
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  faFacebookF, faInstagram, faLinkedinIn, faYoutube,
+  faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok,
 } from "@fortawesome/free-brands-svg-icons";
 
 interface MissionRow {
@@ -63,86 +63,37 @@ interface MissionRow {
 interface QuickTile {
   icon: any;
   label: string;
-  layer?: MosLayer;
-  badge?: string;
-  missionTitle: string;
-  missionDesc: string;
-  squadSlug?: string;
-  agentSlug?: string;
-  workspace?: string;
-  kind?: "squad" | "agent" | "skill";
+  iconBg?: string;
+  /** Set to filter the mission grid by this workspace value (channel tiles). */
+  filterWorkspace?: string;
+  /** Action tiles — keep legacy behaviour */
   isMore?: boolean;
   opensIngest?: SourceId;
-  /** Vivid circle bg color for the icon (Canva-style) */
-  iconBg?: string;
+  isCustom?: boolean;
+  /** Legacy task-launch fields (kept for compat, not used by channel tiles) */
+  missionTitle?: string;
+  missionDesc?: string;
 }
 
+/**
+ * Channel / category tiles.
+ * Clicking a channel tile sets activeCategory → filters the 最近的項目 grid.
+ * The last 3 tiles are action tiles (自訂任務 / 上傳 / 顯示更多).
+ */
 const QUICK_TILES: QuickTile[] = [
-  // ── Facebook × 2 ─────────────────────────────────────────────────────
-  {
-    icon: faFacebookF, label: "FB 月行事曆", layer: "L4",
-    kind: "squad", badge: "推薦", iconBg: "#1877F2",
-    missionTitle: "Facebook 月內容行事曆",
-    missionDesc: "以 Joe Pulizzi 內容支柱框架，規劃下個月的 Facebook 貼文主題、節奏與互動策略。",
-    squadSlug: "fb-monthly-calendar-pulizzi", workspace: "facebook",
-  },
-  {
-    icon: faFacebookF, label: "FB 文案師", layer: "L4",
-    kind: "agent", iconBg: "#1877F2",
-    missionTitle: "Facebook 廣告文案師",
-    missionDesc: "由 AI 文案師依品牌語氣產出 Facebook 廣告標題、貼文與 CTA。",
-    agentSlug: "fb-brief-writer", workspace: "facebook",
-  },
-  // ── Instagram × 2 ────────────────────────────────────────────────────
-  {
-    icon: faInstagram, label: "IG 月行事曆", layer: "L4",
-    kind: "squad", iconBg: "#E1306C",
-    missionTitle: "Instagram 月行事曆規劃",
-    missionDesc: "依 Pulizzi 內容支柱框架，規劃 Instagram 月度貼文主題、Hashtag 策略與限動延伸。",
-    squadSlug: "ig-monthly-calendar-pulizzi", workspace: "instagram",
-  },
-  {
-    icon: faInstagram, label: "IG 視覺指南", layer: "L4",
-    kind: "skill", iconBg: "#E1306C",
-    missionTitle: "Instagram 視覺貼文技能",
-    missionDesc: "掌握 IG 版面設計原則：色彩一致性、圖文比例、輪播架構與視覺鉤子。",
-    workspace: "instagram",
-  },
-  // ── LinkedIn × 1 ─────────────────────────────────────────────────────
-  {
-    icon: faLinkedinIn, label: "LI 月行事曆", layer: "L4",
-    kind: "squad", iconBg: "#0A66C2",
-    missionTitle: "LinkedIn 月行事曆規劃",
-    missionDesc: "依 Pulizzi 內容支柱框架，規劃 LinkedIn 個人品牌與 B2B 思想領袖月度貼文。",
-    squadSlug: "li-monthly-calendar-pulizzi", workspace: "linkedin",
-  },
-  // ── YouTube × 2 ──────────────────────────────────────────────────────
-  {
-    icon: faYoutube, label: "YT 說故事腳本", layer: "L4",
-    kind: "squad", iconBg: "#FF0000",
-    missionTitle: "YouTube 說故事影片腳本",
-    missionDesc: "用故事弧線框架（Hook→衝突→解法→CTA）撰寫讓觀眾看完的 YouTube 影片腳本。",
-    squadSlug: "yt-video-script-storytelling", workspace: "youtube",
-  },
-  {
-    icon: faYoutube, label: "YT 視覺導演", layer: "L4",
-    kind: "agent", iconBg: "#FF0000",
-    missionTitle: "YouTube 縮圖視覺導演",
-    missionDesc: "由 AI 視覺導演提出 YouTube 縮圖設計方向、色彩對比與視覺吸睛策略。",
-    agentSlug: "fb-visual-director", workspace: "youtube",
-  },
-  // ── L1 品牌策略 × 1 ──────────────────────────────────────────────────
-  {
-    icon: faBullseye, label: "品牌原型定位", layer: "L1",
-    kind: "skill", iconBg: "#7C3AED",
-    missionTitle: "品牌原型定位技能",
-    missionDesc: "用 Carol Pearson 12 原型框架梳理品牌性格、溝通語氣與市場差異化立足點。",
-    agentSlug: "brand-archetype-positioning", workspace: "brand-positioning",
-  },
-  // ── 工具列 ────────────────────────────────────────────────────────────
-  { icon: faPlus,         label: "自訂任務", missionTitle: "", missionDesc: "", iconBg: "#6B7280" },
-  { icon: faCloudArrowUp, label: "上傳",     missionTitle: "", missionDesc: "", opensIngest: "upload", iconBg: "#059669" },
-  { icon: faEllipsis,     label: "顯示更多", missionTitle: "", missionDesc: "", isMore: true, iconBg: "#9CA3AF" },
+  // ── Channel filter tiles ──────────────────────────────────────────────
+  { icon: faFacebookF,  label: "Facebook", iconBg: "#1877F2", filterWorkspace: "facebook"          },
+  { icon: faInstagram,  label: "Instagram", iconBg: "#E4405F", filterWorkspace: "instagram"         },
+  { icon: faYoutube,    label: "YouTube",  iconBg: "#FF0000", filterWorkspace: "youtube"            },
+  { icon: faTiktok,     label: "TikTok",   iconBg: "#010101", filterWorkspace: "tiktok"             },
+  { icon: faRocket,     label: "品牌定位", iconBg: "#7C3AED", filterWorkspace: "brand-positioning"  },
+  { icon: faBullhorn,   label: "新聞稿",   iconBg: "#475569", filterWorkspace: "pr"                 },
+  { icon: faUsers,      label: "用戶研究", iconBg: "#E07B0F", filterWorkspace: "audience"           },
+  { icon: faEnvelope,   label: "電子報",   iconBg: "#7B5BC8", filterWorkspace: "email"              },
+  // ── Action tiles (unchanged behaviour) ───────────────────────────────
+  { icon: faPlus,         label: "自訂任務", iconBg: "#6B7280", isCustom: true                     },
+  { icon: faCloudArrowUp, label: "上傳",     iconBg: "#059669", opensIngest: "upload"               },
+  { icon: faEllipsis,     label: "顯示更多", iconBg: "#9CA3AF", isMore: true                        },
 ];
 
 export default function MissionsHome() {
@@ -294,6 +245,8 @@ export default function MissionsHome() {
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
   const [sortDesc, setSortDesc] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  /** Currently-selected channel tile — null means "全部" */
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const filteredRows = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
@@ -306,13 +259,17 @@ export default function MissionsHome() {
         (m.workspace ?? "").toLowerCase().includes(q)
       );
     }
+    // Channel tile filter — AND with search
+    if (activeCategory) {
+      r = r.filter((m) => (m.workspace ?? "").toLowerCase() === activeCategory);
+    }
     r = [...r].sort((a, b) => {
       const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return sortDesc ? tb - ta : ta - tb;
     });
     return r;
-  }, [rows, searchQ, sortDesc]);
+  }, [rows, searchQ, sortDesc, activeCategory]);
 
   // Type (kind) dropdown options
   const kindOptions = useMemo(() => ([
@@ -344,32 +301,17 @@ export default function MissionsHome() {
   const [creatingTpl, setCreatingTpl] = useState<string | null>(null);
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
 
-  const startFromTile = async (t: QuickTile) => {
-    if (t.isMore) { navigate("/templates"); return; }
-    if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
-    if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-
-    // Agent / Skill tiles → open templates catalog (filtered by kind + workspace).
-    // Route is /templates (MethodologyCatalog), NOT /methodology which doesn't exist.
-    if (t.kind === "agent" || t.kind === "skill") {
-      const qs = new URLSearchParams();
-      qs.set("kind", t.kind);
-      if (t.workspace) qs.set("workspace", t.workspace);
-      if (t.agentSlug) qs.set("slug", t.agentSlug);
-      navigate(`/templates?${qs.toString()}`);
+  const startFromTile = (t: QuickTile) => {
+    // ── Channel filter tile: toggle activeCategory + scroll to grid
+    if (t.filterWorkspace) {
+      setActiveCategory(prev => prev === t.filterWorkspace ? null : (t.filterWorkspace ?? null));
+      document.getElementById("missions-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-
-    // ── Squad tiles (default): open Picker workspace in a new tab.
-    // The picker is pre-filtered by workspace (channel) or layer, lets the
-    // user browse methodology squads + preview steps, then click 啟動 to
-    // create the mission and land in /m/:id.
-    const qs = new URLSearchParams();
-    if (t.workspace) qs.set("workspace", t.workspace);
-    if (t.layer) qs.set("layer", t.layer);
-    qs.set("title", t.missionTitle);
-    if (t.squadSlug) qs.set("slug", t.squadSlug);
-    window.open(`/picker?${qs.toString()}`, "_blank", "noopener");
+    // ── Action tiles
+    if (t.isMore)   { navigate("/templates"); return; }
+    if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
+    if (t.isCustom) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
   };
 
   const submitCustom = async () => {
@@ -495,8 +437,7 @@ export default function MissionsHome() {
               <CircleTile
                 key={t.label}
                 tile={t}
-                busy={creatingTpl === t.label}
-                disabled={!!creatingTpl}
+                active={!!t.filterWorkspace && activeCategory === t.filterWorkspace}
                 onClick={() => startFromTile(t)}
               />
             ))}
@@ -506,7 +447,7 @@ export default function MissionsHome() {
       </section>
 
       {/* ─── 最近的項目 (Canva-style primary section) ─────────────────── */}
-      <section className="px-8 py-8 border-b border-divider">
+      <section id="missions-grid" className="px-8 py-8 border-b border-divider">
         {showCustom && (
           <CustomMissionForm
             title={customTitle}
@@ -527,10 +468,24 @@ export default function MissionsHome() {
 
         {/* Section header with inline controls */}
         <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-xl font-semibold flex items-center gap-2 flex-wrap">
             最近的項目
+            {activeCategory && (
+              <button
+                onClick={() => setActiveCategory(null)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  fontSize: 12, fontWeight: 600, color: "#F97316",
+                  background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.25)",
+                  borderRadius: 20, padding: "2px 10px", cursor: "pointer",
+                }}
+              >
+                {QUICK_TILES.find(t => t.filterWorkspace === activeCategory)?.label ?? activeCategory}
+                <span style={{ fontSize: 10, opacity: 0.7 }}>✕</span>
+              </button>
+            )}
             {!isLoading && filteredRows.length > 0 && (
-              <span className="ml-2 text-small font-normal text-default-400">({filteredRows.length})</span>
+              <span className="text-small font-normal text-default-400">({filteredRows.length})</span>
             )}
           </h2>
           <div className="flex items-center gap-2 flex-wrap">
@@ -723,38 +678,34 @@ function LayerNav({
 /* ─────────────────────────── Quick-start circle (monochrome) ───────── */
 
 function CircleTile({
-  tile, busy, disabled, onClick,
+  tile, active, onClick,
 }: {
   tile: QuickTile;
-  busy: boolean;
-  disabled: boolean;
+  active: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      className="flex flex-col items-center gap-2 w-[80px] py-2 px-1 min-w-0 group select-none"
-      style={{ background: "none", border: "none", cursor: disabled ? "not-allowed" : "pointer" }}
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 w-[72px] py-2 px-1 min-w-0 group select-none"
+      style={{ background: "none", border: "none", cursor: "pointer" }}
     >
-      <Badge
-        content={tile.badge}
-        color="primary"
-        isInvisible={!tile.badge}
-        placement="top-right"
-        size="sm"
+      <span
+        className="flex items-center justify-center w-12 h-12 rounded-full text-white transition-transform duration-100 group-hover:scale-105 group-active:scale-95"
+        style={{
+          background: tile.iconBg ?? "#9CA3AF",
+          boxShadow: active
+            ? `0 0 0 3px #fff, 0 0 0 5px ${tile.iconBg ?? "#F97316"}`
+            : "0 2px 8px rgba(0,0,0,0.15)",
+          transition: "box-shadow 0.15s ease",
+        }}
       >
-        <span
-          className="flex items-center justify-center w-12 h-12 rounded-full text-white transition-transform duration-100 group-hover:scale-105 group-active:scale-95"
-          style={{ background: tile.iconBg ?? "#9CA3AF", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}
-        >
-          {busy
-            ? <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-            : <FontAwesomeIcon icon={tile.icon} className="text-base" />
-          }
-        </span>
-      </Badge>
-      <span className="text-[11px] leading-tight text-center text-default-600 line-clamp-2 font-medium">
+        <FontAwesomeIcon icon={tile.icon} className="text-base" />
+      </span>
+      <span
+        className="text-[11px] leading-tight text-center line-clamp-2"
+        style={{ fontWeight: active ? 700 : 500, color: active ? (tile.iconBg ?? "#F97316") : "#44403c" }}
+      >
         {tile.label}
       </span>
     </button>
@@ -905,6 +856,7 @@ const WORKSPACE_BADGE: Record<string, { glyph: string; color: string }> = {
   instagram: { glyph: "ig", color: "#E4405F" },
   linkedin:  { glyph: "in", color: "#0A66C2" },
   youtube:   { glyph: "▶",  color: "#FF0000" },
+  tiktok:    { glyph: "TT", color: "#010101" },
   pr:        { glyph: "PR", color: "#525866" },
   email:     { glyph: "@",  color: "#7B5BC8" },
   audience:  { glyph: "眾", color: "#E07B0F" },
@@ -918,6 +870,7 @@ const WS_ICON: Record<string, { icon: any; bg: string; fg: string }> = {
   instagram:          { icon: faInstagram,  bg: "#E4405F", fg: "#ffffff" },
   linkedin:           { icon: faLinkedinIn, bg: "#0A66C2", fg: "#ffffff" },
   youtube:            { icon: faYoutube,    bg: "#FF0000", fg: "#ffffff" },
+  tiktok:             { icon: faTiktok,     bg: "#010101", fg: "#ffffff" },
   pr:                 { icon: faBullhorn,   bg: "#525866", fg: "#ffffff" },
   email:              { icon: faEnvelope,   bg: "#7B5BC8", fg: "#ffffff" },
   audience:           { icon: faUsers,      bg: "#E07B0F", fg: "#ffffff" },
