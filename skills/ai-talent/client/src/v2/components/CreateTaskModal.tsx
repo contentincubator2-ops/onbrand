@@ -14,7 +14,7 @@
  *
  * Background: blurred backdrop (rgba dark overlay) — home page visible behind.
  */
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -421,24 +421,46 @@ function SubChip({ label, active, color, onClick }: {
 
 /* ── Entity card — Canva-style landscape card ─────────────────────── */
 /**
- * Visual design: landscape 4:3, coloured gradient bg using channel brand color.
- * Mimics Canva's template cards which show a styled content preview.
- * Since we have no real images, we render a simulated "content frame":
- *   - Gradient bg (channel color, light→medium)
- *   - Decorative layout blocks (header bar + content lines = abstract post mockup)
- *   - Platform icon badge top-right
- *   - Hover: slight scale + outline ring + "開始使用" button appears
+ * Priority:
+ *   1. entity.coverImageUrl (real squad hero image) — shown as bg-cover photo
+ *   2. entity.mockupImages[] (multiple mockups) — hover slides through them
+ *   3. Fallback: PlatformMockup SVG device frame
+ *
+ * Multiple mockup images: on hover a CSS animation cycles through them
+ * (each image fades/slides in every 1.2s while card is hovered).
  */
 function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
-  const [hov, setHov] = useState(false);
-  const ws = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? "");
-  const info = WS_INFO[ws] ?? null;
+  const [hov, setHov]         = useState(false);
+  const [imgIdx, setImgIdx]   = useState(0);
+  const timerRef              = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const ws     = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? "");
+  const info   = WS_INFO[ws] ?? null;
   const color  = info?.color ?? "#7C3AED";
   const name   = entity.name ?? "";
-  // Derive a subtle secondary shade from the primary color
-  const colorRgb = hexToRgb(color);
-  const bgLight = `rgba(${colorRgb},0.08)`;
-  const bgMid   = `rgba(${colorRgb},0.14)`;
+  const rgb    = hexToRgb(color);
+
+  // Collect all real images: coverImageUrl + mockupImages[]
+  const coverUrl: string | null    = entity.coverImageUrl ?? null;
+  const mockupImgs: string[]       = Array.isArray(entity.mockupImages) ? entity.mockupImages : [];
+  const allImages: string[]        = [
+    ...(coverUrl ? [coverUrl] : []),
+    ...mockupImgs.filter((u: string) => u !== coverUrl),
+  ];
+  const hasImages = allImages.length > 0;
+
+  // Auto-cycle through images on hover
+  useEffect(() => {
+    if (hov && allImages.length > 1) {
+      timerRef.current = setInterval(() => {
+        setImgIdx(i => (i + 1) % allImages.length);
+      }, 1400);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (!hov) setImgIdx(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [hov, allImages.length]);
 
   return (
     <div
@@ -454,18 +476,48 @@ function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void })
       {/* ── Thumbnail: 4:3 landscape ── */}
       <div style={{
         position: "relative", width: "100%", aspectRatio: "4/3",
-        borderRadius: 10,
-        background: `linear-gradient(135deg, ${bgLight} 0%, ${bgMid} 100%)`,
-        overflow: "hidden",
+        borderRadius: 10, overflow: "hidden",
+        background: hasImages ? "#F3F4F6" : `linear-gradient(135deg,rgba(${rgb},0.08),rgba(${rgb},0.14))`,
         outline: hov ? `2px solid ${color}` : "2px solid rgba(0,0,0,0.06)",
-        boxShadow: hov
-          ? `0 6px 20px rgba(${colorRgb},0.22)`
-          : "0 1px 4px rgba(0,0,0,0.08)",
+        boxShadow: hov ? `0 6px 20px rgba(${rgb},0.22)` : "0 1px 4px rgba(0,0,0,0.08)",
         transition: "outline 0.12s, box-shadow 0.15s",
       }}>
 
-        {/* ── Platform device mockup ── */}
-        <PlatformMockup ws={ws} color={color} name={name} />
+        {/* ── Real images: bg-cover, cross-fade on cycle ── */}
+        {hasImages ? (
+          allImages.map((url, i) => (
+            <div
+              key={url}
+              style={{
+                position: "absolute", inset: 0,
+                backgroundImage: `url(${url})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                opacity: i === imgIdx ? 1 : 0,
+                transition: "opacity 0.45s ease",
+              }}
+            />
+          ))
+        ) : (
+          /* ── Fallback: SVG platform device mockup ── */
+          <PlatformMockup ws={ws} color={color} name={name} />
+        )}
+
+        {/* Dot indicators when multiple images */}
+        {allImages.length > 1 && hov && (
+          <div style={{
+            position: "absolute", bottom: 8, left: 0, right: 0,
+            display: "flex", justifyContent: "center", gap: 4,
+          }}>
+            {allImages.map((_, i) => (
+              <span key={i} style={{
+                width: i === imgIdx ? 14 : 5, height: 5,
+                borderRadius: 3, background: i === imgIdx ? "white" : "rgba(255,255,255,0.5)",
+                transition: "width 0.3s, background 0.2s",
+              }} />
+            ))}
+          </div>
+        )}
 
         {/* Platform icon — top-right badge */}
         {info && (
@@ -484,7 +536,7 @@ function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void })
         <span style={{
           position: "absolute", top: 8, left: 8,
           fontSize: 9, fontWeight: 700,
-          background: "rgba(255,255,255,0.85)",
+          background: "rgba(255,255,255,0.88)",
           color: color,
           borderRadius: 4, padding: "2px 6px",
           letterSpacing: "0.04em", backdropFilter: "blur(4px)",
@@ -492,10 +544,10 @@ function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void })
           {entity.kind === "squad" ? "SQUAD" : entity.kind === "agent" ? "AGENT" : "SKILL"}
         </span>
 
-        {/* Hover overlay: darkens + shows CTA */}
+        {/* Hover CTA */}
         <div style={{
           position: "absolute", inset: 0,
-          background: `rgba(${colorRgb},0.18)`,
+          background: `rgba(${rgb},0.15)`,
           display: "flex", alignItems: "flex-end", justifyContent: "center",
           paddingBottom: 12,
           opacity: hov ? 1 : 0, transition: "opacity 0.15s",
@@ -503,7 +555,7 @@ function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void })
           <span style={{
             fontSize: 12, fontWeight: 700, color: "#fff",
             background: color, borderRadius: 20, padding: "5px 18px",
-            boxShadow: `0 2px 8px rgba(${colorRgb},0.4)`,
+            boxShadow: `0 2px 8px rgba(${rgb},0.4)`,
           }}>
             開始使用
           </span>
