@@ -1,108 +1,154 @@
 /**
- * CreateTaskModal — Canva-style "建立任務" modal overlay.
+ * CreateTaskModal — Canva「建立設計」modal, pixel-faithful.
  *
- * Flow:
- *   Home tile click → open modal (pre-selected workspace)
- *   Left sidebar    → switch workspace
- *   Top chips       → filter by content_type
- *   Squad card      → navigate to /picker?workspace=X&slug=Y
+ * Layout:
+ *   ┌─────────────────────────────────────────────────┐  ✕ (outside card)
+ *   │  建立設計          │  [─── 搜尋 ───────────────] │
+ *   │  ─────────────     │  [熱門][FB][IG][LI][TT][YT] │
+ *   │  ✦ 為你推薦        │  熱門                       │
+ *   │  ❤ 社群媒體 ●      │  ┌──┐ ┌──┐ ┌──┐ ┌──┐      │
+ *   │    品牌策略         │  │  │ │  │ │  │ │  │      │
+ *   │    電子報           │  └──┘ └──┘ └──┘ └──┘      │
+ *   │    上傳             │                            │
+ *   └─────────────────────────────────────────────────┘
  *
- * Mirrors Canva's "建立設計" overlay exactly:
- *   - Full-screen white overlay
- *   - Left 260px: workspace category list
- *   - Right: search bar + content_type chips + squad card grid
- *   - X closes, clicking outside does nothing (user must click X)
+ * Background: blurred backdrop (rgba dark overlay) — home page visible behind.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faXmark, faMagnifyingGlass, faRocket, faBullhorn, faUsers,
-  faEnvelope, faPlus, faWandMagicSparkles,
+  faEnvelope, faCloudArrowUp, faWandMagicSparkles, faFire,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
 } from "@fortawesome/free-brands-svg-icons";
 
-/* ── Workspace sidebar items ─────────────────────────────────────────── */
-const WORKSPACES = [
-  { key: "facebook",          label: "Facebook",  icon: faFacebookF,  color: "#1877F2" },
-  { key: "instagram",         label: "Instagram", icon: faInstagram,  color: "#E4405F" },
-  { key: "youtube",           label: "YouTube",   icon: faYoutube,    color: "#FF0000" },
-  { key: "tiktok",            label: "TikTok",    icon: faTiktok,     color: "#010101" },
-  { key: "linkedin",          label: "LinkedIn",  icon: faLinkedinIn, color: "#0A66C2" },
-  { key: "brand-positioning", label: "品牌定位",  icon: faRocket,     color: "#7C3AED" },
-  { key: "pr",                label: "新聞稿",    icon: faBullhorn,   color: "#475569" },
-  { key: "audience",          label: "用戶研究",  icon: faUsers,      color: "#E07B0F" },
-  { key: "email",             label: "電子報",    icon: faEnvelope,   color: "#7B5BC8" },
+/* ── Categories (left sidebar) ──────────────────────────────────────── */
+const CATEGORIES = [
+  { key: "recommended", label: "為你推薦",  icon: faWandMagicSparkles, color: "#F97316", workspaces: [] as string[] },
+  { key: "social",      label: "社群媒體",  icon: faUsers,             color: "#E4405F", workspaces: ["facebook","instagram","youtube","tiktok","linkedin"] },
+  { key: "brand",       label: "品牌策略",  icon: faRocket,            color: "#7C3AED", workspaces: ["brand-positioning","pr","audience"] },
+  { key: "email",       label: "電子報",    icon: faEnvelope,          color: "#7B5BC8", workspaces: ["email"] },
+  { key: "upload",      label: "上傳",      icon: faCloudArrowUp,      color: "#059669", workspaces: [] as string[] },
 ] as const;
+type CategoryKey = typeof CATEGORIES[number]["key"];
 
-type WorkspaceKey = typeof WORKSPACES[number]["key"];
+const WS_TO_CAT: Record<string, CategoryKey> = {
+  facebook:"social", instagram:"social", youtube:"social", tiktok:"social", linkedin:"social",
+  "brand-positioning":"brand", pr:"brand", audience:"brand",
+  email:"email",
+};
 
-/* ── Content-type chips per workspace ───────────────────────────────── */
+/* ── Channel tabs per category ──────────────────────────────────────── */
+const CHANNEL_TABS: Record<CategoryKey, Array<{ key: string; label: string; icon: any; color: string }>> = {
+  recommended: [],
+  social: [
+    { key:"facebook",  label:"Facebook",  icon:faFacebookF,  color:"#1877F2" },
+    { key:"instagram", label:"Instagram", icon:faInstagram,  color:"#E4405F" },
+    { key:"linkedin",  label:"LinkedIn",  icon:faLinkedinIn, color:"#0A66C2" },
+    { key:"tiktok",    label:"TikTok",    icon:faTiktok,     color:"#010101" },
+    { key:"youtube",   label:"YouTube",   icon:faYoutube,    color:"#FF0000" },
+  ],
+  brand: [
+    { key:"brand-positioning", label:"品牌定位", icon:faRocket,   color:"#7C3AED" },
+    { key:"pr",                label:"新聞稿",   icon:faBullhorn, color:"#475569" },
+    { key:"audience",          label:"用戶研究", icon:faUsers,    color:"#E07B0F" },
+  ],
+  email:  [{ key:"email", label:"電子報", icon:faEnvelope, color:"#7B5BC8" }],
+  upload: [],
+};
+
+/* ── Sub-chips per workspace ─────────────────────────────────────────── */
 const CONTENT_TYPES: Record<string, Array<{ value: string; label: string }>> = {
-  facebook:          [{ value: "all", label: "熱門" }, { value: "calendar", label: "行事曆" }, { value: "post", label: "貼文文案" }, { value: "ad", label: "廣告文案" }, { value: "campaign", label: "活動企劃" }, { value: "report", label: "成效報告" }],
-  instagram:         [{ value: "all", label: "熱門" }, { value: "calendar", label: "行事曆" }, { value: "post", label: "貼文文案" }, { value: "visual", label: "視覺圖文" }, { value: "campaign", label: "活動企劃" }],
-  youtube:           [{ value: "all", label: "熱門" }, { value: "script", label: "影片腳本" }, { value: "visual", label: "縮圖設計" }, { value: "campaign", label: "活動企劃" }, { value: "report", label: "成效報告" }],
-  tiktok:            [{ value: "all", label: "熱門" }, { value: "script", label: "影片腳本" }, { value: "visual", label: "視覺方向" }, { value: "campaign", label: "活動企劃" }],
-  linkedin:          [{ value: "all", label: "熱門" }, { value: "calendar", label: "行事曆" }, { value: "post", label: "貼文文案" }, { value: "campaign", label: "活動企劃" }],
-  "brand-positioning": [{ value: "all", label: "熱門" }, { value: "positioning", label: "品牌定位" }, { value: "research", label: "市場研究" }, { value: "campaign", label: "活動企劃" }],
-  pr:                [{ value: "all", label: "熱門" }, { value: "post", label: "新聞稿" }, { value: "campaign", label: "活動企劃" }, { value: "report", label: "媒體報告" }],
-  audience:          [{ value: "all", label: "熱門" }, { value: "research", label: "用戶研究" }, { value: "report", label: "分析報告" }],
-  email:             [{ value: "all", label: "熱門" }, { value: "newsletter", label: "電子報" }, { value: "campaign", label: "行銷活動" }],
+  facebook:           [{value:"calendar",label:"行事曆"},{value:"post",label:"貼文"},{value:"ad",label:"廣告文案"},{value:"campaign",label:"活動企劃"},{value:"report",label:"成效報告"}],
+  instagram:          [{value:"calendar",label:"行事曆"},{value:"post",label:"貼文"},{value:"visual",label:"視覺圖文"},{value:"campaign",label:"活動"}],
+  youtube:            [{value:"script",label:"影片腳本"},{value:"visual",label:"縮圖設計"},{value:"campaign",label:"活動"},{value:"report",label:"成效"}],
+  tiktok:             [{value:"script",label:"影片腳本"},{value:"visual",label:"視覺方向"},{value:"campaign",label:"活動"}],
+  linkedin:           [{value:"calendar",label:"行事曆"},{value:"post",label:"貼文"},{value:"campaign",label:"活動"}],
+  "brand-positioning":[{value:"positioning",label:"品牌定位"},{value:"research",label:"市場研究"}],
+  pr:                 [{value:"post",label:"新聞稿"},{value:"campaign",label:"活動"}],
+  audience:           [{value:"research",label:"用戶研究"},{value:"report",label:"分析報告"}],
+  email:              [{value:"newsletter",label:"電子報"},{value:"campaign",label:"行銷活動"}],
 };
 
-/* ── Keyword heuristic for content_type filtering ────────────────────── */
 const CT_KW: Record<string, string[]> = {
-  calendar:    ["行事曆", "calendar", "月曆", "規劃"],
-  post:        ["貼文", "post", "文案", "caption"],
-  ad:          ["廣告", "ad", "cvo", "brief", "轉換"],
-  script:      ["腳本", "script", "影片", "video", "hook"],
-  visual:      ["視覺", "visual", "縮圖", "thumbnail", "圖文"],
-  campaign:    ["活動", "campaign", "launch", "倒數", "促銷"],
-  report:      ["報告", "report", "analytics", "成效", "分析"],
-  research:    ["研究", "research", "受眾", "audience", "insight"],
-  positioning: ["定位", "positioning", "品牌", "原型"],
-  newsletter:  ["電子報", "newsletter", "edm", "email"],
+  calendar:["行事曆","calendar","月曆","規劃"],
+  post:["貼文","post","文案","caption"],
+  ad:["廣告","ad","cvo","brief","轉換"],
+  script:["腳本","script","影片","video","hook"],
+  visual:["視覺","visual","縮圖","thumbnail","圖文"],
+  campaign:["活動","campaign","launch","倒數","促銷"],
+  report:["報告","report","analytics","成效","分析"],
+  research:["研究","research","受眾","audience","insight"],
+  positioning:["定位","positioning","品牌","原型"],
+  newsletter:["電子報","newsletter","edm","email"],
 };
 
-/* ─────────────────────────────────────────────────────────────────────── */
+const WS_INFO: Record<string, { icon: any; color: string }> = {
+  facebook:           {icon:faFacebookF,  color:"#1877F2"},
+  instagram:          {icon:faInstagram,  color:"#E4405F"},
+  youtube:            {icon:faYoutube,    color:"#FF0000"},
+  tiktok:             {icon:faTiktok,     color:"#010101"},
+  linkedin:           {icon:faLinkedinIn, color:"#0A66C2"},
+  "brand-positioning":{icon:faRocket,     color:"#7C3AED"},
+  pr:                 {icon:faBullhorn,   color:"#475569"},
+  audience:           {icon:faUsers,      color:"#E07B0F"},
+  email:              {icon:faEnvelope,   color:"#7B5BC8"},
+};
 
-interface Props {
-  open: boolean;
-  initialWorkspace: WorkspaceKey;
-  onClose: () => void;
-}
+/* ════════════════════════════════════════════════════════════════════ */
+interface Props { open: boolean; initialWorkspace: string; onClose: () => void; }
 
 export default function CreateTaskModal({ open, initialWorkspace, onClose }: Props) {
   const navigate = useNavigate();
-  const [workspace, setWorkspace] = useState<WorkspaceKey>(initialWorkspace);
-  const [contentType, setContentType] = useState("all");
-  const [search, setSearch] = useState("");
 
-  // Sync workspace when initialWorkspace changes (tile click)
-  React.useEffect(() => {
+  const [category, setCategory]     = useState<CategoryKey>(() => (WS_TO_CAT[initialWorkspace] ?? "recommended") as CategoryKey);
+  const [channel,  setChannel]      = useState<string>(initialWorkspace || "all");
+  const [contentType, setContentType] = useState("all");
+  const [search, setSearch]         = useState("");
+
+  useEffect(() => {
     if (open) {
-      setWorkspace(initialWorkspace);
+      const cat = (WS_TO_CAT[initialWorkspace] ?? "recommended") as CategoryKey;
+      setCategory(cat);
+      setChannel(initialWorkspace || "all");
       setContentType("all");
       setSearch("");
     }
   }, [open, initialWorkspace]);
 
-  // Query all entities, filter client-side (avoids needing new endpoint)
-  const entityQuery = (trpc as any).entity?.listForHome?.useQuery
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    if (open) document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [open, onClose]);
+
+  const entityQ = (trpc as any).entity?.listForHome?.useQuery
     ? (trpc as any).entity.listForHome.useQuery({ brandId: null }, { refetchOnWindowFocus: false })
     : { data: [], isLoading: false };
+  const allEntities: any[] = (entityQ.data as any[]) ?? [];
 
-  const allEntities: any[] = (entityQuery.data as any[]) ?? [];
+  const catDef = CATEGORIES.find(c => c.key === category)!;
+  const tabs   = CHANNEL_TABS[category] ?? [];
+  const chips  = channel !== "all" ? (CONTENT_TYPES[channel] ?? []) : [];
 
   const filtered = useMemo(() => {
-    let items = allEntities.filter((e: any) => {
-      const ws: string[] = Array.isArray(e.workspace) ? e.workspace : [e.workspace ?? ""];
-      return ws.some(w => w.toLowerCase() === workspace);
-    });
-
+    let items = allEntities;
+    if (category !== "recommended" && catDef.workspaces.length > 0) {
+      items = items.filter((e: any) => {
+        const ws: string[] = Array.isArray(e.workspace) ? e.workspace : [e.workspace ?? ""];
+        return ws.some(w => (catDef.workspaces as string[]).includes(w.toLowerCase()));
+      });
+    }
+    if (channel !== "all") {
+      items = items.filter((e: any) => {
+        const ws: string[] = Array.isArray(e.workspace) ? e.workspace : [e.workspace ?? ""];
+        return ws.some(w => w.toLowerCase() === channel);
+      });
+    }
     if (contentType !== "all") {
       const kws = CT_KW[contentType] ?? [];
       items = items.filter((e: any) => {
@@ -110,23 +156,16 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
         return kws.some(kw => hay.includes(kw));
       });
     }
-
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter((e: any) =>
-        (e.name ?? "").toLowerCase().includes(q) ||
-        (e.description ?? "").toLowerCase().includes(q)
-      );
+        (e.name ?? "").toLowerCase().includes(q) || (e.description ?? "").toLowerCase().includes(q));
     }
-
     return items.slice(0, 48);
-  }, [allEntities, workspace, contentType, search]);
-
-  const currentWs = WORKSPACES.find(w => w.key === workspace)!;
-  const chips = CONTENT_TYPES[workspace] ?? [{ value: "all", label: "熱門" }];
+  }, [allEntities, category, channel, contentType, search, catDef]);
 
   const handleSelect = (entity: any) => {
-    const ws = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? workspace);
+    const ws = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? channel);
     const qs = new URLSearchParams();
     if (ws) qs.set("workspace", ws);
     if (entity.slug) qs.set("slug", entity.slug);
@@ -137,159 +176,190 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
 
   if (!open) return null;
 
+  const sectionLabel = channel !== "all"
+    ? tabs.find(t => t.key === channel)?.label ?? "熱門"
+    : (category === "recommended" ? "為你推薦" : catDef.label);
+
   return (
-    /* ── Full-screen overlay ── */
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 100,
-      background: "#fff",
-      display: "flex", flexDirection: "column",
-      animation: "fadeIn 0.15s ease-out",
-    }}>
-      {/* ── Top bar ── */}
-      <div style={{
-        height: 56, flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 24px",
-        borderBottom: "1px solid #f3f4f6",
-      }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>建立任務</span>
+    /* ── Backdrop: semi-transparent + blur, HOME PAGE VISIBLE BEHIND ── */
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        background: "rgba(30,34,48,0.45)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "24px",
+        animation: "fadeIn 0.15s ease-out",
+      }}
+    >
+      {/* ── White modal card ── */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: "relative",
+          width: "100%", maxWidth: 1120,
+          height: "min(88vh, 760px)",
+          background: "#fff",
+          borderRadius: 16,
+          boxShadow: "0 32px 100px rgba(0,0,0,0.28)",
+          display: "flex", overflow: "hidden",
+          animation: "modalSlideUp 0.2s ease-out",
+        }}
+      >
+        {/* ✕ — floating just outside top-right of card */}
         <button
           onClick={onClose}
           style={{
-            width: 36, height: 36, borderRadius: "50%", border: "none",
-            background: "none", cursor: "pointer", fontSize: 18, color: "#6b7280",
+            position: "absolute", top: -14, right: -14, zIndex: 20,
+            width: 38, height: 38, borderRadius: "50%",
+            background: "#fff", border: "1px solid rgba(0,0,0,0.12)",
+            cursor: "pointer", fontSize: 15, color: "#374151",
             display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
             transition: "background 0.1s",
           }}
           onMouseEnter={e => (e.currentTarget.style.background = "#f3f4f6")}
-          onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
         >
           <FontAwesomeIcon icon={faXmark} />
         </button>
-      </div>
 
-      {/* ── Body: sidebar + main ── */}
-      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-
-        {/* Left sidebar — workspace list */}
+        {/* ── Left sidebar ── */}
         <aside style={{
-          width: 220, flexShrink: 0,
-          borderRight: "1px solid #f3f4f6",
-          overflowY: "auto", padding: "12px 8px",
+          width: 230, flexShrink: 0,
+          borderRight: "1px solid rgba(0,0,0,0.07)",
+          overflowY: "auto", padding: "28px 0 20px",
+          display: "flex", flexDirection: "column",
         }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", padding: "4px 10px 8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            頻道 / 類型
-          </p>
-          {WORKSPACES.map(ws => {
-            const active = workspace === ws.key;
+          {/* Title in left panel — exactly like Canva */}
+          <h2 style={{
+            fontSize: 22, fontWeight: 700, color: "#111827",
+            margin: "0 0 20px", padding: "0 20px",
+            letterSpacing: "-0.02em",
+          }}>
+            建立任務
+          </h2>
+
+          {/* Category list */}
+          {CATEGORIES.map(cat => {
+            const active = category === cat.key;
             return (
               <button
-                key={ws.key}
-                onClick={() => { setWorkspace(ws.key); setContentType("all"); }}
+                key={cat.key}
+                onClick={() => { setCategory(cat.key); setChannel("all"); setContentType("all"); }}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 10,
-                  padding: "8px 10px", borderRadius: 10, border: "none", textAlign: "left",
-                  cursor: "pointer", background: active ? `${ws.color}12` : "none",
+                  padding: "10px 20px", border: "none", textAlign: "left", cursor: "pointer",
+                  background: active ? "rgba(124,58,237,0.07)" : "transparent",
                   transition: "background 0.1s",
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = active ? `${ws.color}12` : "none"; }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(124,58,237,0.07)" : "transparent"; }}
               >
+                <FontAwesomeIcon
+                  icon={cat.icon}
+                  style={{
+                    fontSize: 15, width: 18, flexShrink: 0,
+                    color: active ? cat.color : "#9CA3AF",
+                  }}
+                />
                 <span style={{
-                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                  background: active ? ws.color : "#f3f4f6",
-                  color: active ? "#fff" : "#6b7280",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 13, transition: "background 0.15s, color 0.15s",
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: active ? "#7C3AED" : "#374151",
                 }}>
-                  <FontAwesomeIcon icon={ws.icon} />
-                </span>
-                <span style={{
-                  fontSize: 13, fontWeight: active ? 700 : 400,
-                  color: active ? ws.color : "#374151",
-                }}>
-                  {ws.label}
+                  {cat.label}
                 </span>
               </button>
             );
           })}
         </aside>
 
-        {/* Main area */}
+        {/* ── Main area ── */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
 
-          {/* Search + chips */}
-          <div style={{ flexShrink: 0, padding: "16px 24px 0" }}>
-            {/* Search */}
+          {/* Search bar — top, full-width */}
+          <div style={{ flexShrink: 0, padding: "20px 24px 0" }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 10,
-              height: 44, borderRadius: 22,
-              border: "1.5px solid #e5e7eb", padding: "0 16px",
-              background: "#fff", marginBottom: 14,
+              height: 46, borderRadius: 23,
+              border: "1.5px solid rgba(124,58,237,0.55)",
+              boxShadow: "0 0 0 3px rgba(124,58,237,0.07)",
+              padding: "0 18px", background: "#fff",
             }}>
-              <FontAwesomeIcon icon={faMagnifyingGlass} style={{ color: "#9ca3af", fontSize: 14, flexShrink: 0 }} />
+              <FontAwesomeIcon icon={faMagnifyingGlass} style={{ color: "#9CA3AF", fontSize: 14, flexShrink: 0 }} />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="你想要建立什麼任務？"
+                placeholder="你想要建立什麼？"
+                autoFocus
                 style={{
-                  flex: 1, border: "none", outline: "none", fontSize: 14,
-                  color: "#111827", background: "transparent",
+                  flex: 1, border: "none", outline: "none",
+                  fontSize: 14, color: "#111827", background: "transparent",
                 }}
               />
             </div>
-
-            {/* Content-type chips */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-              {chips.map(chip => {
-                const active = contentType === chip.value;
-                return (
-                  <button
-                    key={chip.value}
-                    onClick={() => setContentType(chip.value)}
-                    style={{
-                      fontSize: 13, fontWeight: active ? 700 : 500,
-                      color: active ? "#fff" : "#374151",
-                      background: active ? currentWs.color : "rgba(0,0,0,0.05)",
-                      border: "none", borderRadius: 20,
-                      padding: "6px 16px", cursor: "pointer",
-                      transition: "all 0.12s ease",
-                    }}
-                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.09)"; }}
-                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                  >
-                    {chip.label}
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
+          {/* Channel tabs row — horizontal scroll, no scrollbar */}
+          {tabs.length > 0 && (
+            <div style={{
+              flexShrink: 0, padding: "12px 24px 0",
+              display: "flex", gap: 6, alignItems: "center",
+              overflowX: "auto", scrollbarWidth: "none",
+            }}>
+              {/* 熱門 */}
+              <TabPill
+                label="熱門" icon={faFire} iconColor="#F97316"
+                active={channel === "all"}
+                onClick={() => { setChannel("all"); setContentType("all"); }}
+              />
+              {tabs.map(t => (
+                <TabPill
+                  key={t.key}
+                  label={t.label} icon={t.icon} iconColor={t.color}
+                  active={channel === t.key}
+                  onClick={() => { setChannel(t.key); setContentType("all"); }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Sub-chips */}
+          {chips.length > 0 && (
+            <div style={{
+              flexShrink: 0, padding: "8px 24px 0",
+              display: "flex", gap: 6, flexWrap: "wrap",
+            }}>
+              <SubChip label="全部" active={contentType === "all"} color={WS_INFO[channel]?.color ?? "#7C3AED"} onClick={() => setContentType("all")} />
+              {chips.map(c => (
+                <SubChip key={c.value} label={c.label} active={contentType === c.value} color={WS_INFO[channel]?.color ?? "#7C3AED"} onClick={() => setContentType(c.value)} />
+              ))}
+            </div>
+          )}
+
           {/* Section label */}
-          <div style={{ padding: "0 24px 12px", flexShrink: 0 }}>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>
-              {chips.find(c => c.value === contentType)?.label ?? "熱門"}
+          <div style={{ flexShrink: 0, padding: "14px 24px 6px" }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: 0 }}>
+              {sectionLabel}
             </p>
           </div>
 
-          {/* Squad card grid */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 32px" }}>
-            {entityQuery.isLoading ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} style={{ aspectRatio: "4/3", borderRadius: 8, background: "rgba(64,79,109,0.06)", animation: "pulse 1.5s infinite" }} />
-                ))}
-              </div>
+          {/* Card grid — scrollable */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 28px" }}>
+            {entityQ.isLoading ? (
+              <GridSkeleton />
             ) : filtered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "64px 0", color: "#9ca3af" }}>
-                <FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 32, marginBottom: 12, display: "block", margin: "0 auto 12px" }} />
-                <p style={{ fontSize: 14 }}>尚無符合的任務範本</p>
-                <p style={{ fontSize: 12, marginTop: 4 }}>試試其他分類或搜尋關鍵字</p>
-              </div>
+              <EmptyState />
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                {filtered.map((entity: any) => (
-                  <SquadCard key={`${entity.kind}-${entity.slug}`} entity={entity} wsColor={currentWs.color} onSelect={() => handleSelect(entity)} />
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: 16,
+              }}>
+                {filtered.map((e: any) => (
+                  <EntityCard key={`${e.kind}-${e.slug}`} entity={e} onSelect={() => handleSelect(e)} />
                 ))}
               </div>
             )}
@@ -300,87 +370,149 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
   );
 }
 
-/* ── Squad card ──────────────────────────────────────────────────────── */
+/* ── Tab pill ─────────────────────────────────────────────────────── */
+function TabPill({ label, icon, iconColor, active, onClick }: {
+  label: string; icon: any; iconColor: string; active: boolean; onClick: () => void;
+}) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "6px 14px", borderRadius: 9999, border: "none",
+        cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+        fontSize: 13, fontWeight: active ? 600 : 500,
+        background: active ? "#7C3AED" : hov ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.04)",
+        color: active ? "#fff" : "#374151",
+        transition: "background 0.12s, color 0.12s",
+      }}
+    >
+      <FontAwesomeIcon icon={icon} style={{ fontSize: 11, color: active ? "#fff" : iconColor }} />
+      {label}
+    </button>
+  );
+}
 
-const WS_ICON_MAP: Record<string, { icon: any; color: string }> = {
-  facebook:           { icon: faFacebookF,  color: "#1877F2" },
-  instagram:          { icon: faInstagram,  color: "#E4405F" },
-  youtube:            { icon: faYoutube,    color: "#FF0000" },
-  tiktok:             { icon: faTiktok,     color: "#010101" },
-  linkedin:           { icon: faLinkedinIn, color: "#0A66C2" },
-  "brand-positioning":{ icon: faRocket,     color: "#7C3AED" },
-  pr:                 { icon: faBullhorn,   color: "#475569" },
-  audience:           { icon: faUsers,      color: "#E07B0F" },
-  email:              { icon: faEnvelope,   color: "#7B5BC8" },
-};
+/* ── Sub-chip ─────────────────────────────────────────────────────── */
+function SubChip({ label, active, color, onClick }: {
+  label: string; active: boolean; color: string; onClick: () => void;
+}) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        fontSize: 12, fontWeight: active ? 600 : 400,
+        padding: "4px 12px", borderRadius: 9999, border: "none", cursor: "pointer",
+        background: active ? color : hov ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.05)",
+        color: active ? "#fff" : "#6B7280",
+        transition: "background 0.1s, color 0.1s",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
-function SquadCard({ entity, wsColor, onSelect }: { entity: any; wsColor: string; onSelect: () => void }) {
-  const [hovered, setHovered] = React.useState(false);
+/* ── Entity card ─────────────────────────────────────────────────── */
+function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
+  const [hov, setHov] = useState(false);
   const ws = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? "");
-  const wsInfo = WS_ICON_MAP[ws] ?? null;
+  const info = WS_INFO[ws] ?? null;
   const letter = (entity.name ?? "?").slice(0, 1).toUpperCase();
 
   return (
     <div
       onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
       style={{ cursor: "pointer" }}
     >
-      {/* Thumbnail */}
+      {/* Thumbnail — portrait, like Canva template cards */}
       <div style={{
-        position: "relative", width: "100%", aspectRatio: "4/3",
-        borderRadius: 8, background: "rgba(64,79,109,0.06)", overflow: "hidden",
-        boxShadow: hovered ? "0 4px 16px rgba(0,0,0,0.12)" : "none",
-        transition: "box-shadow 0.15s ease",
-        transform: hovered ? "translateY(-2px)" : "none",
+        position: "relative", width: "100%", aspectRatio: "3/4",
+        borderRadius: 8,
+        background: hov ? "rgba(57,70,96,0.11)" : "#F3F4F6",
+        overflow: "hidden",
+        outline: hov ? "2px solid #7C3AED" : "2px solid transparent",
+        transition: "outline 0.12s ease, background 0.12s ease",
       }}>
-        {/* Muted icon */}
+        {/* Muted platform icon */}
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {wsInfo ? (
-            <FontAwesomeIcon icon={wsInfo.icon} style={{ fontSize: 48, color: wsInfo.color, opacity: 0.25 }} />
-          ) : (
-            <span style={{ fontSize: 48, fontWeight: 800, color: "rgba(64,79,109,0.18)", lineHeight: 1, userSelect: "none" }}>{letter}</span>
-          )}
+          {info
+            ? <FontAwesomeIcon icon={info.icon} style={{ fontSize: 52, color: info.color, opacity: 0.20 }} />
+            : <span style={{ fontSize: 52, fontWeight: 800, color: "rgba(64,79,109,0.14)", userSelect: "none" }}>{letter}</span>
+          }
         </div>
 
-        {/* Hover overlay */}
+        {/* Kind badge — top-left */}
+        <span style={{
+          position: "absolute", top: 8, left: 8,
+          fontSize: 9, fontWeight: 700,
+          background: info ? info.color : "rgba(0,0,0,0.4)", color: "#fff",
+          borderRadius: 4, padding: "2px 6px",
+          textTransform: "uppercase", letterSpacing: "0.05em",
+        }}>
+          {entity.kind === "squad" ? "Squad" : entity.kind === "agent" ? "Agent" : "技能"}
+        </span>
+
+        {/* Hover CTA fade-in at bottom */}
         <div style={{
-          position: "absolute", inset: 0,
-          background: "rgba(0,0,0,0.28)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          opacity: hovered ? 1 : 0, transition: "opacity 0.15s ease",
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          background: "linear-gradient(to top, rgba(0,0,0,0.32), transparent)",
+          padding: "28px 10px 10px",
+          display: "flex", justifyContent: "center",
+          opacity: hov ? 1 : 0, transition: "opacity 0.15s",
         }}>
           <span style={{
-            fontSize: 12, fontWeight: 700, color: "#fff",
-            background: wsColor, borderRadius: 20, padding: "6px 18px",
+            fontSize: 11, fontWeight: 700, color: "#fff",
+            background: info?.color ?? "#7C3AED",
+            borderRadius: 20, padding: "4px 14px",
           }}>
             開始使用
           </span>
         </div>
-
-        {/* Kind badge */}
-        <span style={{
-          position: "absolute", top: 8, right: 8,
-          fontSize: 9, fontWeight: 700, color: "#fff",
-          background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 6px",
-          textTransform: "uppercase", letterSpacing: "0.05em",
-        }}>
-          {entity.kind === "squad" ? "Squad" : entity.kind === "agent" ? "Agent" : "Skill"}
-        </span>
       </div>
 
-      {/* Text */}
-      <div style={{ padding: "8px 2px 2px" }}>
-        <p style={{
-          fontSize: 13, fontWeight: 600, color: "rgb(15,16,21)",
-          lineHeight: 1.35, margin: 0,
-          overflow: "hidden", display: "-webkit-box",
-          WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-        }}>
-          {entity.name}
-        </p>
-      </div>
+      {/* Label */}
+      <p style={{
+        fontSize: 12, fontWeight: 500, color: "#111827",
+        margin: "7px 2px 0", lineHeight: 1.4,
+        overflow: "hidden", display: "-webkit-box",
+        WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+      }}>
+        {entity.name}
+      </p>
+    </div>
+  );
+}
+
+/* ── Skeleton ─────────────────────────────────────────────────────── */
+function GridSkeleton() {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i}>
+          <div style={{ aspectRatio:"3/4", borderRadius: 8, background: "#F3F4F6", animation: "pulse 1.5s infinite" }} />
+          <div style={{ height: 11, borderRadius: 4, background: "#F3F4F6", margin: "7px 2px 0", animation: "pulse 1.5s infinite" }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Empty ────────────────────────────────────────────────────────── */
+function EmptyState() {
+  return (
+    <div style={{ textAlign: "center", padding: "60px 0", color: "#9CA3AF" }}>
+      <FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 34, display: "block", margin: "0 auto 12px" }} />
+      <p style={{ fontSize: 14 }}>尚無符合的任務範本</p>
+      <p style={{ fontSize: 12, marginTop: 4 }}>試試其他分類或搜尋關鍵字</p>
     </div>
   );
 }
