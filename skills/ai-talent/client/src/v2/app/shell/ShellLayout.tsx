@@ -251,6 +251,7 @@ function IconBar({
         <Tooltip content="顯示更多" placement="right">
           <button
             aria-label="顯示更多"
+            onClick={onToggle}
             style={{
               width: 64, height: 44, margin: "2px auto 0", display: "flex",
               flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
@@ -430,25 +431,29 @@ function SlidePanel({
         <>
           {/* 你的方案 */}
           <div style={{ padding: "0 12px 8px", flexShrink: 0 }}>
-            <button style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 8,
-              padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
-              background: "white", cursor: "pointer", textAlign: "left",
-              marginBottom: 6, transition: "background 0.1s",
-              fontSize: 13, fontWeight: 500, color: "#374151",
-            }}
+            <button
+              onClick={() => onNavigate("/settings/plan")}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
+                background: "white", cursor: "pointer", textAlign: "left",
+                marginBottom: 6, transition: "background 0.1s",
+                fontSize: 13, fontWeight: 500, color: "#374151",
+              }}
               onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
               onMouseLeave={e => e.currentTarget.style.background = "white"}
             >
               <span style={{ fontSize: 13 }}>👑</span>
               你的方案
             </button>
-            <button style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
-              background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151",
-              transition: "background 0.1s",
-            }}
+            <button
+              onClick={() => onNavigate("/settings/team")}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
+                background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151",
+                transition: "background 0.1s",
+              }}
               onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
               onMouseLeave={e => e.currentTarget.style.background = "white"}
             >
@@ -547,11 +552,13 @@ function SlidePanel({
 
           {/* Bottom: trash */}
           <div style={{ flexShrink: 0, padding: "8px 6px 16px", borderTop: "1px solid #f3f4f6" }}>
-            <button style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "8px 10px", borderRadius: 8, border: "none", background: "none",
-              fontSize: 13, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-            }}
+            <button
+              onClick={() => onNavigate("/trash")}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 10px", borderRadius: 8, border: "none", background: "none",
+                fontSize: 13, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
+              }}
               onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
             >
@@ -602,7 +609,7 @@ function SlidePanel({
                     initialBg="#f3f4f6"
                     initialColor="#6b7280"
                     label={b.name}
-                    onClick={() => {}}
+                    onClick={() => onNavigate(`/brands/${b.id}`)}
                   />
                 ))}
               </div>
@@ -624,7 +631,10 @@ function SlidePanel({
                     initialBg="#fff7ed"
                     initialColor="#F97316"
                     label={m.title}
-                    onClick={() => {}}
+                    onClick={() => {
+                      const url = m.brandId ? `/b/${m.brandId}/${m.workspace || "_"}/m/${m.id}` : `/m/${m.id}`;
+                      onNavigate(url);
+                    }}
                   />
                 ))}
                 <button
@@ -656,11 +666,13 @@ function SlidePanel({
 
           {/* Bottom: trash */}
           <div style={{ flexShrink: 0, padding: "8px 8px 16px" }}>
-            <button style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
-              fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-            }}
+            <button
+              onClick={() => onNavigate("/trash")}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
+                fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
+              }}
               onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
               onMouseLeave={e => (e.currentTarget.style.background = "none")}
             >

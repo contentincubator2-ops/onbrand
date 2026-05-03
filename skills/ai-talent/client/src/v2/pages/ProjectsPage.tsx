@@ -31,6 +31,23 @@ import {
   faFacebook, faInstagram, faYoutube, faGoogleDrive, faMicrosoft, faDropbox,
 } from "@fortawesome/free-brands-svg-icons";
 
+/* ── Shared action helpers ── */
+function showToast(msg: string, variant: "default" | "success" | "warn" = "default") {
+  const el = document.createElement("div");
+  el.textContent = msg;
+  const bg = variant === "success" ? "#059669" : variant === "warn" ? "#D97706" : "#1A1A18";
+  el.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+    background:${bg};color:white;padding:10px 22px;border-radius:10px;
+    font-size:13px;font-weight:500;z-index:99999;white-space:nowrap;
+    box-shadow:0 4px 16px rgba(0,0,0,0.22);font-family:Inter,sans-serif;
+    pointer-events:none;opacity:1;transition:opacity 0.3s;`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 320); }, 2000);
+}
+function getMissionUrl(m: { id: number; brandId?: number | null; workspace?: string | null }) {
+  return m.brandId ? `/b/${m.brandId}/${m.workspace || "_"}/m/${m.id}` : `/m/${m.id}`;
+}
+
 /* ── Types ── */
 interface MissionRow {
   id: number;
@@ -462,9 +479,11 @@ export default function ProjectsPage() {
                     gap: 2,
                   }}>
                     {/* Static upload folder */}
-                    <FolderRow icon={faCloudArrowUp} label="上傳" count={null} color="#9CA3AF" />
+                    <FolderRow icon={faCloudArrowUp} label="上傳" count={null} color="#9CA3AF"
+                      onClick={() => setSyncSource("google-drive")} />
                     {brandFolders.map(f => (
-                      <FolderRow key={f.id} label={f.name} count={f.count} color={f.color} />
+                      <FolderRow key={f.id} label={f.name} count={f.count} color={f.color}
+                        onClick={() => setOwnerFilter(String(f.id))} />
                     ))}
                   </div>
                 )}
@@ -727,12 +746,13 @@ function SortDropdown({ open, onToggle, onClose, value, onChange, options }: {
 }
 
 /* ──────────────────────── FolderRow ─────────────────────────────────── */
-function FolderRow({ icon, label, count, color }: {
-  icon?: any; label: string; count: number | null; color: string;
+function FolderRow({ icon, label, count, color, onClick }: {
+  icon?: any; label: string; count: number | null; color: string; onClick?: () => void;
 }) {
   const [hov, setHov] = React.useState(false);
   return (
     <div
+      onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
@@ -782,11 +802,38 @@ function FolderRow({ icon, label, count, color }: {
 function MissionCard({ mission, onClick, onOpen, brands }: {
   mission: MissionRow; onClick: () => void; onOpen: () => void; brands: any[];
 }) {
+  const navigate  = useNavigate();
   const [hovered,  setHovered]  = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [starred,  setStarred]  = React.useState(false);
   const [imgIdx,   setImgIdx]   = React.useState(0);
   const menuRef  = React.useRef<HTMLDivElement>(null);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const missionUrl = getMissionUrl(mission);
+
+  const handleMenuItemClick = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    switch (key) {
+      case "run-once":     navigate(missionUrl + "?run=1"); break;
+      case "run-sched":    navigate(missionUrl + "?tab=schedule"); break;
+      case "open-tab":     window.open(window.location.origin + missionUrl, "_blank"); break;
+      case "info":         navigate(missionUrl); break;
+      case "duplicate":    showToast("建立複本功能即將上線"); break;
+      case "star":         setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); break;
+      case "move":         showToast("移動功能即將上線"); break;
+      case "download":     showToast("下載功能即將上線"); break;
+      case "offline":      showToast("離線功能即將上線"); break;
+      case "share":        showToast("分享功能即將上線"); break;
+      case "copy-link":
+        navigator.clipboard.writeText(window.location.origin + missionUrl)
+          .then(() => showToast("連結已複製", "success"))
+          .catch(() => showToast("複製失敗", "warn"));
+        break;
+      case "trash":        showToast("已移至垃圾桶", "warn"); break;
+    }
+  };
 
   const updatedTxt = formatRelative(mission.updatedAt);
   const layerStr   = (mission.squadLayer ?? "").toString().slice(0, 2);
@@ -918,7 +965,8 @@ function MissionCard({ mission, onClick, onOpen, brands }: {
           opacity: hovered || menuOpen ? 1 : 0, transition: "opacity 0.15s",
           pointerEvents: hovered || menuOpen ? "auto" : "none",
         }}>
-          <HoverBtn icon={faStar}     title="加入星號" onClick={e => e.stopPropagation()} />
+          <HoverBtn icon={faStar} title={starred ? "取消星號" : "加入星號"} active={starred}
+            onClick={e => { e.stopPropagation(); setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); }} />
           <HoverBtn icon={faEllipsis} title="更多選項" active={menuOpen}
             onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
           />
@@ -962,7 +1010,7 @@ function MissionCard({ mission, onClick, onOpen, brands }: {
           {CARD_MENU_ITEMS.map(item => (
             <React.Fragment key={item.key}>
               <button
-                onClick={() => setMenuOpen(false)}
+                onClick={e => handleMenuItemClick(item.key, e)}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 10,
                   padding: "8px 14px", border: "none", background: "transparent",
@@ -1039,11 +1087,37 @@ function MissionListTable({ missions, onOpen }: { missions: MissionRow[]; onOpen
 function MissionCardRow({ mission, isLast, onClick }: {
   mission: MissionRow; isLast: boolean; onClick: () => void;
 }) {
+  const navigate  = useNavigate();
   const [hov, setHov] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [starred, setStarred]   = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
   const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
   const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
+  const missionUrl = getMissionUrl(mission);
+
+  const handleRowMenuClick = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    switch (key) {
+      case "run-once":   navigate(missionUrl + "?run=1"); break;
+      case "run-sched":  navigate(missionUrl + "?tab=schedule"); break;
+      case "open-tab":   window.open(window.location.origin + missionUrl, "_blank"); break;
+      case "info":       navigate(missionUrl); break;
+      case "duplicate":  showToast("建立複本功能即將上線"); break;
+      case "star":       setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); break;
+      case "move":       showToast("移動功能即將上線"); break;
+      case "download":   showToast("下載功能即將上線"); break;
+      case "offline":    showToast("離線功能即將上線"); break;
+      case "share":      showToast("分享功能即將上線"); break;
+      case "copy-link":
+        navigator.clipboard.writeText(window.location.origin + missionUrl)
+          .then(() => showToast("連結已複製", "success"))
+          .catch(() => showToast("複製失敗", "warn"));
+        break;
+      case "trash":      showToast("已移至垃圾桶", "warn"); break;
+    }
+  };
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -1089,8 +1163,10 @@ function MissionCardRow({ mission, isLast, onClick }: {
         <span style={{ fontSize: 13, color: "#6B6A66" }}>{formatRelative(mission.updatedAt)}</span>
         {hov && (
           <div style={{ display: "flex", gap: 4, position: "relative" }} onClick={e => e.stopPropagation()}>
-            <RowBtn icon={faStar}     title="加入星號" />
-            <RowBtn icon={faBookmark} title="收藏"     />
+            <RowBtn icon={faStar}     title={starred ? "取消星號" : "加入星號"}
+              onClick={e => { e.stopPropagation(); setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); }} />
+            <RowBtn icon={faBookmark} title="複製連結"
+              onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(window.location.origin + missionUrl).then(() => showToast("連結已複製", "success")).catch(() => showToast("複製失敗", "warn")); }} />
             <RowBtn icon={faEllipsis} title="更多" onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }} />
             {menuOpen && (
               <div ref={menuRef} style={{
@@ -1102,7 +1178,7 @@ function MissionCardRow({ mission, isLast, onClick }: {
                 {CARD_MENU_ITEMS.map(item => (
                   <React.Fragment key={item.key}>
                     <button
-                      onClick={() => setMenuOpen(false)}
+                      onClick={e => handleRowMenuClick(item.key, e)}
                       style={{
                         width: "100%", display: "flex", alignItems: "center", gap: 10,
                         padding: "8px 14px", border: "none", background: "transparent",

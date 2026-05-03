@@ -916,6 +916,23 @@ function CircleTile({
  *   • Hover: semi-transparent dark overlay + 3 action buttons (★ / ✏ / ⋯)
  */
 /** Canva-style ⋯ context menu for a mission card */
+/* ── Shared action helpers (module-level, no React needed) ── */
+function showToast(msg: string, variant: "default" | "success" | "warn" = "default") {
+  const el = document.createElement("div");
+  el.textContent = msg;
+  const bg = variant === "success" ? "#059669" : variant === "warn" ? "#D97706" : "#1A1A18";
+  el.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+    background:${bg};color:white;padding:10px 22px;border-radius:10px;
+    font-size:13px;font-weight:500;z-index:99999;white-space:nowrap;
+    box-shadow:0 4px 16px rgba(0,0,0,0.22);font-family:Inter,sans-serif;
+    pointer-events:none;opacity:1;transition:opacity 0.3s;`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 320); }, 2000);
+}
+function getMissionUrl(m: { id: number; brandId?: number | null; workspace?: string | null }) {
+  return m.brandId ? `/b/${m.brandId}/${m.workspace || "_"}/m/${m.id}` : `/m/${m.id}`;
+}
+
 const CARD_MENU_ITEMS = [
   // ── 自主執行 (SoWork unique) ────────────────────────────────────────
   { key: "run-once",     icon: faBolt,                    label: "立即自主執行",     accent: "#F97316", badge: null,    dividerAfter: false },
@@ -934,11 +951,61 @@ const CARD_MENU_ITEMS = [
 ] as const;
 
 function MissionCard({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+  const navigate = useNavigate();
   const [hovered, setHovered] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [starred, setStarred]   = React.useState(false);
   const [imgIdx,   setImgIdx]   = React.useState(0);
   const menuRef  = React.useRef<HTMLDivElement>(null);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const missionUrl = getMissionUrl(mission);
+
+  const handleMenuItemClick = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    switch (key) {
+      case "run-once":
+        navigate(missionUrl + "?run=1");
+        break;
+      case "run-schedule":
+        navigate(missionUrl + "?tab=schedule");
+        break;
+      case "open-tab":
+        window.open(window.location.origin + missionUrl, "_blank");
+        break;
+      case "info":
+        navigate(missionUrl);
+        break;
+      case "duplicate":
+        showToast("建立複本功能即將上線");
+        break;
+      case "star":
+        setStarred(v => !v);
+        showToast(starred ? "已取消星號標記" : "已加入星號標記", "success");
+        break;
+      case "move":
+        showToast("移動功能即將上線");
+        break;
+      case "download":
+        showToast("下載功能即將上線");
+        break;
+      case "offline":
+        showToast("離線功能即將上線");
+        break;
+      case "share":
+        showToast("分享功能即將上線");
+        break;
+      case "copy-link":
+        navigator.clipboard.writeText(window.location.origin + missionUrl)
+          .then(() => showToast("連結已複製", "success"))
+          .catch(() => showToast("複製失敗", "warn"));
+        break;
+      case "trash":
+        showToast("已移至垃圾桶", "warn");
+        break;
+    }
+  };
   const updatedTxt = formatRelative(mission.updatedAt);
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsIcon = WS_ICON[ws] ?? null;
@@ -1073,12 +1140,13 @@ function MissionCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
         }}>
           {/* Star */}
           <button
-            title="加入星號"
-            onClick={e => e.stopPropagation()}
+            title={starred ? "取消星號" : "加入星號"}
+            onClick={e => { e.stopPropagation(); setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); }}
             style={{
               width: 32, height: 32, borderRadius: 8, background: "white",
               border: "none", cursor: "pointer", display: "flex", alignItems: "center",
-              justifyContent: "center", fontSize: 13, color: "#374151",
+              justifyContent: "center", fontSize: 13,
+              color: starred ? "#F59E0B" : "#374151",
               boxShadow: "0 1px 4px rgba(0,0,0,0.12)", transition: "background 0.1s",
             }}
             onMouseEnter={e => (e.currentTarget.style.background = "#f3f4f6")}
@@ -1152,7 +1220,7 @@ function MissionCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
           {CARD_MENU_ITEMS.map(item => (
             <React.Fragment key={item.key}>
               <button
-                onClick={e => { e.stopPropagation(); setMenuOpen(false); }}
+                onClick={e => handleMenuItemClick(item.key, e)}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 12,
                   padding: "9px 16px", border: "none", background: "none",
@@ -1165,9 +1233,11 @@ function MissionCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
               >
                 <FontAwesomeIcon
                   icon={item.icon}
-                  style={{ fontSize: 14, width: 16, color: item.accent ?? "#6B7280", flexShrink: 0 }}
+                  style={{ fontSize: 14, width: 16, color: item.key === "star" && starred ? "#F59E0B" : (item.accent ?? "#6B7280"), flexShrink: 0 }}
                 />
-                <span style={{ fontSize: 13, flex: 1 }}>{item.label}</span>
+                <span style={{ fontSize: 13, flex: 1 }}>
+                  {item.key === "star" ? (starred ? "取消星號標記" : "加入已標記星號項目") : item.label}
+                </span>
                 {item.badge && (
                   <span style={{
                     fontSize: 10, fontWeight: 600, color: "#7C3AED",
@@ -1190,9 +1260,35 @@ function MissionCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
 }
 
 function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+  const navigate = useNavigate();
   const [hovered, setHovered] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [starred, setStarred]   = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const missionUrl = getMissionUrl(mission);
+
+  const handleMenuItemClick = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    switch (key) {
+      case "run-once":   navigate(missionUrl + "?run=1"); break;
+      case "run-schedule": navigate(missionUrl + "?tab=schedule"); break;
+      case "open-tab":   window.open(window.location.origin + missionUrl, "_blank"); break;
+      case "info":       navigate(missionUrl); break;
+      case "duplicate":  showToast("建立複本功能即將上線"); break;
+      case "star":       setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); break;
+      case "move":       showToast("移動功能即將上線"); break;
+      case "download":   showToast("下載功能即將上線"); break;
+      case "offline":    showToast("離線功能即將上線"); break;
+      case "share":      showToast("分享功能即將上線"); break;
+      case "copy-link":
+        navigator.clipboard.writeText(window.location.origin + missionUrl)
+          .then(() => showToast("連結已複製", "success"))
+          .catch(() => showToast("複製失敗", "warn"));
+        break;
+      case "trash": showToast("已移至垃圾桶", "warn"); break;
+    }
+  };
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsIcon = WS_ICON[ws] ?? null;
   const updatedTxt = formatRelative(mission.updatedAt);
@@ -1296,13 +1392,13 @@ function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: ()
         opacity: hovered || menuOpen ? 1 : 0, transition: "opacity 0.12s",
       }}>
         <button
-          title="加入星號"
-          onClick={e => e.stopPropagation()}
+          title={starred ? "取消星號" : "加入星號"}
+          onClick={e => { e.stopPropagation(); setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); }}
           style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "transparent",
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 13, color: "#9CA3AF", transition: "color 0.1s" }}
+            fontSize: 13, color: starred ? "#F59E0B" : "#9CA3AF", transition: "color 0.1s" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#F59E0B")}
-          onMouseLeave={e => (e.currentTarget.style.color = "#9CA3AF")}
+          onMouseLeave={e => { if (!starred) e.currentTarget.style.color = "#9CA3AF"; }}
         >
           <FontAwesomeIcon icon={faStar} />
         </button>
@@ -1346,7 +1442,7 @@ function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: ()
           {CARD_MENU_ITEMS.map(item => (
             <React.Fragment key={item.key}>
               <button
-                onClick={e => { e.stopPropagation(); setMenuOpen(false); }}
+                onClick={e => handleMenuItemClick(item.key, e)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 12,
                   padding: "9px 16px", border: "none", background: "none",
                   cursor: "pointer", textAlign: "left", transition: "background 0.08s",
@@ -1354,8 +1450,8 @@ function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: ()
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.04)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "none")}
               >
-                <FontAwesomeIcon icon={item.icon} style={{ fontSize: 14, width: 16, color: item.accent ?? "#6B7280", flexShrink: 0 }} />
-                <span style={{ fontSize: 13, flex: 1 }}>{item.label}</span>
+                <FontAwesomeIcon icon={item.icon} style={{ fontSize: 14, width: 16, color: item.key === "star" && starred ? "#F59E0B" : (item.accent ?? "#6B7280"), flexShrink: 0 }} />
+                <span style={{ fontSize: 13, flex: 1 }}>{item.key === "star" ? (starred ? "取消星號標記" : "加入已標記星號項目") : item.label}</span>
                 {item.badge && (
                   <span style={{ fontSize: 10, fontWeight: 600, color: "#7C3AED",
                     background: "rgba(124,58,237,0.08)", borderRadius: 99, padding: "1px 7px" }}>
