@@ -311,8 +311,9 @@ export default function MissionsHome() {
       .slice(0, selectedLayer === "ALL" ? 12 : 24);
   }, [allEntities, kindFilter, selectedLayer, searchQ, semanticHits]);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
-  const [sortDesc, setSortDesc] = useState(true);
+  const [ownerFilter, setOwnerFilter] = useState<"any" | "shared" | "mine">("any");
+  const [typeFilter, setTypeFilter]   = useState<"any" | "squad" | "agent" | "skill">("any");
+  const [sortMode,   setSortMode]     = useState<"recent" | "asc" | "desc">("recent");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   /** CreateTaskModal — open workspace key, null = closed */
   const [modalWorkspace, setModalWorkspace] = useState<string | null>(null);
@@ -346,12 +347,15 @@ export default function MissionsHome() {
       });
     }
     r = [...r].sort((a, b) => {
+      if (sortMode === "asc") return (a.title ?? "").localeCompare(b.title ?? "", "zh-Hant");
+      if (sortMode === "desc") return (b.title ?? "").localeCompare(a.title ?? "", "zh-Hant");
+      // recent
       const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return sortDesc ? tb - ta : ta - tb;
+      return tb - ta;
     });
     return r;
-  }, [rows, searchQ, sortDesc, activeCategory, activeContentType]);
+  }, [rows, searchQ, sortMode, activeCategory, activeContentType]);
 
   // Type (kind) dropdown options
   const kindOptions = useMemo(() => ([
@@ -610,29 +614,28 @@ export default function MissionsHome() {
               <span className="text-small font-normal text-default-400">({filteredRows.length})</span>
             )}
           </h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            <FilterChip
-              label={ownerFilter === "mine" ? "擁有者・我的" : "擁有者・全部"}
-              options={[
-                { value: "mine", label: "我的" },
-                { value: "all", label: "全部" },
-              ]}
-              onSelect={(v) => setOwnerFilter(v as "mine" | "all")}
-            />
-            <FilterChip
-              label={sortDesc ? "已修改日期・新→舊" : "已修改日期・舊→新"}
-              options={[
-                { value: "desc", label: "新→舊" },
-                { value: "asc", label: "舊→新" },
-              ]}
-              onSelect={(v) => setSortDesc(v === "desc")}
-            />
-            <IconButton
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* 擁有者 pill */}
+            <OwnerFilterPill value={ownerFilter} onChange={setOwnerFilter} />
+            {/* 任何類型 pill */}
+            <TypeFilterPill value={typeFilter} onChange={setTypeFilter} />
+            {/* 排序 ↑↓ icon */}
+            <SortFilterPill value={sortMode} onChange={setSortMode} />
+            {/* Grid / List toggle */}
+            <button
               title={viewMode === "grid" ? "切換為列表" : "切換為網格"}
-              onClick={() => setViewMode((v) => (v === "grid" ? "list" : "grid"))}
+              onClick={() => setViewMode(v => v === "grid" ? "list" : "grid")}
+              style={{
+                width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)",
+                background: "white", cursor: "pointer", display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: 13, color: "#374151",
+                transition: "background 0.1s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f3f4f6")}
+              onMouseLeave={e => (e.currentTarget.style.background = "white")}
             >
               <FontAwesomeIcon icon={viewMode === "grid" ? faList : faTableCells} />
-            </IconButton>
+            </button>
           </div>
         </div>
 
@@ -666,13 +669,25 @@ export default function MissionsHome() {
             ))}
           </div>
         ) : (
-          <Card shadow="none" className="border border-divider overflow-hidden">
-            <div className="flex flex-col divide-y divide-divider">
-              {filteredRows.map((m) => (
-                <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
-              ))}
+          <div style={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.08)", overflow: "hidden", background: "white" }}>
+            {/* Table header */}
+            <div style={{
+              display: "flex", alignItems: "center", padding: "0 16px",
+              height: 40, borderBottom: "1px solid rgba(0,0,0,0.08)",
+              background: "rgba(248,248,250,0.8)",
+            }}>
+              <div style={{ width: 40, flexShrink: 0 }} />
+              <div style={{ width: 40, flexShrink: 0, marginRight: 12 }} />
+              <div style={{ flex: "1 1 0", fontSize: 12, fontWeight: 600, color: "#6B7280" }}>名稱</div>
+              <div style={{ width: 120, flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#6B7280", marginRight: 16 }}>擁有者</div>
+              <div style={{ width: 140, flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#6B7280", marginRight: 16 }}>類型</div>
+              <div style={{ width: 100, flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#6B7280" }}>最近一次編輯：</div>
+              <div style={{ width: 64, flexShrink: 0 }} />
             </div>
-          </Card>
+            {filteredRows.map((m) => (
+              <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
+            ))}
+          </div>
         )}
       </section>
 
@@ -1092,40 +1107,185 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
 }
 
 function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
-  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
-  const tone = LAYER_TOKENS[lk];
+  const [hovered, setHovered] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
   const ws = (mission.workspace ?? "").toLowerCase();
-  const wsBadge = WORKSPACE_BADGE[ws] ?? null;
+  const wsIcon = WS_ICON[ws] ?? null;
+  const updatedTxt = formatRelative(mission.updatedAt);
+  const typeLabel = ws
+    ? (WORKSPACE_BADGE[ws]
+        ? ws.charAt(0).toUpperCase() + ws.slice(1)
+        : ws)
+    : "任務";
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [menuOpen]);
+
   return (
-    <Card
-      isPressable
-      onPress={onClick}
-      shadow="none"
-      radius="none"
-      className="flex flex-row items-center gap-4 px-4 py-3 bg-transparent data-[hover=true]:bg-default-100 transition text-left w-full"
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 0,
+        padding: "0 16px",
+        background: hovered || menuOpen ? "rgba(64,79,109,0.04)" : "white",
+        transition: "background 0.1s",
+        cursor: "pointer",
+        borderBottom: "1px solid rgba(0,0,0,0.06)",
+        minHeight: 56, position: "relative",
+      }}
     >
-      <div className="shrink-0 w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-default-100">
-        <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={36} />
+      {/* Checkbox */}
+      <div style={{
+        width: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        opacity: hovered || menuOpen ? 1 : 0, transition: "opacity 0.12s",
+      }}>
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            width: 16, height: 16, borderRadius: 4, border: "1.5px solid #9CA3AF",
+            background: "white", cursor: "pointer",
+          }}
+        />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-small font-medium truncate">{mission.title}</p>
-        <div className="mt-0.5 flex items-center gap-2 text-tiny text-default-500">
-          <Chip size="sm" color={tone.heroColor} variant="flat">{lk}</Chip>
-          {wsBadge && <span className="capitalize">{ws}</span>}
-          <span>·</span>
-          <span>{formatRelative(mission.updatedAt)}</span>
+
+      {/* Thumbnail icon */}
+      <div style={{
+        width: 40, height: 40, borderRadius: 8, flexShrink: 0, marginRight: 12,
+        background: "rgba(64,79,109,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {wsIcon ? (
+          <FontAwesomeIcon icon={wsIcon.icon} style={{ fontSize: 18, color: wsIcon.bg, opacity: 0.7 }} />
+        ) : (
+          <span style={{ fontSize: 16, fontWeight: 700, color: "rgba(64,79,109,0.4)" }}>
+            {(mission.title ?? "M").trim().slice(0, 1).toUpperCase()}
+          </span>
+        )}
+      </div>
+
+      {/* 名稱 — flex-1 */}
+      <div style={{ flex: "1 1 0", minWidth: 0, marginRight: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{
+            fontSize: 13, fontWeight: 500, color: "#111827",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {mission.title}
+          </span>
+          {(hovered || menuOpen) && (
+            <FontAwesomeIcon icon={faPen} style={{ fontSize: 11, color: "#9CA3AF", flexShrink: 0 }} />
+          )}
         </div>
       </div>
-      {wsBadge && (
-        <Avatar
-          name={wsBadge.glyph}
-          size="sm"
-          className="shrink-0 w-5 h-5 text-tiny"
-          style={{ background: wsBadge.color, color: "white" }}
-        />
+
+      {/* 擁有者 col */}
+      <div style={{ width: 120, flexShrink: 0, fontSize: 13, color: "#6B7280", marginRight: 16 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <FontAwesomeIcon icon={faLink} style={{ fontSize: 10, opacity: 0.5 }} />
+          Private
+        </span>
+      </div>
+
+      {/* 類型 col */}
+      <div style={{ width: 140, flexShrink: 0, fontSize: 13, marginRight: 16 }}>
+        <span style={{ color: wsIcon ? wsIcon.bg : "#6B7280" }}>
+          {typeLabel}
+        </span>
+      </div>
+
+      {/* 最近一次編輯 col */}
+      <div style={{ width: 100, flexShrink: 0, fontSize: 13, color: hovered || menuOpen ? "#111827" : "#6B7280" }}>
+        {updatedTxt}
+      </div>
+
+      {/* Row actions — ⭐ + ⋯ */}
+      <div style={{
+        display: "flex", gap: 4, alignItems: "center", flexShrink: 0, marginLeft: 8,
+        opacity: hovered || menuOpen ? 1 : 0, transition: "opacity 0.12s",
+      }}>
+        <button
+          title="加入星號"
+          onClick={e => e.stopPropagation()}
+          style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "transparent",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 13, color: "#9CA3AF", transition: "color 0.1s" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "#F59E0B")}
+          onMouseLeave={e => (e.currentTarget.style.color = "#9CA3AF")}
+        >
+          <FontAwesomeIcon icon={faStar} />
+        </button>
+        <button
+          title="更多選項"
+          onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+          style={{ width: 28, height: 28, borderRadius: 6, border: "none",
+            background: menuOpen ? "rgba(0,0,0,0.06)" : "transparent",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 13, color: "#6B7280", transition: "background 0.1s" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.06)")}
+          onMouseLeave={e => { if (!menuOpen) e.currentTarget.style.background = "transparent"; }}
+        >
+          <FontAwesomeIcon icon={faEllipsis} />
+        </button>
+      </div>
+
+      {/* Context menu panel (slides from right, same items as MissionThumb) */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "absolute", top: 0, right: 48, zIndex: 200,
+            background: "white", borderRadius: 12,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08)",
+            minWidth: 224, padding: "6px 0",
+            animation: "fadeInDown 0.12s ease-out",
+          }}
+        >
+          <div style={{ padding: "10px 16px 8px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", flex: 1,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {mission.title}
+              </span>
+              <FontAwesomeIcon icon={faPen} style={{ fontSize: 11, color: "#6B7280", cursor: "pointer" }} />
+            </div>
+            <p style={{ fontSize: 11, color: "#9CA3AF", margin: "2px 0 0" }}>{updatedTxt}</p>
+          </div>
+          {CARD_MENU_ITEMS.map(item => (
+            <React.Fragment key={item.key}>
+              <button
+                onClick={e => { e.stopPropagation(); setMenuOpen(false); }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12,
+                  padding: "9px 16px", border: "none", background: "none",
+                  cursor: "pointer", textAlign: "left", transition: "background 0.08s",
+                  color: item.accent ?? "#111827" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.04)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "none")}
+              >
+                <FontAwesomeIcon icon={item.icon} style={{ fontSize: 14, width: 16, color: item.accent ?? "#6B7280", flexShrink: 0 }} />
+                <span style={{ fontSize: 13, flex: 1 }}>{item.label}</span>
+                {item.badge && (
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#7C3AED",
+                    background: "rgba(124,58,237,0.08)", borderRadius: 99, padding: "1px 7px" }}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+              {item.dividerAfter && <div style={{ height: 1, background: "rgba(0,0,0,0.07)", margin: "4px 0" }} />}
+            </React.Fragment>
+          ))}
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -1156,48 +1316,228 @@ const WS_ICON: Record<string, { icon: any; bg: string; fg: string }> = {
   "brand-positioning":{ icon: faRocket,     bg: "#5B3CC8", fg: "#ffffff" },
 };
 
-/* ─────────────────────────── Filter chip + Icon button ─────────────── */
+/* ─────────────────────────── Canva Filter Pills ─────────────────────── */
 
-function FilterChip({
-  label, options, onClick, onSelect,
-}: {
-  label: string;
-  options?: Array<{ value: string; label: string }>;
-  onClick?: () => void;
-  onSelect?: (v: string) => void;
+/** Shared pill button style */
+function pillStyle(active: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    padding: "0 12px", height: 32, borderRadius: 9999,
+    fontSize: 13, fontWeight: 500, cursor: "pointer",
+    border: active ? "1.5px solid #7C3AED" : "1px solid rgba(0,0,0,0.15)",
+    background: active ? "rgba(124,58,237,0.06)" : "white",
+    color: active ? "#7C3AED" : "#374151",
+    transition: "border 0.1s, color 0.1s, background 0.1s",
+    whiteSpace: "nowrap" as const,
+  };
+}
+
+/** Generic dropdown wrapper used by all three pills */
+function PillDropdown({
+  trigger, children, open, onClose,
+}: { trigger: React.ReactNode; children: React.ReactNode; open: boolean; onClose: () => void }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open, onClose]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {trigger}
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 300,
+          background: "white", borderRadius: 12, minWidth: 220,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.13), 0 1px 4px rgba(0,0,0,0.07)",
+          padding: "6px 0", animation: "fadeInDown 0.12s ease-out",
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropdownRow({
+  label, icon, checked, onClick,
+}: { label: string; icon?: React.ReactNode; checked?: boolean; onClick: () => void }) {
+  const [hov, setHov] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 12,
+        padding: "8px 16px", border: "none", background: hov ? "rgba(0,0,0,0.04)" : "none",
+        cursor: "pointer", textAlign: "left",
+      }}
+    >
+      <span style={{ width: 20, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 14, color: "#6B7280", flexShrink: 0 }}>
+        {icon}
+      </span>
+      <span style={{ flex: 1, fontSize: 13, color: "#111827" }}>{label}</span>
+      {checked && <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 12, color: "#7C3AED", transform: "rotate(-90deg)" }} />}
+    </button>
+  );
+}
+
+function OwnerFilterPill({
+  value, onChange,
+}: { value: "any" | "shared" | "mine"; onChange: (v: "any" | "shared" | "mine") => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const labelMap = { any: "擁有者", shared: "與你分享", mine: "SoWork（你）" };
+  const active = value !== "any";
+  const options: Array<{ value: "any" | "shared" | "mine"; label: string; icon: React.ReactNode }> = [
+    { value: "any",    label: "任何擁有者",  icon: <FontAwesomeIcon icon={faUsers} /> },
+    { value: "shared", label: "與你分享",    icon: <FontAwesomeIcon icon={faShareNodes} /> },
+    { value: "mine",   label: "SoWork（你）", icon: <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#6B7280", color: "white", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>S</span> },
+  ];
+  return (
+    <PillDropdown
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <button style={pillStyle(active)} onClick={() => setOpen(v => !v)}>
+          {labelMap[value]}
+          <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 10 }} />
+        </button>
+      }
+    >
+      {/* Search */}
+      <div style={{ padding: "8px 12px 4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+          border: "1.5px solid #7C3AED", borderRadius: 8, background: "white" }}>
+          <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: 12, color: "#9CA3AF" }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="搜尋擁有者"
+            style={{ border: "none", outline: "none", fontSize: 13, color: "#111827", flex: 1, background: "transparent" }}
+          />
+        </div>
+      </div>
+      {options
+        .filter(o => !search || o.label.includes(search))
+        .map(o => (
+          <DropdownRow
+            key={o.value}
+            label={o.label}
+            icon={o.icon}
+            checked={value === o.value}
+            onClick={() => { onChange(o.value); setOpen(false); }}
+          />
+        ))
+      }
+    </PillDropdown>
+  );
+}
+
+function TypeFilterPill({
+  value, onChange,
+}: { value: "any" | "squad" | "agent" | "skill"; onChange: (v: "any" | "squad" | "agent" | "skill") => void }) {
+  const [open, setOpen] = React.useState(false);
+  const labelMap = { any: "任何類型", squad: "小組", agent: "Agent", skill: "技能" };
+  const active = value !== "any";
+  const options: Array<{ value: "any" | "squad" | "agent" | "skill"; label: string; icon: React.ReactNode }> = [
+    { value: "any",   label: "任何類型", icon: <FontAwesomeIcon icon={faTableCells} /> },
+    { value: "squad", label: "小組",    icon: <FontAwesomeIcon icon={faUsers} /> },
+    { value: "agent", label: "Agent",   icon: <FontAwesomeIcon icon={faBolt} /> },
+    { value: "skill", label: "技能",    icon: <FontAwesomeIcon icon={faWandSparkles} /> },
+  ];
+  return (
+    <PillDropdown
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <button style={pillStyle(active)} onClick={() => setOpen(v => !v)}>
+          {labelMap[value]}
+          <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 10 }} />
+        </button>
+      }
+    >
+      {options.map(o => (
+        <DropdownRow
+          key={o.value}
+          label={o.label}
+          icon={o.icon}
+          checked={value === o.value}
+          onClick={() => { onChange(o.value); setOpen(false); }}
+        />
+      ))}
+    </PillDropdown>
+  );
+}
+
+function SortFilterPill({
+  value, onChange,
+}: { value: "recent" | "asc" | "desc"; onChange: (v: "recent" | "asc" | "desc") => void }) {
+  const [open, setOpen] = React.useState(false);
+  const active = value !== "recent";
+  const options: Array<{ value: "recent" | "asc" | "desc"; label: string; icon: React.ReactNode }> = [
+    { value: "recent", label: "上一個活動", icon: <FontAwesomeIcon icon={faCalendarDays} /> },
+    { value: "asc",    label: "依字母（A-Z）", icon: <FontAwesomeIcon icon={faArrowDownWideShort} /> },
+    { value: "desc",   label: "依字母（Z-A）", icon: <FontAwesomeIcon icon={faArrowUpWideShort} /> },
+  ];
+  return (
+    <PillDropdown
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <button
+          title="排序"
+          style={{
+            width: 32, height: 32, borderRadius: 8,
+            border: active ? "1.5px solid #7C3AED" : "1px solid rgba(0,0,0,0.15)",
+            background: active ? "rgba(124,58,237,0.06)" : "white",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, color: active ? "#7C3AED" : "#374151",
+            transition: "border 0.1s, color 0.1s",
+          }}
+          onClick={() => setOpen(v => !v)}
+        >
+          <FontAwesomeIcon icon={faArrowDownWideShort} />
+        </button>
+      }
+    >
+      {options.map(o => (
+        <DropdownRow
+          key={o.value}
+          label={o.label}
+          icon={o.icon}
+          checked={value === o.value}
+          onClick={() => { onChange(o.value); setOpen(false); }}
+        />
+      ))}
+    </PillDropdown>
+  );
+}
+
+/** @deprecated kept for any remaining references */
+function FilterChip({ label, options, onClick, onSelect }: {
+  label: string; options?: Array<{ value: string; label: string }>;
+  onClick?: () => void; onSelect?: (v: string) => void;
 }) {
-  const chevron = <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />;
-
-  if (!options) {
-    return (
-      <Button size="sm" radius="full" variant="bordered" onPress={onClick} endContent={chevron}>
-        {label}
-      </Button>
-    );
-  }
-
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
-        <Button size="sm" radius="full" variant="bordered" endContent={chevron} className="capitalize">
+        <Button size="sm" radius="full" variant="bordered" endContent={<FontAwesomeIcon icon={faChevronDown} />}>
           {label}
         </Button>
       </DropdownTrigger>
-      <DropdownMenu
-        aria-label={label}
-        onAction={(key) => onSelect?.(String(key))}
-      >
-        {options.map((o) => (
-          <DropdownItem key={o.value} className="capitalize">{o.label}</DropdownItem>
-        ))}
+      <DropdownMenu aria-label={label} onAction={(key) => onSelect?.(String(key))}>
+        {(options ?? []).map(o => <DropdownItem key={o.value}>{o.label}</DropdownItem>)}
       </DropdownMenu>
     </Dropdown>
   );
 }
-
-function IconButton({
-  title, onClick, children,
-}: { title: string; onClick: () => void; children: React.ReactNode }) {
+function IconButton({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <Tooltip content={title}>
       <Button isIconOnly size="sm" radius="full" variant="bordered" onPress={onClick} aria-label={title}>
