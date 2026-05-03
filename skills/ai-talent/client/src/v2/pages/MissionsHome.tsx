@@ -411,11 +411,15 @@ export default function MissionsHome() {
     <main>
       {/* ─── Hero ─── */}
       <section
-        className="relative px-8 pt-12 pb-10 border-b border-divider overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 60%, #3d1a8e 100%)" }}
+        className="relative px-8 pt-12 pb-10 overflow-hidden"
+        style={{
+          backgroundImage: [
+            "linear-gradient(to bottom, transparent 70%, rgb(252,251,254) 100%)",
+            "linear-gradient(rgba(255,255,255,0.93), rgba(255,255,255,0.93))",
+            "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 60%, #3d1a8e 100%)",
+          ].join(", "),
+        }}
       >
-        {/* ③ Very light white overlay — near-white, low saturation */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(255,255,255,0.93)" }} />
 
         <div className="relative z-10 flex flex-col items-center text-center">
           {/* Top-right action buttons */}
