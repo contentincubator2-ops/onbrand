@@ -10,13 +10,13 @@ jobs:
     steps:
       - uses: appleboy/ssh-action@v1.0.3
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 600s
-          envs: GH_PAT
+          envs: GH_TOKEN
           script: |
             set -e
             APP=/opt/marketing-os/app
@@ -24,8 +24,8 @@ jobs:
 
             echo "===== 1. Pull latest code ====="
             cd "$APP"
-            # Inject token for this fetch only (not stored permanently)
-            git -c "url.https://x-access-token:${GH_PAT}@github.com/.insteadOf=https://github.com/" \
+            # Use token-authenticated URL for this fetch only (not stored permanently)
+            git -c "url.https://x-access-token:${GH_TOKEN}@github.com/.insteadOf=https://github.com/" \
               fetch origin main
             git reset --hard origin/main
             echo "Commit: $(git log --oneline -1)"
