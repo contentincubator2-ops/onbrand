@@ -1811,9 +1811,7 @@ function FeedbackPanel({
   const [tab, setTab] = useState<"strategy" | "copy" | "visual">("strategy");
   const [input, setInput] = useState("");
   const [notes, setNotes] = useState<Array<{ tab: string; text: string; ts: string }>>([]);
-  const saveNote = (trpc as any).feedback?.saveNote?.useMutation
-    ? (trpc as any).feedback.saveNote.useMutation()
-    : { mutateAsync: async () => null };;
+  const saveNote = trpc.feedback.saveNote.useMutation();
 
   const confirmedCount = Array.from(progressByOrd.values()).filter((p: any) => p?.status === "confirmed").length;
   const pct = steps.length ? (confirmedCount / steps.length) * 100 : 0;
