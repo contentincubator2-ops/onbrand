@@ -131,7 +131,7 @@ async function fetchSquads(ids: number[]): Promise<any[]> {
     ids
   );
   const map = new Map(rows.map((r: any) => [Number(r.id), r]));
-  return ids.map((id) => map.get(id)).filter(Boolean).map((r) => ({ ...r, kind: "squad" }));
+  return ids.map((id) => map.get(id)).filter((r): r is any => !!r).map((r) => ({ ...r, kind: "squad" }));
 }
 
 async function fetchAgents(ids: number[]): Promise<any[]> {
@@ -143,7 +143,7 @@ async function fetchAgents(ids: number[]): Promise<any[]> {
     ids
   );
   const map = new Map(rows.map((r: any) => [Number(r.id), r]));
-  return ids.map((id) => map.get(id)).filter(Boolean).map((r) => ({ ...r, kind: "agent" }));
+  return ids.map((id) => map.get(id)).filter((r): r is any => !!r).map((r) => ({ ...r, kind: "agent" }));
 }
 
 async function fetchSkills(ids: number[]): Promise<any[]> {
@@ -155,7 +155,7 @@ async function fetchSkills(ids: number[]): Promise<any[]> {
     ids
   );
   const map = new Map(rows.map((r: any) => [Number(r.id), r]));
-  return ids.map((id) => map.get(id)).filter(Boolean).map((r) => ({ ...r, kind: "skill" }));
+  return ids.map((id) => map.get(id)).filter((r): r is any => !!r).map((r) => ({ ...r, kind: "skill" }));
 }
 
 // ── Main search route ─────────────────────────────────────────────────────────
