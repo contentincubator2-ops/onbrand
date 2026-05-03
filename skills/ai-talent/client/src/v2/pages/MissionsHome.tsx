@@ -69,59 +69,89 @@ interface QuickTile {
   missionTitle: string;
   missionDesc: string;
   squadSlug?: string;
+  /** For agent/skill tiles: the agent/skill slug to deep-link in methodology catalog. */
+  agentSlug?: string;
   workspace?: string;
+  /** Entity kind — drives routing: squad→picker, agent/skill→methodology catalog */
+  kind?: "squad" | "agent" | "skill";
   isMore?: boolean;
   /** Open CreateMethodologyModal instead of creating a mission. */
   opensIngest?: SourceId;
 }
 
 const QUICK_TILES: QuickTile[] = [
-  { icon: faFacebookF, label: "Facebook", layer: "L4",
-    missionTitle: "Facebook 月度經營計畫",
-    missionDesc: "為品牌規劃下一個月的 Facebook 內容主軸、貼文節奏與互動策略。",
-    workspace: "facebook" },
-  { icon: faInstagram, label: "Instagram", layer: "L4",
-    missionTitle: "Instagram 圖文系列企劃",
-    missionDesc: "規劃 Instagram 連續貼文系列：視覺主題、文案結構、Hashtag、限動延伸。",
-    workspace: "instagram" },
-  { icon: faLinkedinIn, label: "LinkedIn", layer: "L4",
-    missionTitle: "LinkedIn 個人品牌經營",
-    missionDesc: "以創辦人視角產出 B2B 思想領袖內容，建立信任與商機。",
-    workspace: "linkedin" },
-  { icon: faYoutube, label: "YouTube", layer: "L4",
-    missionTitle: "YouTube 頻道內容企劃",
-    missionDesc: "規劃 YouTube 頻道主題、長影片企劃與短影音延伸。",
-    workspace: "youtube" },
-  { icon: faBullseye, label: "品牌定位", layer: "L1", badge: "推薦",
-    missionTitle: "品牌定位重塑（12 原型）",
-    missionDesc: "用 Carol Pearson 12 原型任務範本梳理品牌個性與市場立足點。",
-    squadSlug: "brand-archetype-positioning",
-    workspace: "brand-positioning" },
-  { icon: faRocket, label: "新品上市", layer: "L5",
-    missionTitle: "新品上市發表計畫",
-    missionDesc: "依 Jeff Walker Product Launch Formula，規劃 4 階段發表節奏。",
-    squadSlug: "plf-launch-formula",
-    workspace: "campaign" },
-  { icon: faUsers, label: "受眾分析", layer: "L3",
-    missionTitle: "受眾洞察與分群",
-    missionDesc: "用 STP 與 Persona Canvas 產出可操作的受眾分群與訊息切入。",
-    workspace: "audience" },
-  { icon: faNewspaper, label: "公關", layer: "L4",
-    missionTitle: "公關媒體曝光計畫",
-    missionDesc: "規劃 PR 故事框架、新聞稿節奏與媒體名單。",
-    workspace: "pr" },
-  { icon: faEnvelope, label: "電子報", layer: "L4",
-    missionTitle: "電子報內容規劃",
-    missionDesc: "建立電子報主題曲線、開信率優化與訂閱者分眾。",
-    workspace: "email" },
-  { icon: faPlus, label: "自訂任務",
-    missionTitle: "", missionDesc: "" },
-  { icon: faCloudArrowUp, label: "上傳",
-    missionTitle: "", missionDesc: "",
-    opensIngest: "upload" },
-  { icon: faEllipsis, label: "顯示更多",
-    missionTitle: "", missionDesc: "",
-    isMore: true },
+  // ── Facebook × 2 ─────────────────────────────────────────────────────
+  {
+    icon: faFacebookF, label: "FB 月行事曆", layer: "L4",
+    kind: "squad", badge: "推薦",
+    missionTitle: "Facebook 月內容行事曆",
+    missionDesc: "以 Joe Pulizzi 內容支柱框架，規劃下個月的 Facebook 貼文主題、節奏與互動策略。",
+    squadSlug: "fb-monthly-calendar-pulizzi",
+    workspace: "facebook",
+  },
+  {
+    icon: faFacebookF, label: "FB 文案師", layer: "L4",
+    kind: "agent",
+    missionTitle: "Facebook 廣告文案師",
+    missionDesc: "由 AI 文案師依品牌語氣產出 Facebook 廣告標題、貼文與 CTA。",
+    agentSlug: "fb-brief-writer",
+    workspace: "facebook",
+  },
+  // ── Instagram × 2 ────────────────────────────────────────────────────
+  {
+    icon: faInstagram, label: "IG 月行事曆", layer: "L4",
+    kind: "squad",
+    missionTitle: "Instagram 月行事曆規劃",
+    missionDesc: "依 Pulizzi 內容支柱框架，規劃 Instagram 月度貼文主題、Hashtag 策略與限動延伸。",
+    squadSlug: "ig-monthly-calendar-pulizzi",
+    workspace: "instagram",
+  },
+  {
+    icon: faInstagram, label: "IG 視覺指南", layer: "L4",
+    kind: "skill",
+    missionTitle: "Instagram 視覺貼文技能",
+    missionDesc: "掌握 IG 版面設計原則：色彩一致性、圖文比例、輪播架構與視覺鉤子。",
+    workspace: "instagram",
+  },
+  // ── LinkedIn × 1 ─────────────────────────────────────────────────────
+  {
+    icon: faLinkedinIn, label: "LI 月行事曆", layer: "L4",
+    kind: "squad",
+    missionTitle: "LinkedIn 月行事曆規劃",
+    missionDesc: "依 Pulizzi 內容支柱框架，規劃 LinkedIn 個人品牌與 B2B 思想領袖月度貼文。",
+    squadSlug: "li-monthly-calendar-pulizzi",
+    workspace: "linkedin",
+  },
+  // ── YouTube × 2 ──────────────────────────────────────────────────────
+  {
+    icon: faYoutube, label: "YT 說故事腳本", layer: "L4",
+    kind: "squad",
+    missionTitle: "YouTube 說故事影片腳本",
+    missionDesc: "用故事弧線框架（Hook→衝突→解法→CTA）撰寫讓觀眾看完的 YouTube 影片腳本。",
+    squadSlug: "yt-video-script-storytelling",
+    workspace: "youtube",
+  },
+  {
+    icon: faYoutube, label: "YT 視覺導演", layer: "L4",
+    kind: "agent",
+    missionTitle: "YouTube 縮圖視覺導演",
+    missionDesc: "由 AI 視覺導演提出 YouTube 縮圖設計方向、色彩對比與視覺吸睛策略。",
+    agentSlug: "fb-visual-director",
+    workspace: "youtube",
+  },
+  // ── L1 品牌策略 × 1 ──────────────────────────────────────────────────
+  {
+    icon: faBullseye, label: "品牌原型定位", layer: "L1",
+    kind: "skill",
+    missionTitle: "品牌原型定位技能",
+    missionDesc: "用 Carol Pearson 12 原型框架梳理品牌性格、溝通語氣與市場差異化立足點。",
+    agentSlug: "brand-archetype-positioning",
+    workspace: "brand-positioning",
+  },
+  // ── 工具列 ────────────────────────────────────────────────────────────
+  { icon: faPlus,         label: "自訂任務", missionTitle: "", missionDesc: "" },
+  { icon: faCloudArrowUp, label: "上傳",     missionTitle: "", missionDesc: "", opensIngest: "upload" },
+  { icon: faEllipsis,     label: "顯示更多", missionTitle: "", missionDesc: "", isMore: true },
 ];
 
 export default function MissionsHome() {
@@ -327,7 +357,18 @@ export default function MissionsHome() {
     if (t.isMore) { navigate("/templates"); return; }
     if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
     if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-    // ── Canva-style: open Picker workspace in a new tab.
+
+    // Agent / Skill tiles → open methodology catalog (filtered by kind + workspace).
+    if (t.kind === "agent" || t.kind === "skill") {
+      const qs = new URLSearchParams();
+      qs.set("kind", t.kind);
+      if (t.workspace) qs.set("workspace", t.workspace);
+      if (t.agentSlug) qs.set("slug", t.agentSlug);
+      navigate(`/methodology?${qs.toString()}`);
+      return;
+    }
+
+    // ── Squad tiles (default): open Picker workspace in a new tab.
     // The picker is pre-filtered by workspace (channel) or layer, lets the
     // user browse methodology squads + preview steps, then click 啟動 to
     // create the mission and land in /m/:id.
@@ -728,8 +769,17 @@ function CircleTile({
         </span>
       </Badge>
       <span className="text-tiny leading-tight text-center text-foreground line-clamp-2">
-        {tile.missionTitle || tile.label}
+        {tile.label}
       </span>
+      {tile.kind && (
+        <span className={`text-[10px] leading-none px-1.5 py-0.5 rounded-full font-medium ${
+          tile.kind === "squad"  ? "bg-primary-50 text-primary-600" :
+          tile.kind === "agent"  ? "bg-secondary-50 text-secondary-600" :
+                                   "bg-success-50 text-success-700"
+        }`}>
+          {tile.kind === "squad" ? "小隊" : tile.kind === "agent" ? "Agent" : "技能"}
+        </span>
+      )}
     </Button>
   );
 }

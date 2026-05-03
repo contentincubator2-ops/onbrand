@@ -14,9 +14,9 @@
  * Each row uses HeroUI components. Pastel tints come from HeroUI semantic
  * default-100 / primary-100 / etc., not hex pins.
  */
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSemanticSearch } from "../lib/useSemanticSearch";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
@@ -152,9 +152,21 @@ const FEATURED_BANNERS: Array<{ key: string; title: string; subtitle: string; ic
 export default function MethodologyCatalog() {
   const navigate = useNavigate();
   const { brandId } = useOutletContext<ShellOutletCtx>();
+  const [searchParams] = useSearchParams();
 
-  const [activeKind, setActiveKind] = useState<Kind>("squad");
+  const [activeKind, setActiveKind] = useState<Kind>(() => {
+    const k = searchParams.get("kind");
+    return (k === "agent" || k === "skill" || k === "squad") ? k as Kind : "squad";
+  });
   const [searchQ, setSearchQ] = useState("");
+
+  // When URL params change (e.g., navigated from MissionsHome tile), sync kind.
+  useEffect(() => {
+    const k = searchParams.get("kind");
+    if (k === "agent" || k === "skill" || k === "squad") setActiveKind(k as Kind);
+    const qs = searchParams.get("query");
+    if (qs) setSearchQ(qs);
+  }, [searchParams]);
 
   // Semantic search — covers squads, agents, skills simultaneously.
   // Kind maps to the active bottom-tab so results stay contextual.
