@@ -2376,7 +2376,7 @@ function SquadDetailPanel({
             const imageSlotFlowNode = missionId && isVisualStep ? (
               <ImageSlotFlow
                 key={`${missionId}-step${activeStepOrder}`}
-                brief={visualBrief || description ?? ""}
+                brief={visualBrief || (description ?? "")}
                 brandContext={brandName ?? undefined}
                 kind={activeKind as "image" | "video"}
                 preferredModelTags={preferredTags}
