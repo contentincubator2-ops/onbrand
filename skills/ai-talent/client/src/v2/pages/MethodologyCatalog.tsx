@@ -21,7 +21,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
-import { AgentAvatar } from "../components/AgentAvatar";
+import { agentAvatarUrl } from "../components/AgentAvatar";
 import { TaskChip } from "../components/TaskChip";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
@@ -664,16 +664,17 @@ function LandscapeCard({
             />
           </div>
         ) : entity.kind === "agent" ? (
-          // Agent hero — always show notionists avatar (DiceBear fallback built-in)
-          <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-default-50">
-            <AgentAvatar
-              seed={entity.slug ?? entity.id}
-              role={entity.subtitle ?? entity.name ?? ""}
-              src={coverImageUrl ?? null}
-              size={size === "sm" ? 120 : size === "lg" ? 200 : 160}
-              className="object-cover"
-            />
-          </div>
+          // Agent hero — full-bleed notionists avatar
+          <img
+            src={coverImageUrl || agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "")}
+            alt={entity.name}
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => {
+              const img = e.currentTarget;
+              const fb = agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "");
+              if (img.src !== fb) img.src = fb;
+            }}
+          />
         ) : coverImageUrl ? (
           <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
         ) : (
@@ -840,15 +841,17 @@ function EntityDetailModal({
                     />
                   </div>
                 ) : entity.kind === "agent" ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-default-50">
-                    <AgentAvatar
-                      seed={entity.slug ?? entity.id}
-                      role={entity.subtitle ?? entity.name ?? ""}
-                      src={coverImageUrl ?? null}
-                      size={220}
-                      className="rounded-none object-cover"
-                    />
-                  </div>
+                  // Modal hero — full-bleed notionists avatar
+                  <img
+                    src={coverImageUrl || agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "")}
+                    alt={entity.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      const fb = agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "");
+                      if (img.src !== fb) img.src = fb;
+                    }}
+                  />
                 ) : coverImageUrl ? (
                   <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
                 ) : (
