@@ -19,6 +19,7 @@ import {
   faPlus, faRightFromBracket,
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
+  faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
 } from "@fortawesome/free-solid-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
@@ -750,6 +751,40 @@ function GlobalScopeBar({ scope, setScope, brands }: {
   );
 }
 
+function TeamSubPanel() {
+  return (
+    <>
+      <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>切換團隊</p>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
+        <PopupRow onClick={() => {}}>
+          <span style={{
+            width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+            background: "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontSize: 13, fontWeight: 800,
+          }}>S的</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>SoWork 的團隊</p>
+            <p style={{ fontSize: 11, color: "#9ca3af" }}>團隊版</p>
+          </div>
+          <FontAwesomeIcon icon={faCheck} style={{ color: "#F97316", fontSize: 14 }} />
+        </PopupRow>
+        <PopupRow onClick={() => {}}>
+          <span style={{
+            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+            background: "#f3f4f6",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#6b7280", fontSize: 18,
+          }}>+</span>
+          <span style={{ fontSize: 13, color: "#374151" }}>建立或加入團隊</span>
+        </PopupRow>
+      </div>
+    </>
+  );
+}
+
 function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
   items: any[]; selectedId: number | null; color: string;
   emptyText: string; onSelect: (id: number) => void; onClear?: () => void;
@@ -815,19 +850,29 @@ function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
 function AccountPopup({ onLogout, onClose }: {
   onLogout: () => void;
   onClose: () => void;
-  // kept for compat — scope/setScope/brands now live in GlobalScopeBar only
   scope?: ScopeState;
   setScope?: (s: ScopeState) => void;
   brands?: any[];
 }) {
-  const [subPanel, setSubPanel] = React.useState<"account" | null>(null);
+  const [subPanel, setSubPanel] = React.useState<"account" | "team" | null>(null);
+
+  // Menu rows — mirrors Canva exactly
+  const menuItems = [
+    { icon: faGear,             label: "設定",              arrow: false, badge: null,    danger: false, action: () => {} },
+    { icon: faCircleHalfStroke, label: "主題",              arrow: true,  badge: null,    danger: false, action: () => {} },
+    { icon: faCircleInfo,       label: "說明和資源",         arrow: true,  badge: null,    danger: false, action: () => {} },
+    { icon: faBorderAll,        label: "進階工具",           arrow: true,  badge: "測試版", danger: false, action: () => {} },
+    { icon: faBriefcase,        label: "方案和定價",         arrow: false, badge: null,    danger: false, action: () => {} },
+    { icon: faDisplay,          label: "取得 SoWork 應用程式", arrow: false, badge: null,  danger: false, action: () => {} },
+    { icon: faRightFromBracket, label: "從所有帳號登出",     arrow: false, badge: null,    danger: true,  action: onLogout },
+  ];
 
   return (
     <div style={{
       position: "fixed", left: ICON_W + 8, bottom: 12, zIndex: 50,
       display: "flex", alignItems: "flex-end", gap: 8,
     }}>
-      {/* ── Main card (360px, matches Canva width) ── */}
+      {/* ── Main card ── */}
       <div style={{
         width: 360,
         borderRadius: 16,
@@ -839,7 +884,7 @@ function AccountPopup({ onLogout, onClose }: {
         transformOrigin: "bottom left",
       }}>
 
-        {/* ① 帳號 section */}
+        {/* ① 帳號 */}
         <div style={{ padding: "8px 8px 4px" }}>
           <SectionLabel>帳號</SectionLabel>
           <PopupRow
@@ -866,35 +911,67 @@ function AccountPopup({ onLogout, onClose }: {
 
         <Divider />
 
-        {/* ② Menu items */}
+        {/* ② 團隊 — mirrors Canva "Team" section */}
+        <div style={{ padding: "4px 8px" }}>
+          <SectionLabel>團隊</SectionLabel>
+          <PopupRow
+            onClick={() => setSubPanel(v => v === "team" ? null : "team")}
+            active={subPanel === "team"}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+              background: "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontSize: 15, fontWeight: 800,
+            }}>S的</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>SoWork 的團隊</p>
+              <p style={{ fontSize: 12, color: "#9ca3af", display: "flex", alignItems: "center", gap: 4 }}>
+                團隊版
+                <span style={{ fontSize: 10 }}>•</span>
+                <FontAwesomeIcon icon={faUserGroup} style={{ fontSize: 10 }} />
+                5
+              </p>
+            </div>
+            <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />
+          </PopupRow>
+        </div>
+
+        <Divider />
+
+        {/* ③ Menu */}
         <div style={{ padding: "4px 8px 8px" }}>
-          {[
-            { icon: faGear,             label: "設定",           danger: false, action: () => {} },
-            { icon: faBuilding,         label: "方案和定價",      danger: false, action: () => {} },
-            { icon: faRightFromBracket, label: "從所有帳號登出", danger: true,  action: onLogout },
-          ].map(item => (
+          {menuItems.map(item => (
             <PopupRow key={item.label} onClick={item.action}>
-              <span style={{ width: 22, display: "flex", justifyContent: "center", color: item.danger ? "#ef4444" : "#6b7280", fontSize: 16 }}>
+              <span style={{ width: 22, display: "flex", justifyContent: "center", color: item.danger ? "#ef4444" : "#6b7280", fontSize: 15 }}>
                 <FontAwesomeIcon icon={item.icon} />
               </span>
-              <span style={{ flex: 1, fontSize: 14, color: item.danger ? "#ef4444" : "#111827", fontWeight: 400 }}>
+              <span style={{ flex: 1, fontSize: 14, color: item.danger ? "#ef4444" : "#111827", fontWeight: 400, display: "flex", alignItems: "center", gap: 6 }}>
                 {item.label}
+                {item.badge && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, color: "#7c3aed",
+                    background: "#ede9fe", borderRadius: 4, padding: "1px 5px",
+                  }}>{item.badge}</span>
+                )}
               </span>
+              {item.arrow && <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />}
             </PopupRow>
           ))}
         </div>
       </div>
 
-      {/* ── Account sub-panel ── */}
-      {subPanel === "account" && (
+      {/* ── Sub-panel ── */}
+      {subPanel && (
         <div style={{
           width: 300, borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff",
           boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
-          overflow: "hidden", maxHeight: 480, display: "flex", flexDirection: "column",
+          overflow: "hidden", maxHeight: 500, display: "flex", flexDirection: "column",
           animation: "notifPopIn 0.15s cubic-bezier(0.34,1.56,0.64,1) forwards",
           transformOrigin: "bottom left",
         }}>
-          <AccountSubPanel />
+          {subPanel === "account" && <AccountSubPanel />}
+          {subPanel === "team"    && <TeamSubPanel />}
         </div>
       )}
     </div>
