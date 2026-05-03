@@ -27,6 +27,7 @@ import { useLang } from "../../lib/i18n";
 import { safeLocalizedText, pickLocaleText } from "../../lib/localizeText";
 import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMockupFields, type MockupVariant } from "../lib/inferMockup";
 import { searchAndRankSquads } from "../lib/searchSquads";
+import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import { CalendarGridMockup } from "../components/SquadMockups/calendar";
@@ -354,6 +355,11 @@ export default function PickerWorkspace() {
   const [q, setQ] = useState("");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(initialSlug);
 
+  // Session 3 — server-side semantic search (debounced, 350 ms).
+  // When the server returns hits, they override the client-side ranking.
+  // Client-side searchAndRankSquads() still runs as immediate pre-result.
+  const { semanticHits, isSearching: isSemanticSearching } = useSemanticSearch(q);
+
   // Mission brief — local state for the new 3-col detail panel.
   const [missionTitle, setMissionTitle] = useState<string>(seedTitle);
   const [missionBrief, setMissionBrief] = useState<string>("");
@@ -505,23 +511,42 @@ export default function PickerWorkspace() {
     }
   };
 
-  // PR6 — score-based ranking using shared search lib.
-  // When query is non-empty, results are score-ranked (best match first).
-  // When query is empty, fall back to facet-only filter (original order).
+  // Client-side keyword ranking (runs immediately, acts as pre-result while
+  // server semantic search is in flight, and as fallback when server returns 0 hits).
   const searchResult = useMemo(() => searchAndRankSquads(allSquads, q), [allSquads, q]);
   const bestMatchSlugs = useMemo(
     () => new Set(searchResult.hits.filter((h) => h.isBestMatch).map((h) => h.squad.slug)),
     [searchResult],
   );
+
   const filtered = useMemo(() => {
     const ql = q.trim();
-    if (ql) {
-      // Score-ranked path — facets still apply but ranking trumps order
-      return searchResult.hits.map((h) => h.squad).filter(passesFacets);
+    if (!ql) {
+      // No query — facet-only filter, original order
+      return allSquads.filter(passesFacets);
     }
-    // No query — original facet-only filter, original order
-    return allSquads.filter(passesFacets);
-  }, [allSquads, q, searchResult, layerFilter, channelFilter]);
+
+    // Session 3: prefer server semantic hits when available.
+    // Map semantic hit slugs back to full squad objects from allSquads so
+    // we get the complete squad shape (steps, workspace, etc.).
+    if (semanticHits && semanticHits.length > 0) {
+      const slugSet = new Map(semanticHits.map((h) => [h.slug, true]));
+      const squadMap = new Map(allSquads.map((s) => [s.slug, s]));
+      const semantic = semanticHits
+        .map((h) => squadMap.get(h.slug) ?? null)
+        .filter((s): s is NonNullable<typeof s> => s !== null)
+        .filter(passesFacets);
+      // Append any client-side hits NOT already in semantic results as overflow
+      const overflow = searchResult.hits
+        .map((h) => h.squad)
+        .filter((s) => !slugSet.has(s.slug))
+        .filter(passesFacets);
+      return [...semantic, ...overflow];
+    }
+
+    // Fall back to client-side keyword ranking
+    return searchResult.hits.map((h) => h.squad).filter(passesFacets);
+  }, [allSquads, q, semanticHits, searchResult, layerFilter, channelFilter]);
 
   const selectedSquad = useMemo(
     () => filtered.find((s) => s.slug === selectedSlug)
@@ -837,7 +862,11 @@ export default function PickerWorkspace() {
                     ? `描述你的 ${LAYER_TOKENS[layerFilter].label} 詳細需求…`
                     : "描述你的行銷需求或搜尋方法論…"
               }
-              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+              startContent={
+                isSemanticSearching
+                  ? <span className="w-3 h-3 rounded-full border-2 border-default-400 border-t-transparent animate-spin ml-1" />
+                  : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />
+              }
               classNames={{ inputWrapper: "bg-content2", input: "text-small" }}
             />
             <div className="grid grid-cols-2 gap-2 mt-2">

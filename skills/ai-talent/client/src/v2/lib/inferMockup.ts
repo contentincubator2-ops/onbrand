@@ -29,6 +29,9 @@ export type Platform =
   | "deck"
   // --- new platforms ---
   | "xiaohongshu"
+  | "threads"
+  | "pinterest"
+  | "podcast"
   | "generic";
 
 export type Format =
@@ -85,6 +88,17 @@ export type Format =
   | "note"             // 圖文筆記 (photo + text)
   | "xhs-video"        // 影片筆記
   | "xhs-search"       // 搜索結果卡片
+  // Threads
+  | "post"             // single Threads post
+  | "thread"           // already defined for Twitter — reused for Threads chain
+  // Pinterest
+  | "pin"              // single pin (mobile)
+  | "board"            // board / masonry grid (desktop)
+  | "story-pin"        // idea pin / story format
+  // Podcast
+  | "episode"          // single episode player
+  | "show"             // show/channel page with episode list
+  | "audiogram"        // square audiogram social card
   // fallback
   | "generic";
 
@@ -157,6 +171,17 @@ const VARIANT_LABELS: Record<string, string> = {
   "xiaohongshu:note":       "小紅書 圖文筆記",
   "xiaohongshu:xhs-video":  "小紅書 影片筆記",
   "xiaohongshu:xhs-search": "小紅書 搜索筆記",
+  // Threads
+  "threads:post":    "Threads 貼文",
+  "threads:thread":  "Threads 串文",
+  // Pinterest
+  "pinterest:pin":       "Pinterest Pin",
+  "pinterest:board":     "Pinterest 看板",
+  "pinterest:story-pin": "Pinterest Idea Pin",
+  // Podcast
+  "podcast:episode":   "Podcast 單集",
+  "podcast:show":      "Podcast 節目頁",
+  "podcast:audiogram": "Podcast Audiogram",
 };
 
 const labelOf = (p: Platform, f: Format) =>
@@ -169,48 +194,114 @@ const variant = (platform: Platform, format: Format): MockupVariant =>
 
 const norm = (s: any): string => String(s ?? "").toLowerCase();
 
+/**
+ * Safely coerce a workspace / tags field to string[].
+ * Handles:
+ *   - Already an array   → use as-is
+ *   - JSON string        → parse, flatten
+ *   - Bare string        → wrap in array
+ *   - null / undefined   → []
+ */
+const toStringArray = (v: any): string[] => {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (trimmed.startsWith("[")) {
+      try { const parsed = JSON.parse(trimmed); return Array.isArray(parsed) ? parsed.map(String) : [trimmed]; }
+      catch { /* fall through */ }
+    }
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
+};
+
+/**
+ * Build the inference haystack from an entity.
+ *
+ * Design principle (Session 2):
+ *   Source data for inference is ENGLISH-only.
+ *   Chinese fields (name, specialty, bio) are UI-display only and are
+ *   intentionally excluded to keep keyword rules simple and unambiguous.
+ *
+ * English signal priority:
+ *   1. slug           — DB identifier, always English (e.g. "mkt-kol-social")
+ *   2. workspace      — English JSON array (e.g. ["instagram", "strategy"])
+ *   3. mockup_platform — explicit DB tag (e.g. "instagram")
+ *   4. primarySkill   — English skill slug (e.g. "youtube-publisher")
+ *   5. englishTitle / englishName / specialty_en / bio_en — agent English fields
+ *   6. task_type / taskType — "image" / "video" / "text"
+ *   7. tags / outputFormats / useCases — usually English slugs
+ *
+ * Chinese name/specialty/bio are NOT included.
+ */
 const collectHaystack = (entity: any): string => {
   if (!entity) return "";
-  const arr = (v: any): string[] => Array.isArray(v) ? v : v ? [String(v)] : [];
   return [
+    // ── 1. structural identifiers (always English) ──
     norm(entity.slug),
-    norm(entity.name),
-    norm(typeof entity.name === "object" ? entity.name?.["zh-TW"] || entity.name?.en : ""),
-    norm(entity.title),
-    norm(entity.specialty),
+    // ── 2. workspace tags (English JSON array or string) ──
+    ...toStringArray(entity.workspace).map(norm),
+    // ── 3. explicit mockup fields ──
+    norm(entity.mockup_platform),
+    norm(entity.mockup?.platform),
+    // ── 4. agent English fields ──
     norm(entity.primarySkill),
-    norm(entity.description),
+    norm(entity.englishTitle),
+    norm(entity.englishName),
+    norm(entity.specialty_en),
+    norm(entity.bio_en),
+    // ── 5. task type (skill inference) ──
     norm(entity.task_type),
     norm(entity.taskType),
-    ...arr(entity.workspace).map(norm),
-    ...arr(entity.tags).map(norm),
-    ...arr(entity.outputFormats).map(norm),
-    ...arr(entity.useCases).map(norm),
+    // ── 6. structured tags (English slugs) ──
+    ...toStringArray(entity.tags).map(norm),
+    ...toStringArray(entity.outputFormats).map(norm),
+    ...toStringArray(entity.useCases).map(norm),
+    ...toStringArray(entity.workspace_tags).map(norm),
   ].filter(Boolean).join(" ");
 };
 
 /* ───────────────── platform detection ───────────────── */
 
+/**
+ * Platform keyword map — English only.
+ *
+ * Sources that feed the haystack are already English (slug, workspace,
+ * primarySkill, englishTitle, specialty_en).  No Chinese needed here.
+ * Chinese labels live in VARIANT_LABELS (display only).
+ *
+ * Order: most-specific / least-ambiguous platform first so the first-match
+ * wins rule produces the correct result.
+ */
 const PLATFORM_KEYWORDS: Array<[Platform, string[]]> = [
-  ["instagram", ["instagram", "ig-", "ig_", " ig ", "reels", "限動", "stories"]],
-  ["tiktok",    ["tiktok", "tt-", "douyin", "抖音", "for you"]],
-  ["youtube",   ["youtube", "yt-", "shorts", "youtu.be"]],
-  ["linkedin",  ["linkedin", "li-", "公司頁面", "個人品牌"]],
-  ["facebook",  ["facebook", "fb-", "fb_", " fb ", "meta-fb", "messenger"]],
-  // New channels
-  ["email",   ["email", "edm", "電子報", "電子郵件", "newsletter", "mailer", "enewsletter"]],
-  ["google",  ["google", "google-ads", "gads", "google ads", "search ad", "display ad", "pmax", "performance max", "shopping ad", "google 廣告", "搜尋廣告", "多媒體廣告", "購物廣告"]],
-  ["twitter", ["twitter", "x.com", "tweet", "thread", "推文", "x platform"]],
-  ["line",    ["line", "line-oa", "line官方", "line 官方", "richmenu", "rich menu", "line廣播", "line訊息"]],
-  ["web",     ["website", "landing page", "官網", "落地頁", "網站", "landingpage", "blog", "部落格", "product page", "產品頁"]],
-  ["press",   ["press release", "新聞稿", "公關稿", "pr release", "媒體稿", "媒體發布"]],
-  ["deck",    ["deck", "slide", "slides", "簡報", "presentation", "ppt", "powerpoint", "pitch deck"]],
-  ["xiaohongshu", ["小紅書", "xhs", "xiaohongshu", "red note", "rednote", "小紅書筆記", "圖文筆記"]],
+  // ── Unique brand-name platforms (unambiguous) ─────────────────────────
+  ["xiaohongshu", ["xiaohongshu", "xhs", "rednote", "red-note", "red note"]],
+  ["threads",     ["threads-app", "meta-threads", "threads"]],  // workspace slug "threads" is safe; avoid bare "thread" (singular)
+  ["pinterest",   ["pinterest", "pin-board", "idea-pin", "story-pin"]],
+  ["podcast",     ["podcast", "podcasting", "audiogram", "spotify-podcast", "apple-podcast"]],
+  // ── Video platforms ────────────────────────────────────────────────────
+  ["tiktok",      ["tiktok", "tt-", "douyin", "fyp", "for-you-page"]],
+  ["youtube",     ["youtube", "yt-", "youtu.be", "youtube-shorts", "youtube-studio"]],
+  // ── Social platforms ───────────────────────────────────────────────────
+  ["instagram",   ["instagram", "ig-", "ig_", " ig ", "reels", "stories", "ugc", "kol", "influencer"]],
+  ["facebook",    ["facebook", "fb-", "fb_", " fb ", "meta-fb", "messenger"]],
+  ["linkedin",    ["linkedin", "li-", "b2b-social", "company-page"]],
+  ["twitter",     ["twitter", "x.com", "tweet", "x-platform"]],
+  // ── Owned/paid channels ────────────────────────────────────────────────
+  ["email",       ["email", "edm", "newsletter", "mailer", "enewsletter", "email-marketing", "email-automation"]],
+  ["google",      ["google", "google-ads", "gads", "pmax", "performance-max", "search-ad", "display-ad", "shopping-ad", "sem"]],
+  ["line",        ["line-oa", "line-official", "richmenu", "rich-menu", "line-push", "line@", " line "]],  // " line " (space-padded) matches workspace slug "line" after haystack join
+  ["web",         ["website", "landing-page", "landingpage", "blog", "product-page", "seo", "organic-search"]],
+  ["press",       ["press-release", "pr-release", "media-release", "press-statement", "crisis-pr"]],
+  ["deck",        ["deck", "slide", "slides", "presentation", "ppt", "powerpoint", "pitch-deck"]],
 ];
 
 function detectPlatform(haystack: string): Platform {
+  // Pad with spaces so word-boundary keywords like " line " match even
+  // when the token is at the start or end of the haystack string.
+  const padded = ` ${haystack} `;
   for (const [p, kws] of PLATFORM_KEYWORDS) {
-    if (kws.some((kw) => haystack.includes(kw))) return p;
+    if (kws.some((kw) => padded.includes(kw))) return p;
   }
   return "generic";
 }
@@ -225,65 +316,101 @@ interface FormatRule {
   platforms?: Platform[];
 }
 
+/**
+ * Format rules — English only.
+ *
+ * Keywords match against the English haystack (slug, workspace, primarySkill,
+ * specialty_en, etc.).  No Chinese needed.
+ */
 const FORMAT_RULES: FormatRule[] = [
-  // ── Calendar / monthly plan → feed (must be first so "article" in squad
-  //    description doesn't hijack a calendar squad to article format) ──────
-  { format: "feed", keywords: ["月行事曆", "monthly-calendar", "monthly calendar", "行事曆排程"], platforms: ["linkedin", "instagram", "facebook"] },
-  // 9:16 vertical
-  { format: "reel",         keywords: ["reel", "reels"],                       platforms: ["instagram", "facebook"] },
-  { format: "shorts",       keywords: ["short", "shorts"],                     platforms: ["youtube"] },
-  { format: "foryou",       keywords: ["foryou", "for you", "fyp", "tiktok"],  platforms: ["tiktok"] },
-  // ephemeral
-  { format: "story",        keywords: ["story", "stories", "限動"],             platforms: ["instagram", "facebook"] },
-  // long-form
-  { format: "article",      keywords: ["article", "longform", "長文", "blog"], platforms: ["linkedin"] },
-  { format: "newsletter",   keywords: ["newsletter", "電子報", "issue"],        platforms: ["linkedin"] },
-  // YouTube specials
-  { format: "watch",        keywords: ["watch", "video page", "觀看頁"],         platforms: ["youtube"] },
-  { format: "community",    keywords: ["community post", "社群貼文"],            platforms: ["youtube"] },
-  { format: "premiere",     keywords: ["premiere", "首播", "countdown"],         platforms: ["youtube"] },
-  { format: "live",         keywords: ["live", "直播", "livestream"]                                              },
-  // LinkedIn specials
-  { format: "poll",         keywords: ["poll", "投票"],                          platforms: ["linkedin"] },
-  { format: "document",     keywords: ["document", "pdf", "文件"],               platforms: ["linkedin"] },
-  { format: "native-video", keywords: ["native video", "原生影片"],              platforms: ["linkedin"] },
-  // FB specials
-  { format: "marketplace",  keywords: ["marketplace", "listing"],               platforms: ["facebook"] },
-  { format: "event",        keywords: ["event", "活動"],                         platforms: ["facebook", "linkedin"] },
-  // ads
-  { format: "ad",           keywords: ["ad ", "ads", "advert", "廣告", "sponsored", "promoted"] },
-  // multi-image
-  { format: "carousel",     keywords: ["carousel", "multi-image", "輪播", "圖文"] },
-  // profile
-  { format: "profile",      keywords: ["profile", "個人檔案", "channel page", "頻道頁"] },
-  // Email formats
-  { format: "edm",            keywords: ["edm", "html email", "電子郵件", "email campaign"],        platforms: ["email"] },
-  { format: "email-newsletter", keywords: ["newsletter", "電子報", "issue"],                        platforms: ["email"] },
-  // Google formats
-  { format: "search-ad",    keywords: ["search ad", "搜尋廣告", "text ad", "keyword ad"],           platforms: ["google"] },
-  { format: "display-ad",   keywords: ["display", "banner", "多媒體", "展示廣告"],                  platforms: ["google"] },
-  { format: "pmax",         keywords: ["pmax", "performance max"],                                   platforms: ["google"] },
-  { format: "shopping-ad",  keywords: ["shopping", "購物廣告", "product listing"],                  platforms: ["google"] },
-  { format: "video-ad",     keywords: ["video ad", "trueview", "影片廣告", "youtube ad"],           platforms: ["google"] },
-  // Twitter formats
-  { format: "thread",       keywords: ["thread", "推文串"],                                          platforms: ["twitter"] },
-  { format: "tweet",        keywords: ["tweet", "推文", "x post"],                                   platforms: ["twitter"] },
-  // LINE formats
-  { format: "richmenu",     keywords: ["richmenu", "rich menu", "選單"],                            platforms: ["line"] },
-  { format: "line-card",    keywords: ["flex message", "flex card", "line card", "line訊息卡"],     platforms: ["line"] },
-  { format: "broadcast",    keywords: ["broadcast", "廣播", "群發"],                                 platforms: ["line"] },
-  // Web formats
-  { format: "landing",      keywords: ["landing", "落地頁", "landing page"],                        platforms: ["web"] },
-  { format: "blog",         keywords: ["blog", "部落格", "article", "文章"],                        platforms: ["web"] },
-  { format: "product-page", keywords: ["product page", "產品頁", "ecommerce", "shop"],              platforms: ["web"] },
-  // Press
-  { format: "press-release", keywords: ["press release", "新聞稿", "公關稿", "media release"],      platforms: ["press"] },
-  // Deck
-  { format: "slide",        keywords: ["slide", "deck", "簡報", "presentation", "ppt"],             platforms: ["deck"] },
-  // Xiaohongshu
-  { format: "xhs-video",    keywords: ["影片筆記", "視頻", "xhs video", "小紅書影片"],               platforms: ["xiaohongshu"] },
-  { format: "xhs-search",   keywords: ["搜索", "search", "xhs search"],                             platforms: ["xiaohongshu"] },
-  { format: "note",         keywords: ["筆記", "note", "圖文"],                                      platforms: ["xiaohongshu"] },
+  // ── 0. Guard: calendar/schedule → feed (before "article" or "blog" match) ─
+  { format: "feed",    keywords: ["monthly-calendar", "content-calendar", "content-schedule"], platforms: ["linkedin", "instagram", "facebook"] },
+
+  // ── 1. Short-video / vertical ─────────────────────────────────────────────
+  { format: "reel",    keywords: ["reel", "reels", "short-video"],    platforms: ["instagram", "facebook"] },
+  { format: "shorts",  keywords: ["short", "shorts", "youtube-short"], platforms: ["youtube"] },
+  { format: "foryou",  keywords: ["foryou", "for-you", "fyp"],         platforms: ["tiktok"] },
+
+  // ── 2. Stories ────────────────────────────────────────────────────────────
+  { format: "story",   keywords: ["story", "stories", "ig-story"],    platforms: ["instagram", "facebook"] },
+
+  // ── 3. Live ───────────────────────────────────────────────────────────────
+  { format: "live",    keywords: ["live", "livestream", "live-stream", "live-commerce"] },
+
+  // ── 4. LinkedIn specials ──────────────────────────────────────────────────
+  { format: "article",      keywords: ["article", "long-form", "longform"],          platforms: ["linkedin"] },
+  { format: "newsletter",   keywords: ["newsletter", "linkedin-newsletter"],          platforms: ["linkedin"] },
+  { format: "poll",         keywords: ["poll"],                                        platforms: ["linkedin"] },
+  { format: "document",     keywords: ["document", "pdf", "linkedin-doc"],            platforms: ["linkedin"] },
+  { format: "native-video", keywords: ["native-video", "linkedin-video"],             platforms: ["linkedin"] },
+
+  // ── 5. YouTube specials ───────────────────────────────────────────────────
+  { format: "watch",     keywords: ["watch-page", "video-page", "youtube-watch"],    platforms: ["youtube"] },
+  { format: "community", keywords: ["community-post", "youtube-community"],           platforms: ["youtube"] },
+  { format: "premiere",  keywords: ["premiere", "countdown"],                          platforms: ["youtube"] },
+
+  // ── 6. Facebook specials ──────────────────────────────────────────────────
+  { format: "marketplace", keywords: ["marketplace", "listing"],                      platforms: ["facebook"] },
+  { format: "event",       keywords: ["event", "facebook-event"],                     platforms: ["facebook", "linkedin"] },
+
+  // ── 7. Carousel ───────────────────────────────────────────────────────────
+  { format: "carousel",  keywords: ["carousel", "multi-image", "swipe-post"] },
+
+  // ── 8. Profile ────────────────────────────────────────────────────────────
+  { format: "profile",   keywords: ["profile", "channel-page", "profile-page"] },
+
+  // ── 9. Ads (low-priority catch-all) ───────────────────────────────────────
+  { format: "ad",        keywords: ["ad-creative", "sponsored", "promoted", "paid-ad"] },
+
+  // ── 10. Email ─────────────────────────────────────────────────────────────
+  { format: "edm",              keywords: ["edm", "html-email", "email-campaign", "email-blast"], platforms: ["email"] },
+  { format: "email-newsletter", keywords: ["newsletter", "weekly-digest", "monthly-digest"],      platforms: ["email"] },
+
+  // ── 11. Google Ads ────────────────────────────────────────────────────────
+  { format: "pmax",        keywords: ["pmax", "performance-max"],                          platforms: ["google"] },
+  { format: "shopping-ad", keywords: ["shopping", "product-listing", "google-shopping"],  platforms: ["google"] },
+  { format: "video-ad",    keywords: ["video-ad", "trueview", "youtube-ad"],              platforms: ["google"] },
+  { format: "display-ad",  keywords: ["display", "banner", "gdn", "display-ad"],         platforms: ["google"] },
+  { format: "search-ad",   keywords: ["search-ad", "text-ad", "keyword-ad", "sem"],      platforms: ["google"] },
+
+  // ── 12. Twitter / X ───────────────────────────────────────────────────────
+  { format: "thread",  keywords: ["twitter-thread", "x-thread"],  platforms: ["twitter"] },
+  { format: "tweet",   keywords: ["tweet", "x-post"],              platforms: ["twitter"] },
+
+  // ── 13. LINE ──────────────────────────────────────────────────────────────
+  { format: "richmenu",  keywords: ["richmenu", "rich-menu"],                            platforms: ["line"] },
+  { format: "line-card", keywords: ["flex-message", "flex-card", "line-card"],           platforms: ["line"] },
+  { format: "broadcast", keywords: ["broadcast", "push-message", "line-push"],           platforms: ["line"] },
+
+  // ── 14. Web ───────────────────────────────────────────────────────────────
+  { format: "product-page", keywords: ["product-page", "ecommerce-page", "shop-page"],  platforms: ["web"] },
+  { format: "landing",      keywords: ["landing", "landing-page"],                        platforms: ["web"] },
+  { format: "blog",         keywords: ["blog", "article", "seo-article"],                platforms: ["web"] },
+
+  // ── 15. Press ─────────────────────────────────────────────────────────────
+  { format: "press-release", keywords: ["press-release", "pr-release", "media-release", "press-statement"], platforms: ["press"] },
+
+  // ── 16. Deck ──────────────────────────────────────────────────────────────
+  { format: "slide", keywords: ["slide", "deck", "presentation", "pitch-deck"], platforms: ["deck"] },
+
+  // ── 17. 小紅書 ────────────────────────────────────────────────────────────
+  { format: "xhs-video",  keywords: ["xhs-video", "xhs-reel"],         platforms: ["xiaohongshu"] },
+  { format: "xhs-search", keywords: ["xhs-search", "xhs-search-card"], platforms: ["xiaohongshu"] },
+  { format: "note",       keywords: ["xhs-note", "xhs-post"],          platforms: ["xiaohongshu"] },
+
+  // ── 18. Threads ───────────────────────────────────────────────────────────
+  { format: "thread", keywords: ["threads-thread", "thread-chain"], platforms: ["threads"] },
+  { format: "post",   keywords: ["threads-post"],                    platforms: ["threads"] },
+
+  // ── 19. Pinterest ─────────────────────────────────────────────────────────
+  { format: "story-pin", keywords: ["story-pin", "idea-pin"],    platforms: ["pinterest"] },
+  { format: "board",     keywords: ["board", "pin-board"],        platforms: ["pinterest"] },
+  { format: "pin",       keywords: ["pin", "pinterest-pin"],      platforms: ["pinterest"] },
+
+  // ── 20. Podcast ───────────────────────────────────────────────────────────
+  { format: "audiogram", keywords: ["audiogram"],                         platforms: ["podcast"] },
+  { format: "show",      keywords: ["show-page", "podcast-show"],         platforms: ["podcast"] },
+  { format: "episode",   keywords: ["episode", "podcast-episode"],        platforms: ["podcast"] },
 ];
 
 const PLATFORM_DEFAULT_FORMAT: Record<Platform, Format> = {
@@ -300,6 +427,9 @@ const PLATFORM_DEFAULT_FORMAT: Record<Platform, Format> = {
   press:        "press-release",
   deck:         "slide",
   xiaohongshu:  "note",
+  threads:      "post",
+  pinterest:    "pin",
+  podcast:      "episode",
   generic:      "generic",
 };
 
@@ -318,13 +448,24 @@ function detectFormat(haystack: string, platform: Platform): Format {
  * no platform / format keywords match.
  */
 export function inferMockupVariant(squad: any): MockupVariant {
-  // 1. Explicit override
+  if (!squad) return variant("generic", "generic");
+
+  // 1. Explicit override object { platform, format }
   const ov = squad?.mockup;
   if (ov?.platform && ov?.format) {
     return variant(ov.platform as Platform, ov.format as Format);
   }
-  if (!squad) return variant("generic", "generic");
 
+  // 2. DB-tagged fields (mockup_platform + mockup_format) — highest-trust signal
+  //    These are set by Session-1 migration and future admin tagging.
+  const dbP = norm(squad.mockup_platform);
+  const dbF = norm(squad.mockup_format);
+  if (dbP && dbP !== "generic" && dbF) {
+    return variant(dbP as Platform, dbF as Format);
+  }
+  if (dbP === "generic") return variant("generic", "generic");
+
+  // 3. Heuristic — keyword-based fallback for untagged entities
   const haystack = collectHaystack(squad);
   const platform = detectPlatform(haystack);
   const format = detectFormat(haystack, platform);
@@ -333,20 +474,21 @@ export function inferMockupVariant(squad: any): MockupVariant {
 }
 
 /**
- * Infer mockup variant from an agent. Agents work on multiple formats;
- * we pick the most distinctive one mentioned in title/specialty.
+ * Infer mockup variant from an agent.
+ * Agents now have mockup_platform + mockup_format columns (Session A).
+ * The shared inferMockupVariant() already reads these DB fields first.
  */
 export function inferMockupVariantFromAgent(agent: any): MockupVariant {
   return inferMockupVariant(agent);
 }
 
 /**
- * Infer mockup variant from a skill. Skills have task_type
- * (text/image/code/search/audio/video/multimodal/embedding) which we
- * map to a likely format hint.
+ * Infer mockup variant from a skill.
+ * Skills now have mockup_platform + mockup_format columns (Session A).
+ * Falls back to task_type hint when DB fields are not set.
  */
 export function inferMockupVariantFromSkill(skill: any): MockupVariant {
-  // First try keyword match in name/tags
+  // DB-tagged fields take priority (same path as squads/agents)
   const v = inferMockupVariant(skill);
   if (v.platform !== "generic") return v;
 
@@ -385,6 +527,10 @@ const PLATFORM_TOP_VARIANTS: Record<Platform, Format[]> = {
   web:       ["landing", "blog", "product-page"],
   press:     ["press-release"],
   deck:      ["slide"],
+  xiaohongshu: ["note", "xhs-video", "xhs-search"],
+  threads:   ["post", "thread"],
+  pinterest: ["pin", "board", "story-pin"],
+  podcast:   ["episode", "show", "audiogram"],
   generic:   ["generic"],
 };
 

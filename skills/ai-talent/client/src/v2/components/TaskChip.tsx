@@ -13,8 +13,12 @@ import { Chip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faInstagram, faFacebook, faLinkedin, faYoutube, faTiktok,
+  faXTwitter, faLine, faPinterest,
 } from "@fortawesome/free-brands-svg-icons";
-import { faNewspaper } from "@fortawesome/free-solid-svg-icons";
+import {
+  faNewspaper, faEnvelope, faGlobe, faBullhorn,
+  faLayerGroup, faHashtag, faMicrophone,
+} from "@fortawesome/free-solid-svg-icons";
 import {
   inferMockupVariant,
   inferMockupVariantFromAgent,
@@ -24,12 +28,23 @@ import {
 } from "../lib/inferMockup";
 
 const PLATFORM_ICON: Record<Platform, any> = {
-  instagram: faInstagram,
-  facebook:  faFacebook,
-  linkedin:  faLinkedin,
-  youtube:   faYoutube,
-  tiktok:    faTiktok,
-  generic:   faNewspaper,
+  instagram:    faInstagram,
+  facebook:     faFacebook,
+  linkedin:     faLinkedin,
+  youtube:      faYoutube,
+  tiktok:       faTiktok,
+  twitter:      faXTwitter,
+  line:         faLine,
+  pinterest:    faPinterest,
+  threads:      faHashtag,
+  podcast:      faMicrophone,
+  email:        faEnvelope,
+  google:       faGlobe,
+  web:          faGlobe,
+  press:        faNewspaper,
+  deck:         faLayerGroup,
+  xiaohongshu:  faBullhorn,
+  generic:      faNewspaper,
 };
 
 export type TaskChipKind = "squad" | "agent" | "skill" | "mission" | "explicit";

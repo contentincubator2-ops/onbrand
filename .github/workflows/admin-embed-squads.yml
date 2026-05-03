@@ -1,0 +1,59 @@
+name: Admin — Generate squad embeddings (semantic search)
+
+# Runs scripts/compute-squad-embeddings.ts on the VM to batch-embed
+# all active squads using Azure text-embedding-3-large.
+#
+# Idempotent: skips squads that already have squads.embedding populated.
+# Use --force to re-embed all squads (e.g. after content changes).
+#
+# After running, the /api/squads/search endpoint uses cosine similarity
+# against the cached embeddings instead of LIKE queries.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Type "true" to re-embed all squads (not just missing ones)'
+        required: false
+        default: 'false'
+
+jobs:
+  embed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE:    ${{ github.event.inputs.force }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3600s
+          envs: GH_TOKEN,FORCE
+          script: |
+            set -e
+            APP=/opt/marketing-os/app
+            cd "$APP"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git fetch origin main && git reset --hard origin/main
+
+            ENV_FILE=$APP/skills/ai-talent/.env
+            set -a; source "$ENV_FILE"; set +a
+            cd $APP/skills/ai-talent
+
+            ARGS=""
+            [ "$FORCE" = "true" ] && ARGS="--force"
+
+            echo "===== tsx scripts/compute-squad-embeddings.ts $ARGS ====="
+            ./node_modules/.bin/tsx scripts/compute-squad-embeddings.ts $ARGS
+
+            echo ""
+            echo "===== Checking coverage ====="
+            mysql -u"$LOCAL_DB_USER" -p"$LOCAL_DB_PASSWORD" "$LOCAL_DB_NAME" \
+              -e "SELECT COUNT(*) AS total, SUM(embedding IS NOT NULL) AS embedded, ROUND(100*SUM(embedding IS NOT NULL)/COUNT(*),1) AS pct FROM squads WHERE is_active=1;"
+
+            echo ""
+            echo "===== PM2 restart to refresh embedding cache ====="
+            pm2 restart ai-talent --update-env || true

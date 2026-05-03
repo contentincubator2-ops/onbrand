@@ -15,30 +15,55 @@ import { Card, CardBody, Chip, Divider } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faInstagram, faFacebook, faLinkedin, faYoutube, faTiktok,
+  faXTwitter, faLine, faPinterest, faSpotify,
 } from "@fortawesome/free-brands-svg-icons";
 import {
   faClock, faNewspaper, faWandMagicSparkles, faChevronRight,
+  faEnvelope, faGlobe, faBullhorn, faLayerGroup,
+  faHashtag, faMicrophone,
 } from "@fortawesome/free-solid-svg-icons";
 import type { MockupVariant, Platform } from "../../lib/inferMockup";
 import type { MockupFields } from "./shared";
 import { MockupHeader } from "./shared";
 
 const PLATFORM_ICON: Record<Platform, any> = {
-  instagram: faInstagram,
-  facebook:  faFacebook,
-  linkedin:  faLinkedin,
-  youtube:   faYoutube,
-  tiktok:    faTiktok,
-  generic:   faNewspaper,
+  instagram:    faInstagram,
+  facebook:     faFacebook,
+  linkedin:     faLinkedin,
+  youtube:      faYoutube,
+  tiktok:       faTiktok,
+  twitter:      faXTwitter,
+  line:         faLine,
+  pinterest:    faPinterest,
+  threads:      faHashtag,   // Threads has no FA icon yet
+  podcast:      faMicrophone,
+  email:        faEnvelope,
+  google:       faGlobe,
+  web:          faGlobe,
+  press:        faNewspaper,
+  deck:         faLayerGroup,
+  xiaohongshu:  faBullhorn,
+  generic:      faNewspaper,
 };
 
 const PLATFORM_LABEL: Record<Platform, string> = {
-  instagram: "Instagram",
-  facebook:  "Facebook",
-  linkedin:  "LinkedIn",
-  youtube:   "YouTube",
-  tiktok:    "TikTok",
-  generic:   "通用",
+  instagram:    "Instagram",
+  facebook:     "Facebook",
+  linkedin:     "LinkedIn",
+  youtube:      "YouTube",
+  tiktok:       "TikTok",
+  twitter:      "X (Twitter)",
+  line:         "LINE",
+  pinterest:    "Pinterest",
+  threads:      "Threads",
+  podcast:      "Podcast",
+  email:        "Email / EDM",
+  google:       "Google Ads",
+  web:          "官方網站",
+  press:        "新聞稿 / PR",
+  deck:         "簡報 Deck",
+  xiaohongshu:  "小紅書",
+  generic:      "通用",
 };
 
 interface Props extends MockupFields {

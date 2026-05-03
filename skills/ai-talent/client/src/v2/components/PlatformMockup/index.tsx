@@ -1,7 +1,7 @@
 /**
  * PlatformMockup — single entry, dispatches to platform/format variant.
  *
- * Variants implemented (55):
+ * Variants implemented (63):
  *   instagram: feed, carousel, reel, story, profile, live, ad
  *   facebook:  feed, reel, story, marketplace, event, ad, carousel
  *   linkedin:  feed, article, newsletter, poll, document,
@@ -16,6 +16,9 @@
  *   press:        press-release
  *   deck:         slide
  *   xiaohongshu:  note, xhs-video, xhs-search
+ *   threads:      post, thread
+ *   pinterest:    pin, board, story-pin
+ *   podcast:      episode, show, audiogram
  *   generic:      generic
  */
 import React from "react";
@@ -43,6 +46,9 @@ import { WebLanding, WebBlog, WebProduct } from "./web";
 import { PressRelease, DeckMockup } from "./press";
 import { GenericMockup } from "./generic";
 import { XHSNote, XHSVideo, XHSSearch } from "./xiaohongshu";
+import { ThreadsPost, ThreadsThread } from "./threads";
+import { PinterestPin, PinterestBoard, PinterestStoryPin } from "./pinterest";
+import { PodcastEpisode, PodcastShow, PodcastAudiogram } from "./podcast";
 import { UnsupportedVariantPlaceholder } from "./unsupported";
 
 export interface PlatformMockupProps extends MockupFields {
@@ -131,6 +137,20 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "xiaohongshu:note":       return <XHSNote   {...f} />;
     case "xiaohongshu:xhs-video":  return <XHSVideo  {...f} />;
     case "xiaohongshu:xhs-search": return <XHSSearch {...f} />;
+
+    // ── Threads (2) ───────────────────────────────────────────────────
+    case "threads:post":    return <ThreadsPost   {...f} />;
+    case "threads:thread":  return <ThreadsThread {...f} />;
+
+    // ── Pinterest (3) ─────────────────────────────────────────────────
+    case "pinterest:pin":       return <PinterestPin      {...f} />;
+    case "pinterest:board":     return <PinterestBoard    {...f} />;
+    case "pinterest:story-pin": return <PinterestStoryPin {...f} />;
+
+    // ── Podcast (3) ───────────────────────────────────────────────────
+    case "podcast:episode":   return <PodcastEpisode   {...f} />;
+    case "podcast:show":      return <PodcastShow      {...f} />;
+    case "podcast:audiogram": return <PodcastAudiogram {...f} />;
 
     // ── Generic ───────────────────────────────────────────────────────
     case "generic:generic": return <GenericMockup {...f} />;

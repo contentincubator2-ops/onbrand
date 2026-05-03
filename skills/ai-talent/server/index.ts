@@ -39,6 +39,7 @@ import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
 import { missionSquadRouter } from "./routes/missionSquadRoute";
 import { projectSyncCallbackRouter } from "./routes/projectSyncCallbackRoute";
+import { squadSearchRouter } from "./routers/squadSearchRouter";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
@@ -187,6 +188,7 @@ app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);
 app.use("/api/missions", missionSquadRouter);
 app.use("/api/project-sync", projectSyncCallbackRouter);
+app.use("/api/squads/search", squadSearchRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 app.get("/health", healthLimiter, async (_req, res) => {
