@@ -12,7 +12,7 @@
  *
  * Pure HeroUI tokens, no hex pins.
  */
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
@@ -381,7 +381,7 @@ export default function ProjectsPage() {
                 <div className="flex gap-3 px-1 pb-2">
                   {recent.map((m) => (
                     <div key={m.id} className="w-[200px] shrink-0">
-                      <MissionThumb
+                      <MissionCard
                         mission={m}
                         active={m.id === active?.id}
                         onClick={() => setActiveId(m.id)}
@@ -408,7 +408,7 @@ export default function ProjectsPage() {
               {viewMode === "grid" ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {all.map((m) => (
-                    <MissionThumb
+                    <MissionCard
                       key={m.id}
                       mission={m}
                       active={m.id === active?.id}
@@ -421,7 +421,7 @@ export default function ProjectsPage() {
                 <Card shadow="none" className="border border-divider overflow-hidden">
                   <div className="flex flex-col divide-y divide-divider">
                     {all.map((m) => (
-                      <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
+                      <MissionCardRow key={m.id} mission={m} onClick={() => goToMission(m)} />
                     ))}
                   </div>
                 </Card>
@@ -524,9 +524,9 @@ function FolderTile({ icon, label, hint }: { icon: any; label: string; hint: str
   );
 }
 
-/* ─────────────────────────── Mission thumb ──────────────────────────── */
+/* ─────────────────────────── MissionCard ──────────────────────────── */
 
-function MissionThumb({
+function MissionCard({
   mission, active, onClick, onOpen,
 }: {
   mission: MissionRow;
@@ -534,14 +534,40 @@ function MissionThumb({
   onClick: () => void;
   onOpen: () => void;
 }) {
+  const [hovered, setHovered] = React.useState(false);
+  const [imgIdx,  setImgIdx]  = React.useState(0);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
   const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
   const isLayerKnown = layerStr in LAYER_TOKENS;
   const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
-  const tone = LAYER_TOKENS[lk];
   const updatedTxt = formatRelative(mission.updatedAt);
 
+  // Build image list (same priority as MissionsHome MissionCard)
+  const thumbnailUrl: string | null = (mission as any).thumbnailUrl ?? null;
+  const squadMockupImages: string[] = Array.isArray((mission as any).squadMockupImages)
+    ? (mission as any).squadMockupImages : [];
+  const allImages: string[] = thumbnailUrl
+    ? [thumbnailUrl, ...squadMockupImages.filter(u => u !== thumbnailUrl)]
+    : squadMockupImages;
+  const hasImages = allImages.length > 0;
+
+  React.useEffect(() => {
+    if (hovered && allImages.length > 1) {
+      timerRef.current = setInterval(() => setImgIdx(i => (i + 1) % allImages.length), 1400);
+    } else {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (!hovered) setImgIdx(0);
+    }
+    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+  }, [hovered, allImages.length]);
+
   return (
-    <div className="group relative">
+    <div
+      className="group relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <Card
         isPressable
         isHoverable
@@ -553,10 +579,45 @@ function MissionThumb({
           active ? "ring-2 ring-primary ring-offset-2 ring-offset-content1" : "",
         ].join(" ")}
       >
-        <div className="relative w-full overflow-hidden bg-default-100" style={{ aspectRatio: "5 / 4" }}>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={70} />
-          </div>
+        <div className="relative w-full overflow-hidden bg-default-100" style={{ aspectRatio: "4 / 3" }}>
+          {hasImages ? (
+            <>
+              {allImages.map((url, i) => (
+                <div key={url} style={{
+                  position: "absolute", inset: 0,
+                  backgroundImage: `url(${url})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  opacity: i === imgIdx ? 1 : 0,
+                  transition: "opacity 0.4s ease-in-out",
+                }} />
+              ))}
+              <div style={{
+                position: "absolute", inset: 0,
+                background: hovered ? "rgba(0,0,0,0.10)" : "transparent",
+                transition: "background 0.15s ease-in-out",
+                pointerEvents: "none",
+              }} />
+              {allImages.length > 1 && hovered && (
+                <div style={{
+                  position: "absolute", bottom: 6, left: 0, right: 0,
+                  display: "flex", justifyContent: "center", gap: 4, pointerEvents: "none",
+                }}>
+                  {allImages.map((_, i) => (
+                    <div key={i} style={{
+                      width: i === imgIdx ? 14 : 5, height: 5, borderRadius: 3,
+                      background: i === imgIdx ? "white" : "rgba(255,255,255,0.5)",
+                      transition: "all 0.3s ease",
+                    }} />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <MethodologyGlyph seed={mission.squadSlug ?? mission.id} layer={lk} size={70} />
+            </div>
+          )}
           {isLayerKnown && (
             <Chip size="sm" variant="flat" className="absolute top-2 left-2 bg-content1/95 backdrop-blur-sm">
               {lk}
@@ -587,7 +648,7 @@ function MissionThumb({
   );
 }
 
-function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
   const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
   const lk = (layerStr in LAYER_TOKENS ? layerStr : "L1") as MosLayer;
   const tone = LAYER_TOKENS[lk];

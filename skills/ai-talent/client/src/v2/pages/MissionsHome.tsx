@@ -30,7 +30,7 @@ import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import { TaskChip } from "../components/TaskChip";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
-import CreateTaskModal from "../components/CreateTaskModal";
+import CreateMissionModal from "../components/CreateMissionModal";
 import { Avatar, Badge, Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -315,7 +315,7 @@ export default function MissionsHome() {
   const [typeFilter, setTypeFilter]   = useState<"any" | "squad" | "agent" | "skill">("any");
   const [sortMode,   setSortMode]     = useState<"recent" | "asc" | "desc">("recent");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  /** CreateTaskModal — open workspace key, null = closed */
+  /** CreateMissionModal — open workspace key, null = closed */
   const [modalWorkspace, setModalWorkspace] = useState<string | null>(null);
   /** Currently-selected channel tile for grid filter (kept for direct grid filtering) */
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -388,7 +388,7 @@ export default function MissionsHome() {
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
 
   const startFromTile = (t: QuickTile) => {
-    // ── Channel tile → open CreateTaskModal (squads + agents + skills filtered by workspace)
+    // ── Channel tile → open CreateMissionModal (squads + agents + skills filtered by workspace)
     if (t.filterWorkspace) {
       setModalWorkspace(t.filterWorkspace);
       return;
@@ -665,7 +665,7 @@ export default function MissionsHome() {
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {filteredRows.map((m) => (
-              <MissionThumb key={m.id} mission={m} onClick={() => goToMission(m)} />
+              <MissionCard key={m.id} mission={m} onClick={() => goToMission(m)} />
             ))}
           </div>
         ) : (
@@ -685,7 +685,7 @@ export default function MissionsHome() {
               <div style={{ width: 64, flexShrink: 0 }} />
             </div>
             {filteredRows.map((m) => (
-              <MissionListRow key={m.id} mission={m} onClick={() => goToMission(m)} />
+              <MissionCardRow key={m.id} mission={m} onClick={() => goToMission(m)} />
             ))}
           </div>
         )}
@@ -746,7 +746,7 @@ export default function MissionsHome() {
 
       {/* ─── CreateTask modal — Canva-style overlay ── */}
       {modalWorkspace && (
-        <CreateTaskModal
+        <CreateMissionModal
           open={!!modalWorkspace}
           initialWorkspace={modalWorkspace as any}
           onClose={() => setModalWorkspace(null)}
@@ -908,7 +908,7 @@ function CircleTile({
 /* ─────────────────────────── Mission thumb ─────────────────────────── */
 
 /**
- * MissionThumb — Canva-faithful card:
+ * MissionCard — Canva-faithful card:
  *   • No card border / shadow / white bg — thumbnail + text sit directly on page
  *   • Thumbnail 4:3, background rgba(64,79,109,0.06) (very pale blue-grey)
  *   • Platform icon centered, muted opacity (not vivid solid bg)
@@ -933,15 +933,39 @@ const CARD_MENU_ITEMS = [
   { key: "trash",        icon: faTrash,                   label: "移至垃圾桶",       accent: "#EF4444",  badge: null,    dividerAfter: false },
 ] as const;
 
-function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+function MissionCard({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
   const [hovered, setHovered] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [imgIdx,   setImgIdx]   = React.useState(0);
+  const menuRef  = React.useRef<HTMLDivElement>(null);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const updatedTxt = formatRelative(mission.updatedAt);
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsIcon = WS_ICON[ws] ?? null;
   const heroLabel = mission.squadName ?? mission.title ?? "";
   const heroLetter = heroLabel.trim().slice(0, 1).toUpperCase() || "M";
+
+  // Build image list: real output first, then squad mockups
+  // thumbnailUrl = output_image_url ?? cover_image_url ?? squad hero_image_url
+  const thumbnailUrl: string | null = (mission as any).thumbnailUrl ?? null;
+  const squadMockupImages: string[] = Array.isArray((mission as any).squadMockupImages)
+    ? (mission as any).squadMockupImages : [];
+  // All images for slideshow — deduped
+  const allImages: string[] = thumbnailUrl
+    ? [thumbnailUrl, ...squadMockupImages.filter(u => u !== thumbnailUrl)]
+    : squadMockupImages;
+  const hasImages = allImages.length > 0;
+
+  // Slideshow: cycle images every 1400ms when hovered + multiple images
+  React.useEffect(() => {
+    if (hovered && allImages.length > 1) {
+      timerRef.current = setInterval(() => setImgIdx(i => (i + 1) % allImages.length), 1400);
+    } else {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (!hovered) setImgIdx(0);
+    }
+    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+  }, [hovered, allImages.length]);
 
   // Close menu on outside click
   React.useEffect(() => {
@@ -962,7 +986,7 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
       onMouseLeave={() => { setHovered(false); }}
       onClick={onClick}
     >
-      {/* ── Thumbnail — 4:3, pale neutral bg ── */}
+      {/* ── Thumbnail — 4:3 ── */}
       <div style={{
         position: "relative",
         width: "100%",
@@ -972,16 +996,54 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
         overflow: "hidden",
         transition: "background-color 0.15s ease-in-out",
       }}>
-        {/* Centered muted icon */}
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {wsIcon ? (
-            <FontAwesomeIcon icon={wsIcon.icon} style={{ fontSize: 52, color: wsIcon.bg, opacity: 0.28 }} />
-          ) : (
-            <span style={{ fontSize: 52, fontWeight: 800, color: "rgba(64,79,109,0.18)", lineHeight: 1, userSelect: "none" }}>
-              {heroLetter}
-            </span>
-          )}
-        </div>
+        {/* Real images / mockup slideshow */}
+        {hasImages ? (
+          <>
+            {allImages.map((url, i) => (
+              <div key={url} style={{
+                position: "absolute", inset: 0,
+                backgroundImage: `url(${url})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                opacity: i === imgIdx ? 1 : 0,
+                transition: "opacity 0.4s ease-in-out",
+              }} />
+            ))}
+            {/* Subtle dark overlay on hover so overlay buttons stay readable */}
+            <div style={{
+              position: "absolute", inset: 0,
+              background: hovered ? "rgba(0,0,0,0.12)" : "transparent",
+              transition: "background 0.15s ease-in-out",
+              pointerEvents: "none",
+            }} />
+            {/* Dot indicators (hover + multiple images) */}
+            {allImages.length > 1 && hovered && (
+              <div style={{
+                position: "absolute", bottom: 6, left: 0, right: 0,
+                display: "flex", justifyContent: "center", gap: 4, pointerEvents: "none",
+              }}>
+                {allImages.map((_, i) => (
+                  <div key={i} style={{
+                    width: i === imgIdx ? 14 : 5, height: 5,
+                    borderRadius: 3, background: i === imgIdx ? "white" : "rgba(255,255,255,0.5)",
+                    transition: "all 0.3s ease",
+                  }} />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Fallback: muted workspace icon / letter */
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {wsIcon ? (
+              <FontAwesomeIcon icon={wsIcon.icon} style={{ fontSize: 52, color: wsIcon.bg, opacity: 0.28 }} />
+            ) : (
+              <span style={{ fontSize: 52, fontWeight: 800, color: "rgba(64,79,109,0.18)", lineHeight: 1, userSelect: "none" }}>
+                {heroLetter}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Top-left: checkbox (opacity 0→1 on hover) */}
         <div style={{
@@ -1127,7 +1189,7 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
   );
 }
 
-function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
   const [hovered, setHovered] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -1258,7 +1320,7 @@ function MissionListRow({ mission, onClick }: { mission: MissionRow; onClick: ()
         </button>
       </div>
 
-      {/* Context menu panel (slides from right, same items as MissionThumb) */}
+      {/* Context menu panel (slides from right, same items as MissionCard) */}
       {menuOpen && (
         <div
           ref={menuRef}
@@ -1323,7 +1385,7 @@ const WORKSPACE_BADGE: Record<string, { glyph: string; color: string }> = {
   "brand-positioning": { glyph: "品", color: "#5B3CC8" },
 };
 
-/** Platform / workspace FA icon + brand colour for MissionThumb hero area. */
+/** Platform / workspace FA icon + brand colour for MissionCard hero area. */
 const WS_ICON: Record<string, { icon: any; bg: string; fg: string }> = {
   facebook:           { icon: faFacebookF,  bg: "#1877F2", fg: "#ffffff" },
   instagram:          { icon: faInstagram,  bg: "#E4405F", fg: "#ffffff" },

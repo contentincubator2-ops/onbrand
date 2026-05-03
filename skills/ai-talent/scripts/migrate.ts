@@ -1077,6 +1077,42 @@ async function main() {
       console.log("[migrate] task_catalog.methodology_label: already exists, skipped");
     }
 
+    // Add output_image_url + cover_image_url to missions (idempotent)
+    // output_image_url: written after execution completes (real output screenshot / cover)
+    // cover_image_url:  user-customisable cover (future feature)
+    const [missionImgCols] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'missions'
+         AND COLUMN_NAME IN ('output_image_url', 'cover_image_url')
+    `) as any;
+    const haveMissionImgCols = new Set((missionImgCols as any[]).map((r: any) => r.COLUMN_NAME));
+    if (!haveMissionImgCols.has("output_image_url")) {
+      await conn.execute(`ALTER TABLE missions ADD COLUMN output_image_url TEXT NULL COMMENT 'Real output image written after execution'`);
+      console.log("[migrate] missions.output_image_url: added");
+    } else {
+      console.log("[migrate] missions.output_image_url: already exists, skipped");
+    }
+    if (!haveMissionImgCols.has("cover_image_url")) {
+      await conn.execute(`ALTER TABLE missions ADD COLUMN cover_image_url TEXT NULL COMMENT 'User-customisable cover image'`);
+      console.log("[migrate] missions.cover_image_url: added");
+    } else {
+      console.log("[migrate] missions.cover_image_url: already exists, skipped");
+    }
+
+    // Add mockup_images JSON array column to squads (idempotent)
+    // Stores an ordered list of image URLs shown in the card hover slideshow.
+    const [mockupImgCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'squads'
+         AND COLUMN_NAME = 'mockup_images'
+    `) as any;
+    if ((mockupImgCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE squads ADD COLUMN mockup_images TEXT NULL COMMENT 'JSON array of mockup image URLs for hover slideshow'`);
+      console.log("[migrate] squads.mockup_images: added");
+    } else {
+      console.log("[migrate] squads.mockup_images: already exists, skipped");
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

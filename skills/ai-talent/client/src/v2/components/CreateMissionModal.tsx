@@ -1,5 +1,5 @@
 /**
- * CreateTaskModal — Canva「建立設計」modal, pixel-faithful.
+ * CreateMissionModal — Canva「建立設計」modal, pixel-faithful.
  *
  * Layout:
  *   ┌─────────────────────────────────────────────────┐  ✕ (outside card)
@@ -102,7 +102,7 @@ const WS_INFO: Record<string, { icon: any; color: string }> = {
 /* ════════════════════════════════════════════════════════════════════ */
 interface Props { open: boolean; initialWorkspace: string; onClose: () => void; }
 
-export default function CreateTaskModal({ open, initialWorkspace, onClose }: Props) {
+export default function CreateMissionModal({ open, initialWorkspace, onClose }: Props) {
   const navigate = useNavigate();
 
   const [category, setCategory]     = useState<CategoryKey>(() => (WS_TO_CAT[initialWorkspace] ?? "recommended") as CategoryKey);
@@ -194,21 +194,16 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
         animation: "fadeIn 0.15s ease-out",
       }}
     >
-      {/* ── White modal card ── */}
+      {/* ── Wrapper: positions card + X button together, overflow visible ── */}
       <div
         onClick={e => e.stopPropagation()}
         style={{
           position: "relative",
           width: "100%", maxWidth: 1120,
-          height: "min(88vh, 760px)",
-          background: "#fff",
-          borderRadius: 16,
-          boxShadow: "0 32px 100px rgba(0,0,0,0.28)",
-          display: "flex", overflow: "hidden",
           animation: "modalSlideUp 0.2s ease-out",
         }}
       >
-        {/* ✕ — floating just outside top-right of card */}
+        {/* ✕ — outside card top-right, won't be clipped */}
         <button
           onClick={onClose}
           style={{
@@ -226,6 +221,16 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
           <FontAwesomeIcon icon={faXmark} />
         </button>
 
+        {/* ── White modal card ── */}
+        <div style={{
+          width: "100%",
+          height: "min(88vh, 760px)",
+          background: "#fff",
+          borderRadius: 16,
+          boxShadow: "0 32px 100px rgba(0,0,0,0.28)",
+          display: "flex", overflow: "hidden",
+        }}>
+
         {/* ── Left sidebar ── */}
         <aside style={{
           width: 230, flexShrink: 0,
@@ -233,7 +238,7 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
           overflowY: "auto", padding: "28px 0 20px",
           display: "flex", flexDirection: "column",
         }}>
-          {/* Title in left panel — exactly like Canva */}
+          {/* Title */}
           <h2 style={{
             fontSize: 22, fontWeight: 700, color: "#111827",
             margin: "0 0 20px", padding: "0 20px",
@@ -242,38 +247,99 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
             建立任務
           </h2>
 
-          {/* Category list */}
-          {CATEGORIES.map(cat => {
-            const active = category === cat.key;
-            return (
+          {channel !== "all" ? (
+            /* ── Channel mode: show sub-categories for the selected channel ── */
+            <>
+              {/* Back to top-level */}
               <button
-                key={cat.key}
-                onClick={() => { setCategory(cat.key); setChannel("all"); setContentType("all"); }}
+                onClick={() => { setChannel("all"); setContentType("all"); }}
                 style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 10,
-                  padding: "10px 20px", border: "none", textAlign: "left", cursor: "pointer",
-                  background: active ? "rgba(124,58,237,0.07)" : "transparent",
-                  transition: "background 0.1s",
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "6px 20px 12px", border: "none", background: "transparent",
+                  cursor: "pointer", color: "#9CA3AF", fontSize: 12,
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(124,58,237,0.07)" : "transparent"; }}
+                onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
+                onMouseLeave={e => (e.currentTarget.style.color = "#9CA3AF")}
               >
-                <FontAwesomeIcon
-                  icon={cat.icon}
-                  style={{
-                    fontSize: 15, width: 18, flexShrink: 0,
-                    color: active ? cat.color : "#9CA3AF",
-                  }}
-                />
-                <span style={{
-                  fontSize: 13, fontWeight: active ? 600 : 400,
-                  color: active ? "#7C3AED" : "#374151",
-                }}>
-                  {cat.label}
-                </span>
+                ← 返回
               </button>
-            );
-          })}
+
+              {/* Channel header */}
+              {(() => {
+                const tabDef = tabs.find(t => t.key === channel);
+                if (!tabDef) return null;
+                return (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "4px 20px 14px",
+                    borderBottom: "1px solid rgba(0,0,0,0.07)",
+                    marginBottom: 8,
+                  }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: tabDef.color,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <FontAwesomeIcon icon={tabDef.icon} style={{ fontSize: 12, color: "#fff" }} />
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
+                      {tabDef.label}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              {/* 全部 */}
+              <SidebarItem
+                label="全部"
+                active={contentType === "all"}
+                color={WS_INFO[channel]?.color ?? "#7C3AED"}
+                onClick={() => setContentType("all")}
+              />
+
+              {/* Content type sub-categories */}
+              {(CONTENT_TYPES[channel] ?? []).map(ct => (
+                <SidebarItem
+                  key={ct.value}
+                  label={ct.label}
+                  active={contentType === ct.value}
+                  color={WS_INFO[channel]?.color ?? "#7C3AED"}
+                  onClick={() => setContentType(ct.value)}
+                />
+              ))}
+            </>
+          ) : (
+            /* ── Default mode: top-level categories (no 上傳) ── */
+            CATEGORIES.filter(c => c.key !== "upload").map(cat => {
+              const active = category === cat.key;
+              return (
+                <button
+                  key={cat.key}
+                  onClick={() => { setCategory(cat.key); setChannel("all"); setContentType("all"); }}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 20px", border: "none", textAlign: "left", cursor: "pointer",
+                    background: active ? "rgba(124,58,237,0.07)" : "transparent",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(124,58,237,0.07)" : "transparent"; }}
+                >
+                  <FontAwesomeIcon
+                    icon={cat.icon}
+                    style={{ fontSize: 15, width: 18, flexShrink: 0, color: active ? cat.color : "#9CA3AF" }}
+                  />
+                  <span style={{
+                    fontSize: 13, fontWeight: active ? 600 : 400,
+                    color: active ? "#7C3AED" : "#374151",
+                  }}>
+                    {cat.label}
+                  </span>
+                </button>
+              );
+            })
+          )}
         </aside>
 
         {/* ── Main area ── */}
@@ -302,8 +368,8 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
             </div>
           </div>
 
-          {/* Channel tabs row — horizontal scroll, no scrollbar */}
-          {tabs.length > 0 && (
+          {/* Channel tabs row — only shown when no specific channel is selected */}
+          {tabs.length > 0 && channel === "all" && (
             <div style={{
               flexShrink: 0, padding: "12px 24px 0",
               display: "flex", gap: 6, alignItems: "center",
@@ -320,29 +386,29 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
                   key={t.key}
                   label={t.label} icon={t.icon} iconColor={t.color}
                   active={channel === t.key}
-                  onClick={() => { setChannel(t.key); setContentType("all"); }}
+                  onClick={() => {
+                    const cat = WS_TO_CAT[t.key];
+                    if (cat) setCategory(cat);
+                    setChannel(t.key);
+                    setContentType("all");
+                  }}
                 />
               ))}
             </div>
           )}
 
-          {/* Sub-chips */}
-          {chips.length > 0 && (
-            <div style={{
-              flexShrink: 0, padding: "8px 24px 0",
-              display: "flex", gap: 6, flexWrap: "wrap",
-            }}>
-              <SubChip label="全部" active={contentType === "all"} color={WS_INFO[channel]?.color ?? "#7C3AED"} onClick={() => setContentType("all")} />
-              {chips.map(c => (
-                <SubChip key={c.value} label={c.label} active={contentType === c.value} color={WS_INFO[channel]?.color ?? "#7C3AED"} onClick={() => setContentType(c.value)} />
-              ))}
-            </div>
-          )}
-
-          {/* Section label */}
-          <div style={{ flexShrink: 0, padding: "14px 24px 6px" }}>
+          {/* Section label — shows breadcrumb when channel is selected */}
+          <div style={{ flexShrink: 0, padding: "14px 24px 6px", display: "flex", alignItems: "center", gap: 6 }}>
+            {channel !== "all" && (
+              <span style={{ fontSize: 12, color: "#9CA3AF" }}>
+                {tabs.find(t => t.key === channel)?.label ?? ""}
+                {contentType !== "all" && " ›"}
+              </span>
+            )}
             <p style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: 0 }}>
-              {sectionLabel}
+              {contentType !== "all"
+                ? (CONTENT_TYPES[channel] ?? []).find(c => c.value === contentType)?.label ?? sectionLabel
+                : sectionLabel}
             </p>
           </div>
 
@@ -359,14 +425,49 @@ export default function CreateTaskModal({ open, initialWorkspace, onClose }: Pro
                 gap: 16,
               }}>
                 {filtered.map((e: any) => (
-                  <EntityCard key={`${e.kind}-${e.slug}`} entity={e} onSelect={() => handleSelect(e)} />
+                  <SquadCard key={`${e.kind}-${e.slug}`} entity={e} onSelect={() => handleSelect(e)} />
                 ))}
               </div>
             )}
           </div>
         </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+/* ── Sidebar item (channel sub-category) ─────────────────────────── */
+function SidebarItem({ label, active, color, onClick }: {
+  label: string; active: boolean; color: string; onClick: () => void;
+}) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "9px 20px", border: "none", textAlign: "left", cursor: "pointer",
+        background: active ? `${color}14` : hov ? "rgba(0,0,0,0.04)" : "transparent",
+        transition: "background 0.1s",
+      }}
+    >
+      {/* Active indicator dot */}
+      <div style={{
+        width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+        background: active ? color : "transparent",
+        border: active ? "none" : "1.5px solid #D1D5DB",
+        transition: "background 0.1s, border 0.1s",
+      }} />
+      <span style={{
+        fontSize: 13, fontWeight: active ? 600 : 400,
+        color: active ? color : "#374151",
+      }}>
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -419,8 +520,9 @@ function SubChip({ label, active, color, onClick }: {
   );
 }
 
-/* ── Entity card — Canva-style landscape card ─────────────────────── */
+/* ── SquadCard — Canva-style landscape card (squad template picker) ── */
 /**
+ * Displays a squad template card inside CreateMissionModal.
  * Priority:
  *   1. entity.coverImageUrl (real squad hero image) — shown as bg-cover photo
  *   2. entity.mockupImages[] (multiple mockups) — hover slides through them
@@ -429,7 +531,7 @@ function SubChip({ label, active, color, onClick }: {
  * Multiple mockup images: on hover a CSS animation cycles through them
  * (each image fades/slides in every 1.2s while card is hovered).
  */
-function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
+function SquadCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
   const [hov, setHov]         = useState(false);
   const [imgIdx, setImgIdx]   = useState(0);
   const timerRef              = useRef<ReturnType<typeof setInterval> | null>(null);

@@ -47,10 +47,14 @@ export const missionRouter = router({
         SELECT m.id, m.title, m.description, m.workspace, m.methodology,
                m.squadSlug AS squadSlug, m.brandId AS brandId,
                m.status, m.updatedAt AS updatedAt,
+               m.output_image_url AS outputImageUrl,
+               m.cover_image_url  AS coverImageUrl,
                b.name AS brandName,
                s.name AS squadName,
                s.strategy_layer AS squadLayer,
-               s.steps AS squadSteps
+               s.steps AS squadSteps,
+               s.hero_image_url AS squadHeroImageUrl,
+               s.mockup_images  AS squadMockupImages
           FROM missions m
           LEFT JOIN brands b ON b.id = m.brandId
           LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
@@ -62,15 +66,35 @@ export const missionRouter = router({
       // drizzle returns [rows, fields] for raw execute on mysql2
       const data = Array.isArray(rows) ? rows[0] : (rows as any).rows ?? rows;
       const arr = Array.isArray(data) ? data : [];
-      // Compute step count per row from steps JSON, then drop the raw JSON
+      // Compute step count + resolve thumbnail priority, then drop raw JSON blobs
       return arr.map((r: any) => {
         let steps: any = r.squadSteps;
         if (typeof steps === "string") {
           try { steps = JSON.parse(steps); } catch { steps = null; }
         }
         const stepCount = Array.isArray(steps) ? steps.length : null;
-        const { squadSteps, ...rest } = r;
-        return { ...rest, squadStepCount: stepCount };
+
+        // Parse squad mockup_images JSON array (may be null if column not yet populated)
+        let squadMockupImages: string[] = [];
+        if (r.squadMockupImages) {
+          try { squadMockupImages = JSON.parse(r.squadMockupImages); } catch { /* ignore */ }
+        }
+
+        // Resolved thumbnail priority:
+        //   1. missions.output_image_url  — real output after execution
+        //   2. missions.cover_image_url   — user-set cover
+        //   3. squads.hero_image_url      — squad mockup (fallback)
+        // squadMockupImages[] is passed separately for hover slideshow
+        const thumbnailUrl: string | null =
+          r.outputImageUrl ?? r.coverImageUrl ?? r.squadHeroImageUrl ?? null;
+
+        const { squadSteps, squadMockupImages: _raw, ...rest } = r;
+        return {
+          ...rest,
+          squadStepCount: stepCount,
+          squadMockupImages,
+          thumbnailUrl,
+        };
       });
     }),
 

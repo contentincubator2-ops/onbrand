@@ -150,6 +150,13 @@ export interface HomeEntity {
    * Client falls back to MethodologyGlyph when null.
    */
   coverImageUrl?: string | null;
+
+  /**
+   * Ordered list of mockup image URLs for the card hover slideshow.
+   * Stored as JSON array in squads.mockup_images.
+   * When length > 1 the card cycles through them every 1400 ms on hover.
+   */
+  mockupImages?: string[];
 }
 
 const KIND_LABELS = {
@@ -165,7 +172,7 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
             agents, steps,
             strategy_layer, methodology, workspace,
             task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind,
-            hero_image_url, is_curated
+            hero_image_url, mockup_images, is_curated
        FROM squads
       WHERE is_active = 1
       ORDER BY COALESCE(tier, 99) ASC, id ASC
@@ -224,6 +231,7 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
         ? { platform: String(r.mockup_platform), format: String(r.mockup_format) }
         : undefined,
       coverImageUrl: r.hero_image_url ?? null,
+      mockupImages: safeJsonParse<string[]>(r.mockup_images, []),
       isCurated: Number(r.is_curated) === 1,
     };
   });
