@@ -9,11 +9,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: appleboy/ssh-action@v1.0.3
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 600s
+          envs: GH_PAT
           script: |
             set -e
             APP=/opt/marketing-os/app
@@ -21,7 +24,9 @@ jobs:
 
             echo "===== 1. Pull latest code ====="
             cd "$APP"
-            git fetch origin main
+            # Inject token for this fetch only (not stored permanently)
+            git -c "url.https://x-access-token:${GH_PAT}@github.com/.insteadOf=https://github.com/" \
+              fetch origin main
             git reset --hard origin/main
             echo "Commit: $(git log --oneline -1)"
 
