@@ -18,6 +18,7 @@ import {
   faMicrophone, faBookBookmark, faEllipsis, faBell,
   faPlus, faRightFromBracket,
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
+  faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
 } from "@fortawesome/free-solid-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
@@ -288,7 +289,7 @@ function IconBar({
           </button>
         </Tooltip>
 
-        {/* Avatar */}
+        {/* Avatar — opens AccountPopup */}
         <div ref={avatarRef} style={{ position: "relative" }}>
           <button
             onClick={() => setAvatarOpen((v) => !v)}
@@ -297,49 +298,16 @@ function IconBar({
           >
             <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold text-sm" }} />
           </button>
-
           {avatarOpen && (
-            <div
-              style={{
-                position: "absolute", bottom: "calc(100% + 8px)", left: "calc(100% + 8px)",
-                width: 300, borderRadius: 16, border: "1px solid #f3f4f6",
-                background: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.12)", zIndex: 50,
-                animation: "slideInUp 0.15s ease-out",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderBottom: "1px solid #f3f4f6" }}>
-                <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold" }} />
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>SoWork</p>
-                  <p style={{ fontSize: 11, color: "#9ca3af" }}>sowork@sowork.tw</p>
-                </div>
-              </div>
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6" }}>
-                <p style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>工作範圍</p>
-                <ScopeBar scope={scope} setScope={setScope} />
-              </div>
-              <div style={{ padding: 8 }}>
-                {[
-                  { icon: faGear, label: "設定", action: () => {} },
-                  { icon: faRightFromBracket, label: "從所有帳號登出", action: async () => {
-                    try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
-                    window.location.href = "/auth/login";
-                  }},
-                ].map((item) => (
-                  <button key={item.label} onClick={item.action} style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 10px", borderRadius: 8, border: "none", background: "none",
-                    fontSize: 13, color: "#374151", cursor: "pointer", transition: "background 0.1s",
-                  }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "none")}
-                  >
-                    <FontAwesomeIcon icon={item.icon} style={{ color: "#9ca3af", width: 16 }} />
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <>
+              <div onClick={() => setAvatarOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 49 }} />
+              <AccountPopup
+                scope={scope}
+                setScope={setScope}
+                onLogout={onLogout}
+                onClose={() => setAvatarOpen(false)}
+              />
+            </>
           )}
         </div>
       </div>
@@ -573,6 +541,262 @@ function PanelRow({ initial, initialBg, initialColor, label, onClick }: {
         {label}
       </span>
     </button>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Account popup (S button) — Canva-style with sub-panels
+══════════════════════════════════════════════════════════════════ */
+
+type SubPanel = "account" | "brand" | "product" | "event" | null;
+
+// Stub data — replace with real tRPC queries when available
+const STUB_BRANDS   = [{ id: 1, name: "SoWork 品牌" }, { id: 2, name: "Pokémon GO" }];
+const STUB_PRODUCTS = [{ id: 1, name: "Marketing OS" }, { id: 2, name: "AI Agent 方案" }];
+const STUB_EVENTS   = [{ id: 1, name: "2025 Q2 發布會" }, { id: 2, name: "染色球派對" }];
+
+function AccountPopup({ scope, setScope, onLogout, onClose }: {
+  scope: ScopeState;
+  setScope: (s: ScopeState) => void;
+  onLogout: () => void;
+  onClose: () => void;
+}) {
+  const [subPanel, setSubPanel] = React.useState<SubPanel>(null);
+
+  const currentBrand   = STUB_BRANDS.find(b => b.id === scope.brandId)?.name ?? "選擇品牌";
+  const currentProduct = scope.productId ? STUB_PRODUCTS.find(p => p.id === scope.productId)?.name ?? "選擇產品" : "選擇產品";
+  const currentEvent   = scope.eventId   ? STUB_EVENTS.find(e => e.id === scope.eventId)?.name   ?? "選擇活動" : "選擇活動";
+
+  return (
+    <div style={{
+      position: "fixed",
+      left: ICON_W + 8,
+      bottom: 12,
+      zIndex: 50,
+      display: "flex",
+      alignItems: "flex-end",
+      gap: 6,
+    }}>
+      {/* ── Main card ── */}
+      <div style={{
+        width: 320,
+        borderRadius: 16,
+        border: "1px solid #e5e7eb",
+        background: "#fff",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
+        overflow: "hidden",
+        animation: "notifPopIn 0.18s cubic-bezier(0.34,1.56,0.64,1) forwards",
+        transformOrigin: "bottom left",
+      }}>
+
+        {/* ① Account row */}
+        <div style={{ padding: "6px 6px 4px" }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em", padding: "6px 10px 4px" }}>帳號</p>
+          <MenuRow
+            icon={<Avatar name="S" size="sm" radius="full" color="primary" classNames={{ name: "font-bold text-xs" }} />}
+            label="SoWork"
+            sub="sowork@sowork.tw"
+            active={subPanel === "account"}
+            hasArrow
+            onClick={() => setSubPanel(v => v === "account" ? null : "account")}
+          />
+        </div>
+
+        <div style={{ height: 1, background: "#f3f4f6", margin: "0 0" }} />
+
+        {/* ② 工作範圍 — brand / product / event */}
+        <div style={{ padding: "4px 6px" }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em", padding: "6px 10px 4px" }}>工作範圍</p>
+
+          <MenuRow
+            icon={<span style={{ width: 32, height: 32, borderRadius: 8, background: "#fff7ed", display: "flex", alignItems: "center", justifyContent: "center", color: "#F97316", fontSize: 14 }}><FontAwesomeIcon icon={faBuilding} /></span>}
+            label="品牌"
+            sub={currentBrand}
+            active={subPanel === "brand"}
+            hasArrow
+            onClick={() => setSubPanel(v => v === "brand" ? null : "brand")}
+          />
+          <MenuRow
+            icon={<span style={{ width: 32, height: 32, borderRadius: 8, background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", color: "#16a34a", fontSize: 14 }}><FontAwesomeIcon icon={faBoxOpen} /></span>}
+            label="產品"
+            sub={currentProduct}
+            active={subPanel === "product"}
+            hasArrow
+            onClick={() => setSubPanel(v => v === "product" ? null : "product")}
+          />
+          <MenuRow
+            icon={<span style={{ width: 32, height: 32, borderRadius: 8, background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#2563eb", fontSize: 14 }}><FontAwesomeIcon icon={faCalendarDays} /></span>}
+            label="活動"
+            sub={currentEvent}
+            active={subPanel === "event"}
+            hasArrow
+            onClick={() => setSubPanel(v => v === "event" ? null : "event")}
+          />
+        </div>
+
+        <div style={{ height: 1, background: "#f3f4f6" }} />
+
+        {/* ③ Actions */}
+        <div style={{ padding: "4px 6px 6px" }}>
+          <MenuRow icon={<FAIcon icon={faGear} />}            label="設定"           onClick={() => {}} />
+          <MenuRow icon={<FAIcon icon={faRightFromBracket} />} label="從所有帳號登出" onClick={onLogout} danger />
+        </div>
+      </div>
+
+      {/* ── Sub-panel (slides in to the right) ── */}
+      {subPanel && (
+        <div style={{
+          width: 280,
+          borderRadius: 16,
+          border: "1px solid #e5e7eb",
+          background: "#fff",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
+          overflow: "hidden",
+          animation: "notifPopIn 0.15s cubic-bezier(0.34,1.56,0.64,1) forwards",
+          transformOrigin: "bottom left",
+          maxHeight: 400,
+          display: "flex", flexDirection: "column",
+        }}>
+          {subPanel === "account" && <AccountSubPanel onClose={() => setSubPanel(null)} />}
+          {subPanel === "brand"   && (
+            <ScopeSubPanel
+              title="切換品牌"
+              items={STUB_BRANDS}
+              selectedId={scope.brandId ?? null}
+              onSelect={(id) => { setScope({ ...scope, brandId: id }); setSubPanel(null); }}
+              color="#F97316"
+              onClose={() => setSubPanel(null)}
+            />
+          )}
+          {subPanel === "product" && (
+            <ScopeSubPanel
+              title="切換產品"
+              items={STUB_PRODUCTS}
+              selectedId={scope.productId ?? null}
+              onSelect={(id) => { setScope({ ...scope, productId: id }); setSubPanel(null); }}
+              color="#16a34a"
+              onClose={() => setSubPanel(null)}
+            />
+          )}
+          {subPanel === "event" && (
+            <ScopeSubPanel
+              title="切換活動"
+              items={STUB_EVENTS}
+              selectedId={scope.eventId ?? null}
+              onSelect={(id) => { setScope({ ...scope, eventId: id }); setSubPanel(null); }}
+              color="#2563eb"
+              onClose={() => setSubPanel(null)}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* helper: icon button */
+function FAIcon({ icon }: { icon: any }) {
+  return (
+    <span style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 15 }}>
+      <FontAwesomeIcon icon={icon} />
+    </span>
+  );
+}
+
+/* reusable menu row */
+function MenuRow({ icon, label, sub, active, hasArrow, onClick, danger }: {
+  icon: React.ReactNode; label: string; sub?: string;
+  active?: boolean; hasArrow?: boolean; onClick: () => void; danger?: boolean;
+}) {
+  return (
+    <button onClick={onClick} style={{
+      width: "100%", display: "flex", alignItems: "center", gap: 10,
+      padding: "7px 10px", borderRadius: 10, border: "none", textAlign: "left", cursor: "pointer",
+      background: active ? "#fff7ed" : "none",
+      transition: "background 0.1s",
+    }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? "#fff7ed" : "none"; }}
+    >
+      {icon}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 500, color: danger ? "#ef4444" : "#111827", lineHeight: 1.3 }}>{label}</p>
+        {sub && <p style={{ fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</p>}
+      </div>
+      {hasArrow && <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }} />}
+    </button>
+  );
+}
+
+/* account sub-panel (switch account) */
+function AccountSubPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <>
+      <div style={{ padding: "12px 14px 8px", borderBottom: "1px solid #f3f4f6" }}>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>切換帳號</p>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
+        {[
+          { name: "SoWork", email: "sowork@sowork.tw", active: true, color: "#7c3aed" },
+          { name: "C.J. Wang", email: "biomba.cj@gmail.com", active: false, color: "#0891b2" },
+        ].map((acc) => (
+          <button key={acc.email} style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 10, border: "none", background: "none", cursor: "pointer", transition: "background 0.1s",
+          }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          >
+            <span style={{ width: 36, height: 36, borderRadius: "50%", background: acc.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+              {acc.name.slice(0, 1)}
+            </span>
+            <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>{acc.name}</p>
+              <p style={{ fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc.email}</p>
+            </div>
+            {acc.active && <FontAwesomeIcon icon={faCheck} style={{ color: "#F97316", fontSize: 13 }} />}
+          </button>
+        ))}
+        <button style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, border: "none", background: "none", cursor: "pointer", fontSize: 13, color: "#374151", transition: "background 0.1s" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+          onMouseLeave={e => (e.currentTarget.style.background = "none")}
+        >
+          <span style={{ width: 36, height: 36, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: 16 }}>+</span>
+          新增其他帳號
+        </button>
+      </div>
+    </>
+  );
+}
+
+/* scope sub-panel (brand / product / event) */
+function ScopeSubPanel({ title, items, selectedId, onSelect, color, onClose }: {
+  title: string; items: { id: number; name: string }[];
+  selectedId: number | null; onSelect: (id: number) => void; color: string; onClose: () => void;
+}) {
+  return (
+    <>
+      <div style={{ padding: "12px 14px 8px", borderBottom: "1px solid #f3f4f6" }}>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{title}</p>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
+        {items.map((item) => (
+          <button key={item.id} onClick={() => onSelect(item.id)} style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 10, border: "none", background: "none", cursor: "pointer", transition: "background 0.1s",
+          }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          >
+            <span style={{ width: 32, height: 32, borderRadius: 8, background: "#f9fafb", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#6b7280", flexShrink: 0 }}>
+              {item.name.slice(0, 1)}
+            </span>
+            <span style={{ flex: 1, fontSize: 13, color: "#111827", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+            {selectedId === item.id && <FontAwesomeIcon icon={faCheck} style={{ color, fontSize: 13 }} />}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
