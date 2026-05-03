@@ -435,7 +435,7 @@ export default function MissionsHome() {
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
               <FontAwesomeIcon icon={faWandSparkles} className="text-xs" />
-              瀏覽方法論型錄
+              ✦ 先睹為快
             </button>
             <button
               onClick={() => setCreateSource("recommended")}
@@ -500,30 +500,9 @@ export default function MissionsHome() {
             />
           </div>
 
-          {/* Filter pills */}
-          <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
-            <FilterChip
-              label={kindLabelMap[kindFilter] ?? "類型"}
-              options={kindOptions}
-              onSelect={(v) => setKindFilter(v as typeof kindFilter)}
-            />
-            <FilterChip
-              label={selectedLayer === "ALL" ? "類別" : `${selectedLayer}・${LAYER_TOKENS[selectedLayer].label}`}
-              options={[
-                { value: "ALL", label: "全部層級" },
-                { value: "L1", label: "L1・品牌策略" },
-                { value: "L2", label: "L2・產品策略" },
-                { value: "L3", label: "L3・受眾策略" },
-                { value: "L4", label: "L4・通路策略" },
-                { value: "L5", label: "L5・活動策略" },
-                { value: "L6", label: "L6・驗證校準" },
-              ]}
-              onSelect={(v) => setSelectedLayer(v as MosLayer | "ALL")}
-            />
-          </div>
-
-          {/* Quick-start tiles */}
-          <div className="mt-8 flex items-start justify-center gap-2 flex-wrap">
+          {/* Quick-start tiles — single horizontal scroll row (Canva-style) */}
+          <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <div className="flex items-start gap-2 w-max mx-auto px-2">
             {QUICK_TILES.map((t) => (
               <CircleTile
                 key={t.label}
@@ -533,6 +512,7 @@ export default function MissionsHome() {
                 onClick={() => startFromTile(t)}
               />
             ))}
+          </div>
           </div>
         </div>
       </section>

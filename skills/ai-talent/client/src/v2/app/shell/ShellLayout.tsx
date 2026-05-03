@@ -298,19 +298,18 @@ function SidebarNavLink({
 }) {
   if (collapsed) {
     return (
-      <Tooltip content={item.label} placement="right">
-        <button
-          onClick={onClick}
-          aria-label={item.label}
-          style={{ transition: "color 0.1s linear, transform 0.07s" }}
-          className={[
-            "w-full mt-1 flex items-center justify-center py-2.5",
-            active ? "text-[#F97316]" : "text-default-400 hover:text-default-700",
-          ].join(" ")}
-        >
-          <span className={`leading-none ${active ? "text-base" : "text-sm"}`}>{item.icon}</span>
-        </button>
-      </Tooltip>
+      <button
+        onClick={onClick}
+        aria-label={item.label}
+        style={{ transition: "color 0.1s linear, transform 0.07s" }}
+        className={[
+          "w-full mt-1 flex flex-col items-center gap-0.5 py-2",
+          active ? "text-[#7b2ff7]" : "text-default-400 hover:text-default-700",
+        ].join(" ")}
+      >
+        <span className={`leading-none ${active ? "text-base" : "text-sm"}`}>{item.icon}</span>
+        <span className="text-[10px] leading-tight font-medium">{item.label}</span>
+      </button>
     );
   }
 
