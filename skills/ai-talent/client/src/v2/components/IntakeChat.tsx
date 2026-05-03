@@ -1,68 +1,42 @@
 /**
  * IntakeChat — conversational pre-launch intake replacing the static
  * SquadIntakeSidebar form.
- *
- * Layout (380px middle column):
- *   ┌─────────────────────────────┐
- *   │ ← 所有方法論  Squad name    │  ← header (shrink-0)
- *   │ [chips: layer · workspace]  │
- *   ├─────────────────────────────┤
- *   │                             │
- *   │  agent bubble               │  ← scrollable message list
- *   │          user bubble →      │
- *   │  [OAuth card]               │
- *   │  agent bubble               │
- *   │                             │
- *   ├─────────────────────────────┤
- *   │ [input] [送出]              │  ← shrink-0 input bar
- *   ├─────────────────────────────┤
- *   │ [派出小組 →]                │  ← sticky launch footer
- *   └─────────────────────────────┘
- *
- * Props mirror SquadIntakeSidebar so swap-in is minimal.
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Avatar, Button, Chip, Divider, Spinner, Textarea,
-} from "@heroui/react";
+import { Avatar, Button, Chip, Spinner, Textarea } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBookOpen, faLayerGroup, faRocket, faBrain,
-  faInstagram, faFacebook, faLinkedin, faYoutube, faTiktok, faLine,
-  faPaperPlane,
-} from "@fortawesome/react-fontawesome";
-import {
-  faInstagram  as _i,
-  faFacebook   as _f,
-  faLinkedin   as _li,
-  faYoutube    as _y,
-  faTiktok     as _tt,
-  faLine       as _ln,
+  faInstagram,
+  faFacebook,
+  faLinkedin,
+  faYoutube,
+  faTiktok,
+  faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import {
-  faBookOpen   as _bo,
-  faLayerGroup as _lg,
-  faRocket     as _r,
-  faBrain      as _br,
-  faPaperPlane as _pp,
+  faBookOpen,
+  faLayerGroup,
+  faRocket,
+  faBrain,
+  faPaperPlane,
   faCheck,
   faLock,
 } from "@fortawesome/free-solid-svg-icons";
-import { useIntakeChat, type ChatMessage } from "../lib/useIntakeChat";
+import { useIntakeChat } from "../lib/useIntakeChat";
 import { trpc } from "../../lib/trpc";
 import { pickLocaleText } from "../../lib/localizeText";
 import { LAYER_TOKENS, resolveLayer } from "../../studio/primitives/tokens";
 
-// ── Platform auth config ────────────────────────────────────────────────────
+// ── Platform config ──────────────────────────────────────────────────────────
 
 const PLATFORM_ICON_MAP: Record<string, any> = {
-  instagram: _i,
-  facebook:  _f,
-  linkedin:  _li,
-  youtube:   _y,
-  tiktok:    _tt,
-  line:      _ln,
+  instagram: faInstagram,
+  facebook:  faFacebook,
+  linkedin:  faLinkedin,
+  youtube:   faYoutube,
+  tiktok:    faTiktok,
+  line:      faLine,
 };
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -71,15 +45,15 @@ const PLATFORM_LABEL: Record<string, string> = {
 };
 
 const WORKSPACE_META: Record<string, { label: string; icon: any }> = {
-  instagram: { label: "Instagram", icon: _i },
-  facebook:  { label: "Facebook",  icon: _f },
-  linkedin:  { label: "LinkedIn",  icon: _li },
-  youtube:   { label: "YouTube",   icon: _y },
-  tiktok:    { label: "TikTok",    icon: _tt },
-  line:      { label: "LINE",      icon: _ln },
+  instagram: { label: "Instagram", icon: faInstagram },
+  facebook:  { label: "Facebook",  icon: faFacebook  },
+  linkedin:  { label: "LinkedIn",  icon: faLinkedin  },
+  youtube:   { label: "YouTube",   icon: faYoutube   },
+  tiktok:    { label: "TikTok",    icon: faTiktok    },
+  line:      { label: "LINE",      icon: faLine      },
 };
 
-// ── Single chat bubble ───────────────────────────────────────────────────────
+// ── Chat bubbles ─────────────────────────────────────────────────────────────
 
 function AgentBubble({ content, streaming }: { content: string; streaming?: boolean }) {
   return (
@@ -117,11 +91,7 @@ function UserBubble({ content }: { content: string }) {
 // ── OAuth inline card ────────────────────────────────────────────────────────
 
 function AuthCard({
-  platform,
-  onAuth,
-  onSkip,
-  authorized,
-  authorizedName,
+  platform, onAuth, onSkip, authorized, authorizedName,
 }: {
   platform: string;
   onAuth: () => void;
@@ -129,7 +99,7 @@ function AuthCard({
   authorized: boolean;
   authorizedName: string;
 }) {
-  const icon = PLATFORM_ICON_MAP[platform] ?? _br;
+  const icon = PLATFORM_ICON_MAP[platform] ?? faBrain;
   const label = PLATFORM_LABEL[platform] ?? platform;
 
   if (authorized) {
@@ -158,8 +128,7 @@ function AuthCard({
           onPress={onAuth}>
           授權 {label}
         </Button>
-        <Button size="sm" variant="light" className="text-tiny text-default-400"
-          onPress={onSkip}>
+        <Button size="sm" variant="light" className="text-tiny text-default-400" onPress={onSkip}>
           略過
         </Button>
       </div>
@@ -174,7 +143,7 @@ export interface IntakeChatProps {
   lang: "zh-TW" | "en";
   workspace: string | null;
   brandName: string | null;
-  brandCtx: string;       // full serialized brand context
+  brandCtx: string;
   busy: boolean;
   error: string | null;
   missionId: number | null;
@@ -197,7 +166,7 @@ export function IntakeChat({
   const author = squad.methodology?.author;
   const year   = squad.methodology?.year;
 
-  // Local squad context — fetched once from /api/intake/squad-ctx/:id
+  // Squad context fetched from server
   const [squadCtx, setSquadCtx] = useState<string>("");
   const [ctxLoaded, setCtxLoaded] = useState(false);
 
@@ -207,22 +176,19 @@ export function IntakeChat({
       .then((r) => r.json())
       .then((d) => { setSquadCtx(d.ctx ?? ""); setCtxLoaded(true); })
       .catch(() => {
-        // Fallback: build minimal ctx from squad object
         setSquadCtx(`小組名稱：${name}\n工作區：${wsKey ?? ""}`);
         setCtxLoaded(true);
       });
   }, [squad.id]);
 
-  // Platform OAuth state
+  // Platform OAuth
   const [platformAuthorized, setPlatformAuthorized] = useState(false);
   const [platformName, setPlatformName] = useState("");
   const getConnectToken = trpc.platformConnect.getConnectToken.useMutation();
 
   async function handlePlatformAuth(platform: string) {
     try {
-      const { token, appSlug, projectId, env } = await getConnectToken.mutateAsync({
-        platform: platform as any,
-      });
+      const { token, appSlug, env } = await getConnectToken.mutateAsync({ platform: platform as any });
       const { PipedreamClient } = await import("@pipedream/sdk");
       const pd = new PipedreamClient({
         projectEnvironment: env,
@@ -238,7 +204,7 @@ export function IntakeChat({
   }
 
   // Chat hook
-  const { messages, isStreaming, isReady, send, reset } = useIntakeChat({
+  const { messages, isStreaming, isReady, send } = useIntakeChat({
     squadId: squad.id,
     squadCtx,
     brandCtx,
@@ -253,25 +219,21 @@ export function IntakeChat({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  // Kick off first agent message when ctx loads + no messages yet
+  // Kick off agent opener when context loads
   useEffect(() => {
     if (ctxLoaded && messages.length === 0) {
-      // Trigger agent opener by sending an empty user "ping"
-      // (hidden — we don't append it to messages; handled via initial role injection)
-      const opener = `請開始 intake。品牌：${brandName ?? "（未提供）"}。`;
-      send(opener);
+      send(`請開始 intake。品牌：${brandName ?? "（未提供）"}。`);
     }
   }, [ctxLoaded]);
 
-  // Compose intake summary from conversation (for launchSquad context)
+  // Intake summary for launchSquad
   const intakeSummary = messages
     .filter((m) => !m.cardType)
     .map((m) => `${m.role === "user" ? "用戶" : "Agent"}：${m.content}`)
     .join("\n");
 
-  // Input state
+  // Input
   const [input, setInput] = useState("");
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   function handleSend() {
     const text = input.trim();
@@ -300,18 +262,18 @@ export function IntakeChat({
           )}
           <Chip size="sm" variant="flat"
             style={{ background: `${tone.bg}1A`, color: tone.bg }}
-            startContent={<FontAwesomeIcon icon={_lg} className="text-tiny ml-1" />}>
+            startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}>
             {lk}
           </Chip>
           {(author || year) && (
             <Chip size="sm" variant="flat"
-              startContent={<FontAwesomeIcon icon={_bo} className="text-tiny ml-1" />}>
+              startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}>
               {author ?? "—"}{year ? ` · ${year}` : ""}
             </Chip>
           )}
           {brandName && (
             <Chip size="sm" variant="flat" color="success"
-              startContent={<FontAwesomeIcon icon={_br} className="text-tiny ml-1" />}>
+              startContent={<FontAwesomeIcon icon={faBrain} className="text-tiny ml-1" />}>
               {brandName}
             </Chip>
           )}
@@ -319,16 +281,12 @@ export function IntakeChat({
       </div>
 
       {/* Message list */}
-      <div
-        ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3"
-      >
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
         {!ctxLoaded && (
           <div className="flex justify-center py-8">
             <Spinner size="sm" />
           </div>
         )}
-
         {messages.map((msg, i) => {
           if (msg.cardType === "auth" && msg.authPlatform) {
             return (
@@ -342,9 +300,8 @@ export function IntakeChat({
               />
             );
           }
-          // Skip the hidden opener ping from user
+          // Hide the hidden opener ping
           if (msg.role === "user" && i === 0 && msg.content.startsWith("請開始 intake")) return null;
-
           return msg.role === "assistant"
             ? <AgentBubble key={i} content={msg.content} streaming={msg.streaming} />
             : <UserBubble  key={i} content={msg.content} />;
@@ -356,35 +313,25 @@ export function IntakeChat({
         <div className="shrink-0 px-3 pb-2 pt-2 border-t border-default-200">
           <div className="flex items-end gap-2">
             <Textarea
-              ref={inputRef as any}
-              variant="bordered"
-              radius="lg"
-              size="sm"
+              variant="bordered" radius="lg" size="sm"
               placeholder="回覆 Agent 的問題…"
-              minRows={1}
-              maxRows={4}
+              minRows={1} maxRows={4}
               value={input}
               onValueChange={setInput}
               classNames={{ inputWrapper: "border-default-200 bg-content2" }}
               isDisabled={isStreaming || !ctxLoaded}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
               }}
             />
             <Button
-              isIconOnly
-              size="sm"
-              radius="full"
-              color="primary"
+              isIconOnly size="sm" radius="full" color="primary"
               className="shrink-0 mb-0.5"
               isDisabled={!input.trim() || isStreaming}
               onPress={handleSend}
               aria-label="送出"
             >
-              <FontAwesomeIcon icon={_pp} className="text-tiny" />
+              <FontAwesomeIcon icon={faPaperPlane} className="text-tiny" />
             </Button>
           </div>
         </div>
@@ -392,28 +339,22 @@ export function IntakeChat({
 
       {/* Sticky launch footer */}
       <div className="shrink-0 px-4 py-3 border-t border-default-200 space-y-2">
-        {error && (
-          <p className="text-tiny text-danger text-center">{error}</p>
-        )}
+        {error && <p className="text-tiny text-danger text-center">{error}</p>}
         {!missionId ? (
           <Button
-            color="primary"
-            size="lg"
-            radius="lg"
+            color="primary" size="lg" radius="lg"
             className="w-full font-semibold"
             isLoading={busy}
             isDisabled={busy || (!isReady && messages.filter((m) => m.role === "user" && !m.content.startsWith("請開始")).length === 0)}
             onPress={() => onLaunch(intakeSummary)}
-            startContent={!busy && <FontAwesomeIcon icon={_r} />}
+            startContent={!busy && <FontAwesomeIcon icon={faRocket} />}
           >
             {busy ? "啟動中…" : isReady ? "一切就緒，派出小組 →" : "派出小組 →"}
           </Button>
         ) : (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-tiny text-default-500">
-              <Spinner size="sm" />
-              <span>任務執行中…</span>
-            </div>
+          <div className="flex items-center gap-2 text-tiny text-default-500">
+            <Spinner size="sm" />
+            <span>任務執行中…</span>
           </div>
         )}
       </div>
