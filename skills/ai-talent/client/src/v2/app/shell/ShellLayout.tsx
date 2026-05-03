@@ -179,11 +179,11 @@ function Sidebar({
 }) {
   return (
     <aside
-      className="fixed left-0 top-0 bottom-0 z-40 bg-content1 border-r border-divider flex flex-col transition-[width] duration-200"
+      className="fixed left-0 top-0 bottom-0 z-40 flex flex-col transition-[width] duration-200"
       style={{ width }}
     >
       {/* Top: logo monogram */}
-      <div className="h-14 flex items-center justify-center border-b border-divider shrink-0">
+      <div className="h-14 flex items-center justify-center shrink-0">
         <Avatar name="SO" size="sm" radius="md" color="primary" classNames={{ name: "font-bold text-xs" }} />
       </div>
 
@@ -255,7 +255,7 @@ function Sidebar({
       </nav>
 
       {/* Bottom: collapse toggle */}
-      <div className="p-2 border-t border-divider shrink-0">
+      <div className="p-2 shrink-0">
         <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
           <Button isIconOnly size="sm" variant="light" fullWidth onPress={onToggle} aria-label="切換側邊欄">
             <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
