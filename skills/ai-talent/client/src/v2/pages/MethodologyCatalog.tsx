@@ -1,35 +1,25 @@
 /**
  * MethodologyCatalog — 範本目錄（Canva 風格，純 inline-CSS）
  *
- * 正確的資料模型（修正版）：
- *   範本頁面 = 展示平台目錄（用戶使用「之前」）
- *     - Squads   → trpc.squad.listForFront({ includeUnapproved: true })
- *                  繞過 is_approved gate，CJ 可以看到所有 active squads
- *     - Agents   → entity.listForHome (kind="agent")
- *     - Skills   → entity.listForHome (kind="skill")
+ * 資料模型（正確版）：
+ *   範本頁面 = 平台目錄（用戶使用「之前」）
+ *     - entity.listForHome  → squads + agents + skills（含圖片）
+ *     - squad.listForFront(includeUnapproved:true) → 補上未審核的 squads
+ *   不放 task_catalog（那是 mission 執行步驟，不是範本）
  *
- *   專案頁面 = 展示用戶的 Mission（用戶使用「之後」）
- *     → ProjectsPage / MissionsHome（不在本頁面）
- *
- * 絕對不放 task_catalog：那是 mission 執行步驟，不是範本目錄。
- *
- * 頁面結構：
- *   1. 漸層 Hero — 搜尋 + 快速篩選 pills
- *   2. 探索類別 — L1–L6 + Agent + Skill 橫向捲動 tiles
- *   3. 精選 Squads — 橫向捲動
- *   4. Agents — 橫向捲動
- *   5. Skills — 橫向捲動
- *   6. 為你提供更多 — 3-col 網格，可按類型 + 層級篩選
+ * 卡片風格：原版 LandscapeCard（有圖，inline-CSS 版本）
+ *   - Squad  → MethodologyGlyph + layer chip
+ *   - Agent  → 全幅 avatar 圖片
+ *   - Skill  → 大字技能名 + task-type icon
  */
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMagnifyingGlass, faChevronLeft, faChevronRight,
-  faCrown, faRocket, faStar, faEllipsis,
-  faUsers, faRobot, faCubes, faChevronDown, faXmark,
-  faCircleInfo, faBullseye, faMessage, faPalette,
+  faRocket, faStar, faEllipsis, faUsers, faRobot, faCubes,
+  faChevronDown, faXmark, faCircleInfo, faBullseye, faPalette,
   faChartLine, faShareNodes, faVideo, faBriefcase,
   faPenNib, faImage, faMicrophoneLines, faChartColumn,
   faChessKnight, faCode, faWandSparkles,
@@ -41,28 +31,25 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 
 // ── Layer palette ────────────────────────────────────────────────────────────
 const LAYER: Record<string, { bg: string; text: string; label: string; icon: any }> = {
-  L1: { bg: "#EEF2FF", text: "#4F46E5", label: "品牌策略", icon: faBullseye  },
-  L2: { bg: "#FFF1F2", text: "#E11D48", label: "產品策略", icon: faBriefcase },
-  L3: { bg: "#FFFBEB", text: "#D97706", label: "受眾策略", icon: faUsers     },
-  L4: { bg: "#F5F3FF", text: "#7C3AED", label: "通路策略", icon: faShareNodes},
-  L5: { bg: "#F0FDF4", text: "#16A34A", label: "活動策略", icon: faRocket    },
-  L6: { bg: "#F5F5F4", text: "#57534E", label: "驗證校準", icon: faChartLine },
+  L1: { bg: "#EEF2FF", text: "#4F46E5", label: "品牌策略", icon: faBullseye   },
+  L2: { bg: "#FFF1F2", text: "#E11D48", label: "產品策略", icon: faBriefcase  },
+  L3: { bg: "#FFFBEB", text: "#D97706", label: "受眾策略", icon: faUsers      },
+  L4: { bg: "#F5F3FF", text: "#7C3AED", label: "通路策略", icon: faShareNodes },
+  L5: { bg: "#F0FDF4", text: "#16A34A", label: "活動策略", icon: faRocket     },
+  L6: { bg: "#F5F5F4", text: "#57534E", label: "驗證校準", icon: faChartLine  },
 };
 function layerInfo(raw?: string | null) {
   const k = String(raw ?? "L1").toUpperCase().match(/L([1-6])/)?.[0] ?? "L1";
-  return LAYER[k] ?? LAYER.L1;
+  return { key: k, ...(LAYER[k] ?? LAYER.L1) };
 }
 
-// ── Skill task_type icon ─────────────────────────────────────────────────────
+// ── Skill icon ────────────────────────────────────────────────────────────────
 const SKILL_ICON: Record<string, any> = {
-  text: faPenNib, image: faImage, video: faVideo,
-  audio: faMicrophoneLines, data: faChartColumn,
-  research: faMagnifyingGlass, strategy: faChessKnight,
+  text: faPenNib, image: faImage, video: faVideo, audio: faMicrophoneLines,
+  data: faChartColumn, research: faMagnifyingGlass, strategy: faChessKnight,
   code: faCode, generic: faWandSparkles,
 };
-function skillIcon(t?: string | null) {
-  return SKILL_ICON[String(t ?? "").toLowerCase()] ?? faWandSparkles;
-}
+const skillIcon = (t?: string | null) => SKILL_ICON[String(t ?? "").toLowerCase()] ?? faWandSparkles;
 
 // ── Kind tabs ────────────────────────────────────────────────────────────────
 type Kind = "squad" | "agent" | "skill";
@@ -72,44 +59,42 @@ const KIND_TABS: Array<{ id: Kind; label: string; icon: any }> = [
   { id: "skill", label: "技能",       icon: faCubes  },
 ];
 
-// ── Category tiles (Canva-style "探索範本") ──────────────────────────────────
+// ── Category explore tiles ───────────────────────────────────────────────────
 const EXPLORE_TILES = [
-  { key: "L1", label: "品牌策略",  hint: "定位 / 原型 / 敘事",       kind: "squad" as Kind, layer: "L1" },
-  { key: "L2", label: "產品策略",  hint: "JTBD / 上市 / 價值主張",   kind: "squad" as Kind, layer: "L2" },
-  { key: "L3", label: "受眾策略",  hint: "STP / Persona / 分眾",     kind: "squad" as Kind, layer: "L3" },
-  { key: "L4", label: "通路策略",  hint: "FB / IG / YT / LinkedIn",  kind: "squad" as Kind, layer: "L4" },
-  { key: "L5", label: "活動策略",  hint: "Launch / Campaign / Event", kind: "squad" as Kind, layer: "L5" },
-  { key: "L6", label: "驗證校準",  hint: "監測 / 稽核 / 校準",       kind: "squad" as Kind, layer: "L6" },
+  { key: "L1", label: "品牌策略", hint: "定位 / 原型 / 敘事",        kind: "squad" as Kind, layer: "L1" },
+  { key: "L2", label: "產品策略", hint: "JTBD / 上市 / 價值主張",    kind: "squad" as Kind, layer: "L2" },
+  { key: "L3", label: "受眾策略", hint: "STP / Persona / 分眾",      kind: "squad" as Kind, layer: "L3" },
+  { key: "L4", label: "通路策略", hint: "FB / IG / YT / LinkedIn",   kind: "squad" as Kind, layer: "L4" },
+  { key: "L5", label: "活動策略", hint: "Launch / Campaign / Event",  kind: "squad" as Kind, layer: "L5" },
+  { key: "L6", label: "驗證校準", hint: "監測 / 稽核 / 校準",        kind: "squad" as Kind, layer: "L6" },
   { key: "agent", label: "Agents", hint: "AI 角色與專家",            kind: "agent" as Kind, layer: "" },
   { key: "skill", label: "技能",   hint: "原子能力庫",               kind: "skill" as Kind, layer: "" },
 ];
 
+const LAYER_OPTIONS = [
+  { value: "ALL", label: "全部層級" },
+  ...Object.entries(LAYER).map(([k, v]) => ({ value: k, label: `${k}・${v.label}` })),
+];
+
 // ── Toast ────────────────────────────────────────────────────────────────────
-function showToast(msg: string, variant: "default" | "success" | "warn" = "default") {
+function showToast(msg: string) {
   const el = document.createElement("div");
   el.textContent = msg;
-  const bg = variant === "success" ? "#059669" : variant === "warn" ? "#D97706" : "#1A1A18";
   el.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
-    background:${bg};color:white;padding:10px 22px;border-radius:10px;font-size:13px;
+    background:#1A1A18;color:white;padding:10px 22px;border-radius:10px;font-size:13px;
     font-weight:500;z-index:99999;white-space:nowrap;pointer-events:none;
     box-shadow:0 4px 16px rgba(0,0,0,0.22);font-family:Inter,sans-serif;`;
   document.body.appendChild(el);
   setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 320); }, 2000);
 }
 
-// ── Layer options for dropdown ────────────────────────────────────────────────
-const LAYER_OPTIONS = [
-  { value: "ALL", label: "全部層級" },
-  ...Object.entries(LAYER).map(([k, v]) => ({ value: k, label: `${k}・${v.label}` })),
-];
-
 // ════════════════════════════════════════════════════════════════════════════
 export default function MethodologyCatalog() {
   const { brandId } = useOutletContext<ShellOutletCtx>();
   const [searchParams] = useSearchParams();
 
-  const [searchQ,     setSearchQ]     = useState(() => searchParams.get("query") ?? "");
-  const [activeKind,  setActiveKind]  = useState<Kind>(() => {
+  const [searchQ,     setSearchQ]    = useState(() => searchParams.get("query") ?? "");
+  const [activeKind,  setActiveKind] = useState<Kind>(() => {
     const k = searchParams.get("kind");
     return (k === "agent" || k === "skill" || k === "squad") ? k as Kind : "squad";
   });
@@ -118,59 +103,71 @@ export default function MethodologyCatalog() {
   const [kindOpen,    setKindOpen]    = useState(false);
   const [selected,    setSelected]    = useState<any | null>(null);
 
-  // ── Data: squads (includeUnapproved bypasses is_approved gate) ────────────
-  // CJ direction: CJ needs to see all active squads in /templates even
-  // before they are manually approved. The approval gate (is_approved=1)
-  // is only for anonymous/public access; authenticated staff see all.
+  // ── Data: entity.listForHome → squads+agents+skills with images ───────────
+  const entityQuery = (trpc as any).entity?.listForHome?.useQuery
+    ? (trpc as any).entity.listForHome.useQuery(
+        { brandId: brandId ?? null },
+        { refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: null, isLoading: false };
+
+  // ── Data: squad.listForFront(includeUnapproved) → supplement unapproved ───
+  // Used ONLY to add squads that entity.listForHome might miss (unapproved ones)
   const squadQuery = trpc.squad.listForFront.useQuery(
     { includeUnapproved: true } as any,
     { refetchOnWindowFocus: false, staleTime: 30_000 }
   );
 
-  // ── Data: agents + skills via entity.listForHome (best-effort) ────────────
-  const entityQuery = (trpc as any).entity?.listForHome?.useQuery
-    ? (trpc as any).entity.listForHome.useQuery(
-        { brandId: brandId ?? null, kinds: ["agent", "skill"] },
-        { refetchOnWindowFocus: false, staleTime: 30_000 }
-      )
-    : { data: null, isLoading: false };
+  // ── Merge: entity data (has images) + listForFront supplement ─────────────
+  const allEntities: any[] = useMemo(() => {
+    const entityData: any[] = (entityQuery.data as any[]) ?? [];
+    const entitySlugSet = new Set(entityData.filter(e => e.kind === "squad").map((e: any) => String(e.slug)));
 
-  const squads:  any[] = useMemo(() => (squadQuery.data  as any[]) ?? [], [squadQuery.data]);
-  const agents:  any[] = useMemo(() => ((entityQuery.data as any[]) ?? []).filter((e: any) => e.kind === "agent"), [entityQuery.data]);
-  const skills:  any[] = useMemo(() => ((entityQuery.data as any[]) ?? []).filter((e: any) => e.kind === "skill"), [entityQuery.data]);
+    // Add squads from listForFront that entity missed (unapproved or not yet indexed)
+    const extraSquads: any[] = ((squadQuery.data as any[]) ?? [])
+      .filter((s: any) => !entitySlugSet.has(String(s.slug)))
+      .map((s: any) => ({
+        id: s.id,
+        kind: "squad" as Kind,
+        slug: s.slug,
+        name: s.name,
+        description: s.description,
+        strategyLayer: String(s.strategy_layer ?? "L1").slice(0, 2).toUpperCase(),
+        badge: { label: String(s.strategy_layer ?? "L1").slice(0, 2), color: "default" },
+        stats: [],
+        is_approved: s.is_approved,
+        coverImageUrl: null,
+      }));
 
-  const allEntities: any[] = useMemo(() => [
-    ...squads.map(s => ({ ...s, kind: "squad" as Kind, strategyLayer: String(s.strategy_layer ?? "L1") })),
-    ...agents,
-    ...skills,
-  ], [squads, agents, skills]);
+    return [...entityData, ...extraSquads];
+  }, [entityQuery.data, squadQuery.data]);
 
-  const isLoading = squadQuery.isLoading;
+  const squads = useMemo(() => allEntities.filter(e => e.kind === "squad"), [allEntities]);
+  const agents = useMemo(() => allEntities.filter(e => e.kind === "agent"), [allEntities]);
+  const skills = useMemo(() => allEntities.filter(e => e.kind === "skill"), [allEntities]);
 
-  // ── Counts ────────────────────────────────────────────────────────────────
   const counts = useMemo(() => ({
-    squad: squads.length,
-    agent: agents.length,
-    skill: skills.length,
+    squad: squads.length, agent: agents.length, skill: skills.length,
     total: squads.length + agents.length + skills.length,
   }), [squads, agents, skills]);
 
-  // ── Grid filtered ─────────────────────────────────────────────────────────
+  const isLoading = entityQuery.isLoading && squadQuery.isLoading;
+
+  // ── Grid filter ───────────────────────────────────────────────────────────
   const gridItems = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     return allEntities.filter(e => {
       if (e.kind !== activeKind) return false;
-      if (layerFilter !== "ALL" && !String(e.strategyLayer ?? e.strategy_layer ?? "").startsWith(layerFilter)) return false;
+      const layer = String(e.strategyLayer ?? e.strategy_layer ?? "").slice(0, 2);
+      if (layerFilter !== "ALL" && layer !== layerFilter) return false;
       if (!q) return true;
       return `${e.name ?? ""} ${e.description ?? ""} ${e.slug ?? ""}`.toLowerCase().includes(q);
     });
   }, [allEntities, activeKind, layerFilter, searchQ]);
 
-  // ── Apply explore tile ────────────────────────────────────────────────────
-  const applyTile = (tile: typeof EXPLORE_TILES[0]) => {
-    setActiveKind(tile.kind);
-    if (tile.layer) setLayerFilter(tile.layer);
-    else setLayerFilter("ALL");
+  const applyTile = (t: typeof EXPLORE_TILES[0]) => {
+    setActiveKind(t.kind);
+    setLayerFilter(t.layer || "ALL");
     setTimeout(() => document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }), 60);
   };
 
@@ -180,21 +177,16 @@ export default function MethodologyCatalog() {
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAF9", paddingBottom: 64 }}>
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div style={{
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         padding: "48px 40px 56px", position: "relative", overflow: "hidden",
       }}>
         <div style={{ position: "absolute", top: -80, right: -80, width: 320, height: 320, borderRadius: "50%", background: "rgba(255,255,255,0.05)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: -50, left: "35%", width: 240, height: 240, borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
-
         <div style={{ maxWidth: 860, position: "relative", zIndex: 1 }}>
-          <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px" }}>
-            TEMPLATES · 範本庫
-          </p>
-          <h1 style={{ color: "white", fontSize: 38, fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1 }}>
-            什麼都可以做到
-          </h1>
+          <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px" }}>TEMPLATES · 範本庫</p>
+          <h1 style={{ color: "white", fontSize: 38, fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1 }}>什麼都可以做到</h1>
           <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 15, margin: "0 0 30px", lineHeight: 1.6 }}>
             {counts.total > 0
               ? `${counts.squad} 個方法論小組 · ${counts.agent} 個 Agents · ${counts.skill} 個技能`
@@ -203,56 +195,32 @@ export default function MethodologyCatalog() {
 
           {/* Search */}
           <div style={{ position: "relative", maxWidth: 580 }}>
-            <FontAwesomeIcon icon={faMagnifyingGlass} style={{
-              position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)",
-              color: "#9CA3AF", fontSize: 16, zIndex: 1,
-            }} />
+            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", fontSize: 16, zIndex: 1 }} />
             <input
               value={searchQ}
               onChange={e => setSearchQ(e.target.value)}
               placeholder="搜尋方法論小組、Agent、技能…"
-              style={{
-                width: "100%", padding: "14px 48px 14px 50px", borderRadius: 50,
-                border: "none", fontSize: 15, outline: "none", background: "white",
-                color: "#1A1A18", boxSizing: "border-box",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
-              }}
+              style={{ width: "100%", padding: "14px 48px 14px 50px", borderRadius: 50, border: "none", fontSize: 15, outline: "none", background: "white", color: "#1A1A18", boxSizing: "border-box", boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}
             />
             {searchQ && (
-              <button onClick={() => setSearchQ("")} style={{
-                position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
-                background: "#E5E5E3", border: "none", borderRadius: "50%",
-                width: 24, height: 24, cursor: "pointer", color: "#57534E",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
-              }}>
+              <button onClick={() => setSearchQ("")} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "#E5E5E3", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", color: "#57534E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
                 <FontAwesomeIcon icon={faXmark} />
               </button>
             )}
           </div>
 
-          {/* Quick pills */}
+          {/* Kind pills */}
           <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
             {KIND_TABS.map(t => (
-              <button
-                key={t.id}
+              <button key={t.id}
                 onClick={() => { setActiveKind(t.id); setSearchQ(""); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
-                style={{
-                  padding: "7px 16px", borderRadius: 50, fontSize: 13,
-                  background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)",
-                  color: "white", cursor: "pointer", fontWeight: 500,
-                  display: "flex", alignItems: "center", gap: 7,
-                  transition: "background 0.15s",
-                }}
+                style={{ padding: "7px 16px", borderRadius: 50, fontSize: 13, background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)", color: "white", cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 7, transition: "background 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
                 onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.18)"}
               >
                 <FontAwesomeIcon icon={t.icon} style={{ fontSize: 11 }} />
                 {t.label}
-                {counts[t.id] > 0 && (
-                  <span style={{ background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>
-                    {counts[t.id]}
-                  </span>
-                )}
+                {counts[t.id] > 0 && <span style={{ background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>{counts[t.id]}</span>}
               </button>
             ))}
           </div>
@@ -261,24 +229,14 @@ export default function MethodologyCatalog() {
 
       <div style={{ padding: "0 40px" }}>
 
-        {/* ── 探索類別 tiles ───────────────────────────────────────────── */}
+        {/* ── 探索類別 ─────────────────────────────────────────────────── */}
         <HScrollSection title="探索類別" mt={32}>
           {EXPLORE_TILES.map(t => {
-            const li = t.layer ? layerInfo(t.layer) : { bg: t.key === "agent" ? "#F5F3FF" : "#EEF2FF", text: t.key === "agent" ? "#7C3AED" : "#4F46E5", icon: t.key === "agent" ? faRobot : faCubes };
-            const active = t.layer ? activeKind === t.kind && layerFilter === t.layer : activeKind === t.kind;
+            const li = t.layer ? layerInfo(t.layer) : (t.key === "agent" ? { key: "agent", bg: "#F5F3FF", text: "#7C3AED", label: "Agents", icon: faRobot } : { key: "skill", bg: "#ECFDF5", text: "#059669", label: "技能", icon: faCubes });
+            const active = t.layer ? (activeKind === t.kind && layerFilter === t.layer) : activeKind === t.kind;
             return (
-              <button
-                key={t.key}
-                onClick={() => applyTile(t)}
-                style={{
-                  flexShrink: 0, width: 168, height: 92, borderRadius: 12,
-                  padding: "14px 16px", background: active ? li.text : li.bg,
-                  border: `1.5px solid ${active ? li.text : "transparent"}`,
-                  cursor: "pointer", textAlign: "left",
-                  display: "flex", flexDirection: "column", justifyContent: "space-between",
-                  boxSizing: "border-box", transition: "all 0.15s",
-                  boxShadow: active ? `0 4px 16px ${li.text}40` : "none",
-                }}
+              <button key={t.key} onClick={() => applyTile(t)}
+                style={{ flexShrink: 0, width: 168, height: 92, borderRadius: 12, padding: "14px 16px", background: active ? li.text : li.bg, border: `1.5px solid ${active ? li.text : "transparent"}`, cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column", justifyContent: "space-between", boxSizing: "border-box", transition: "all 0.15s", boxShadow: active ? `0 4px 16px ${li.text}40` : "none" }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.transform = "translateY(-2px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = ""; }}
               >
@@ -293,48 +251,41 @@ export default function MethodologyCatalog() {
         </HScrollSection>
 
         {/* ── 精選方法論小組 ─────────────────────────────────────────────── */}
-        <HScrollSection
-          title="精選方法論小組"
-          subtitle={`${counts.squad} 個預配好的 agent 編組，照工作流跑出產出`}
-          accentColor="#4F46E5"
-          cta="完整目錄 →"
-          onCta={() => { setActiveKind("squad"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
-          loading={isLoading}
-          mt={32}
+        <HScrollSection title="精選方法論小組" subtitle={`${counts.squad} 個預配好的 agent 編組`} accentColor="#4F46E5"
+          cta="完整目錄 →" onCta={() => { setActiveKind("squad"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+          loading={isLoading} mt={32}
         >
-          {squads.slice(0, 24).map(s => (
-            <SquadCard key={s.id} squad={s} onSelect={() => setSelected({ ...s, kind: "squad", strategyLayer: s.strategy_layer })} />
+          {squads.slice(0, 24).map(e => (
+            <div key={e.id} style={{ flexShrink: 0, width: 260 }}>
+              <LandscapeCard entity={e} onPreview={() => setSelected(e)} aspect="5/4" size="sm" />
+            </div>
           ))}
         </HScrollSection>
 
         {/* ── Agents ──────────────────────────────────────────────────────── */}
         {agents.length > 0 && (
-          <HScrollSection
-            title="精選 Agents"
-            subtitle={`${counts.agent} 個個別 AI 專家角色`}
-            accentColor="#7C3AED"
-            cta="完整目錄 →"
-            onCta={() => { setActiveKind("agent"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+          <HScrollSection title="精選 Agents" subtitle={`${counts.agent} 個 AI 專家角色`} accentColor="#7C3AED"
+            cta="完整目錄 →" onCta={() => { setActiveKind("agent"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
             mt={28}
           >
-            {agents.slice(0, 24).map((e: any) => (
-              <AgentCard key={e.id} entity={e} onSelect={() => setSelected(e)} />
+            {agents.slice(0, 24).map(e => (
+              <div key={e.id} style={{ flexShrink: 0, width: 200 }}>
+                <LandscapeCard entity={e} onPreview={() => setSelected(e)} aspect="3/4" size="sm" />
+              </div>
             ))}
           </HScrollSection>
         )}
 
-        {/* ── 技能 ─────────────────────────────────────────────────────────── */}
+        {/* ── 技能 ────────────────────────────────────────────────────────── */}
         {skills.length > 0 && (
-          <HScrollSection
-            title="精選技能"
-            subtitle={`${counts.skill} 個原子能力，可被 Agent 套用`}
-            accentColor="#059669"
-            cta="完整目錄 →"
-            onCta={() => { setActiveKind("skill"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+          <HScrollSection title="精選技能" subtitle={`${counts.skill} 個原子能力`} accentColor="#059669"
+            cta="完整目錄 →" onCta={() => { setActiveKind("skill"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
             mt={28}
           >
-            {skills.slice(0, 24).map((e: any) => (
-              <SkillCard key={e.id} entity={e} onSelect={() => setSelected(e)} />
+            {skills.slice(0, 24).map(e => (
+              <div key={e.id} style={{ flexShrink: 0, width: 260 }}>
+                <LandscapeCard entity={e} onPreview={() => setSelected(e)} aspect="16/9" size="sm" />
+              </div>
             ))}
           </HScrollSection>
         )}
@@ -343,26 +294,14 @@ export default function MethodologyCatalog() {
         <div id="grid-section" style={{ marginTop: 44 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
             <div>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1A1A18", margin: "0 0 2px", letterSpacing: "-0.01em" }}>
-                為你提供更多範本
-              </h2>
-              <p style={{ fontSize: 13, color: "#A8A29E", margin: 0 }}>
-                {gridItems.length} 個 {kindLabel}{layerFilter !== "ALL" ? ` · ${layerLabel}` : ""}
-              </p>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1A1A18", margin: "0 0 2px", letterSpacing: "-0.01em" }}>為你提供更多範本</h2>
+              <p style={{ fontSize: 13, color: "#A8A29E", margin: 0 }}>{gridItems.length} 個 {kindLabel}{layerFilter !== "ALL" ? ` · ${layerLabel}` : ""}</p>
             </div>
-
-            {/* Filters */}
             <div style={{ display: "flex", gap: 8 }}>
               {/* Kind dropdown */}
               <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => { setKindOpen(v => !v); setLayerOpen(false); }}
-                  style={{
-                    padding: "7px 14px", borderRadius: 50, border: "1px solid #E4E3E1",
-                    background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18",
-                    display: "flex", alignItems: "center", gap: 6,
-                  }}
-                >
+                <button onClick={() => { setKindOpen(v => !v); setLayerOpen(false); }}
+                  style={{ padding: "7px 14px", borderRadius: 50, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18", display: "flex", alignItems: "center", gap: 6 }}>
                   <FontAwesomeIcon icon={KIND_TABS.find(t => t.id === activeKind)?.icon ?? faUsers} style={{ fontSize: 11 }} />
                   {kindLabel}
                   <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 10, color: "#A8A29E" }} />
@@ -378,17 +317,10 @@ export default function MethodologyCatalog() {
                   </DropMenu>
                 )}
               </div>
-
               {/* Layer dropdown */}
               <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => { setLayerOpen(v => !v); setKindOpen(false); }}
-                  style={{
-                    padding: "7px 14px", borderRadius: 50, border: "1px solid #E4E3E1",
-                    background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18",
-                    display: "flex", alignItems: "center", gap: 6,
-                  }}
-                >
+                <button onClick={() => { setLayerOpen(v => !v); setKindOpen(false); }}
+                  style={{ padding: "7px 14px", borderRadius: 50, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18", display: "flex", alignItems: "center", gap: 6 }}>
                   {layerLabel}
                   <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 10, color: "#A8A29E" }} />
                 </button>
@@ -405,42 +337,30 @@ export default function MethodologyCatalog() {
             </div>
           </div>
 
-          {/* Loading skeleton */}
           {isLoading && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} style={{ height: 200, borderRadius: 12, background: "#F0F0EE", animation: "pulse 1.5s ease-in-out infinite" }} />
+                <div key={i} style={{ borderRadius: 12, background: "#F0F0EE", aspectRatio: "16/9", animation: "pulse 1.5s ease-in-out infinite" }} />
               ))}
             </div>
           )}
 
-          {/* Empty state */}
           {!isLoading && gridItems.length === 0 && (
             <div style={{ padding: "60px 24px", textAlign: "center", border: "2px dashed #E4E3E1", borderRadius: 16 }}>
               <FontAwesomeIcon icon={faCircleInfo} style={{ fontSize: 36, color: "#D1D0CE", marginBottom: 16 }} />
-              <p style={{ fontSize: 16, fontWeight: 600, color: "#57534E", margin: "0 0 8px" }}>
-                沒有符合的{kindLabel}
-              </p>
-              <p style={{ fontSize: 14, color: "#A8A29E", margin: "0 0 16px" }}>
-                試試清除搜尋，或換個層級篩選
-              </p>
-              <button
-                onClick={() => { setSearchQ(""); setLayerFilter("ALL"); }}
-                style={{
-                  padding: "8px 20px", borderRadius: 8, background: "#6366F1",
-                  color: "white", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600,
-                }}
-              >
+              <p style={{ fontSize: 16, fontWeight: 600, color: "#57534E", margin: "0 0 8px" }}>沒有符合的{kindLabel}</p>
+              <p style={{ fontSize: 14, color: "#A8A29E", margin: "0 0 16px" }}>試試清除搜尋或換個層級篩選</p>
+              <button onClick={() => { setSearchQ(""); setLayerFilter("ALL"); }}
+                style={{ padding: "8px 20px", borderRadius: 8, background: "#6366F1", color: "white", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
                 清除篩選
               </button>
             </div>
           )}
 
-          {/* Grid */}
           {!isLoading && gridItems.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-              {gridItems.map((e: any) => (
-                <GridCard key={`${e.kind}-${e.id}`} entity={e} onSelect={() => setSelected(e)} />
+              {gridItems.map(e => (
+                <LandscapeCard key={`${e.kind}-${e.id ?? e.slug}`} entity={e} onPreview={() => setSelected(e)} />
               ))}
             </div>
           )}
@@ -451,6 +371,7 @@ export default function MethodologyCatalog() {
       {selected && (
         <DetailModal
           entity={selected}
+          relatedEntities={allEntities.filter(e => e.kind === selected.kind && e.id !== selected.id && String(e.strategyLayer ?? e.strategy_layer ?? "").slice(0,2) === String(selected.strategyLayer ?? selected.strategy_layer ?? "").slice(0,2)).slice(0, 6)}
           onClose={() => setSelected(null)}
           onLaunch={(e: any) => {
             setSelected(null);
@@ -458,9 +379,10 @@ export default function MethodologyCatalog() {
             if (e.slug) qs.set("slug", e.slug);
             const ws = Array.isArray(e.workspace) ? e.workspace[0] : (e.workspace ?? "");
             if (ws) qs.set("workspace", ws);
-            if (e.strategyLayer) qs.set("layer", String(e.strategyLayer).slice(0, 2));
+            if (e.strategyLayer ?? e.strategy_layer) qs.set("layer", String(e.strategyLayer ?? e.strategy_layer).slice(0, 2));
             window.open(`/picker?${qs}`, "_blank", "noopener");
           }}
+          onSelectRelated={e => setSelected(e)}
         />
       )}
 
@@ -496,8 +418,8 @@ function HScrollSection({ title, subtitle, accentColor, cta, onCta, loading, mt 
       </div>
       {loading ? (
         <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} style={{ flexShrink: 0, width: 240, height: 160, borderRadius: 12, background: "#F0F0EE", animation: "pulse 1.5s ease-in-out infinite" }} />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ flexShrink: 0, width: 260, borderRadius: 12, background: "#F0F0EE", aspectRatio: "5/4", animation: "pulse 1.5s ease-in-out infinite" }} />
           ))}
         </div>
       ) : (
@@ -509,174 +431,177 @@ function HScrollSection({ title, subtitle, accentColor, cta, onCta, loading, mt 
   );
 }
 
-/* ── SquadCard (horizontal scroll) ─────────────────────────────────────── */
-function SquadCard({ squad, onSelect }: { squad: any; onSelect: () => void }) {
+/* ── LandscapeCard — 原版有圖卡片（inline-CSS 版）───────────────────────────
+ *
+ * Squad  → MethodologyGlyph + bg-default-50
+ * Agent  → 全幅 avatar 圖片
+ * Skill  → 大字技能名 + task-type icon
+ * 共用   → layer chip（左上）、kind chip（右上，hover 淡出）
+ *           hover overlay：star + ellipsis 按鈕 + 淡色遮罩
+ * ─────────────────────────────────────────────────────────────────────── */
+function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
+  entity: any; onPreview: () => void; aspect?: string; size?: "sm" | "md" | "lg";
+}) {
   const [hov, setHov] = useState(false);
-  const li = layerInfo(squad.strategy_layer);
-  const layer = String(squad.strategy_layer ?? "L1").slice(0, 2).toUpperCase();
+  const [starHov, setStarHov] = useState(false);
+  const [menuHov, setMenuHov] = useState(false);
+  const [starred, setStarred] = useState(false);
+
+  const li = layerInfo(entity.strategyLayer ?? entity.strategy_layer);
+  const layer = li.key;
+  const coverImageUrl: string | undefined = entity.coverImageUrl ?? entity.heroImageUrl;
+  const kindLabel = entity.kind === "squad" ? "小組" : entity.kind === "agent" ? "Agent" : "技能";
+  const titleSize = size === "sm" ? 13 : size === "lg" ? 16 : 14;
+  const glyphSize = size === "sm" ? 64 : size === "lg" ? 120 : 88;
+
   return (
     <div
-      onClick={onSelect}
+      onClick={onPreview}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        flexShrink: 0, width: 240, borderRadius: 12, background: "white",
-        border: "1px solid #E4E3E1", cursor: "pointer", overflow: "hidden",
+        width: "100%", borderRadius: 12, background: "white",
+        border: "1px solid #E4E3E1", overflow: "hidden", cursor: "pointer",
         transition: "all 0.2s",
-        transform: hov ? "translateY(-3px)" : "none",
+        transform: hov ? "translateY(-2px)" : "none",
         boxShadow: hov ? "0 8px 24px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.05)",
       }}
     >
-      <div style={{ height: 110, background: li.bg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <MethodologyGlyph seed={squad.slug ?? String(squad.id)} layer={(layer as MosLayer)} size={76} />
-        <div style={{ position: "absolute", top: 8, left: 8, background: "white", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700, color: li.text }}>
-          {layer}・{li.label}
-        </div>
-        {hov && (
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ background: li.text, color: "white", borderRadius: 20, padding: "6px 16px", fontSize: 12, fontWeight: 600 }}>預覽</div>
+      {/* ── Hero area ───────────────────────────────────────────────── */}
+      <div style={{
+        position: "relative", width: "100%", background: "#F5F4F2",
+        borderBottom: "1px solid #E4E3E1", aspectRatio: aspect, overflow: "hidden",
+      }}>
+        {entity.kind === "skill" ? (
+          /* Skill: big name text + icon */
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-end", padding: "0 14px 12px", background: "#F5F4F2" }}>
+            <p style={{
+              fontWeight: 700, color: "#374151", margin: 0, lineHeight: 1.05,
+              flex: 1, overflow: "hidden",
+              display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
+              fontSize: size === "sm" ? 18 : size === "lg" ? 28 : 22,
+            }}>
+              {entity.name}
+            </p>
+            <FontAwesomeIcon icon={skillIcon(entity.taskType)} style={{
+              color: "#9CA3AF", position: "absolute", bottom: 12, right: 14,
+              fontSize: size === "sm" ? 18 : size === "lg" ? 30 : 22,
+            }} />
+          </div>
+        ) : entity.kind === "agent" ? (
+          /* Agent: full-bleed avatar */
+          <img
+            src={coverImageUrl || agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "")}
+            alt={entity.name}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            onError={e => {
+              const img = e.currentTarget;
+              const fb = agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "");
+              if (img.src !== fb) img.src = fb;
+            }}
+          />
+        ) : coverImageUrl ? (
+          /* Squad with cover image */
+          <img src={coverImageUrl} alt={entity.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          /* Squad: MethodologyGlyph */
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85 }}>
+            <MethodologyGlyph seed={entity.slug ?? entity.id} layer={(layer as MosLayer)} size={glyphSize} />
           </div>
         )}
-      </div>
-      <div style={{ padding: "10px 12px 12px" }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", margin: "0 0 4px", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-          {squad.name}
-        </p>
-        {squad.description && (
-          <p style={{ fontSize: 11, color: "#A8A29E", margin: 0, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-            {squad.description}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
 
-/* ── AgentCard ──────────────────────────────────────────────────────────── */
-function AgentCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
-  const [hov, setHov] = useState(false);
-  const avatarUrl = entity.coverImageUrl || agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "");
-  return (
-    <div
-      onClick={onSelect}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        flexShrink: 0, width: 190, borderRadius: 12, background: "white",
-        border: "1px solid #E4E3E1", cursor: "pointer", overflow: "hidden",
-        transition: "all 0.2s",
-        transform: hov ? "translateY(-3px)" : "none",
-        boxShadow: hov ? "0 8px 24px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.05)",
-      }}
-    >
-      <div style={{ height: 130, background: "#F5F3FF", position: "relative", overflow: "hidden" }}>
-        <img
-          src={avatarUrl}
-          alt={entity.name}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-          onError={(e) => { const img = e.currentTarget; const fb = agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? ""); if (img.src !== fb) img.src = fb; }}
-        />
-        <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(255,255,255,0.92)", borderRadius: 6, padding: "2px 7px", fontSize: 10, fontWeight: 700, color: "#7C3AED" }}>Agent</div>
-      </div>
-      <div style={{ padding: "10px 12px 12px" }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", margin: "0 0 2px" }}>{entity.name}</p>
-        {entity.subtitle && <p style={{ fontSize: 11, color: "#A8A29E", margin: 0 }}>{entity.subtitle}</p>}
-      </div>
-    </div>
-  );
-}
-
-/* ── SkillCard ──────────────────────────────────────────────────────────── */
-function SkillCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <div
-      onClick={onSelect}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        flexShrink: 0, width: 220, borderRadius: 12, background: "white",
-        border: "1px solid #E4E3E1", cursor: "pointer", overflow: "hidden",
-        transition: "all 0.2s",
-        transform: hov ? "translateY(-3px)" : "none",
-        boxShadow: hov ? "0 8px 24px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.05)",
-      }}
-    >
-      <div style={{ height: 100, background: "#F0FDF4", display: "flex", alignItems: "flex-end", padding: "0 14px 12px", position: "relative" }}>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#059669", margin: 0, lineHeight: 1.1, flex: 1, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-          {entity.name}
-        </p>
-        <FontAwesomeIcon icon={skillIcon(entity.taskType)} style={{ fontSize: 22, color: "#059669", opacity: 0.4 }} />
-        <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(255,255,255,0.9)", borderRadius: 6, padding: "2px 7px", fontSize: 10, fontWeight: 700, color: "#059669" }}>技能</div>
-      </div>
-      <div style={{ padding: "10px 12px 12px" }}>
-        {entity.description && (
-          <p style={{ fontSize: 11, color: "#A8A29E", margin: 0, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-            {entity.description}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ── GridCard (3-col grid) ────────────────────────────────────────────── */
-function GridCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
-  const [hov, setHov] = useState(false);
-  const li = layerInfo(entity.strategyLayer ?? entity.strategy_layer);
-  const layer = String(entity.strategyLayer ?? entity.strategy_layer ?? "L1").slice(0, 2).toUpperCase();
-
-  if (entity.kind === "agent") {
-    const avatarUrl = entity.coverImageUrl || agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "");
-    return (
-      <div onClick={onSelect} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-        style={{ background: "white", borderRadius: 12, border: "1px solid #E4E3E1", overflow: "hidden", cursor: "pointer", transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none", boxShadow: hov ? "0 8px 24px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.05)" }}>
-        <div style={{ height: 140, background: "#F5F3FF", position: "relative", overflow: "hidden" }}>
-          <img src={avatarUrl} alt={entity.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e) => { const img = e.currentTarget; const fb = agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? ""); if (img.src !== fb) img.src = fb; }} />
-          <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(255,255,255,0.92)", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700, color: "#7C3AED" }}>Agent</div>
-          {hov && <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ background: "#7C3AED", color: "white", borderRadius: 20, padding: "7px 18px", fontSize: 13, fontWeight: 600 }}>套用 Agent</div></div>}
+        {/* Layer chip — top-left */}
+        <div style={{
+          position: "absolute", top: 10, left: 10,
+          background: "rgba(255,255,255,0.94)", backdropFilter: "blur(4px)",
+          borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 600,
+          color: li.text, pointerEvents: "none",
+          border: `1px solid ${li.text}20`,
+        }}>
+          {layer}・{li.label}
         </div>
-        <div style={{ padding: "12px 14px" }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A18", margin: "0 0 4px" }}>{entity.name}</p>
-          {entity.subtitle && <p style={{ fontSize: 12, color: "#A8A29E", margin: 0 }}>{entity.subtitle}</p>}
-        </div>
-      </div>
-    );
-  }
 
-  if (entity.kind === "skill") {
-    return (
-      <div onClick={onSelect} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-        style={{ background: "white", borderRadius: 12, border: "1px solid #E4E3E1", overflow: "hidden", cursor: "pointer", transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none", boxShadow: hov ? "0 8px 24px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.05)" }}>
-        <div style={{ height: 120, background: "#F0FDF4", display: "flex", alignItems: "flex-end", padding: "0 16px 14px", position: "relative" }}>
-          <p style={{ fontSize: 22, fontWeight: 700, color: "#059669", margin: 0, flex: 1, lineHeight: 1.1, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{entity.name}</p>
-          <FontAwesomeIcon icon={skillIcon(entity.taskType)} style={{ fontSize: 28, color: "#059669", opacity: 0.35 }} />
-          <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(255,255,255,0.9)", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700, color: "#059669" }}>技能</div>
-          {hov && <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ background: "#059669", color: "white", borderRadius: 20, padding: "7px 18px", fontSize: 13, fontWeight: 600 }}>套用技能</div></div>}
+        {/* Kind chip — top-right, fades on hover */}
+        <div style={{
+          position: "absolute", top: 10, right: 10,
+          background: "rgba(255,255,255,0.94)", backdropFilter: "blur(4px)",
+          borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 500,
+          color: "#57534E", pointerEvents: "none",
+          opacity: hov ? 0 : 1, transition: "opacity 0.2s",
+        }}>
+          {kindLabel}
         </div>
-        <div style={{ padding: "12px 14px" }}>
-          {entity.description && <p style={{ fontSize: 12, color: "#78716C", margin: 0, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{entity.description}</p>}
-        </div>
-      </div>
-    );
-  }
 
-  // Squad
-  return (
-    <div onClick={onSelect} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ background: "white", borderRadius: 12, border: "1px solid #E4E3E1", overflow: "hidden", cursor: "pointer", transition: "all 0.2s", transform: hov ? "translateY(-2px)" : "none", boxShadow: hov ? "0 8px 24px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.05)" }}>
-      <div style={{ height: 130, background: li.bg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <MethodologyGlyph seed={entity.slug ?? String(entity.id)} layer={(layer as MosLayer)} size={80} />
-        <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(255,255,255,0.92)", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700, color: li.text }}>{layer}・{li.label}</div>
+        {/* Unapproved badge */}
         {entity.is_approved === 0 && (
-          <div style={{ position: "absolute", top: 10, right: 10, background: "#FEF3C7", borderRadius: 6, padding: "3px 8px", fontSize: 10, fontWeight: 600, color: "#D97706" }}>審核中</div>
+          <div style={{
+            position: "absolute", bottom: 10, right: 10,
+            background: "#FEF3C7", borderRadius: 6, padding: "2px 7px",
+            fontSize: 10, fontWeight: 600, color: "#D97706",
+          }}>審核中</div>
         )}
-        {hov && <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ background: li.text, color: "white", borderRadius: 20, padding: "7px 18px", fontSize: 13, fontWeight: 600 }}>啟動小組</div></div>}
+
+        {/* Hover overlay: subtle tint + action buttons */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "rgba(0,0,0,0.05)",
+          opacity: hov ? 1 : 0, transition: "opacity 0.2s",
+          pointerEvents: hov ? "auto" : "none",
+        }}>
+          <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
+            <button
+              onClick={e => { e.stopPropagation(); setStarred(v => !v); }}
+              onMouseEnter={() => setStarHov(true)}
+              onMouseLeave={() => setStarHov(false)}
+              style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: starHov ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.94)",
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: starred ? "#F59E0B" : "#57534E", fontSize: 13,
+                transition: "all 0.15s",
+              }}
+            >
+              <FontAwesomeIcon icon={faStar} />
+            </button>
+            <button
+              onClick={e => e.stopPropagation()}
+              onMouseEnter={() => setMenuHov(true)}
+              onMouseLeave={() => setMenuHov(false)}
+              style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: menuHov ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.94)",
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#57534E", fontSize: 13, transition: "all 0.15s",
+              }}
+            >
+              <FontAwesomeIcon icon={faEllipsis} />
+            </button>
+          </div>
+        </div>
       </div>
-      <div style={{ padding: "12px 14px" }}>
-        <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A18", margin: "0 0 4px", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{entity.name}</p>
-        {entity.description && <p style={{ fontSize: 12, color: "#78716C", margin: 0, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{entity.description}</p>}
+
+      {/* ── Card body ───────────────────────────────────────────────── */}
+      <div style={{ padding: "10px 12px 12px" }}>
+        {entity.kind === "skill" ? (
+          /* Skill: subtitle + description (name is in the hero) */
+          <>
+            {entity.subtitle && <p style={{ fontSize: 11, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{entity.subtitle}</p>}
+            {entity.description && <p style={{ fontSize: 12, color: "#78716C", margin: 0, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{entity.description}</p>}
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: titleSize, fontWeight: 600, color: "#1A1A18", margin: "0 0 3px", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" }}>
+              {entity.name}
+            </p>
+            {entity.description && (
+              <p style={{ fontSize: 12, color: "#78716C", margin: 0, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                {entity.description}
+              </p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -691,12 +616,7 @@ function DropMenu({ children, onClose }: { children: React.ReactNode; onClose: (
     return () => document.removeEventListener("mousedown", h);
   }, [onClose]);
   return (
-    <div ref={ref} style={{
-      position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 300,
-      background: "white", borderRadius: 12, minWidth: 200, padding: "6px 0",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)",
-      border: "1px solid rgba(0,0,0,0.07)",
-    }}>
+    <div ref={ref} style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 300, background: "white", borderRadius: 12, minWidth: 200, padding: "6px 0", boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)", border: "1px solid rgba(0,0,0,0.07)" }}>
       {children}
     </div>
   );
@@ -704,32 +624,23 @@ function DropMenu({ children, onClose }: { children: React.ReactNode; onClose: (
 function DropItem({ children, active, onClick }: { children: React.ReactNode; active?: boolean; onClick: () => void }) {
   const [hov, setHov] = useState(false);
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        width: "100%", padding: "8px 16px", border: "none", textAlign: "left",
-        background: active ? "#EEF2FF" : hov ? "#FAFAF9" : "white",
-        color: active ? "#4F46E5" : "#1A1A18", fontSize: 13, cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 8, fontWeight: active ? 600 : 400,
-      }}
-    >
+    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ width: "100%", padding: "8px 16px", border: "none", textAlign: "left", background: active ? "#EEF2FF" : hov ? "#FAFAF9" : "white", color: active ? "#4F46E5" : "#1A1A18", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontWeight: active ? 600 : 400 }}>
       {children}
     </button>
   );
 }
 
 /* ── DetailModal ────────────────────────────────────────────────────────── */
-function DetailModal({ entity, onClose, onLaunch }: {
-  entity: any; onClose: () => void; onLaunch: (e: any) => void;
+function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelated }: {
+  entity: any; relatedEntities: any[]; onClose: () => void;
+  onLaunch: (e: any) => void; onSelectRelated: (e: any) => void;
 }) {
   const li = layerInfo(entity.strategyLayer ?? entity.strategy_layer);
-  const layer = String(entity.strategyLayer ?? entity.strategy_layer ?? "L1").slice(0, 2).toUpperCase();
-  const isSquad = entity.kind === "squad";
-  const isAgent = entity.kind === "agent";
-  const isSkill = entity.kind === "skill";
-  const ctaLabel = isSquad ? "啟動小組" : isAgent ? "套用 Agent" : "套用技能";
+  const layer = li.key;
+  const coverImageUrl: string | undefined = entity.coverImageUrl ?? entity.heroImageUrl;
+  const kindLabel = entity.kind === "squad" ? "方法論小組" : entity.kind === "agent" ? "Agent" : "技能";
+  const ctaLabel  = entity.kind === "squad" ? "啟動此小組" : entity.kind === "agent" ? "套用此 Agent" : "套用此技能";
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -738,75 +649,82 @@ function DetailModal({ entity, onClose, onLaunch }: {
   }, [onClose]);
 
   return (
-    <div onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      zIndex: 9000, padding: 24,
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: "white", borderRadius: 20, width: "100%", maxWidth: 680,
-        maxHeight: "86vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
-      }}>
-        {/* Hero */}
-        <div style={{ height: 160, background: isAgent ? "#F5F3FF" : isSkill ? "#F0FDF4" : li.bg, position: "relative", borderRadius: "20px 20px 0 0", overflow: "hidden" }}>
-          {isAgent ? (
-            <img
-              src={entity.coverImageUrl || agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "")}
-              alt={entity.name}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : isSkill ? (
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FontAwesomeIcon icon={skillIcon(entity.taskType)} style={{ fontSize: 72, color: "#059669", opacity: 0.25 }} />
-            </div>
-          ) : (
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <MethodologyGlyph seed={entity.slug ?? String(entity.id)} layer={(layer as MosLayer)} size={120} />
-            </div>
-          )}
-          <button onClick={onClose} style={{
-            position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.9)",
-            border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#57534E",
-          }}>
-            <FontAwesomeIcon icon={faXmark} />
-          </button>
-        </div>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "white", borderRadius: 20, width: "100%", maxWidth: 1000, maxHeight: "88vh", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.22)", display: "grid", gridTemplateColumns: "1fr auto" }}>
 
-        <div style={{ padding: "24px 28px 32px" }}>
-          {/* Chips */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-            {isSquad && (
-              <span style={{ padding: "4px 10px", borderRadius: 20, background: li.bg, fontSize: 12, fontWeight: 700, color: li.text }}>
-                {layer}・{li.label}
-              </span>
+        {/* Left: preview */}
+        <div style={{ padding: "28px 28px 28px 28px", overflowY: "auto", borderRight: "1px solid #F0F0EE" }}>
+          {/* Big hero */}
+          <div style={{ position: "relative", width: "100%", background: "#F5F4F2", borderRadius: 12, overflow: "hidden", aspectRatio: "4/3", border: "1px solid #E4E3E1" }}>
+            {entity.kind === "skill" ? (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <FontAwesomeIcon icon={skillIcon(entity.taskType)} style={{ fontSize: 120, color: "#D1D0CE" }} />
+              </div>
+            ) : entity.kind === "agent" ? (
+              <img src={coverImageUrl || agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? "")} alt={entity.name}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                onError={e => { const img = e.currentTarget; const fb = agentAvatarUrl(entity.slug ?? String(entity.id), entity.subtitle ?? entity.name ?? ""); if (img.src !== fb) img.src = fb; }}
+              />
+            ) : coverImageUrl ? (
+              <img src={coverImageUrl} alt={entity.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.9 }}>
+                <MethodologyGlyph seed={entity.slug ?? entity.id} layer={(layer as MosLayer)} size={200} />
+              </div>
             )}
-            <span style={{ padding: "4px 10px", borderRadius: 20, background: isAgent ? "#F5F3FF" : isSkill ? "#F0FDF4" : "#F5F5F4", fontSize: 12, fontWeight: 600, color: isAgent ? "#7C3AED" : isSkill ? "#059669" : "#57534E" }}>
-              {isSquad ? "方法論小組" : isAgent ? "Agent" : "技能"}
-            </span>
-            {isSquad && entity.is_approved === 0 && (
-              <span style={{ padding: "4px 10px", borderRadius: 20, background: "#FEF3C7", fontSize: 12, fontWeight: 600, color: "#D97706" }}>審核中</span>
-            )}
+            <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(255,255,255,0.94)", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, color: li.text }}>{layer}・{li.label}</div>
+            <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,255,255,0.94)", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 500, color: "#57534E" }}>{kindLabel}</div>
           </div>
 
-          <h2 style={{ fontSize: 26, fontWeight: 800, color: "#1A1A18", margin: "0 0 8px", letterSpacing: "-0.01em" }}>{entity.name}</h2>
-          {entity.subtitle && <p style={{ fontSize: 14, color: "#6366F1", fontWeight: 600, margin: "0 0 14px" }}>{entity.subtitle}</p>}
-          {entity.description && <p style={{ fontSize: 14, color: "#57534E", lineHeight: 1.65, margin: "0 0 24px" }}>{entity.description}</p>}
+          {/* Related */}
+          {relatedEntities.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A18", margin: "0 0 12px" }}>更多類似的{kindLabel}</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                {relatedEntities.map(r => (
+                  <div key={`rel-${r.kind}-${r.id}`} onClick={() => onSelectRelated(r)}
+                    style={{ borderRadius: 8, border: "1px solid #E4E3E1", overflow: "hidden", cursor: "pointer", background: "white" }}>
+                    <div style={{ background: "#F5F4F2", aspectRatio: "4/3", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <MethodologyGlyph seed={r.slug ?? r.id} layer={(String(r.strategyLayer ?? r.strategy_layer ?? "L1").slice(0, 2) as MosLayer)} size={48} />
+                    </div>
+                    <div style={{ padding: "6px 8px" }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.3 }}>{r.name}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-          {/* CTA */}
-          <button
-            onClick={() => onLaunch(entity)}
-            style={{
-              width: "100%", padding: "14px", borderRadius: 12,
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              color: "white", border: "none", fontSize: 16, fontWeight: 700,
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              boxShadow: "0 4px 16px rgba(99,102,241,0.3)",
-            }}
-          >
-            <FontAwesomeIcon icon={faRocket} />
-            {ctaLabel}
+        {/* Right: meta + CTA */}
+        <div style={{ width: 340, padding: "28px 28px 28px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+          <button onClick={onClose} style={{ alignSelf: "flex-end", background: "#F5F4F2", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#57534E", fontSize: 14 }}>
+            <FontAwesomeIcon icon={faXmark} />
           </button>
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ padding: "4px 10px", borderRadius: 20, background: li.bg, fontSize: 12, fontWeight: 600, color: li.text }}>{layer}・{li.label}</span>
+            <span style={{ padding: "4px 10px", borderRadius: 20, background: "#F5F4F2", fontSize: 12, color: "#57534E" }}>{kindLabel}</span>
+            {entity.is_approved === 0 && <span style={{ padding: "4px 10px", borderRadius: 20, background: "#FEF3C7", fontSize: 12, fontWeight: 600, color: "#D97706" }}>審核中</span>}
+          </div>
+
+          <div>
+            <h2 style={{ fontSize: 26, fontWeight: 800, color: "#1A1A18", margin: "0 0 6px", letterSpacing: "-0.01em", lineHeight: 1.2 }}>{entity.name}</h2>
+            {entity.subtitle && <p style={{ fontSize: 14, color: "#6366F1", fontWeight: 600, margin: 0 }}>{entity.subtitle}</p>}
+          </div>
+
+          {entity.description && (
+            <p style={{ fontSize: 14, color: "#57534E", lineHeight: 1.65, margin: 0 }}>{entity.description}</p>
+          )}
+
+          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
+            <button onClick={() => onLaunch(entity)}
+              style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", color: "white", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 16px rgba(99,102,241,0.3)" }}>
+              <FontAwesomeIcon icon={faRocket} />
+              {ctaLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>
