@@ -408,12 +408,10 @@ function detectLanguage(messages: Message[]): "zh" | "ja" | "ko" | "en" {
 
 // Verified-working Azure Foundry deployments (probed 2026-04-25):
 // gpt-4o (OpenAI), DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3, Kimi-K2.5
+// NOTE 2026-05-03: gpt-5-nano deployment removed from Foundry project.
+// Reverted zh to gpt-4o which is stable. Override with AZURE_FOUNDRY_MODEL_ZH if needed.
 const AZURE_MODEL_BY_LANG: Record<string, string> = {
-  // Note: probe (2026-04-25) confirms `gpt-5-nano` is the only deployed gpt-5
-  // family member on the Foundry project. `gpt-5` / `gpt-5-mini` / `gpt-5-chat`
-  // exist in the model catalog but no deployment is published under those names.
-  // The reasoning-model param translation below handles max_completion_tokens.
-  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-5-nano",
+  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-4o",
   ja: process.env.AZURE_FOUNDRY_MODEL_JA || "gpt-4o",
   ko: process.env.AZURE_FOUNDRY_MODEL_KO || "gpt-4o",
   en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4o",
@@ -540,6 +538,76 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 }
 
 
+// ─── Anthropic native streaming fallback ────────────────────────────────────
+/**
+ * Stream tokens from Anthropic's native API (different SSE format to OpenAI).
+ * Used as fallback when the primary provider fails with a deployment error.
+ */
+async function* anthropicStream(
+  messages: Message[],
+  maxTokens: number,
+): AsyncGenerator<string> {
+  const key = (ENV as any).ANTHROPIC_API_KEY ?? "";
+  if (!key) throw new Error("Anthropic not configured");
+  const model = (ENV as any).ANTHROPIC_MODEL ?? "claude-sonnet-4-5-20250929";
+
+  // Split system message from conversation
+  const systemMsgs = messages.filter((m) => m.role === "system");
+  const chatMsgs   = messages.filter((m) => m.role !== "system");
+  const systemText = systemMsgs
+    .map((m) => (typeof m.content === "string" ? m.content : ""))
+    .join("\n");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      stream: true,
+      ...(systemText ? { system: systemText } : {}),
+      messages: chatMsgs.map((m) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+      })),
+    }),
+  });
+
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`Anthropic stream ${response.status}: ${t.slice(0, 200)}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body from Anthropic");
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data: ")) continue;
+      try {
+        const json = JSON.parse(trimmed.slice(6)) as any;
+        // Anthropic SSE: event type=content_block_delta, delta.type=text_delta
+        if (json.type === "content_block_delta" && json.delta?.type === "text_delta") {
+          const text = json.delta?.text;
+          if (text) yield text;
+        }
+      } catch { /* skip malformed lines */ }
+    }
+  }
+}
+
 // ─── Streaming invoke function ──────────────────────────────────────────────
 export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<string> {
   const providerKey = resolveProvider(params.provider as any);
@@ -601,7 +669,17 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`LLM stream failed: ${response.status} ${response.statusText} – ${errorText}`);
+    const primaryErr = `LLM stream failed: ${response.status} ${response.statusText} – ${errorText}`;
+    console.warn(`[invokeLLMStream] primary (${providerKey}/${model}) failed: ${primaryErr.slice(0, 200)}`);
+
+    // ── Fallback: Anthropic native streaming ──────────────────────────
+    const anthropicKey = (ENV as any).ANTHROPIC_API_KEY ?? "";
+    if (anthropicKey && providerKey !== "anthropic") {
+      console.warn("[invokeLLMStream] falling back to Anthropic streaming");
+      yield* anthropicStream(messages, params.maxTokens ?? params.max_tokens ?? 4000);
+      return;
+    }
+    throw new Error(primaryErr);
   }
 
   const reader = response.body?.getReader();
