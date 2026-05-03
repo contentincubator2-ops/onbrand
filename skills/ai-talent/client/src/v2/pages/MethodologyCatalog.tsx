@@ -157,7 +157,7 @@ export default function MethodologyCatalog() {
 
   // Semantic search — covers squads, agents, skills simultaneously.
   // Kind maps to the active bottom-tab so results stay contextual.
-  const semanticKind = activeKind === "task" ? "all" : activeKind === "all" ? "all" : activeKind as any;
+  const semanticKind = (activeKind as string) === "task" ? "all" : (activeKind as string) === "all" ? "all" : activeKind as any;
   const { semanticHits, isSearching: isSemanticSearching } = useSemanticSearch(searchQ, semanticKind);
   const [layerFilter, setLayerFilter] = useState<string>("ALL");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -229,7 +229,7 @@ export default function MethodologyCatalog() {
   // Prefers server semantic hits when available; falls back to client substring.
   const gridFiltered = useMemo(() => {
     const passesFacets = (e: any) =>
-      (activeKind === "all" || e.kind === activeKind) &&
+      ((activeKind as string) === "all" || e.kind === activeKind) &&
       (layerFilter === "ALL" || (e.strategyLayer ?? "").toString().slice(0, 2) === layerFilter);
 
     const q = searchQ.trim().toLowerCase();

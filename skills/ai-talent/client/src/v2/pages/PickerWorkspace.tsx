@@ -1584,7 +1584,8 @@ function SquadIntakeSidebar({
       });
       // Dynamically import Pipedream SDK to keep bundle small
       const { PipedreamClient } = await import("@pipedream/sdk");
-      const pd = new PipedreamClient({
+      // Cast to any — Pipedream SDK shape varies across versions; errors are caught below.
+      const pd: any = new (PipedreamClient as any)({
         projectEnvironment: env,
         externalUserId: `sowork-user`,
         tokenCallback: async () => token,

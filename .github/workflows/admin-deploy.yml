@@ -1,9 +1,4 @@
-name: Admin — Deploy to VM
-
-# Pulls latest main, installs dependencies, rebuilds the client,
-# restarts the single ai-marketer pm2 process. Use this after
-# pushing server or client changes that need to take effect on
-# ai-marketer.sowork.ai.
+name: Admin — Deploy to VM (git pull + build + restart)
 
 on:
   workflow_dispatch:
@@ -11,61 +6,49 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: appleboy/ssh-action@v1.0.3
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 600s
-          envs: GH_TOKEN
           script: |
             set -e
             APP=/opt/marketing-os/app
             AI=$APP/skills/ai-talent
 
-            echo "===== Step 1: Pull latest main ====="
-            REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            echo "===== 1. Pull latest code ====="
             cd "$APP"
-            git remote set-url origin "$REPO"
             git fetch origin main
             git reset --hard origin/main
             echo "Commit: $(git log --oneline -1)"
 
             echo ""
-            echo "===== Step 2: Server dependencies ====="
+            echo "===== 2. Install backend dependencies ====="
             cd "$AI"
             npm install --legacy-peer-deps 2>&1 | tail -5
 
             echo ""
-            echo "===== Step 2b: DB migrations (idempotent) ====="
-            npx tsx scripts/migrate.ts 2>&1 | tail -30 || {
-              echo "[deploy] migrations failed — continuing anyway; check logs"
-            }
-
-            echo ""
-            echo "===== Step 3: Client build ====="
+            echo "===== 3. Build frontend ====="
             cd "$AI/client"
             npm install --legacy-peer-deps 2>&1 | tail -5
-            npm run build 2>&1 | tail -10
-            echo "Frontend build done:"
+            npm run build 2>&1 | tail -15
+            echo "Build output:"
             stat -c '%y %s bytes' "$AI/public/index.html"
 
             echo ""
-            echo "===== Step 4: Restart pm2 ====="
-            # Real server is the `marketing-os` pm2 entry (per ecosystem.config.cjs).
-            # The `ai-marketer` entry is a stale broken process — do not touch.
-            pm2 restart marketing-os --update-env 2>&1 | tail -5 || \
-              pm2 start "$AI/ecosystem.config.cjs" --only marketing-os 2>&1 | tail -5
-            pm2 save
+            echo "===== 4. Restart PM2 ====="
+            cd "$AI"
+            pm2 restart marketing-os 2>/dev/null || \
+              pm2 start "node_modules/.bin/tsx server/index.ts" \
+                --name marketing-os --cwd "$AI"
+            pm2 save --force
 
             echo ""
-            echo "===== Step 5: Health check ====="
-            sleep 4
-            pm2 list | head -6
-            curl -s -o /dev/null -w "Backend /health: HTTP %{http_code}\n" http://127.0.0.1:3101/health
-
-            echo ""
-            echo "===== Done ====="
+            echo "===== 5. Health check ====="
+            sleep 5
+            curl -s -o /dev/null -w "Backend HTTP %{http_code}\n" http://127.0.0.1:3101/health
+            pm2 list | grep marketing-os
+            echo "===== Deploy complete ====="

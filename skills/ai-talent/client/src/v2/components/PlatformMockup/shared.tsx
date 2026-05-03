@@ -1,13 +1,86 @@
 /**
  * Shared helpers + types for PlatformMockup family.
  *
- * Field shape is intentionally loose — each variant pulls what it
- * needs, missing fields render as Skeleton placeholders (PR2.1).
- * PR2.3 will wire real squad-step outputs into these fields.
+ * Session 6: added MockupSlotMap + SlotContent for per-slot loading/filled/empty states.
  */
 import React from "react";
-import { Chip } from "@heroui/react";
+import { Chip, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+// ── Slot state system (Session 6) ─────────────────────────────────────────────
+
+export type MockupSlotStatus = "empty" | "loading" | "filled";
+
+export interface MockupSlotState {
+  /** Rendered value — string for text slots, string[] for hashtags */
+  value?: string | string[];
+  status: MockupSlotStatus;
+}
+
+/** Map of slotKey → SlotState. Keys match the `mockupSlot` field on squad steps.
+ *  Known slot keys: caption, image, hashtags, title, description, cta, imageDesc, videoDesc, body */
+export type MockupSlotMap = Record<string, MockupSlotState>;
+
+/**
+ * SlotContent — renders one mockup slot in the correct state:
+ *   "empty"   → renders `placeholder` (grayed-out skeleton or nothing)
+ *   "loading" → animated shimmer skeleton
+ *   "filled"  → calls `children(value)` with the slot value
+ *
+ * Usage:
+ *   <SlotContent slotKey="caption" slotMap={slotMap} skeletonLines={3}
+ *     placeholder={<Skeleton className="h-3 w-3/4 rounded" />}
+ *   >
+ *     {(val) => <p>{val as string}</p>}
+ *   </SlotContent>
+ */
+export function SlotContent({
+  slotKey,
+  slotMap,
+  children,
+  placeholder,
+  skeletonLines = 2,
+  skeletonClassName,
+}: {
+  slotKey: string;
+  slotMap?: MockupSlotMap;
+  children: (value: string | string[] | undefined) => React.ReactNode;
+  placeholder?: React.ReactNode;
+  skeletonLines?: number;
+  skeletonClassName?: string;
+}) {
+  const slot = slotMap?.[slotKey];
+
+  // No slot map wired yet — fall back to old liveXxx prop behaviour (children handles it)
+  if (!slotMap) return <>{children(undefined)}</>;
+
+  if (slot?.status === "loading") {
+    return (
+      <div className="space-y-1.5 w-full animate-in fade-in duration-300">
+        {Array.from({ length: skeletonLines }).map((_, i) => (
+          <Skeleton
+            key={i}
+            className={skeletonClassName ?? `h-2.5 rounded ${i === 0 ? "w-full" : i === skeletonLines - 1 ? "w-[60%]" : "w-[85%]"}`}
+          />
+        ))}
+        {/* Pulse label */}
+        <div className="flex items-center gap-1 mt-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+          <span className="text-[10px] text-primary/70">Agent 生成中…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (slot?.status === "filled") {
+    return <>{children(slot.value)}</>;
+  }
+
+  // "empty" or undefined slot
+  return <>{placeholder ?? null}</>;
+}
+
+// ── Original MockupFields interface (extended with slotMap) ────────────────────
 
 export interface MockupFields {
   /** Mission title — used as caption hook / video title */
@@ -20,8 +93,7 @@ export interface MockupFields {
   variantLabel?: string;
   /** Squad steps — only consumed by UnsupportedVariantPlaceholder */
   steps?: Array<{ name?: string; outputType?: string; assignedAgentName?: string }>;
-  /** Live content fields aggregated from content-step outputs (PR4.3).
-   *  When present, variants render real content instead of skeletons. */
+  /** Live content fields — legacy path (still works when slotMap is absent) */
   liveCaption?: string;
   liveHashtags?: string[];
   liveTitle?: string;
@@ -29,13 +101,16 @@ export interface MockupFields {
   liveImageDesc?: string;
   liveVideoDesc?: string;
   liveCta?: string;
+  /**
+   * Session 6: per-slot state map.
+   * When provided, variants use SlotContent to show loading/filled/empty per slot.
+   * Falls back gracefully to liveXxx props when absent.
+   */
+  slotMap?: MockupSlotMap;
 }
 
-// Used only inside PlatformMockup/* (simulated FB/IG/LinkedIn posts where
-// the avatar represents a fake post author, not a real SoWork agent). Real
-// agent avatars use AgentAvatar component (DiceBear notionists) per design system.
-// 2026-05-02: switched from avataaars → notionists to match the product-wide
-// "illustrated portrait, specialty-keyed background" avatar standard.
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 export const dicebear = (name: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name || "anon")}&backgroundColor=4267B2&backgroundType=solid`;
 
@@ -65,10 +140,7 @@ export function MockupHeader({
   );
 }
 
-/** IG-style story-ring avatar (conic gradient pink→purple→blue→orange) */
-export function StoryRingAvatar({
-  src, size = 36,
-}: { src: string; size?: number }) {
+export function StoryRingAvatar({ src, size = 36 }: { src: string; size?: number }) {
   return (
     <span
       className="shrink-0 inline-flex items-center justify-center rounded-full p-[2px]"
@@ -78,19 +150,13 @@ export function StoryRingAvatar({
       }}
     >
       <span className="block w-full h-full rounded-full bg-content1 p-[2px]">
-        <img
-          src={src} alt=""
-          className="w-full h-full rounded-full block object-cover"
-        />
+        <img src={src} alt="" className="w-full h-full rounded-full block object-cover" />
       </span>
     </span>
   );
 }
 
-/** Vertical action rail used by IG Reels / YT Shorts / TikTok FYP */
-export function VerticalActionRail({
-  items,
-}: {
+export function VerticalActionRail({ items }: {
   items: Array<{ icon: any; label: string; count?: string }>;
 }) {
   return (
