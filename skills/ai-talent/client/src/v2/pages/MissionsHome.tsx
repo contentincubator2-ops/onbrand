@@ -823,6 +823,15 @@ function LayerNav({
 
 /* ─────────────────────────── Quick-start circle (monochrome) ───────── */
 
+/** Hover subtitle for every tile type */
+function tileSubtitle(tile: QuickTile): string {
+  if (tile.filterWorkspace) return "查看全部";
+  if (tile.isCustom)        return "空白建立";
+  if (tile.opensIngest)     return "上傳檔案";
+  if (tile.isMore)          return "顯示全部";
+  return "查看全部";
+}
+
 function CircleTile({
   tile, active, onClick,
 }: {
@@ -831,29 +840,36 @@ function CircleTile({
   onClick: () => void;
 }) {
   const [hovered, setHovered] = React.useState(false);
+  const color = tile.iconBg ?? "#9CA3AF";
+
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-        width: 72, padding: "8px 4px", minWidth: 0,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        width: 76, padding: "8px 4px 6px", minWidth: 0,
         background: "none", border: "none", cursor: "pointer", userSelect: "none",
+        /* Slight lift on hover for the whole tile */
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        transition: "transform 0.25s ease",
       }}
     >
-      {/* Circle — scale(1.05) on hover, 0.3s (exact Canva spec) */}
+      {/* Circle — scale(1.05) + glow on hover */}
       <span
         style={{
-          width: 48, height: 48, borderRadius: "50%",
-          background: tile.iconBg ?? "#9CA3AF",
+          width: 52, height: 52, borderRadius: "50%",
+          background: color,
           display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#fff", fontSize: 16, flexShrink: 0,
-          transform: hovered ? "scale(1.05)" : "scale(1)",
-          transition: "transform 0.3s, box-shadow 0.15s ease",
+          color: "#fff", fontSize: 18, flexShrink: 0,
+          transform: hovered ? "scale(1.08)" : "scale(1)",
+          transition: "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease",
           boxShadow: active
-            ? `0 0 0 3px #fff, 0 0 0 5px ${tile.iconBg ?? "#F97316"}`
-            : "0 2px 8px rgba(0,0,0,0.15)",
+            ? `0 0 0 3px #fff, 0 0 0 5px ${color}`
+            : hovered
+              ? `0 6px 18px ${color}55`
+              : "0 2px 8px rgba(0,0,0,0.14)",
         }}
       >
         <FontAwesomeIcon icon={tile.icon} />
@@ -861,24 +877,29 @@ function CircleTile({
 
       {/* Label */}
       <span style={{
+        marginTop: 6,
         fontSize: 11, fontWeight: active ? 700 : 500, lineHeight: 1.3,
-        textAlign: "center", color: active ? (tile.iconBg ?? "#F97316") : "#44403c",
+        textAlign: "center",
+        color: hovered ? color : active ? color : "#374151",
+        transition: "color 0.15s",
         overflow: "hidden", display: "-webkit-box",
         WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
       }}>
         {tile.label}
       </span>
 
-      {/* Subtitle — slides in on hover (Canva "查看全部" pattern) */}
+      {/* Subtitle — slides down on hover, every tile has one */}
       <span style={{
-        fontSize: 10, color: "rgba(19,22,32,0.55)", textAlign: "center",
-        maxHeight: hovered ? 16 : 0,
+        fontSize: 10, color: color, textAlign: "center",
+        fontWeight: 500,
+        maxHeight: hovered ? 18 : 0,
         opacity: hovered ? 1 : 0,
         overflow: "hidden",
-        transition: "max-height 0.2s ease, opacity 0.15s ease-in-out",
+        transition: "max-height 0.22s ease, opacity 0.18s ease-in-out",
         whiteSpace: "nowrap",
+        marginTop: hovered ? 1 : 0,
       }}>
-        {tile.filterWorkspace ? "查看全部" : tile.label === "自訂任務" ? "空白建立" : ""}
+        {tileSubtitle(tile)}
       </span>
     </button>
   );
