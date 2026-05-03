@@ -30,6 +30,7 @@ import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import { TaskChip } from "../components/TaskChip";
 import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import CreateTaskModal from "../components/CreateTaskModal";
 import { Avatar, Badge, Button, Input, Textarea, Tooltip, Chip, Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -309,7 +310,9 @@ export default function MissionsHome() {
   const [ownerFilter, setOwnerFilter] = useState<"mine" | "all">("mine");
   const [sortDesc, setSortDesc] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  /** Currently-selected channel tile — null means "全部" */
+  /** CreateTaskModal — open workspace key, null = closed */
+  const [modalWorkspace, setModalWorkspace] = useState<string | null>(null);
+  /** Currently-selected channel tile for grid filter (kept for direct grid filtering) */
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   /** Currently-selected content_type sub-filter — resets when channel changes */
   const [activeContentType, setActiveContentType] = useState<string | null>(null);
@@ -377,17 +380,15 @@ export default function MissionsHome() {
   const [createSource, setCreateSource] = useState<SourceId | null>(null);
 
   const startFromTile = (t: QuickTile) => {
-    // ── Channel filter tile: toggle activeCategory + scroll to grid
+    // ── Channel tile → open CreateTaskModal (squads + agents + skills filtered by workspace)
     if (t.filterWorkspace) {
-      setActiveCategory(prev => prev === t.filterWorkspace ? null : (t.filterWorkspace ?? null));
-      setActiveContentType(null); // reset sub-filter when channel changes
-      document.getElementById("missions-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setModalWorkspace(t.filterWorkspace);
       return;
     }
     // ── Action tiles
-    if (t.isMore)   { navigate("/templates"); return; }
+    if (t.isMore)      { navigate("/templates"); return; }
     if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
-    if (t.isCustom) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (t.isCustom)    { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
   };
 
   const submitCustom = async () => {
@@ -520,36 +521,6 @@ export default function MissionsHome() {
           </div>
           </div>
 
-          {/* Sub-category chips — appear when a channel is active */}
-          {activeCategory && CHANNEL_CONTENT_TYPES[activeCategory] && (
-            <div
-              className="mt-3 flex items-center gap-2 flex-wrap justify-center"
-              style={{ animation: "slideInUp 0.18s ease-out" }}
-            >
-              {CHANNEL_CONTENT_TYPES[activeCategory].map(ct => {
-                const isActive = activeContentType === ct.value;
-                return (
-                  <button
-                    key={ct.value}
-                    onClick={() => setActiveContentType(v => v === ct.value ? null : ct.value)}
-                    style={{
-                      fontSize: 12, fontWeight: isActive ? 700 : 500,
-                      color: isActive ? "#F97316" : "#6b7280",
-                      background: isActive ? "rgba(249,115,22,0.10)" : "rgba(0,0,0,0.04)",
-                      border: isActive ? "1.5px solid rgba(249,115,22,0.35)" : "1.5px solid transparent",
-                      borderRadius: 20, padding: "4px 14px",
-                      cursor: "pointer", transition: "all 0.12s ease",
-                      whiteSpace: "nowrap",
-                    }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(0,0,0,0.07)"; }}
-                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
-                  >
-                    {ct.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
       </section>
 
@@ -712,6 +683,15 @@ export default function MissionsHome() {
             })}
           </div>
         </section>
+      )}
+
+      {/* ─── CreateTask modal — Canva-style overlay ── */}
+      {modalWorkspace && (
+        <CreateTaskModal
+          open={!!modalWorkspace}
+          initialWorkspace={modalWorkspace as any}
+          onClose={() => setModalWorkspace(null)}
+        />
       )}
 
       {/* ─── Create-methodology modal (Canva-style source picker) ── */}
