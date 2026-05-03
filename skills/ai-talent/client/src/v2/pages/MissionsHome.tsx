@@ -358,13 +358,14 @@ export default function MissionsHome() {
     if (t.opensIngest) { setCreateSource(t.opensIngest); return; }
     if (!t.missionTitle) { setShowCustom(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
 
-    // Agent / Skill tiles → open methodology catalog (filtered by kind + workspace).
+    // Agent / Skill tiles → open templates catalog (filtered by kind + workspace).
+    // Route is /templates (MethodologyCatalog), NOT /methodology which doesn't exist.
     if (t.kind === "agent" || t.kind === "skill") {
       const qs = new URLSearchParams();
       qs.set("kind", t.kind);
       if (t.workspace) qs.set("workspace", t.workspace);
       if (t.agentSlug) qs.set("slug", t.agentSlug);
-      navigate(`/methodology?${qs.toString()}`);
+      navigate(`/templates?${qs.toString()}`);
       return;
     }
 

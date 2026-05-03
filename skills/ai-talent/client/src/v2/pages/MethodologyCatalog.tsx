@@ -546,7 +546,25 @@ export default function MethodologyCatalog() {
             : []
         }
         onClose={() => setSelectedEntity(null)}
-        onLaunch={(slug) => { setSelectedEntity(null); navigate(`/templates/${slug}`); }}
+        onLaunch={(slug, entity) => {
+          setSelectedEntity(null);
+          // Squad → open Picker (mission creation entry point)
+          // Agent / Skill → open Picker filtered by workspace so user can pick a squad
+          if (!entity || entity.kind === "squad") {
+            const qs = new URLSearchParams();
+            qs.set("slug", slug);
+            const ws = Array.isArray(entity?.workspace) ? entity.workspace[0] : (entity?.workspace ?? "");
+            if (ws) qs.set("workspace", ws);
+            window.open(`/picker?${qs.toString()}`, "_blank", "noopener");
+          } else {
+            // agent / skill: open picker filtered to their workspace
+            const qs = new URLSearchParams();
+            const ws = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? "");
+            if (ws) qs.set("workspace", ws);
+            if (entity.strategyLayer) qs.set("layer", String(entity.strategyLayer).slice(0, 2));
+            window.open(`/picker?${qs.toString()}`, "_blank", "noopener");
+          }
+        }}
         onSelectRelated={(e) => setSelectedEntity(e)}
       />
     </main>
@@ -802,7 +820,7 @@ function EntityDetailModal({
   entity: any | null;
   relatedEntities: any[];
   onClose: () => void;
-  onLaunch: (slug: string) => void;
+  onLaunch: (slug: string, entity: any) => void;
   onSelectRelated: (e: any) => void;
 }) {
   const open = !!entity;
@@ -969,7 +987,7 @@ function EntityDetailModal({
                   size="lg"
                   fullWidth
                   startContent={<FontAwesomeIcon icon={faRocket} />}
-                  onPress={() => onLaunch(entity.slug)}
+                  onPress={() => onLaunch(entity.slug, entity)}
                 >
                   {ctaLabel}
                 </Button>
