@@ -188,16 +188,24 @@ export function IntakeChat({
 
   async function handlePlatformAuth(platform: string) {
     try {
-      const { token, appSlug, env } = await getConnectToken.mutateAsync({ platform: platform as any });
-      const { PipedreamClient } = await import("@pipedream/sdk");
-      // Cast to any — Pipedream SDK shape varies across versions; errors are caught below.
-      const pd: any = new (PipedreamClient as any)({
-        projectEnvironment: env,
+      const { token, appSlug, expiresAt, env } = await getConnectToken.mutateAsync({ platform: platform as any });
+      const { PipedreamClient } = await import("@pipedream/sdk/browser");
+      const pd = new PipedreamClient({
+        projectEnvironment: env as "production" | "development",
         externalUserId: "sowork-user",
-        tokenCallback: async () => token,
+        tokenCallback: async () => ({ token, expiresAt: new Date(expiresAt || Date.now() + 300_000), connectLinkUrl: "" }),
       });
-      const account = await pd.connectAccount({ app: appSlug });
-      setPlatformName((account as any).name ?? (account as any).username ?? PLATFORM_LABEL[platform] ?? platform);
+      const accountId = await new Promise<string>((resolve, reject) => {
+        pd.connectAccount({
+          app: appSlug,
+          onSuccess: (res) => resolve(res.id),
+          onError: (err) => reject(new Error(String(err))),
+          onClose: ({ successful }) => {
+            if (!successful) reject(new Error("視窗已關閉"));
+          },
+        });
+      });
+      setPlatformName(PLATFORM_LABEL[platform] ?? accountId);
       setPlatformAuthorized(true);
     } catch {
       // Silent — user can skip

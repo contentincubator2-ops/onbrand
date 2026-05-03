@@ -1580,20 +1580,28 @@ function SquadIntakeSidebar({
     setPlatformAuthBusy(true);
     setPlatformAuthError(null);
     try {
-      const { token, appSlug, projectId, env } = await getConnectToken.mutateAsync({
+      const { token, appSlug, expiresAt, env } = await getConnectToken.mutateAsync({
         platform: wsKey as "facebook" | "instagram" | "linkedin" | "youtube",
       });
-      // Dynamically import Pipedream SDK to keep bundle small
-      const { PipedreamClient } = await import("@pipedream/sdk");
-      // Cast to any — Pipedream SDK shape varies across versions; errors are caught below.
-      const pd: any = new (PipedreamClient as any)({
-        projectEnvironment: env,
+      // Dynamically import Pipedream SDK (browser-specific entry) to keep bundle small
+      const { PipedreamClient } = await import("@pipedream/sdk/browser");
+      const pd = new PipedreamClient({
+        projectEnvironment: env as "production" | "development",
         externalUserId: `sowork-user`,
-        tokenCallback: async () => token,
+        tokenCallback: async () => ({ token, expiresAt: new Date(expiresAt || Date.now() + 300_000), connectLinkUrl: "" }),
       });
-      const account = await pd.connectAccount({ app: appSlug });
-      setPlatformAccountId((account as any).id ?? (account as any).external_id ?? "");
-      setPlatformHandle((account as any).name ?? (account as any).username ?? (account as any).id ?? platformAuth.label);
+      const accountId = await new Promise<string>((resolve, reject) => {
+        pd.connectAccount({
+          app: appSlug,
+          onSuccess: (res) => resolve(res.id),
+          onError: (err) => reject(new Error(String(err))),
+          onClose: ({ successful }) => {
+            if (!successful) reject(new Error("視窗已關閉"));
+          },
+        });
+      });
+      setPlatformAccountId(accountId);
+      setPlatformHandle(accountId);
       setPlatformAuthorized(true);
       setPlatformAuthBusy(false);
     } catch (e: any) {
