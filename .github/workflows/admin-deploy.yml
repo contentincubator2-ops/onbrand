@@ -7,28 +7,45 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
+      # 1. Checkout code on the Actions runner
+      - uses: actions/checkout@v4
+
+      # 2. Write SSH key to file for rsync
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      # 3. Rsync repo to VM (replaces git fetch/reset)
+      - name: Sync code to VM
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='skills/ai-talent/client/node_modules' \
+            --exclude='skills/ai-talent/public' \
+            ./ "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/marketing-os/app/"
+
+      # 4. Install deps, build frontend, restart PM2
       - uses: appleboy/ssh-action@v1.0.3
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 600s
-          envs: GH_TOKEN
           script: |
             set -e
             APP=/opt/marketing-os/app
             AI=$APP/skills/ai-talent
 
-            echo "===== 1. Pull latest code ====="
+            echo "===== 1. Code already synced by rsync ====="
             cd "$APP"
-            # Use token-authenticated URL for this fetch only (not stored permanently)
-            git -c "url.https://x-access-token:${GH_TOKEN}@github.com/.insteadOf=https://github.com/" \
-              fetch origin main
-            git reset --hard origin/main
-            echo "Commit: $(git log --oneline -1)"
+            echo "Tip: $(ls -1 | head -5)"
 
             echo ""
             echo "===== 2. Install backend dependencies ====="
