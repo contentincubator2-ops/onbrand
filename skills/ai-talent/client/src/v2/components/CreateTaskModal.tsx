@@ -464,8 +464,8 @@ function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void })
         transition: "outline 0.12s, box-shadow 0.15s",
       }}>
 
-        {/* ── Decorative content mockup ── */}
-        <ContentMockup color={color} name={name} kind={entity.kind} />
+        {/* ── Platform device mockup ── */}
+        <PlatformMockup ws={ws} color={color} name={name} />
 
         {/* Platform icon — top-right badge */}
         {info && (
@@ -531,51 +531,214 @@ function hexToRgb(hex: string): string {
   return isNaN(r) ? "100,100,100" : `${r},${g},${b}`;
 }
 
-/**
- * ContentMockup — abstract "post preview" inside card.
- * Mimics Canva's template cards: a header photo area + text lines.
- * Uses the channel color to give each card a distinct, designed look.
- */
-function ContentMockup({ color, name, kind }: { color: string; name: string; kind: string }) {
-  const rgb = hexToRgb(color);
-  const letter = name.trim().slice(0, 1).toUpperCase() || "A";
-  return (
-    <div style={{
-      position: "absolute", inset: 0, padding: 12,
-      display: "flex", flexDirection: "column", gap: 6,
-    }}>
-      {/* "Image" area — top 55%, colored block with centered letter */}
-      <div style={{
-        flex: "0 0 55%", borderRadius: 6,
-        background: `rgba(${rgb},0.25)`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        position: "relative", overflow: "hidden",
-      }}>
-        {/* decorative diagonal stripe */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: `repeating-linear-gradient(
-            -45deg,
-            rgba(${rgb},0.07) 0px, rgba(${rgb},0.07) 4px,
-            transparent 4px, transparent 12px
-          )`,
-        }} />
-        <span style={{
-          fontSize: 28, fontWeight: 800, color: `rgba(${rgb},0.45)`,
-          letterSpacing: "-0.02em", zIndex: 1, userSelect: "none",
-        }}>
-          {letter}
-        </span>
-      </div>
+/** Which device mockup to render per workspace */
+function mockupType(ws: string): "phone-post" | "phone-story" | "phone-video" | "browser" | "document" {
+  if (ws === "instagram") return "phone-story";
+  if (ws === "tiktok")    return "phone-video";
+  if (ws === "youtube" || ws === "linkedin") return "browser";
+  if (ws === "email" || ws === "brand-positioning" || ws === "pr" || ws === "audience") return "document";
+  return "phone-post"; // facebook, default
+}
 
-      {/* "Text" lines */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
-        <div style={{ height: 7, borderRadius: 4, background: `rgba(${rgb},0.30)`, width: "80%" }} />
-        <div style={{ height: 5, borderRadius: 4, background: `rgba(${rgb},0.18)`, width: "60%" }} />
-        <div style={{ height: 5, borderRadius: 4, background: `rgba(${rgb},0.14)`, width: "70%" }} />
-      </div>
-    </div>
-  );
+/**
+ * PlatformMockup — SVG device frame that looks like Canva's template previews.
+ * Each workspace gets a distinct device type with platform-coloured content.
+ */
+function PlatformMockup({ ws, color, name }: { ws: string; color: string; name: string }) {
+  const kind = mockupType(ws);
+  const rgb  = hexToRgb(color);
+  const c    = (a: number) => `rgba(${rgb},${a})`;  // shorthand
+
+  // All SVGs use a 200×150 viewBox matching the 4:3 card ratio
+  switch (kind) {
+
+    /* ── Phone (portrait) — Facebook-style post ── */
+    case "phone-post": return (
+      <svg viewBox="0 0 200 150" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
+        {/* bg */}
+        <rect width="200" height="150" fill={c(0.07)} />
+        {/* phone body */}
+        <rect x="62" y="8" width="76" height="134" rx="10" fill="white" stroke={c(0.25)} strokeWidth="1.5"/>
+        {/* status bar */}
+        <rect x="62" y="8" width="76" height="12" rx="10" fill={c(0.15)} />
+        <circle cx="100" cy="14" r="2" fill={c(0.4)} />
+        {/* platform header bar */}
+        <rect x="62" y="20" width="76" height="18" fill={c(0.12)} />
+        <circle cx="74" cy="29" r="5" fill={color} />
+        <rect x="83" y="26" width="28" height="4" rx="2" fill={c(0.35)} />
+        <rect x="83" y="32" width="18" height="3" rx="1.5" fill={c(0.2)} />
+        {/* image area */}
+        <rect x="62" y="38" width="76" height="52" fill={c(0.22)} />
+        {/* diagonal stripes in image */}
+        <line x1="62" y1="38" x2="138" y2="90" stroke={c(0.12)} strokeWidth="6"/>
+        <line x1="75" y1="38" x2="138" y2="101" stroke={c(0.12)} strokeWidth="6"/>
+        <line x1="88" y1="38" x2="138" y2="88" stroke={c(0.08)} strokeWidth="6"/>
+        {/* caption lines */}
+        <rect x="67" y="95"  width="50" height="4" rx="2" fill={c(0.35)} />
+        <rect x="67" y="102" width="38" height="3" rx="1.5" fill={c(0.22)} />
+        <rect x="67" y="108" width="44" height="3" rx="1.5" fill={c(0.18)} />
+        {/* action bar */}
+        <rect x="62" y="118" width="76" height="14" rx="0" fill={c(0.07)} />
+        <rect x="67" y="123" width="12" height="3" rx="1.5" fill={c(0.3)} />
+        <rect x="83" y="123" width="12" height="3" rx="1.5" fill={c(0.3)} />
+        <rect x="99" y="123" width="12" height="3" rx="1.5" fill={c(0.3)} />
+        {/* home indicator */}
+        <rect x="88" y="136" width="24" height="3" rx="1.5" fill={c(0.2)} />
+      </svg>
+    );
+
+    /* ── Phone (portrait) — Instagram story (9:16 tall frame) ── */
+    case "phone-story": return (
+      <svg viewBox="0 0 200 150" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
+        <rect width="200" height="150" fill={c(0.07)} />
+        {/* phone body */}
+        <rect x="66" y="6" width="68" height="138" rx="12" fill="white" stroke={c(0.25)} strokeWidth="1.5"/>
+        {/* full-screen story image */}
+        <rect x="67" y="7" width="66" height="136" rx="11" fill={c(0.20)} />
+        {/* story gradient overlay bottom */}
+        <defs>
+          <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="transparent"/>
+            <stop offset="100%" stopColor={`rgba(${rgb},0.5)`}/>
+          </linearGradient>
+        </defs>
+        <rect x="67" y="90" width="66" height="53" rx="0" fill="url(#sg)" />
+        {/* story progress bars */}
+        <rect x="71" y="12" width="14" height="2" rx="1" fill="rgba(255,255,255,0.8)" />
+        <rect x="87" y="12" width="14" height="2" rx="1" fill="rgba(255,255,255,0.4)" />
+        <rect x="103" y="12" width="14" height="2" rx="1" fill="rgba(255,255,255,0.4)" />
+        <rect x="119" y="12" width="10" height="2" rx="1" fill="rgba(255,255,255,0.4)" />
+        {/* avatar + name */}
+        <circle cx="75" cy="24" r="5" fill="white" opacity="0.9"/>
+        <rect x="83" y="21" width="22" height="3" rx="1.5" fill="rgba(255,255,255,0.9)" />
+        <rect x="83" y="26" width="14" height="2" rx="1" fill="rgba(255,255,255,0.6)" />
+        {/* text lines bottom */}
+        <rect x="70" y="108" width="40" height="4" rx="2" fill="rgba(255,255,255,0.9)" />
+        <rect x="70" y="115" width="30" height="3" rx="1.5" fill="rgba(255,255,255,0.6)" />
+        {/* send message bar */}
+        <rect x="69" y="127" width="62" height="9" rx="4.5" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
+        <rect x="73" y="130" width="20" height="2.5" rx="1.25" fill="rgba(255,255,255,0.5)" />
+        {/* home indicator */}
+        <rect x="83" y="139" width="24" height="3" rx="1.5" fill={c(0.3)} />
+      </svg>
+    );
+
+    /* ── Phone (vertical video) — TikTok ── */
+    case "phone-video": return (
+      <svg viewBox="0 0 200 150" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
+        <rect width="200" height="150" fill={c(0.07)} />
+        {/* phone */}
+        <rect x="66" y="6" width="68" height="138" rx="12" fill="#111" stroke={c(0.25)} strokeWidth="1"/>
+        {/* video bg */}
+        <rect x="67" y="7" width="66" height="136" rx="11" fill={c(0.30)} />
+        {/* play button */}
+        <polygon points="92,55 92,85 118,70" fill="rgba(255,255,255,0.85)" />
+        {/* right-side action icons */}
+        <circle cx="124" cy="45" r="6" fill="rgba(255,255,255,0.25)"/>
+        <rect x="121" y="43" width="6" height="4" rx="1" fill="rgba(255,255,255,0.7)" />
+        <circle cx="124" cy="62" r="6" fill="rgba(255,255,255,0.25)"/>
+        <rect x="121" y="59.5" width="6" height="1.5" rx="0.75" fill="rgba(255,255,255,0.7)" />
+        <rect x="121" y="62" width="6" height="1.5" rx="0.75" fill="rgba(255,255,255,0.7)" />
+        <rect x="121" y="64.5" width="6" height="1.5" rx="0.75" fill="rgba(255,255,255,0.7)" />
+        {/* bottom info */}
+        <rect x="70" y="108" width="35" height="4" rx="2" fill="rgba(255,255,255,0.9)"/>
+        <rect x="70" y="115" width="25" height="3" rx="1.5" fill="rgba(255,255,255,0.6)"/>
+        {/* progress bar */}
+        <rect x="67" y="128" width="66" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+        <rect x="67" y="128" width="28" height="2" rx="1" fill="rgba(255,255,255,0.8)"/>
+        <circle cx="95" cy="129" r="3" fill="white"/>
+        {/* home indicator */}
+        <rect x="83" y="136" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.3)"/>
+      </svg>
+    );
+
+    /* ── Browser window — YouTube / LinkedIn ── */
+    case "browser": return (
+      <svg viewBox="0 0 200 150" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
+        <rect width="200" height="150" fill={c(0.07)} />
+        {/* browser chrome */}
+        <rect x="20" y="18" width="160" height="114" rx="8" fill="white" stroke={c(0.2)} strokeWidth="1.5"/>
+        {/* title bar */}
+        <rect x="20" y="18" width="160" height="22" rx="8" fill={c(0.12)}/>
+        <rect x="20" y="30" width="160" height="10" fill={c(0.12)}/>
+        {/* traffic lights */}
+        <circle cx="33" cy="29" r="4" fill="#FF5F57"/>
+        <circle cx="44" cy="29" r="4" fill="#FFBD2E"/>
+        <circle cx="55" cy="29" r="4" fill="#28C840"/>
+        {/* URL bar */}
+        <rect x="66" y="24" width="96" height="10" rx="5" fill="white" opacity="0.7"/>
+        <rect x="71" y="27" width="40" height="3" rx="1.5" fill={c(0.3)}/>
+        {/* content area */}
+        {ws === "youtube" ? (
+          <>
+            {/* YT layout: thumbnail grid */}
+            <rect x="25" y="44" width="70" height="40" rx="4" fill={c(0.20)}/>
+            <polygon points="48,57 48,71 62,64" fill="rgba(255,255,255,0.8)"/>
+            <rect x="25" y="88" width="50" height="4" rx="2" fill={c(0.35)}/>
+            <rect x="25" y="94" width="35" height="3" rx="1.5" fill={c(0.2)}/>
+            <rect x="105" y="44" width="70" height="40" rx="4" fill={c(0.15)}/>
+            <polygon points="128,57 128,71 142,64" fill="rgba(255,255,255,0.7)"/>
+            <rect x="105" y="88" width="50" height="4" rx="2" fill={c(0.3)}/>
+            <rect x="105" y="94" width="38" height="3" rx="1.5" fill={c(0.18)}/>
+            {/* second row */}
+            <rect x="25" y="104" width="70" height="36" rx="4" fill={c(0.12)}/>
+            <rect x="105" y="104" width="70" height="36" rx="4" fill={c(0.10)}/>
+          </>
+        ) : (
+          <>
+            {/* LinkedIn layout */}
+            {/* left sidebar */}
+            <rect x="25" y="42" width="36" height="90" rx="4" fill={c(0.07)}/>
+            <circle cx="43" cy="56" r="10" fill={c(0.25)}/>
+            <rect x="29" y="70" width="28" height="3" rx="1.5" fill={c(0.3)}/>
+            <rect x="32" y="75" width="22" height="2.5" rx="1.25" fill={c(0.2)}/>
+            {/* main feed */}
+            <rect x="66" y="42" width="88" height="90" rx="4" fill={c(0.05)}/>
+            <rect x="70" y="46" width="80" height="30" rx="3" fill={c(0.18)}/>
+            <rect x="70" y="80" width="60" height="4" rx="2" fill={c(0.35)}/>
+            <rect x="70" y="87" width="44" height="3" rx="1.5" fill={c(0.22)}/>
+            <rect x="70" y="93" width="50" height="3" rx="1.5" fill={c(0.18)}/>
+            <rect x="70" y="102" width="80" height="22" rx="3" fill={c(0.1)}/>
+          </>
+        )}
+      </svg>
+    );
+
+    /* ── Document / Email / Brand ── */
+    case "document": return (
+      <svg viewBox="0 0 200 150" style={{ position:"absolute", inset:0, width:"100%", height:"100%" }}>
+        <rect width="200" height="150" fill={c(0.06)} />
+        {/* paper shadow */}
+        <rect x="37" y="19" width="126" height="115" rx="6" fill={c(0.08)}/>
+        {/* paper */}
+        <rect x="34" y="16" width="126" height="115" rx="6" fill="white" stroke={c(0.18)} strokeWidth="1"/>
+        {/* header band */}
+        <rect x="34" y="16" width="126" height="28" rx="6" fill={color}/>
+        <rect x="34" y="34" width="126" height="10" fill={color}/>
+        {/* logo/icon in header */}
+        <circle cx="50" cy="30" r="8" fill="rgba(255,255,255,0.25)"/>
+        <rect x="44" y="28" width="12" height="4" rx="2" fill="rgba(255,255,255,0.6)"/>
+        {/* header title */}
+        <rect x="64" y="26" width="50" height="5" rx="2.5" fill="rgba(255,255,255,0.9)"/>
+        <rect x="64" y="33" width="32" height="3.5" rx="1.75" fill="rgba(255,255,255,0.6)"/>
+        {/* body content */}
+        <rect x="42" y="52" width="90" height="5" rx="2.5" fill={c(0.35)}/>
+        <rect x="42" y="61" width="110" height="3.5" rx="1.75" fill={c(0.22)}/>
+        <rect x="42" y="68" width="100" height="3.5" rx="1.75" fill={c(0.18)}/>
+        <rect x="42" y="75" width="85" height="3.5" rx="1.75" fill={c(0.15)}/>
+        {/* divider */}
+        <rect x="42" y="84" width="110" height="1" fill={c(0.12)}/>
+        {/* second section */}
+        <rect x="42" y="91" width="45" height="22" rx="4" fill={c(0.15)}/>
+        <rect x="93" y="91" width="57" height="4" rx="2" fill={c(0.25)}/>
+        <rect x="93" y="99" width="45" height="3" rx="1.5" fill={c(0.18)}/>
+        <rect x="93" y="105" width="50" height="3" rx="1.5" fill={c(0.15)}/>
+        {/* CTA button */}
+        <rect x="42" y="118" width="55" height="10" rx="5" fill={color}/>
+        <rect x="47" y="121.5" width="35" height="3" rx="1.5" fill="rgba(255,255,255,0.9)"/>
+      </svg>
+    );
+  }
 }
 
 /* ── Skeleton ─────────────────────────────────────────────────────── */
