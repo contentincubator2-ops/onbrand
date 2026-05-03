@@ -60,55 +60,49 @@ interface MissionRow {
 }
 
 interface QuickTile {
-  /** FontAwesome icon — neutral, never colored (per design system). */
   icon: any;
   label: string;
-  /** Layer hint for hover tint only. */
   layer?: MosLayer;
   badge?: string;
   missionTitle: string;
   missionDesc: string;
   squadSlug?: string;
-  /** For agent/skill tiles: the agent/skill slug to deep-link in methodology catalog. */
   agentSlug?: string;
   workspace?: string;
-  /** Entity kind — drives routing: squad→picker, agent/skill→methodology catalog */
   kind?: "squad" | "agent" | "skill";
   isMore?: boolean;
-  /** Open CreateMethodologyModal instead of creating a mission. */
   opensIngest?: SourceId;
+  /** Vivid circle bg color for the icon (Canva-style) */
+  iconBg?: string;
 }
 
 const QUICK_TILES: QuickTile[] = [
   // ── Facebook × 2 ─────────────────────────────────────────────────────
   {
     icon: faFacebookF, label: "FB 月行事曆", layer: "L4",
-    kind: "squad", badge: "推薦",
+    kind: "squad", badge: "推薦", iconBg: "#1877F2",
     missionTitle: "Facebook 月內容行事曆",
     missionDesc: "以 Joe Pulizzi 內容支柱框架，規劃下個月的 Facebook 貼文主題、節奏與互動策略。",
-    squadSlug: "fb-monthly-calendar-pulizzi",
-    workspace: "facebook",
+    squadSlug: "fb-monthly-calendar-pulizzi", workspace: "facebook",
   },
   {
     icon: faFacebookF, label: "FB 文案師", layer: "L4",
-    kind: "agent",
+    kind: "agent", iconBg: "#1877F2",
     missionTitle: "Facebook 廣告文案師",
     missionDesc: "由 AI 文案師依品牌語氣產出 Facebook 廣告標題、貼文與 CTA。",
-    agentSlug: "fb-brief-writer",
-    workspace: "facebook",
+    agentSlug: "fb-brief-writer", workspace: "facebook",
   },
   // ── Instagram × 2 ────────────────────────────────────────────────────
   {
     icon: faInstagram, label: "IG 月行事曆", layer: "L4",
-    kind: "squad",
+    kind: "squad", iconBg: "#E1306C",
     missionTitle: "Instagram 月行事曆規劃",
     missionDesc: "依 Pulizzi 內容支柱框架，規劃 Instagram 月度貼文主題、Hashtag 策略與限動延伸。",
-    squadSlug: "ig-monthly-calendar-pulizzi",
-    workspace: "instagram",
+    squadSlug: "ig-monthly-calendar-pulizzi", workspace: "instagram",
   },
   {
     icon: faInstagram, label: "IG 視覺指南", layer: "L4",
-    kind: "skill",
+    kind: "skill", iconBg: "#E1306C",
     missionTitle: "Instagram 視覺貼文技能",
     missionDesc: "掌握 IG 版面設計原則：色彩一致性、圖文比例、輪播架構與視覺鉤子。",
     workspace: "instagram",
@@ -116,42 +110,38 @@ const QUICK_TILES: QuickTile[] = [
   // ── LinkedIn × 1 ─────────────────────────────────────────────────────
   {
     icon: faLinkedinIn, label: "LI 月行事曆", layer: "L4",
-    kind: "squad",
+    kind: "squad", iconBg: "#0A66C2",
     missionTitle: "LinkedIn 月行事曆規劃",
     missionDesc: "依 Pulizzi 內容支柱框架，規劃 LinkedIn 個人品牌與 B2B 思想領袖月度貼文。",
-    squadSlug: "li-monthly-calendar-pulizzi",
-    workspace: "linkedin",
+    squadSlug: "li-monthly-calendar-pulizzi", workspace: "linkedin",
   },
   // ── YouTube × 2 ──────────────────────────────────────────────────────
   {
     icon: faYoutube, label: "YT 說故事腳本", layer: "L4",
-    kind: "squad",
+    kind: "squad", iconBg: "#FF0000",
     missionTitle: "YouTube 說故事影片腳本",
     missionDesc: "用故事弧線框架（Hook→衝突→解法→CTA）撰寫讓觀眾看完的 YouTube 影片腳本。",
-    squadSlug: "yt-video-script-storytelling",
-    workspace: "youtube",
+    squadSlug: "yt-video-script-storytelling", workspace: "youtube",
   },
   {
     icon: faYoutube, label: "YT 視覺導演", layer: "L4",
-    kind: "agent",
+    kind: "agent", iconBg: "#FF0000",
     missionTitle: "YouTube 縮圖視覺導演",
     missionDesc: "由 AI 視覺導演提出 YouTube 縮圖設計方向、色彩對比與視覺吸睛策略。",
-    agentSlug: "fb-visual-director",
-    workspace: "youtube",
+    agentSlug: "fb-visual-director", workspace: "youtube",
   },
   // ── L1 品牌策略 × 1 ──────────────────────────────────────────────────
   {
     icon: faBullseye, label: "品牌原型定位", layer: "L1",
-    kind: "skill",
+    kind: "skill", iconBg: "#7C3AED",
     missionTitle: "品牌原型定位技能",
     missionDesc: "用 Carol Pearson 12 原型框架梳理品牌性格、溝通語氣與市場差異化立足點。",
-    agentSlug: "brand-archetype-positioning",
-    workspace: "brand-positioning",
+    agentSlug: "brand-archetype-positioning", workspace: "brand-positioning",
   },
   // ── 工具列 ────────────────────────────────────────────────────────────
-  { icon: faPlus,         label: "自訂任務", missionTitle: "", missionDesc: "" },
-  { icon: faCloudArrowUp, label: "上傳",     missionTitle: "", missionDesc: "", opensIngest: "upload" },
-  { icon: faEllipsis,     label: "顯示更多", missionTitle: "", missionDesc: "", isMore: true },
+  { icon: faPlus,         label: "自訂任務", missionTitle: "", missionDesc: "", iconBg: "#6B7280" },
+  { icon: faCloudArrowUp, label: "上傳",     missionTitle: "", missionDesc: "", opensIngest: "upload", iconBg: "#059669" },
+  { icon: faEllipsis,     label: "顯示更多", missionTitle: "", missionDesc: "", isMore: true, iconBg: "#9CA3AF" },
 ];
 
 export default function MissionsHome() {
@@ -423,13 +413,13 @@ export default function MissionsHome() {
       <section
         className="relative px-8 pt-12 pb-10 border-b border-divider overflow-hidden"
         style={{
-          background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 40%, #fed7aa 100%)",
+          background: "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 60%, #3d1a8e 100%)",
         }}
       >
-        {/* Subtle overlay to lighten — Canva pattern */}
+        {/* White overlay — Canva pattern, lightens to pastel */}
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: "rgba(255,255,255,0.55)" }}
+          style={{ background: "rgba(255,255,255,0.82)" }}
         />
 
         <div className="relative z-10">
@@ -474,7 +464,7 @@ export default function MissionsHome() {
               className="font-semibold tracking-tight leading-none"
               style={{
                 fontSize: "clamp(2rem, 4vw, 3rem)",
-                background: "linear-gradient(135deg, #F97316 0%, #E8631A 60%, #c2410c 100%)",
+                background: "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -500,9 +490,9 @@ export default function MissionsHome() {
               placeholder="搜尋方法論、任務、最近的工作"
               classNames={{
                 inputWrapper: [
-                  "h-10 bg-white border-default-200 shadow-sm",
-                  "data-[focus=true]:border-[#F97316]",
-                  "data-[focus=true]:shadow-[0_0_0_3px_rgba(249,115,22,0.15)]",
+                  "h-10 bg-white border-transparent shadow-sm",
+                  "data-[focus=true]:border-transparent",
+                  "data-[focus=true]:shadow-[0_0_0_3px_rgba(123,47,247,0.2)]",
                   "transition-all duration-100",
                 ].join(" "),
               }}
@@ -781,12 +771,11 @@ function CircleTile({
   onClick: () => void;
 }) {
   return (
-    <Button
-      onPress={onClick}
-      isDisabled={disabled}
-      variant="light"
-      isLoading={busy}
-      className="flex flex-col items-center gap-2 h-auto w-[112px] py-2 px-1 min-w-0"
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className="flex flex-col items-center gap-2 w-[80px] py-2 px-1 min-w-0 group select-none"
+      style={{ background: "none", border: "none", cursor: disabled ? "not-allowed" : "pointer" }}
     >
       <Badge
         content={tile.badge}
@@ -795,23 +784,20 @@ function CircleTile({
         placement="top-right"
         size="sm"
       >
-        <span className="flex items-center justify-center w-10 h-10 rounded-full bg-default-100 border border-divider text-default-600">
-          <FontAwesomeIcon icon={tile.icon} className="text-medium" />
+        <span
+          className="flex items-center justify-center w-12 h-12 rounded-full text-white transition-transform duration-100 group-hover:scale-105 group-active:scale-95"
+          style={{ background: tile.iconBg ?? "#9CA3AF", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}
+        >
+          {busy
+            ? <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            : <FontAwesomeIcon icon={tile.icon} className="text-base" />
+          }
         </span>
       </Badge>
-      <span className="text-tiny leading-tight text-center text-foreground line-clamp-2">
+      <span className="text-[11px] leading-tight text-center text-default-600 line-clamp-2 font-medium">
         {tile.label}
       </span>
-      {tile.kind && (
-        <span className={`text-[10px] leading-none px-1.5 py-0.5 rounded-full font-medium ${
-          tile.kind === "squad"  ? "bg-primary-50 text-primary-600" :
-          tile.kind === "agent"  ? "bg-secondary-50 text-secondary-600" :
-                                   "bg-success-50 text-success-700"
-        }`}>
-          {tile.kind === "squad" ? "小隊" : tile.kind === "agent" ? "Agent" : "技能"}
-        </span>
-      )}
-    </Button>
+    </button>
   );
 }
 

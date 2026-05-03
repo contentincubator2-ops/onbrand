@@ -6,7 +6,7 @@
 @tailwind utilities;
 
 html {
-  background-color: rgb(252, 251, 254);
+  background-color: transparent;
 }
 
 /* ─── Studio editorial scope (kept as CSS classes; HeroUI tokens elsewhere) ── */

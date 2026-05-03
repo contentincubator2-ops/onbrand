@@ -65,7 +65,7 @@ export default function ShellLayout() {
     window.location.href = "/auth/login";
   };
 
-  const sidebarWidth = collapsed ? 70 : 200;
+  const sidebarWidth = collapsed ? 70 : 200; // ① 70px confirmed
 
   return (
     <div className="min-h-screen" style={{ background: "rgb(252,251,254)" }}>
@@ -155,7 +155,7 @@ function Sidebar({
                 background: "#F97316",
                 transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
               }}
-              className="mx-auto flex items-center justify-center w-10 h-10 rounded-full text-white shadow-sm hover:shadow-md active:scale-95"
+              className="mx-auto flex items-center justify-center w-7 h-7 rounded-full text-white shadow-sm hover:shadow-md active:scale-95"
               onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
               onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
             >
@@ -311,7 +311,7 @@ function SidebarNavLink({
           aria-label={item.label}
           style={{ transition: "color 0.1s linear, transform 0.07s" }}
           className={[
-            "w-full mt-1 flex items-center justify-center py-2.5 rounded-xl",
+            "w-full mt-1 flex items-center justify-center py-2.5",
             active ? "text-[#F97316]" : "text-default-400 hover:text-default-700",
           ].join(" ")}
         >
