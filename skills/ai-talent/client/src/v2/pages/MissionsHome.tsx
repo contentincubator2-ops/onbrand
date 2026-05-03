@@ -425,10 +425,7 @@ export default function MissionsHome() {
         }}
       >
         <div className="relative z-10 flex flex-col items-center text-center">
-          {/* Top-right: Brand switcher capsule */}
-          <div className="absolute top-0 right-0" style={{ position: "relative" }}>
-            <BrandSwitcherCapsule scope={scope} setScope={setScope} brands={brands} />
-          </div>
+          {/* Top-right: intentionally empty — brand switcher is global (ShellLayout) */}
 
           {/* Headline — 32px, centered */}
           <div className="mb-6 w-full">

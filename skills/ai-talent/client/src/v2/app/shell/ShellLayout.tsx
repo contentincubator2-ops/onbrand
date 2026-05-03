@@ -139,6 +139,9 @@ export default function ShellLayout() {
         </>
       )}
 
+      {/* Global scope bar — fixed top-right, always visible */}
+      <GlobalScopeBar scope={scope} setScope={setScope} brands={brands} />
+
       {/* Main content */}
       <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
         <Outlet context={{ brandId, setBrandId, brands, scope, setScope }} />
@@ -541,6 +544,264 @@ function PanelRow({ initial, initialBg, initialColor, label, onClick }: {
         {label}
       </span>
     </button>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Global scope bar — fixed top-right, always visible across all pages
+══════════════════════════════════════════════════════════════════ */
+
+function GlobalScopeBar({ scope, setScope, brands }: {
+  scope: ScopeState;
+  setScope: (s: ScopeState) => void;
+  brands: any[];
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<"brand" | "product" | "event">("brand");
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // Load products + events based on selected brand
+  const productsQuery = (trpc as any).product?.listByBrand?.useQuery
+    ? (trpc as any).product.listByBrand.useQuery(
+        { brandId: scope.brandId ?? 0 },
+        { enabled: !!scope.brandId, refetchOnWindowFocus: false }
+      )
+    : { data: [] };
+  const eventsQuery = (trpc as any).event?.listByBrand?.useQuery
+    ? (trpc as any).event.listByBrand.useQuery(
+        { brandId: scope.brandId ?? 0 },
+        { enabled: !!scope.brandId, refetchOnWindowFocus: false }
+      )
+    : { data: [] };
+
+  const products: any[] = (productsQuery.data as any[]) ?? [];
+  const events:   any[] = (eventsQuery.data   as any[]) ?? [];
+
+  const currentBrand   = brands.find(b => b.id === scope.brandId);
+  const currentProduct = products.find(p => p.id === scope.productId);
+  const currentEvent   = events.find(e => e.id === scope.eventId);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Breadcrumb segments
+  const segments = [
+    currentBrand   ? { label: currentBrand.name,   key: "brand"   as const, color: "#F97316" } : null,
+    currentProduct ? { label: currentProduct.name,  key: "product" as const, color: "#16a34a" } : null,
+    currentEvent   ? { label: currentEvent.name,    key: "event"   as const, color: "#2563eb" } : null,
+  ].filter(Boolean) as { label: string; key: "brand" | "product" | "event"; color: string }[];
+
+  return (
+    <div ref={ref} style={{ position: "fixed", top: 12, right: 16, zIndex: 35 }}>
+      {/* ── Trigger pill ── */}
+      <button
+        onClick={() => { setOpen(v => !v); setActiveTab("brand"); }}
+        style={{
+          display: "flex", alignItems: "center", gap: 0,
+          height: 36, borderRadius: 18,
+          border: open ? "1.5px solid rgba(249,115,22,0.4)" : "1.5px solid rgba(0,0,0,0.09)",
+          background: open ? "rgba(255,255,255,0.98)" : "rgba(255,255,255,0.85)",
+          backdropFilter: "blur(12px)",
+          boxShadow: open
+            ? "0 4px 20px rgba(249,115,22,0.15), 0 1px 4px rgba(0,0,0,0.06)"
+            : "0 2px 8px rgba(0,0,0,0.06)",
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+          overflow: "hidden",
+          padding: 0,
+        }}
+      >
+        {segments.length === 0 ? (
+          /* No scope selected — invite user to pick */
+          <span style={{ padding: "0 14px", fontSize: 12, fontWeight: 500, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6 }}>
+            <FontAwesomeIcon icon={faBuilding} style={{ fontSize: 11 }} />
+            選擇品牌
+            <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 9, opacity: 0.5, transform: "rotate(90deg)" }} />
+          </span>
+        ) : (
+          segments.map((seg, i) => (
+            <React.Fragment key={seg.key}>
+              {i > 0 && (
+                <span style={{ fontSize: 10, color: "#d1d5db", padding: "0 2px", userSelect: "none" }}>›</span>
+              )}
+              <span
+                onClick={(e) => { e.stopPropagation(); setActiveTab(seg.key); setOpen(true); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: i === 0 ? "0 10px 0 10px" : "0 10px",
+                  height: "100%",
+                  fontSize: 12, fontWeight: i === 0 ? 700 : 500,
+                  color: i === 0 ? seg.color : "#374151",
+                  transition: "background 0.1s",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.03)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              >
+                {i === 0 && (
+                  <span style={{
+                    width: 18, height: 18, borderRadius: 5, background: seg.color,
+                    color: "#fff", fontSize: 9, fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    {seg.label.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span style={{ maxWidth: i === 0 ? 120 : 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {seg.label}
+                </span>
+              </span>
+            </React.Fragment>
+          ))
+        )}
+        {/* Chevron */}
+        <span style={{ padding: "0 10px 0 4px", display: "flex", alignItems: "center" }}>
+          <FontAwesomeIcon icon={faChevronRight} style={{
+            fontSize: 9, color: "#9ca3af",
+            transform: open ? "rotate(90deg)" : "rotate(90deg)",
+            transition: "transform 0.15s",
+            ...(open ? { transform: "rotate(-90deg)" } : {}),
+          }} />
+        </span>
+      </button>
+
+      {/* ── Dropdown panel ── */}
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", right: 0,
+          width: 340, borderRadius: 16,
+          background: "#fff", border: "1px solid #e5e7eb",
+          boxShadow: "0 12px 48px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
+          overflow: "hidden", zIndex: 36,
+          animation: "slideDown 0.15s ease-out",
+        }}>
+          {/* Tab header */}
+          <div style={{ display: "flex", borderBottom: "1px solid #f3f4f6", padding: "0 6px" }}>
+            {([
+              { key: "brand" as const,   label: "品牌",   color: "#F97316", icon: faBuilding },
+              { key: "product" as const, label: "產品",   color: "#16a34a", icon: faBoxOpen },
+              { key: "event" as const,   label: "活動",   color: "#2563eb", icon: faCalendarDays },
+            ] as const).map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
+                flex: 1, padding: "10px 4px 8px", border: "none", background: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: activeTab === tab.key ? 700 : 500,
+                color: activeTab === tab.key ? tab.color : "#9ca3af",
+                borderBottom: activeTab === tab.key ? `2px solid ${tab.color}` : "2px solid transparent",
+                transition: "color 0.1s, border-color 0.1s",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+              }}>
+                <FontAwesomeIcon icon={tab.icon} style={{ fontSize: 11 }} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div style={{ maxHeight: 320, overflowY: "auto", padding: "6px" }}>
+            {activeTab === "brand" && (
+              <ScopeList
+                items={brands}
+                selectedId={scope.brandId}
+                color="#F97316"
+                emptyText="尚無品牌 — 請先到「品牌」頁建立"
+                onSelect={(id) => {
+                  setScope({ brandId: id, productId: null, eventId: null });
+                  setOpen(false);
+                }}
+              />
+            )}
+            {activeTab === "product" && (
+              !scope.brandId
+                ? <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>請先選擇品牌</p>
+                : <ScopeList
+                    items={products}
+                    selectedId={scope.productId}
+                    color="#16a34a"
+                    emptyText="此品牌尚無產品"
+                    onSelect={(id) => { setScope({ ...scope, productId: id }); setOpen(false); }}
+                    onClear={scope.productId ? () => setScope({ ...scope, productId: null, eventId: null }) : undefined}
+                  />
+            )}
+            {activeTab === "event" && (
+              !scope.brandId
+                ? <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>請先選擇品牌</p>
+                : <ScopeList
+                    items={events}
+                    selectedId={scope.eventId}
+                    color="#2563eb"
+                    emptyText="此品牌尚無活動"
+                    onSelect={(id) => { setScope({ ...scope, eventId: id }); setOpen(false); }}
+                    onClear={scope.eventId ? () => setScope({ ...scope, eventId: null }) : undefined}
+                  />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
+  items: any[]; selectedId: number | null; color: string;
+  emptyText: string; onSelect: (id: number) => void; onClear?: () => void;
+}) {
+  if (items.length === 0) {
+    return <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>{emptyText}</p>;
+  }
+  return (
+    <>
+      {onClear && (
+        <button onClick={onClear} style={{
+          width: "100%", padding: "7px 10px", borderRadius: 8, border: "none", background: "none",
+          fontSize: 12, color: "#9ca3af", cursor: "pointer", textAlign: "left", transition: "background 0.1s",
+        }}
+          onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+          onMouseLeave={e => (e.currentTarget.style.background = "none")}
+        >
+          ✕ 清除選擇
+        </button>
+      )}
+      {items.map((item: any) => (
+        <button key={item.id} onClick={() => onSelect(item.id)} style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 10,
+          padding: "8px 10px", borderRadius: 10, border: "none", textAlign: "left", cursor: "pointer",
+          background: selectedId === item.id ? `${color}12` : "none",
+          transition: "background 0.1s",
+        }}
+          onMouseEnter={e => { if (selectedId !== item.id) e.currentTarget.style.background = "#f9fafb"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = selectedId === item.id ? `${color}12` : "none"; }}
+        >
+          <span style={{
+            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+            background: selectedId === item.id ? color : "#f3f4f6",
+            color: selectedId === item.id ? "#fff" : "#6b7280",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontWeight: 800, transition: "background 0.15s, color 0.15s",
+          }}>
+            {(item.name ?? "?").slice(0, 1).toUpperCase()}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {item.name}
+            </p>
+            {item.description && (
+              <p style={{ fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {item.description}
+              </p>
+            )}
+          </div>
+          {selectedId === item.id && (
+            <FontAwesomeIcon icon={faCheck} style={{ color, fontSize: 13, flexShrink: 0 }} />
+          )}
+        </button>
+      ))}
+    </>
   );
 }
 
