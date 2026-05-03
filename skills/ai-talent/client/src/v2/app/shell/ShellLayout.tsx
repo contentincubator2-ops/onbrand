@@ -127,17 +127,15 @@ export default function ShellLayout() {
         />
       )}
 
-      {/* Notification drawer — slides from icon bar right edge */}
-      <NotifPanel
-        open={notifOpen}
-        onClose={() => setNotifOpen(false)}
-        offsetLeft={ICON_W}
-      />
+      {/* Notification popup — floating card near bell */}
       {notifOpen && (
-        <div
-          onClick={() => setNotifOpen(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 38, background: "rgba(0,0,0,0.06)" }}
-        />
+        <>
+          <div
+            onClick={() => setNotifOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 44 }}
+          />
+          <NotifPanel onClose={() => setNotifOpen(false)} />
+        </>
       )}
 
       {/* Main content */}
@@ -603,16 +601,26 @@ const MOCK_NOTIFS = [
   },
 ];
 
-function NotifPanel({ open, onClose, offsetLeft }: { open: boolean; onClose: () => void; offsetLeft: number }) {
+function NotifPanel({ onClose }: { onClose: () => void }) {
   const [readAll, setReadAll] = React.useState(false);
   return (
     <div style={{
-      position: "fixed", top: 0, bottom: 0, left: offsetLeft, width: 380,
-      background: "#fff", boxShadow: "4px 0 24px rgba(0,0,0,0.10)", zIndex: 39,
+      /* Floating card — positioned to the right of the icon bar, bottom-anchored near bell */
+      position: "fixed",
+      left: ICON_W + 8,
+      bottom: 60,          /* just above the bell button */
+      width: 380,
+      maxHeight: "calc(100vh - 80px)",
+      background: "#fff",
+      borderRadius: 16,
+      border: "1px solid #e5e7eb",
+      boxShadow: "0 8px 40px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
+      zIndex: 45,
       display: "flex", flexDirection: "column",
-      transform: open ? "translateX(0)" : "translateX(-110%)",
-      transition: "transform 0.22s cubic-bezier(0.4,0,0.2,1)",
-      borderRight: "1px solid #f3f4f6",
+      /* Animate: scale up from bottom-left (near bell), fade in */
+      animation: "notifPopIn 0.18s cubic-bezier(0.34,1.56,0.64,1) forwards",
+      transformOrigin: "bottom left",
+      overflow: "hidden",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 12px", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
         <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>通知</span>
@@ -639,7 +647,7 @@ function NotifPanel({ open, onClose, offsetLeft }: { open: boolean; onClose: () 
           </button>
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", minHeight: 0 }}>
         {MOCK_NOTIFS.map((n) => {
           const isUnread = n.unread && !readAll;
           return (

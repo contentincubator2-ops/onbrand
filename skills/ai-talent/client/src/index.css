@@ -161,6 +161,11 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes notifPopIn {
+  from { opacity: 0; transform: scale(0.88) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
 /* ─── Scrollbar Styling ──────────────────────────────────────────────────── */
 .messages-scroll::-webkit-scrollbar,
 .right-panel-scroll::-webkit-scrollbar {
