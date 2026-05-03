@@ -42,7 +42,7 @@ body {
 }
 
 :root {
-  --bg-base: #FAFAF9;
+  --bg-base: rgb(252, 251, 254);
   --bg-elevated: #FFFFFF;
   --bg-overlay: #F5F5F4;
   --bg-hover: #EEECE9;
@@ -62,8 +62,13 @@ body {
 }
 
 body {
-  background: var(--bg-base);
+  background: rgb(252, 251, 254);
   color: var(--text-primary);
+}
+
+/* Override HeroUI background token so bg-background matches */
+:root {
+  --heroui-background: 252 251 254;
 }
 
 /* Mobile responsive */
@@ -95,7 +100,7 @@ body {
   --v7-accent: #E8631A;
   --v7-accent-bg: #FFF5EE;
   --v7-accent-border: #F5C9A8;
-  --v7-bg: #F9F9F8;
+  --v7-bg: rgb(252, 251, 254);
   --v7-bg-rail: #F2F1EF;
   --v7-border: #E4E3E1;
   --v7-text: #1A1A18;
