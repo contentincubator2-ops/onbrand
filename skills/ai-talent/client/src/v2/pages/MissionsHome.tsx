@@ -412,29 +412,22 @@ export default function MissionsHome() {
       {/* ─── Hero ─── */}
       <section
         className="relative px-8 pt-12 pb-10 border-b border-divider overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 60%, #3d1a8e 100%)",
-        }}
+        style={{ background: "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 60%, #3d1a8e 100%)" }}
       >
-        {/* White overlay — Canva pattern, lightens to pastel */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: "rgba(255,255,255,0.82)" }}
-        />
+        {/* ③ Very light white overlay — near-white, low saturation */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(255,255,255,0.93)" }} />
 
-        <div className="relative z-10">
-          {/* Top-right action buttons — capsule style */}
+        <div className="relative z-10 flex flex-col items-center text-center">
+          {/* Top-right action buttons */}
           <div className="absolute top-0 right-0 flex items-center gap-2">
             <button
               onClick={() => navigate("/templates")}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-all"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border"
               style={{
-                borderColor: "#F97316",
-                color: "#F97316",
-                background: "transparent",
+                borderColor: "#7b2ff7", color: "#7b2ff7", background: "transparent",
                 transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#fff7ed"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(123,47,247,0.06)"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
               <FontAwesomeIcon icon={faWandSparkles} className="text-xs" />
@@ -444,24 +437,24 @@ export default function MissionsHome() {
               onClick={() => setCreateSource("recommended")}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium text-white"
               style={{
-                background: "#F97316",
+                background: "#7b2ff7",
                 transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#ea6c0a"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(249,115,22,0.35)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "#F97316"; e.currentTarget.style.boxShadow = "none"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#6d28d9"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(123,47,247,0.35)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#7b2ff7"; e.currentTarget.style.boxShadow = "none"; }}
             >
               立即開新任務
               <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
             </button>
           </div>
 
-          {/* Headline */}
-          <div className="mb-6">
+          {/* ④ Headline — centred */}
+          <div className="mb-6 w-full">
             <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
               SoWork · Marketing OS
             </p>
             <h1
-              className="font-semibold tracking-tight leading-none"
+              className="font-semibold tracking-tight leading-tight"
               style={{
                 fontSize: "clamp(2rem, 4vw, 3rem)",
                 background: "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 100%)",
@@ -477,12 +470,12 @@ export default function MissionsHome() {
             </div>
           </div>
 
-          {/* Search bar — wider, radius-lg (Canva: 8px) */}
-          <div className="max-w-[744px] mx-auto">
+          {/* ⑤ Search bar — centred, no border, 60% width */}
+          <div className="w-full max-w-[600px]">
             <Input
               size="md"
               radius="lg"
-              variant="bordered"
+              variant="flat"
               value={searchQ}
               onValueChange={setSearchQ}
               isClearable
@@ -490,8 +483,7 @@ export default function MissionsHome() {
               placeholder="搜尋方法論、任務、最近的工作"
               classNames={{
                 inputWrapper: [
-                  "h-10 bg-white border-transparent shadow-sm",
-                  "data-[focus=true]:border-transparent",
+                  "h-10 bg-white shadow-sm border-none",
                   "data-[focus=true]:shadow-[0_0_0_3px_rgba(123,47,247,0.2)]",
                   "transition-all duration-100",
                 ].join(" "),
@@ -512,11 +504,7 @@ export default function MissionsHome() {
               onSelect={(v) => setKindFilter(v as typeof kindFilter)}
             />
             <FilterChip
-              label={
-                selectedLayer === "ALL"
-                  ? "類別"
-                  : `${selectedLayer}・${LAYER_TOKENS[selectedLayer].label}`
-              }
+              label={selectedLayer === "ALL" ? "類別" : `${selectedLayer}・${LAYER_TOKENS[selectedLayer].label}`}
               options={[
                 { value: "ALL", label: "全部層級" },
                 { value: "L1", label: "L1・品牌策略" },
@@ -868,20 +856,16 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
               </div>
             </div>
           )}
+          {/* ⑥ badges — hidden by default, fade in on hover */}
           {isLayerKnown && (
-            <Chip
-              size="sm"
-              color={tone.heroColor}
-              variant="solid"
-              className="absolute top-2 left-2"
-            >
-              {lk}・{tone.label}
-            </Chip>
+            <span className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-[10px] font-medium px-1.5 py-0.5 rounded bg-black/40 text-white">
+              {lk}
+            </span>
           )}
           {stepCount > 0 && (
-            <Chip size="sm" variant="flat" className="absolute top-2 right-2 bg-black/30 text-white border-0">
+            <span className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-[10px] font-medium px-1.5 py-0.5 rounded bg-black/40 text-white">
               {stepCount} 步
-            </Chip>
+            </span>
           )}
         </div>
         <CardBody className="p-3 gap-1">

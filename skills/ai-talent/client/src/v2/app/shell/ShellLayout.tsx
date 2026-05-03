@@ -46,26 +46,19 @@ export default function ShellLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.brandId]);
 
-  const [collapsed, setCollapsed] = React.useState<boolean>(() => {
-    try {
-      const v = localStorage.getItem("sowork.sidebarCollapsed");
-      return v === null ? true : v === "1";
-    } catch { return true; }
-  });
-  const toggleCollapsed = () => {
-    setCollapsed((v) => {
-      const nv = !v;
-      try { localStorage.setItem("sowork.sidebarCollapsed", nv ? "1" : "0"); } catch {}
-      return nv;
-    });
-  };
+  // Sidebar always 70px — clear any old expanded localStorage state
+  React.useEffect(() => {
+    try { localStorage.removeItem("sowork.sidebarCollapsed"); } catch {}
+  }, []);
+  const collapsed = true;
+  const toggleCollapsed = () => {};
 
   const handleLogout = async () => {
     try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
     window.location.href = "/auth/login";
   };
 
-  const sidebarWidth = collapsed ? 70 : 200; // ① 70px confirmed
+  const sidebarWidth = 70;
 
   return (
     <div className="min-h-screen" style={{ background: "rgb(252,251,254)" }}>
