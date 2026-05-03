@@ -208,37 +208,48 @@ function Sidebar({
 
       {/* ─── Bottom: collapse toggle + bell + avatar popup ─── */}
       <div className={`shrink-0 pb-3 flex flex-col items-center gap-1 ${collapsed ? "px-2" : "px-3"}`}>
-        {/* Collapse toggle */}
+        {/* Collapse toggle — 36×36px */}
         <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
           <button
             onClick={onToggle}
             aria-label="切換側邊欄"
-            style={{ transition: "color 0.1s linear" }}
-            className="w-full flex items-center justify-center py-2 rounded-xl text-default-400 hover:text-default-700"
+            style={{
+              width: 36, height: 36, borderRadius: "50%", border: "none", background: "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "color 0.1s linear, background-color 0.1s linear",
+              fontSize: 12,
+            }}
+            className="text-default-400 hover:text-default-700 hover:bg-default-100"
           >
-            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} className="text-xs" />
+            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
           </button>
         </Tooltip>
 
-        {/* Notification bell */}
+        {/* Notification bell — 36×36px hit area (Canva spec) */}
         <Tooltip content="通知" placement="right">
           <button
             aria-label="通知"
-            style={{ transition: "color 0.1s linear" }}
-            className="w-full flex items-center justify-center py-2 rounded-xl text-default-400 hover:text-default-700"
+            style={{
+              width: 36, height: 36, borderRadius: "50%", border: "none", background: "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "color 0.1s linear, background-color 0.1s linear",
+              fontSize: 16,
+            }}
+            className="text-default-400 hover:text-default-700 hover:bg-default-100"
           >
-            <FontAwesomeIcon icon={faBell} className="text-sm" />
+            <FontAwesomeIcon icon={faBell} />
           </button>
         </Tooltip>
 
-        {/* Avatar — opens scope/account popup */}
+        {/* Avatar — 40×40px (Canva spec) */}
         <div ref={avatarRef} className="relative mt-1 w-full flex justify-center">
           <button
             aria-label="帳號與品牌切換"
             onClick={() => setAvatarOpen((v) => !v)}
-            className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F97316]"
+            style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: "none", padding: 0 }}
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F97316]"
           >
-            <Avatar name="S" size="sm" radius="full" color="primary" classNames={{ name: "font-bold text-xs" }} />
+            <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold text-sm" }} />
           </button>
 
           {/* Popup panel */}
@@ -301,14 +312,30 @@ function SidebarNavLink({
       <button
         onClick={onClick}
         aria-label={item.label}
-        style={{ transition: "color 0.1s linear, transform 0.07s" }}
-        className={[
-          "w-full mt-1 flex flex-col items-center gap-0.5 py-2",
-          active ? "text-[#7b2ff7]" : "text-default-400 hover:text-default-700",
-        ].join(" ")}
+        style={{
+          transition: "color 0.1s linear, transform 0.07s",
+          width: 64,
+          height: 52,
+          background: "none",
+          border: "none",
+          padding: 0,
+          margin: "2px auto 0",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 4,
+          color: active ? "#F97316" : undefined,
+        }}
+        className={active ? "" : "text-default-400 hover:text-default-700"}
       >
-        <span className={`leading-none ${active ? "text-base" : "text-sm"}`}>{item.icon}</span>
-        <span className="text-[10px] leading-tight font-medium">{item.label}</span>
+        {/* 24×24 icon box — matches Canva's SVG slot */}
+        <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1 }}>
+          {item.icon}
+        </span>
+        <span style={{ fontSize: 12, lineHeight: 1.2, fontWeight: 500, textAlign: "center" }}>
+          {item.label}
+        </span>
       </button>
     );
   }
