@@ -193,19 +193,19 @@ function Sidebar({
           <button
             onClick={() => onNavigate("/")}
             aria-label="建立任務"
-            className="w-full flex flex-col items-center gap-0.5 py-2 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            style={{ background: "#F97316" }}
+            className="mx-auto flex items-center justify-center w-10 h-10 rounded-full text-white shadow-sm hover:opacity-90 active:scale-95 transition-all"
           >
-            <FontAwesomeIcon icon={faPlus} className="text-sm" />
-            <span className="text-[9px] font-medium leading-tight">建立</span>
+            <FontAwesomeIcon icon={faPlus} className="text-base" />
           </button>
         ) : (
           <Button
-            color="primary"
             variant="solid"
             onPress={() => onNavigate("/")}
             fullWidth
             aria-label="建立任務"
             startContent={<FontAwesomeIcon icon={faPlus} />}
+            style={{ background: "#F97316", color: "#fff" }}
           >
             建立任務
           </Button>
