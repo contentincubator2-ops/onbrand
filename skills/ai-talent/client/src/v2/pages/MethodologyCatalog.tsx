@@ -21,6 +21,7 @@ import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import CreateMethodologyModal from "../components/methodology/CreateMethodologyModal";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
+import { AgentAvatar } from "../components/AgentAvatar";
 import { TaskChip } from "../components/TaskChip";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
@@ -662,6 +663,17 @@ function LandscapeCard({
               style={{ fontSize: size === "sm" ? 20 : size === "lg" ? 32 : 24 }}
             />
           </div>
+        ) : entity.kind === "agent" ? (
+          // Agent hero — always show notionists avatar (DiceBear fallback built-in)
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-default-50">
+            <AgentAvatar
+              seed={entity.slug ?? entity.id}
+              role={entity.subtitle ?? entity.name ?? ""}
+              src={coverImageUrl ?? null}
+              size={size === "sm" ? 120 : size === "lg" ? 200 : 160}
+              className="object-cover"
+            />
+          </div>
         ) : coverImageUrl ? (
           <img src={coverImageUrl} alt={entity.name} className="w-full h-full object-cover" />
         ) : (
@@ -825,6 +837,16 @@ function EntityDetailModal({
                       icon={skillIcon(entity.taskType)}
                       className="text-default-400"
                       style={{ fontSize: 160 }}
+                    />
+                  </div>
+                ) : entity.kind === "agent" ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-default-50">
+                    <AgentAvatar
+                      seed={entity.slug ?? entity.id}
+                      role={entity.subtitle ?? entity.name ?? ""}
+                      src={coverImageUrl ?? null}
+                      size={220}
+                      className="rounded-none object-cover"
                     />
                   </div>
                 ) : coverImageUrl ? (
