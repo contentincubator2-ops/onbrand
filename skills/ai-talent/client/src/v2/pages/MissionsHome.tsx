@@ -472,47 +472,32 @@ export default function MissionsHome() {
               }
             />
 
-            {/* Filter pills under search bar — Canva style */}
-            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
-              <FilterChip
-                label={kindLabelMap[kindFilter] ?? "類型"}
-                options={kindOptions}
-                onSelect={(v) => setKindFilter(v as typeof kindFilter)}
-              />
-              <FilterChip
-                label={
-                  selectedLayer === "ALL"
-                    ? "類別"
-                    : `${selectedLayer}・${LAYER_TOKENS[selectedLayer].label}`
-                }
-                options={[
-                  { value: "ALL", label: "全部層級" },
-                  { value: "L1", label: "L1・品牌策略" },
-                  { value: "L2", label: "L2・產品策略" },
-                  { value: "L3", label: "L3・受眾策略" },
-                  { value: "L4", label: "L4・通路策略" },
-                  { value: "L5", label: "L5・活動策略" },
-                  { value: "L6", label: "L6・驗證校準" },
-                ]}
-                onSelect={(v) => setSelectedLayer(v as MosLayer | "ALL")}
-              />
-              <FilterChip
-                label={ownerFilter === "mine" ? "擁有者・我的" : "擁有者・全部"}
-                options={[
-                  { value: "mine", label: "我的" },
-                  { value: "all", label: "全部" },
-                ]}
-                onSelect={(v) => setOwnerFilter(v as "mine" | "all")}
-              />
-              <FilterChip
-                label={sortDesc ? "已修改日期・新→舊" : "已修改日期・舊→新"}
-                options={[
-                  { value: "desc", label: "新→舊" },
-                  { value: "asc", label: "舊→新" },
-                ]}
-                onSelect={(v) => setSortDesc(v === "desc")}
-              />
             </div>
+
+          {/* Method / layer filter pills — compact row, below search */}
+          <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+            <FilterChip
+              label={kindLabelMap[kindFilter] ?? "類型"}
+              options={kindOptions}
+              onSelect={(v) => setKindFilter(v as typeof kindFilter)}
+            />
+            <FilterChip
+              label={
+                selectedLayer === "ALL"
+                  ? "類別"
+                  : `${selectedLayer}・${LAYER_TOKENS[selectedLayer].label}`
+              }
+              options={[
+                { value: "ALL", label: "全部層級" },
+                { value: "L1", label: "L1・品牌策略" },
+                { value: "L2", label: "L2・產品策略" },
+                { value: "L3", label: "L3・受眾策略" },
+                { value: "L4", label: "L4・通路策略" },
+                { value: "L5", label: "L5・活動策略" },
+                { value: "L6", label: "L6・驗證校準" },
+              ]}
+              onSelect={(v) => setSelectedLayer(v as MosLayer | "ALL")}
+            />
           </div>
 
           {/* Monochrome quick-start tiles */}
@@ -530,75 +515,8 @@ export default function MissionsHome() {
         </div>
       </section>
 
-      {/* 🆕 Recently added catalog tasks rail (CJ direction 2026-05-02:
-       *  「我要能在前端直接測試」— 一條顯眼的橫向 rail 直接列出最近
-       *  剛 seed 完的 FB / IG tasks，不用再進子頁面找）*/}
-      {recentTasks.length > 0 && (
-        <section className="px-8 pt-8 pb-2 border-b border-divider bg-default-50/50">
-          <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
-            <h2 className="text-medium font-semibold flex items-center gap-2">
-              🆕 最近新增的任務
-              <Chip size="sm" variant="flat" color="primary">{recentTasks.length}</Chip>
-            </h2>
-            <p className="text-tiny text-default-500">點任一張卡 → 進 picker 直接測試</p>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
-            {recentTasks.map((t: any) => {
-              const isComingSoon = t.status === "coming_soon";
-              const isSquad = t.impl_kind === "squad";
-              // Click only valid when we have a real underlying impl. Otherwise
-              // CJ-direction-2026-05-02 bug: clicking a coming_soon-without-
-              // squad falls through to /picker?workspace=X and picker auto-
-              // selects an unrelated legacy squad (e.g. EDM 活動小組).
-              const canRun = isSquad ? !!t.squad_slug : !!t.agent_id;
-              return (
-                <Card
-                  key={t.id}
-                  isPressable={canRun}
-                  shadow="sm"
-                  radius="lg"
-                  className={`shrink-0 w-[280px] border border-divider ${canRun ? "" : "opacity-70"}`}
-                  style={{ scrollSnapAlign: "start" }}
-                  onPress={!canRun ? undefined : () => {
-                    if (isSquad && t.squad_slug) {
-                      navigate(`/picker?workspace=${t.workspace}&slug=${t.squad_slug}`);
-                    } else if (!isSquad && t.agent_id) {
-                      // Atomic task — go to picker workspace where the
-                      // catalog rail has the dedicated runAtomic flow.
-                      navigate(`/picker?workspace=${t.workspace}&task=${t.slug}`);
-                    }
-                  }}
-                >
-                  <CardBody className="p-3 gap-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-small font-semibold flex-1 min-w-0 line-clamp-1">{t.name_zh}</span>
-                      <Chip size="sm" variant="flat" color={isComingSoon ? "warning" : "success"} className="h-4 text-tiny">
-                        {isComingSoon ? "🟡 設計中" : "🟢 上線"}
-                      </Chip>
-                    </div>
-                    <Chip size="sm" variant="flat" className="h-4 text-tiny self-start">
-                      {t.workspace} · {isSquad ? "squad" : "atomic"}
-                    </Chip>
-                    {t.methodology_label && (
-                      <p className="text-tiny text-default-500 italic line-clamp-1">{t.methodology_label}</p>
-                    )}
-                    <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em]">{t.description}</p>
-                    <div className="flex items-center justify-between text-tiny text-default-400 mt-1">
-                      <span>{t.estimated_minutes ? `約 ${t.estimated_minutes} 分鐘` : "—"}</span>
-                      <span className={canRun ? "text-primary" : "text-default-400"}>
-                        {canRun ? "→ 開啟" : "尚未綁定 squad/agent"}
-                      </span>
-                    </div>
-                  </CardBody>
-                </Card>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ─── Body sections ──────────────────────────────────────── */}
-      <section className="px-8 py-10">
+      {/* ─── 最近的項目 (Canva-style primary section) ─────────────────── */}
+      <section className="px-8 py-8 border-b border-divider">
         {showCustom && (
           <CustomMissionForm
             title={customTitle}
@@ -612,30 +530,36 @@ export default function MissionsHome() {
           />
         )}
         {error && !showCustom && (
-          <Card shadow="none" className="mb-6 border border-danger">
+          <Card shadow="none" className="mb-4 border border-danger">
             <CardBody className="text-small text-danger">{error}</CardBody>
           </Card>
         )}
 
-        {/* Recent missions — header + filter chips */}
-        <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-          <h2 className="text-xl font-semibold">最近的任務</h2>
-          <div className="flex items-center gap-2">
+        {/* Section header with inline controls */}
+        <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
+          <h2 className="text-xl font-semibold">
+            最近的項目
+            {!isLoading && filteredRows.length > 0 && (
+              <span className="ml-2 text-small font-normal text-default-400">({filteredRows.length})</span>
+            )}
+          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
             <FilterChip
-              label={ownerFilter === "mine" ? "擁有者" : "全部"}
-              onClick={() => setOwnerFilter((v) => (v === "mine" ? "all" : "mine"))}
+              label={ownerFilter === "mine" ? "擁有者・我的" : "擁有者・全部"}
+              options={[
+                { value: "mine", label: "我的" },
+                { value: "all", label: "全部" },
+              ]}
+              onSelect={(v) => setOwnerFilter(v as "mine" | "all")}
             />
             <FilterChip
-              label={kindLabelMap[kindFilter] ?? "類型"}
-              options={kindOptions}
-              onSelect={(v) => setKindFilter(v as typeof kindFilter)}
+              label={sortDesc ? "已修改日期・新→舊" : "已修改日期・舊→新"}
+              options={[
+                { value: "desc", label: "新→舊" },
+                { value: "asc", label: "舊→新" },
+              ]}
+              onSelect={(v) => setSortDesc(v === "desc")}
             />
-            <IconButton
-              title={sortDesc ? "新→舊" : "舊→新"}
-              onClick={() => setSortDesc((v) => !v)}
-            >
-              <FontAwesomeIcon icon={sortDesc ? faArrowDownWideShort : faArrowUpWideShort} />
-            </IconButton>
             <IconButton
               title={viewMode === "grid" ? "切換為列表" : "切換為網格"}
               onClick={() => setViewMode((v) => (v === "grid" ? "list" : "grid"))}
@@ -646,17 +570,30 @@ export default function MissionsHome() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             {Array.from({ length: 6 }).map((_, i) => <ThumbSkeleton key={i} />)}
           </div>
         ) : filteredRows.length === 0 ? (
-          <Card shadow="none" className="border-2 border-dashed border-divider">
-            <CardBody className="py-12 text-center text-small text-default-500">
-              {searchQ ? `沒有找到「${searchQ}」相關的項目。` : "還沒有任務 — 從上方挑一個快速開始。"}
-            </CardBody>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-default-100 flex items-center justify-center">
+              <FontAwesomeIcon icon={faPlus} className="text-2xl text-default-400" />
+            </div>
+            <div>
+              <p className="text-medium font-semibold text-default-600">
+                {searchQ ? `沒有找到「${searchQ}」的項目` : "還沒有任何任務"}
+              </p>
+              <p className="text-small text-default-400 mt-1">
+                {searchQ ? "試試其他關鍵字" : "從上方挑一個快速開始範本，或點「立即開新任務」"}
+              </p>
+            </div>
+            {!searchQ && (
+              <Button size="sm" color="primary" onPress={() => setCreateSource("recommended")}>
+                建立第一個任務
+              </Button>
+            )}
+          </div>
         ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             {filteredRows.map((m) => (
               <MissionThumb key={m.id} mission={m} onClick={() => goToMission(m)} />
             ))}
@@ -671,6 +608,59 @@ export default function MissionsHome() {
           </Card>
         )}
       </section>
+
+      {/* ─── 探索任務範本 (system catalog — secondary) ──────────────── */}
+      {recentTasks.length > 0 && (
+        <section className="px-8 pt-8 pb-4 border-b border-divider bg-default-50/40">
+          <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+            <h2 className="text-medium font-semibold flex items-center gap-2">
+              探索任務範本
+              <Chip size="sm" variant="flat" color="default">{recentTasks.length}</Chip>
+            </h2>
+            <Button size="sm" variant="light" onPress={() => navigate("/templates")} endContent={<FontAwesomeIcon icon={faArrowRight} />}>
+              查看全部
+            </Button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
+            {recentTasks.map((t: any) => {
+              const isComingSoon = t.status === "coming_soon";
+              const isSquad = t.impl_kind === "squad";
+              const canRun = isSquad ? !!t.squad_slug : !!t.agent_id;
+              return (
+                <Card
+                  key={t.id}
+                  isPressable={canRun}
+                  shadow="none"
+                  radius="lg"
+                  className={`shrink-0 w-[260px] border border-divider bg-content1 ${canRun ? "" : "opacity-60"}`}
+                  style={{ scrollSnapAlign: "start" }}
+                  onPress={!canRun ? undefined : () => {
+                    if (isSquad && t.squad_slug) {
+                      navigate(`/picker?workspace=${t.workspace}&slug=${t.squad_slug}`);
+                    } else if (!isSquad && t.agent_id) {
+                      navigate(`/picker?workspace=${t.workspace}&task=${t.slug}`);
+                    }
+                  }}
+                >
+                  <CardBody className="p-3 gap-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-small font-semibold flex-1 min-w-0 line-clamp-1">{t.name_zh}</span>
+                      <Chip size="sm" variant="flat" color={isComingSoon ? "warning" : "success"} className="h-4 text-tiny">
+                        {isComingSoon ? "設計中" : "上線"}
+                      </Chip>
+                    </div>
+                    <Chip size="sm" variant="flat" className="h-4 text-tiny self-start">{t.workspace}</Chip>
+                    <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em] mt-1">{t.description}</p>
+                    <p className={`text-tiny mt-1 ${canRun ? "text-primary" : "text-default-400"}`}>
+                      {canRun ? "點擊開啟 →" : "尚未綁定"}
+                    </p>
+                  </CardBody>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ─── Create-methodology modal (Canva-style source picker) ── */}
       <CreateMethodologyModal
