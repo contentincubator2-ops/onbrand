@@ -219,11 +219,25 @@ const CHANNEL_OPTIONS: Array<{ key: string; label: string; icon: any }> = [
 const CHANNEL_ALIASES: Record<string, string[]> = {
   facebook:  ["facebook", "fb", "meta-fb", "fb-page", "fb-ads"],
   instagram: ["instagram", "ig", "ig-reels", "ig-feed"],
-  linkedin:  ["linkedin", "li", "linkedin-post"],
+  linkedin:  ["linkedin", "linkedin-post"],
   youtube:   ["youtube", "yt", "shorts", "yt-shorts"],
   pr:        ["pr", "public-relations", "media-relations", "press"],
   email:     ["email", "edm", "newsletter", "mailer"],
 };
+
+/** Word-boundary-aware alias test: alias "fb" should match "fb" or "fb-page"
+ *  but NOT "afb" or embedded substrings.  We split the haystack on
+ *  non-alphanumeric chars so short tokens ("ig", "yt", "fb") only match
+ *  standalone tokens, not parts of longer words like "analytics". */
+function aliasMatchesHaystack(aliases: string[], haystack: string): boolean {
+  const tokens = new Set(haystack.split(/[^a-z0-9]+/).filter(Boolean));
+  return aliases.some((a) => {
+    // If alias contains a hyphen it's a compound token — check as substring
+    // of the full haystack (e.g. "ig-reels" lives as one token in wsArr).
+    if (a.includes("-")) return haystack.includes(a);
+    return tokens.has(a);
+  });
+}
 
 const LAYER_OPTIONS: MosLayer[] = ["L1", "L2", "L3", "L4", "L5", "L6"];
 
@@ -463,7 +477,7 @@ export default function PickerWorkspace() {
         pickLocaleText(s.name, "en"),
         pickLocaleText(s.name, "zh-TW"),
       ].filter(Boolean).join(" ").toLowerCase();
-      if (!aliases.some((a) => channelHaystack.includes(a))) return false;
+      if (!aliasMatchesHaystack(aliases, channelHaystack)) return false;
     }
     return true;
   };
@@ -476,7 +490,7 @@ export default function PickerWorkspace() {
       // Channel facet
       if (channelFilter !== "all") {
         const aliases = CHANNEL_ALIASES[channelFilter] ?? [channelFilter];
-        if (!aliases.some((a) => String(t.workspace ?? "").toLowerCase().includes(a))) return false;
+        if (!aliasMatchesHaystack(aliases, String(t.workspace ?? "").toLowerCase())) return false;
       }
       // Query
       if (!ql) return true;
@@ -683,7 +697,7 @@ export default function PickerWorkspace() {
     if (selectedSquad?.workspace?.length) {
       for (const [key, aliases] of Object.entries(CHANNEL_ALIASES)) {
         if (selectedSquad.workspace.some((w: string) =>
-          aliases.some((a) => String(w).toLowerCase().includes(a))
+          aliasMatchesHaystack(aliases, String(w).toLowerCase())
         )) return key;
       }
     }
