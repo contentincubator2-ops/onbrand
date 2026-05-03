@@ -14,7 +14,7 @@ import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles,
+  faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles, faRocket,
   faMicrophone, faBookBookmark, faEllipsis, faBell,
   faPlus, faRightFromBracket,
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
@@ -120,6 +120,7 @@ export default function ShellLayout() {
         brands={brands}
         brandId={brandId}
         onNavigate={(to) => navigate(to)}
+        currentPath={loc.pathname}
       />
 
       {/* Backdrop for slide panel */}
@@ -373,16 +374,31 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
    LAYER 2 — Slide panel (210px, left:70px, slides in/out)
 ══════════════════════════════════════════════════════════════════ */
 
+/* ── Sub-nav items for Projects panel ── */
+const PROJECTS_SUB_NAV = [
+  { id: "all",     label: "所有專案",   icon: faFolderOpen     },
+  { id: "mine",    label: "你的專案",   icon: faRocket         },
+  { id: "shared",  label: "與你分享",   icon: faUserGroup      },
+  { id: "offline", label: "可離線使用", icon: faCheckDouble    },
+] as const;
+
 function SlidePanel({
-  open, onClose, brands, brandId, onNavigate,
+  open, onClose, brands, brandId, onNavigate, currentPath,
 }: {
   open: boolean;
   onClose: () => void;
   brands: any[];
   brandId: number | null;
   onNavigate: (to: string) => void;
+  currentPath: string;
 }) {
-  // Recent missions
+  const isProjects = currentPath === "/projects" || currentPath.startsWith("/projects");
+
+  // Detect active sub-nav from URL
+  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const activeSubNav = searchParams.get("sub") ?? "all";
+
+  // Data
   const recentQuery = (trpc as any).mission?.listAllForUser?.useQuery
     ? (trpc as any).mission.listAllForUser.useQuery(undefined, { refetchOnWindowFocus: false })
     : { data: [] };
@@ -403,125 +419,259 @@ function SlidePanel({
       }}
     >
       {/* Header: wordmark */}
-      <div style={{
-        height: 56, display: "flex", alignItems: "center", padding: "0 16px",
-        flexShrink: 0,
-      }}>
+      <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 16px", flexShrink: 0 }}>
         <span style={{ fontSize: 18, fontWeight: 800, color: "#F97316", letterSpacing: "-0.03em" }}>
           SoWork
         </span>
       </div>
 
-      {/* 建立 full-width button */}
-      <div style={{ padding: "0 12px 12px", flexShrink: 0 }}>
-        <button
-          onClick={() => onNavigate("/")}
-          style={{
-            width: "100%", height: 40, borderRadius: 10, border: "none",
-            background: "#F97316", color: "#fff",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            fontSize: 14, fontWeight: 600, cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(249,115,22,0.30)",
-            transition: "background 0.1s",
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
-          onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
-        >
-          <FontAwesomeIcon icon={faPlus} />
-          建立任務
-        </button>
-      </div>
+      {/* ── Projects-specific panel ── */}
+      {isProjects ? (
+        <>
+          {/* 你的方案 */}
+          <div style={{ padding: "0 12px 8px", flexShrink: 0 }}>
+            <button style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 8,
+              padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
+              background: "white", cursor: "pointer", textAlign: "left",
+              marginBottom: 6, transition: "background 0.1s",
+              fontSize: 13, fontWeight: 500, color: "#374151",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
+              onMouseLeave={e => e.currentTarget.style.background = "white"}
+            >
+              <span style={{ fontSize: 13 }}>👑</span>
+              你的方案
+            </button>
+            <button style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
+              background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151",
+              transition: "background 0.1s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
+              onMouseLeave={e => e.currentTarget.style.background = "white"}
+            >
+              <FontAwesomeIcon icon={faUserGroup} style={{ fontSize: 11 }} />
+              邀請使用者
+            </button>
+          </div>
 
-      {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 8px" }}>
+          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
 
-        {/* Starred brands */}
-        {brands.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px 6px" }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                已加星號的品牌
-              </span>
-              <button style={{ background: "none", border: "none", color: "#9ca3af", fontSize: 13, cursor: "pointer" }}>
-                <FontAwesomeIcon icon={faPlus} />
+          {/* Sub-nav */}
+          <nav style={{ padding: "8px 6px", flexShrink: 0 }}>
+            {PROJECTS_SUB_NAV.map(n => {
+              const active = activeSubNav === n.id;
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => onNavigate(`/projects?sub=${n.id}`)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 10px", borderRadius: 8, border: "none", marginBottom: 1,
+                    textAlign: "left", cursor: "pointer",
+                    background: active ? "#EEF2FF" : "transparent",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EEF2FF" : "transparent"; }}
+                >
+                  <FontAwesomeIcon icon={n.icon} style={{ fontSize: 13, width: 15, flexShrink: 0, color: active ? "#4F46E5" : "#6B7280" }} />
+                  <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? "#4338CA" : "#374151", flex: 1 }}>
+                    {n.label}
+                  </span>
+                  {n.id === "mine" && brands[0] && (
+                    <div style={{
+                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                      background: "#6366F1",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 8, fontWeight: 700, color: "#fff",
+                    }}>
+                      {((brands[0]?.name ?? "S") as string).slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div style={{ height: 1, background: "#f3f4f6", margin: "4px 0", flexShrink: 0 }} />
+
+          {/* 已標記星號的內容 */}
+          <div style={{ padding: "8px 14px 6px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              已標記星號的內容
+            </span>
+            <button style={{
+              width: 20, height: 20, borderRadius: 4, border: "none", background: "transparent",
+              cursor: "pointer", color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
+            }}>
+              <FontAwesomeIcon icon={faPlus} />
+            </button>
+          </div>
+
+          {/* Starred items list */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
+            {recentMissions.length === 0 && (
+              <p style={{ fontSize: 11.5, color: "#9ca3af", padding: "4px 8px 8px", lineHeight: 1.5 }}>
+                點擊任一設計的星號圖示，即可從這裡輕鬆找到。
+              </p>
+            )}
+            {recentMissions.map((m: any) => (
+              <button key={m.id} onClick={() => onNavigate(`/projects`)} style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                padding: "6px 8px", borderRadius: 8, border: "none", background: "transparent",
+                cursor: "pointer", textAlign: "left", transition: "background 0.1s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                {/* Thumbnail */}
+                <div style={{
+                  width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+                  background: (m as any).thumbnailUrl ? `url(${(m as any).thumbnailUrl}) center/cover` : "#EEF2FF",
+                  backgroundImage: (m as any).thumbnailUrl ? `url(${(m as any).thumbnailUrl})` : undefined,
+                  backgroundSize: "cover", backgroundPosition: "center",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 700, color: "#4F46E5",
+                }}>
+                  {!(m as any).thumbnailUrl && ((m.title ?? "M") as string).slice(0, 1).toUpperCase()}
+                </div>
+                <span style={{ fontSize: 12.5, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  {m.title}
+                </span>
               </button>
-            </div>
-            {brands.slice(0, 6).map((b: any) => (
-              <PanelRow
-                key={b.id}
-                initial={(b.name ?? "B").slice(0, 1).toUpperCase()}
-                initialBg="#f3f4f6"
-                initialColor="#6b7280"
-                label={b.name}
-                onClick={() => {}}
-              />
             ))}
           </div>
-        )}
 
-        {/* Recent missions */}
-        {recentMissions.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px 6px" }}>
-              <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#9ca3af" }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                近期任務
-              </span>
-            </div>
-            {recentMissions.map((m: any) => (
-              <PanelRow
-                key={m.id}
-                initial={(m.title ?? "M").slice(0, 1).toUpperCase()}
-                initialBg="#fff7ed"
-                initialColor="#F97316"
-                label={m.title}
-                onClick={() => {}}
-              />
-            ))}
+          {/* Bottom: trash */}
+          <div style={{ flexShrink: 0, padding: "8px 6px 16px", borderTop: "1px solid #f3f4f6" }}>
+            <button style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "8px 10px", borderRadius: 8, border: "none", background: "none",
+              fontSize: 13, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}
+            >
+              <FontAwesomeIcon icon={faTrash} style={{ fontSize: 13, width: 15 }} />
+              垃圾桶
+            </button>
+          </div>
+        </>
+      ) : (
+        /* ── Default panel (non-projects pages) ── */
+        <>
+          {/* 建立 full-width button */}
+          <div style={{ padding: "0 12px 12px", flexShrink: 0 }}>
             <button
               onClick={() => onNavigate("/")}
               style={{
-                width: "100%", textAlign: "center", padding: "6px 8px", border: "none",
-                background: "none", fontSize: 12, color: "#F97316", cursor: "pointer", fontWeight: 500,
+                width: "100%", height: 40, borderRadius: 10, border: "none",
+                background: "#F97316", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                fontSize: 14, fontWeight: 600, cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(249,115,22,0.30)",
+                transition: "background 0.1s",
               }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
+              onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
             >
-              查看全部
+              <FontAwesomeIcon icon={faPlus} />
+              建立任務
             </button>
           </div>
-        )}
 
-        {/* More */}
-        <button style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 10,
-          padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
-          fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-        }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-          onMouseLeave={e => (e.currentTarget.style.background = "none")}
-        >
-          <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <FontAwesomeIcon icon={faEllipsis} />
-          </span>
-          顯示更多
-        </button>
-      </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 8px" }}>
+            {/* Starred brands */}
+            {brands.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px 6px" }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    已加星號的品牌
+                  </span>
+                  <button style={{ background: "none", border: "none", color: "#9ca3af", fontSize: 13, cursor: "pointer" }}>
+                    <FontAwesomeIcon icon={faPlus} />
+                  </button>
+                </div>
+                {brands.slice(0, 6).map((b: any) => (
+                  <PanelRow
+                    key={b.id}
+                    initial={(b.name ?? "B").slice(0, 1).toUpperCase()}
+                    initialBg="#f3f4f6"
+                    initialColor="#6b7280"
+                    label={b.name}
+                    onClick={() => {}}
+                  />
+                ))}
+              </div>
+            )}
 
-      {/* Bottom: trash */}
-      <div style={{ flexShrink: 0, padding: "8px 8px 16px" }}>
-        <button style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 10,
-          padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
-          fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-        }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-          onMouseLeave={e => (e.currentTarget.style.background = "none")}
-        >
-          <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} />
-          </span>
-          垃圾桶
-        </button>
-      </div>
+            {/* Recent missions */}
+            {recentMissions.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px 6px" }}>
+                  <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#9ca3af" }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    近期任務
+                  </span>
+                </div>
+                {recentMissions.map((m: any) => (
+                  <PanelRow
+                    key={m.id}
+                    initial={(m.title ?? "M").slice(0, 1).toUpperCase()}
+                    initialBg="#fff7ed"
+                    initialColor="#F97316"
+                    label={m.title}
+                    onClick={() => {}}
+                  />
+                ))}
+                <button
+                  onClick={() => onNavigate("/")}
+                  style={{
+                    width: "100%", textAlign: "center", padding: "6px 8px", border: "none",
+                    background: "none", fontSize: 12, color: "#F97316", cursor: "pointer", fontWeight: 500,
+                  }}
+                >
+                  查看全部
+                </button>
+              </div>
+            )}
+
+            <button style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
+              fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
+            }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = "none")}
+            >
+              <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <FontAwesomeIcon icon={faEllipsis} />
+              </span>
+              顯示更多
+            </button>
+          </div>
+
+          {/* Bottom: trash */}
+          <div style={{ flexShrink: 0, padding: "8px 8px 16px" }}>
+            <button style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
+              fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
+            }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = "none")}
+            >
+              <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} />
+              </span>
+              垃圾桶
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
