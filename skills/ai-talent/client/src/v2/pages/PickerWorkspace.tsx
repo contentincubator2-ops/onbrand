@@ -29,6 +29,7 @@ import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMoc
 import { searchAndRankSquads } from "../lib/searchSquads";
 import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { IntakeChat } from "../components/IntakeChat";
+import { useMissionStream } from "../lib/useMissionStream";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
 import { CalendarGridMockup } from "../components/SquadMockups/calendar";
@@ -1969,15 +1970,26 @@ function SquadDetailPanel({
   // worst case at 14k users; now 1400). User-triggered actions
   // (confirm / redo / edit) still call refetch() explicitly so the
   // immediate feedback loop is preserved.
+  // Polling now at 60s — SSE stream handles real-time updates during active execution.
+  // refetch() is still called explicitly after each step completes.
   const progressQuery: any = (trpc.squad as any).stepGetProgress?.useQuery
     ? (trpc.squad as any).stepGetProgress.useQuery(
         { missionId: missionId ?? 0 },
-        { enabled: !!missionId, refetchInterval: missionId ? 10_000 : false, refetchOnWindowFocus: false },
+        { enabled: !!missionId, refetchInterval: missionId ? 60_000 : false, refetchOnWindowFocus: false },
       )
     : { data: null, refetch: () => Promise.resolve({}) };
   const stepExecute: any = (trpc.squad as any).stepExecute?.useMutation
     ? (trpc.squad as any).stepExecute.useMutation()
     : { mutateAsync: async () => null, isPending: false };
+
+  // SSE streaming hook — replaces stepExecute for mode="run"
+  const { liveFields, stepStatus, isStreaming: isStepStreaming, streamError, startStep } = useMissionStream({
+    onStepDone: (_ord, _output) => {
+      // Refresh polling state after step completes so confirm/redo buttons appear
+      progressQuery.refetch?.();
+    },
+    onProgress: () => progressQuery.refetch?.(),
+  });
 
   // Scope-injecting wrapper — every stepExecute call needs to carry the
   // active ScopeBar state so the agent reads brand + product + event
@@ -2040,16 +2052,16 @@ function SquadDetailPanel({
     if (stepExecute.isPending) return;
     if (autoTriggered) return;
     setAutoTriggered(true);
-    stepExecute
-      .mutateAsync({
-        missionId,
-        squadSlug: squad.slug,
-        stepOrder: 1,
-        mode: "run",
-        userInput: "",
-      })
-      .then(() => progressQuery.refetch?.())
-      .catch(() => { /* error surfaced in FeedbackPanel */ });
+    // Use SSE streaming instead of blocking stepExecute mutation
+    startStep({
+      missionId,
+      squadSlug: squad.slug,
+      stepOrder: 1,
+      step: stepsArr[0],
+      scopeBrandId:   scope.brandId   ?? null,
+      scopeProductId: scope.productId ?? null,
+      scopeEventId:   scope.eventId   ?? null,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missionId]);
 
@@ -2139,6 +2151,59 @@ function SquadDetailPanel({
                : primaryOutputKind === "research" ? "🔍 研究報告輸出"
                : "📋 報告輸出"}
             </Chip>
+          </div>
+        )}
+
+        {/* ── Step progress indicator (SSE-driven, visible while mission running) ── */}
+        {missionId && stepsArr.length > 0 && (
+          <div className="shrink-0 border-b border-default-100 bg-content1 px-4 py-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+              {stepsArr.map((s: any, i: number) => {
+                const ord = i + 1;
+                const prog = progressByOrd.get(ord);
+                const dbStatus: string = prog?.status ?? "pending";
+                const isActive = stepStatus.isRunning && stepStatus.stepOrder === ord;
+                const isDone = dbStatus === "confirmed" || dbStatus === "drafted";
+                const isConfirmed = dbStatus === "confirmed";
+
+                return (
+                  <React.Fragment key={ord}>
+                    {i > 0 && <span className="text-default-200 text-tiny shrink-0">→</span>}
+                    <div className={[
+                      "shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-tiny font-medium transition-all",
+                      isActive
+                        ? "bg-primary/10 text-primary border border-primary/30"
+                        : isConfirmed
+                        ? "bg-success/10 text-success border border-success/20"
+                        : isDone
+                        ? "bg-default-100 text-default-600 border border-default-200"
+                        : "text-default-400 border border-transparent",
+                    ].join(" ")}>
+                      {isActive && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+                      )}
+                      {isConfirmed && !isActive && (
+                        <span className="text-success">✓</span>
+                      )}
+                      <span className="max-w-[80px] truncate">
+                        {s.name ?? s.title ?? `Step ${ord}`}
+                      </span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+              {(isStepStreaming || stepStatus.isRunning) && stepStatus.agentName && (
+                <span className="ml-2 text-tiny text-default-400 shrink-0 flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-default-400 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1 h-1 rounded-full bg-default-400 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1 h-1 rounded-full bg-default-400 animate-bounce [animation-delay:300ms]" />
+                  {stepStatus.agentName}
+                </span>
+              )}
+              {streamError && (
+                <span className="ml-2 text-tiny text-danger shrink-0">⚠ {streamError}</span>
+              )}
+            </div>
           </div>
         )}
 
@@ -2294,7 +2359,11 @@ function SquadDetailPanel({
             }
 
             // Default: single-post PlatformMockup
-            const live = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
+            // Merge: SSE live fields (real-time) override DB-backed aggregated fields
+            const dbLive = missionId ? aggregateMockupFields(stepsArr, progressByOrd) : {};
+            const live = isStepStreaming
+              ? { ...dbLive, ...liveFields }  // SSE wins when streaming
+              : dbLive;
             // Show streaming intake preview when agent is answering (pre-launch)
             if (!missionId && intakePreviewText) {
               return (
