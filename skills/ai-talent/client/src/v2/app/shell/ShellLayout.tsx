@@ -15,7 +15,7 @@ import {
   faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles,
   faMicrophone, faBookBookmark, faEllipsis, faBell,
   faChevronLeft, faChevronRight, faPlus, faRightFromBracket,
-  faGear, faStar, faClock, faTrash,
+  faGear, faClock, faTrash, faXmark, faCheckDouble,
 } from "@fortawesome/free-solid-svg-icons";
 
 const COLLAPSED_W = 70;
@@ -67,6 +67,7 @@ export default function ShellLayout() {
     window.location.href = "/auth/login";
   };
 
+  const [notifOpen, setNotifOpen] = React.useState(false);
   const sidebarWidth = collapsed ? COLLAPSED_W : EXPANDED_W;
 
   return (
@@ -81,7 +82,24 @@ export default function ShellLayout() {
         onLogout={handleLogout}
         brands={brands}
         brandId={brandId}
+        notifOpen={notifOpen}
+        onNotifToggle={() => setNotifOpen((v) => !v)}
       />
+
+      {/* Notification drawer — slides in from sidebar edge */}
+      <NotifPanel
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        offsetLeft={sidebarWidth}
+      />
+      {/* Backdrop — closes panel on outside click */}
+      {notifOpen && (
+        <div
+          onClick={() => setNotifOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 38, background: "rgba(0,0,0,0.08)" }}
+        />
+      )}
+
       <div style={{ paddingLeft: sidebarWidth, transition: "padding-left 0.2s ease" }}>
         <Outlet context={{ brandId, setBrandId, brands, scope, setScope }} />
       </div>
@@ -112,6 +130,7 @@ const NAV_ITEMS: NavItem[] = [
 
 function Sidebar({
   collapsed, onToggle, currentPath, onNavigate, scope, setScope, onLogout, brands, brandId,
+  notifOpen, onNotifToggle,
 }: {
   collapsed: boolean;
   onToggle: () => void;
@@ -122,6 +141,8 @@ function Sidebar({
   onLogout: () => void;
   brands: any[];
   brandId: number | null;
+  notifOpen: boolean;
+  onNotifToggle: () => void;
 }) {
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
@@ -385,21 +406,42 @@ function Sidebar({
           </button>
         )}
 
-        {/* Bell */}
+        {/* Bell — with unread badge + active state */}
         <Tooltip content="通知" placement="right">
           <button
             aria-label="通知"
+            onClick={onNotifToggle}
             style={{
-              width: 36, height: 36, borderRadius: "50%", border: "none", background: "none",
+              position: "relative",
+              width: 36, height: 36, borderRadius: "50%", border: "none",
+              background: notifOpen ? "#fff7ed" : "none",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "color 0.1s linear, background-color 0.1s linear",
-              fontSize: 16, color: "#9ca3af",
+              fontSize: 16,
+              color: notifOpen ? "#F97316" : "#9ca3af",
               alignSelf: collapsed ? "center" : "flex-start",
+              cursor: "pointer",
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; e.currentTarget.style.color = "#374151"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#9ca3af"; }}
+            onMouseEnter={e => {
+              if (!notifOpen) { e.currentTarget.style.background = "#f3f4f6"; e.currentTarget.style.color = "#374151"; }
+            }}
+            onMouseLeave={e => {
+              if (!notifOpen) { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#9ca3af"; }
+            }}
           >
             <FontAwesomeIcon icon={faBell} />
+            {/* Unread badge */}
+            <span style={{
+              position: "absolute", top: 2, right: 2,
+              minWidth: 16, height: 16, borderRadius: 8,
+              background: "#ef4444", color: "#fff",
+              fontSize: 9, fontWeight: 700, lineHeight: "16px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "0 3px", border: "1.5px solid white",
+              pointerEvents: "none",
+            }}>
+              9+
+            </span>
           </button>
         </Tooltip>
 
@@ -456,6 +498,162 @@ function Sidebar({
         </div>
       </div>
     </aside>
+  );
+}
+
+/* ─────────────────────────── Notification panel ─────────────────── */
+
+const MOCK_NOTIFS = [
+  {
+    id: 1, unread: true,
+    avatar: "L", avatarColor: "#7c3aed",
+    title: "Laila Chu 在任務「品牌月曆」撰寫了評論。",
+    excerpt: "社群日活動時間這串文字想要變色強調",
+    time: "3月31日 下午6:45",
+    from: "Laila Chu",
+    fromCount: 2,
+  },
+  {
+    id: 2, unread: true,
+    avatar: "Y", avatarColor: "#059669",
+    title: "「yirenyan」解決了有關「Facebook 廣告文案」的評論。",
+    excerpt: "@SoWork 圖片上的英文字幕可以去除嗎",
+    time: "1月22日 上午10:26",
+    from: "yirenyan",
+    fromCount: 1,
+  },
+  {
+    id: 3, unread: false,
+    avatar: "簡", avatarColor: "#0891b2",
+    title: "簡維德 在任務「GO Tour DM」撰寫了評論。",
+    excerpt: "建議這兩隻皮卡丘的外框用更明顯的顏色替代白色，避免過稿來回",
+    time: "4天前",
+    from: "簡維德",
+    fromCount: 1,
+  },
+];
+
+function NotifPanel({ open, onClose, offsetLeft }: { open: boolean; onClose: () => void; offsetLeft: number }) {
+  const [readAll, setReadAll] = React.useState(false);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0, bottom: 0,
+        left: offsetLeft,
+        width: 380,
+        background: "#fff",
+        boxShadow: "4px 0 24px rgba(0,0,0,0.10)",
+        zIndex: 39,
+        display: "flex",
+        flexDirection: "column",
+        transform: open ? "translateX(0)" : "translateX(-110%)",
+        transition: "transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+        borderRight: "1px solid #f3f4f6",
+      }}
+    >
+      {/* Header */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "16px 16px 12px", borderBottom: "1px solid #f3f4f6", flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>通知</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => setReadAll(true)}
+            title="將全部標示為已讀"
+            style={{
+              display: "flex", alignItems: "center", gap: 5, padding: "4px 10px",
+              borderRadius: 8, border: "none", background: "none",
+              fontSize: 12, color: "#6b7280", cursor: "pointer",
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          >
+            <FontAwesomeIcon icon={faCheckDouble} style={{ fontSize: 11 }} />
+            將全部標示為已讀
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              width: 28, height: 28, borderRadius: "50%", border: "none", background: "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#9ca3af", cursor: "pointer", fontSize: 14,
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f3f4f6")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </div>
+      </div>
+
+      {/* Notification list */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+        {MOCK_NOTIFS.map((n) => {
+          const isUnread = n.unread && !readAll;
+          return (
+            <div
+              key={n.id}
+              style={{
+                display: "flex", gap: 12, padding: "12px 16px",
+                background: isUnread ? "rgba(249,115,22,0.04)" : "transparent",
+                borderBottom: "1px solid #f9fafb",
+                cursor: "pointer", transition: "background 0.1s",
+                position: "relative",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.08)" : "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.04)" : "transparent")}
+            >
+              {/* Avatar */}
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                background: n.avatarColor,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontSize: 14, fontWeight: 700,
+              }}>
+                {n.avatar}
+              </div>
+
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, color: "#111827", lineHeight: 1.45, marginBottom: 4 }}>
+                  {n.title}
+                </p>
+                <div style={{
+                  fontSize: 12, color: "#6b7280", background: "#f9fafb",
+                  borderRadius: 6, padding: "4px 8px", marginBottom: 6,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                }}>
+                  {n.excerpt}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#9ca3af" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3b82f6", flexShrink: 0 }} />
+                  <span>{n.time}</span>
+                </div>
+                <button style={{
+                  marginTop: 4, fontSize: 12, fontWeight: 500, color: "#F97316",
+                  background: "none", border: "none", padding: 0, cursor: "pointer",
+                }}>
+                  來自「{n.from}」的 {n.fromCount} 個更新
+                </button>
+              </div>
+
+              {/* Unread dot */}
+              {isUnread && (
+                <span style={{
+                  position: "absolute", top: 14, right: 14,
+                  width: 8, height: 8, borderRadius: "50%", background: "#ef4444",
+                }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
