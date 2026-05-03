@@ -1,25 +1,25 @@
-name: Admin — Nullify old agent avatars
+name: Admin — Backfill agent DiceBear notionists avatars
 
 on:
   workflow_dispatch:
 
 jobs:
-  nullify-avatars:
+  backfill-avatars:
     runs-on: ubuntu-latest
     steps:
-      - name: Run nullify-old-avatars on VM
+      - name: Run backfill-agent-avatars on VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 120s
+          command_timeout: 180s
           script: |
             AI=/opt/marketing-os/app/skills/ai-talent
             cd "$AI"
             set -a
             source "$AI/.env"
             set +a
-            echo "── Running nullify-old-avatars ──"
-            npx tsx server/scripts/nullify-old-avatars.ts
+            echo "── Running backfill-agent-avatars ──"
+            npx tsx server/scripts/backfill-agent-avatars.ts
             echo "── Done ──"
