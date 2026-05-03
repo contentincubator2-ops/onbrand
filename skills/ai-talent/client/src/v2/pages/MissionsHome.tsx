@@ -414,54 +414,45 @@ export default function MissionsHome() {
         className="relative px-8 pt-12 pb-10 overflow-hidden"
         style={{
           backgroundImage: [
-            "linear-gradient(to bottom, transparent 70%, rgb(252,251,254) 100%)",
-            "linear-gradient(rgba(255,255,255,0.93), rgba(255,255,255,0.93))",
-            "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 60%, #3d1a8e 100%)",
+            /* fade to page bg at bottom */
+            "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",
+            /* white wash — raise to 0.96 to desaturate (Canva is very pastel) */
+            "linear-gradient(rgba(255,255,255,0.96), rgba(255,255,255,0.96))",
+            /* base hue: softer teal → soft purple */
+            "linear-gradient(135deg, #00b4bc 0%, #8b5cf6 60%, #4c1d95 100%)",
           ].join(", "),
         }}
       >
-
         <div className="relative z-10 flex flex-col items-center text-center">
-          {/* Top-right action buttons */}
-          <div className="absolute top-0 right-0 flex items-center gap-2">
+          {/* Top-right: single ghost capsule only (Canva pattern) */}
+          <div className="absolute top-0 right-0">
             <button
               onClick={() => navigate("/templates")}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
               style={{
-                borderColor: "#7b2ff7", color: "#7b2ff7", background: "transparent",
-                transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
+                border: "1px solid rgba(139,92,246,0.35)",
+                color: "#7c3aed",
+                background: "rgba(255,255,255,0.55)",
+                backdropFilter: "blur(4px)",
+                transition: "background 0.1s linear",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(123,47,247,0.06)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(139,92,246,0.08)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.55)"; }}
             >
-              <FontAwesomeIcon icon={faWandSparkles} className="text-xs" />
               ✦ 先睹為快
-            </button>
-            <button
-              onClick={() => setCreateSource("recommended")}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium text-white"
-              style={{
-                background: "#7b2ff7",
-                transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#6d28d9"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(123,47,247,0.35)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "#7b2ff7"; e.currentTarget.style.boxShadow = "none"; }}
-            >
-              立即開新任務
-              <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
             </button>
           </div>
 
-          {/* ④ Headline — centred */}
+          {/* Headline — 32px, centered */}
           <div className="mb-6 w-full">
             <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
               SoWork · Marketing OS
             </p>
             <h1
-              className="font-semibold tracking-tight leading-tight"
+              className="font-semibold tracking-tight leading-tight text-center"
               style={{
-                fontSize: "clamp(2rem, 4vw, 3rem)",
-                background: "linear-gradient(135deg, #00c4cc 0%, #7b2ff7 100%)",
+                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -474,30 +465,42 @@ export default function MissionsHome() {
             </div>
           </div>
 
-          {/* ⑤ Search bar — centred, no border, 60% width */}
-          <div className="w-full max-w-[600px]">
-            <Input
-              size="md"
-              radius="lg"
-              variant="flat"
-              value={searchQ}
-              onValueChange={setSearchQ}
-              isClearable
-              onClear={() => setSearchQ("")}
-              placeholder="搜尋方法論、任務、最近的工作"
-              classNames={{
-                inputWrapper: [
-                  "h-10 bg-white shadow-sm border-none",
-                  "data-[focus=true]:shadow-[0_0_0_3px_rgba(123,47,247,0.2)]",
-                  "transition-all duration-100",
-                ].join(" "),
-              }}
-              startContent={
-                isSemanticSearching
-                  ? <span className="w-4 h-4 rounded-full border-2 border-default-400 border-t-transparent animate-spin shrink-0" />
-                  : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" />
-              }
-            />
+          {/* Search bar — 800px max, 64px tall, orange glow (Canva spec) */}
+          <div
+            className="w-full"
+            style={{
+              maxWidth: 800,
+              borderRadius: 20,
+              boxShadow: [
+                "rgba(249,115,22,0.15) 6px 3px 12px 0px",
+                "rgba(234,88,12,0.15) -6px -3px 12px 0px",
+              ].join(", "),
+            }}
+          >
+            <div style={{ background: "white", borderRadius: 20, boxShadow: "rgb(255,220,180) 0px 6px 20px -4px" }}>
+              <Input
+                size="lg"
+                radius="none"
+                variant="flat"
+                value={searchQ}
+                onValueChange={setSearchQ}
+                isClearable
+                onClear={() => setSearchQ("")}
+                placeholder="搜尋方法論、任務、最近的工作"
+                classNames={{
+                  base: "rounded-[20px] overflow-hidden",
+                  inputWrapper: [
+                    "h-16 bg-white border-none shadow-none rounded-[20px]",
+                    "data-[focus=true]:shadow-none",
+                  ].join(" "),
+                }}
+                startContent={
+                  isSemanticSearching
+                    ? <span className="w-4 h-4 rounded-full border-2 border-default-400 border-t-transparent animate-spin shrink-0" />
+                    : <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 18 }} />
+                }
+              />
+            </div>
           </div>
 
           {/* Quick-start tiles — single horizontal scroll row (Canva-style) */}
