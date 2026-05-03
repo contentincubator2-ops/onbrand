@@ -812,15 +812,15 @@ function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
    Account popup (S button) — Canva-style with sub-panels
 ══════════════════════════════════════════════════════════════════ */
 
-function AccountPopup({ scope, setScope, onLogout, onClose, brands }: {
-  scope: ScopeState;
-  setScope: (s: ScopeState) => void;
+function AccountPopup({ onLogout, onClose }: {
   onLogout: () => void;
   onClose: () => void;
-  brands: any[];
+  // kept for compat — scope/setScope/brands now live in GlobalScopeBar only
+  scope?: ScopeState;
+  setScope?: (s: ScopeState) => void;
+  brands?: any[];
 }) {
-  const [subPanel, setSubPanel] = React.useState<"account" | "scope" | null>(null);
-  const currentBrand = brands.find(b => b.id === scope.brandId);
+  const [subPanel, setSubPanel] = React.useState<"account" | null>(null);
 
   return (
     <div style={{
@@ -839,14 +839,13 @@ function AccountPopup({ scope, setScope, onLogout, onClose, brands }: {
         transformOrigin: "bottom left",
       }}>
 
-        {/* ① 帳號 */}
+        {/* ① 帳號 section */}
         <div style={{ padding: "8px 8px 4px" }}>
           <SectionLabel>帳號</SectionLabel>
           <PopupRow
             onClick={() => setSubPanel(v => v === "account" ? null : "account")}
             active={subPanel === "account"}
           >
-            {/* Avatar with camera badge */}
             <div style={{ position: "relative", flexShrink: 0 }}>
               <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold" }} />
               <span style={{
@@ -867,42 +866,12 @@ function AccountPopup({ scope, setScope, onLogout, onClose, brands }: {
 
         <Divider />
 
-        {/* ② 工作範圍（品牌）— Canva 的「團隊」位置 */}
-        <div style={{ padding: "4px 8px" }}>
-          <SectionLabel>工作範圍</SectionLabel>
-          <PopupRow
-            onClick={() => setSubPanel(v => v === "scope" ? null : "scope")}
-            active={subPanel === "scope"}
-          >
-            {/* Brand avatar (colored square, like Canva team avatar) */}
-            <div style={{
-              width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-              background: "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: 15, fontWeight: 800,
-            }}>
-              {(currentBrand?.name ?? "S").slice(0, 1).toUpperCase()}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {currentBrand?.name ?? "選擇品牌"}
-              </p>
-              <p style={{ fontSize: 12, color: "#9ca3af" }}>
-                品牌空間{brands.length > 0 ? ` · ${brands.length} 個品牌` : ""}
-              </p>
-            </div>
-            <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />
-          </PopupRow>
-        </div>
-
-        <Divider />
-
-        {/* ③ Menu items — exact Canva style */}
+        {/* ② Menu items */}
         <div style={{ padding: "4px 8px 8px" }}>
           {[
-            { icon: faGear,            label: "設定",              sub: null,     arrow: false, danger: false, action: () => {} },
-            { icon: faBuilding,        label: "方案和定價",         sub: null,     arrow: false, danger: false, action: () => {} },
-            { icon: faRightFromBracket,label: "從所有帳號登出",    sub: null,     arrow: false, danger: true,  action: onLogout },
+            { icon: faGear,             label: "設定",           danger: false, action: () => {} },
+            { icon: faBuilding,         label: "方案和定價",      danger: false, action: () => {} },
+            { icon: faRightFromBracket, label: "從所有帳號登出", danger: true,  action: onLogout },
           ].map(item => (
             <PopupRow key={item.label} onClick={item.action}>
               <span style={{ width: 22, display: "flex", justifyContent: "center", color: item.danger ? "#ef4444" : "#6b7280", fontSize: 16 }}>
@@ -911,14 +880,13 @@ function AccountPopup({ scope, setScope, onLogout, onClose, brands }: {
               <span style={{ flex: 1, fontSize: 14, color: item.danger ? "#ef4444" : "#111827", fontWeight: 400 }}>
                 {item.label}
               </span>
-              {item.arrow && <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />}
             </PopupRow>
           ))}
         </div>
       </div>
 
-      {/* ── Sub-panel ── */}
-      {subPanel && (
+      {/* ── Account sub-panel ── */}
+      {subPanel === "account" && (
         <div style={{
           width: 300, borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff",
           boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
@@ -926,8 +894,7 @@ function AccountPopup({ scope, setScope, onLogout, onClose, brands }: {
           animation: "notifPopIn 0.15s cubic-bezier(0.34,1.56,0.64,1) forwards",
           transformOrigin: "bottom left",
         }}>
-          {subPanel === "account" && <AccountSubPanel />}
-          {subPanel === "scope"   && <ScopeSubPanel scope={scope} setScope={setScope} brands={brands} onClose={() => setSubPanel(null)} />}
+          <AccountSubPanel />
         </div>
       )}
     </div>
@@ -995,81 +962,6 @@ function AccountSubPanel() {
   );
 }
 
-function ScopeSubPanel({ scope, setScope, brands, onClose }: {
-  scope: ScopeState; setScope: (s: ScopeState) => void; brands: any[]; onClose: () => void;
-}) {
-  const [tab, setTab] = React.useState<"brand" | "product" | "event">("brand");
-
-  const productsQuery = (trpc as any).product?.listByBrand?.useQuery
-    ? (trpc as any).product.listByBrand.useQuery({ brandId: scope.brandId ?? 0 }, { enabled: !!scope.brandId, refetchOnWindowFocus: false })
-    : { data: [] };
-  const eventsQuery = (trpc as any).event?.listByBrand?.useQuery
-    ? (trpc as any).event.listByBrand.useQuery({ brandId: scope.brandId ?? 0 }, { enabled: !!scope.brandId, refetchOnWindowFocus: false })
-    : { data: [] };
-
-  const products: any[] = (productsQuery.data as any[]) ?? [];
-  const events:   any[] = (eventsQuery.data   as any[]) ?? [];
-
-  const tabs = [
-    { key: "brand" as const,   label: "品牌",   color: "#F97316" },
-    { key: "product" as const, label: "產品",   color: "#16a34a" },
-    { key: "event" as const,   label: "活動",   color: "#2563eb" },
-  ];
-
-  const items = tab === "brand" ? brands : tab === "product" ? products : events;
-  const selectedId = tab === "brand" ? scope.brandId : tab === "product" ? scope.productId : scope.eventId;
-  const color = tabs.find(t => t.key === tab)!.color;
-
-  const handleSelect = (id: number) => {
-    if (tab === "brand")   setScope({ brandId: id, productId: null, eventId: null });
-    if (tab === "product") setScope({ ...scope, productId: id });
-    if (tab === "event")   setScope({ ...scope, eventId: id });
-    onClose();
-  };
-
-  return (
-    <>
-      {/* Tab bar */}
-      <div style={{ display: "flex", borderBottom: "1px solid #f3f4f6", padding: "0 6px", flexShrink: 0 }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{
-            flex: 1, padding: "10px 4px 8px", border: "none", background: "none", cursor: "pointer",
-            fontSize: 12, fontWeight: tab === t.key ? 700 : 500,
-            color: tab === t.key ? t.color : "#9ca3af",
-            borderBottom: tab === t.key ? `2px solid ${t.color}` : "2px solid transparent",
-            transition: "color 0.1s, border-color 0.1s",
-          }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {/* List */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
-        {items.length === 0 ? (
-          <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>
-            {tab === "brand" ? "尚無品牌" : tab === "product" ? (scope.brandId ? "此品牌尚無產品" : "請先選擇品牌") : (scope.brandId ? "此品牌尚無活動" : "請先選擇品牌")}
-          </p>
-        ) : items.map((item: any) => (
-          <PopupRow key={item.id} onClick={() => handleSelect(item.id)}>
-            <span style={{
-              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-              background: selectedId === item.id ? color : "#f3f4f6",
-              color: selectedId === item.id ? "#fff" : "#6b7280",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, transition: "background 0.15s",
-            }}>
-              {(item.name ?? "?").slice(0, 1).toUpperCase()}
-            </span>
-            <span style={{ flex: 1, fontSize: 13, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {item.name}
-            </span>
-            {selectedId === item.id && <FontAwesomeIcon icon={faCheck} style={{ color, fontSize: 13 }} />}
-          </PopupRow>
-        ))}
-      </div>
-    </>
-  );
-}
 
 /* ══════════════════════════════════════════════════════════════════
    Notification panel
