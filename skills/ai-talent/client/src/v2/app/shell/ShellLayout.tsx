@@ -66,10 +66,13 @@ export default function ShellLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.brandId]);
 
-  // Sidebar collapsed state
+  // Sidebar collapsed state — default true (70 px icon+label stacked)
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
-    try { return localStorage.getItem("sowork.sidebarCollapsed") === "1"; }
-    catch { return false; }
+    try {
+      const v = localStorage.getItem("sowork.sidebarCollapsed");
+      return v === null ? true : v === "1"; // default collapsed
+    }
+    catch { return true; }
   });
   const toggleCollapsed = () => {
     setCollapsed((v) => {
@@ -79,7 +82,7 @@ export default function ShellLayout() {
     });
   };
 
-  const sidebarWidth = collapsed ? 64 : 200;
+  const sidebarWidth = collapsed ? 70 : 200;
 
   return (
     <div className="min-h-screen bg-background">
@@ -179,35 +182,38 @@ function Sidebar({
       className="fixed left-0 top-0 bottom-0 z-40 bg-content1 border-r border-divider flex flex-col transition-[width] duration-200"
       style={{ width }}
     >
-      {/* Top: logo monogram + collapse toggle */}
-      <div className="h-14 px-3 flex items-center justify-between border-b border-divider shrink-0">
-        <Avatar name="SO" size="sm" radius="md" color="primary" classNames={{ name: "font-bold" }} />
-        {!collapsed && (
-          <Tooltip content="收合側邊欄" placement="right">
-            <Button isIconOnly size="sm" variant="light" onPress={onToggle} aria-label="收合側邊欄">
-              <FontAwesomeIcon icon={faChevronLeft} />
-            </Button>
-          </Tooltip>
-        )}
+      {/* Top: logo monogram */}
+      <div className="h-14 flex items-center justify-center border-b border-divider shrink-0">
+        <Avatar name="SO" size="sm" radius="md" color="primary" classNames={{ name: "font-bold text-xs" }} />
       </div>
 
       {/* Primary CTA: + 建立 */}
-      <div className="p-3 shrink-0">
-        <Button
-          color="primary"
-          variant="solid"
-          onPress={() => onNavigate("/")}
-          isIconOnly={collapsed}
-          fullWidth={!collapsed}
-          aria-label="建立任務"
-          startContent={!collapsed ? <FontAwesomeIcon icon={faPlus} /> : undefined}
-        >
-          {collapsed ? <FontAwesomeIcon icon={faPlus} /> : "建立任務"}
-        </Button>
+      <div className={`shrink-0 ${collapsed ? "px-2 py-3" : "p-3"}`}>
+        {collapsed ? (
+          <button
+            onClick={() => onNavigate("/")}
+            aria-label="建立任務"
+            className="w-full flex flex-col items-center gap-0.5 py-2 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            <FontAwesomeIcon icon={faPlus} className="text-sm" />
+            <span className="text-[9px] font-medium leading-tight">建立</span>
+          </button>
+        ) : (
+          <Button
+            color="primary"
+            variant="solid"
+            onPress={() => onNavigate("/")}
+            fullWidth
+            aria-label="建立任務"
+            startContent={<FontAwesomeIcon icon={faPlus} />}
+          >
+            建立任務
+          </Button>
+        )}
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto px-2 pb-3">
+      <nav className="flex-1 overflow-y-auto pb-3" style={{ paddingInline: collapsed ? "6px" : "8px" }}>
         {NAV_ITEMS.map((item) => {
           const isActive = item.matchPrefix
             ? currentPath.startsWith(item.matchPrefix)
@@ -228,11 +234,13 @@ function Sidebar({
 
         {/* Show-more */}
         {collapsed ? (
-          <Tooltip content="顯示更多" placement="right">
-            <Button isIconOnly variant="light" aria-label="顯示更多" className="mt-1">
-              <FontAwesomeIcon icon={faEllipsis} />
-            </Button>
-          </Tooltip>
+          <button
+            aria-label="顯示更多"
+            className="w-full mt-1 flex flex-col items-center gap-0.5 py-2 rounded-xl text-default-500 hover:bg-default-100 transition-colors"
+          >
+            <FontAwesomeIcon icon={faEllipsis} className="text-sm" />
+            <span className="text-[9px] leading-tight">更多</span>
+          </button>
         ) : (
           <Button
             variant="light"
@@ -246,16 +254,14 @@ function Sidebar({
         )}
       </nav>
 
-      {/* Bottom: collapse toggle when collapsed */}
-      {collapsed && (
-        <div className="p-2 border-t border-divider shrink-0">
-          <Tooltip content="展開側邊欄" placement="right">
-            <Button isIconOnly size="sm" variant="light" fullWidth onPress={onToggle} aria-label="展開側邊欄">
-              <FontAwesomeIcon icon={faChevronRight} />
-            </Button>
-          </Tooltip>
-        </div>
-      )}
+      {/* Bottom: collapse toggle */}
+      <div className="p-2 border-t border-divider shrink-0">
+        <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
+          <Button isIconOnly size="sm" variant="light" fullWidth onPress={onToggle} aria-label="切換側邊欄">
+            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
+          </Button>
+        </Tooltip>
+      </div>
     </aside>
   );
 }
@@ -268,18 +274,27 @@ function SidebarNavLink({
   collapsed: boolean;
   onClick: () => void;
 }) {
-  const inner = collapsed ? (
-    <Button
-      isIconOnly
-      onPress={onClick}
-      variant={active ? "flat" : "light"}
-      color={active ? "primary" : "default"}
-      aria-label={item.label}
-      className="mt-1"
-    >
-      {item.icon}
-    </Button>
-  ) : (
+  if (collapsed) {
+    return (
+      <button
+        onClick={onClick}
+        aria-label={item.label}
+        className={[
+          "w-full mt-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-colors",
+          active
+            ? "bg-primary-50 text-primary"
+            : "text-default-500 hover:bg-default-100 hover:text-default-800",
+        ].join(" ")}
+      >
+        <span className="text-sm leading-none">{item.icon}</span>
+        <span className="text-[9px] leading-tight font-medium max-w-full px-0.5 text-center line-clamp-1">
+          {item.label}
+        </span>
+      </button>
+    );
+  }
+
+  return (
     <Button
       onPress={onClick}
       variant={active ? "flat" : "light"}
@@ -292,12 +307,6 @@ function SidebarNavLink({
       {item.label}
     </Button>
   );
-
-  return collapsed ? (
-    <Tooltip content={item.label} placement="right">
-      {inner}
-    </Tooltip>
-  ) : inner;
 }
 
 export interface ShellOutletCtx {
