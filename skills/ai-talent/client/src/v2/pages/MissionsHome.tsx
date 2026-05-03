@@ -413,6 +413,7 @@ export default function MissionsHome() {
       <section
         className="relative px-8 pt-12 pb-10 overflow-hidden"
         style={{
+          boxShadow: "0 8px 32px rgba(139,92,246,0.08), 0 2px 8px rgba(0,0,0,0.04)",
           backgroundImage: [
             /* fade to page bg at bottom */
             "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",

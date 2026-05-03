@@ -678,14 +678,36 @@ function SidebarNavLink({
           background: "none", border: "none", padding: 0, cursor: "pointer",
           color: active ? "#F97316" : "#9ca3af",
           transition: "color 0.1s linear",
+          position: "relative",
         }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.color = "#374151"; }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.color = "#9ca3af"; }}
+        onMouseEnter={e => {
+          if (!active) {
+            e.currentTarget.style.color = "#374151";
+            const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
+            if (pill) pill.style.background = "rgba(0,0,0,0.05)";
+          }
+        }}
+        onMouseLeave={e => {
+          if (!active) {
+            e.currentTarget.style.color = "#9ca3af";
+            const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
+            if (pill) pill.style.background = "transparent";
+          }
+        }}
       >
-        <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1 }}>
+        {/* Canva-style rounded-rect active/hover pill behind icon+label */}
+        <span className="nav-pill" style={{
+          position: "absolute",
+          inset: "4px 6px",
+          borderRadius: 10,
+          background: active ? "rgba(249,115,22,0.10)" : "transparent",
+          transition: "background 0.1s linear",
+          pointerEvents: "none",
+        }} />
+        <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1, position: "relative" }}>
           {item.icon}
         </span>
-        <span style={{ fontSize: 12, lineHeight: 1.2, fontWeight: 500, textAlign: "center" }}>
+        <span style={{ fontSize: 12, lineHeight: 1.2, fontWeight: active ? 600 : 500, textAlign: "center", position: "relative" }}>
           {item.label}
         </span>
       </button>
@@ -698,13 +720,13 @@ function SidebarNavLink({
       style={{
         width: "100%", display: "flex", alignItems: "center", gap: 10,
         padding: "7px 8px", borderRadius: 8, border: "none",
-        background: active ? "#fff7ed" : "none",
+        background: active ? "rgba(249,115,22,0.10)" : "none",
         cursor: "pointer", textAlign: "left",
         color: active ? "#F97316" : "#374151",
         fontWeight: active ? 600 : 400, fontSize: 14,
         transition: "background-color 0.1s linear, color 0.1s linear",
       }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f3f4f6"; }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = "none"; }}
     >
       <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
