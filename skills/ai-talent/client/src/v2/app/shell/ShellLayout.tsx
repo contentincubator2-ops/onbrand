@@ -16,8 +16,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles,
   faMicrophone, faBookBookmark, faEllipsis, faBell,
-  faChevronLeft, faChevronRight, faPlus, faRightFromBracket,
-  faGear, faClock, faTrash, faXmark, faCheckDouble,
+  faPlus, faRightFromBracket,
+  faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
 } from "@fortawesome/free-solid-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
@@ -204,7 +204,7 @@ function IconBar({
             onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; e.currentTarget.style.color = "#374151"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#9ca3af"; }}
           >
-            <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
+            <FontAwesomeIcon icon={faTableColumns} />
           </button>
         </Tooltip>
       </div>
