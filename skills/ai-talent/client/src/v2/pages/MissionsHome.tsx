@@ -744,7 +744,13 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
   const updatedTxt = formatRelative(mission.updatedAt);
   const ws = (mission.workspace ?? "").toLowerCase();
   const wsBadge = WORKSPACE_BADGE[ws] ?? null;
+  const wsIcon = WS_ICON[ws] ?? null;
   const stepCount = mission.squadStepCount ?? 0;
+
+  // Hero visual — platform icon on brand-color bg when workspace is known,
+  // otherwise first letter of squad/mission name on a neutral bg.
+  const heroLabel = mission.squadName ?? mission.title ?? "";
+  const heroLetter = heroLabel.trim().slice(0, 1).toUpperCase() || "M";
 
   return (
     <div className="group relative">
@@ -756,16 +762,45 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
         className="flex flex-col text-left overflow-hidden w-full"
       >
         <div
-          className="relative w-full overflow-hidden bg-default-100"
-          style={{ aspectRatio: "5 / 4" }}
+          className="relative w-full overflow-hidden"
+          style={{
+            aspectRatio: "5 / 4",
+            background: wsIcon ? wsIcon.bg : "#e4e4e7",
+          }}
         >
           <div className="absolute inset-0 flex items-center justify-center">
-            <MethodologyGlyph
-              seed={mission.squadSlug ?? mission.id}
-              layer={lk}
-              size={70}
-            />
+            {wsIcon ? (
+              <FontAwesomeIcon
+                icon={wsIcon.icon}
+                style={{ color: wsIcon.fg, opacity: 0.18, fontSize: 88 }}
+              />
+            ) : (
+              <span
+                className="font-bold select-none"
+                style={{ fontSize: 72, color: "#a1a1aa", lineHeight: 1 }}
+              >
+                {heroLetter}
+              </span>
+            )}
           </div>
+          {/* Centred icon (full-opacity, smaller) on top of the faded bg icon */}
+          {wsIcon && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="flex items-center justify-center rounded-2xl shadow-lg"
+                style={{
+                  width: 64, height: 64,
+                  background: "rgba(255,255,255,0.18)",
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                <FontAwesomeIcon
+                  icon={wsIcon.icon}
+                  style={{ color: "#ffffff", fontSize: 30 }}
+                />
+              </div>
+            </div>
+          )}
           {isLayerKnown && (
             <Chip
               size="sm"
@@ -777,7 +812,7 @@ function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () =
             </Chip>
           )}
           {stepCount > 0 && (
-            <Chip size="sm" variant="flat" className="absolute top-2 right-2">
+            <Chip size="sm" variant="flat" className="absolute top-2 right-2 bg-black/30 text-white border-0">
               {stepCount} 步
             </Chip>
           )}
@@ -894,6 +929,19 @@ const WORKSPACE_BADGE: Record<string, { glyph: string; color: string }> = {
   audience:  { glyph: "眾", color: "#E07B0F" },
   campaign:  { glyph: "→",  color: "#1A9B8E" },
   "brand-positioning": { glyph: "品", color: "#5B3CC8" },
+};
+
+/** Platform / workspace FA icon + brand colour for MissionThumb hero area. */
+const WS_ICON: Record<string, { icon: any; bg: string; fg: string }> = {
+  facebook:           { icon: faFacebookF,  bg: "#1877F2", fg: "#ffffff" },
+  instagram:          { icon: faInstagram,  bg: "#E4405F", fg: "#ffffff" },
+  linkedin:           { icon: faLinkedinIn, bg: "#0A66C2", fg: "#ffffff" },
+  youtube:            { icon: faYoutube,    bg: "#FF0000", fg: "#ffffff" },
+  pr:                 { icon: faBullhorn,   bg: "#525866", fg: "#ffffff" },
+  email:              { icon: faEnvelope,   bg: "#7B5BC8", fg: "#ffffff" },
+  audience:           { icon: faUsers,      bg: "#E07B0F", fg: "#ffffff" },
+  campaign:           { icon: faBullseye,   bg: "#1A9B8E", fg: "#ffffff" },
+  "brand-positioning":{ icon: faRocket,     bg: "#5B3CC8", fg: "#ffffff" },
 };
 
 /* ─────────────────────────── Filter chip + Icon button ─────────────── */
