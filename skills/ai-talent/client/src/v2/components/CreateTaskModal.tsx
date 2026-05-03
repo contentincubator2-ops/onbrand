@@ -419,60 +419,91 @@ function SubChip({ label, active, color, onClick }: {
   );
 }
 
-/* ── Entity card ─────────────────────────────────────────────────── */
+/* ── Entity card — Canva-style landscape card ─────────────────────── */
+/**
+ * Visual design: landscape 4:3, coloured gradient bg using channel brand color.
+ * Mimics Canva's template cards which show a styled content preview.
+ * Since we have no real images, we render a simulated "content frame":
+ *   - Gradient bg (channel color, light→medium)
+ *   - Decorative layout blocks (header bar + content lines = abstract post mockup)
+ *   - Platform icon badge top-right
+ *   - Hover: slight scale + outline ring + "開始使用" button appears
+ */
 function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
   const [hov, setHov] = useState(false);
   const ws = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? "");
   const info = WS_INFO[ws] ?? null;
-  const letter = (entity.name ?? "?").slice(0, 1).toUpperCase();
+  const color  = info?.color ?? "#7C3AED";
+  const name   = entity.name ?? "";
+  // Derive a subtle secondary shade from the primary color
+  const colorRgb = hexToRgb(color);
+  const bgLight = `rgba(${colorRgb},0.08)`;
+  const bgMid   = `rgba(${colorRgb},0.14)`;
 
   return (
     <div
       onClick={onSelect}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      style={{ cursor: "pointer" }}
+      style={{
+        cursor: "pointer",
+        transform: hov ? "translateY(-2px)" : "translateY(0)",
+        transition: "transform 0.2s ease",
+      }}
     >
-      {/* Thumbnail — portrait, like Canva template cards */}
+      {/* ── Thumbnail: 4:3 landscape ── */}
       <div style={{
-        position: "relative", width: "100%", aspectRatio: "3/4",
-        borderRadius: 8,
-        background: hov ? "rgba(57,70,96,0.11)" : "#F3F4F6",
+        position: "relative", width: "100%", aspectRatio: "4/3",
+        borderRadius: 10,
+        background: `linear-gradient(135deg, ${bgLight} 0%, ${bgMid} 100%)`,
         overflow: "hidden",
-        outline: hov ? "2px solid #7C3AED" : "2px solid transparent",
-        transition: "outline 0.12s ease, background 0.12s ease",
+        outline: hov ? `2px solid ${color}` : "2px solid rgba(0,0,0,0.06)",
+        boxShadow: hov
+          ? `0 6px 20px rgba(${colorRgb},0.22)`
+          : "0 1px 4px rgba(0,0,0,0.08)",
+        transition: "outline 0.12s, box-shadow 0.15s",
       }}>
-        {/* Muted platform icon */}
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {info
-            ? <FontAwesomeIcon icon={info.icon} style={{ fontSize: 52, color: info.color, opacity: 0.20 }} />
-            : <span style={{ fontSize: 52, fontWeight: 800, color: "rgba(64,79,109,0.14)", userSelect: "none" }}>{letter}</span>
-          }
-        </div>
+
+        {/* ── Decorative content mockup ── */}
+        <ContentMockup color={color} name={name} kind={entity.kind} />
+
+        {/* Platform icon — top-right badge */}
+        {info && (
+          <span style={{
+            position: "absolute", top: 8, right: 8,
+            width: 24, height: 24, borderRadius: "50%",
+            background: color, color: "#fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+          }}>
+            <FontAwesomeIcon icon={info.icon} />
+          </span>
+        )}
 
         {/* Kind badge — top-left */}
         <span style={{
           position: "absolute", top: 8, left: 8,
           fontSize: 9, fontWeight: 700,
-          background: info ? info.color : "rgba(0,0,0,0.4)", color: "#fff",
+          background: "rgba(255,255,255,0.85)",
+          color: color,
           borderRadius: 4, padding: "2px 6px",
-          textTransform: "uppercase", letterSpacing: "0.05em",
+          letterSpacing: "0.04em", backdropFilter: "blur(4px)",
         }}>
-          {entity.kind === "squad" ? "Squad" : entity.kind === "agent" ? "Agent" : "技能"}
+          {entity.kind === "squad" ? "SQUAD" : entity.kind === "agent" ? "AGENT" : "SKILL"}
         </span>
 
-        {/* Hover CTA fade-in at bottom */}
+        {/* Hover overlay: darkens + shows CTA */}
         <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0,
-          background: "linear-gradient(to top, rgba(0,0,0,0.32), transparent)",
-          padding: "28px 10px 10px",
-          display: "flex", justifyContent: "center",
+          position: "absolute", inset: 0,
+          background: `rgba(${colorRgb},0.18)`,
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
+          paddingBottom: 12,
           opacity: hov ? 1 : 0, transition: "opacity 0.15s",
         }}>
           <span style={{
-            fontSize: 11, fontWeight: 700, color: "#fff",
-            background: info?.color ?? "#7C3AED",
-            borderRadius: 20, padding: "4px 14px",
+            fontSize: 12, fontWeight: 700, color: "#fff",
+            background: color, borderRadius: 20, padding: "5px 18px",
+            boxShadow: `0 2px 8px rgba(${colorRgb},0.4)`,
           }}>
             開始使用
           </span>
@@ -486,8 +517,63 @@ function EntityCard({ entity, onSelect }: { entity: any; onSelect: () => void })
         overflow: "hidden", display: "-webkit-box",
         WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
       }}>
-        {entity.name}
+        {name}
       </p>
+    </div>
+  );
+}
+
+/** Convert #RRGGBB to "R,G,B" for rgba() usage */
+function hexToRgb(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return isNaN(r) ? "100,100,100" : `${r},${g},${b}`;
+}
+
+/**
+ * ContentMockup — abstract "post preview" inside card.
+ * Mimics Canva's template cards: a header photo area + text lines.
+ * Uses the channel color to give each card a distinct, designed look.
+ */
+function ContentMockup({ color, name, kind }: { color: string; name: string; kind: string }) {
+  const rgb = hexToRgb(color);
+  const letter = name.trim().slice(0, 1).toUpperCase() || "A";
+  return (
+    <div style={{
+      position: "absolute", inset: 0, padding: 12,
+      display: "flex", flexDirection: "column", gap: 6,
+    }}>
+      {/* "Image" area — top 55%, colored block with centered letter */}
+      <div style={{
+        flex: "0 0 55%", borderRadius: 6,
+        background: `rgba(${rgb},0.25)`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        position: "relative", overflow: "hidden",
+      }}>
+        {/* decorative diagonal stripe */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: `repeating-linear-gradient(
+            -45deg,
+            rgba(${rgb},0.07) 0px, rgba(${rgb},0.07) 4px,
+            transparent 4px, transparent 12px
+          )`,
+        }} />
+        <span style={{
+          fontSize: 28, fontWeight: 800, color: `rgba(${rgb},0.45)`,
+          letterSpacing: "-0.02em", zIndex: 1, userSelect: "none",
+        }}>
+          {letter}
+        </span>
+      </div>
+
+      {/* "Text" lines */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+        <div style={{ height: 7, borderRadius: 4, background: `rgba(${rgb},0.30)`, width: "80%" }} />
+        <div style={{ height: 5, borderRadius: 4, background: `rgba(${rgb},0.18)`, width: "60%" }} />
+        <div style={{ height: 5, borderRadius: 4, background: `rgba(${rgb},0.14)`, width: "70%" }} />
+      </div>
     </div>
   );
 }
@@ -498,7 +584,7 @@ function GridSkeleton() {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i}>
-          <div style={{ aspectRatio:"3/4", borderRadius: 8, background: "#F3F4F6", animation: "pulse 1.5s infinite" }} />
+          <div style={{ aspectRatio:"4/3", borderRadius: 8, background: "#F3F4F6", animation: "pulse 1.5s infinite" }} />
           <div style={{ height: 11, borderRadius: 4, background: "#F3F4F6", margin: "7px 2px 0", animation: "pulse 1.5s infinite" }} />
         </div>
       ))}
