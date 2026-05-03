@@ -10,7 +10,7 @@ import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
-import CreateMethodologyModal, { type SourceId } from "../components/methodology/CreateMethodologyModal";
+import CreateMissionModal from "../components/CreateMissionModal";
 import ProjectSyncModal, { type SyncSource } from "../components/projects/ProjectSyncModal";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Skeleton } from "@heroui/react";
@@ -74,14 +74,22 @@ const SUB_NAV: Array<{ id: SubNavKey; label: string; icon: any }> = [
   { id: "offline", label: "可離線使用", icon: faCloudArrowDown },
 ];
 
-/* ── Add-item menu ── */
+/* ── Add-item menu
+ *  Canva label → SoWork action mapping:
+ *  新增資料夾  → navigate /brands (品牌即資料夾)
+ *  新課程      → CreateMissionModal workspace="content" (長內容任務)
+ *  設計        → CreateMissionModal workspace="all" (主要任務建立入口)
+ *  上傳檔案    → ProjectSyncModal (sync / upload)
+ *  上傳資料夾  → ProjectSyncModal (sync folder)
+ *  匯入        → ProjectSyncModal social/import sources
+ * ── */
 const ADD_ITEM_OPTIONS = [
-  { key: "folder",         icon: faFolderPlus,    label: "新增資料夾",  dividerBefore: false, dividerAfter: false },
-  { key: "course",         icon: faGraduationCap, label: "新課程",      dividerBefore: false, dividerAfter: false },
-  { key: "design",         icon: faTableCells,    label: "設計",        dividerBefore: false, dividerAfter: true  },
-  { key: "upload-file",    icon: faCloudArrowUp,  label: "上傳檔案",    dividerBefore: false, dividerAfter: false },
-  { key: "upload-folder",  icon: faFolder,        label: "上傳資料夾",  dividerBefore: false, dividerAfter: false },
-  { key: "import",         icon: faFileImport,    label: "匯入",        dividerBefore: false, dividerAfter: false, arrow: true },
+  { key: "folder",        icon: faFolderPlus,    label: "新增品牌資料夾", dividerAfter: false },
+  { key: "course",        icon: faGraduationCap, label: "長內容任務",     dividerAfter: false },
+  { key: "design",        icon: faTableCells,    label: "新任務",         dividerAfter: true  },
+  { key: "upload-file",   icon: faCloudArrowUp,  label: "上傳檔案",       dividerAfter: false },
+  { key: "upload-folder", icon: faFolder,        label: "上傳資料夾",     dividerAfter: false },
+  { key: "import",        icon: faFileImport,    label: "匯入社群素材",   dividerAfter: false, arrow: true },
 ] as const;
 
 /* ── Card context menu ── */
@@ -177,7 +185,8 @@ export default function ProjectsPage() {
   const [designsOpen,     setDesignsOpen]     = useState(false);
   const [imagesOpen,      setImagesOpen]      = useState(false);
   const [videosOpen,      setVideosOpen]      = useState(false);
-  const [createSource,    setCreateSource]    = useState<SourceId | null>(null);
+  const [missionModalOpen,      setMissionModalOpen]      = useState(false);
+  const [missionModalWorkspace, setMissionModalWorkspace] = useState("all");
   const [syncSource,      setSyncSource]      = useState<SyncSource | null>(null);
 
   /* Option lists */
@@ -408,8 +417,11 @@ export default function ProjectsPage() {
                 open={addOpen}
                 onToggle={() => setAddOpen(v => !v)}
                 onClose={() => setAddOpen(false)}
-                onDesign={() => { setAddOpen(false); setCreateSource("recommended"); }}
-                onUpload={() => { setAddOpen(false); setSyncSource("google-drive"); }}
+                onNewMission={(ws) => { setAddOpen(false); setMissionModalWorkspace(ws); setMissionModalOpen(true); }}
+                onNewFolder={() => { setAddOpen(false); navigate("/brands"); }}
+                onUploadFile={() => { setAddOpen(false); setSyncSource("google-drive"); }}
+                onUploadFolder={() => { setAddOpen(false); setSyncSource("google-drive"); }}
+                onImport={() => { setAddOpen(false); setSyncSource("facebook"); }}
               />
             </div>
 
@@ -438,7 +450,7 @@ export default function ProjectsPage() {
                 <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: 40, color: "#C8C7C3" }} />
                 <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A18", margin: 0 }}>還沒有專案</p>
                 <p style={{ fontSize: 14, color: "#6B6A66", margin: 0 }}>從首頁選個任務範本開始。</p>
-                <button onClick={() => setCreateSource("recommended")} style={{
+                <button onClick={() => { setMissionModalWorkspace("all"); setMissionModalOpen(true); }} style={{
                   marginTop: 8, padding: "9px 20px", borderRadius: 20,
                   background: "#1A1A18", color: "white", border: "none",
                   cursor: "pointer", fontSize: 14, fontWeight: 600,
@@ -570,11 +582,10 @@ export default function ProjectsPage() {
         brandId={brandId}
         onClose={() => setSyncSource(null)}
       />
-      <CreateMethodologyModal
-        open={createSource !== null}
-        initialSource={createSource ?? "recommended"}
-        onClose={() => setCreateSource(null)}
-        onCreated={(slug) => { setCreateSource(null); navigate(`/templates/${slug}`); }}
+      <CreateMissionModal
+        open={missionModalOpen}
+        initialWorkspace={missionModalWorkspace}
+        onClose={() => setMissionModalOpen(false)}
       />
     </div>
   );
@@ -612,9 +623,10 @@ function SectionToggle({ open, onToggle, label, count }: {
 }
 
 /* ──────────────────────── AddItemDropdown ──────────────────────────── */
-function AddItemDropdown({ open, onToggle, onClose, onDesign, onUpload }: {
+function AddItemDropdown({ open, onToggle, onClose, onNewMission, onNewFolder, onUploadFile, onUploadFolder, onImport }: {
   open: boolean; onToggle: () => void; onClose: () => void;
-  onDesign: () => void; onUpload: () => void;
+  onNewMission: (ws: string) => void; onNewFolder: () => void;
+  onUploadFile: () => void; onUploadFolder: () => void; onImport: () => void;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -625,8 +637,12 @@ function AddItemDropdown({ open, onToggle, onClose, onDesign, onUpload }: {
   }, [open, onClose]);
 
   const handleClick = (key: string) => {
-    if (key === "design" || key === "course") { onDesign(); }
-    else if (key === "upload-file" || key === "upload-folder" || key === "import") { onUpload(); }
+    if (key === "design") { onNewMission("all"); }
+    else if (key === "course") { onNewMission("content"); }
+    else if (key === "folder") { onNewFolder(); }
+    else if (key === "upload-file") { onUploadFile(); }
+    else if (key === "upload-folder") { onUploadFolder(); }
+    else if (key === "import") { onImport(); }
     else onClose();
   };
 
