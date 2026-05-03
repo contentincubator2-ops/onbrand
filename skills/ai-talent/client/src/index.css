@@ -5,6 +5,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  background-color: transparent;
+}
+
 /* ─── Studio editorial scope (kept as CSS classes; HeroUI tokens elsewhere) ── */
 .mos-scope {
   color: hsl(var(--heroui-foreground));
