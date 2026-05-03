@@ -160,7 +160,7 @@ export default function MethodologyCatalog() {
   });
   const [searchQ, setSearchQ] = useState("");
 
-  // When URL params change (e.g., navigated from MissionsHome tile), sync kind.
+  // When URL params change (e.g., navigated from MissionsHome tile), sync kind + slug.
   useEffect(() => {
     const k = searchParams.get("kind");
     if (k === "agent" || k === "skill" || k === "squad") setActiveKind(k as Kind);
@@ -175,6 +175,8 @@ export default function MethodologyCatalog() {
   const [layerFilter, setLayerFilter] = useState<string>("ALL");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
+  // Track whether we've already auto-opened a slug from URL (avoid repeated opens on re-render)
+  const autoOpenedSlug = React.useRef<string | null>(null);
 
   const entityQuery = (trpc as any).entity?.listForHome?.useQuery
     ? (trpc as any).entity.listForHome.useQuery(
@@ -209,6 +211,20 @@ export default function MethodologyCatalog() {
     () => [...catalogEntities, ...((entityQuery.data ?? []) as any[])],
     [catalogEntities, entityQuery.data],
   );
+
+  // Auto-open entity detail when ?slug= is in URL (e.g., from QUICK_TILES agent/skill tiles).
+  // Runs once when entities load and a slug param is present.
+  useEffect(() => {
+    const targetSlug = searchParams.get("slug");
+    if (!targetSlug || autoOpenedSlug.current === targetSlug || allEntities.length === 0) return;
+    const found = allEntities.find((e) => e.slug === targetSlug);
+    if (found) {
+      autoOpenedSlug.current = targetSlug;
+      setSelectedEntity(found);
+      // Scroll to "更多" section so modal has context
+      setTimeout(() => document.getElementById("more-templates-section")?.scrollIntoView({ behavior: "smooth" }), 200);
+    }
+  }, [allEntities, searchParams]);
 
   // Counts per kind
   const counts = useMemo(() => {
