@@ -125,18 +125,25 @@ async function main() {
     await pool.end(); return;
   }
 
-  // ── 3. Compute + UPDATE in batches ───────────────────────────────────────
+  // ── 3. Compute all URLs client-side (instant), then batch UPDATE ────────
+  // Build batches of CASE WHEN to do hundreds of rows per single SQL query.
+  const BATCH = 500;
   let updated = 0;
-  for (const a of agents) {
-    const hint = [a.specialty, a.primarySkill, a.name, a.layer]
-      .filter(Boolean).join(" ");
-    const url = dicebearUrl(a.slug || String(a.id), hint);
-    await pool.execute(
-      `UPDATE agents SET avatarUrl = ? WHERE id = ?`,
-      [url, a.id],
-    );
-    updated++;
-    if (updated % 50 === 0) process.stdout.write(`  …${updated}/${agents.length}\r`);
+
+  for (let i = 0; i < agents.length; i += BATCH) {
+    const chunk = agents.slice(i, i + BATCH);
+    // Build: UPDATE agents SET avatarUrl = CASE id WHEN ? THEN ? … END WHERE id IN (?)
+    const caseWhen = chunk.map(() => "WHEN ? THEN ?").join(" ");
+    const ids = chunk.map((a) => a.id);
+    const params: (string | number)[] = [];
+    for (const a of chunk) {
+      const hint = [a.specialty, a.primarySkill, a.name, a.layer].filter(Boolean).join(" ");
+      params.push(a.id, dicebearUrl(a.slug || String(a.id), hint));
+    }
+    const sql = `UPDATE agents SET avatarUrl = CASE id ${caseWhen} END WHERE id IN (${ids.map(() => "?").join(",")})`;
+    await pool.execute(sql, [...params, ...ids]);
+    updated += chunk.length;
+    console.log(`  …${updated}/${agents.length} updated`);
   }
 
   // ── 4. Final audit ────────────────────────────────────────────────────────
