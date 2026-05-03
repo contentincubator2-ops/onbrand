@@ -6,7 +6,7 @@
 @tailwind utilities;
 
 html {
-  background-color: transparent;
+  background-color: rgb(252, 251, 254);
 }
 
 /* ─── Studio editorial scope (kept as CSS classes; HeroUI tokens elsewhere) ── */
@@ -70,10 +70,6 @@ body {
   color: var(--text-primary);
 }
 
-/* Override HeroUI background token so bg-background matches */
-:root {
-  --heroui-background: 252 251 254;
-}
 
 /* Mobile responsive */
 @media (max-width: 767px) {

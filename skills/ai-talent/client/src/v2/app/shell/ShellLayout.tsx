@@ -68,7 +68,7 @@ export default function ShellLayout() {
   const sidebarWidth = collapsed ? 70 : 200;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ background: "rgb(252,251,254)" }}>
       <Sidebar
         width={sidebarWidth}
         collapsed={collapsed}
