@@ -34,9 +34,10 @@ import { Avatar, Badge, Button, Input, Textarea, Tooltip, Chip, Card, CardBody, 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faMagnifyingGlass, faChevronDown, faArrowDownWideShort, faArrowUpWideShort,
-  faTableCells, faList, faBookmark, faEllipsis,
+  faTableCells, faList, faEllipsis,
   faArrowRight, faWandSparkles,
   faBullseye, faBullhorn, faRocket, faUsers, faNewspaper, faEnvelope, faPlus, faCloudArrowUp,
+  faStar, faPen,
   faF, // generic fallback letter icon
 } from "@fortawesome/free-solid-svg-icons";
 import {
@@ -559,8 +560,8 @@ export default function MissionsHome() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <ThumbSkeleton key={i} />)}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+            {Array.from({ length: 12 }).map((_, i) => <ThumbSkeleton key={i} />)}
           </div>
         ) : filteredRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
@@ -582,7 +583,7 @@ export default function MissionsHome() {
             )}
           </div>
         ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {filteredRows.map((m) => (
               <MissionThumb key={m.id} mission={m} onClick={() => goToMission(m)} />
             ))}
@@ -762,144 +763,102 @@ function CircleTile({
 
 /* ─────────────────────────── Mission thumb ─────────────────────────── */
 
+/**
+ * MissionThumb — Canva-faithful card:
+ *   • No card border / shadow / white bg — thumbnail + text sit directly on page
+ *   • Thumbnail 4:3, background rgba(64,79,109,0.06) (very pale blue-grey)
+ *   • Platform icon centered, muted opacity (not vivid solid bg)
+ *   • Text: ONLY title (14px 600) + relative time (12px rgba grey) — 2 lines max
+ *   • Hover: semi-transparent dark overlay + 3 action buttons (★ / ✏ / ⋯)
+ */
 function MissionThumb({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
-  const layerStr = (mission.squadLayer ?? "").toString().slice(0, 2);
-  const isLayerKnown = layerStr in LAYER_TOKENS;
-  const lk = (isLayerKnown ? layerStr : "L1") as MosLayer;
-  const tone = LAYER_TOKENS[lk];
+  const [hovered, setHovered] = React.useState(false);
   const updatedTxt = formatRelative(mission.updatedAt);
   const ws = (mission.workspace ?? "").toLowerCase();
-  const wsBadge = WORKSPACE_BADGE[ws] ?? null;
   const wsIcon = WS_ICON[ws] ?? null;
-  const stepCount = mission.squadStepCount ?? 0;
-
-  // Hero visual — platform icon on brand-color bg when workspace is known,
-  // otherwise first letter of squad/mission name on a neutral bg.
   const heroLabel = mission.squadName ?? mission.title ?? "";
   const heroLetter = heroLabel.trim().slice(0, 1).toUpperCase() || "M";
 
   return (
-    <div className="group relative">
-      <Card
-        isPressable
-        isHoverable
-        onPress={onClick}
-        shadow="sm"
-        className="flex flex-col text-left overflow-hidden w-full"
-      >
-        <div
-          className="relative w-full overflow-hidden"
-          style={{
-            aspectRatio: "5 / 4",
-            background: wsIcon ? wsIcon.bg : "#e4e4e7",
-          }}
-        >
-          <div className="absolute inset-0 flex items-center justify-center">
-            {wsIcon ? (
-              <FontAwesomeIcon
-                icon={wsIcon.icon}
-                style={{ color: wsIcon.fg, opacity: 0.18, fontSize: 88 }}
-              />
-            ) : (
-              <span
-                className="font-bold select-none"
-                style={{ fontSize: 72, color: "#a1a1aa", lineHeight: 1 }}
-              >
-                {heroLetter}
-              </span>
-            )}
-          </div>
-          {/* Centred icon (full-opacity, smaller) on top of the faded bg icon */}
-          {wsIcon && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div
-                className="flex items-center justify-center rounded-2xl shadow-lg"
-                style={{
-                  width: 64, height: 64,
-                  background: "rgba(255,255,255,0.18)",
-                  backdropFilter: "blur(4px)",
-                }}
-              >
-                <FontAwesomeIcon
-                  icon={wsIcon.icon}
-                  style={{ color: "#ffffff", fontSize: 30 }}
-                />
-              </div>
-            </div>
-          )}
-          {/* ⑥ badges — hidden by default, fade in on hover */}
-          {isLayerKnown && (
-            <span className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-[10px] font-medium px-1.5 py-0.5 rounded bg-black/40 text-white">
-              {lk}
-            </span>
-          )}
-          {stepCount > 0 && (
-            <span className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-[10px] font-medium px-1.5 py-0.5 rounded bg-black/40 text-white">
-              {stepCount} 步
+    <div
+      style={{ cursor: "pointer" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+    >
+      {/* ── Thumbnail — 4:3, pale neutral bg ── */}
+      <div style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: "4 / 3",
+        borderRadius: 8,
+        background: "rgba(64,79,109,0.06)",
+        overflow: "hidden",
+      }}>
+        {/* Centered muted icon */}
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {wsIcon ? (
+            <FontAwesomeIcon
+              icon={wsIcon.icon}
+              style={{ fontSize: 52, color: wsIcon.bg, opacity: 0.28 }}
+            />
+          ) : (
+            <span style={{ fontSize: 52, fontWeight: 800, color: "rgba(64,79,109,0.18)", lineHeight: 1, userSelect: "none" }}>
+              {heroLetter}
             </span>
           )}
         </div>
-        <CardBody className="p-3 gap-1">
-          <p className="text-small font-medium leading-snug line-clamp-2 min-h-[2.4em]">
-            {mission.title}
-          </p>
-          <TaskChip
-            entity={{
-              workspace: mission.workspace,
-              name: mission.squadName,
-              slug: mission.squadSlug,
-            }}
-            kind="squad"
-            size="sm"
-            className="self-start"
-          />
-          {mission.squadName && (
-            <p className="text-tiny text-warning truncate">
-              {mission.squadName}
-            </p>
-          )}
-          <div className="flex items-center gap-1.5 text-tiny text-default-500">
-            {wsBadge && (
-              <Avatar
-                name={wsBadge.glyph}
-                size="sm"
-                className="w-4 h-4 text-tiny shrink-0"
-                style={{ background: wsBadge.color, color: "white" }}
-              />
-            )}
-            <span className="truncate">{updatedTxt}</span>
-          </div>
-        </CardBody>
-      </Card>
-      {/* Hover action — bookmark + ⋯ menu (Canva pattern) */}
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-        <ThumbAction title="收藏" onClick={(e) => { e.stopPropagation(); /* TODO: bookmark */ }}>
-          <FontAwesomeIcon icon={faBookmark} />
-        </ThumbAction>
-        <ThumbAction title="更多" onClick={(e) => { e.stopPropagation(); /* TODO: menu */ }}>
-          <FontAwesomeIcon icon={faEllipsis} />
-        </ThumbAction>
+
+        {/* Hover overlay — dark scrim + 3 action buttons */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "rgba(0,0,0,0.30)",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          opacity: hovered ? 1 : 0,
+          transition: "opacity 0.15s ease",
+          pointerEvents: hovered ? "auto" : "none",
+        }}>
+          {[
+            { icon: faStar,     title: "加入星號" },
+            { icon: faPen,      title: "重新命名" },
+            { icon: faEllipsis, title: "更多選項" },
+          ].map(action => (
+            <button
+              key={action.title}
+              title={action.title}
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "rgba(255,255,255,0.92)",
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, color: "#111827",
+                transition: "background 0.1s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#fff")}
+              onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.92)")}
+            >
+              <FontAwesomeIcon icon={action.icon} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Text area — title + time only ── */}
+      <div style={{ padding: "8px 2px 2px" }}>
+        <p style={{
+          fontSize: 14, fontWeight: 600, color: "rgb(15,16,21)",
+          lineHeight: 1.35, margin: 0,
+          overflow: "hidden", display: "-webkit-box",
+          WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+        }}>
+          {mission.title}
+        </p>
+        <p style={{ fontSize: 12, color: "rgba(15,18,26,0.70)", marginTop: 3 }}>
+          {updatedTxt}
+        </p>
       </div>
     </div>
-  );
-}
-
-function ThumbAction({
-  title, onClick, children,
-}: { title: string; onClick: (e: React.MouseEvent) => void; children: React.ReactNode }) {
-  return (
-    <Tooltip content={title}>
-      <Button
-        isIconOnly
-        size="sm"
-        radius="full"
-        variant="flat"
-        onClick={onClick}
-        aria-label={title}
-      >
-        {children}
-      </Button>
-    </Tooltip>
   );
 }
 
@@ -1041,13 +1000,13 @@ function formatRelative(iso?: string | null): string {
 
 function ThumbSkeleton() {
   return (
-    <Card shadow="none" className="overflow-hidden">
-      <Skeleton className="w-full" style={{ aspectRatio: "4 / 3" }} />
-      <CardBody className="p-3 gap-1.5">
+    <div>
+      <Skeleton className="w-full rounded-lg" style={{ aspectRatio: "4 / 3" }} />
+      <div className="p-0 pt-2 gap-1.5 flex flex-col">
         <Skeleton className="h-3 w-4/5 rounded" />
         <Skeleton className="h-2 w-2/5 rounded" />
-      </CardBody>
-    </Card>
+      </div>
+    </div>
   );
 }
 
