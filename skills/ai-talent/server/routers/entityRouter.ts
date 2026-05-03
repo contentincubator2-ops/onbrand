@@ -128,6 +128,17 @@ export interface HomeEntity {
    */
   taskType?: string | null;
 
+  /**
+   * DB-classified mockup fields (Session A). When present, inferMockupVariant()
+   * uses these directly without running keyword heuristics. The `mockup` object
+   * above is the squad-level alias; agents + skills surface as flat fields.
+   */
+  mockup_platform?: string | null;
+  mockup_format?:   string | null;
+
+  /** primarySkill slug for agents — used as a secondary signal in inferMockupVariantFromAgent(). */
+  primarySkill?: string | null;
+
   /** True for squads with is_curated=1 (the 30 親選 IPs that get covers). */
   isCurated?: boolean;
 
@@ -228,7 +239,8 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
   try {
     const [r] = (await db.execute(sql`
       SELECT id, slug, name, name_zh, title, title_zh, bio, bio_zh,
-             specialty, layer, workspace, avatarUrl
+             specialty, layer, workspace, avatarUrl,
+             primarySkill, mockup_platform, mockup_format
         FROM agents
        WHERE isAvailable = 1
        LIMIT ${limit}
@@ -279,6 +291,12 @@ async function fetchAgentEntities(limit = 200): Promise<HomeEntity[]> {
       workspace: r.workspace ? [String(r.workspace)] : [],
       // Use generated B&W half-body line-art portrait stored in avatarUrl.
       coverImageUrl: (r as any).avatarUrl ?? null,
+      taskType: null,
+      // DB-classified mockup fields (Session A). Surfaced so inferMockupVariantFromAgent()
+      // can take the direct DB path instead of falling back to heuristics.
+      primarySkill: r.primarySkill ?? null,
+      mockup_platform: r.mockup_platform ?? null,
+      mockup_format:   r.mockup_format   ?? null,
     };
   });
 }
@@ -303,7 +321,8 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
       `SELECT id, slug, name, name_zh, description, description_zh,
               category, strategy_layer,
               origin_model, source, task_type, recommended_models,
-              quality_score, cover_image_url
+              quality_score, cover_image_url,
+              mockup_platform, mockup_format
          FROM skills
         WHERE is_active = 1 AND ${filter}
         ORDER BY quality_score DESC, id ASC
@@ -371,6 +390,10 @@ async function fetchSkillTableEntities(opts: { onlyAgentTemplates: boolean; limi
       // cover_image_url as a temporary fallback.
       coverImageUrl: kind === "skill" ? null : (r.cover_image_url ?? null),
       taskType: r.task_type ?? null,
+      // DB-classified mockup fields (Session A). Surfaced so inferMockupVariantFromSkill()
+      // can take the direct DB path instead of falling back to task_type heuristics.
+      mockup_platform: r.mockup_platform ?? null,
+      mockup_format:   r.mockup_format   ?? null,
     };
   });
 }
