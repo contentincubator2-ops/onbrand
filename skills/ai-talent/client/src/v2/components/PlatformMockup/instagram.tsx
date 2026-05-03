@@ -25,13 +25,24 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
-  dicebear, handleOf,
+  dicebear, handleOf, SlotContent,
 } from "./shared";
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
-export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc }: MockupFields) {
+export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc, slotMap }: MockupFields) {
   const handle = handleOf(brandName);
+
+  // Resolve caption: slotMap "caption" wins over legacy liveCaption prop
+  const captionSlot = slotMap?.caption;
+  const hashtagSlot = slotMap?.hashtags;
+  const imageSlot   = slotMap?.image ?? slotMap?.imageDesc;
+
+  // Effective values (slotMap overrides legacy props)
+  const effectiveCaption   = captionSlot?.status === "filled" ? captionSlot.value as string : liveCaption;
+  const effectiveHashtags  = hashtagSlot?.status === "filled" ? hashtagSlot.value as string[] : liveHashtags;
+  const effectiveImageDesc = imageSlot?.status   === "filled" ? imageSlot.value  as string : liveImageDesc;
+
   return (
     <div className="w-full max-w-[420px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
@@ -52,14 +63,26 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
           </Button>
         </div>
 
+        {/* Image slot — loading skeleton | filled (image desc) | empty placeholder */}
         <div className="relative aspect-square bg-default-100">
-          <Skeleton className="absolute inset-0" />
-          <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
-            <div className="text-center">
-              <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-              <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+          {imageSlot?.status === "loading" ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center px-4">
+                <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-3" />
+                <p className="text-tiny text-primary/70">視覺 Agent 生成中…</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <Skeleton className="absolute inset-0" />
+              <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
+                <div className="text-center">
+                  <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
+                  <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
@@ -89,23 +112,62 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
         <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
           <span className="text-foreground">{title}</span>
-          {liveCaption ? (
-            <p className="mt-1.5 whitespace-pre-wrap line-clamp-6 text-foreground">{liveCaption}</p>
-          ) : (
-            <div className="mt-1.5 space-y-1">
-              <Skeleton className="h-2.5 w-[94%] rounded" />
-              <Skeleton className="h-2.5 w-[78%] rounded" />
-            </div>
-          )}
-          {liveHashtags && liveHashtags.length > 0 ? (
-            <p className="mt-1.5 text-secondary text-small">
-              {liveHashtags.slice(0, 8).join(" ")}{liveHashtags.length > 8 && <span className="text-default-500"> …更多</span>}
-            </p>
-          ) : (
-            <p className="mt-1.5 text-secondary text-small">
-              #等寫手 #等寫手 #等寫手 <span className="text-default-500">…更多</span>
-            </p>
-          )}
+
+          {/* Caption slot — SlotContent handles loading/filled/empty */}
+          <div className="mt-1.5">
+            <SlotContent
+              slotKey="caption"
+              slotMap={slotMap}
+              skeletonLines={3}
+              placeholder={
+                effectiveCaption ? (
+                  <p className="whitespace-pre-wrap line-clamp-6 text-foreground">{effectiveCaption}</p>
+                ) : (
+                  <div className="space-y-1">
+                    <Skeleton className="h-2.5 w-[94%] rounded" />
+                    <Skeleton className="h-2.5 w-[78%] rounded" />
+                  </div>
+                )
+              }
+            >
+              {(val) => (
+                <p className="whitespace-pre-wrap line-clamp-6 text-foreground">
+                  {(val as string) || effectiveCaption || ""}
+                </p>
+              )}
+            </SlotContent>
+          </div>
+
+          {/* Hashtag slot — SlotContent handles loading/filled/empty */}
+          <div className="mt-1.5">
+            <SlotContent
+              slotKey="hashtags"
+              slotMap={slotMap}
+              skeletonLines={1}
+              placeholder={
+                effectiveHashtags && effectiveHashtags.length > 0 ? (
+                  <p className="text-secondary text-small">
+                    {effectiveHashtags.slice(0, 8).join(" ")}
+                    {effectiveHashtags.length > 8 && <span className="text-default-500"> …更多</span>}
+                  </p>
+                ) : (
+                  <p className="text-secondary text-small">
+                    #等寫手 #等寫手 #等寫手 <span className="text-default-500">…更多</span>
+                  </p>
+                )
+              }
+            >
+              {(val) => {
+                const tags = Array.isArray(val) ? val as string[] : [val as string];
+                return (
+                  <p className="text-secondary text-small">
+                    {tags.slice(0, 8).join(" ")}
+                    {tags.length > 8 && <span className="text-default-500"> …更多</span>}
+                  </p>
+                );
+              }}
+            </SlotContent>
+          </div>
         </div>
 
         <p className="px-3 pb-1 text-small text-default-500">
