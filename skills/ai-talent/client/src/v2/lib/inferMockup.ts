@@ -19,6 +19,14 @@ export type Platform =
   | "linkedin"
   | "youtube"
   | "tiktok"
+  // --- new channels ---
+  | "email"
+  | "google"
+  | "twitter"
+  | "line"
+  | "web"
+  | "press"
+  | "deck"
   | "generic";
 
 export type Format =
@@ -47,6 +55,30 @@ export type Format =
   | "event"           // event card
   // TikTok
   | "foryou"          // FYP video w/ side action rail
+  // Email / EDM
+  | "edm"             // full HTML email
+  | "email-newsletter"// simple single-column newsletter
+  // Google Ads
+  | "search-ad"       // text search result ad
+  | "display-ad"      // banner / image display ad
+  | "pmax"            // Performance Max
+  | "shopping-ad"     // Google Shopping product card
+  | "video-ad"        // YouTube TrueView in-stream ad
+  // Twitter / X
+  | "tweet"           // single tweet card
+  | "thread"          // multi-tweet thread
+  // LINE
+  | "broadcast"       // LINE OA mass message
+  | "line-card"       // LINE Flex Message card
+  | "richmenu"        // LINE Rich Menu
+  // Web
+  | "landing"         // landing page
+  | "blog"            // blog article
+  | "product-page"    // product / e-commerce page
+  // Press / PR
+  | "press-release"   // news release
+  // Deck
+  | "slide"           // presentation deck
   // fallback
   | "generic";
 
@@ -90,6 +122,30 @@ const VARIANT_LABELS: Record<string, string> = {
   "tiktok:carousel":      "TikTok 圖文",
   "tiktok:live":          "TikTok 直播",
   "tiktok:profile":       "TikTok 個人檔案",
+  // Email
+  "email:edm":            "EDM 電子郵件",
+  "email:email-newsletter": "電子報",
+  // Google
+  "google:search-ad":     "Google 搜尋廣告",
+  "google:display-ad":    "Google 多媒體廣告",
+  "google:pmax":          "Google PMax",
+  "google:shopping-ad":   "Google 購物廣告",
+  "google:video-ad":      "Google 影片廣告",
+  // Twitter / X
+  "twitter:tweet":        "X 推文",
+  "twitter:thread":       "X Thread",
+  // LINE
+  "line:broadcast":       "LINE 廣播訊息",
+  "line:line-card":       "LINE Flex Card",
+  "line:richmenu":        "LINE Rich Menu",
+  // Web
+  "web:landing":          "官網 Landing Page",
+  "web:blog":             "部落格文章",
+  "web:product-page":     "產品頁面",
+  // Press
+  "press:press-release":  "新聞稿",
+  // Deck
+  "deck:slide":           "簡報 Deck",
   "generic:generic":      "通用輸出",
 };
 
@@ -131,6 +187,14 @@ const PLATFORM_KEYWORDS: Array<[Platform, string[]]> = [
   ["youtube",   ["youtube", "yt-", "shorts", "youtu.be"]],
   ["linkedin",  ["linkedin", "li-", "公司頁面", "個人品牌"]],
   ["facebook",  ["facebook", "fb-", "fb_", " fb ", "meta-fb", "messenger"]],
+  // New channels
+  ["email",   ["email", "edm", "電子報", "電子郵件", "newsletter", "mailer", "enewsletter"]],
+  ["google",  ["google", "google-ads", "gads", "google ads", "search ad", "display ad", "pmax", "performance max", "shopping ad", "google 廣告", "搜尋廣告", "多媒體廣告", "購物廣告"]],
+  ["twitter", ["twitter", "x.com", "tweet", "thread", "推文", "x platform"]],
+  ["line",    ["line", "line-oa", "line官方", "line 官方", "richmenu", "rich menu", "line廣播", "line訊息"]],
+  ["web",     ["website", "landing page", "官網", "落地頁", "網站", "landingpage", "blog", "部落格", "product page", "產品頁"]],
+  ["press",   ["press release", "新聞稿", "公關稿", "pr release", "媒體稿", "媒體發布"]],
+  ["deck",    ["deck", "slide", "slides", "簡報", "presentation", "ppt", "powerpoint", "pitch deck"]],
 ];
 
 function detectPlatform(haystack: string): Platform {
@@ -181,6 +245,30 @@ const FORMAT_RULES: FormatRule[] = [
   { format: "carousel",     keywords: ["carousel", "multi-image", "輪播", "圖文"] },
   // profile
   { format: "profile",      keywords: ["profile", "個人檔案", "channel page", "頻道頁"] },
+  // Email formats
+  { format: "edm",            keywords: ["edm", "html email", "電子郵件", "email campaign"],        platforms: ["email"] },
+  { format: "email-newsletter", keywords: ["newsletter", "電子報", "issue"],                        platforms: ["email"] },
+  // Google formats
+  { format: "search-ad",    keywords: ["search ad", "搜尋廣告", "text ad", "keyword ad"],           platforms: ["google"] },
+  { format: "display-ad",   keywords: ["display", "banner", "多媒體", "展示廣告"],                  platforms: ["google"] },
+  { format: "pmax",         keywords: ["pmax", "performance max"],                                   platforms: ["google"] },
+  { format: "shopping-ad",  keywords: ["shopping", "購物廣告", "product listing"],                  platforms: ["google"] },
+  { format: "video-ad",     keywords: ["video ad", "trueview", "影片廣告", "youtube ad"],           platforms: ["google"] },
+  // Twitter formats
+  { format: "thread",       keywords: ["thread", "推文串"],                                          platforms: ["twitter"] },
+  { format: "tweet",        keywords: ["tweet", "推文", "x post"],                                   platforms: ["twitter"] },
+  // LINE formats
+  { format: "richmenu",     keywords: ["richmenu", "rich menu", "選單"],                            platforms: ["line"] },
+  { format: "line-card",    keywords: ["flex message", "flex card", "line card", "line訊息卡"],     platforms: ["line"] },
+  { format: "broadcast",    keywords: ["broadcast", "廣播", "群發"],                                 platforms: ["line"] },
+  // Web formats
+  { format: "landing",      keywords: ["landing", "落地頁", "landing page"],                        platforms: ["web"] },
+  { format: "blog",         keywords: ["blog", "部落格", "article", "文章"],                        platforms: ["web"] },
+  { format: "product-page", keywords: ["product page", "產品頁", "ecommerce", "shop"],              platforms: ["web"] },
+  // Press
+  { format: "press-release", keywords: ["press release", "新聞稿", "公關稿", "media release"],      platforms: ["press"] },
+  // Deck
+  { format: "slide",        keywords: ["slide", "deck", "簡報", "presentation", "ppt"],             platforms: ["deck"] },
 ];
 
 const PLATFORM_DEFAULT_FORMAT: Record<Platform, Format> = {
@@ -189,6 +277,13 @@ const PLATFORM_DEFAULT_FORMAT: Record<Platform, Format> = {
   linkedin:  "feed",
   youtube:   "video-card",
   tiktok:    "foryou",
+  email:     "edm",
+  google:    "search-ad",
+  twitter:   "tweet",
+  line:      "broadcast",
+  web:       "landing",
+  press:     "press-release",
+  deck:      "slide",
   generic:   "generic",
 };
 
@@ -267,6 +362,13 @@ const PLATFORM_TOP_VARIANTS: Record<Platform, Format[]> = {
   linkedin:  ["feed", "article", "newsletter", "poll", "document"],
   youtube:   ["video-card", "watch", "shorts", "community"],
   tiktok:    ["foryou", "profile"],
+  email:     ["edm", "email-newsletter"],
+  google:    ["search-ad", "display-ad", "pmax", "shopping-ad", "video-ad"],
+  twitter:   ["tweet", "thread"],
+  line:      ["broadcast", "line-card", "richmenu"],
+  web:       ["landing", "blog", "product-page"],
+  press:     ["press-release"],
+  deck:      ["slide"],
   generic:   ["generic"],
 };
 

@@ -1,17 +1,20 @@
 /**
  * PlatformMockup — single entry, dispatches to platform/format variant.
  *
- * PR2.5 (2026-04-28): all 32 variants now have dedicated mockups.
- * UnsupportedVariantPlaceholder kept as a safety net for unknown
- * combinations (defensive default).
- *
- * Variants implemented (32):
+ * Variants implemented (55):
  *   instagram: feed, carousel, reel, story, profile, live, ad
  *   facebook:  feed, reel, story, marketplace, event, ad, carousel
  *   linkedin:  feed, article, newsletter, poll, document,
  *              native-video, ad, event
  *   youtube:   video-card, watch, shorts, community, premiere, live
  *   tiktok:    foryou, profile, carousel, live
+ *   email:     edm, email-newsletter
+ *   google:    search-ad, display-ad, pmax, shopping-ad, video-ad
+ *   twitter:   tweet, thread
+ *   line:      broadcast, line-card, richmenu
+ *   web:       landing, blog, product-page
+ *   press:     press-release
+ *   deck:      slide
  *   generic:   generic
  */
 import React from "react";
@@ -31,6 +34,12 @@ import {
   YTVideoCard, YTShorts, YTWatch, YTCommunity, YTPremiere, YTLive,
 } from "./youtube";
 import { TTForYou, TTProfile, TTCarousel, TTLive } from "./tiktok";
+import { EDMMockup, EmailNewsletterMockup } from "./email";
+import { GoogleSearchAd, GoogleDisplayAd, GooglePMax } from "./google";
+import { XTweet, XThread } from "./twitter";
+import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
+import { WebLanding, WebBlog, WebProduct } from "./web";
+import { PressRelease, DeckMockup } from "./press";
 import { GenericMockup } from "./generic";
 import { UnsupportedVariantPlaceholder } from "./unsupported";
 
@@ -43,7 +52,7 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
   const key = `${variant.platform}:${variant.format}`;
 
   switch (key) {
-    // Instagram (7)
+    // ── Instagram (7) ─────────────────────────────────────────────────
     case "instagram:feed":      return <IGFeed     {...f} />;
     case "instagram:carousel":  return <IGCarousel {...f} />;
     case "instagram:reel":      return <IGReels    {...f} />;
@@ -52,26 +61,26 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "instagram:live":      return <IGLive     {...f} />;
     case "instagram:ad":        return <IGAd       {...f} />;
 
-    // Facebook (7)
-    case "facebook:feed":       return <FBFeed        {...f} />;
-    case "facebook:reel":       return <FBReel        {...f} />;
-    case "facebook:story":      return <FBStory       {...f} />;
-    case "facebook:marketplace":return <FBMarketplace {...f} />;
-    case "facebook:event":      return <FBEvent       {...f} />;
-    case "facebook:ad":         return <FBAd          {...f} />;
-    case "facebook:carousel":   return <FBCarousel    {...f} />;
+    // ── Facebook (7) ──────────────────────────────────────────────────
+    case "facebook:feed":        return <FBFeed        {...f} />;
+    case "facebook:reel":        return <FBReel        {...f} />;
+    case "facebook:story":       return <FBStory       {...f} />;
+    case "facebook:marketplace": return <FBMarketplace {...f} />;
+    case "facebook:event":       return <FBEvent       {...f} />;
+    case "facebook:ad":          return <FBAd          {...f} />;
+    case "facebook:carousel":    return <FBCarousel    {...f} />;
 
-    // LinkedIn (8)
-    case "linkedin:feed":         return <LIFeed        {...f} />;
-    case "linkedin:article":      return <LIArticle    {...f} />;
-    case "linkedin:newsletter":   return <LINewsletter {...f} />;
-    case "linkedin:poll":         return <LIPoll       {...f} />;
-    case "linkedin:document":     return <LIDocument   {...f} />;
-    case "linkedin:native-video": return <LINativeVideo {...f} />;
-    case "linkedin:ad":           return <LIAd         {...f} />;
-    case "linkedin:event":        return <LIEvent      {...f} />;
+    // ── LinkedIn (8) ──────────────────────────────────────────────────
+    case "linkedin:feed":          return <LIFeed        {...f} />;
+    case "linkedin:article":       return <LIArticle     {...f} />;
+    case "linkedin:newsletter":    return <LINewsletter  {...f} />;
+    case "linkedin:poll":          return <LIPoll        {...f} />;
+    case "linkedin:document":      return <LIDocument    {...f} />;
+    case "linkedin:native-video":  return <LINativeVideo {...f} />;
+    case "linkedin:ad":            return <LIAd          {...f} />;
+    case "linkedin:event":         return <LIEvent       {...f} />;
 
-    // YouTube (6)
+    // ── YouTube (6) ───────────────────────────────────────────────────
     case "youtube:video-card":  return <YTVideoCard {...f} />;
     case "youtube:watch":       return <YTWatch     {...f} />;
     case "youtube:shorts":      return <YTShorts    {...f} />;
@@ -79,16 +88,47 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "youtube:premiere":    return <YTPremiere  {...f} />;
     case "youtube:live":        return <YTLive      {...f} />;
 
-    // TikTok (4)
-    case "tiktok:foryou":       return <TTForYou   {...f} />;
-    case "tiktok:profile":      return <TTProfile  {...f} />;
-    case "tiktok:carousel":     return <TTCarousel {...f} />;
-    case "tiktok:live":         return <TTLive     {...f} />;
+    // ── TikTok (4) ────────────────────────────────────────────────────
+    case "tiktok:foryou":    return <TTForYou   {...f} />;
+    case "tiktok:profile":   return <TTProfile  {...f} />;
+    case "tiktok:carousel":  return <TTCarousel {...f} />;
+    case "tiktok:live":      return <TTLive     {...f} />;
 
-    // Generic
-    case "generic:generic":     return <GenericMockup {...f} />;
+    // ── Email / EDM (2) ───────────────────────────────────────────────
+    case "email:edm":              return <EDMMockup           {...f} />;
+    case "email:email-newsletter": return <EmailNewsletterMockup {...f} />;
+
+    // ── Google Ads (5) ────────────────────────────────────────────────
+    case "google:search-ad":   return <GoogleSearchAd  {...f} />;
+    case "google:display-ad":  return <GoogleDisplayAd {...f} />;
+    case "google:pmax":        return <GooglePMax      {...f} />;
+    case "google:shopping-ad": return <GoogleSearchAd  {...f} />; // reuse search layout until shopping component built
+    case "google:video-ad":    return <GoogleDisplayAd {...f} />; // reuse display layout until video ad component built
+
+    // ── Twitter / X (2) ───────────────────────────────────────────────
+    case "twitter:tweet":   return <XTweet  {...f} />;
+    case "twitter:thread":  return <XThread {...f} />;
+
+    // ── LINE (3) ──────────────────────────────────────────────────────
+    case "line:broadcast":   return <LINEBroadcast {...f} />;
+    case "line:line-card":   return <LINECard      {...f} />;
+    case "line:richmenu":    return <LINERichMenu  {...f} />;
+
+    // ── Web (3) ───────────────────────────────────────────────────────
+    case "web:landing":       return <WebLanding {...f} />;
+    case "web:blog":          return <WebBlog    {...f} />;
+    case "web:product-page":  return <WebProduct {...f} />;
+
+    // ── Press Release (1) ─────────────────────────────────────────────
+    case "press:press-release": return <PressRelease {...f} />;
+
+    // ── Deck / Presentation (1) ───────────────────────────────────────
+    case "deck:slide": return <DeckMockup {...f} />;
+
+    // ── Generic ───────────────────────────────────────────────────────
+    case "generic:generic": return <GenericMockup {...f} />;
 
     // Defensive: unknown variant → honest placeholder
-    default:                    return <UnsupportedVariantPlaceholder variant={variant} {...f} />;
+    default: return <UnsupportedVariantPlaceholder variant={variant} {...f} />;
   }
 }
