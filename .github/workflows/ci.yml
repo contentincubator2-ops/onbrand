@@ -62,22 +62,25 @@ jobs:
             cd "$AI/client"
             npm install --legacy-peer-deps 2>&1 | tail -3
 
-            # Vite's emptyOutDir doesn't reliably clear outDir when it's
-            # outside the project root (../public). Stale asset hashes
-            # accumulate and the index.html may end up pointing at an old
-            # one. Force a clean before build.
-            echo "Cleaning $AI/public/assets before build..."
-            rm -rf "$AI/public/assets" "$AI/public/index.html"
+            # Build into a temp dir first, so the live public/ is never
+            # left in a broken state if the build times out mid-flight.
+            BUILD_TMP="$AI/public_build_tmp"
+            rm -rf "$BUILD_TMP"
+            npx vite build --outDir "$BUILD_TMP" --emptyOutDir 2>&1 | tail -15 || true
 
-            BUILD_OUT=$(npm run build 2>&1)
-            echo "$BUILD_OUT" | tail -15
-            # Fail the deploy hard if vite/tsc didn't actually emit a fresh bundle.
-            NEW_HASH=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$AI/public/index.html" 2>/dev/null | head -1)
+            NEW_HASH=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$BUILD_TMP/index.html" 2>/dev/null | head -1)
             if [ -z "$NEW_HASH" ]; then
-              echo "❌ Build did not produce $AI/public/index.html — aborting"
+              echo "❌ Build did not produce index.html — keeping existing public/ intact"
+              rm -rf "$BUILD_TMP"
               exit 1
             fi
             echo "✓ Built bundle: $NEW_HASH"
+
+            # Atomically swap: remove old assets, move new bundle into place.
+            rm -rf "$AI/public/assets" "$AI/public/index.html"
+            cp -a "$BUILD_TMP/." "$AI/public/"
+            rm -rf "$BUILD_TMP"
+            echo "✓ public/ updated atomically"
 
             echo "===== Restart (delete + start fresh) ====="
             AI=/opt/marketing-os/app/skills/ai-talent

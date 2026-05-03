@@ -29,30 +29,39 @@ jobs:
             git reset --hard origin/main
 
             echo ""
-            echo "════ Wipe public/ ════"
-            rm -rf "$AI/public"
-            mkdir -p "$AI/public"
-
-            echo ""
             echo "════ Client install ════"
             cd "$AI/client"
             npm install --legacy-peer-deps --no-audit --no-fund 2>&1 | tail -10
 
             echo ""
-            echo "════ FULL build (no truncation) ════"
-            npm run build
+            echo "════ FULL build → temp dir (atomic swap) ════"
+            BUILD_TMP="$AI/public_build_tmp"
+            rm -rf "$BUILD_TMP"
+            npx vite build --outDir "$BUILD_TMP" --emptyOutDir
 
             echo ""
             echo "════ Verify ════"
-            HASH_INDEX=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$AI/public/index.html" | head -1)
+            HASH_INDEX=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$BUILD_TMP/index.html" | head -1)
             echo "index.html references: $HASH_INDEX"
-            ls -la "$AI/public/assets/" | head -10
-            if [ -f "$AI/public/assets/$HASH_INDEX" ]; then
+            if [ -z "$HASH_INDEX" ]; then
+              echo "❌ Build failed — no index.html produced"
+              rm -rf "$BUILD_TMP"
+              exit 1
+            fi
+            if [ -f "$BUILD_TMP/assets/$HASH_INDEX" ]; then
               echo "✅ Asset present: $HASH_INDEX"
             else
               echo "❌ MISSING: $HASH_INDEX"
+              rm -rf "$BUILD_TMP"
               exit 1
             fi
+
+            echo ""
+            echo "════ Atomic swap into public/ ════"
+            rm -rf "$AI/public/assets" "$AI/public/index.html"
+            cp -a "$BUILD_TMP/." "$AI/public/"
+            rm -rf "$BUILD_TMP"
+            echo "✅ public/ updated"
 
             echo ""
             echo "════ Restart pm2 ════"
