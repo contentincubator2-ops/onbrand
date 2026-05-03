@@ -193,8 +193,13 @@ function Sidebar({
           <button
             onClick={() => onNavigate("/")}
             aria-label="建立任務"
-            style={{ background: "#F97316" }}
-            className="mx-auto flex items-center justify-center w-10 h-10 rounded-full text-white shadow-sm hover:opacity-90 active:scale-95 transition-all"
+            style={{
+              background: "#F97316",
+              transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s",
+            }}
+            className="mx-auto flex items-center justify-center w-10 h-10 rounded-full text-white shadow-sm hover:shadow-md active:scale-95"
+            onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
           >
             <FontAwesomeIcon icon={faPlus} className="text-base" />
           </button>
@@ -205,7 +210,7 @@ function Sidebar({
             fullWidth
             aria-label="建立任務"
             startContent={<FontAwesomeIcon icon={faPlus} />}
-            style={{ background: "#F97316", color: "#fff" }}
+            style={{ background: "#F97316", color: "#fff", transition: "background-color 0.1s linear, box-shadow 0.1s linear, color 0.1s linear, transform 0.07s" }}
           >
             建立任務
           </Button>
