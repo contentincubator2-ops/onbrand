@@ -352,7 +352,8 @@ async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/
 // so we don't have to edit every legacy call site that hardcoded a now-disabled provider.
 const DEPRECATED_PROVIDERS = new Set(["openrouter"]);
 function resolveProvider(requested: string | undefined): string {
-  const def = (process.env.LLM_DEFAULT_PROVIDER as any) || "azure-foundry";
+  // Default: Anthropic (best quality, stable). Override with LLM_DEFAULT_PROVIDER env.
+  const def = (process.env.LLM_DEFAULT_PROVIDER as any) || "anthropic";
   if (!requested) return def;
   if (DEPRECATED_PROVIDERS.has(requested)) return def;
   return requested;
@@ -549,7 +550,8 @@ async function* anthropicStream(
 ): AsyncGenerator<string> {
   const key = (ENV as any).ANTHROPIC_API_KEY ?? "";
   if (!key) throw new Error("Anthropic not configured");
-  const model = (ENV as any).ANTHROPIC_MODEL ?? "claude-sonnet-4-5-20250929";
+  // Primary model: claude-sonnet-4-6. Override via ANTHROPIC_MODEL env.
+  const model = (ENV as any).ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
   // Split system message from conversation
   const systemMsgs = messages.filter((m) => m.role === "system");
@@ -672,12 +674,62 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
     const primaryErr = `LLM stream failed: ${response.status} ${response.statusText} – ${errorText}`;
     console.warn(`[invokeLLMStream] primary (${providerKey}/${model}) failed: ${primaryErr.slice(0, 200)}`);
 
-    // ── Fallback: Anthropic native streaming ──────────────────────────
-    const anthropicKey = (ENV as any).ANTHROPIC_API_KEY ?? "";
-    if (anthropicKey && providerKey !== "anthropic") {
-      console.warn("[invokeLLMStream] falling back to Anthropic streaming");
-      yield* anthropicStream(messages, params.maxTokens ?? params.max_tokens ?? 4000);
-      return;
+    // ── Fallback chain ────────────────────────────────────────────────
+    // Primary = Anthropic  → fallback to Azure Foundry gpt-4o
+    // Primary = other      → fallback to Anthropic (claude-sonnet-4-6)
+    if (providerKey === "anthropic") {
+      const foundryKey = (ENV as any).AZURE_FOUNDRY_API_KEY ?? (ENV as any).AZURE_AI_API_KEY ?? "";
+      const foundryEndpoint = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT ?? "").replace(/\/$/, "");
+      if (foundryKey && foundryEndpoint) {
+        console.warn("[invokeLLMStream] Anthropic failed → falling back to Azure Foundry gpt-4o");
+        // Build a minimal OpenAI-compatible streaming request to Azure Foundry
+        const fbModel = "gpt-4o";
+        const fbUrl = `${foundryEndpoint}/openai/v1/chat/completions`;
+        const fbPayload = {
+          model: fbModel,
+          messages: messages.map(normalizeMessage),
+          max_tokens: params.maxTokens ?? params.max_tokens ?? 4000,
+          stream: true,
+        };
+        const fbResp = await fetch(fbUrl, {
+          method: "POST",
+          headers: { "api-key": foundryKey, "content-type": "application/json" },
+          body: JSON.stringify(fbPayload),
+        });
+        if (!fbResp.ok) {
+          const fbErr = await fbResp.text();
+          throw new Error(`All stream providers failed. Anthropic: ${primaryErr.slice(0, 120)} | Azure Foundry: ${fbErr.slice(0, 120)}`);
+        }
+        const fbReader = fbResp.body?.getReader();
+        if (!fbReader) throw new Error("No response body from Azure Foundry fallback");
+        const fbDec = new TextDecoder();
+        let fbBuf = "";
+        while (true) {
+          const { done, value } = await fbReader.read();
+          if (done) break;
+          fbBuf += fbDec.decode(value, { stream: true });
+          const fbLines = fbBuf.split("\n");
+          fbBuf = fbLines.pop() ?? "";
+          for (const line of fbLines) {
+            const t = line.trim();
+            if (!t || t === "data: [DONE]" || !t.startsWith("data: ")) continue;
+            try {
+              const j = JSON.parse(t.slice(6)) as any;
+              const d = j.choices?.[0]?.delta?.content;
+              if (d) yield d;
+            } catch { /* skip */ }
+          }
+        }
+        return;
+      }
+    } else {
+      // Primary was not Anthropic → try Anthropic as fallback
+      const anthropicKey = (ENV as any).ANTHROPIC_API_KEY ?? "";
+      if (anthropicKey) {
+        console.warn("[invokeLLMStream] primary failed → falling back to Anthropic claude-sonnet-4-6");
+        yield* anthropicStream(messages, params.maxTokens ?? params.max_tokens ?? 4000);
+        return;
+      }
     }
     throw new Error(primaryErr);
   }

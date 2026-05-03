@@ -44,7 +44,7 @@ const ANTHROPIC_KEYS = [
   process.env.ANTHROPIC_API_KEY_BACKUP_1,
   process.env.ANTHROPIC_API_KEY_BACKUP_2,
 ].filter((k): k is string => !!k);
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-5-20250929";
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
 const AZURE_FOUNDRY_KEY = process.env.AZURE_FOUNDRY_API_KEY ?? process.env.AZURE_AI_API_KEY ?? "";
 const AZURE_FOUNDRY_ENDPOINT = (
@@ -52,7 +52,8 @@ const AZURE_FOUNDRY_ENDPOINT = (
   ?? process.env.AZURE_AI_ENDPOINT
   ?? ""
 ).replace(/\/+$/, "");
-const AZURE_FOUNDRY_MODEL = process.env.AZURE_FOUNDRY_MODEL ?? "gpt-4o-mini";
+// Fallback model on Azure Foundry — gpt-4o confirmed stable 2026-04-25.
+const AZURE_FOUNDRY_MODEL = process.env.AZURE_FOUNDRY_MODEL ?? "gpt-4o";
 
 const AZURE_OPENAI_KEY = process.env.AZURE_OPENAI_API_KEY ?? "";
 const AZURE_OPENAI_ENDPOINT = (process.env.AZURE_OPENAI_ENDPOINT ?? "").replace(/\/+$/, "");
