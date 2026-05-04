@@ -860,15 +860,16 @@ function GlobalScopeBar({ scope, setScope, brands }: {
   const ref = React.useRef<HTMLDivElement>(null);
 
   // Load products + events based on selected brand
-  const productsQuery = (trpc as any).product?.listByBrand?.useQuery
-    ? (trpc as any).product.listByBrand.useQuery(
-        { brandId: scope.brandId ?? 0 },
+  // NOTE: product.list / event.list are the correct endpoints (no listByBrand variant exists)
+  const productsQuery = (trpc as any).product?.list?.useQuery
+    ? (trpc as any).product.list.useQuery(
+        { brandId: scope.brandId ?? undefined },
         { enabled: !!scope.brandId, refetchOnWindowFocus: false }
       )
     : { data: [] };
-  const eventsQuery = (trpc as any).event?.listByBrand?.useQuery
-    ? (trpc as any).event.listByBrand.useQuery(
-        { brandId: scope.brandId ?? 0 },
+  const eventsQuery = (trpc as any).event?.list?.useQuery
+    ? (trpc as any).event.list.useQuery(
+        { brandId: scope.brandId ?? undefined },
         { enabled: !!scope.brandId, refetchOnWindowFocus: false }
       )
     : { data: [] };

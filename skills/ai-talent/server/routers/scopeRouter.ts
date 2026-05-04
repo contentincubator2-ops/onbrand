@@ -121,7 +121,8 @@ export const eventRouter = router({
       const userId = ctx.user!.id;
       const conds: string[] = ["e.userId = ?"];
       const params: any[] = [userId];
-      if (input?.brandId)   { conds.push("e.brandId = ?");   params.push(input.brandId); }
+      // Include events that belong to this brand OR have no brandId (legacy null records)
+      if (input?.brandId)   { conds.push("(e.brandId = ? OR e.brandId IS NULL)");   params.push(input.brandId); }
       if (input?.productId) {
         // Match either the legacy single-product link OR the m:n join table.
         conds.push("(e.productId = ? OR EXISTS (SELECT 1 FROM event_products ep WHERE ep.eventId = e.id AND ep.productId = ?))");
