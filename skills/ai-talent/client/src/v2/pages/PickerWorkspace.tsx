@@ -19,7 +19,7 @@
  *   │  │ (vertical)     │   detail panel (steps grid)        │
  *   └──┴───────────────┴────────────────────────────────────┘
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { LAYER_TOKENS, resolveLayer, type MosLayer } from "../../studio/primitives/tokens";
@@ -2112,6 +2112,67 @@ function SquadDetailPanel({
   // Auto-reset viewingStep when activeStepOrder advances (new step becomes active)
   useEffect(() => { setViewingStepOrder(null); }, [activeStepOrder]);
   // The step order actually rendered in the canvas = user selection OR auto-active
+
+  // ── Auto-run all: executes every step sequentially, auto-confirming each ──
+  const [autoRunning, setAutoRunning] = useState(false);
+  const autoRunRef = useRef(false);
+
+  const handleAutoRunAll = async () => {
+    if (!missionId || autoRunning || isStepStreaming) return;
+    setAutoRunning(true);
+    autoRunRef.current = true;
+
+    for (let i = 0; i < stepsArr.length; i++) {
+      if (!autoRunRef.current) break;
+      const ord = i + 1;
+      const prog = progressByOrd.get(ord);
+      const status = prog?.status ?? "pending";
+      if (status === "confirmed" || status === "skipped") continue;
+
+      // Run the step via SSE
+      startStep({
+        missionId,
+        squadSlug: squad.slug,
+        stepOrder: ord,
+        step: stepsArr[i],
+        scopeBrandId:   scope.brandId   ?? null,
+        scopeProductId: scope.productId ?? null,
+        scopeEventId:   scope.eventId   ?? null,
+      });
+
+      // Poll until drafted or confirmed
+      await new Promise<void>((resolve) => {
+        const interval = setInterval(async () => {
+          const fresh = await progressQuery.refetch?.();
+          const freshSteps: any[] = fresh?.data?.steps ?? fresh?.data ?? [];
+          const stepProg = freshSteps.find((p: any) => Number(p.stepOrder ?? p.step_order) === ord);
+          if (stepProg?.status === "drafted" || stepProg?.status === "confirmed") {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 3000);
+      });
+
+      if (!autoRunRef.current) break;
+
+      // Auto-confirm
+      await stepExecuteWithScope.mutateAsync({
+        missionId, squadSlug: squad.slug, stepOrder: ord, mode: "confirm", userInput: "",
+      }).catch(() => {});
+      await progressQuery.refetch?.();
+    }
+
+    autoRunRef.current = false;
+    setAutoRunning(false);
+  };
+
+  const handleSkipStep = async (ord: number) => {
+    if (!missionId || isStepStreaming) return;
+    await stepExecuteWithScope.mutateAsync({
+      missionId, squadSlug: squad.slug, stepOrder: ord, mode: "skip", userInput: "",
+    }).catch(() => {});
+    await progressQuery.refetch?.();
+  };
   const displayStepOrder = viewingStepOrder ?? activeStepOrder;
 
   // ── Step-execution error surfacing ────────────────────────────────────
@@ -2257,61 +2318,98 @@ function SquadDetailPanel({
 
         {/* ── Step progress indicator (SSE-driven, visible while mission running) ── */}
         {missionId && stepsArr.length > 0 && (
-          <div className="shrink-0 border-b border-default-100 bg-content1 px-4 py-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          <div className="shrink-0 border-b border-default-100 bg-content1 px-3 py-2">
+            {/* Auto-run controls */}
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-tiny text-default-400 font-medium">
+                {stepsArr.filter((_: any, i: number) => {
+                  const p = progressByOrd.get(i + 1);
+                  return p?.status === "confirmed" || p?.status === "skipped";
+                }).length} / {stepsArr.length} 完成
+              </span>
+              <div className="flex items-center gap-1.5">
+                {autoRunning && (
+                  <Button size="sm" variant="light" radius="full" className="text-tiny h-6 px-2 text-danger"
+                    onPress={() => { autoRunRef.current = false; setAutoRunning(false); }}>
+                    ⏹ 停止
+                  </Button>
+                )}
+                <Button
+                  size="sm" variant="flat" radius="full" color="primary"
+                  className="text-tiny h-6 px-3 font-semibold"
+                  isDisabled={autoRunning || isStepStreaming || allStepsConfirmed}
+                  isLoading={autoRunning}
+                  onPress={handleAutoRunAll}
+                >
+                  {autoRunning ? "自動執行中…" : "⚡ 全部自動執行"}
+                </Button>
+              </div>
+            </div>
+            {/* Step chips — full names, horizontal scroll */}
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide pb-0.5">
               {stepsArr.map((s: any, i: number) => {
                 const ord = i + 1;
                 const prog = progressByOrd.get(ord);
                 const dbStatus: string = prog?.status ?? "pending";
                 const isActive = stepStatus.isRunning && stepStatus.stepOrder === ord;
-                const isDone = dbStatus === "confirmed" || dbStatus === "drafted";
+                const isSkipped = dbStatus === "skipped";
                 const isConfirmed = dbStatus === "confirmed";
+                const isDrafted = dbStatus === "drafted";
+                const isViewing = displayStepOrder === ord && !isActive;
 
                 return (
                   <React.Fragment key={ord}>
                     {i > 0 && <span className="text-default-200 text-tiny shrink-0">→</span>}
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        if (!missionId) return;
-                        // Single click → view that step's output in canvas
-                        setViewingStepOrder(ord === displayStepOrder ? null : ord);
-                      }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.currentTarget.click(); }}
-                      className={[
-                        "shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-tiny font-medium transition-all",
-                        missionId && !isStepStreaming ? "cursor-pointer hover:opacity-80" : "cursor-default",
-                        isActive
-                          ? "bg-primary/10 text-primary border border-primary/30"
-                          : displayStepOrder === ord && !isActive
-                          ? "bg-secondary/10 text-secondary border border-secondary/30 ring-1 ring-secondary/40"
-                          : isConfirmed
-                          ? "bg-success/10 text-success border border-success/20"
-                          : isDone
-                          ? "bg-default-100 text-default-600 border border-default-200"
+                    <Tooltip
+                      content={
+                        <div className="text-tiny">
+                          <div className="font-semibold mb-1">{s.name ?? s.title ?? `Step ${ord}`}</div>
+                          {!isConfirmed && !isSkipped && !isActive && (
+                            <button
+                              className="text-warning hover:text-warning-600 font-medium"
+                              onClick={(e) => { e.stopPropagation(); handleSkipStep(ord); }}
+                            >
+                              跳過此步驟 →
+                            </button>
+                          )}
+                          {isSkipped && <span className="text-default-400">已跳過</span>}
+                          {isConfirmed && <span className="text-success">已確認 ✓</span>}
+                        </div>
+                      }
+                      placement="bottom" radius="sm" delay={300}
+                    >
+                      <div
+                        role="button" tabIndex={0}
+                        onClick={() => {
+                          if (!missionId) return;
+                          setViewingStepOrder(ord === displayStepOrder ? null : ord);
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.currentTarget.click(); }}
+                        className={[
+                          "shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-tiny font-medium transition-all whitespace-nowrap",
+                          !isStepStreaming ? "cursor-pointer hover:opacity-80" : "cursor-default",
+                          isActive    ? "bg-primary/10 text-primary border border-primary/30"
+                          : isViewing ? "bg-secondary/10 text-secondary border border-secondary/30 ring-1 ring-secondary/40"
+                          : isConfirmed ? "bg-success/10 text-success border border-success/20"
+                          : isDrafted   ? "bg-default-100 text-default-600 border border-default-200"
+                          : isSkipped   ? "text-default-300 border border-transparent line-through"
                           : "text-default-400 border border-transparent",
-                      ].join(" ")}>
-                      {isActive && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
-                      )}
-                      {isConfirmed && !isActive && (
-                        <span className="text-success">✓</span>
-                      )}
-                      <span className="max-w-[80px] truncate">
-                        {s.name ?? s.title ?? `Step ${ord}`}
-                      </span>
-                      {/* outputType badge */}
-                      {(() => {
-                        const outMeta = s.outputType ? getOutputTypeMeta(s.outputType) : null;
-                        if (!outMeta) return null;
-                        return (
-                          <span style={{ fontSize: 9, fontWeight: 700, color: outMeta.color, background: `${outMeta.color}20`, padding: "1px 5px", borderRadius: 6, flexShrink: 0, letterSpacing: "0.01em" }}>
-                            {outMeta.label}
-                          </span>
-                        );
-                      })()}
-                    </div>
+                        ].join(" ")}>
+                        {isActive    && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block shrink-0" />}
+                        {isConfirmed && !isActive && <span className="text-success shrink-0">✓</span>}
+                        {isSkipped   && <span className="text-default-300 shrink-0">–</span>}
+                        <span>{s.name ?? s.title ?? `Step ${ord}`}</span>
+                        {(() => {
+                          const outMeta = s.outputType ? getOutputTypeMeta(s.outputType) : null;
+                          if (!outMeta) return null;
+                          return (
+                            <span style={{ fontSize: 9, fontWeight: 700, color: outMeta.color, background: `${outMeta.color}20`, padding: "1px 5px", borderRadius: 6, flexShrink: 0 }}>
+                              {outMeta.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </Tooltip>
                   </React.Fragment>
                 );
               })}
