@@ -141,15 +141,18 @@ jobs:
               fi
             fi
 
-            # Verify the token was actually persisted
-            VERIFY=$($MYSQL -e "SELECT
-                                  CASE WHEN passwordResetToken = '${TOKEN}' OR password_reset_token = '${TOKEN}'
-                                       THEN 'OK' ELSE 'MISSING' END
-                                FROM users WHERE id = ${USER_ID}" 2>&1)
-            if ! echo "$VERIFY" | grep -q "OK"; then
-              echo "❌ Token not persisted: $VERIFY"
+            # Verify the token was persisted — try both column conventions
+            # but only fail if BOTH are missing (DESCRIBE-driven would be
+            # nicer but this is simpler).
+            VERIFY_CAMEL=$($MYSQL -e "SELECT 'OK' FROM users WHERE id = ${USER_ID} AND passwordResetToken = '${TOKEN}'" 2>/dev/null)
+            VERIFY_SNAKE=$($MYSQL -e "SELECT 'OK' FROM users WHERE id = ${USER_ID} AND password_reset_token = '${TOKEN}'" 2>/dev/null)
+            if [ "$VERIFY_CAMEL" != "OK" ] && [ "$VERIFY_SNAKE" != "OK" ]; then
+              echo "❌ Token not persisted under either column name"
+              echo "── columns in users table ──"
+              $MYSQL -e "DESCRIBE users" 2>&1 | head -30
               exit 1
             fi
+            echo "✓ Token confirmed in DB ($([ "$VERIFY_CAMEL" = "OK" ] && echo "passwordResetToken" || echo "password_reset_token") column)"
 
             APP_URL_VAL="${APP_URL:-https://marketing-os.sowork.ai}"
             RESET_URL="${APP_URL_VAL}/reset-password?token=${TOKEN}"
