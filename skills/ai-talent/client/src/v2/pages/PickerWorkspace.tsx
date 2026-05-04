@@ -1903,7 +1903,7 @@ function FeedbackPanel({
   const [selectedModel, setSelectedModel] = useState("auto");
   const [showModelPicker, setShowModelPicker] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const callModel = (trpc as any).ai?.chat?.useMutation?.();
+  const callModel = trpc.squadLead.chat.useMutation();
 
   const confirmedCount = Array.from(progressByOrd.values()).filter((p: any) => p?.status === "confirmed").length;
   const currentStep = steps[activeStepOrder - 1];
@@ -1958,24 +1958,17 @@ function FeedbackPanel({
       const providerToUse = isHermes ? "hermes" : undefined;
 
       let reply = "";
-      if (callModel?.mutateAsync) {
-        const result = await callModel.mutateAsync({
-          system: systemPrompt,
-          model: modelToUse,
-          provider: providerToUse,
-          messages: isHermes
-            // Hermes already has full history in system prompt — just send current message
-            ? [{ role: "user", content: text }]
-            : [
-                ...msgs.map((m) => ({ role: m.role, content: m.text })),
-                { role: "user", content: text },
-              ],
-        });
-        reply = result?.content ?? result?.text ?? "收到，我正在處理你的問題。";
-      } else {
-        await new Promise((r) => setTimeout(r, 800));
-        reply = `收到你的問題：「${text}」\n\n我正在根據目前任務狀態為你分析，請稍等。`;
-      }
+      const result = await callModel.mutateAsync({
+        message: text,
+        system: systemPrompt,
+        model: modelToUse,
+        provider: providerToUse,
+        messages: isHermes
+          // Hermes already has full history in system prompt — send only current turn
+          ? []
+          : msgs.map((m) => ({ role: m.role, content: m.text })),
+      });
+      reply = result?.content ?? result?.text ?? "收到，我正在處理你的問題。";
       setMsgs((prev) => [...prev, {
         role: "assistant",
         text: reply,
