@@ -296,11 +296,21 @@ export default function ProjectsPage() {
       {/* ════════════════════ MAIN COLUMN ════════════════════ */}
       <main style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: "100vh", overflow: "hidden" }}>
 
-        {/* Hero zone */}
+        {/* Hero zone — Canva-faithful composite gradient */}
         <div style={{
           flexShrink: 0,
-          background: "linear-gradient(160deg, #EDE9FE 0%, #E0E7FF 40%, #F0F9FF 100%)",
-          padding: "36px 40px 24px",
+          /* Canva's multi-layer transparent-to-white overlay on a blue-violet base:
+             1. Base: blue-violet linear gradient (the "colour" layer)
+             2. radial-gradient from bottom-centre → fades to transparent (lens flare feel)
+             3. linear-gradient top-to-bottom fade → white at bottom (smooth cut-off)
+             4. Two semi-transparent white washes to lighten & "透光" the whole area */
+          background: [
+            "radial-gradient(72% 150% at 50% 100%, rgba(255,255,255,0.82), transparent)",
+            "linear-gradient(transparent 9.5%, rgba(255,255,255,0.96) 94%)",
+            "rgba(255,255,255,0.18)",
+            "linear-gradient(135deg, #C4B5FD 0%, #A5B4FC 45%, #BAE6FD 100%)",
+          ].join(", "),
+          padding: "48px 40px 32px",
           textAlign: "center",
         }}>
           <h1 style={{ fontSize: 36, fontWeight: 700, color: "#1A1A18", margin: "0 0 20px", letterSpacing: "-0.03em" }}>
