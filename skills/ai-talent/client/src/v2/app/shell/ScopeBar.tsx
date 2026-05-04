@@ -145,9 +145,20 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
   const filteredProducts = scope.brandId
     ? products.filter((p: any) => p.brandId === scope.brandId)
     : products;
-  const filteredEvents = scope.brandId
-    ? events.filter((e: any) => e.brandId === scope.brandId)
-    : events;
+  // Events: show events of this brand PLUS the currently-selected event even if
+  // its brandId is null/mismatched (brandId may be null on old records). This
+  // ensures the dropdown always reflects the actual scope.eventId state.
+  const filteredEvents = (() => {
+    const base = scope.brandId
+      ? events.filter((e: any) => e.brandId === scope.brandId || !e.brandId)
+      : events;
+    // Also include the currently-selected event if not already in list
+    if (scope.eventId && !base.some((e: any) => e.id === scope.eventId)) {
+      const selected = events.find((e: any) => e.id === scope.eventId);
+      if (selected) return [...base, selected];
+    }
+    return base;
+  })();
 
   const [createKind, setCreateKind] = React.useState<CreateScopeKind | null>(null);
 
@@ -180,6 +191,7 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
         icon={faCalendarDay}
         label="活動"
         current={event?.name ?? null}
+        selectedId={scope.eventId}
         items={filteredEvents.map((e: any) => ({ id: e.id, name: e.name }))}
         onPick={(id) => pick("event", id)}
         onCreate={() => setCreateKind("event")}
@@ -196,11 +208,12 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
 }
 
 function ScopePicker({
-  icon, label, current, items, onPick, onCreate, emptyHint,
+  icon, label, current, selectedId, items, onPick, onCreate, emptyHint,
 }: {
   icon: any;
   label: string;
   current: string | null;
+  selectedId?: number | null;
   items: Array<{ id: number; name: string }>;
   onPick: (id: number | null) => void;
   onCreate: () => void;
@@ -226,9 +239,11 @@ function ScopePicker({
       <DropdownMenu
         aria-label={`${label} 切換`}
         selectionMode="single"
-        selectedKeys={current
-          ? new Set([String(items.find((i) => i.name === current)?.id ?? "")])
-          : new Set()}
+        selectedKeys={selectedId != null
+          ? new Set([String(selectedId)])
+          : current
+            ? new Set([String(items.find((i) => i.name === current)?.id ?? "")])
+            : new Set()}
         emptyContent={
           <div className="px-3 py-4 text-tiny text-default-400">{emptyHint}</div>
         }
