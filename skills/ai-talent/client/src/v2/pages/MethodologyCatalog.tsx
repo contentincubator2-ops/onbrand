@@ -971,98 +971,110 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
           )}
         </div>
 
-        {/* Right: meta + CTA */}
-        <div style={{ width: 380, padding: "24px 24px 28px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 0 }}>
+        {/* Right: Canva-style meta panel */}
+        <div style={{ width: 340, padding: "20px 24px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 0 }}>
 
-          {/* Top bar: chips + close */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ padding: "4px 10px", borderRadius: 20, background: li.bg, fontSize: 12, fontWeight: 600, color: li.text }}>{layer}・{li.label}</span>
-              <span style={{ padding: "4px 10px", borderRadius: 20, background: "#F5F4F2", fontSize: 12, color: "#57534E" }}>{kindLabel}</span>
-              {entity.is_approved === 0 && <span style={{ padding: "4px 10px", borderRadius: 20, background: "#FEF3C7", fontSize: 12, fontWeight: 600, color: "#D97706" }}>審核中</span>}
-            </div>
-            <button onClick={onClose} style={{ flexShrink: 0, background: "#F5F4F2", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#57534E", fontSize: 14 }}>
+          {/* ── Row 1: close button ── */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <button onClick={onClose} style={{ background: "#F5F4F2", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#57534E", fontSize: 14 }}>
               <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
 
-          {/* Title */}
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A18", margin: "0 0 6px", letterSpacing: "-0.01em", lineHeight: 1.25 }}>{entity.name}</h2>
-          {entity.subtitle && <p style={{ fontSize: 14, color: "#6366F1", fontWeight: 600, margin: "0 0 12px" }}>{entity.subtitle}</p>}
+          {/* ── Row 2: chips ── */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            <span style={{ padding: "3px 10px", borderRadius: 20, background: li.bg, fontSize: 11, fontWeight: 600, color: li.text }}>{layer}・{li.label}</span>
+            <span style={{ padding: "3px 10px", borderRadius: 20, background: "#F5F4F2", fontSize: 11, color: "#57534E" }}>{kindLabel}</span>
+            {entity.is_approved === 0 && <span style={{ padding: "3px 10px", borderRadius: 20, background: "#FEF3C7", fontSize: 11, fontWeight: 600, color: "#D97706" }}>審核中</span>}
+          </div>
 
-          {/* Description */}
+          {/* ── Row 3: title ── */}
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1A1A18", margin: "0 0 4px", letterSpacing: "-0.01em", lineHeight: 1.25 }}>{entity.name}</h2>
+          {entity.subtitle && <p style={{ fontSize: 13, color: "#6366F1", fontWeight: 600, margin: "0 0 12px" }}>{entity.subtitle}</p>}
+
+          {/* ── Row 4: PRIMARY CTA — 緊跟標題，最顯眼 ── */}
+          <button onClick={() => onLaunch(entity)}
+            style={{ width: "100%", padding: "13px", borderRadius: 10, background: "#7c3aed", color: "white", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8, boxShadow: "0 3px 12px rgba(124,58,237,0.35)", transition: "background 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#6d28d9"}
+            onMouseLeave={e => e.currentTarget.style.background = "#7c3aed"}
+          >
+            <FontAwesomeIcon icon={faRocket} />
+            採用此範本
+          </button>
+
+          {/* ── Row 5: secondary actions ── */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            <button style={{ flex: 1, padding: "9px", borderRadius: 8, background: "white", color: "#57534E", border: "1.5px solid #E4E3E1", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "border-color 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = "#A8A29E"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = "#E4E3E1"}
+            >
+              <FontAwesomeIcon icon={faStar} style={{ fontSize: 12 }} /> 收藏
+            </button>
+            <button style={{ flex: 1, padding: "9px", borderRadius: 8, background: "white", color: "#57534E", border: "1.5px solid #E4E3E1", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "border-color 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = "#A8A29E"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = "#E4E3E1"}
+            >
+              <FontAwesomeIcon icon={faEllipsis} style={{ fontSize: 12 }} /> 更多
+            </button>
+          </div>
+
+          {/* ── Divider ── */}
+          <div style={{ height: 1, background: "#F0F0EE", marginBottom: 20 }} />
+
+          {/* ── Description ── */}
           {entity.description && (
             <p style={{ fontSize: 14, color: "#57534E", lineHeight: 1.7, margin: "0 0 20px" }}>{entity.description}</p>
           )}
 
-          {/* Metadata row: steps + agents count */}
-          {entity.kind === "squad" && (
-            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-              {(entity.steps?.length ?? 0) > 0 && (
-                <div style={{ flex: 1, background: "#F9F8F7", borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: "#1A1A18", margin: 0 }}>{entity.steps.length}</p>
-                  <p style={{ fontSize: 11, color: "#A8A29E", margin: "2px 0 0" }}>執行步驟</p>
-                </div>
-              )}
-              {(entity.agents?.length ?? 0) > 0 && (
-                <div style={{ flex: 1, background: "#F9F8F7", borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: "#1A1A18", margin: 0 }}>{entity.agents.length}</p>
-                  <p style={{ fontSize: 11, color: "#A8A29E", margin: "2px 0 0" }}>AI Agents</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Agents list */}
+          {/* ── Agents — avatar 頭像列 ── */}
           {entity.kind === "squad" && (entity.agents?.length ?? 0) > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 10px" }}>參與 Agents</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {entity.agents.map((a: any, i: number) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F9F8F7", borderRadius: 8 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: li.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <FontAwesomeIcon icon={faRobot} style={{ fontSize: 13, color: li.text }} />
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 12px" }}>參與 Agents</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {entity.agents.map((a: any, i: number) => {
+                  const agentSlug = a.slug ?? a.agentId ?? `agent-${i}`;
+                  const agentName = a.name ?? a.agentName ?? `Agent ${i + 1}`;
+                  const agentRole = a.role ?? a.primarySkill ?? null;
+                  const avatarSrc = agentAvatarUrl(String(agentSlug), agentName);
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <img
+                        src={avatarSrc}
+                        alt={agentName}
+                        style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${li.bg}` }}
+                        onError={e => { e.currentTarget.style.display = "none"; }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agentName}</p>
+                        {agentRole && <p style={{ fontSize: 11, color: "#A8A29E", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agentRole}</p>}
+                      </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A18", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {a.name ?? a.agentName ?? `Agent ${i + 1}`}
-                      </p>
-                      {(a.role ?? a.primarySkill) && (
-                        <p style={{ fontSize: 11, color: "#A8A29E", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.role ?? a.primarySkill}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Steps list */}
+          {/* ── Steps ── */}
           {entity.kind === "squad" && (entity.steps?.length ?? 0) > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 10px" }}>工作流程</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {entity.steps.slice(0, 5).map((s: any, i: number) => (
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px" }}>工作流程（{entity.steps.length} 步）</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {entity.steps.slice(0, 6).map((s: any, i: number) => (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: li.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, fontWeight: 700, color: li.text, marginTop: 1 }}>
-                      {i + 1}
-                    </div>
-                    <p style={{ fontSize: 13, color: "#57534E", margin: 0, lineHeight: 1.5 }}>
-                      {s.name ?? s.title ?? `步驟 ${i + 1}`}
-                    </p>
+                    <span style={{ width: 20, height: 20, borderRadius: "50%", background: li.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 700, color: li.text, marginTop: 1 }}>{i + 1}</span>
+                    <p style={{ fontSize: 13, color: "#57534E", margin: 0, lineHeight: 1.5 }}>{s.name ?? s.title ?? `步驟 ${i + 1}`}</p>
                   </div>
                 ))}
-                {entity.steps.length > 5 && (
-                  <p style={{ fontSize: 12, color: "#A8A29E", margin: "2px 0 0 32px" }}>還有 {entity.steps.length - 5} 個步驟…</p>
-                )}
+                {entity.steps.length > 6 && <p style={{ fontSize: 12, color: "#A8A29E", margin: "0 0 0 30px" }}>還有 {entity.steps.length - 6} 個步驟…</p>}
               </div>
             </div>
           )}
 
-          {/* Workspace tags */}
+          {/* ── Workspace tags ── */}
           {entity.workspace && (
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 8px" }}>適用通路</p>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 8px" }}>適用通路</p>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {(Array.isArray(entity.workspace) ? entity.workspace : [entity.workspace]).map((w: string, i: number) => (
                   <span key={i} style={{ padding: "3px 10px", borderRadius: 20, background: "#F0F0EE", fontSize: 12, color: "#57534E" }}>{w}</span>
@@ -1070,26 +1082,6 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
               </div>
             </div>
           )}
-
-          {/* CTA buttons */}
-          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
-            <button onClick={() => onLaunch(entity)}
-              style={{ padding: "14px", borderRadius: 12, background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", color: "white", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 16px rgba(99,102,241,0.3)", transition: "opacity 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              <FontAwesomeIcon icon={faRocket} />
-              採用此範本
-            </button>
-            <button onClick={onClose}
-              style={{ padding: "11px", borderRadius: 12, background: "white", color: "#57534E", border: "1.5px solid #E4E3E1", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "border-color 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = "#A8A29E"}
-              onMouseLeave={e => e.currentTarget.style.borderColor = "#E4E3E1"}
-            >
-              <FontAwesomeIcon icon={faStar} />
-              收藏
-            </button>
-          </div>
         </div>
       </div>
     </div>
