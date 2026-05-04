@@ -25,6 +25,19 @@ function initSendGrid() {
 /**
  * Send an email using SendGrid
  */
+/**
+ * SEC: Mask email address for logs (PII protection / GDPR Art.5(1)(c)).
+ * "alice@example.com" → "al***@example.com"
+ */
+function maskEmail(addr: string): string {
+  const at = addr.indexOf("@");
+  if (at < 1) return "***";
+  const local = addr.slice(0, at);
+  const domain = addr.slice(at);
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${"*".repeat(Math.max(1, local.length - visible.length))}${domain}`;
+}
+
 export async function sendEmail(data: EmailData): Promise<void> {
   try {
     initSendGrid();
@@ -36,7 +49,8 @@ export async function sendEmail(data: EmailData): Promise<void> {
       html: data.html,
     });
 
-    console.log(`[email] Sent email to ${data.to}: ${data.subject}`);
+    // SEC: don't log raw email — only masked form
+    console.log(`[email] Sent email to ${maskEmail(data.to)}: ${data.subject}`);
   } catch (error) {
     console.error("[email] Failed to send email:", error);
     throw new Error("Failed to send email");

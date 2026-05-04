@@ -11,8 +11,19 @@ const AUTH_TAG_LENGTH = 16;
 function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
   if (key && key.length === 64) return Buffer.from(key, "hex");
-  // Derive from JWT_SECRET as fallback
-  const secret = process.env.JWT_SECRET ?? "default-insecure-key";
+  // Derive from JWT_SECRET as fallback. JWT_SECRET is validated by env.ts
+  // (zod min(32) at startup), so absence here = misconfigured deployment.
+  // SEC-B-01 (2026-05-04): removed `?? "default-insecure-key"` literal —
+  // any code that fell through to the literal would encrypt every OAuth
+  // token / API key with a constant string published in the source repo.
+  // Now we throw fail-fast so the misconfig is visible immediately.
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      "ENCRYPTION_KEY (64-hex) or JWT_SECRET (≥32 chars) must be set; " +
+      "refusing to encrypt with a default/empty key.",
+    );
+  }
   return createHash("sha256").update(secret).digest();
 }
 

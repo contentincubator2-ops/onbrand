@@ -73,8 +73,17 @@ async function ensureTable(pool: mysql.Pool): Promise<void> {
   ) as any[];
   for (const idx of (idxRows as any[]) ?? []) {
     const name = idx.INDEX_NAME;
-    if (name && name !== "PRIMARY" && name !== "uq_mission_phase") {
-      try { await pool.execute(`ALTER TABLE squad_chat_sessions DROP INDEX ${name}`); } catch {}
+    // SEC: even though INDEX_NAME comes from information_schema (not user
+    // input), validate as MySQL identifier — defense in depth against any
+    // future call site that might pass user-controlled values.
+    if (
+      name &&
+      typeof name === "string" &&
+      /^[A-Za-z0-9_$]{1,64}$/.test(name) &&
+      name !== "PRIMARY" &&
+      name !== "uq_mission_phase"
+    ) {
+      try { await pool.execute(`ALTER TABLE squad_chat_sessions DROP INDEX \`${name}\``); } catch {}
     }
   }
   const [uqRows] = await pool.execute(

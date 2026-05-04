@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { marketingQueue } from '../queue/marketingQueue';
 import { randomUUID } from 'crypto';
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { taskWorkflows, tasks, agents, subscriptions } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -317,8 +317,15 @@ export const workflowRouter = router({
 
   /**
    * start — 提交任務到 BullMQ Queue（A2A 非同步模式）
+   *
+   * SEC-B-04 (2026-05-04): changed from publicProcedure to protectedProcedure.
+   * Previous public + per-IP rate limit allowed any anonymous caller to burn
+   * Anthropic / Azure quota by submitting LLM jobs (10/min/IP, easily bypassed
+   * via IP rotation, and the in-memory rate map evaporates on PM2 restart).
+   * Frontend caller (MissionChatCore.tsx:577) is always inside a logged-in
+   * session, so this change is non-breaking for legit users.
    */
-  start: publicProcedure
+  start: protectedProcedure
     .input(z.object({
       userRequest: z.string().min(1).max(2000),
       brand: z.string().optional(),
@@ -326,9 +333,9 @@ export const workflowRouter = router({
       taskType: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // SEC: rate limit — 10 requests/minute per IP
-      const ip = (ctx as any)?.req?.ip ?? (ctx as any)?.ip ?? 'unknown';
-      _checkRateLimit(`start:${ip}`, 10);
+      // Belt-and-suspenders: still rate-limit per user (account-level)
+      const userId = (ctx as any)?.user?.id ?? "anon";
+      _checkRateLimit(`start:user:${userId}`, 30);
       const jobId = randomUUID();
       const job = await marketingQueue.add('execute-task', {
         jobId,
@@ -336,6 +343,7 @@ export const workflowRouter = router({
         brand: input.brand,
         industry: input.industry,
         taskType: input.taskType,
+        userId, // tag the job so worker can audit
       }, {
         jobId,
         attempts: 3,
@@ -346,9 +354,10 @@ export const workflowRouter = router({
 
   /**
    * status — 輪詢任務狀態
+   * SEC-B-04: protected so anonymous callers can't enumerate jobIds.
    */
-  status: publicProcedure
-    .input(z.object({ jobId: z.string() }))
+  status: protectedProcedure
+    .input(z.object({ jobId: z.string().min(1).max(128) }))
     .query(async ({ input }) => {
       const job = await marketingQueue.getJob(input.jobId);
       if (!job) return { status: 'not_found' };

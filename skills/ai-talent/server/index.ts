@@ -61,27 +61,49 @@ if (process.env.TRUST_PROXY === "1") {
 
 // SEC-9: Helmet — HTTP security headers
 // Sprint 4: add HTTP security hardening headers
+// SEC-S-06 (2026-05-04): explicit HSTS preload-eligible config (default off in helmet).
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      // 'unsafe-inline' / 'unsafe-eval' tracked as S-05 in SECURITY-AUDIT.md
+      // — needed by Vite + HeroUI runtime; migration to nonce-based CSP is
+      // a separate workstream.
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "https://marketing-os.sowork.ai"],
     },
   },
+  hsts: {
+    maxAge: 31536000,        // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
   crossOriginEmbedderPolicy: false,  // allow SPA iframe embeds if needed
 }));
 
+// SEC-S-07 (2026-05-04): production no longer falls back to localhost (a
+// misconfig that would have allowed cross-origin writes). If CORS_ORIGIN is
+// unset in prod, we default to the real public domain only — never localhost.
+const isProd = process.env.NODE_ENV === "production";
+const corsOrigin = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map(s => s.trim())
+  : isProd
+    ? ["https://marketing-os.sowork.ai"]
+    : ["http://localhost:5173", "http://localhost:3000"];
 app.use(cors({
-  origin: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(",").map(s => s.trim())
-    : ["http://localhost:5173", "http://localhost:3000"],
+  origin: corsOrigin,
   credentials: true,
 }));
+console.log(`[server] CORS origin: ${Array.isArray(corsOrigin) ? corsOrigin.join(",") : corsOrigin}`);
 app.use(cookieParser());
-app.use(express.json());
+// SEC-B-08 (2026-05-04): cap JSON body size to 1MB. Default was unbounded
+// (express's 100KB default applies only when limit is set explicitly via the
+// option), creating a DoS vector via giant payloads. 1MB covers all legit
+// inputs including markdown / brief / prompt strings; raise for specific
+// upload routes if/when needed.
+app.use(express.json({ limit: '1mb' }));
 
 // DEBT-3: Request logging — minimal, no PII logged
 app.use((req, _res, next) => {

@@ -31,8 +31,13 @@ function getEncryptionKey(): Buffer {
 
   // Fallback: deterministic key derived from JWT_SECRET
   const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret) {
-    throw new Error("[tokenEncryption] Neither TOKEN_ENCRYPTION_KEY nor JWT_SECRET is set.");
+  // SEC-B-01 (2026-05-04): also enforce 32-char minimum so a short / weak
+  // JWT_SECRET can't be silently derived from. env.ts already validates ≥32
+  // at startup, but defense in depth.
+  if (!jwtSecret || jwtSecret.length < 32) {
+    throw new Error(
+      "[tokenEncryption] Neither TOKEN_ENCRYPTION_KEY (64 hex) nor JWT_SECRET (≥32 chars) is set.",
+    );
   }
   console.warn(
     "[tokenEncryption] TOKEN_ENCRYPTION_KEY not set — deriving key from JWT_SECRET. " +
