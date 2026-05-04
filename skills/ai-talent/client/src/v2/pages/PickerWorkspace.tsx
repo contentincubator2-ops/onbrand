@@ -29,6 +29,7 @@ import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMoc
 import { searchAndRankSquads } from "../lib/searchSquads";
 import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { IntakeChat } from "../components/IntakeChat";
+import { BriefPanel } from "../components/BriefPanel";
 import { useMissionStream, buildSlotMapFromProgress } from "../lib/useMissionStream";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
@@ -845,27 +846,22 @@ export default function PickerWorkspace() {
           ) : activeRailKey === "members" ? (
             <MembersDrawer onBackToTemplates={() => setActiveRailKey("templates")} />
           ) : (activeRailKey === "detail" || activeRailKey === "templates") && selectedSquad ? (
-            <IntakeChat
-              squad={selectedSquad}
-              lang={lang}
-              workspace={effectiveChannel}
+            <BriefPanel
+              layer={String(selectedSquad.strategy_layer ?? selectedSquad.strategyLayer ?? "L1").slice(0, 2)}
+              squadSlug={selectedSquad.slug}
+              squadName={selectedSquad.name}
+              brandId={brandId}
               brandName={brands.find((b: any) => b.id === brandId)?.name ?? null}
-              brandCtx={(() => {
-                const brand = brands.find((b: any) => b.id === brandId);
-                if (!brand) return "";
-                return [
-                  `品牌名稱：${brand.name ?? ""}`,
-                  brand.description ? `品牌描述：${brand.description}` : null,
-                  brand.industry   ? `產業：${brand.industry}`         : null,
-                  brand.tone       ? `語氣：${brand.tone}`             : null,
-                ].filter(Boolean).join("\n");
-              })()}
-              busy={busy}
-              error={error}
-              missionId={activeMissionId}
-              onLaunch={(intakeSummary) => launchSquad(selectedSquad, intakeSummary)}
+              productName={scope.productId ? brands.find((b: any) => b.id === brandId)?.name ?? null : null}
+              eventName={null}
+              onLaunch={(briefValues) => {
+                const summary = Object.entries(briefValues)
+                  .filter(([, v]) => v.trim())
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join("\n");
+                launchSquad(selectedSquad, summary);
+              }}
               onBack={() => { setSelectedSlug(null); setActiveRailKey("templates"); setPreviewText(""); }}
-              onPreviewChunk={(chunk) => setPreviewText((prev) => prev + chunk)}
             />
           ) : (
           <>
