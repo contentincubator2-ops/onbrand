@@ -38,6 +38,7 @@ import {
   faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
   faFolderOpen, faUserPlus, faCrown,
   faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
+  faRocket, faBullhorn,
   faWandSparkles, faEllipsis, faCircleInfo,
   faMagnifyingGlass, faGear, faCheck, faUserCircle,
 } from "@fortawesome/free-solid-svg-icons";
@@ -145,7 +146,7 @@ export default function BrandsPage() {
   const category: "positioning" | "visual" | "settings" =
     urlCat === "visual" ? "visual" : urlCat === "settings" ? "settings" : "positioning";
 
-  const defaultSection: SectionId = category === "visual" ? "asset:logo" : category === "settings" ? "settings" : "card";
+  const defaultSection: SectionId = category === "visual" ? "asset:all" : category === "settings" ? "settings" : "pos:home";
   const [section, setSection] = useState<SectionId>(defaultSection);
   const derivedCategory = category; // alias for content-area conditions
 
@@ -154,17 +155,17 @@ export default function BrandsPage() {
   React.useEffect(() => {
     if (prevCatRef.current !== category) {
       prevCatRef.current = category;
-      if (category === "visual")      setSection("asset:logo");
+      if (category === "visual")        setSection("asset:all");
       else if (category === "settings") setSection("settings");
-      else                              setSection("card");
+      else                              setSection("pos:home");
     }
   }, [category]);
 
   // (brand dropdown moved to ShellLayout sidebar)
 
-  // Reset to positioning when scope changes
+  // Reset to positioning grid when scope changes
   React.useEffect(() => {
-    setSection("card");
+    setSection("pos:home");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
 
@@ -646,8 +647,23 @@ export default function BrandsPage() {
           {/* ── 品牌 / 產品 / 活動定位 ── */}
           {derivedCategory === "positioning" && (
             <>
-              {/* Positioning content */}
+              {/* ── 定位 card grid (pos:home) ── */}
+              {section === "pos:home" ? (
+                <PositioningGrid
+                  scopeMode={scopeMode}
+                  segments={segments}
+                  onSelect={setSection}
+                />
+              ) : (
+              /* ── 選了具體 section → 原本的內容 ── */
               <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                <button onClick={() => setSection("pos:home")} style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  fontSize: 12, color: "#78716C", background: "none", border: "none",
+                  cursor: "pointer", padding: 0, marginBottom: 4,
+                }}>
+                  ← 品牌定位總覽
+                </button>
                 {scopeMode !== "none" && pipelineSteps.length > 0 && (
                   <PipelineRunner
                     steps={pipelineSteps}
@@ -703,6 +719,7 @@ export default function BrandsPage() {
                   onAutoFill={runSegmentAutoFill}
                 />
               </div>
+              )}  {/* end section !== pos:home */}
             </>
           )}
 
@@ -843,6 +860,112 @@ export default function BrandsPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+/* ─────────────────────────── PositioningGrid ───────────────────────── */
+// 品牌定位的 card grid — 速查卡/指令庫 + segments 分組顯示
+function PositioningGrid({
+  scopeMode, segments, onSelect,
+}: {
+  scopeMode: "brand" | "product" | "event" | "none";
+  segments: import("../lib/positioningSchema").SegmentSpec[];
+  onSelect: (section: string) => void;
+}) {
+  // Derive groups from segment num prefix
+  const groupedSegs = React.useMemo(() => {
+    const map = new Map<string, { label: string; segs: typeof segments }>();
+    for (const s of segments) {
+      const prefix = s.num.split(".")[0]!;
+      // label by prefix convention
+      const label =
+        prefix === "1" ? "品牌識別"
+        : prefix === "2" ? "品牌背景"
+        : prefix === "3" ? "目標受眾"
+        : prefix === "4" ? "市場分析"
+        : prefix === "5" ? "競爭策略"
+        : prefix === "6" ? "行銷策略"
+        : prefix === "7" ? "市場趨勢"
+        : prefix === "8" ? "品牌個性"
+        : `第 ${prefix} 章`;
+      if (!map.has(label)) map.set(label, { label, segs: [] });
+      map.get(label)!.segs.push(s);
+    }
+    return Array.from(map.values());
+  }, [segments]);
+
+  // Icon map per segment id
+  const ICONS: Record<string, any> = {
+    goldenCircle: faBullseye, tagline: faPenNib, taglineScore: faChartPie,
+    origin: faBookOpen, values: faShieldHalved,
+    audience: faUsers, competition: faTableList,
+    differentiation: faRocket, trends: faBullhorn, voice: faQuoteLeft,
+    // product / event fallbacks
+    core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
+  };
+  const BG_CYCLE = ["#FFF7ED","#F5F3FF","#EFF6FF","#F0FDF4","#FFF0F6","#FFFBEB","#F0F9FF","#ECFDF5"];
+
+  return (
+    <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32 }}>
+      {/* ── 工具群組 ── */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", letterSpacing: "0.10em", textTransform: "uppercase" }}>
+            品牌工具
+          </span>
+          <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+          <AssetCard label="速查卡"   icon={faTableList} bg="#FFF7ED" onClick={() => onSelect("card")} />
+          <AssetCard label="AI 指令庫" icon={faRobot}     bg="#F5F3FF" onClick={() => onSelect("prompts")} />
+        </div>
+      </div>
+
+      {/* ── Segment groups ── */}
+      {groupedSegs.map((group, gi) => (
+        <div key={group.label}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", letterSpacing: "0.10em", textTransform: "uppercase" }}>
+              {group.label}
+            </span>
+            <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
+            {group.segs.length > 4 && (
+              <button style={{ fontSize: 12, color: "#6366F1", background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap", padding: 0, fontWeight: 500 }}>
+                顯示更多
+              </button>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            {group.segs.map((s, si) => (
+              <AssetCard
+                key={s.id}
+                label={`${s.num} ${s.title}`}
+                icon={ICONS[s.id] ?? faBookOpen}
+                bg={BG_CYCLE[(gi * 4 + si) % BG_CYCLE.length]!}
+                onClick={() => onSelect(`seg:${s.id}`)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* ⑥ 紫色浮動 + 按鈕 */}
+      <button title="新增" style={{
+        position: "fixed", bottom: 32, right: 32, zIndex: 50,
+        width: 52, height: 52, borderRadius: "50%",
+        background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+        border: "none", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "white", fontSize: 22,
+        boxShadow: "0 6px 20px rgba(99,102,241,0.45)",
+        transition: "transform 0.18s, box-shadow 0.18s",
+      }}
+        onMouseEnter={e => { e.currentTarget.style.transform="scale(1.08)"; e.currentTarget.style.boxShadow="0 10px 28px rgba(99,102,241,0.55)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(99,102,241,0.45)"; }}
+      >
+        <FontAwesomeIcon icon={faPlus} />
+      </button>
+    </div>
   );
 }
 
