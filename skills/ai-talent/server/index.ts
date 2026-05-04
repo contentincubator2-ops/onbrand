@@ -41,7 +41,7 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { existsSync } from "fs";
+// existsSync already imported at top for env path resolution
 import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./llmWithBilling";
 import { createContext } from "./_core/trpc";

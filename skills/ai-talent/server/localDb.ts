@@ -5,12 +5,23 @@ import mysql from 'mysql2/promise';
  * 此 DB 存放從 Azure MySQL 同步過來的行銷相關 agents（17,000+ 筆）
  * 來源: ytcreator-ai-server.mysql.database.azure.com/sowork_db
  * 同步時間: 2026-04-12
+ *
+ * SEC-B-02 (2026-05-04): hardcoded "mos_secure_2026" fallback removed.
+ * LOCAL_DB_PASSWORD must be set via .env (see admin-write-required-env.yml).
  */
+const password = process.env.LOCAL_DB_PASSWORD;
+if (!password) {
+  throw new Error(
+    "[localDb] LOCAL_DB_PASSWORD env var is required. " +
+    "Run admin-write-required-env.yml to populate it.",
+  );
+}
+
 const localPool = mysql.createPool({
   host: process.env.LOCAL_DB_HOST || 'localhost',
   port: parseInt(process.env.LOCAL_DB_PORT || '3306'),
   user: process.env.LOCAL_DB_USER || 'mos_user',
-  password: process.env.LOCAL_DB_PASSWORD || 'mos_secure_2026',
+  password,
   database: process.env.LOCAL_DB_NAME || 'mos_db',
   waitForConnections: true,
   connectionLimit: 20,

@@ -2,11 +2,12 @@
  * Database connection — Drizzle ORM over MySQL2
  *
  * ✅ All data lives in mos_db (localhost VM).
- *    getDb()       → mos_db (primary, via LOCAL_DB_* env or hardcoded mos defaults)
+ *    getDb()       → mos_db (primary)
  *    getSoworkDb() → alias of getDb() (sowork_db dependency fully removed)
  *
- * LOCAL_DB_HOST / LOCAL_DB_USER / LOCAL_DB_PASSWORD / LOCAL_DB_NAME
- *   → default to localhost / mos_user / mos_secure_2026 / mos_db
+ * Required env vars (non-secret defaults retained for the public ones):
+ *   LOCAL_DB_HOST / LOCAL_DB_USER / LOCAL_DB_NAME — fall back to safe defaults
+ *   LOCAL_DB_PASSWORD — REQUIRED, no fallback (SEC-B-02 2026-05-04)
  */
 
 import { drizzle } from "drizzle-orm/mysql2";
@@ -22,10 +23,22 @@ let pool: Pool | null = null;
 export async function getDb(): Promise<DB> {
   if (db) return db;
 
+  // SEC-B-02 (2026-05-04): hardcoded "mos_secure_2026" fallback removed.
+  // Anyone reading the public source repo previously had the prod DB
+  // password in plain text. Now we fail-fast at first connection if env
+  // is misconfigured, instead of silently using the published string.
+  const password = process.env.LOCAL_DB_PASSWORD;
+  if (!password) {
+    throw new Error(
+      "LOCAL_DB_PASSWORD env var is required. Run admin-write-required-env.yml " +
+      "to populate it from secrets, or set it in skills/ai-talent/.env locally.",
+    );
+  }
+
   pool = createPool({
     host:     process.env.LOCAL_DB_HOST     || "localhost",
     user:     process.env.LOCAL_DB_USER     || "mos_user",
-    password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+    password,
     database: process.env.LOCAL_DB_NAME     || "mos_db",
     connectionLimit:      10,
     waitForConnections:   true,
