@@ -1,0 +1,32 @@
+name: Admin — Tail marketing-os error log (last 80 lines, raw)
+
+# Quick raw-tail of PM2 error log. No filtering, no grep.
+# Useful when you need to see what's actually crashing right now.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tail:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            ERR=~/.pm2/logs/marketing-os-error.log
+            OUT=~/.pm2/logs/marketing-os-out.log
+
+            echo "════════════ ERROR LOG (last 80) ════════════"
+            tail -80 "$ERR" 2>/dev/null
+
+            echo ""
+            echo "════════════ STDOUT LOG (last 60) ════════════"
+            tail -60 "$OUT" 2>/dev/null
+
+            echo ""
+            echo "════════════ Current PM2 status ════════════"
+            pm2 list 2>/dev/null | head -10
