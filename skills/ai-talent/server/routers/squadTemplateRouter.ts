@@ -2616,45 +2616,71 @@ ${input.question}`;
     }),
 
   // ── briefSearch ──────────────────────────────────────────────────────────
-  // Real-time web search for BriefPanel fields via Perplexity sonar-pro.
-  // Returns a short plain-text answer (1-3 sentences).
+  // Real-time web search for BriefPanel fields.
+  // Provider cascade: Tavily (dedicated search API, cheap) → OpenAI web search
+  // → plain LLM fallback (no live data). Returns a short plain-text answer.
   briefSearch: protectedProcedure
     .input(z.object({
       query:       z.string().min(1).max(400),
       brandName:   z.string().optional(),
       productName: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
-      const { invokeLLM } = await import("../_core/llm");
+    .mutation(async ({ input, ctx }) => {
       const q = input.query
         .replace("{brand_name}",   input.brandName   ?? "")
         .replace("{product_name}", input.productName ?? "");
 
-      let result = "";
+      // ── 1. Try Tavily (include_answer=true → instant 1-sentence answer) ──
+      const tavilyKey = (process.env as any).TAVILY_API_KEY ?? "";
+      if (tavilyKey) {
+        try {
+          const res = await fetch("https://api.tavily.com/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              api_key:         tavilyKey,
+              query:           q,
+              include_answer:  true,
+              search_depth:    "basic",
+              max_results:     3,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json() as any;
+            // Prefer the AI-generated answer; fall back to top snippet
+            const answer = (data?.answer as string | undefined)?.trim()
+              || (data?.results?.[0]?.content as string | undefined)?.trim()
+              || "";
+            if (answer) return { result: answer };
+          }
+        } catch { /* fall through */ }
+      }
+
+      // ── 2. Fallback: LLM with best available provider (no live search) ──
       try {
+        const { invokeLLM } = await import("../_core/llm");
         const res = await (invokeLLM as any)({
-          provider: "perplexity",
-          model:    "sonar-pro",
+          provider: "openai",   // fast + cheap for short answers
+          model:    "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: "你是行銷數據研究員。根據搜尋結果，用繁體中文給出簡短、準確的摘要（1-3句）。只回傳內容，不要加前言或解釋。",
+              content: "你是行銷數據研究員。根據你的知識，用繁體中文給出簡短、準確的摘要（1-3句）。只回傳內容，不要加前言或解釋。注意：這是基於訓練資料的回答，非即時資料。",
             },
             { role: "user", content: q },
           ],
-          maxTokens: 400,
+          maxTokens: 300,
         } as any);
         const raw = (res as any)?.choices?.[0]?.message?.content;
-        result = typeof raw === "string"
+        const answer = typeof raw === "string"
           ? raw.trim()
           : Array.isArray(raw)
             ? raw.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("").trim()
             : "";
-      } catch {
-        // Return empty string — client will keep field idle so user can fill manually
-        return { result: "" };
-      }
+        if (answer) return { result: answer };
+      } catch { /* fall through */ }
 
-      return { result };
+      // ── 3. All providers failed — return empty so client stays idle ──
+      return { result: "" };
     }),
 });
