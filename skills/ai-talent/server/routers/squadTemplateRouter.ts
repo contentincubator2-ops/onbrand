@@ -685,15 +685,31 @@ ${schemaExample}
       const filter = input?.includeUnapproved
         ? "1=1"           // admin mode: show all squads regardless of is_active/is_approved
         : "s.is_approved = 1";
-      const [rows] = await localPool.execute(
-        `SELECT s.id, s.slug, s.name, s.description,
-                s.strategy_layer,
-                NULL AS tier, NULL AS is_approved, NULL AS hero_image_url
-           FROM squads s
-          WHERE ${filter}
-          ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC
-          LIMIT 1000`
-      ) as any[];
+      // Try rich query first; fall back to minimal if columns are missing
+      const richQuery = `
+        SELECT s.id, s.slug, s.name, s.description,
+               s.strategy_layer, s.workspace, s.methodology,
+               s.agents, s.steps,
+               NULL AS hero_image_url
+          FROM squads s
+         WHERE ${filter}
+         ORDER BY s.id ASC
+         LIMIT 1000`;
+      const minimalQuery = `
+        SELECT id, slug, name, description, strategy_layer,
+               NULL AS workspace, NULL AS methodology,
+               NULL AS agents, NULL AS steps,
+               NULL AS hero_image_url
+          FROM squads
+         WHERE ${filter.replace(/s\./g, "")}
+         ORDER BY id ASC
+         LIMIT 1000`;
+      let rows: any[];
+      try {
+        [rows] = await localPool.execute(richQuery) as any[];
+      } catch {
+        [rows] = await localPool.execute(minimalQuery) as any[];
+      }
       return (rows as any[]) ?? [];
     }),
 
