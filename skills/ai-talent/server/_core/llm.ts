@@ -59,7 +59,7 @@ export type ToolChoice =
 export type InvokeParams = {
   messages: Message[];
   // Note: "openrouter" is deprecated — at runtime it's silently routed to LLM_DEFAULT_PROVIDER.
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "azure-position" | "azure-claude" | "azure-northcentral" | "azure-canada" | "google-vertex" | "gemini";
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "azure-position" | "azure-claude" | "azure-northcentral" | "azure-canada" | "google-vertex" | "gemini" | "hermes";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -238,6 +238,25 @@ const PROVIDER_CONFIG: Record<
     baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/ecommerce-483415/locations/us-central1/endpoints/openapi",
     defaultModel: "google/gemini-2.5-flash",
     getKey:       () => "service-account", // sentinel: token fetched dynamically
+  },
+
+  // ─── Hermes Agent — self-hosted on VM ────────────────────────────────────────
+  // FastAPI wrapper around the Hermes Agent CLI (hermes_api_server.py).
+  // Exposes /v1/chat/completions (OpenAI-compatible) on localhost:8765.
+  // Loaded with 1,879 sowork skills — carries full persona + working style.
+  //
+  // Setup:
+  //   1. Deploy hermes-deploy-full.tar.gz to VM
+  //   2. Start hermes-api systemd service
+  //   3. Add to .env:
+  //        HERMES_API_URL=http://127.0.0.1:8765
+  //        HERMES_API_KEY=<same Bearer token as in hermes-api.service>
+  hermes: {
+    baseUrl:      ENV.HERMES_API_URL
+      ? ENV.HERMES_API_URL.replace(/\/$/, "")
+      : "http://127.0.0.1:8765",
+    defaultModel: "hermes",
+    getKey:       () => ENV.HERMES_API_KEY ?? "local",
   },
 };
 

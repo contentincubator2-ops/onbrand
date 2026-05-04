@@ -1877,8 +1877,9 @@ function SquadIntakeSidebar({
 type ChatMsg = { role: "user" | "assistant"; text: string; ts: string; model?: string };
 
 /** Models available for Squad Lead chat */
-const SL_MODELS: Array<{ id: string; label: string; description: string; badge?: string }> = [
-  { id: "auto",               label: "Auto",           description: "自動選擇最佳模型",           badge: "推薦" },
+const SL_MODELS: Array<{ id: string; label: string; description: string; badge?: string; provider?: string }> = [
+  { id: "auto",               label: "Auto",           description: "自動選擇最佳模型",                        badge: "推薦" },
+  { id: "hermes",             label: "Hermes",         description: "你訓練的 Agent，帶完整人設 + 1,879 skills", badge: "本地", provider: "hermes" },
   { id: "claude-sonnet-4-6",  label: "Claude Sonnet",  description: "策略分析最強，適合深度諮詢" },
   { id: "gpt-5.4-mini",       label: "GPT-5.4 mini",   description: "快速回覆，適合即時問答" },
   { id: "Kimi-K2.5",          label: "Kimi K2.5",      description: "繁中最佳，理解品牌語境" },
@@ -1934,18 +1935,41 @@ function FeedbackPanel({
       const progressCtx = steps.length
         ? `整體進度：${confirmedCount}/${steps.length} 步驟完成。`
         : "";
-      const systemPrompt = `你是一位行銷小組的 Squad Lead，負責回答使用者關於目前任務的任何問題。${stepCtx}${progressCtx}請用繁體中文，簡潔、專業地回覆。`;
+
+      // Hermes gets the full session context — all steps, all progress, entire chat history
+      const isHermes = selectedModel === "hermes";
+      const systemPrompt = isHermes
+        ? [
+            `## 當前任務 Session`,
+            squadName ? `小組名稱：${squadName}` : "",
+            stepCtx,
+            progressCtx,
+            steps.length ? `\n## 所有步驟\n${steps.map((s: any, i: number) => {
+              const ord = i + 1;
+              const prog = progressByOrd.get(ord);
+              const status = prog?.status ?? "pending";
+              return `  Step ${ord}: ${s.name ?? s.title ?? "未命名"} [${status}]`;
+            }).join("\n")}` : "",
+            msgs.length ? `\n## 對話紀錄（最近 ${Math.min(msgs.length, 10)} 則）\n${msgs.slice(-10).map((m) => `${m.role === "user" ? "用戶" : "你"}: ${m.text}`).join("\n")}` : "",
+          ].filter(Boolean).join("\n")
+        : `你是一位行銷小組的 Squad Lead，負責回答使用者關於目前任務的任何問題。${stepCtx}${progressCtx}請用繁體中文，簡潔、專業地回覆。`;
+
       const modelToUse = selectedModel === "auto" ? undefined : selectedModel;
+      const providerToUse = isHermes ? "hermes" : undefined;
 
       let reply = "";
       if (callModel?.mutateAsync) {
         const result = await callModel.mutateAsync({
           system: systemPrompt,
           model: modelToUse,
-          messages: [
-            ...msgs.map((m) => ({ role: m.role, content: m.text })),
-            { role: "user", content: text },
-          ],
+          provider: providerToUse,
+          messages: isHermes
+            // Hermes already has full history in system prompt — just send current message
+            ? [{ role: "user", content: text }]
+            : [
+                ...msgs.map((m) => ({ role: m.role, content: m.text })),
+                { role: "user", content: text },
+              ],
         });
         reply = result?.content ?? result?.text ?? "收到，我正在處理你的問題。";
       } else {

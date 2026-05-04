@@ -41,6 +41,11 @@ const envSchema = z.object({
   AZURE_FOUNDRY_PROJECT_ENDPOINT: z.string().url().optional(),
   GOOGLE_VERTEX_API_KEY:    z.string().optional(),
 
+  // Hermes Agent — self-hosted on VM via FastAPI wrapper
+  // Set HERMES_API_URL=http://127.0.0.1:8765 after deploying hermes_api_server.py
+  HERMES_API_URL:  z.string().url().optional(),
+  HERMES_API_KEY:  z.string().optional(),   // Bearer token set in hermes-api.service
+
   // Azure Search
   AZURE_SEARCH_ENDPOINT:   z.string().url().optional(),
   AZURE_SEARCH_API_KEY:    z.string().optional(),

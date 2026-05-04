@@ -46,7 +46,8 @@ export type ModelProvider =
   | "azure-northcentral"
   | "azure-canada"
   | "anthropic"
-  | "gemini";
+  | "gemini"
+  | "hermes";
 
 export interface MultiModelMessage {
   role: "system" | "user" | "assistant";
@@ -131,6 +132,7 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
   forge:              "gemini-2.5-flash",
   anthropic:          "claude-sonnet-4-6",
   gemini:             "gemini-2.5-flash",
+  hermes:             "hermes",
 };
 
 /**
@@ -155,6 +157,7 @@ function getAvailabilityMap(): Record<ModelProvider, boolean> {
     cohere:              false,   // 401 — key invalid
     forge:               false,   // no key on VM
     gemini:              false,   // 400 — openai-compat mismatch; native works in perplexityScout
+    hermes:              !!(ENV as any).HERMES_API_URL,  // self-hosted on VM when deployed
   };
 }
 
