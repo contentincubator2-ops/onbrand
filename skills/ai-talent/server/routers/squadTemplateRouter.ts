@@ -2732,8 +2732,13 @@ ${input.question}`;
 
   // ── briefSearch ──────────────────────────────────────────────────────────
   // Real-time web search for BriefPanel fields.
-  // Provider cascade: Tavily (dedicated search API, cheap) → OpenAI web search
-  // → plain LLM fallback (no live data). Returns a short plain-text answer.
+  // Provider cascade (in order):
+  //   0. Vertex AI Grounding  (GOOGLE_APPLICATION_CREDENTIALS / GOOGLE_VERTEX_TOKEN)
+  //   1. Gemini 2.0 Flash + Google Search  (GEMINI_API_KEY / GOOGLE_AI_API_KEY)
+  //   2. Tavily  (TAVILY_API_KEY)
+  //   3. Jina AI  (free, no key)
+  //   4. Azure AI Foundry  (knowledge fallback, no live data)
+  // Returns a short plain-text answer; empty string → client keeps field idle.
   briefSearch: protectedProcedure
     .input(z.object({
       query:       z.string().min(1).max(400),
@@ -2742,7 +2747,7 @@ ${input.question}`;
     }))
     .mutation(async ({ input }) => {
       const { ENV } = await import("../_core/env");
-      const { invokeLLM } = await import("../_core/llm");
+      const { invokeLLM, invokeVertexGrounding } = await import("../_core/llm");
 
       const q = input.query
         .replace("{brand_name}",   input.brandName   ?? "")
@@ -2753,6 +2758,26 @@ ${input.question}`;
         if (Array.isArray(raw)) return raw.map((p: any) => typeof p === "string" ? p : p?.text ?? "").join("").trim();
         return "";
       };
+
+      // ── 0. Vertex AI Grounding (Google Search via Vertex AI) ──────────────
+      // Best quality: uses GOOGLE_APPLICATION_CREDENTIALS (service account) or
+      // GOOGLE_VERTEX_TOKEN env var. Falls through silently if neither is set.
+      const hasVertexCreds = !!(process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLE_VERTEX_TOKEN);
+      if (hasVertexCreds) {
+        try {
+          const answer = await invokeVertexGrounding({
+            query: `用繁體中文，簡短回答（1-3句）：${q}`,
+            system: "你是行銷數據研究員。只回傳答案本身，不要前言。",
+            maxOutputTokens: 300,
+          });
+          if (answer.trim()) {
+            console.log("[briefSearch] Vertex Grounding OK:", q.slice(0, 60));
+            return { result: answer.trim() };
+          }
+        } catch (e: any) {
+          console.warn("[briefSearch] Vertex Grounding error:", e?.message ?? e);
+        }
+      }
 
       // ── 1. Gemini 2.0 Flash + Google Search grounding ────────────────────
       // Uses google_search tool — real-time Google results, no extra key.

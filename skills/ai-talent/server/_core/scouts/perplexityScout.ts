@@ -9,7 +9,7 @@
  * Keeps the same Scout interface so orchestrator.ts is unchanged.
  */
 
-import { invokeLLM } from "../llm";
+import { invokeLLM, invokeVertexGrounding } from "../llm";
 import type { Scout, ScoutContext, IntelItem, IntelItemType } from "./types";
 
 const ALLOWED: Set<IntelItemType> = new Set([
@@ -178,12 +178,41 @@ export const perplexityScout: Scout = {
 
   async isAvailable(): Promise<boolean> {
     return (
+      !!(process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLE_VERTEX_TOKEN) ||
       !!(process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY) ||
       !!process.env.TAVILY_API_KEY
     );
   },
 
   async fetch(ctx: ScoutContext): Promise<IntelItem[]> {
+    // 0. Vertex AI Grounding (Google Search via Vertex AI)
+    const hasVertexCreds = !!(process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLE_VERTEX_TOKEN);
+    if (hasVertexCreds) {
+      try {
+        const { brandName, industry, keywords, competitors, days, limit } = ctx;
+        const q = [
+          `【品牌】${brandName ?? ""}`, `【產業】${industry ?? ""}`,
+          competitors?.length ? `【競品】${competitors.join(", ")}` : "",
+          keywords?.length ? `【關鍵字】${keywords.join(", ")}` : "",
+          `近 ${days} 天的最新新聞、趨勢、社群話題。產出 ${limit} 筆 JSON: {"items":[{"type":"competitor_news"|"trending_topic"|"social_trend","title":string,"content":string,"source":string,"url":string,"publishedAt":string,"relevanceScore":number}]}`,
+        ].filter(Boolean).join("\n");
+
+        const raw = await invokeVertexGrounding({
+          query: q,
+          system: "你是行銷市調 agent。只輸出 JSON，不要前言。",
+          maxOutputTokens: 2400,
+        });
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+        const items = parseItems(cleaned, limit, "vertex-grounding");
+        if (items.length > 0) {
+          console.log("[perplexityScout] Vertex Grounding OK, items:", items.length);
+          return items;
+        }
+      } catch (e) {
+        console.warn("[perplexityScout] Vertex Grounding failed:", (e as Error).message);
+      }
+    }
+
     // 1. Gemini + Google Search grounding
     try {
       const items = await fetchViaGemini(ctx);

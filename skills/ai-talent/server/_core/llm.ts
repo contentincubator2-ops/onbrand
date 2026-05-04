@@ -346,6 +346,65 @@ async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/
   return data.access_token;
 }
 
+// ─── Vertex AI Grounding (exported) ──────────────────────────────────────────
+// Uses Vertex AI's native generateContent API (NOT the OpenAI-compat shim)
+// so that googleSearch grounding tool works.
+//
+// Requirements (any one is enough):
+//   GOOGLE_APPLICATION_CREDENTIALS  — path to service account JSON (preferred)
+//   GOOGLE_VERTEX_TOKEN             — pre-issued Bearer token (CI / manual)
+//
+// Project defaults to GOOGLE_VERTEX_PROJECT_ID env var, then the built-in
+// project (ecommerce-483415).  Region defaults to us-central1.
+
+const VERTEX_PROJECT = process.env.GOOGLE_VERTEX_PROJECT_ID ?? "ecommerce-483415";
+const VERTEX_REGION  = process.env.GOOGLE_VERTEX_REGION    ?? "us-central1";
+
+export async function invokeVertexGrounding(opts: {
+  query: string;
+  system?: string;
+  model?: string;
+  maxOutputTokens?: number;
+}): Promise<string> {
+  // Resolve bearer token
+  let token = (process.env.GOOGLE_VERTEX_TOKEN ?? "").trim();
+  if (!token && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    token = await getGoogleServiceAccountToken("https://www.googleapis.com/auth/cloud-platform");
+  }
+  if (!token) throw new Error("Vertex AI: no credentials (set GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_VERTEX_TOKEN)");
+
+  const model = opts.model ?? "gemini-2.0-flash";
+  const url = `https://${VERTEX_REGION}-aiplatform.googleapis.com/v1beta1/projects/${VERTEX_PROJECT}/locations/${VERTEX_REGION}/publishers/google/models/${model}:generateContent`;
+
+  const body: any = {
+    contents: [{ role: "user", parts: [{ text: opts.query }] }],
+    tools: [{ googleSearch: {} }],
+    generationConfig: { maxOutputTokens: opts.maxOutputTokens ?? 2048 },
+  };
+  if (opts.system) {
+    body.systemInstruction = { parts: [{ text: opts.system }] };
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Vertex Grounding ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const json = await res.json() as any;
+  const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!text.trim()) throw new Error("Vertex Grounding: empty response");
+  return text;
+}
+
 // ─── Main invoke function ─────────────────────────────────────────────────────
 
 // Deprecated provider aliases — silently route to the configured default
