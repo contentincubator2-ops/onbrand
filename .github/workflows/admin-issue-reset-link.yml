@@ -86,12 +86,14 @@ jobs:
               [ -n "$VAL" ] && echo "  $v = (set, ${#VAL} chars)"
             done
 
-            # LOCAL_DB_* takes precedence (the actual DB used by the app)
-            MYSQL_USER_ARG="${LOCAL_DB_USER:-${DB_USER:-root}}"
+            # Fallbacks match the hardcoded defaults in db.ts / localDb.ts
+            # so this works even when .env doesn't override (which is the case
+            # on this VM as of 2026-05-04).
+            MYSQL_USER_ARG="${LOCAL_DB_USER:-${DB_USER:-mos_user}}"
             MYSQL_HOST_ARG="${LOCAL_DB_HOST:-${DB_HOST:-localhost}}"
             MYSQL_DB_ARG="${LOCAL_DB_NAME:-${DB_NAME:-mos_db}}"
             MYSQL_PORT_ARG="${LOCAL_DB_PORT:-${DB_PORT:-3306}}"
-            MYSQL_PWD_ARG="${LOCAL_DB_PASSWORD:-${DB_PASSWORD:-}}"
+            MYSQL_PWD_ARG="${LOCAL_DB_PASSWORD:-${DB_PASSWORD:-mos_secure_2026}}"
 
             export MYSQL_PWD="$MYSQL_PWD_ARG"
             MYSQL="mysql -h $MYSQL_HOST_ARG -P $MYSQL_PORT_ARG -u $MYSQL_USER_ARG $MYSQL_DB_ARG -B -N --silent"
