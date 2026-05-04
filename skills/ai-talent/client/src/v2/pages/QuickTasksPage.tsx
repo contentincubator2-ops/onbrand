@@ -343,7 +343,9 @@ export default function QuickTasksPage() {
           {/* ── Atomic tasks — Canva horizontal-scroll card row ── */}
           {(() => {
             const atomicTasks = catalogTasks.filter((t: any) => {
+              // Must be atomic AND have a bound agent — otherwise runAtomic will 500
               if (t.impl_kind !== "atomic") return false;
+              if (!t.agent_id && !t.agent_name) return false; // no bound agent
               if (catalogSearch) {
                 const q = catalogSearch.toLowerCase();
                 return (t.name_zh ?? "").toLowerCase().includes(q) ||

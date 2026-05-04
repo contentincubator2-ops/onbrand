@@ -126,17 +126,55 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
     return () => document.removeEventListener("keydown", h);
   }, [open, onClose]);
 
+  // Entity query (squads/agents/skills)
   const entityQ = (trpc as any).entity?.listForHome?.useQuery
     ? (trpc as any).entity.listForHome.useQuery({ brandId: null }, { refetchOnWindowFocus: false })
     : { data: [], isLoading: false };
   const allEntities: any[] = (entityQ.data as any[]) ?? [];
+
+  // Task catalog query — has full workspace tags, much better coverage than entity list
+  const catalogQ = (trpc as any).taskCatalog?.listForPicker?.useQuery
+    ? (trpc as any).taskCatalog.listForPicker.useQuery(
+        { includeComingSoon: false },
+        { refetchOnWindowFocus: false }
+      )
+    : { data: [] };
+  const catalogTasks: any[] = ((catalogQ.data as any[]) ?? []).map((t: any) => ({
+    id: `task-${t.id}`,
+    kind: "task",
+    slug: t.slug,
+    name: t.name_zh ?? t.slug,
+    description: t.description,
+    workspace: [t.workspace].filter(Boolean),
+    impl_kind: t.impl_kind,
+    agent_id: t.agent_id,
+    agent_name: t.agent_name,
+    // mark tasks with no bound agent so we can dim them
+    _noAgent: t.impl_kind === "atomic" && !t.agent_id && !t.agent_name,
+    _task: t,
+  }));
+
+  // Merge: catalog tasks first (curated), then entities (squads/agents/skills)
+  // Deduplicate by slug
+  const allItems = useMemo(() => {
+    const seen = new Set<string>();
+    const result: any[] = [];
+    for (const t of catalogTasks) {
+      if (!seen.has(t.slug)) { seen.add(t.slug); result.push(t); }
+    }
+    for (const e of allEntities) {
+      const key = e.slug ?? e.id;
+      if (!seen.has(key)) { seen.add(key); result.push(e); }
+    }
+    return result;
+  }, [catalogTasks, allEntities]);
 
   const catDef = CATEGORIES.find(c => c.key === category)!;
   const tabs   = CHANNEL_TABS[category] ?? [];
   const chips  = channel !== "all" ? (CONTENT_TYPES[channel] ?? []) : [];
 
   const filtered = useMemo(() => {
-    let items = allEntities;
+    let items = allItems;
     if (category !== "recommended" && catDef.workspaces.length > 0) {
       items = items.filter((e: any) => {
         const ws: string[] = Array.isArray(e.workspace) ? e.workspace : [e.workspace ?? ""];
@@ -162,7 +200,7 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
         (e.name ?? "").toLowerCase().includes(q) || (e.description ?? "").toLowerCase().includes(q));
     }
     return items.slice(0, 48);
-  }, [allEntities, category, channel, contentType, search, catDef]);
+  }, [allItems, category, channel, contentType, search, catDef]);
 
   const handleSelect = (entity: any) => {
     const ws = Array.isArray(entity.workspace) ? entity.workspace[0] : (entity.workspace ?? channel);
