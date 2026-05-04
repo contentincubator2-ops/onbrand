@@ -73,25 +73,25 @@ jobs:
             source "$ENV_FILE" 2>/dev/null
             set +a
 
-            # Probe what DB var names .env actually uses (different envs use
-            # different conventions). Print non-secret ones so we can debug.
+            # The app uses LOCAL_DB_* var names (see env.ts comment:
+            # "Actual connection uses LOCAL_DB_*"). Legacy DB_* are unused.
             echo ""
             echo "── 3. DB env var probe ──"
-            for v in DB_HOST DB_PORT DB_USER DB_NAME DATABASE_URL MYSQL_HOST MYSQL_USER MYSQL_DATABASE; do
+            for v in LOCAL_DB_HOST LOCAL_DB_PORT LOCAL_DB_USER LOCAL_DB_NAME DB_HOST DB_USER DB_NAME; do
               VAL=$(eval "echo \${$v:-}")
               [ -n "$VAL" ] && echo "  $v = $VAL"
             done
-            for v in DB_PASSWORD DB_PASS MYSQL_PASSWORD MYSQL_PWD; do
+            for v in LOCAL_DB_PASSWORD DB_PASSWORD; do
               VAL=$(eval "echo \${$v:-}")
               [ -n "$VAL" ] && echo "  $v = (set, ${#VAL} chars)"
             done
 
-            # Pick first available combo. Try DATABASE_URL first if present.
-            MYSQL_USER_ARG="${DB_USER:-${MYSQL_USER:-root}}"
-            MYSQL_HOST_ARG="${DB_HOST:-${MYSQL_HOST:-localhost}}"
-            MYSQL_DB_ARG="${DB_NAME:-${MYSQL_DATABASE:-marketing_os}}"
-            MYSQL_PORT_ARG="${DB_PORT:-3306}"
-            MYSQL_PWD_ARG="${DB_PASSWORD:-${DB_PASS:-${MYSQL_PASSWORD:-${MYSQL_PWD:-}}}}"
+            # LOCAL_DB_* takes precedence (the actual DB used by the app)
+            MYSQL_USER_ARG="${LOCAL_DB_USER:-${DB_USER:-root}}"
+            MYSQL_HOST_ARG="${LOCAL_DB_HOST:-${DB_HOST:-localhost}}"
+            MYSQL_DB_ARG="${LOCAL_DB_NAME:-${DB_NAME:-mos_db}}"
+            MYSQL_PORT_ARG="${LOCAL_DB_PORT:-${DB_PORT:-3306}}"
+            MYSQL_PWD_ARG="${LOCAL_DB_PASSWORD:-${DB_PASSWORD:-}}"
 
             export MYSQL_PWD="$MYSQL_PWD_ARG"
             MYSQL="mysql -h $MYSQL_HOST_ARG -P $MYSQL_PORT_ARG -u $MYSQL_USER_ARG $MYSQL_DB_ARG -B -N --silent"
