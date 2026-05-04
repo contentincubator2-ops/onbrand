@@ -1,0 +1,30 @@
+name: Admin — Write Hermes env vars to .env
+
+on:
+  workflow_dispatch:
+
+jobs:
+  write-env:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            upsert() {
+              local key="$1" val="$2"
+              if grep -q "^${key}=" "$ENV" 2>/dev/null; then
+                sed -i "s|^${key}=.*|${key}=${val}|" "$ENV"
+                echo "updated  $key"
+              else
+                echo "${key}=${val}" >> "$ENV"
+                echo "appended $key"
+              fi
+            }
+            upsert "HERMES_API_URL" "http://127.0.0.1:8765"
+            upsert "HERMES_API_KEY" "${{ secrets.HERMES_API_KEY }}"
+            echo "✅ Done — .env updated"
