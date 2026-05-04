@@ -708,31 +708,129 @@ export default function BrandsPage() {
 
           {/* ── 視覺資產 ── */}
           {derivedCategory === "visual" && scopeMode === "brand" && (
-            <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Asset editor — section drives which asset type is shown */}
-              {(scope?.brandId ?? brandId) ? (() => {
+            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32, position: "relative" }}>
+
+              {/* ── 若選了具體資產類別，顯示其編輯器 ── */}
+              {(() => {
                 const VALID_ASSET_KEYS: AssetKey[] = ["logo", "colors", "fonts", "photos", "guidelines", "templates"];
                 const assetKey = section.slice("asset:".length) as AssetKey;
-                if (VALID_ASSET_KEYS.includes(assetKey)) {
-                  return <BrandAssetPanel assetKey={assetKey} brandId={(scope?.brandId ?? brandId)!} />;
+                const activeBrandId = scope?.brandId ?? brandId;
+                if (VALID_ASSET_KEYS.includes(assetKey) && activeBrandId) {
+                  return (
+                    <div>
+                      {/* Back to grid */}
+                      <button onClick={() => setSection("asset:all")} style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        fontSize: 12, color: "#78716C", background: "none", border: "none",
+                        cursor: "pointer", marginBottom: 16, padding: 0,
+                      }}>
+                        ← 所有資產
+                      </button>
+                      <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} />
+                    </div>
+                  );
                 }
+
+                /* ── 預設：所有資產卡片 grid ── */
+                const ASSET_GROUPS: Array<{
+                  label: string;
+                  items: Array<{ id: string; label: string; icon: any; bg: string; }>;
+                }> = [
+                  {
+                    label: "基礎資產",
+                    items: [
+                      { id: "asset:logo",       label: "標誌",   icon: faPenNib,    bg: "#FFF7ED" },
+                      { id: "asset:colors",     label: "顏色",   icon: faPalette,   bg: "#F5F3FF" },
+                      { id: "asset:fonts",      label: "字型",   icon: faFont,      bg: "#EFF6FF" },
+                      { id: "asset:guidelines", label: "準則",   icon: faShieldHalved, bg: "#F0FDF4" },
+                    ],
+                  },
+                  {
+                    label: "品牌個性",
+                    items: [
+                      { id: "asset:voice",      label: "品牌口吻", icon: faQuoteLeft, bg: "#FFF0F6" },
+                      { id: "asset:templates",  label: "品牌範本", icon: faFolderOpen, bg: "#FFFBEB" },
+                      { id: "asset:photos",     label: "照片",     icon: faImages,    bg: "#F0F9FF" },
+                    ],
+                  },
+                  {
+                    label: "視覺素材",
+                    items: [
+                      { id: "asset:images",  label: "圖像", icon: faImage,    bg: "#FFF7ED" },
+                      { id: "asset:icons",   label: "圖示", icon: faIcons,    bg: "#F5F3FF" },
+                      { id: "asset:charts",  label: "圖表", icon: faChartPie, bg: "#ECFDF5" },
+                    ],
+                  },
+                ];
+
                 return (
-                  <Card shadow="none" className="border-2 border-dashed border-divider">
-                    <CardBody className="py-16 items-center text-center gap-3">
-                      <FontAwesomeIcon icon={faPalette} className="text-3xl text-default-300" />
-                      <p className="text-medium font-medium">即將推出</p>
-                      <p className="text-small text-default-500">此資產類型功能開發中。</p>
-                    </CardBody>
-                  </Card>
+                  <>
+                    {ASSET_GROUPS.map((group, gi) => (
+                      <div key={gi}>
+                        {/* 分組標題 — 細線 + 灰色小標籤 */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 600, color: "#A8A29E",
+                            letterSpacing: "0.10em", textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                          }}>{group.label}</span>
+                          <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
+                          <button style={{
+                            fontSize: 12, color: "#6366F1", background: "none", border: "none",
+                            cursor: "pointer", whiteSpace: "nowrap", padding: 0,
+                            fontWeight: 500,
+                          }}>
+                            顯示更多
+                          </button>
+                        </div>
+
+                        {/* 4-col card grid */}
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(4, 1fr)",
+                          gap: 14,
+                          marginBottom: 4,
+                        }}>
+                          {group.items.map(item => (
+                            <AssetCard
+                              key={item.id}
+                              label={item.label}
+                              icon={item.icon}
+                              bg={item.bg}
+                              onClick={() => setSection(item.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* ⑥ 紫色浮動 + 按鈕 */}
+                    <button
+                      title="新增資產"
+                      style={{
+                        position: "fixed", bottom: 32, right: 32, zIndex: 50,
+                        width: 52, height: 52, borderRadius: "50%",
+                        background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                        border: "none", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "white", fontSize: 22,
+                        boxShadow: "0 6px 20px rgba(99,102,241,0.45)",
+                        transition: "transform 0.18s, box-shadow 0.18s",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = "scale(1.08)";
+                        e.currentTarget.style.boxShadow = "0 10px 28px rgba(99,102,241,0.55)";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = "scale(1)";
+                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(99,102,241,0.45)";
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faPlus} />
+                    </button>
+                  </>
                 );
-              })() : (
-                <Card shadow="none" className="border-2 border-dashed border-divider">
-                  <CardBody className="py-16 items-center text-center gap-3">
-                    <FontAwesomeIcon icon={faShapes} className="text-3xl text-default-300" />
-                    <p className="text-medium font-medium">請先選擇品牌</p>
-                  </CardBody>
-                </Card>
-              )}
+              })()}
             </div>
           )}
 
@@ -745,6 +843,35 @@ export default function BrandsPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+/* ─────────────────────────── AssetCard ─────────────────────────── */
+// ③ 4-col 資產卡片：hover scale(1.02) + shadow 加深
+function AssetCard({ label, icon, bg, onClick }: {
+  label: string; icon: any; bg: string; onClick: () => void;
+}) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 12, padding: "28px 16px", borderRadius: 12,
+        background: bg, border: "1px solid rgba(0,0,0,0.06)",
+        cursor: "pointer", width: "100%",
+        transform: hovered ? "scale(1.02)" : "scale(1)",
+        boxShadow: hovered
+          ? "0 8px 24px rgba(0,0,0,0.13)"
+          : "0 1px 4px rgba(0,0,0,0.06)",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+      }}
+    >
+      <FontAwesomeIcon icon={icon} style={{ fontSize: 28, color: "#6B7280", opacity: 0.85 }} />
+      <span style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{label}</span>
+    </button>
   );
 }
 
