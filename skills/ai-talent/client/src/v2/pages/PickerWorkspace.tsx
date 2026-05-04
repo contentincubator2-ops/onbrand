@@ -29,7 +29,7 @@ import { inferMockupVariant, getVariantsForPlatform, inferStepKind, aggregateMoc
 import { searchAndRankSquads } from "../lib/searchSquads";
 import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { IntakeChat } from "../components/IntakeChat";
-import { BriefPanel } from "../components/BriefPanel";
+import { BriefPanel, LAYER_TAB_IDS } from "../components/BriefPanel";
 import { useMissionStream, buildSlotMapFromProgress } from "../lib/useMissionStream";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
@@ -95,7 +95,7 @@ import {
 // now — content gets populated as the underlying tables land in later
 // sprints. Clicking 範本 returns to the squad list.
 
-type RailKind = "global" | "layer" | "connections";
+type RailKind = "global" | "layer" | "connections" | "brief";
 type RailItem = {
   key: string;
   label: string;
@@ -110,13 +110,28 @@ type RailItem = {
 
 // Section labels shown above each group in the icon rail
 const RAIL_SECTION_LABELS: Partial<Record<RailKind, string>> = {
-  global: "詳情",
+  brief: "詳情",
   connections: "連結",
 };
 
+// Icon map for brief tab items — uses icons already imported in PickerWorkspace
+const BRIEF_TAB_ICONS: Record<string, any> = {
+  _summary:    faClipboardCheck,
+  brand:       faPalette,
+  competitors: faChessKnight,
+  audience:    faUsers,
+  product:     faBox,
+  pricing:     faMoneyBillWave,
+  channel:     faHashtag,
+  content:     faImage,
+  campaign:    faCalendarDays,
+  metrics:     faChartLine,
+  audit:       faRankingStar,
+  persona:     faUserTie,
+};
+
 const RAIL_TOP: RailItem[] = [
-  { key: "templates", label: "範本", icon: faTableCells,      kind: "global" },
-  { key: "detail",    label: "詳情", icon: faClipboardCheck,  kind: "global" },
+  { key: "templates", label: "範本", icon: faTableCells, kind: "global" },
 ];
 
 const RAIL_BOTTOM: RailItem[] = [
@@ -597,13 +612,12 @@ export default function PickerWorkspace() {
     }
   }, [filtered, selectedSlug]);
 
-  // ── Auto-switch to "詳情" tab when a squad is selected ────────────────
-  // When user clicks a squad card, jump them straight to the intake form.
-  // Going back to "範本" (via ← 所有方法論) clears selectedSlug and returns
-  // the middle column to the squad list.
+  // ── Auto-switch to brief 摘要 tab when a squad is selected ──────────
+  // When user clicks a squad card, jump them to the 摘要 brief tab.
+  // Going back (← 所有方法論) clears selectedSlug and resets.
   useEffect(() => {
     if (selectedSlug) {
-      setActiveRailKey("detail");
+      setActiveRailKey("brief__summary");
     }
   }, [selectedSlug]);
 
@@ -711,11 +725,24 @@ export default function PickerWorkspace() {
     return null;
   }, [channelFilter, selectedSquad]);
 
-  /** Currently visible rail items (top + layer-specific middle + bottom). */
-  const railItems = useMemo(
-    () => resolveRailItems(effectiveLayer, effectiveChannel),
-    [effectiveLayer, effectiveChannel],
-  );
+  /** Currently visible rail items (top + brief tabs when squad selected + layer-specific middle + bottom). */
+  const railItems = useMemo(() => {
+    const base = resolveRailItems(effectiveLayer, effectiveChannel);
+    if (!selectedSquad) return base;
+    // Build brief tab items from selected squad's layer
+    const layerKey = String(selectedSquad.strategy_layer ?? selectedSquad.strategyLayer ?? "L1").slice(0, 2).toUpperCase();
+    const tabs = LAYER_TAB_IDS[layerKey] ?? LAYER_TAB_IDS.L1;
+    const briefItems: RailItem[] = tabs.map(t => ({
+      key: `brief_${t.id}`,
+      label: t.label,
+      icon: BRIEF_TAB_ICONS[t.id] ?? faClipboardCheck,
+      kind: "brief" as RailKind,
+    }));
+    const topItems       = base.filter(it => it.kind === "global");
+    const layerItems     = base.filter(it => it.kind === "layer");
+    const connectionItems = base.filter(it => it.kind === "connections");
+    return [...topItems, ...briefItems, ...layerItems, ...connectionItems];
+  }, [effectiveLayer, effectiveChannel, selectedSquad]);
 
   /** The rail item the user has clicked into. Drives middle column mode. */
   const activeRailItem = useMemo(
@@ -857,7 +884,7 @@ export default function PickerWorkspace() {
             <UploadDrawer scope={scope} onBackToTemplates={() => setActiveRailKey("templates")} />
           ) : activeRailKey === "members" ? (
             <MembersDrawer onBackToTemplates={() => setActiveRailKey("templates")} />
-          ) : (activeRailKey === "detail" || activeRailKey === "templates") && selectedSquad ? (
+          ) : activeRailKey.startsWith("brief_") && selectedSquad ? (
             <BriefPanel
               layer={String(selectedSquad.strategy_layer ?? selectedSquad.strategyLayer ?? "L1").slice(0, 2)}
               squadSlug={selectedSquad.slug}
@@ -866,6 +893,8 @@ export default function PickerWorkspace() {
               brandName={brands.find((b: any) => b.id === brandId)?.name ?? null}
               productName={scope.productId ? brands.find((b: any) => b.id === brandId)?.name ?? null : null}
               eventName={null}
+              activeTabId={activeRailKey.slice(6) /* strip "brief_" */}
+              onTabChange={(tabId) => setActiveRailKey(`brief_${tabId}`)}
               onLaunch={(briefValues) => {
                 const summary = Object.entries(briefValues)
                   .filter(([, v]) => v.trim())

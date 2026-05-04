@@ -56,6 +56,48 @@ interface FieldState {
   editDraft?: string;
 }
 
+// ── Exported tab metadata (id + label only) — used by PickerWorkspace rail ──
+
+export const LAYER_TAB_IDS: Record<string, Array<{ id: string; label: string }>> = {
+  L1: [
+    { id: "_summary",    label: "摘要" },
+    { id: "brand",       label: "品牌" },
+    { id: "competitors", label: "競品" },
+    { id: "audience",    label: "受眾" },
+  ],
+  L2: [
+    { id: "_summary",    label: "摘要" },
+    { id: "brand",       label: "品牌" },
+    { id: "product",     label: "產品" },
+    { id: "pricing",     label: "定價" },
+    { id: "competitors", label: "競品" },
+  ],
+  L3: [
+    { id: "_summary", label: "摘要" },
+    { id: "brand",    label: "品牌" },
+    { id: "audience", label: "受眾" },
+    { id: "persona",  label: "Persona" },
+  ],
+  L4: [
+    { id: "_summary", label: "摘要" },
+    { id: "brand",    label: "品牌" },
+    { id: "channel",  label: "頻道" },
+    { id: "content",  label: "素材" },
+  ],
+  L5: [
+    { id: "_summary",  label: "摘要" },
+    { id: "brand",     label: "品牌" },
+    { id: "campaign",  label: "活動" },
+    { id: "audience",  label: "受眾" },
+  ],
+  L6: [
+    { id: "_summary", label: "摘要" },
+    { id: "brand",    label: "品牌" },
+    { id: "metrics",  label: "指標" },
+    { id: "audit",    label: "對標" },
+  ],
+};
+
 // ── Layer schemas（不含摘要，摘要永遠自動加在第一位）────────────────────────
 
 const LAYER_TABS: Record<string, BriefTab[]> = {
@@ -328,10 +370,14 @@ export interface BriefPanelProps {
   eventName?: string | null;
   onLaunch: (briefValues: Record<string, string>) => void;
   onBack?: () => void;
+  /** Controlled tab (driven by external icon rail). When provided, hides internal tab strip. */
+  activeTabId?: string;
+  onTabChange?: (tabId: string) => void;
 }
 
 export function BriefPanel({
-  layer, squadSlug, squadName, brandId, brandName, productName, eventName, onLaunch, onBack,
+  layer, squadSlug, squadName, brandId, brandName, productName, eventName,
+  onLaunch, onBack, activeTabId: externalActiveTabId, onTabChange,
 }: BriefPanelProps) {
   const layerKey = String(layer ?? "L1").slice(0, 2).toUpperCase();
   const contentTabs: BriefTab[] = LAYER_TABS[layerKey] ?? LAYER_TABS.L1;
@@ -345,7 +391,13 @@ export function BriefPanel({
   const allFields = useMemo(() => contentTabs.flatMap(t => t.fields), [contentTabs]);
   const layerColor = LAYER_COLOR[layerKey] ?? "#7C3AED";
 
-  const [activeTab, setActiveTab] = useState("_summary");
+  const isControlled = !!onTabChange;
+  const [_internalActiveTab, _setInternalActiveTab] = useState("_summary");
+  const activeTab = isControlled ? (externalActiveTabId ?? "_summary") : _internalActiveTab;
+  const setActiveTab = useCallback((id: string) => {
+    _setInternalActiveTab(id);
+    onTabChange?.(id);
+  }, [onTabChange]);
   const [isAutoRunning, setIsAutoRunning] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [typingFieldId, setTypingFieldId] = useState<string | null>(null);
@@ -529,24 +581,26 @@ export function BriefPanel({
         <div style={{ fontSize: 10, color: "#A8A29E", marginTop: 3 }}>{filledCount}/{totalFields} 欄位已填</div>
       </div>
 
-      {/* ── Tabs ── */}
-      <div style={{ display: "flex", background: "white", borderBottom: "1px solid #F0F0EE", overflowX: "auto" }}>
-        {allTabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            disabled={isAutoRunning}
-            style={{
-              flexShrink: 0, padding: "7px 12px", border: "none", background: "none",
-              cursor: isAutoRunning ? "default" : "pointer",
-              fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500,
-              color: activeTab === tab.id ? layerColor : "#A8A29E",
-              borderBottom: `2px solid ${activeTab === tab.id ? layerColor : "transparent"}`,
-              transition: "all 0.15s",
-            }}
-          >
-            {tab.id === "_summary" ? "摘要" : tab.label}
-          </button>
-        ))}
-      </div>
+      {/* ── Tabs (hidden in controlled/rail mode) ── */}
+      {!isControlled && (
+        <div style={{ display: "flex", background: "white", borderBottom: "1px solid #F0F0EE", overflowX: "auto" }}>
+          {allTabs.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              disabled={isAutoRunning}
+              style={{
+                flexShrink: 0, padding: "7px 12px", border: "none", background: "none",
+                cursor: isAutoRunning ? "default" : "pointer",
+                fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500,
+                color: activeTab === tab.id ? layerColor : "#A8A29E",
+                borderBottom: `2px solid ${activeTab === tab.id ? layerColor : "transparent"}`,
+                transition: "all 0.15s",
+              }}
+            >
+              {tab.id === "_summary" ? "摘要" : tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Tab content ── */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
