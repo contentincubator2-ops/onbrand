@@ -7,12 +7,28 @@
 
 // Load .env before any other imports (dotenv must come first)
 import { config as dotenvConfig } from "dotenv";
-import { join } from "path";
+import { join, dirname } from "path";
+import { existsSync } from "fs";
+import { fileURLToPath } from "url";
 
-// Use process.cwd() so PM2 --cwd flag controls where we look for .env.
-// CWD is set to skills/ai-talent/ so .env lives right there.
-const envPath = join(process.cwd(), ".env");
-console.log('[server] Loading .env from:', envPath);
+// SEC-B-03 (2026-05-04): try multiple .env paths.
+// PM2 daemon restarts (e.g. server reboot, OOM-kill recovery) sometimes
+// don't preserve CWD, so process.cwd()-relative resolution alone caused
+// JWT_SECRET to go missing on restart, triggering an env-validation exit
+// code 1 loop (1500+ recorded restarts in PM2 stats before this fix).
+const here = dirname(fileURLToPath(import.meta.url));
+const candidatePaths = [
+  join(process.cwd(), ".env"),              // CWD-relative (when ci.yml launches us)
+  join(here, "..", ".env"),                  // server/index.ts → ../.env (always works)
+  "/opt/marketing-os/app/skills/ai-talent/.env", // prod absolute fallback
+];
+const envPath = candidatePaths.find((p) => existsSync(p));
+console.log('[server] .env candidate paths checked:', candidatePaths);
+console.log('[server] .env resolved to:', envPath ?? "NONE FOUND");
+if (!envPath) {
+  console.error('[server] FATAL: no .env file found in any expected path');
+  process.exit(1);
+}
 // override: true — otherwise pm2's cached env wins over .env edits and
 // LLM provider switches (via admin-* workflows) silently don't take effect.
 const result = dotenvConfig({ path: envPath, override: true });
