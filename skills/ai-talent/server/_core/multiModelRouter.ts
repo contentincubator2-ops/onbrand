@@ -42,6 +42,7 @@ export type ModelProvider =
   | "forge"
   | "azure-foundry"
   | "azure-position"
+  | "azure-claude"
   | "azure-northcentral"
   | "azure-canada"
   | "anthropic"
@@ -101,13 +102,14 @@ export function detectTaskType(content: string): TaskType {
 //   chinese/general   → qwen (native Chinese LLM) first
 //   fallback chain    → qwen → zhipu → azure-foundry (all confirmed working)
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
-  chinese_content: ["qwen",           "zhipu", "azure-foundry", "azure-position"],
-  creative_writing: ["azure-position", "qwen",  "zhipu",         "azure-foundry"],
-  search_realtime:  ["qwen",           "zhipu", "azure-foundry", "azure-position"],
-  analysis:         ["azure-position", "qwen",  "zhipu",         "azure-foundry"],
-  classification:   ["qwen",           "zhipu", "azure-foundry", "azure-position"],
-  coding:           ["azure-northcentral", "azure-foundry", "qwen", "zhipu"],
-  general:          ["qwen",           "zhipu", "azure-foundry", "azure-position"],
+  //                  best choice          ↓ fallbacks ────────────────────────────────────
+  chinese_content:  ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
+  creative_writing: ["azure-position",    "azure-claude","qwen",           "azure-foundry"],
+  search_realtime:  ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
+  analysis:         ["azure-position",    "azure-claude","qwen",           "azure-foundry"],
+  classification:   ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
+  coding:           ["azure-northcentral","azure-foundry","qwen",          "zhipu"],
+  general:          ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
 };
 
 // Best model to use for each provider when called by this router
@@ -116,10 +118,11 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
   qwen:               "qwen-plus",
   zhipu:              "glm-4-flash",
   // Azure endpoints
-  "azure-foundry":    "gpt-5.4-mini",          // cheaper than gpt-5.4; Kimi-K2.5 also confirmed
-  "azure-position":   "claude-sonnet-4-6",      // best model for creative/analysis
-  "azure-northcentral": "DeepSeek-V3.2",        // R1 for reasoning, V3.2 for speed
-  "azure-canada":     "gpt-4o-mini-transcribe", // transcription only
+  "azure-foundry":      "gpt-5.4-mini",          // gpt-5.4/Kimi-K2.5/grok-4 also available
+  "azure-position":     "claude-sonnet-4-6",    // also: claude-haiku-4-5, gpt-5.4-pro
+  "azure-claude":       "claude-sonnet-4-6",    // Sweden: claude-sonnet/haiku/opus variants
+  "azure-northcentral": "DeepSeek-V3.2",        // also: DeepSeek-R1, Mistral-Large-3
+  "azure-canada":       "gpt-4o-mini-transcribe",
   // Disabled / not used via invokeLLM
   perplexity:         "sonar-pro",
   google:             "gemini-2.0-flash",
@@ -134,20 +137,16 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
  * Determine which providers are available based on configured API keys.
  */
 function getAvailabilityMap(): Record<ModelProvider, boolean> {
-  const foundryKey  = !!(ENV as any).AZURE_FOUNDRY_API_KEY;
-  const positionKey = !!(ENV as any).AZURE_POSITION_API_KEY || foundryKey; // fallback to shared key
-  const northKey    = !!(ENV as any).AZURE_NORTHCENTRAL_API_KEY || foundryKey;
-  const canadaKey   = !!(ENV as any).AZURE_CANADA_API_KEY || foundryKey;
-
   return {
     // Confirmed working (probed 2026-05-04)
-    qwen:                !!ENV.QWEN_API_KEY,
-    zhipu:               !!ENV.ZHIPU_API_KEY,
-    "azure-foundry":     foundryKey,
-    // Available when keys present (using shared foundry key as fallback)
-    "azure-position":    positionKey,
-    "azure-northcentral": northKey,
-    "azure-canada":      canadaKey,
+    qwen:                 !!ENV.QWEN_API_KEY,
+    zhipu:                !!ENV.ZHIPU_API_KEY,
+    "azure-foundry":      !!(ENV as any).AZURE_FOUNDRY_API_KEY,
+    // Newly added Azure resources (keys written 2026-05-04)
+    "azure-position":     !!(ENV as any).AZURE_POSITION_API_KEY,
+    "azure-claude":       !!(ENV as any).AZURE_CLAUDE_SWEDEN_API_KEY,
+    "azure-northcentral": !!(ENV as any).AZURE_NORTHCENTRAL_API_KEY,
+    "azure-canada":       !!(ENV as any).AZURE_CANADA_API_KEY,
     // Force-disabled: confirmed broken or not OpenAI-compat via invokeLLM
     anthropic:           false,   // 404 — uses /messages not /chat/completions
     openai:              false,   // 401 — key expired

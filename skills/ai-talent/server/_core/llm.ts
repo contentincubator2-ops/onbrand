@@ -178,40 +178,52 @@ const PROVIDER_CONFIG: Record<
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
 
-  // Resource 2: sowork-ai-position-resource
+  // Resource 2: sowork-ai-position-resource (cognitiveservices endpoint)
   //   Models: claude-sonnet-4-6, claude-haiku-4-5, gpt-5.4-pro, gpt-5.4-nano,
   //           cohere-command-a, FLUX.1-Kontext-pro,
-  //           gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2,
-  //           gpt-4o-mini-tts, gpt-4o-transcribe, gpt-audio-1.5, whisper
+  //           gpt-image-1/1-mini/1.5/2, gpt-4o-mini-tts, gpt-4o-transcribe,
+  //           gpt-audio-1.5, whisper
   //   Key: AZURE_POSITION_API_KEY  Endpoint: AZURE_POSITION_ENDPOINT
   "azure-position": {
     baseUrl:      (ENV as any).AZURE_POSITION_ENDPOINT
       ? `${((ENV as any).AZURE_POSITION_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://sowork-ai-position-resource.services.ai.azure.com/openai/v1",
+      : "https://sowork-ai-position-resource.cognitiveservices.azure.com/openai/v1",
     defaultModel: (ENV as any).AZURE_POSITION_MODEL || "claude-sonnet-4-6",
-    getKey:       () => (ENV as any).AZURE_POSITION_API_KEY ?? (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+    getKey:       () => (ENV as any).AZURE_POSITION_API_KEY ?? "",
   },
 
-  // Resource 3: cjwan-mnykipqt-northcentralus
+  // Resource 3: proj-claude-sweden-resource (cognitiveservices endpoint)
+  //   Models: claude-sonnet-4-6, claude-haiku-4-5, claude-opus-4-5/4-6 (all variants)
+  //   Note: deployments showed 失敗 in portal but may work with correct key
+  //   Key: AZURE_CLAUDE_SWEDEN_API_KEY  Endpoint: AZURE_CLAUDE_SWEDEN_ENDPOINT
+  "azure-claude": {
+    baseUrl:      (ENV as any).AZURE_CLAUDE_SWEDEN_ENDPOINT
+      ? `${((ENV as any).AZURE_CLAUDE_SWEDEN_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
+      : "https://proj-claude-sweden-resource.cognitiveservices.azure.com/openai/v1",
+    defaultModel: "claude-sonnet-4-6",
+    getKey:       () => (ENV as any).AZURE_CLAUDE_SWEDEN_API_KEY ?? "",
+  },
+
+  // Resource 4: cjwan-mnykipqt-northcentralus (cognitiveservices endpoint)
   //   Models: DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3
-  //   Key: AZURE_NORTHCENTRAL_API_KEY  Endpoint: Azure OpenAI northcentralus
+  //   Key: AZURE_NORTHCENTRAL_API_KEY  Endpoint: AZURE_NORTHCENTRAL_ENDPOINT
   "azure-northcentral": {
     baseUrl:      (ENV as any).AZURE_NORTHCENTRAL_ENDPOINT
       ? `${((ENV as any).AZURE_NORTHCENTRAL_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://cjwan-mnykipqt-northcentralus.services.ai.azure.com/openai/v1",
+      : "https://cjwan-mnykipqt-northcentralus.cognitiveservices.azure.com/openai/v1",
     defaultModel: "DeepSeek-V3.2",
-    getKey:       () => (ENV as any).AZURE_NORTHCENTRAL_API_KEY ?? (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+    getKey:       () => (ENV as any).AZURE_NORTHCENTRAL_API_KEY ?? "",
   },
 
-  // Resource 4: cjwan-mnynpm8k-canadacentral
+  // Resource 5: cjwan-mnynpm8k-canadacentral (cognitiveservices endpoint)
   //   Models: gpt-4o-mini-transcribe
-  //   Key: AZURE_CANADA_API_KEY
+  //   Key: AZURE_CANADA_API_KEY  Endpoint: AZURE_CANADA_ENDPOINT
   "azure-canada": {
     baseUrl:      (ENV as any).AZURE_CANADA_ENDPOINT
       ? `${((ENV as any).AZURE_CANADA_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://cjwan-mnynpm8k-canadacentral.services.ai.azure.com/openai/v1",
+      : "https://cjwan-mnynpm8k-canadacentral.cognitiveservices.azure.com/openai/v1",
     defaultModel: "gpt-4o-mini-transcribe",
-    getKey:       () => (ENV as any).AZURE_CANADA_API_KEY ?? (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+    getKey:       () => (ENV as any).AZURE_CANADA_API_KEY ?? "",
   },
   // Google Gemini — AI Studio / Generative Language API (OpenAI-compatible shim)
   // Endpoint: https://generativelanguage.googleapis.com/v1beta/openai
