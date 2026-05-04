@@ -110,11 +110,30 @@ export default function MethodologyCatalog() {
     { refetchOnWindowFocus: false, staleTime: 30_000 }
   );
 
-  // ── Data: agents via trpc.agent.list (typed, reliable — uses getSoworkDb) ──
+  // ── Data: agents via trpc.agent.list — paginated (10,000+ total) ──────────
+  // agentOffset drives load-more; each page is 200 rows.
+  // allAgentPages accumulates fetched pages so previous results are preserved.
+  const [agentOffset, setAgentOffset] = useState(0);
+  const [allAgentPages, setAllAgentPages] = useState<any[][]>([]);
+
   const agentQuery = trpc.agent.list.useQuery(
-    { limit: 200 },
-    { refetchOnWindowFocus: false, staleTime: 30_000 }
+    { limit: 200, offset: agentOffset },
+    { refetchOnWindowFocus: false, staleTime: 60_000 }
   );
+
+  // Accumulate pages into allAgentPages whenever a page lands
+  useEffect(() => {
+    const page = agentQuery.data as any[] | undefined;
+    if (!page || page.length === 0) return;
+    setAllAgentPages(prev => {
+      const pageIndex = agentOffset / 200;
+      const next = [...prev];
+      next[pageIndex] = page;
+      return next;
+    });
+  }, [agentQuery.data, agentOffset]);
+
+  const agentHasMore = (agentQuery.data?.length ?? 0) === 200;
 
   // ── Data: entity.listForHome → skills + any enrichment ───────────────────
   // Best-effort: provides skills + agents-from-skills (agent-template category).
@@ -135,6 +154,12 @@ export default function MethodologyCatalog() {
         if (typeof s.mockup_images === "string") mockupImages = JSON.parse(s.mockup_images);
         else if (Array.isArray(s.mockup_images)) mockupImages = s.mockup_images;
       } catch {}
+      // 4-tier image fallback:
+      //   1. hero_image_url (written to DB by generateSquadCovers script)
+      //   2. mockupImages[0] (JSON array in DB)
+      //   3. /static/covers/<slug>.png (image exists on VM but hero_image_url not backfilled)
+      //   4. MethodologyGlyph pattern (ultimate fallback in LandscapeCard)
+      const slugCover = s.slug ? `/static/covers/${s.slug}.png` : null;
       return {
         id: s.id,
         kind: "squad" as Kind,
@@ -142,8 +167,7 @@ export default function MethodologyCatalog() {
         name: s.name,
         description: s.description,
         strategyLayer: String(s.strategy_layer ?? "L1").slice(0, 2).toUpperCase(),
-        // Three-tier image fallback: hero_image_url → mockupImages[0] → MethodologyGlyph
-        coverImageUrl: s.hero_image_url ?? mockupImages[0] ?? null,
+        coverImageUrl: s.hero_image_url ?? mockupImages[0] ?? slugCover,
         mockupImages,
         is_approved: s.is_approved,
       };
@@ -152,7 +176,9 @@ export default function MethodologyCatalog() {
 
   // ── Normalize agent data ───────────────────────────────────────────────────
   const agents: any[] = useMemo(() => {
-    const fromAgent = ((agentQuery.data as any[]) ?? []).map((a: any) => ({
+    // Flatten all loaded pages
+    const allRaw = allAgentPages.flat();
+    const fromAgent = allRaw.map((a: any) => ({
       id: a.id,
       kind: "agent" as Kind,
       slug: a.slug ?? `agent-${a.id}`,
@@ -160,7 +186,8 @@ export default function MethodologyCatalog() {
       subtitle: a.title_zh ?? a.title ?? null,
       description: a.bio_zh ?? a.bio ?? a.specialty ?? null,
       strategyLayer: "L4",
-      coverImageUrl: a.avatarUrl ?? null,
+      // Agent avatar: avatarUrl from DB → fallback /static/covers/agent-<slug>.png
+      coverImageUrl: a.avatarUrl ?? (a.slug ? `/static/covers/agent-${a.slug}.png` : null),
     }));
     // Also grab agents from entity.listForHome if available (more enriched)
     const fromEntity = ((entityQuery.data as any[]) ?? []).filter((e: any) => e.kind === "agent");
@@ -182,7 +209,9 @@ export default function MethodologyCatalog() {
 
   const allEntities: any[] = useMemo(() => [...squads, ...agents, ...skills], [squads, agents, skills]);
 
-  const isLoading = squadQuery.isLoading && agentQuery.isLoading;
+  // Loading: show skeleton only on very first load (no data yet at all)
+  const isLoading = squadQuery.isLoading && allAgentPages.length === 0;
+  const agentLoadingMore = agentQuery.isFetching && allAgentPages.length > 0;
 
   // ── Grid filter ───────────────────────────────────────────────────────────
   const gridItems = useMemo(() => {
@@ -395,6 +424,29 @@ export default function MethodologyCatalog() {
               ))}
             </div>
           )}
+
+          {/* Load-more button — shown when viewing agents and more pages are available */}
+          {activeKind === "agent" && (agentHasMore || agentLoadingMore) && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 32 }}>
+              <button
+                onClick={() => { if (!agentLoadingMore) setAgentOffset(prev => prev + 200); }}
+                disabled={agentLoadingMore}
+                style={{
+                  padding: "10px 32px", borderRadius: 50,
+                  background: agentLoadingMore ? "#F0F0EE" : "#6366F1",
+                  color: agentLoadingMore ? "#A8A29E" : "white",
+                  border: "none", cursor: agentLoadingMore ? "default" : "pointer",
+                  fontSize: 14, fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: 8,
+                  transition: "background 0.15s",
+                }}
+              >
+                {agentLoadingMore
+                  ? "載入中…"
+                  : `顯示更多 Agents（已載入 ${agents.length} 個）`}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -477,6 +529,7 @@ function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
   const [starHov, setStarHov] = useState(false);
   const [menuHov, setMenuHov] = useState(false);
   const [starred, setStarred] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const li = layerInfo(entity.strategyLayer ?? entity.strategy_layer);
   const layer = li.key;
@@ -535,14 +588,23 @@ function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
               if (img.src !== fb) img.src = fb;
             }}
           />
-        ) : coverImageUrl ? (
-          /* Squad with cover image */
-          <img src={coverImageUrl} alt={entity.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          /* Squad: MethodologyGlyph */
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85 }}>
-            <MethodologyGlyph seed={entity.slug ?? entity.id} layer={(layer as MosLayer)} size={glyphSize} />
-          </div>
+          /* Squad: cover image (if available + not failed) OR MethodologyGlyph */
+          <>
+            {coverImageUrl && !imgFailed && (
+              <img
+                src={coverImageUrl}
+                alt={entity.name}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                onError={() => setImgFailed(true)}
+              />
+            )}
+            {(!coverImageUrl || imgFailed) && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85 }}>
+                <MethodologyGlyph seed={entity.slug ?? entity.id} layer={(layer as MosLayer)} size={glyphSize} />
+              </div>
+            )}
+          </>
         )}
 
         {/* Layer chip — top-left */}

@@ -23,19 +23,20 @@ function detectTaskType(description: string): string {
 
 // ── Router ─────────────────────────────────────────────────────────────────
 export const agentRouter = router({
-  /** List all available agents, optional layer filter */
+  /** List all available agents, optional layer filter + offset pagination */
   list: protectedProcedure
     .input(
       z.object({
         layer: z.enum(["strategy", "execution", "training"]).optional(),
         limit: z.number().default(50),
+        offset: z.number().default(0),
         workspace: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
       const db = await getSoworkDb();
       if (!db) return [];
-            // Build dynamic where: isAvailable + optional layer + optional workspace
+      // Build dynamic where: isAvailable + optional layer + optional workspace
       const conditions = [eq(soworkAgents.isAvailable, true)];
       if (input.layer) conditions.push(eq(soworkAgents.layer, input.layer));
       if (input.workspace) conditions.push(eq(soworkAgents.workspace, input.workspace));
@@ -44,7 +45,8 @@ export const agentRouter = router({
         .select()
         .from(soworkAgents)
         .where(whereClause)
-        .limit(input.limit);
+        .limit(input.limit)
+        .offset(input.offset);
     }),
 
   /** Count agents grouped by layer */

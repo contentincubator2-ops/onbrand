@@ -20,6 +20,8 @@ import {
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
   faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
+  faStar, faImage, faUser, faPaintBrush, faFont, faMagnifyingGlass,
+  faTrademark, faChevronDown, faCrown,
 } from "@fortawesome/free-solid-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
@@ -375,14 +377,88 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
    LAYER 2 — Slide panel (210px, left:70px, slides in/out)
 ══════════════════════════════════════════════════════════════════ */
 
-/* ── Sub-nav items for Projects panel ── */
-const PROJECTS_SUB_NAV = [
-  { id: "all",     label: "所有專案",   icon: faFolderOpen     },
-  { id: "mine",    label: "你的專案",   icon: faRocket         },
-  { id: "shared",  label: "與你分享",   icon: faUserGroup      },
-  { id: "offline", label: "可離線使用", icon: faCheckDouble    },
-] as const;
+/* ── Shared top buttons: 你的方案 + 邀請使用者 ── */
+function PlanInviteButtons({ onNavigate }: { onNavigate: (to: string) => void }) {
+  return (
+    <div style={{ padding: "0 10px 8px", display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
+      {[
+        { icon: faCrown, label: "你的方案",   to: "/settings/plan" },
+        { icon: faUserGroup, label: "邀請使用者", to: "/settings/team" },
+      ].map(({ icon, label, to }) => (
+        <button key={label} onClick={() => onNavigate(to)} style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 8,
+          padding: "7px 10px", borderRadius: 8,
+          border: "1px solid #E9E8E6", background: "white",
+          cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151",
+          transition: "background 0.1s", textAlign: "left",
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
+          onMouseLeave={e => e.currentTarget.style.background = "white"}
+        >
+          <FontAwesomeIcon icon={icon} style={{ fontSize: 12, width: 14, color: "#78716C" }} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
+/* ── Starred items section header ── */
+function StarredHeader() {
+  return (
+    <div style={{ padding: "10px 14px 6px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        已標記星號的內容
+      </span>
+      <button style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#A8A29E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 }}>
+        <FontAwesomeIcon icon={faPlus} />
+      </button>
+    </div>
+  );
+}
+
+/* ── Slim nav row (icon + label, active highlight) ── */
+function NavRow({ icon, label, active, onClick }: { icon: any; label: string; active?: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      width: "100%", display: "flex", alignItems: "center", gap: 10,
+      padding: "8px 10px", borderRadius: 8, border: "none",
+      background: active ? "#EDE9FE" : "transparent",
+      cursor: "pointer", textAlign: "left", transition: "background 0.1s", marginBottom: 1,
+    }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "transparent"; }}
+    >
+      <FontAwesomeIcon icon={icon} style={{ fontSize: 13, width: 15, flexShrink: 0, color: active ? "#4F46E5" : "#6B7280" }} />
+      <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? "#4338CA" : "#374151", flex: 1 }}>
+        {label}
+      </span>
+    </button>
+  );
+}
+
+/* ── Trash button ── */
+function TrashButton({ onNavigate }: { onNavigate: (to: string) => void }) {
+  return (
+    <div style={{ flexShrink: 0, padding: "6px 10px 14px", borderTop: "1px solid #f3f4f6" }}>
+      <button onClick={() => onNavigate("/trash")} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "8px 10px", borderRadius: 8, border: "none", background: "none",
+        fontSize: 13, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
+      }}
+        onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+        onMouseLeave={e => e.currentTarget.style.background = "none"}
+      >
+        <FontAwesomeIcon icon={faTrash} style={{ fontSize: 13, width: 15 }} />
+        垃圾桶
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SlidePanel — Canva-faithful per-page sidebar content
+══════════════════════════════════════════════════════════════════ */
 function SlidePanel({
   open, onClose, brands, brandId, onNavigate, currentPath,
 }: {
@@ -393,295 +469,349 @@ function SlidePanel({
   onNavigate: (to: string) => void;
   currentPath: string;
 }) {
-  const isProjects = currentPath === "/projects" || currentPath.startsWith("/projects");
+  const isHome      = currentPath === "/";
+  const isProjects  = currentPath.startsWith("/projects");
+  const isTemplates = currentPath.startsWith("/templates");
+  const isBrands    = currentPath.startsWith("/brands");
 
-  // Detect active sub-nav from URL
+  // URL-based sub-nav detection
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const activeSubNav = searchParams.get("sub") ?? "all";
 
-  // Data
+  // Recent missions (used by Home + Projects)
   const recentQuery = (trpc as any).mission?.listAllForUser?.useQuery
     ? (trpc as any).mission.listAllForUser.useQuery(undefined, { refetchOnWindowFocus: false })
     : { data: [] };
   const recentMissions: any[] = ((recentQuery.data as any[]) ?? []).slice(0, 6);
 
+  // Brand dropdown state (used by Brands panel)
+  const [brandDropOpen, setBrandDropOpen] = React.useState(false);
+  const [brandSearch, setBrandSearch] = React.useState("");
+  const activeBrand = brands.find((b: any) => b.id === brandId);
+
   return (
-    <div
-      style={{
-        position: "fixed", left: ICON_W, top: 0, bottom: 0, zIndex: 29,
-        width: PANEL_W,
-        background: "#fff",
-        borderRight: "1px solid #f3f4f6",
-        boxShadow: open ? "4px 0 20px rgba(0,0,0,0.08)" : "none",
-        display: "flex", flexDirection: "column",
-        transform: open ? "translateX(0)" : `translateX(-${PANEL_W + 4}px)`,
-        transition: "transform 0.22s cubic-bezier(0.4,0,0.2,1), box-shadow 0.22s",
-        overflow: "hidden",
-      }}
-    >
-      {/* Header: wordmark */}
+    <div style={{
+      position: "fixed", left: ICON_W, top: 0, bottom: 0, zIndex: 29,
+      width: PANEL_W,
+      background: "#fff",
+      borderRight: "1px solid #f3f4f6",
+      boxShadow: open ? "4px 0 20px rgba(0,0,0,0.08)" : "none",
+      display: "flex", flexDirection: "column",
+      transform: open ? "translateX(0)" : `translateX(-${PANEL_W + 4}px)`,
+      transition: "transform 0.22s cubic-bezier(0.4,0,0.2,1), box-shadow 0.22s",
+      overflow: "hidden",
+      fontFamily: "Inter, system-ui, sans-serif",
+    }}>
+      {/* Wordmark header */}
       <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 16px", flexShrink: 0 }}>
-        <span style={{ fontSize: 18, fontWeight: 800, color: "#F97316", letterSpacing: "-0.03em" }}>
-          SoWork
-        </span>
+        <span style={{ fontSize: 18, fontWeight: 800, color: "#F97316", letterSpacing: "-0.03em" }}>SoWork</span>
       </div>
 
-      {/* ── Projects-specific panel ── */}
-      {isProjects ? (
+      {/* ── 首頁 panel (Screenshot 1) ── */}
+      {isHome && (
         <>
-          {/* 你的方案 */}
-          <div style={{ padding: "0 12px 8px", flexShrink: 0 }}>
-            <button
-              onClick={() => onNavigate("/settings/plan")}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 8,
-                padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
-                background: "white", cursor: "pointer", textAlign: "left",
-                marginBottom: 6, transition: "background 0.1s",
-                fontSize: 13, fontWeight: 500, color: "#374151",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
-              onMouseLeave={e => e.currentTarget.style.background = "white"}
-            >
-              <span style={{ fontSize: 13 }}>👑</span>
-              你的方案
-            </button>
-            <button
-              onClick={() => onNavigate("/settings/team")}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "7px 10px", borderRadius: 8, border: "1px solid #E9E8E6",
-                background: "white", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151",
-                transition: "background 0.1s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
-              onMouseLeave={e => e.currentTarget.style.background = "white"}
-            >
-              <FontAwesomeIcon icon={faUserGroup} style={{ fontSize: 11 }} />
-              邀請使用者
-            </button>
+          <PlanInviteButtons onNavigate={onNavigate} />
+          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
+          <StarredHeader />
+          {/* Starred brands */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
+            {brands.length === 0 && (
+              <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 8px 8px", lineHeight: 1.5 }}>
+                點擊品牌的星號圖示，即可從這裡快速找到。
+              </p>
+            )}
+            {brands.slice(0, 6).map((b: any) => (
+              <PanelRow key={b.id}
+                initial={(b.name ?? "B").slice(0, 1).toUpperCase()}
+                initialBg="#EEF2FF" initialColor="#4F46E5"
+                label={b.name} onClick={() => onNavigate("/brands")} />
+            ))}
+            {/* 近期設計 */}
+            {recentMissions.length > 0 && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 8px 6px" }}>
+                  <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#A8A29E" }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>近期設計</span>
+                </div>
+                {recentMissions.map((m: any) => (
+                  <PanelRow key={m.id}
+                    initial={(m.title ?? "M").slice(0, 1).toUpperCase()}
+                    initialBg="#FFF7ED" initialColor="#F97316"
+                    label={m.title}
+                    onClick={() => {
+                      const url = m.brandId ? `/b/${m.brandId}/${m.workspace || "_"}/m/${m.id}` : `/m/${m.id}`;
+                      onNavigate(url);
+                    }} />
+                ))}
+                <button onClick={() => onNavigate("/")} style={{
+                  width: "100%", textAlign: "center", padding: "6px 8px", border: "none",
+                  background: "none", fontSize: 12, color: "#F97316", cursor: "pointer", fontWeight: 600,
+                }}>查看全部</button>
+              </>
+            )}
           </div>
+          <TrashButton onNavigate={onNavigate} />
+        </>
+      )}
 
+      {/* ── 專案 panel (Screenshot 2) ── */}
+      {isProjects && (
+        <>
+          <PlanInviteButtons onNavigate={onNavigate} />
+          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
+          <nav style={{ padding: "8px 6px", flexShrink: 0 }}>
+            {([
+              { id: "all",     label: "所有專案",   icon: faFolderOpen  },
+              { id: "mine",    label: "你的專案",   icon: faRocket      },
+              { id: "shared",  label: "與你分享",   icon: faUserGroup   },
+              { id: "offline", label: "可離線使用", icon: faCheckDouble },
+            ] as const).map(n => (
+              <NavRow key={n.id} icon={n.icon} label={n.label}
+                active={activeSubNav === n.id}
+                onClick={() => onNavigate(`/projects?sub=${n.id}`)} />
+            ))}
+          </nav>
+          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
+          <StarredHeader />
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
+            {brands.slice(0, 6).map((b: any) => (
+              <PanelRow key={b.id}
+                initial={(b.name ?? "B").slice(0, 1).toUpperCase()}
+                initialBg="#EEF2FF" initialColor="#4F46E5"
+                label={b.name} onClick={() => onNavigate("/brands")} />
+            ))}
+          </div>
+          <TrashButton onNavigate={onNavigate} />
+        </>
+      )}
+
+      {/* ── 範本 panel (Screenshot 3) ── */}
+      {isTemplates && (
+        <>
+          <PlanInviteButtons onNavigate={onNavigate} />
+          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
+          <nav style={{ padding: "8px 6px", flex: 1 }}>
+            {([
+              { id: "templates", label: "範本",         icon: faTableCells,   to: "/templates"           },
+              { id: "photos",    label: "照片",         icon: faImage,        to: "/templates?kind=photo" },
+              { id: "images",    label: "圖像",         icon: faPaintBrush,   to: "/templates?kind=image" },
+              { id: "creators",  label: "創作者",       icon: faUser,         to: "/templates?kind=agent" },
+              { id: "starred",   label: "已標記星號的內容", icon: faStar,       to: "/templates?kind=skill" },
+            ]).map(n => {
+              const active =
+                n.id === "templates"
+                  ? currentPath === "/templates" && !searchParams.get("kind")
+                  : searchParams.get("kind") === n.id.replace("photos","photo").replace("images","image").replace("creators","agent").replace("starred","skill");
+              return (
+                <NavRow key={n.id} icon={n.icon} label={n.label} active={active} onClick={() => onNavigate(n.to)} />
+              );
+            })}
+          </nav>
+        </>
+      )}
+
+      {/* ── 品牌 panel (Screenshots 4 & 5) ── */}
+      {isBrands && (
+        <>
+          <PlanInviteButtons onNavigate={onNavigate} />
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
 
-          {/* Sub-nav */}
-          <nav style={{ padding: "8px 6px", flexShrink: 0 }}>
-            {PROJECTS_SUB_NAV.map(n => {
-              const active = activeSubNav === n.id;
+          {/* 所有品牌範本 */}
+          <button style={{
+            display: "flex", alignItems: "center", padding: "9px 14px",
+            fontSize: 13, fontWeight: 500, color: "#374151",
+            background: "none", border: "none", cursor: "pointer", textAlign: "left", width: "100%",
+            transition: "background 0.1s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+          >
+            所有品牌範本
+          </button>
+
+          {/* 品牌工具組 dropdown trigger */}
+          <div style={{ padding: "0 10px 4px", position: "relative" }}>
+            <button
+              onClick={() => { setBrandDropOpen(v => !v); setBrandSearch(""); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                padding: "7px 10px", borderRadius: 8,
+                background: brandDropOpen ? "#EDE9FE" : "#F5F4F2",
+                border: brandDropOpen ? "1.5px solid #6366F1" : "1.5px solid transparent",
+                cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18",
+                transition: "all 0.15s", textAlign: "left",
+              }}
+            >
+              {/* Swatch */}
+              <div style={{
+                width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ color: "white", fontSize: 9, fontWeight: 700 }}>
+                  {((activeBrand?.name ?? "B") as string).slice(0,1).toUpperCase()}
+                </span>
+              </div>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                品牌工具組
+              </span>
+              <FontAwesomeIcon icon={faChevronDown} style={{
+                fontSize: 9, color: "#78716C",
+                transform: brandDropOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s",
+              }} />
+            </button>
+
+            {/* Dropdown panel */}
+            {brandDropOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 4px)", left: 10, right: 10,
+                background: "white", borderRadius: 10,
+                border: "1px solid #E4E3E1",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                zIndex: 200, overflow: "hidden",
+              }}>
+                {/* Search */}
+                <div style={{ padding: "8px 10px", borderBottom: "1px solid #F0EFED", position: "relative" }}>
+                  <FontAwesomeIcon icon={faMagnifyingGlass} style={{
+                    position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)",
+                    color: "#A8A29E", fontSize: 11, pointerEvents: "none",
+                  }} />
+                  <input
+                    autoFocus
+                    value={brandSearch}
+                    onChange={e => setBrandSearch(e.target.value)}
+                    placeholder="搜尋品牌工具組"
+                    style={{
+                      width: "100%", padding: "5px 6px 5px 22px",
+                      borderRadius: 6, border: "1px solid #E4E3E1",
+                      fontSize: 12, color: "#1A1A18", outline: "none",
+                      background: "#FAFAF9", boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                {/* Brand list */}
+                <div style={{ maxHeight: 160, overflowY: "auto" }}>
+                  {brands
+                    .filter((b: any) => !brandSearch || b.name?.toLowerCase().includes(brandSearch.toLowerCase()))
+                    .map((b: any) => {
+                      const isActive = b.id === brandId;
+                      return (
+                        <button key={b.id}
+                          onClick={() => { onNavigate("/brands"); setBrandDropOpen(false); }}
+                          style={{
+                            width: "100%", display: "flex", alignItems: "center", gap: 8,
+                            padding: "7px 10px", background: isActive ? "#EDE9FE" : "none",
+                            border: "none", cursor: "pointer", textAlign: "left",
+                            transition: "background 0.12s", fontSize: 12,
+                          }}
+                          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#F5F4F2"; }}
+                          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "none"; }}
+                        >
+                          <div style={{
+                            width: 24, height: 24, borderRadius: 5, flexShrink: 0,
+                            background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            <span style={{ color: "white", fontSize: 9, fontWeight: 700 }}>
+                              {(b.name?.charAt(0) || "B").toUpperCase()}
+                            </span>
+                          </div>
+                          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1A1A18", fontWeight: isActive ? 600 : 400 }}>
+                            {b.name}
+                          </span>
+                          {isActive && <FontAwesomeIcon icon={faCheck} style={{ color: "#6366F1", fontSize: 10 }} />}
+                        </button>
+                      );
+                    })}
+                  {brands.filter((b: any) => !brandSearch || b.name?.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && (
+                    <p style={{ padding: "10px 14px", fontSize: 12, color: "#A8A29E" }}>找不到品牌</p>
+                  )}
+                </div>
+                {/* Actions */}
+                <div style={{ borderTop: "1px solid #F0EFED", padding: "5px 0" }}>
+                  {[
+                    { icon: faPlus,     label: "建立新的品牌工具組" },
+                    { icon: faPlus,     label: "建立個人品牌工具組" },
+                    { icon: faGear,     label: "品牌控制" },
+                  ].map(({ icon, label }) => (
+                    <button key={label} style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 8,
+                      padding: "7px 12px", background: "none", border: "none",
+                      cursor: "pointer", fontSize: 12, color: "#57534E", textAlign: "left",
+                      transition: "background 0.12s",
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
+                      onMouseLeave={e => e.currentTarget.style.background = "none"}
+                    >
+                      <FontAwesomeIcon icon={icon} style={{ fontSize: 10, width: 11 }} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Brand subnav */}
+          <nav style={{ flex: 1, overflowY: "auto", padding: "4px 6px 8px" }}>
+            {([
+              { id: "all",    label: "所有資產",  hasPlus: true  },
+              { id: "guide",  label: "準則",      hasPlus: false },
+              { id: "tmpl",   label: "品牌範本",  badge: "最新"  },
+              { id: "logo",   label: "標誌"                       },
+              { id: "color",  label: "顏色"                       },
+              { id: "font",   label: "字型"                       },
+              { id: "voice",  label: "品牌口吻"                   },
+              { id: "photo",  label: "照片"                       },
+              { id: "image",  label: "圖像"                       },
+              { id: "icon",   label: "圖示"                       },
+              { id: "chart",  label: "圖表"                       },
+            ] as Array<{ id: string; label: string; hasPlus?: boolean; badge?: string }>).map(n => {
+              const active = searchParams.get("asset") === n.id || (n.id === "all" && !searchParams.get("asset"));
               return (
-                <button
-                  key={n.id}
-                  onClick={() => onNavigate(`/projects?sub=${n.id}`)}
+                <button key={n.id}
+                  onClick={() => onNavigate(n.id === "all" ? "/brands" : `/brands?asset=${n.id}`)}
                   style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 10px", borderRadius: 8, border: "none", marginBottom: 1,
-                    textAlign: "left", cursor: "pointer",
-                    background: active ? "#EEF2FF" : "transparent",
-                    transition: "background 0.1s",
+                    width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "7px 10px", borderRadius: 8,
+                    background: active ? "#EDE9FE" : "none",
+                    border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: active ? 600 : 400,
+                    color: active ? "#4F46E5" : "#374151",
+                    textAlign: "left", transition: "background 0.12s", marginBottom: 1,
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EEF2FF" : "transparent"; }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
                 >
-                  <FontAwesomeIcon icon={n.icon} style={{ fontSize: 13, width: 15, flexShrink: 0, color: active ? "#4F46E5" : "#6B7280" }} />
-                  <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? "#4338CA" : "#374151", flex: 1 }}>
-                    {n.label}
-                  </span>
-                  {n.id === "mine" && brands[0] && (
-                    <div style={{
-                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                      background: "#6366F1",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 8, fontWeight: 700, color: "#fff",
-                    }}>
-                      {((brands[0]?.name ?? "S") as string).slice(0, 1).toUpperCase()}
-                    </div>
+                  <span style={{ flex: 1 }}>{n.label}</span>
+                  {n.hasPlus && <FontAwesomeIcon icon={faPlus} style={{ fontSize: 10, color: active ? "#4F46E5" : "#A8A29E" }} />}
+                  {n.badge && (
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 4, background: "#6366F1", color: "white" }}>
+                      {n.badge}
+                    </span>
                   )}
                 </button>
               );
             })}
           </nav>
+        </>
+      )}
 
-          <div style={{ height: 1, background: "#f3f4f6", margin: "4px 0", flexShrink: 0 }} />
-
-          {/* 已標記星號的內容 */}
-          <div style={{ padding: "8px 14px 6px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              已標記星號的內容
-            </span>
-            <button style={{
-              width: 20, height: 20, borderRadius: 4, border: "none", background: "transparent",
-              cursor: "pointer", color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
-            }}>
-              <FontAwesomeIcon icon={faPlus} />
-            </button>
-          </div>
-
-          {/* Starred items list */}
+      {/* ── Other pages — generic home-style panel ── */}
+      {!isHome && !isProjects && !isTemplates && !isBrands && (
+        <>
+          <PlanInviteButtons onNavigate={onNavigate} />
+          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
           <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
-            {recentMissions.length === 0 && (
-              <p style={{ fontSize: 11.5, color: "#9ca3af", padding: "4px 8px 8px", lineHeight: 1.5 }}>
-                點擊任一設計的星號圖示，即可從這裡輕鬆找到。
-              </p>
-            )}
-            {recentMissions.map((m: any) => (
-              <button key={m.id} onClick={() => onNavigate(`/projects`)} style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 8,
-                padding: "6px 8px", borderRadius: 8, border: "none", background: "transparent",
-                cursor: "pointer", textAlign: "left", transition: "background 0.1s",
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.04)"}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-              >
-                {/* Thumbnail */}
-                <div style={{
-                  width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-                  background: (m as any).thumbnailUrl ? `url(${(m as any).thumbnailUrl}) center/cover` : "#EEF2FF",
-                  backgroundImage: (m as any).thumbnailUrl ? `url(${(m as any).thumbnailUrl})` : undefined,
-                  backgroundSize: "cover", backgroundPosition: "center",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, color: "#4F46E5",
-                }}>
-                  {!(m as any).thumbnailUrl && ((m.title ?? "M") as string).slice(0, 1).toUpperCase()}
-                </div>
-                <span style={{ fontSize: 12.5, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                  {m.title}
-                </span>
-              </button>
+            {brands.slice(0, 6).map((b: any) => (
+              <PanelRow key={b.id}
+                initial={(b.name ?? "B").slice(0, 1).toUpperCase()}
+                initialBg="#EEF2FF" initialColor="#4F46E5"
+                label={b.name} onClick={() => onNavigate("/brands")} />
             ))}
           </div>
-
-          {/* Bottom: trash */}
-          <div style={{ flexShrink: 0, padding: "8px 6px 16px", borderTop: "1px solid #f3f4f6" }}>
-            <button
-              onClick={() => onNavigate("/trash")}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "8px 10px", borderRadius: 8, border: "none", background: "none",
-                fontSize: 13, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}
-            >
-              <FontAwesomeIcon icon={faTrash} style={{ fontSize: 13, width: 15 }} />
-              垃圾桶
-            </button>
-          </div>
-        </>
-      ) : (
-        /* ── Default panel (non-projects pages) ── */
-        <>
-          {/* 建立 full-width button */}
-          <div style={{ padding: "0 12px 12px", flexShrink: 0 }}>
-            <button
-              onClick={() => onNavigate("/")}
-              style={{
-                width: "100%", height: 40, borderRadius: 10, border: "none",
-                background: "#F97316", color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                fontSize: 14, fontWeight: 600, cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(249,115,22,0.30)",
-                transition: "background 0.1s",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
-              onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              建立任務
-            </button>
-          </div>
-
-          <div style={{ flex: 1, overflowY: "auto", padding: "0 8px" }}>
-            {/* Starred brands */}
-            {brands.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px 6px" }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    已加星號的品牌
-                  </span>
-                  <button style={{ background: "none", border: "none", color: "#9ca3af", fontSize: 13, cursor: "pointer" }}>
-                    <FontAwesomeIcon icon={faPlus} />
-                  </button>
-                </div>
-                {brands.slice(0, 6).map((b: any) => (
-                  <PanelRow
-                    key={b.id}
-                    initial={(b.name ?? "B").slice(0, 1).toUpperCase()}
-                    initialBg="#f3f4f6"
-                    initialColor="#6b7280"
-                    label={b.name}
-                    onClick={() => onNavigate(`/brands/${b.id}`)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Recent missions */}
-            {recentMissions.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px 6px" }}>
-                  <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#9ca3af" }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    近期任務
-                  </span>
-                </div>
-                {recentMissions.map((m: any) => (
-                  <PanelRow
-                    key={m.id}
-                    initial={(m.title ?? "M").slice(0, 1).toUpperCase()}
-                    initialBg="#fff7ed"
-                    initialColor="#F97316"
-                    label={m.title}
-                    onClick={() => {
-                      const url = m.brandId ? `/b/${m.brandId}/${m.workspace || "_"}/m/${m.id}` : `/m/${m.id}`;
-                      onNavigate(url);
-                    }}
-                  />
-                ))}
-                <button
-                  onClick={() => onNavigate("/")}
-                  style={{
-                    width: "100%", textAlign: "center", padding: "6px 8px", border: "none",
-                    background: "none", fontSize: 12, color: "#F97316", cursor: "pointer", fontWeight: 500,
-                  }}
-                >
-                  查看全部
-                </button>
-              </div>
-            )}
-
-            <button style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
-              fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-              onMouseLeave={e => (e.currentTarget.style.background = "none")}
-            >
-              <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <FontAwesomeIcon icon={faEllipsis} />
-              </span>
-              顯示更多
-            </button>
-          </div>
-
-          {/* Bottom: trash */}
-          <div style={{ flexShrink: 0, padding: "8px 8px 16px" }}>
-            <button
-              onClick={() => onNavigate("/trash")}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "7px 8px", borderRadius: 8, border: "none", background: "none",
-                fontSize: 14, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-              onMouseLeave={e => (e.currentTarget.style.background = "none")}
-            >
-              <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} />
-              </span>
-              垃圾桶
-            </button>
-          </div>
+          <TrashButton onNavigate={onNavigate} />
         </>
       )}
     </div>

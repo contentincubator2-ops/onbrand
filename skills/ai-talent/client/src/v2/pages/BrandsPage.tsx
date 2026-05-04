@@ -38,7 +38,8 @@ import {
   faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
   faFolderOpen, faUserPlus, faCrown,
   faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
-  faWandSparkles,
+  faWandSparkles, faEllipsis, faCircleInfo,
+  faMagnifyingGlass, faGear, faCheck, faUserCircle,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
@@ -139,6 +140,10 @@ export default function BrandsPage() {
   // Default to 速查卡 for all scopes (CJ: 預設為速查卡頁籤).
   const defaultSection: SectionId = "card";
   const [section, setSection] = useState<SectionId>(defaultSection);
+
+  // Brand-kit dropdown (Canva-style switcher)
+  const [brandDropOpen, setBrandDropOpen] = useState(false);
+  const [brandSearch, setBrandSearch] = useState("");
   // Reset section when scope mode changes
   React.useEffect(() => {
     setSection(defaultSection);
@@ -477,99 +482,302 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Top header — scope-aware (brand / product / event) ─────── */}
-      <header className="px-8 py-10 border-b border-divider bg-content1">
-        <Chip
-          color="default"
-          variant="flat"
-          size="sm"
-          className="uppercase tracking-wider mb-2"
-          startContent={<FontAwesomeIcon icon={scopeIcon} className="ml-1" />}
+      {/* ─── Top header — scope-aware, centred, 180px, composite gradient ── */}
+      <header style={{
+        height: 180,
+        background: [
+          "radial-gradient(ellipse at 72% 0%,   rgba(139,92,246,0.28) 0%, transparent 56%)",
+          "radial-gradient(ellipse at 18% 110%,  rgba(99,102,241,0.18) 0%, transparent 52%)",
+          "linear-gradient(135deg, #EDE9FE 0%, #E0E7FF 48%, #F0F9FF 100%)",
+        ].join(", "),
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        borderBottom: "1px solid var(--heroui-divider, #E4E3E1)",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        {/* ⋯ menu — top-right */}
+        <button
+          title="更多選項"
+          style={{
+            position: "absolute", top: 14, right: 18,
+            width: 32, height: 32, borderRadius: 8,
+            background: "rgba(255,255,255,0.60)", border: "1px solid rgba(0,0,0,0.08)",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#57534E", fontSize: 14, backdropFilter: "blur(4px)",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.90)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.60)")}
         >
+          <FontAwesomeIcon icon={faEllipsis} />
+        </button>
+
+        {/* Info tooltip — bottom-right corner, replaces the noisy subtitle */}
+        <div style={{ position: "absolute", bottom: 12, right: 16 }}
+          title="請於右上 ScopeBar 切換 品牌 / 產品 / 活動">
+          <FontAwesomeIcon icon={faCircleInfo}
+            style={{ color: "rgba(99,102,241,0.45)", fontSize: 13, cursor: "default" }} />
+        </div>
+
+        {/* Square brand-block icon */}
+        <div style={{
+          width: 52, height: 52, borderRadius: 14,
+          background: "linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginBottom: 10,
+          boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+        }}>
+          <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 22 }} />
+        </div>
+
+        {/* Eyebrow */}
+        <p style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+          color: "rgba(99,102,241,0.75)", textTransform: "uppercase",
+          margin: "0 0 5px",
+        }}>
           {scopeEyebrow}
-        </Chip>
-        <h1 className="text-3xl font-semibold tracking-tight">{scopeName}</h1>
-        <p className="text-small text-default-500 mt-1">
-          請於右上 ScopeBar 切換 品牌 / 產品 / 活動
         </p>
+
+        {/* Main title — 32px / 600 */}
+        <h1 style={{
+          fontSize: 32, fontWeight: 600, letterSpacing: "-0.02em",
+          color: "#1A1A18", margin: 0, textAlign: "center",
+          maxWidth: 520, lineHeight: 1.2,
+        }}>
+          {scopeName}
+        </h1>
       </header>
 
       {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
       <div className="flex-1 flex">
-        {/* Left rail — full-bleed, fixed 240px, NO max-w-anything */}
-        <aside className="w-[240px] shrink-0 border-r border-divider bg-content1 flex flex-col">
-          {/* Top: 你的方案 + 邀請使用者 */}
-          <div className="p-4 space-y-2 border-b border-divider">
-            <Button
-              fullWidth
-              radius="lg"
-              variant="bordered"
-              startContent={<FontAwesomeIcon icon={faCrown} />}
-              className="justify-start"
-            >
-              你的方案
-            </Button>
-            <Button
-              fullWidth
-              radius="lg"
-              variant="bordered"
-              startContent={<FontAwesomeIcon icon={faUserPlus} />}
-              className="justify-start"
-            >
-              邀請使用者
-            </Button>
+        {/* ── Canva-faithful brand left rail ── */}
+        <aside style={{
+          width: 240, flexShrink: 0,
+          borderRight: "1px solid #E4E3E1",
+          background: "white",
+          display: "flex", flexDirection: "column",
+          overflowY: "auto",
+          fontFamily: "Inter, system-ui, sans-serif",
+        }}>
+
+          {/* ① 你的方案 + 邀請使用者 */}
+          <div style={{ padding: "12px 10px 10px", display: "flex", flexDirection: "column", gap: 5, borderBottom: "1px solid #F0EFED" }}>
+            {[
+              { icon: faCrown,    label: "你的方案" },
+              { icon: faUserPlus, label: "邀請使用者" },
+            ].map(({ icon, label }) => (
+              <button key={label} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 12px", borderRadius: 8,
+                background: "white", border: "1px solid #E4E3E1",
+                cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18",
+                width: "100%", textAlign: "left", transition: "background 0.12s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
+                onMouseLeave={e => e.currentTarget.style.background = "white"}
+              >
+                <FontAwesomeIcon icon={icon} style={{ fontSize: 13, color: "#78716C", width: 14 }} />
+                {label}
+              </button>
+            ))}
           </div>
 
-          {/* 所有品牌範本 link */}
-          <Button
-            fullWidth
-            variant="light"
-            radius="none"
-            className="justify-start px-4 h-11"
+          {/* ② 所有品牌範本 */}
+          <button style={{
+            display: "flex", alignItems: "center",
+            padding: "10px 16px", fontSize: 13, fontWeight: 500,
+            color: "#1A1A18", background: "none", border: "none",
+            cursor: "pointer", textAlign: "left", width: "100%",
+            transition: "background 0.12s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
             所有品牌範本
-          </Button>
+          </button>
 
-          {/* Scope read-only chip (single source of truth = ScopeBar) */}
-          <div className="px-3 pt-2 pb-1">
-            <div className="flex items-center gap-2 px-3 h-12 rounded-lg border border-divider bg-default-50">
-              <Avatar
-                name={(scopeName.charAt(0) || "?").toUpperCase()}
-                size="sm"
-                radius="md"
-                classNames={{ base: "shrink-0 bg-default-100 text-default-600", name: "text-tiny font-bold" }}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-tiny text-default-400 uppercase tracking-wider">{scopeEyebrow}</p>
-                <p className="text-small font-medium truncate">{scopeName}</p>
+          {/* ③ 品牌工具組 dropdown trigger */}
+          <div style={{ padding: "0 10px 6px", position: "relative" }}>
+            <button
+              onClick={() => { setBrandDropOpen(v => !v); setBrandSearch(""); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 10px", borderRadius: 8,
+                background: brandDropOpen ? "#EDE9FE" : "#F5F4F2",
+                border: brandDropOpen ? "1.5px solid #6366F1" : "1.5px solid transparent",
+                cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18",
+                transition: "all 0.15s", textAlign: "left",
+              }}
+            >
+              {/* Brand colour swatch thumbnail */}
+              <div style={{
+                width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 2px 6px rgba(99,102,241,0.30)",
+              }}>
+                <span style={{ color: "white", fontSize: 11, fontWeight: 700 }}>
+                  {(scopeName.charAt(0) || "B").toUpperCase()}
+                </span>
               </div>
-            </div>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                品牌工具組
+              </span>
+              <FontAwesomeIcon icon={faChevronDown} style={{
+                fontSize: 10, color: "#78716C",
+                transform: brandDropOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s",
+              }} />
+            </button>
+
+            {/* Dropdown panel — Canva screenshot 5 */}
+            {brandDropOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 4px)", left: 10, right: 10,
+                background: "white", borderRadius: 10,
+                border: "1px solid #E4E3E1",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                zIndex: 200, overflow: "hidden",
+              }}>
+                {/* Search */}
+                <div style={{ padding: "8px 10px", borderBottom: "1px solid #F0EFED", position: "relative" }}>
+                  <FontAwesomeIcon icon={faMagnifyingGlass} style={{
+                    position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)",
+                    color: "#A8A29E", fontSize: 12, pointerEvents: "none",
+                  }} />
+                  <input
+                    autoFocus
+                    value={brandSearch}
+                    onChange={e => setBrandSearch(e.target.value)}
+                    placeholder="搜尋品牌工具組"
+                    style={{
+                      width: "100%", padding: "6px 8px 6px 26px",
+                      borderRadius: 6, border: "1px solid #E4E3E1",
+                      fontSize: 12, color: "#1A1A18", outline: "none",
+                      background: "#FAFAF9", boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+
+                {/* Brand list */}
+                <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                  {((scopeBrands as any[]).filter((b: any) =>
+                    !brandSearch || b.name?.toLowerCase().includes(brandSearch.toLowerCase())
+                  ) as any[]).map((b: any) => {
+                    const isActive = b.id === (scope?.brandId ?? brandId);
+                    return (
+                      <button key={b.id}
+                        onClick={() => { setBrandId(b.id); setBrandDropOpen(false); }}
+                        style={{
+                          width: "100%", display: "flex", alignItems: "center", gap: 10,
+                          padding: "8px 12px", background: isActive ? "#EDE9FE" : "none",
+                          border: "none", cursor: "pointer", textAlign: "left",
+                          transition: "background 0.12s", fontSize: 13,
+                        }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#F5F4F2"; }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "none"; }}
+                      >
+                        {/* Mini swatch */}
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                          background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          <span style={{ color: "white", fontSize: 10, fontWeight: 700 }}>
+                            {(b.name?.charAt(0) || "B").toUpperCase()}
+                          </span>
+                        </div>
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1A1A18", fontWeight: isActive ? 600 : 400 }}>
+                          {b.name}
+                        </span>
+                        {isActive && <FontAwesomeIcon icon={faCheck} style={{ color: "#6366F1", fontSize: 11 }} />}
+                      </button>
+                    );
+                  })}
+                  {(scopeBrands as any[]).filter((b: any) =>
+                    !brandSearch || b.name?.toLowerCase().includes(brandSearch.toLowerCase())
+                  ).length === 0 && (
+                    <p style={{ padding: "10px 14px", fontSize: 12, color: "#A8A29E" }}>找不到品牌</p>
+                  )}
+                </div>
+
+                {/* Divider + create/settings actions */}
+                <div style={{ borderTop: "1px solid #F0EFED", padding: "6px 0" }}>
+                  {[
+                    { icon: faPlus, label: "建立新的品牌工具組" },
+                    { icon: faPlus, label: "建立個人品牌工具組" },
+                    { icon: faGear, label: "品牌控制" },
+                  ].map(({ icon, label }) => (
+                    <button key={label} style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10,
+                      padding: "8px 14px", background: "none", border: "none",
+                      cursor: "pointer", fontSize: 12, color: "#57534E", textAlign: "left",
+                      transition: "background 0.12s",
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
+                      onMouseLeave={e => e.currentTarget.style.background = "none"}
+                    >
+                      <FontAwesomeIcon icon={icon} style={{ fontSize: 11, width: 12 }} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Sub-nav */}
-          <nav className="px-3 py-2 flex flex-col gap-0.5 flex-1 overflow-y-auto">
+          {/* ④ Sub-nav — 所有資產 (top) + positioning segments + brand assets */}
+          <nav style={{ flex: 1, padding: "2px 10px 12px", display: "flex", flexDirection: "column", gap: 1 }}>
+            {/* 所有資產 — always first, with + */}
+            {(() => {
+              const active = section === "all";
+              return (
+                <button onClick={() => setSection("all")} style={{
+                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "7px 10px", borderRadius: 7,
+                  background: active ? "#EDE9FE" : "none",
+                  border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: active ? "#4F46E5" : "#1A1A18",
+                  transition: "background 0.12s",
+                }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
+                >
+                  所有資產
+                  <FontAwesomeIcon icon={faPlus} style={{ fontSize: 11, color: active ? "#4F46E5" : "#A8A29E" }} />
+                </button>
+              );
+            })()}
+
+            {/* Existing sub-nav entries */}
             {SUBNAV.map((s) => {
               const active = section === s.id;
-              const isAll = s.id === "all";
               return (
-                <Button
-                  key={s.id}
-                  fullWidth
-                  size="sm"
-                  variant={active ? "flat" : "light"}
-                  color={active ? "primary" : "default"}
-                  radius="lg"
-                  className="justify-between h-9 text-small"
-                  onPress={() => setSection(s.id)}
-                  endContent={
-                    <span className="flex items-center gap-1.5">
-                      {s.badge && <Chip size="sm" color="primary" variant="flat" className="h-4 text-tiny">{s.badge}</Chip>}
-                      {isAll && <FontAwesomeIcon icon={faPlus} className="text-tiny text-default-400" />}
-                    </span>
-                  }
+                <button key={s.id} onClick={() => setSection(s.id)} style={{
+                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "7px 10px", borderRadius: 7,
+                  background: active ? "#EDE9FE" : "none",
+                  border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: active ? "#4F46E5" : "#1A1A18",
+                  textAlign: "left", transition: "background 0.12s",
+                }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
                 >
-                  <span className="text-left flex-1">{s.label}</span>
-                </Button>
+                  <span style={{ flex: 1 }}>{s.label}</span>
+                  {s.badge && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+                      background: "#6366F1", color: "white", marginLeft: 4,
+                    }}>{s.badge}</span>
+                  )}
+                </button>
               );
             })}
           </nav>
