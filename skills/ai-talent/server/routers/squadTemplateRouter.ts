@@ -2549,4 +2549,69 @@ ${input.question}`;
         lastUsed:    r.last_used as Date,
       }));
     }),
+
+  // ── getStepsAdmin ─────────────────────────────────────────────────────────
+  // Returns the full steps array for a squad so the admin can view/edit
+  // outputType per step. Uses localPool (mos_db).
+  getStepsAdmin: protectedProcedure
+    .input(z.object({ squadId: z.number() }))
+    .query(async ({ input }) => {
+      const [[row]] = await localPool.execute(
+        `SELECT id, slug, name, steps FROM squads WHERE id = ?`,
+        [input.squadId],
+      ) as any;
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Squad not found" });
+      let steps: any[] = [];
+      try {
+        steps = typeof row.steps === "string"
+          ? JSON.parse(row.steps)
+          : (Array.isArray(row.steps) ? row.steps : []);
+      } catch {}
+      return {
+        id: row.id as number,
+        slug: row.slug as string,
+        name: row.name as string,
+        steps,
+      };
+    }),
+
+  // ── setStepOutputType ─────────────────────────────────────────────────────
+  // Patches a single step's outputType inside the steps JSON.
+  // Matches by step index (0-based) or step.order / step.step field.
+  setStepOutputType: protectedProcedure
+    .input(z.object({
+      squadId:    z.number(),
+      stepIndex:  z.number(),       // 0-based index in the steps array
+      outputType: z.string(),       // key from OUTPUT_TYPE_REGISTRY, or "" to clear
+    }))
+    .mutation(async ({ input }) => {
+      const [[row]] = await localPool.execute(
+        `SELECT steps FROM squads WHERE id = ?`,
+        [input.squadId],
+      ) as any;
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Squad not found" });
+
+      let steps: any[] = [];
+      try {
+        steps = typeof row.steps === "string"
+          ? JSON.parse(row.steps)
+          : (Array.isArray(row.steps) ? row.steps : []);
+      } catch {}
+
+      if (input.stepIndex < 0 || input.stepIndex >= steps.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Step index ${input.stepIndex} out of range` });
+      }
+
+      steps[input.stepIndex] = {
+        ...steps[input.stepIndex],
+        outputType: input.outputType || undefined,
+      };
+
+      await localPool.execute(
+        `UPDATE squads SET steps = ? WHERE id = ?`,
+        [JSON.stringify(steps), input.squadId],
+      );
+
+      return { ok: true, steps };
+    }),
 });

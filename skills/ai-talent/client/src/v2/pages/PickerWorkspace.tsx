@@ -30,6 +30,7 @@ import { searchAndRankSquads } from "../lib/searchSquads";
 import { useSemanticSearch } from "../lib/useSemanticSearch";
 import { IntakeChat } from "../components/IntakeChat";
 import { BriefPanel, LAYER_TAB_IDS } from "../components/BriefPanel";
+import { getOutputTypeMeta } from "../lib/outputTypes";
 import { useMissionStream, buildSlotMapFromProgress } from "../lib/useMissionStream";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { DocMockup } from "../components/PlatformMockup/doc";
@@ -2277,6 +2278,16 @@ function SquadDetailPanel({
                       <span className="max-w-[80px] truncate">
                         {s.name ?? s.title ?? `Step ${ord}`}
                       </span>
+                      {/* outputType badge */}
+                      {(() => {
+                        const outMeta = s.outputType ? getOutputTypeMeta(s.outputType) : null;
+                        if (!outMeta) return null;
+                        return (
+                          <span style={{ fontSize: 9, fontWeight: 700, color: outMeta.color, background: `${outMeta.color}20`, padding: "1px 5px", borderRadius: 6, flexShrink: 0, letterSpacing: "0.01em" }}>
+                            {outMeta.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </React.Fragment>
                 );

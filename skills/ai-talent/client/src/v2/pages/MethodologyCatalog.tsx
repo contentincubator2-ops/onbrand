@@ -28,6 +28,7 @@ import MethodologyGlyph from "../components/methodology/MethodologyGlyph";
 import { agentAvatarUrl } from "../components/AgentAvatar";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import { OUTPUT_TYPE_REGISTRY, ALL_OUTPUT_TYPES, getOutputTypeMeta } from "../lib/outputTypes";
 
 // ── Layer palette ────────────────────────────────────────────────────────────
 const LAYER: Record<string, { bg: string; text: string; label: string; icon: any }> = {
@@ -902,6 +903,96 @@ function DropItem({ children, active, onClick }: { children: React.ReactNode; ac
   );
 }
 
+/* ── StepOutputEditor ───────────────────────────────────────────────────── */
+// Shows the squad's steps with their outputType badge.
+// Each step has a dropdown to assign / change the outputType.
+// Saves via trpc.squadTemplate.setStepOutputType.
+function StepOutputEditor({ entity, li }: { entity: any; li: { bg: string; text: string } }) {
+  const [steps, setSteps] = useState<any[]>(entity.steps ?? []);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [saving, setSaving] = useState<number | null>(null);
+
+  const setStepOutputMut = (trpc as any).squadTemplate?.setStepOutputType?.useMutation
+    ? (trpc as any).squadTemplate.setStepOutputType.useMutation()
+    : null;
+
+  const handleSave = async (stepIndex: number, outputType: string) => {
+    if (!setStepOutputMut || !entity.id) return;
+    setSaving(stepIndex);
+    try {
+      const res = await setStepOutputMut.mutateAsync({ squadId: entity.id, stepIndex, outputType });
+      if (res?.steps) setSteps(res.steps);
+    } catch {}
+    setSaving(null);
+    setEditingIdx(null);
+  };
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px" }}>
+        工作流程（{steps.length} 步）
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {steps.map((s: any, i: number) => {
+          const outKey = s.outputType ?? "";
+          const outMeta = outKey ? getOutputTypeMeta(outKey) : null;
+          const isEditing = editingIdx === i;
+          const isSaving = saving === i;
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 10px", borderRadius: 8, background: isEditing ? "#FAFAF9" : "white", border: `1px solid ${isEditing ? "#E0DCFF" : "#F0F0EE"}`, transition: "all 0.15s" }}>
+              {/* Step number */}
+              <span style={{ width: 22, height: 22, borderRadius: "50%", background: li.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 700, color: li.text, marginTop: 1 }}>{i + 1}</span>
+
+              {/* Step name */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, color: "#1A1A18", margin: "0 0 4px", lineHeight: 1.4, fontWeight: 500 }}>
+                  {s.name ?? s.title ?? `步驟 ${i + 1}`}
+                </p>
+
+                {/* Output badge + assign button */}
+                {isEditing ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <select
+                      autoFocus
+                      defaultValue={outKey}
+                      onChange={e => handleSave(i, e.target.value)}
+                      disabled={isSaving}
+                      style={{ fontSize: 11, padding: "3px 6px", borderRadius: 6, border: "1px solid #C4C0BB", color: "#57534E", background: "white", cursor: "pointer" }}
+                    >
+                      <option value="">— 尚未指定 —</option>
+                      {ALL_OUTPUT_TYPES.map(t => (
+                        <option key={t.key} value={t.key}>{t.label} ({t.format})</option>
+                      ))}
+                    </select>
+                    <button onClick={() => setEditingIdx(null)}
+                      style={{ fontSize: 10, color: "#A8A29E", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>取消</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {outMeta ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: outMeta.color, background: `${outMeta.color}14`, padding: "2px 8px", borderRadius: 10, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span>📄</span>{outMeta.label}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: "#D1D0CE", fontStyle: "italic" }}>尚未指定產出</span>
+                    )}
+                    <button onClick={() => setEditingIdx(i)}
+                      style={{ fontSize: 10, color: "#A8A29E", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", opacity: 0.6 }}
+                      title="指定此步驟的產出文件類型">✏️</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {steps.length > 6 && (
+          <p style={{ fontSize: 12, color: "#A8A29E", margin: "0 0 0 32px" }}>還有更多步驟在執行時動態展開</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── DetailModal ────────────────────────────────────────────────────────── */
 function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelated }: {
   entity: any; relatedEntities: any[]; onClose: () => void;
@@ -1055,20 +1146,9 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
             </div>
           )}
 
-          {/* ── Steps ── */}
+          {/* ── Steps (with outputType badges + inline edit) ── */}
           {entity.kind === "squad" && (entity.steps?.length ?? 0) > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px" }}>工作流程（{entity.steps.length} 步）</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {entity.steps.slice(0, 6).map((s: any, i: number) => (
-                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <span style={{ width: 20, height: 20, borderRadius: "50%", background: li.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 700, color: li.text, marginTop: 1 }}>{i + 1}</span>
-                    <p style={{ fontSize: 13, color: "#57534E", margin: 0, lineHeight: 1.5 }}>{s.name ?? s.title ?? `步驟 ${i + 1}`}</p>
-                  </div>
-                ))}
-                {entity.steps.length > 6 && <p style={{ fontSize: 12, color: "#A8A29E", margin: "0 0 0 30px" }}>還有 {entity.steps.length - 6} 個步驟…</p>}
-              </div>
-            </div>
+            <StepOutputEditor entity={entity} li={li} />
           )}
 
           {/* ── Workspace tags ── */}
