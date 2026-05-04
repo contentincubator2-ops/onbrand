@@ -16,6 +16,8 @@
  *   來源 badge（Scope / Brand Brain / Web）
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { trpc } from "../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -334,12 +336,11 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
 function SummaryTab({ values, allFields, loading }: {
   values: Record<string, string>; allFields: BriefField[]; loading: boolean;
 }) {
-  const lines = allFields
-    .filter(f => (values[f.id] ?? "").trim())
-    .map(f => `**${f.label}**\n${values[f.id]}`);
-  const text = lines.join("\n\n");
+  const filled = allFields.filter(f => (values[f.id] ?? "").trim());
+  const text = filled.map(f => `**${f.label}**\n\n${values[f.id]}`).join("\n\n---\n\n");
 
   const { displayed, done } = useTypewriter(text, loading, 6);
+  const renderText = loading ? displayed : text;
 
   if (!text && !loading) {
     return (
@@ -351,9 +352,17 @@ function SummaryTab({ values, allFields, loading }: {
   }
 
   return (
-    <div style={{ fontSize: 13, color: "#1A1A18", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
-      {loading ? displayed : text}
-      {loading && !done && <span style={{ opacity: 0.35 }}>▌</span>}
+    <div>
+      {/* While typewriting: show raw text for performance; once done, render markdown */}
+      {loading ? (
+        <div style={{ fontSize: 13, color: "#1A1A18", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+          {renderText}{!done && <span style={{ opacity: 0.35 }}>▌</span>}
+        </div>
+      ) : (
+        <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-strong:font-semibold prose-hr:my-3 prose-p:leading-relaxed prose-p:text-[#1A1A18]">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+        </div>
+      )}
     </div>
   );
 }

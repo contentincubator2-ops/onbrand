@@ -2072,6 +2072,11 @@ function SquadDetailPanel({
 
   // Active step = first step that's not 'confirmed' or 'skipped'.
   const stepsArr: any[] = Array.isArray(squad.steps) ? squad.steps : [];
+  // Mission fully complete when all steps are confirmed
+  const allStepsConfirmed = stepsArr.length > 0 && stepsArr.every((_: any, i: number) => {
+    const p = progressByOrd.get(i + 1);
+    return p?.status === "confirmed" || p?.status === "skipped";
+  });
 
   // Session 6: build DB-backed slot map from completed step progress,
   // then merge SSE live slots on top (SSE wins for the active slot).
@@ -2296,6 +2301,42 @@ function SquadDetailPanel({
               {streamError && (
                 <span className="ml-2 text-tiny text-danger shrink-0">⚠ {streamError}</span>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Mission complete banner ────────────────────────────────── */}
+        {allStepsConfirmed && missionId && (
+          <div className="shrink-0 mx-4 mt-4 mb-0 rounded-xl border border-success-200 bg-success-50 px-4 py-3 flex items-center gap-3">
+            <span className="text-success text-lg">✓</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-small font-semibold text-success-700">任務完成！所有步驟已確認</p>
+              <p className="text-tiny text-success-600 mt-0.5">成果已自動存檔，可在首頁任務牆查看或匯出</p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                size="sm" variant="flat" color="success" radius="full"
+                onPress={() => {
+                  // Build full markdown export from all confirmed steps
+                  const lines: string[] = [`# ${name}`, "", `> ${description ?? ""}`, ""];
+                  stepsArr.forEach((_s: any, i: number) => {
+                    const p = progressByOrd.get(i + 1);
+                    const sn = _s.name ?? _s.title ?? `Step ${i + 1}`;
+                    if (p?.agentOutput ?? p?.agent_output) {
+                      lines.push(`## ${i + 1}. ${sn}`, "", p.agentOutput ?? p.agent_output, "");
+                    }
+                  });
+                  const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.download = `${name ?? "mission"}.md`; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >↓ 匯出 .md</Button>
+              <Button
+                size="sm" color="success" radius="full"
+                onPress={() => { window.location.href = "/"; }}
+              >查看任務牆 →</Button>
             </div>
           </div>
         )}
