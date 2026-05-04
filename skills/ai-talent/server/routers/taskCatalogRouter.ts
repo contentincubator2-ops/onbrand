@@ -338,12 +338,15 @@ export const taskCatalogRouter = router({
         [input.taskId],
       ).then((r) => r[0]);
       if (!task) throw new TRPCError({ code: "NOT_FOUND", message: `task ${input.taskId} not found` });
-      if (task.impl_kind !== "atomic") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: `task ${task.slug} is impl_kind=${task.impl_kind}, not atomic. Use squad.stepExecute.` });
+      // Allow atomic tasks OR bypassable squad tasks (bypassable = "can run without intake form")
+      const canRunAtomic = task.impl_kind === "atomic" || task.bypassable === 1 || task.bypassable === true;
+      if (!canRunAtomic) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `task ${task.slug} is impl_kind=${task.impl_kind} and not bypassable. Use squad.stepExecute.` });
       }
-      if (!task.agent_id_resolved) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `task ${task.slug} has no bound agent` });
-      }
+      // agent_id is optional for bypassable squad tasks — fallback to generic persona
+      const agentName  = task.agent_name  ?? task.name_zh ?? "行銷 Agent";
+      const agentTitle = task.agent_title ?? "內容創作專家";
+      const agentSkill = task.agent_skill ?? task.description ?? "社群內容創作";
 
       // 2. Resolve scope context — same logic as stepExecute
       const contextParts: string[] = [];
@@ -400,7 +403,7 @@ export const taskCatalogRouter = router({
 【正確輸出】直接是 Facebook / IG / TikTok 用戶看到的那行字。emoji + hook 開頭 + CTA + 結尾 hashtag。`
         : `直接交付完成品本身，不要寫「我會這樣做」的方法論說明。`;
 
-      const systemPrompt = `你是 ${task.agent_name}（${task.agent_title ?? ""}），專長：${task.agent_skill ?? ""}。
+      const systemPrompt = `你是 ${agentName}（${agentTitle}），專長：${agentSkill}。
 你正在執行「${task.name_zh}」這個 atomic 任務（單 agent 直接交付，不分多步驟）。
 
 任務描述：${task.description}
@@ -441,7 +444,7 @@ ${guide}
       return {
         ok: true,
         task: { id: task.id, slug: task.slug, name: task.name_zh },
-        agent: { id: task.agent_id_resolved, name: task.agent_name, title: task.agent_title },
+        agent: { id: task.agent_id_resolved ?? null, name: agentName, title: agentTitle },
         output,
         rawText: rawText !== output ? rawText : undefined,
         durationMs: Date.now() - t0,
