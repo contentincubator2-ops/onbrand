@@ -16,8 +16,6 @@
  *   來源 badge（Scope / Brand Brain / Web）
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { trpc } from "../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -332,37 +330,68 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
 }
 
 // ── Summary tab content ───────────────────────────────────────────────────────
+// Shows ALL fields (grouped by tab section) as editable FieldCards.
+// This is the single place the user can see & edit everything at once.
 
-function SummaryTab({ values, allFields, loading }: {
-  values: Record<string, string>; allFields: BriefField[]; loading: boolean;
-}) {
-  const filled = allFields.filter(f => (values[f.id] ?? "").trim());
-  const text = filled.map(f => `**${f.label}**\n\n${values[f.id]}`).join("\n\n---\n\n");
+interface SummaryTabProps {
+  contentTabs: BriefTab[];
+  fieldStates: Record<string, FieldState>;
+  typingFieldId: string | null;
+  onEdit: (id: string) => void;
+  onRefetch: (field: BriefField) => void;
+  onChange: (id: string, value: string) => void;
+  activeFieldId?: string | null; // highlights the currently-filling field
+}
 
-  const { displayed, done } = useTypewriter(text, loading, 6);
-  const renderText = loading ? displayed : text;
+function SummaryTab({ contentTabs, fieldStates, typingFieldId, onEdit, onRefetch, onChange, activeFieldId }: SummaryTabProps) {
+  const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  if (!text && !loading) {
-    return (
-      <div style={{ padding: "20px 0", textAlign: "center", color: "#C4C0BB", fontSize: 13 }}>
-        <FontAwesomeIcon icon={faAlignLeft} style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
-        執行自動填寫後，摘要將在此顯示
-      </div>
-    );
-  }
+  // Scroll to active field when auto-fill moves to it
+  useEffect(() => {
+    if (activeFieldId && fieldRefs.current[activeFieldId]) {
+      fieldRefs.current[activeFieldId]!.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [activeFieldId]);
+
+  const hasAnyField = contentTabs.some(tab => tab.fields.length > 0);
+  if (!hasAnyField) return null;
 
   return (
-    <div>
-      {/* While typewriting: show raw text for performance; once done, render markdown */}
-      {loading ? (
-        <div style={{ fontSize: 13, color: "#1A1A18", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
-          {renderText}{!done && <span style={{ opacity: 0.35 }}>▌</span>}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {contentTabs.map((tab, ti) => (
+        <div key={tab.id}>
+          {/* Section header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
+              {tab.label}
+            </p>
+            <div style={{ flex: 1, height: 1, background: "#F0F0EE" }} />
+          </div>
+          {/* Fields */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {tab.fields.map(field => (
+              <div
+                key={field.id}
+                ref={el => { fieldRefs.current[field.id] = el; }}
+                style={{
+                  outline: activeFieldId === field.id ? "2px solid #7C3AED" : "none",
+                  borderRadius: 10,
+                  transition: "outline 0.2s",
+                }}
+              >
+                <FieldCard
+                  field={field}
+                  state={fieldStates[field.id] ?? { status: "idle", value: "" }}
+                  typing={typingFieldId === field.id}
+                  onEdit={() => onEdit(field.id)}
+                  onRefetch={() => onRefetch(field)}
+                  onChange={v => onChange(field.id, v)}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-strong:font-semibold prose-hr:my-3 prose-p:leading-relaxed prose-p:text-[#1A1A18]">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -408,8 +437,8 @@ export function BriefPanel({
     onTabChange?.(id);
   }, [onTabChange]);
   const [isAutoRunning, setIsAutoRunning] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
   const [typingFieldId, setTypingFieldId] = useState<string | null>(null);
+  const [activeFieldId, setActiveFieldId] = useState<string | null>(null); // for scroll highlight in summary
 
   // ── Field states ──────────────────────────────────────────────────────
   const [fieldStates, setFieldStates] = useState<Record<string, FieldState>>(() => {
@@ -431,9 +460,9 @@ export function BriefPanel({
     : { data: null };
   const brainEntries = (brainQuery.data as any)?.entries ?? {};
 
-  // Web search via Perplexity — called per-field during auto-fill
-  const briefSearchMut = (trpc as any).squadTemplate?.briefSearch?.useMutation
-    ? (trpc as any).squadTemplate.briefSearch.useMutation()
+  // Web search via Perplexity — tRPC key is "squad" (squadTemplateRouter registered as squad)
+  const briefSearchMut = (trpc as any).squad?.briefSearch?.useMutation
+    ? (trpc as any).squad.briefSearch.useMutation()
     : null;
   const briefSearchRef = useRef<typeof briefSearchMut>(briefSearchMut);
   useEffect(() => { briefSearchRef.current = briefSearchMut; }, [briefSearchMut]);
@@ -449,6 +478,7 @@ export function BriefPanel({
 
     setField(field.id, { status: "loading" });
     setTypingFieldId(field.id);
+    setActiveFieldId(field.id);
 
     let value = "";
 
@@ -487,32 +517,21 @@ export function BriefPanel({
     setTypingFieldId(null);
   }, [brandName, productName, eventName, brainEntries]);
 
-  // ── Auto-run: go through each tab sequentially ────────────────────────
+  // ── Auto-run: stay on 摘要 tab, fill all fields in place with scroll ──
   const runAuto = useCallback(async () => {
     if (isAutoRunning) return;
     setIsAutoRunning(true);
+    setActiveTab("_summary"); // stay on summary the whole time
 
     for (const tab of contentTabs) {
-      // Switch to this tab
-      setActiveTab(tab.id);
-      await new Promise(r => setTimeout(r, 300));
-
-      // Fill each field sequentially
       for (const field of tab.fields) {
-        await fillField(field);
+        await fillField(field); // fillField sets activeFieldId → scroll highlight
       }
-      await new Promise(r => setTimeout(r, 200));
     }
 
-    // All tabs done → switch to 摘要 and generate summary
-    setActiveTab("_summary");
-    setSummaryLoading(true);
-    // Estimate summary typing duration
-    const summaryLen = allFields.reduce((acc, f) => acc + (fieldStates[f.id]?.value?.length ?? 0), 0);
-    await new Promise(r => setTimeout(r, Math.max(1000, summaryLen * 6)));
-    setSummaryLoading(false);
+    setActiveFieldId(null);
     setIsAutoRunning(false);
-  }, [isAutoRunning, contentTabs, fillField, allFields, fieldStates]);
+  }, [isAutoRunning, contentTabs, fillField]);
 
   // ── Pre-fill scope fields on mount ───────────────────────────────────
   useEffect(() => {
@@ -630,9 +649,13 @@ export function BriefPanel({
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         {isSummary ? (
           <SummaryTab
-            values={Object.fromEntries(allFields.map(f => [f.id, fieldStates[f.id]?.value ?? ""]))}
-            allFields={allFields}
-            loading={summaryLoading}
+            contentTabs={contentTabs}
+            fieldStates={fieldStates}
+            typingFieldId={typingFieldId}
+            onEdit={handleEdit}
+            onRefetch={handleRefetch}
+            onChange={handleChange}
+            activeFieldId={activeFieldId}
           />
         ) : (
           (activeTabDef?.fields ?? []).map(field => (
