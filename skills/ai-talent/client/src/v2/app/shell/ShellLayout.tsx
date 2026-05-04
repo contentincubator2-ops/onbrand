@@ -753,44 +753,35 @@ function SlidePanel({
             )}
           </div>
 
-          {/* Brand subnav */}
-          <nav style={{ flex: 1, overflowY: "auto", padding: "4px 6px 8px" }}>
+          {/* 大分類 nav — 品牌定位 / 視覺資產 / 設定 */}
+          <nav style={{ flex: 1, overflowY: "auto", padding: "6px 8px 8px" }}>
+            <p style={{
+              fontSize: 10, fontWeight: 700, color: "#A8A29E",
+              letterSpacing: "0.10em", textTransform: "uppercase",
+              padding: "4px 6px 6px", margin: 0,
+            }}>分類</p>
             {([
-              { id: "all",    label: "所有資產",  hasPlus: true  },
-              { id: "guide",  label: "準則",      hasPlus: false },
-              { id: "tmpl",   label: "品牌範本",  badge: "最新"  },
-              { id: "logo",   label: "標誌"                       },
-              { id: "color",  label: "顏色"                       },
-              { id: "font",   label: "字型"                       },
-              { id: "voice",  label: "品牌口吻"                   },
-              { id: "photo",  label: "照片"                       },
-              { id: "image",  label: "圖像"                       },
-              { id: "icon",   label: "圖示"                       },
-              { id: "chart",  label: "圖表"                       },
-            ] as Array<{ id: string; label: string; hasPlus?: boolean; badge?: string }>).map(n => {
-              const active = searchParams.get("asset") === n.id || (n.id === "all" && !searchParams.get("asset"));
+              { cat: "positioning", label: "品牌定位", icon: faBookBookmark },
+              { cat: "visual",      label: "視覺資產", icon: faPaintBrush   },
+            ] as Array<{ cat: string; label: string; icon: any }>).map(n => {
+              const active = (searchParams.get("cat") ?? "positioning") === n.cat;
               return (
-                <button key={n.id}
-                  onClick={() => onNavigate(n.id === "all" ? "/brands" : `/brands?asset=${n.id}`)}
+                <button key={n.cat}
+                  onClick={() => onNavigate(`/brands?cat=${n.cat}`)}
                   style={{
-                    width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                    width: "100%", display: "flex", alignItems: "center", gap: 9,
                     padding: "7px 10px", borderRadius: 8,
-                    background: active ? "#EDE9FE" : "none",
+                    background: active ? "rgba(163,112,252,0.15)" : "none",
                     border: "none", cursor: "pointer",
                     fontSize: 13, fontWeight: active ? 600 : 400,
-                    color: active ? "#4F46E5" : "#374151",
+                    color: active ? "rgb(74,46,126)" : "#374151",
                     textAlign: "left", transition: "background 0.12s", marginBottom: 1,
                   }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
                 >
-                  <span style={{ flex: 1 }}>{n.label}</span>
-                  {n.hasPlus && <FontAwesomeIcon icon={faPlus} style={{ fontSize: 10, color: active ? "#4F46E5" : "#A8A29E" }} />}
-                  {n.badge && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 4, background: "#6366F1", color: "white" }}>
-                      {n.badge}
-                    </span>
-                  )}
+                  <FontAwesomeIcon icon={n.icon} style={{ fontSize: 12, width: 14, color: active ? "rgb(74,46,126)" : "#9CA3AF" }} />
+                  {n.label}
                 </button>
               );
             })}

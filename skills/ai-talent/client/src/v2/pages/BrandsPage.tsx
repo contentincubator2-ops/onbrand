@@ -14,7 +14,7 @@
  * No max-width container anywhere — extends to viewport edges.
  */
 import React, { useMemo, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
@@ -138,11 +138,27 @@ export default function BrandsPage() {
   }, [scopeMode, segments]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  // Single `section` drives both sidebar active state and content area.
-  // Derived category: section.startsWith("asset:") → visual; "settings" → settings; else → positioning
-  const defaultSection: SectionId = "card";
+  // `cat` URL param (set by ShellLayout sidebar) drives the large category.
+  // `section` (page-level aside) drives the sub-item within that category.
+  const [searchParams] = useSearchParams();
+  const urlCat = searchParams.get("cat") ?? "positioning";
+  const category: "positioning" | "visual" | "settings" =
+    urlCat === "visual" ? "visual" : urlCat === "settings" ? "settings" : "positioning";
+
+  const defaultSection: SectionId = category === "visual" ? "asset:logo" : category === "settings" ? "settings" : "card";
   const [section, setSection] = useState<SectionId>(defaultSection);
-  const derivedCategory = section.startsWith("asset:") ? "visual" : section === "settings" ? "settings" : "positioning";
+  const derivedCategory = category; // alias for content-area conditions
+
+  // When category changes via URL, reset section to a sensible default
+  const prevCatRef = React.useRef(category);
+  React.useEffect(() => {
+    if (prevCatRef.current !== category) {
+      prevCatRef.current = category;
+      if (category === "visual")      setSection("asset:logo");
+      else if (category === "settings") setSection("settings");
+      else                              setSection("card");
+    }
+  }, [category]);
 
   // Brand-kit dropdown (Canva-style switcher)
   const [brandDropOpen, setBrandDropOpen] = useState(false);
@@ -732,21 +748,21 @@ export default function BrandsPage() {
             )}
           </div>
 
-          {/* ④ Canva-style sidebar nav — section headers + sub-items */}
-          <nav style={{ flex: 1, padding: "8px 10px 16px", display: "flex", flexDirection: "column", gap: 0, overflowY: "auto" }}>
-
-            {/* ── 品牌定位 section ── */}
+          {/* ④ Sub-nav — items for the active category (set by ShellLayout sidebar via ?cat=) */}
+          <nav style={{ flex: 1, padding: "6px 8px 16px", display: "flex", flexDirection: "column", gap: 0, overflowY: "auto" }}>
             <p style={{
-              fontSize: 11, fontWeight: 700, color: "#A8A29E",
-              letterSpacing: "0.08em", textTransform: "uppercase",
-              padding: "10px 4px 4px", margin: 0, userSelect: "none",
+              fontSize: 10, fontWeight: 700, color: "#A8A29E",
+              letterSpacing: "0.10em", textTransform: "uppercase",
+              padding: "4px 4px 6px", margin: 0,
             }}>
-              {scopeMode === "product" ? "產品定位" : scopeMode === "event" ? "活動定位" : "品牌定位"}
+              {category === "visual" ? "視覺資產" : category === "settings" ? "設定" : (
+                scopeMode === "product" ? "產品定位" : scopeMode === "event" ? "活動定位" : "品牌定位"
+              )}
             </p>
 
-            {/* 速查卡 */}
-            {[
-              { id: "card",    label: "速查卡"   },
+            {/* 品牌定位 sub-items */}
+            {category === "positioning" && [
+              { id: "card",    label: "速查卡"    },
               { id: "prompts", label: "AI 指令庫" },
               ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${s.title}` })),
             ].map(item => {
@@ -754,7 +770,7 @@ export default function BrandsPage() {
               return (
                 <button key={item.id} onClick={() => setSection(item.id)} style={{
                   width: "100%", display: "flex", alignItems: "center",
-                  padding: "4px 12px", borderRadius: 8,
+                  padding: "5px 10px", borderRadius: 8,
                   background: active ? "rgba(163,112,252,0.15)" : "none",
                   border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: active ? 600 : 400,
@@ -770,70 +786,51 @@ export default function BrandsPage() {
               );
             })}
 
-            {/* ── 視覺資產 section — brand scope only ── */}
-            {scopeMode === "brand" && (
-              <>
-                <p style={{
-                  fontSize: 11, fontWeight: 700, color: "#A8A29E",
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                  padding: "14px 4px 4px", margin: 0, userSelect: "none",
-                }}>
-                  視覺資產
-                </p>
-                {[
-                  { id: "asset:all",        label: "所有資產"  },
-                  { id: "asset:guidelines", label: "準則"      },
-                  { id: "asset:templates",  label: "品牌範本", badge: "最新" },
-                  { id: "asset:logo",       label: "標誌"      },
-                  { id: "asset:colors",     label: "顏色"      },
-                  { id: "asset:fonts",      label: "字型"      },
-                  { id: "asset:voice",      label: "品牌口吻"  },
-                  { id: "asset:photos",     label: "照片"      },
-                  { id: "asset:images",     label: "圖像"      },
-                  { id: "asset:icons",      label: "圖示"      },
-                  { id: "asset:charts",     label: "圖表"      },
-                ].map(item => {
-                  const active = section === item.id;
-                  return (
-                    <VisualNavItem
-                      key={item.id}
-                      id={item.id}
-                      label={item.label}
-                      badge={(item as any).badge}
-                      active={active}
-                      onClick={() => setSection(item.id)}
-                    />
-                  );
-                })}
-              </>
-            )}
+            {/* 視覺資產 sub-items */}
+            {category === "visual" && [
+              { id: "asset:all",        label: "所有資產"               },
+              { id: "asset:guidelines", label: "準則"                   },
+              { id: "asset:templates",  label: "品牌範本", badge: "最新" },
+              { id: "asset:logo",       label: "標誌"                   },
+              { id: "asset:colors",     label: "顏色"                   },
+              { id: "asset:fonts",      label: "字型"                   },
+              { id: "asset:voice",      label: "品牌口吻"               },
+              { id: "asset:photos",     label: "照片"                   },
+              { id: "asset:images",     label: "圖像"                   },
+              { id: "asset:icons",      label: "圖示"                   },
+              { id: "asset:charts",     label: "圖表"                   },
+            ].map(item => (
+              <VisualNavItem
+                key={item.id}
+                id={item.id}
+                label={item.label}
+                badge={(item as any).badge}
+                active={section === item.id}
+                onClick={() => setSection(item.id)}
+              />
+            ))}
 
-            {/* ── 設定 — event scope only ── */}
-            {scopeMode === "event" && (
-              <>
-                <div style={{ height: 8 }} />
-                {(() => {
-                  const active = section === "settings";
-                  return (
-                    <button onClick={() => setSection("settings")} style={{
-                      width: "100%", display: "flex", alignItems: "center", gap: 8,
-                      padding: "4px 12px", borderRadius: 8,
-                      background: active ? "rgba(163,112,252,0.15)" : "none",
-                      border: "none", cursor: "pointer",
-                      fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
-                      textAlign: "left", transition: "background 0.12s",
-                    }}
-                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
-                    >
-                      <FontAwesomeIcon icon={faGear} style={{ fontSize: 11, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
-                      設定
-                    </button>
-                  );
-                })()}
-              </>
-            )}
+            {/* 設定 sub-items (event only) */}
+            {category === "settings" && scopeMode === "event" && (() => {
+              const active = section === "settings";
+              return (
+                <button onClick={() => setSection("settings")} style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 8,
+                  padding: "5px 10px", borderRadius: 8,
+                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  border: "none", cursor: "pointer",
+                  fontSize: 12, fontWeight: active ? 600 : 400,
+                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  textAlign: "left", transition: "background 0.12s",
+                }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                >
+                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 11, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
+                  設定
+                </button>
+              );
+            })()}
           </nav>
         </aside>
 
