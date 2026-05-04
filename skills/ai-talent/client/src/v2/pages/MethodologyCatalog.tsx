@@ -310,23 +310,23 @@ export default function MethodologyCatalog() {
           })}
         </HScrollSection>
 
-        {/* ── 精選方法論小組 ─────────────────────────────────────────────── */}
-        <HScrollSection title="精選方法論小組" subtitle={`${counts.squad} 個預配好的 agent 編組`} accentColor="#4F46E5"
+        {/* ── 探索範本 ─────────────────────────────────────────────── */}
+        <HScrollSection title="探索範本" subtitle={`${counts.squad} 個預配好的 AI 小組方法論`} accentColor="#4F46E5"
           cta="完整目錄 →" onCta={() => { setActiveKind("squad"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
           loading={isLoading} mt={32}
         >
-          {squads.slice(0, 24).map(e => (
+          {squads.slice(0, 30).map(e => (
             <div key={e.id} style={{ flexShrink: 0, width: 260 }}>
               <LandscapeCard entity={e} onPreview={() => setSelected(e)} aspect="5/4" size="sm" />
             </div>
           ))}
         </HScrollSection>
 
-        {/* ── Agents ──────────────────────────────────────────────────────── */}
+        {/* ── 認識 AI Agents ──────────────────────────────────────────────── */}
         {agents.length > 0 && (
-          <HScrollSection title="精選 Agents" subtitle={`${counts.agent} 個 AI 專家角色`} accentColor="#7C3AED"
-            cta="完整目錄 →" onCta={() => { setActiveKind("agent"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
-            mt={28}
+          <HScrollSection title="認識 AI Agents" subtitle={`${counts.agent} 個 AI 專家角色，各有獨立人格與專業`} accentColor="#7C3AED"
+            cta="認識更多 →" onCta={() => { setActiveKind("agent"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+            mt={32}
           >
             {agents.slice(0, 24).map(e => (
               <div key={e.id} style={{ flexShrink: 0, width: 200 }}>
@@ -336,11 +336,11 @@ export default function MethodologyCatalog() {
           </HScrollSection>
         )}
 
-        {/* ── 技能 ────────────────────────────────────────────────────────── */}
+        {/* ── 熱門技能 ────────────────────────────────────────────────────────── */}
         {skills.length > 0 && (
-          <HScrollSection title="精選技能" subtitle={`${counts.skill} 個原子能力`} accentColor="#059669"
-            cta="完整目錄 →" onCta={() => { setActiveKind("skill"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
-            mt={28}
+          <HScrollSection title="熱門技能" subtitle={`${counts.skill} 個原子能力，可組合執行任何行銷任務`} accentColor="#059669"
+            cta="瀏覽全部 →" onCta={() => { setActiveKind("skill"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+            mt={32}
           >
             {skills.slice(0, 24).map(e => (
               <div key={e.id} style={{ flexShrink: 0, width: 260 }}>
@@ -349,6 +349,9 @@ export default function MethodologyCatalog() {
             ))}
           </HScrollSection>
         )}
+
+        {/* ── 受你啟發 ─────────────────────────────────────────────────────── */}
+        <InspirationSection squads={squads} onPreview={setSelected} mt={32} />
 
         {/* ── 為你提供更多 grid ─────────────────────────────────────────── */}
         <div id="grid-section" style={{ marginTop: 44 }}>
@@ -471,6 +474,95 @@ export default function MethodologyCatalog() {
 
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
     </div>
+  );
+}
+
+/* ── InspirationSection — 受你啟發（平台 chip + squad 推薦）──────────── */
+const INSPIRATION_PLATFORMS = [
+  { key: "facebook",  label: "Facebook",  color: "#1877F2", bg: "#EBF5FF", keywords: ["facebook","fb","社群"] },
+  { key: "instagram", label: "Instagram", color: "#C13584", bg: "#FDF2F8", keywords: ["instagram","ig","限動"] },
+  { key: "linkedin",  label: "LinkedIn",  color: "#0A66C2", bg: "#EBF4FF", keywords: ["linkedin","職場","b2b"] },
+  { key: "youtube",   label: "YouTube",   color: "#FF0000", bg: "#FFF0F0", keywords: ["youtube","影片","video"] },
+  { key: "tiktok",    label: "TikTok",    color: "#010101", bg: "#F5F5F5", keywords: ["tiktok","短影音","reels"] },
+  { key: "email",     label: "Email",     color: "#F59E0B", bg: "#FFFBEB", keywords: ["email","郵件","edm"] },
+  { key: "line",      label: "LINE",      color: "#06C755", bg: "#F0FFF4", keywords: ["line","line官方"] },
+];
+
+function InspirationSection({ squads, onPreview, mt = 32 }: {
+  squads: any[]; onPreview: (e: any) => void; mt?: number;
+}) {
+  const [activePlatform, setActivePlatform] = useState<string>("facebook");
+  const ref = useRef<HTMLDivElement>(null);
+  const scroll = (d: 1 | -1) => ref.current?.scrollBy({ left: d * 680, behavior: "smooth" });
+
+  const platform = INSPIRATION_PLATFORMS.find(p => p.key === activePlatform)!;
+
+  // Filter squads: workspace or name/description matches platform keywords
+  const filtered = useMemo(() => {
+    const kws = platform.keywords;
+    return squads.filter(s => {
+      const haystack = `${s.name ?? ""} ${s.description ?? ""} ${Array.isArray(s.workspace) ? s.workspace.join(" ") : (s.workspace ?? "")}`.toLowerCase();
+      return kws.some(k => haystack.includes(k));
+    }).slice(0, 20);
+  }, [squads, activePlatform]);
+
+  // Fallback: L4 squads if no keyword match
+  const displaySquads = filtered.length > 0
+    ? filtered
+    : squads.filter(s => String(s.strategyLayer ?? "").startsWith("L4")).slice(0, 20);
+
+  return (
+    <section style={{ marginTop: mt }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1A1A18", margin: 0, letterSpacing: "-0.01em" }}>受你啟發</h2>
+          <p style={{ fontSize: 13, color: "#A8A29E", margin: "2px 0 0" }}>根據你常用的平台，推薦最匹配的行銷小組</p>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => scroll(-1)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #E4E3E1", background: "white", cursor: "pointer", color: "#57534E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
+            <FontAwesomeIcon icon={faChevronLeft} />
+          </button>
+          <button onClick={() => scroll(1)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #E4E3E1", background: "white", cursor: "pointer", color: "#57534E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
+            <FontAwesomeIcon icon={faChevronRight} />
+          </button>
+        </div>
+      </div>
+
+      {/* Platform chip row */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {INSPIRATION_PLATFORMS.map(p => {
+          const active = activePlatform === p.key;
+          return (
+            <button key={p.key} onClick={() => setActivePlatform(p.key)} style={{
+              padding: "6px 16px", borderRadius: 50,
+              background: active ? p.color : p.bg,
+              border: `1.5px solid ${active ? p.color : "transparent"}`,
+              color: active ? "white" : p.color,
+              fontSize: 13, fontWeight: active ? 600 : 500,
+              cursor: "pointer", transition: "all 0.15s",
+            }}>
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Squad scroll */}
+      {displaySquads.length === 0 ? (
+        <div style={{ padding: "32px 24px", textAlign: "center", background: "#F9F8F7", borderRadius: 12, color: "#A8A29E", fontSize: 14 }}>
+          尚無 {platform.label} 相關小組，敬請期待 ✨
+        </div>
+      ) : (
+        <div ref={ref} style={{ display: "flex", gap: 16, overflowX: "auto", scrollbarWidth: "none", paddingBottom: 8 }}>
+          {displaySquads.map(e => (
+            <div key={e.id} style={{ flexShrink: 0, width: 260 }}>
+              <LandscapeCard entity={e} onPreview={() => onPreview(e)} aspect="5/4" size="sm" />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
