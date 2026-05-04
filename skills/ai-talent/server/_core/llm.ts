@@ -161,14 +161,57 @@ const PROVIDER_CONFIG: Record<
     defaultModel: "command-r-plus",
     getKey:       () => ENV.COHERE_API_KEY ?? "",
   },
-  // Azure AI Foundry — project-level OpenAI-compatible endpoint
-  // Endpoint: https://{hub}.services.ai.azure.com/api/projects/{project}/openai/v1
+  // ─── Azure AI Foundry endpoints ─────────────────────────────────────────────
+  //
+  // Resource 1: sowork-foundry-claw-api-router / proj-mkt-agent-law
+  //   Models: gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano,
+  //           gpt-4o-mini, o3, o4-mini, grok-4-1-fast, grok-4-20-reasoning,
+  //           Kimi-K2.5, Llama-3.3-70B, FW-MiniMax-M2.5, Phi-4-multimodal,
+  //           FLUX.2-flex, FLUX.2-pro, MAI-Image-2, MAI-Image-2e,
+  //           text-embedding-3-large/small, Cohere-embed-v3-multilingual, Cohere-rerank-v4.0-pro
+  //   Key: AZURE_FOUNDRY_API_KEY  Endpoint: AZURE_FOUNDRY_PROJECT_ENDPOINT
   "azure-foundry": {
     baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
       ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
       : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
-    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4o",
+    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-5.4-mini",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+  },
+
+  // Resource 2: sowork-ai-position-resource
+  //   Models: claude-sonnet-4-6, claude-haiku-4-5, gpt-5.4-pro, gpt-5.4-nano,
+  //           cohere-command-a, FLUX.1-Kontext-pro,
+  //           gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2,
+  //           gpt-4o-mini-tts, gpt-4o-transcribe, gpt-audio-1.5, whisper
+  //   Key: AZURE_POSITION_API_KEY  Endpoint: AZURE_POSITION_ENDPOINT
+  "azure-position": {
+    baseUrl:      (ENV as any).AZURE_POSITION_ENDPOINT
+      ? `${((ENV as any).AZURE_POSITION_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
+      : "https://sowork-ai-position-resource.services.ai.azure.com/openai/v1",
+    defaultModel: (ENV as any).AZURE_POSITION_MODEL || "claude-sonnet-4-6",
+    getKey:       () => (ENV as any).AZURE_POSITION_API_KEY ?? (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+  },
+
+  // Resource 3: cjwan-mnykipqt-northcentralus
+  //   Models: DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3
+  //   Key: AZURE_NORTHCENTRAL_API_KEY  Endpoint: Azure OpenAI northcentralus
+  "azure-northcentral": {
+    baseUrl:      (ENV as any).AZURE_NORTHCENTRAL_ENDPOINT
+      ? `${((ENV as any).AZURE_NORTHCENTRAL_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
+      : "https://cjwan-mnykipqt-northcentralus.services.ai.azure.com/openai/v1",
+    defaultModel: "DeepSeek-V3.2",
+    getKey:       () => (ENV as any).AZURE_NORTHCENTRAL_API_KEY ?? (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
+  },
+
+  // Resource 4: cjwan-mnynpm8k-canadacentral
+  //   Models: gpt-4o-mini-transcribe
+  //   Key: AZURE_CANADA_API_KEY
+  "azure-canada": {
+    baseUrl:      (ENV as any).AZURE_CANADA_ENDPOINT
+      ? `${((ENV as any).AZURE_CANADA_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
+      : "https://cjwan-mnynpm8k-canadacentral.services.ai.azure.com/openai/v1",
+    defaultModel: "gpt-4o-mini-transcribe",
+    getKey:       () => (ENV as any).AZURE_CANADA_API_KEY ?? (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
   // Google Gemini — AI Studio / Generative Language API (OpenAI-compatible shim)
   // Endpoint: https://generativelanguage.googleapis.com/v1beta/openai

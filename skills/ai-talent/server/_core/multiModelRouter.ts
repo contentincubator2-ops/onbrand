@@ -2,9 +2,22 @@
  * Multi-Model AI Router
  * Automatically selects the best AI model based on task type and available API keys.
  *
- * BUG-2 fix: No longer duplicates provider config or calls fetch directly.
- * All LLM calls now go through invokeLLM() from llm.ts, which owns the
- * single source-of-truth PROVIDER_CONFIG routing table.
+ * Azure AI Foundry endpoints (4 resources, 42+ deployments):
+ *   azure-foundry    — sowork-foundry-claw-api-router / proj-mkt-agent-law
+ *                      gpt-5.4/mini/nano, gpt-4.1/mini/nano, gpt-4o-mini, o3, o4-mini,
+ *                      grok-4-1/grok-4-20, Kimi-K2.5, Llama-3.3-70B, FLUX.2, embeddings
+ *   azure-position   — sowork-ai-position-resource
+ *                      claude-sonnet-4-6, claude-haiku-4-5, gpt-5.4-pro, cohere-command-a,
+ *                      FLUX.1-Kontext-pro, gpt-image-1/1.5/2, whisper, TTS
+ *   azure-northcentral — cjwan-mnykipqt-northcentralus
+ *                      DeepSeek-R1, DeepSeek-V3.2, Mistral-Large-3
+ *   azure-canada     — cjwan-mnynpm8k-canadacentral
+ *                      gpt-4o-mini-transcribe
+ *
+ * Non-Azure (confirmed working 2026-05-04):
+ *   qwen, zhipu — primary workhorse LLMs
+ *   gemini-native — web-grounded search via perplexityScout (not invokeLLM)
+ *   tavily — search API via perplexityScout
  */
 
 import { ENV } from "./env";
@@ -28,6 +41,9 @@ export type ModelProvider =
   | "openai"
   | "forge"
   | "azure-foundry"
+  | "azure-position"
+  | "azure-northcentral"
+  | "azure-canada"
   | "anthropic"
   | "gemini";
 
@@ -73,76 +89,84 @@ export function detectTaskType(content: string): TaskType {
 
 // ─── Provider selection ───────────────────────────────────────────────────────
 
-// Provider status (probed 2026-05-04, second probe after key restoration):
-//   WORKING (200):  qwen, zhipu, azure-foundry/gpt-4o, azure-foundry/Kimi-K2.5,
-//                   gemini-native (direct API), tavily-search
-//   NOT OpenAI-compat: anthropic (404 — uses /messages not /chat/completions)
-//   KEY INVALID: openai (401 expired), perplexity (401 all 5 quota exhausted), cohere (401)
-//   DISABLED: gemini-openai-compat (400 format mismatch — use native API path instead)
+// Probe results 2026-05-04 (post key-restore):
+//   WORKING (200): qwen, zhipu, azure-foundry/Kimi-K2.5, gemini-native, tavily
+//   PENDING KEY:   azure-position (claude-sonnet-4-6), azure-northcentral (DeepSeek)
+//   NOT OAI-COMPAT: anthropic (404 — /messages API, not /chat/completions)
+//   BROKEN: openai (401), perplexity (401 quota), cohere (401), gemini-oai-compat (400)
 //
-// invokeLLM() uses OpenAI-compatible /chat/completions format.
-// Only providers that speak OpenAI-compat can be listed here.
-// Gemini native API is used directly in perplexityScout (not via invokeLLM).
+// Priority strategy:
+//   creative/analysis → claude-sonnet-4-6 (azure-position) when key available
+//   coding            → DeepSeek-R1 (azure-northcentral) when key available
+//   chinese/general   → qwen (native Chinese LLM) first
+//   fallback chain    → qwen → zhipu → azure-foundry (all confirmed working)
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
-  chinese_content: ["qwen", "zhipu", "azure-foundry"],
-  creative_writing: ["zhipu", "qwen", "azure-foundry"],
-  search_realtime:  ["qwen", "zhipu", "azure-foundry"],
-  analysis:         ["qwen", "zhipu", "azure-foundry"],
-  classification:   ["qwen", "zhipu", "azure-foundry"],
-  coding:           ["qwen", "zhipu", "azure-foundry"],
-  general:          ["qwen", "zhipu", "azure-foundry"],
+  chinese_content: ["qwen",           "zhipu", "azure-foundry", "azure-position"],
+  creative_writing: ["azure-position", "qwen",  "zhipu",         "azure-foundry"],
+  search_realtime:  ["qwen",           "zhipu", "azure-foundry", "azure-position"],
+  analysis:         ["azure-position", "qwen",  "zhipu",         "azure-foundry"],
+  classification:   ["qwen",           "zhipu", "azure-foundry", "azure-position"],
+  coding:           ["azure-northcentral", "azure-foundry", "qwen", "zhipu"],
+  general:          ["qwen",           "zhipu", "azure-foundry", "azure-position"],
 };
 
+// Best model to use for each provider when called by this router
 const DEFAULT_MODELS: Record<ModelProvider, string> = {
-  qwen: "qwen-plus",
-  zhipu: "glm-4-flash",
-  perplexity: "sonar-pro",
-  google: "gemini-2.0-flash",
-  cohere: "command-r-plus",
-  openai: "gpt-4o-mini",
-  forge: "gemini-2.5-flash",
-  // "gpt-4o" deployment not found in proj-mkt-agent-law (404).
-  // Kimi-K2.5 confirmed 200. Claude Sonnet / GPT-5.4 also deployed —
-  // override with AZURE_FOUNDRY_MODEL env var once deployment name is known.
-  "azure-foundry": "Kimi-K2.5",
-  anthropic: "claude-sonnet-4-6",
-  gemini: "gemini-2.5-flash",
+  // Non-Azure (confirmed working)
+  qwen:               "qwen-plus",
+  zhipu:              "glm-4-flash",
+  // Azure endpoints
+  "azure-foundry":    "gpt-5.4-mini",          // cheaper than gpt-5.4; Kimi-K2.5 also confirmed
+  "azure-position":   "claude-sonnet-4-6",      // best model for creative/analysis
+  "azure-northcentral": "DeepSeek-V3.2",        // R1 for reasoning, V3.2 for speed
+  "azure-canada":     "gpt-4o-mini-transcribe", // transcription only
+  // Disabled / not used via invokeLLM
+  perplexity:         "sonar-pro",
+  google:             "gemini-2.0-flash",
+  cohere:             "command-r-plus",
+  openai:             "gpt-4o-mini",
+  forge:              "gemini-2.5-flash",
+  anthropic:          "claude-sonnet-4-6",
+  gemini:             "gemini-2.5-flash",
 };
 
 /**
  * Determine which providers are available based on configured API keys.
- * BUG-1 fix: references SCREAMING_SNAKE_CASE keys from the zod-validated ENV.
  */
 function getAvailabilityMap(): Record<ModelProvider, boolean> {
+  const foundryKey  = !!(ENV as any).AZURE_FOUNDRY_API_KEY;
+  const positionKey = !!(ENV as any).AZURE_POSITION_API_KEY || foundryKey; // fallback to shared key
+  const northKey    = !!(ENV as any).AZURE_NORTHCENTRAL_API_KEY || foundryKey;
+  const canadaKey   = !!(ENV as any).AZURE_CANADA_API_KEY || foundryKey;
+
   return {
-    // Confirmed WORKING (probed 2026-05-04)
-    qwen:            !!ENV.QWEN_API_KEY,
-    zhipu:           !!ENV.ZHIPU_API_KEY,
-    // azure-foundry: key restored 2026-05-04 (AZURE_FOUNDRY_API_KEY written directly to VM .env)
-    "azure-foundry": !!(ENV as any).AZURE_FOUNDRY_API_KEY,
-    // Force-disabled: confirmed broken via probe 2026-05-04
-    // anthropic: 404 — uses /messages not /chat/completions (not OpenAI-compat)
-    anthropic:       false,
-    openai:          false,   // 401 — key expired
-    perplexity:      false,   // 401 — all 5 keys quota exhausted
-    google:          false,   // gemini-openai-compat 400; native API works but not via invokeLLM
-    cohere:          false,   // 401 — key invalid
-    forge:           false,   // no key on VM
-    gemini:          false,   // 400/404 — openai-compat endpoint mismatch; native API works in perplexityScout
+    // Confirmed working (probed 2026-05-04)
+    qwen:                !!ENV.QWEN_API_KEY,
+    zhipu:               !!ENV.ZHIPU_API_KEY,
+    "azure-foundry":     foundryKey,
+    // Available when keys present (using shared foundry key as fallback)
+    "azure-position":    positionKey,
+    "azure-northcentral": northKey,
+    "azure-canada":      canadaKey,
+    // Force-disabled: confirmed broken or not OpenAI-compat via invokeLLM
+    anthropic:           false,   // 404 — uses /messages not /chat/completions
+    openai:              false,   // 401 — key expired
+    perplexity:          false,   // 401 — all 5 keys quota exhausted
+    google:              false,   // gemini-oai-compat 400; native works in perplexityScout
+    cohere:              false,   // 401 — key invalid
+    forge:               false,   // no key on VM
+    gemini:              false,   // 400 — openai-compat mismatch; native works in perplexityScout
   };
 }
 
 /**
  * Select the highest-priority available provider for the given task type.
- * Falls back to "forge" if no other provider is configured.
  */
 function selectProvider(taskType: TaskType): ModelProvider {
   const availability = getAvailabilityMap();
   for (const provider of TASK_PRIORITY_MAP[taskType]) {
     if (availability[provider]) return provider;
   }
-  // Last-resort fallback: qwen and zhipu are confirmed-working on VM (probed 2026-05-04).
-  // Use qwen if key exists, otherwise zhipu, otherwise fail loudly.
   if (ENV.QWEN_API_KEY) return "qwen";
   if (ENV.ZHIPU_API_KEY) return "zhipu";
   return "qwen"; // will throw with clear error if key missing
@@ -164,9 +188,6 @@ export function selectModel(taskType: TaskType): { provider: ModelProvider; mode
  *
  * Provider selection priority is driven by task type. Override with
  * `preferredProvider` when the caller has a specific requirement.
- *
- * BUG-2 fix: delegates all HTTP/auth logic to invokeLLM() — no duplicate
- * fetch calls or provider config here.
  */
 export async function callModel(
   messages: MultiModelMessage[],
@@ -175,15 +196,10 @@ export async function callModel(
 ): Promise<{ content: string; provider: ModelProvider; model: string }> {
   const availability = getAvailabilityMap();
 
-  // Resolve provider + model
   let provider: ModelProvider;
   let model: string;
 
   if (preferredProvider) {
-    // Soft mode: honor preferred provider when its key is set, otherwise
-    // gracefully degrade to the task-type priority list (which now leads with
-    // azure-foundry — the SoWork VM's verified-working route). Hard throws
-    // here have been confirmed by the user to break the boardroom UX.
     if (availability[preferredProvider]) {
       provider = preferredProvider;
       model = DEFAULT_MODELS[provider];
@@ -201,12 +217,7 @@ export async function callModel(
     model = DEFAULT_MODELS[provider];
   }
 
-  // Delegate to the single authoritative LLM invoker
-  const result = await invokeLLM({
-    provider,
-    model,
-    messages,
-  });
+  const result = await invokeLLM({ provider, model, messages });
 
   const content = result.choices[0]?.message?.content;
   if (typeof content !== "string") {
