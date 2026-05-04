@@ -174,7 +174,6 @@ async function fetchSquadEntities(): Promise<HomeEntity[]> {
             task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind,
             hero_image_url, mockup_images, is_curated
        FROM squads
-      WHERE is_active = 1
       ORDER BY COALESCE(tier, 99) ASC, id ASC
       LIMIT 1000`
   ) as any[];

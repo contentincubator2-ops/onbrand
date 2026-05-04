@@ -683,8 +683,8 @@ ${schemaExample}
     }).optional())
     .query(async ({ input }) => {
       const filter = input?.includeUnapproved
-        ? "s.is_active = 1"
-        : "s.is_active = 1 AND s.is_approved = 1";
+        ? "1=1"           // admin mode: show all squads regardless of is_active/is_approved
+        : "s.is_approved = 1";
       const [rows] = await localPool.execute(
         `SELECT s.id, s.slug, s.name, s.description,
                 s.tier, s.strategy_layer, s.is_approved,
