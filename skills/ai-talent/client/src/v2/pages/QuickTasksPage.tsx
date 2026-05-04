@@ -22,13 +22,14 @@ import {
   Avatar, AvatarGroup, Badge, Button, Card, CardBody, CardHeader, CardFooter,
   Chip, Divider, Input, Textarea, Select, SelectItem, NumberInput,
   Progress, ScrollShadow, Skeleton, Snippet, Spinner, Tooltip, User,
+  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faWandMagicSparkles, faArrowLeft, faCircleCheck, faCircleXmark,
   faPlay, faRotateRight, faPaperPlane, faClipboard, faClipboardCheck,
   faRocket, faMagnifyingGlass, faChartColumn, faPenNib, faPalette, faClock,
-  faBullseye, faBolt,
+  faBullseye, faBolt, faCopy,
 } from "@fortawesome/free-solid-svg-icons";
 
 /* ─────────────────────────── Types ─────────────────────────────────────── */
@@ -155,11 +156,35 @@ type AgentState =
 /* ─────────────────────────── Page ───────────────────────────────────── */
 
 export default function QuickTasksPage() {
-  const { brands, brandId } = useOutletContext<ShellOutletCtx>();
+  const { brands, brandId, scope } = useOutletContext<ShellOutletCtx>();
   const currentBrand = useMemo(
     () => brands.find((b: any) => b.id === brandId) ?? null,
     [brands, brandId]
   );
+
+  // Atomic task modal state
+  const runAtomicMutation: any = (trpc as any).taskCatalog?.runAtomic?.useMutation?.()
+    ?? { mutateAsync: async () => { throw new Error("taskCatalog.runAtomic not available"); } };
+  const [atomicResult, setAtomicResult] = useState<any | null>(null);
+  const [atomicError, setAtomicError] = useState<string | null>(null);
+
+  const runAtomic = async (t: any) => {
+    setAtomicError(null);
+    setAtomicResult({ pending: true, task: t });
+    try {
+      const res = await runAtomicMutation.mutateAsync({
+        taskId: t.id,
+        scopeBrandId:   scope?.brandId   ?? brandId ?? null,
+        scopeProductId: scope?.productId ?? null,
+        scopeEventId:   scope?.eventId   ?? null,
+        userInput: "",
+      });
+      setAtomicResult({ pending: false, task: t, ...res });
+    } catch (e: any) {
+      setAtomicError(e?.message ?? String(e));
+      setAtomicResult({ pending: false, task: t, ok: false });
+    }
+  };
 
   const tasksQuery = (trpc as any).quickTask?.list?.useQuery?.(undefined, {
     refetchOnWindowFocus: false,
@@ -259,52 +284,50 @@ export default function QuickTasksPage() {
         </section>
       ) : (
         <section className="px-8 mt-14">
-          {/* Catalog tasks — curated front-door, opens /picker for full flow */}
-          {catalogTasks.length > 0 && (
-            <div className="mb-12">
-              <div className="flex items-end justify-between mb-4">
-                <h2 className="font-semibold text-xl tracking-tight">從任務目錄選</h2>
-                <Chip size="sm" variant="flat" color="primary">
-                  {catalogTasks.length} 個精選任務
-                </Chip>
+          {/* Atomic tasks only — all cards open modal directly, no picker navigation */}
+          {(() => {
+            const atomicTasks = catalogTasks.filter(
+              (t: any) => t.impl_kind === "atomic" || t.bypassable
+            );
+            if (atomicTasks.length === 0) return null;
+            return (
+              <div className="mb-12">
+                <div className="flex items-end justify-between mb-4">
+                  <div>
+                    <h2 className="font-semibold text-xl tracking-tight">⚡ 一鍵任務</h2>
+                    <p className="text-tiny text-default-400 mt-0.5">按下即產出，不需填寫表單</p>
+                  </div>
+                  <Chip size="sm" variant="flat" color="secondary">
+                    {atomicTasks.length} 件
+                  </Chip>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {atomicTasks.map((t: any) => (
+                    <Card
+                      key={`task-${t.id}`}
+                      isPressable
+                      shadow="sm"
+                      radius="lg"
+                      onPress={() => void runAtomic(t)}
+                      className="border border-secondary-200 hover:border-secondary-400 transition"
+                    >
+                      <CardBody className="p-4 gap-2">
+                        <div className="flex items-start gap-2 flex-wrap">
+                          <span className="text-medium font-semibold flex-1 min-w-0 line-clamp-1">{t.name_zh}</span>
+                          <Chip size="sm" variant="flat" color="secondary">⚡</Chip>
+                        </div>
+                        <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em]">{t.description}</p>
+                        <div className="flex items-center gap-2 text-tiny text-default-400 mt-1">
+                          {t.estimated_minutes && <span>約 {t.estimated_minutes} 分鐘</span>}
+                          <span className="ml-auto text-secondary font-medium">立即產出 →</span>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {catalogTasks.map((t) => (
-                  <Card
-                    key={`task-${t.id}`}
-                    isPressable
-                    shadow="sm"
-                    radius="lg"
-                    onPress={() => {
-                      // Catalog tasks navigate to /picker which has the
-                      // full intake + scope flow. Free-form input bar
-                      // above can also route there with prefill.
-                      const url = t.impl_kind === "squad" && t.squad_slug
-                        ? `/picker?workspace=${t.workspace}&slug=${t.squad_slug}`
-                        : `/picker?workspace=${t.workspace}`;
-                      window.location.href = url;
-                    }}
-                    className="border border-divider"
-                  >
-                    <CardBody className="p-4 gap-2">
-                      <div className="flex items-start gap-2 flex-wrap">
-                        <span className="text-medium font-semibold flex-1 min-w-0 line-clamp-1">{t.name_zh}</span>
-                        <Chip size="sm" variant="flat" color={t.impl_kind === "squad" ? "primary" : "secondary"}>
-                          {t.impl_kind === "squad" ? "squad" : "atomic"}
-                        </Chip>
-                      </div>
-                      <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em]">{t.description}</p>
-                      <div className="flex items-center gap-2 text-tiny text-default-400 mt-1">
-                        {t.bypassable && <Chip size="sm" variant="flat" color="success" className="h-4 text-tiny">一鍵跑</Chip>}
-                        {t.estimated_minutes && <span>約 {t.estimated_minutes} 分鐘</span>}
-                        <span className="ml-auto text-primary">→ 開啟流程</span>
-                      </div>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })()}
           <div className="flex items-end justify-between mb-6">
             <h2 className="font-semibold text-2xl tracking-tight">所有 Squads</h2>
             <Chip size="sm" variant="flat">
@@ -337,7 +360,118 @@ export default function QuickTasksPage() {
           )}
         </section>
       )}
+
+      {/* Atomic task result modal */}
+      <AtomicResultModal
+        isOpen={!!atomicResult}
+        onClose={() => { setAtomicResult(null); setAtomicError(null); }}
+        result={atomicResult}
+        error={atomicError}
+      />
     </main>
+  );
+}
+
+/* ─────────────────────────── Atomic Result Modal ─────────────────────── */
+
+function AtomicResultModal({
+  isOpen, onClose, result, error,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  result: any | null;
+  error: string | null;
+}) {
+  const [editBuffer, setEditBuffer] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  React.useEffect(() => {
+    if (result?.pending) {
+      setElapsed(0);
+      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [result?.pending]);
+
+  React.useEffect(() => {
+    if (result?.output) setEditBuffer(result.output);
+  }, [result?.output]);
+
+  if (!result) return null;
+  const t = result.task ?? {};
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" scrollBehavior="inside">
+      <ModalContent>
+        <ModalHeader className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Chip size="sm" variant="flat" color="secondary" className="uppercase">⚡ Atomic</Chip>
+            <h2 className="text-medium font-semibold">{t.name_zh}</h2>
+          </div>
+          {result.agent && (
+            <p className="text-tiny text-default-500">
+              由 {result.agent.name}（{result.agent.title ?? ""}）交付
+              {result.durationMs != null && ` · ${(result.durationMs / 1000).toFixed(1)}s`}
+            </p>
+          )}
+        </ModalHeader>
+        <ModalBody className="gap-3">
+          {result.pending ? (
+            <div className="flex flex-col items-center gap-3 py-10">
+              <Spinner size="lg" color="secondary" />
+              <p className="text-small text-default-500">agent 產出中…</p>
+              <div className="flex items-center gap-1 text-tiny text-default-400">
+                <FontAwesomeIcon icon={faClock} />
+                <span>{elapsed}s</span>
+              </div>
+              <Progress
+                size="sm"
+                isIndeterminate
+                color="secondary"
+                className="w-48"
+                aria-label="loading"
+              />
+            </div>
+          ) : error ? (
+            <Card shadow="none" className="border border-danger-200 bg-danger-50">
+              <CardBody className="p-3">
+                <p className="text-small font-medium text-danger">✗ 執行失敗</p>
+                <p className="text-tiny text-danger-700 mt-1">{error}</p>
+              </CardBody>
+            </Card>
+          ) : (
+            <>
+              <Textarea
+                size="sm"
+                variant="bordered"
+                value={editBuffer}
+                onValueChange={setEditBuffer}
+                minRows={10}
+                maxRows={24}
+                classNames={{ input: "text-small leading-relaxed font-sans whitespace-pre-wrap" }}
+              />
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="secondary"
+                  onPress={() => navigator.clipboard.writeText(editBuffer)}
+                  startContent={<FontAwesomeIcon icon={faCopy} />}
+                >
+                  複製到剪貼簿
+                </Button>
+              </div>
+            </>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button size="sm" variant="light" onPress={onClose}>關閉</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }
 
