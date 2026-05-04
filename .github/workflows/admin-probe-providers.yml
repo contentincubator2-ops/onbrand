@@ -155,6 +155,30 @@ jobs:
               printf "%-22s | %-3s | %-6s | %s\n" "azure-foundry (Kimi-K2.5)" "YES" "$http_status2" "$works2"
             fi
 
+            # ── Azure: sowork-ai-position-resource (claude-sonnet-4-6, gpt-5.4-pro) ──
+            AZ_POS_KEY=$(get_key AZURE_POSITION_API_KEY)
+            AZ_POS_EP=$(get_key AZURE_POSITION_ENDPOINT)
+            AZ_POS_EP="${AZ_POS_EP:-https://sowork-ai-position-resource.cognitiveservices.azure.com}"
+            probe_openai_compat "azure-position (claude)" "${AZ_POS_EP%/}/openai/v1" "claude-sonnet-4-6" "$AZ_POS_KEY" "api-key"
+
+            # ── Azure: proj-claude-sweden-resource (claude variants) ───────────
+            AZ_CL_KEY=$(get_key AZURE_CLAUDE_SWEDEN_API_KEY)
+            AZ_CL_EP=$(get_key AZURE_CLAUDE_SWEDEN_ENDPOINT)
+            AZ_CL_EP="${AZ_CL_EP:-https://proj-claude-sweden-resource.cognitiveservices.azure.com}"
+            probe_openai_compat "azure-claude (sweden)" "${AZ_CL_EP%/}/openai/v1" "claude-sonnet-4-6" "$AZ_CL_KEY" "api-key"
+
+            # ── Azure: cjwan-mnykipqt-northcentralus (DeepSeek-R1, Mistral) ───
+            AZ_NC_KEY=$(get_key AZURE_NORTHCENTRAL_API_KEY)
+            AZ_NC_EP=$(get_key AZURE_NORTHCENTRAL_ENDPOINT)
+            AZ_NC_EP="${AZ_NC_EP:-https://cjwan-mnykipqt-northcentralus.cognitiveservices.azure.com}"
+            probe_openai_compat "azure-northcentral (DS)" "${AZ_NC_EP%/}/openai/v1" "DeepSeek-V3.2" "$AZ_NC_KEY" "api-key"
+
+            # ── Azure: cjwan-mnynpm8k-canadacentral (transcribe) ──────────────
+            AZ_CA_KEY=$(get_key AZURE_CANADA_API_KEY)
+            AZ_CA_EP=$(get_key AZURE_CANADA_ENDPOINT)
+            AZ_CA_EP="${AZ_CA_EP:-https://cjwan-mnynpm8k-canadacentral.cognitiveservices.azure.com}"
+            probe_openai_compat "azure-canada (transc)" "${AZ_CA_EP%/}/openai/v1" "gpt-4o-mini-transcribe" "$AZ_CA_KEY" "api-key"
+
             # ── Anthropic ─────────────────────────────────────────────────────
             ANTHROPIC_KEY=$(get_key ANTHROPIC_API_KEY)
             probe_anthropic "$ANTHROPIC_KEY"
