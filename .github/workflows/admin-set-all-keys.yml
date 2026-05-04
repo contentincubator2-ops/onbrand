@@ -73,6 +73,8 @@ jobs:
           script: |
             set -e
             ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            # Create .env if it doesn't exist (first run after fresh deploy)
+            touch "$ENV"
             cp "$ENV" "${ENV}.bak.$(date +%s)"
             BEFORE=$(wc -l < "$ENV")
 
