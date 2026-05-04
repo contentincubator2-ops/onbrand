@@ -137,29 +137,19 @@ export default function BrandsPage() {
     return items;
   }, [scopeMode, segments]);
 
-  // ── Two-tier navigation ───────────────────────────────────────────────────
-  // category = top-level sidebar choice (大分類)
-  // section  = sub-item within that category (小分類, driven by content-area sub-nav)
-  type Category = "positioning" | "visual" | "settings";
-  const [category, setCategory] = useState<Category>("positioning");
+  // ── Navigation ────────────────────────────────────────────────────────────
+  // Single `section` drives both sidebar active state and content area.
+  // Derived category: section.startsWith("asset:") → visual; "settings" → settings; else → positioning
   const defaultSection: SectionId = "card";
   const [section, setSection] = useState<SectionId>(defaultSection);
+  const derivedCategory = section.startsWith("asset:") ? "visual" : section === "settings" ? "settings" : "positioning";
 
   // Brand-kit dropdown (Canva-style switcher)
   const [brandDropOpen, setBrandDropOpen] = useState(false);
   const [brandSearch, setBrandSearch] = useState("");
 
-  // Switching category resets section to the sensible default for that category
-  const switchCategory = (c: Category) => {
-    setCategory(c);
-    if (c === "positioning") setSection("card");
-    if (c === "visual")      setSection("asset:logo");
-    if (c === "settings")    setSection("settings");
-  };
-
   // Reset to positioning when scope changes
   React.useEffect(() => {
-    setCategory("positioning");
     setSection("card");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
@@ -742,122 +732,116 @@ export default function BrandsPage() {
             )}
           </div>
 
-          {/* ④ 大分類 nav — 品牌定位 / 視覺資產 / 設定 */}
-          <nav style={{ flex: 1, padding: "8px 10px 16px", display: "flex", flexDirection: "column", gap: 2 }}>
-            {/* Section label */}
-            <p style={{ fontSize: 10, fontWeight: 700, color: "#A8A29E", letterSpacing: "0.10em", textTransform: "uppercase", padding: "4px 4px 8px", margin: 0 }}>
-              分類
+          {/* ④ Canva-style sidebar nav — section headers + sub-items */}
+          <nav style={{ flex: 1, padding: "8px 10px 16px", display: "flex", flexDirection: "column", gap: 0, overflowY: "auto" }}>
+
+            {/* ── 品牌定位 section ── */}
+            <p style={{
+              fontSize: 11, fontWeight: 700, color: "#A8A29E",
+              letterSpacing: "0.08em", textTransform: "uppercase",
+              padding: "10px 4px 4px", margin: 0, userSelect: "none",
+            }}>
+              {scopeMode === "product" ? "產品定位" : scopeMode === "event" ? "活動定位" : "品牌定位"}
             </p>
 
-            {/* 品牌 / 產品 / 活動定位 */}
-            {(() => {
-              const catLabel =
-                scopeMode === "product" ? "產品定位"
-                : scopeMode === "event"   ? "活動定位"
-                : "品牌定位";
-              const active = category === "positioning";
+            {/* 速查卡 */}
+            {[
+              { id: "card",    label: "速查卡"   },
+              { id: "prompts", label: "AI 指令庫" },
+              ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${s.title}` })),
+            ].map(item => {
+              const active = section === item.id;
               return (
-                <button onClick={() => switchCategory("positioning")} style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 12px", borderRadius: 8,
-                  background: active ? "#EDE9FE" : "none",
-                  border: active ? "1px solid #C7D2FE" : "1px solid transparent",
-                  cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
-                  color: active ? "#4F46E5" : "#374151",
-                  textAlign: "left", transition: "all 0.15s",
+                <button key={item.id} onClick={() => setSection(item.id)} style={{
+                  width: "100%", display: "flex", alignItems: "center",
+                  padding: "4px 12px", borderRadius: 8,
+                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  border: "none", cursor: "pointer",
+                  fontSize: 12, fontWeight: active ? 600 : 400,
+                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  textAlign: "left", transition: "background 0.12s",
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
                 >
-                  <FontAwesomeIcon icon={faBookOpen} style={{ fontSize: 14, width: 16, color: active ? "#4F46E5" : "#6B7280" }} />
-                  {catLabel}
+                  {item.label}
                 </button>
               );
-            })()}
+            })}
 
-            {/* 視覺資產 — brand scope only */}
-            {scopeMode === "brand" && (() => {
-              const active = category === "visual";
-              return (
-                <button onClick={() => switchCategory("visual")} style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 12px", borderRadius: 8,
-                  background: active ? "#EDE9FE" : "none",
-                  border: active ? "1px solid #C7D2FE" : "1px solid transparent",
-                  cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
-                  color: active ? "#4F46E5" : "#374151",
-                  textAlign: "left", transition: "all 0.15s",
-                }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
-                >
-                  <FontAwesomeIcon icon={faPalette} style={{ fontSize: 14, width: 16, color: active ? "#4F46E5" : "#6B7280" }} />
+            {/* ── 視覺資產 section — brand scope only ── */}
+            {scopeMode === "brand" && (
+              <>
+                <p style={{
+                  fontSize: 11, fontWeight: 700, color: "#A8A29E",
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  padding: "14px 4px 4px", margin: 0, userSelect: "none",
+                }}>
                   視覺資產
-                </button>
-              );
-            })()}
+                </p>
+                {[
+                  { id: "asset:all",        label: "所有資產"  },
+                  { id: "asset:guidelines", label: "準則"      },
+                  { id: "asset:templates",  label: "品牌範本", badge: "最新" },
+                  { id: "asset:logo",       label: "標誌"      },
+                  { id: "asset:colors",     label: "顏色"      },
+                  { id: "asset:fonts",      label: "字型"      },
+                  { id: "asset:voice",      label: "品牌口吻"  },
+                  { id: "asset:photos",     label: "照片"      },
+                  { id: "asset:images",     label: "圖像"      },
+                  { id: "asset:icons",      label: "圖示"      },
+                  { id: "asset:charts",     label: "圖表"      },
+                ].map(item => {
+                  const active = section === item.id;
+                  return (
+                    <VisualNavItem
+                      key={item.id}
+                      id={item.id}
+                      label={item.label}
+                      badge={(item as any).badge}
+                      active={active}
+                      onClick={() => setSection(item.id)}
+                    />
+                  );
+                })}
+              </>
+            )}
 
-            {/* 設定 — event scope only */}
-            {scopeMode === "event" && (() => {
-              const active = category === "settings";
-              return (
-                <button onClick={() => switchCategory("settings")} style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 12px", borderRadius: 8,
-                  background: active ? "#EDE9FE" : "none",
-                  border: active ? "1px solid #C7D2FE" : "1px solid transparent",
-                  cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
-                  color: active ? "#4F46E5" : "#374151",
-                  textAlign: "left", transition: "all 0.15s",
-                }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
-                >
-                  <FontAwesomeIcon icon={faWandSparkles} style={{ fontSize: 14, width: 16, color: active ? "#4F46E5" : "#6B7280" }} />
-                  設定
-                </button>
-              );
-            })()}
+            {/* ── 設定 — event scope only ── */}
+            {scopeMode === "event" && (
+              <>
+                <div style={{ height: 8 }} />
+                {(() => {
+                  const active = section === "settings";
+                  return (
+                    <button onClick={() => setSection("settings")} style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 8,
+                      padding: "4px 12px", borderRadius: 8,
+                      background: active ? "rgba(163,112,252,0.15)" : "none",
+                      border: "none", cursor: "pointer",
+                      fontSize: 12, fontWeight: active ? 600 : 400,
+                      color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                      textAlign: "left", transition: "background 0.12s",
+                    }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                    >
+                      <FontAwesomeIcon icon={faGear} style={{ fontSize: 11, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
+                      設定
+                    </button>
+                  );
+                })()}
+              </>
+            )}
           </nav>
         </aside>
 
-        {/* Right: scope-aware content pane */}
+        {/* Right: scope-aware content pane — driven by `section` (sidebar handles all nav) */}
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
           {/* ── 品牌 / 產品 / 活動定位 ── */}
-          {category === "positioning" && (
+          {derivedCategory === "positioning" && (
             <>
-              {/* Horizontal sub-nav: 速查卡 | AI指令庫 | segments */}
-              <div style={{
-                display: "flex", gap: 0, overflowX: "auto", flexShrink: 0,
-                borderBottom: "1px solid #E4E3E1",
-                padding: "0 24px",
-                scrollbarWidth: "none",
-              }}>
-                {[
-                  { id: "card",    label: "速查卡"   },
-                  { id: "prompts", label: "AI 指令庫" },
-                  ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${s.title}` })),
-                ].map(t => {
-                  const active = section === t.id;
-                  return (
-                    <button key={t.id} onClick={() => setSection(t.id)} style={{
-                      flexShrink: 0, padding: "12px 16px",
-                      background: "none", border: "none", cursor: "pointer",
-                      fontSize: 13, fontWeight: active ? 600 : 400,
-                      color: active ? "#4F46E5" : "#57534E",
-                      borderBottom: active ? "2px solid #4F46E5" : "2px solid transparent",
-                      marginBottom: -1, transition: "color 0.12s, border-color 0.12s",
-                      whiteSpace: "nowrap",
-                    }}
-                      onMouseEnter={e => { if (!active) e.currentTarget.style.color = "#1A1A18"; }}
-                      onMouseLeave={e => { if (!active) e.currentTarget.style.color = "#57534E"; }}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-
               {/* Positioning content */}
               <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
                 {scopeMode !== "none" && pipelineSteps.length > 0 && (
@@ -919,42 +903,25 @@ export default function BrandsPage() {
           )}
 
           {/* ── 視覺資產 ── */}
-          {category === "visual" && scopeMode === "brand" && (
+          {derivedCategory === "visual" && scopeMode === "brand" && (
             <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Asset type tabs */}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {[
-                  { id: "asset:logo",   label: "標誌",  icon: faPenNib  },
-                  { id: "asset:colors", label: "顏色",  icon: faPalette },
-                  { id: "asset:fonts",  label: "字型",  icon: faFont    },
-                ].map(t => {
-                  const active = section === t.id;
-                  return (
-                    <button key={t.id} onClick={() => setSection(t.id)} style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      padding: "8px 18px", borderRadius: 50,
-                      background: active ? "#4F46E5" : "white",
-                      border: `1.5px solid ${active ? "#4F46E5" : "#E4E3E1"}`,
-                      cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
-                      color: active ? "white" : "#374151",
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "#F5F4F2"; } }}
-                      onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "white"; } }}
-                    >
-                      <FontAwesomeIcon icon={t.icon} style={{ fontSize: 12 }} />
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Asset editor */}
-              {(scope?.brandId ?? brandId) ? (
-                <BrandAssetPanel
-                  assetKey={section.slice("asset:".length) as AssetKey}
-                  brandId={(scope?.brandId ?? brandId)!}
-                />
-              ) : (
+              {/* Asset editor — section drives which asset type is shown */}
+              {(scope?.brandId ?? brandId) ? (() => {
+                const VALID_ASSET_KEYS: AssetKey[] = ["logo", "colors", "fonts", "photos", "guidelines", "templates"];
+                const assetKey = section.slice("asset:".length) as AssetKey;
+                if (VALID_ASSET_KEYS.includes(assetKey)) {
+                  return <BrandAssetPanel assetKey={assetKey} brandId={(scope?.brandId ?? brandId)!} />;
+                }
+                return (
+                  <Card shadow="none" className="border-2 border-dashed border-divider">
+                    <CardBody className="py-16 items-center text-center gap-3">
+                      <FontAwesomeIcon icon={faPalette} className="text-3xl text-default-300" />
+                      <p className="text-medium font-medium">即將推出</p>
+                      <p className="text-small text-default-500">此資產類型功能開發中。</p>
+                    </CardBody>
+                  </Card>
+                );
+              })() : (
                 <Card shadow="none" className="border-2 border-dashed border-divider">
                   <CardBody className="py-16 items-center text-center gap-3">
                     <FontAwesomeIcon icon={faShapes} className="text-3xl text-default-300" />
@@ -966,7 +933,7 @@ export default function BrandsPage() {
           )}
 
           {/* ── 設定（活動限定）── */}
-          {category === "settings" && scopeMode === "event" && scope?.eventId && (
+          {derivedCategory === "settings" && scopeMode === "event" && scope?.eventId && (
             <div style={{ padding: "24px" }}>
               <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
             </div>
@@ -974,6 +941,48 @@ export default function BrandsPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+/* ─────────────────────────── VisualNavItem ─────────────────────────── */
+// Sidebar item for visual assets — shows hover-reveal + button, purple badge for 最新.
+function VisualNavItem({ id, label, badge, active, onClick }: {
+  id: string; label: string; badge?: string; active: boolean; onClick: () => void;
+}) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: "100%", display: "flex", alignItems: "center",
+        padding: "4px 12px", borderRadius: 8,
+        background: active ? "rgba(163,112,252,0.15)" : hovered ? "#F5F4F2" : "none",
+        border: "none", cursor: "pointer",
+        fontSize: 12, fontWeight: active ? 600 : 400,
+        color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+        textAlign: "left", transition: "background 0.12s",
+        gap: 6,
+      }}
+    >
+      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      {badge && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
+          background: "rgba(163,112,252,0.20)", color: "rgb(74,46,126)",
+          flexShrink: 0,
+        }}>{badge}</span>
+      )}
+      {hovered && (
+        <span style={{
+          width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+          background: "rgba(163,112,252,0.20)", display: "flex",
+          alignItems: "center", justifyContent: "center",
+          fontSize: 11, color: "rgb(74,46,126)", fontWeight: 700,
+        }}>+</span>
+      )}
+    </button>
   );
 }
 
