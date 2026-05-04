@@ -166,7 +166,7 @@ const PROVIDER_CONFIG: Record<
   "azure-foundry": {
     baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
       ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
+      : "https://sowork-app-production-resource.services.ai.azure.com/api/projects/sowork-app-production/openai/v1",
     defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4o",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },

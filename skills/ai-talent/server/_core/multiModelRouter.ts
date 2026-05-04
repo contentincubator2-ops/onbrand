@@ -114,11 +114,11 @@ function getAvailabilityMap(): Record<ModelProvider, boolean> {
     // Confirmed WORKING (probed 2026-05-04)
     qwen:            !!ENV.QWEN_API_KEY,
     zhipu:           !!ENV.ZHIPU_API_KEY,
-    // azure-foundry: key was baked on VM, now lost. Re-enable via GitHub Secret AZURE_FOUNDRY_API_KEY
+    // azure-foundry: key restored 2026-05-04 (AZURE_FOUNDRY_API_KEY written directly to VM .env)
     "azure-foundry": !!(ENV as any).AZURE_FOUNDRY_API_KEY,
-    // anthropic: key exists (CLAUDE_API_KEY_DEFAULT), probe gave 404 due to wrong model name in probe script
+    // anthropic: key exists (CLAUDE_API_KEY_DEFAULT)
     anthropic:       !!(ENV as any).ANTHROPIC_API_KEY,
-    // Force-disabled: key missing or confirmed broken
+    // Force-disabled: confirmed broken via probe 2026-05-04
     openai:          false,   // 401 — key expired
     perplexity:      false,   // 401 — all 5 keys quota exhausted
     google:          false,   // 403 — service policy block
