@@ -497,56 +497,66 @@ export default function BrandsPage() {
       : null;
 
   return (
-    <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Hero header — 首頁同款三層漸層 ── */}
-      <section
-        className="relative px-8 pt-10 pb-8 overflow-hidden"
-        style={{
-          boxShadow: "0 6px 24px rgba(0,0,0,0.07)",
-          backgroundImage: [
-            "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",
-            "linear-gradient(rgba(255,255,255,0.96), rgba(255,255,255,0.96))",
-            "linear-gradient(135deg, #00b4bc 0%, #8b5cf6 60%, #4c1d95 100%)",
-          ].join(", "),
-        }}
-      >
-        <div className="relative z-10 flex flex-col items-center text-center">
-          {/* Eyebrow */}
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "rgba(99,102,241,0.7)" }}>
-            SoWork · {scopeEyebrow}
-          </p>
+    <main
+      className="min-h-[calc(100vh-3.5rem)]"
+      style={{
+        /* 橘色漸層頁面背景 */
+        background: [
+          "linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18))",
+          "linear-gradient(135deg, #FF6B35 0%, #FF9F43 45%, #FFCF77 100%)",
+        ].join(", "),
+        padding: 20,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* ── 白色工作卡片（Canva 同款浮起 card） ── */}
+      <div style={{
+        flex: 1,
+        background: "white",
+        borderRadius: 16,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.13)",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+      }}>
 
-          {/* Brand icon */}
+        {/* ── 輕量標題列 ── */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "14px 20px",
+          borderBottom: "1px solid #F0EFED",
+          flexShrink: 0,
+        }}>
+          {/* 橘色小矩形 icon（Canva 同款） */}
           <div style={{
-            width: 48, height: 48, borderRadius: 14,
-            background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 12,
-            boxShadow: "0 4px 16px rgba(124,58,237,0.30)",
-          }}>
-            <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 20 }} />
-          </div>
-
-          {/* Main title — gradient text, 首頁同款 */}
-          <h1
-            className="font-semibold tracking-tight leading-tight"
-            style={{
-              fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              margin: 0,
-            }}
-          >
+            width: 22, height: 15, borderRadius: 4, flexShrink: 0,
+            background: "linear-gradient(135deg, #FF6B35, #FF9F43)",
+          }} />
+          <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A18", flex: 1 }}>
             {scopeName}
-          </h1>
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {scopeEyebrow}
+          </span>
+          <button style={{
+            width: 28, height: 28, borderRadius: 6, border: "none",
+            background: "none", cursor: "pointer", color: "#78716C",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, transition: "background 0.12s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+          >
+            <FontAwesomeIcon icon={faEllipsis} />
+          </button>
         </div>
-      </section>
 
-      {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
-      <div className="flex-1 flex">
-        {/* ── Brand left rail — sub-nav only (你的方案/品牌選擇器 已移至收放側邊欄) ── */}
+        {/* ── Body: aside + content ── */}
+        <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+
+        {/* ── Brand left rail — sub-nav only ── */}
         <aside style={{
           width: 200, flexShrink: 0,
           borderRight: "1px solid #E4E3E1",
@@ -742,8 +752,9 @@ export default function BrandsPage() {
               <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
             </div>
           )}
-        </div>
-      </div>
+        </div>   {/* end right content */}
+        </div>   {/* end Body flex (aside + content) */}
+      </div>     {/* end white card */}
     </main>
   );
 }
