@@ -72,33 +72,87 @@ jobs:
             set -a
             source "$ENV_FILE" 2>/dev/null
             set +a
-            MYSQL="mysql -h ${DB_HOST:-localhost} -u ${DB_USER:-root} -p${DB_PASSWORD} ${DB_NAME:-marketing_os} -B -N --silent"
+
+            # Probe what DB var names .env actually uses (different envs use
+            # different conventions). Print non-secret ones so we can debug.
+            echo ""
+            echo "── 3. DB env var probe ──"
+            for v in DB_HOST DB_PORT DB_USER DB_NAME DATABASE_URL MYSQL_HOST MYSQL_USER MYSQL_DATABASE; do
+              VAL=$(eval "echo \${$v:-}")
+              [ -n "$VAL" ] && echo "  $v = $VAL"
+            done
+            for v in DB_PASSWORD DB_PASS MYSQL_PASSWORD MYSQL_PWD; do
+              VAL=$(eval "echo \${$v:-}")
+              [ -n "$VAL" ] && echo "  $v = (set, ${#VAL} chars)"
+            done
+
+            # Pick first available combo. Try DATABASE_URL first if present.
+            MYSQL_USER_ARG="${DB_USER:-${MYSQL_USER:-root}}"
+            MYSQL_HOST_ARG="${DB_HOST:-${MYSQL_HOST:-localhost}}"
+            MYSQL_DB_ARG="${DB_NAME:-${MYSQL_DATABASE:-marketing_os}}"
+            MYSQL_PORT_ARG="${DB_PORT:-3306}"
+            MYSQL_PWD_ARG="${DB_PASSWORD:-${DB_PASS:-${MYSQL_PASSWORD:-${MYSQL_PWD:-}}}}"
+
+            export MYSQL_PWD="$MYSQL_PWD_ARG"
+            MYSQL="mysql -h $MYSQL_HOST_ARG -P $MYSQL_PORT_ARG -u $MYSQL_USER_ARG $MYSQL_DB_ARG -B -N --silent"
 
             echo ""
-            echo "── 3. Look up user ──"
-            USER_ROW=$($MYSQL -e "SELECT id, email, name FROM users WHERE email = '${EMAIL}' LIMIT 1" 2>&1)
-            if [ -z "$USER_ROW" ]; then
-              echo "❌ No user found with email $EMAIL"
+            echo "── 4. Look up user ──"
+            USER_ROW=$($MYSQL -e "SELECT id, email, COALESCE(name,'(no name)') FROM users WHERE email = '${EMAIL}' LIMIT 1" 2>&1)
+            RC=$?
+            echo "$USER_ROW"
+            if [ $RC -ne 0 ] || [ -z "$USER_ROW" ] || echo "$USER_ROW" | grep -qi "ERROR\|Access denied"; then
+              echo ""
+              echo "❌ MySQL connection failed — fix DB credentials before retrying"
               exit 1
             fi
-            USER_ID=$(echo "$USER_ROW" | awk '{print $1}')
-            USER_NAME=$(echo "$USER_ROW" | awk '{print $3}')
+            USER_ID=$(echo "$USER_ROW" | awk -F'\t' '{print $1}')
+            USER_NAME=$(echo "$USER_ROW" | awk -F'\t' '{print $3}')
             echo "✓ User id=$USER_ID name=$USER_NAME"
 
             echo ""
-            echo "── 4. Generate fresh reset token ──"
-            # 64-char URL-safe random token (matches nanoid(64) used in code)
+            echo "── 5. Generate fresh reset token ──"
             TOKEN=$(openssl rand -hex 32)
             EXPIRES=$(date -u -d "+1 hour" '+%Y-%m-%d %H:%M:%S')
-            $MYSQL -e "UPDATE users
+
+            # Try the camelCase column names (matches drizzle schema for users)
+            UPDATE_OUT=$($MYSQL -e "UPDATE users
                           SET passwordResetToken = '${TOKEN}',
                               passwordResetExpires = '${EXPIRES}'
-                        WHERE id = ${USER_ID}" 2>&1
+                        WHERE id = ${USER_ID}" 2>&1)
+            UPDATE_RC=$?
+            if [ $UPDATE_RC -ne 0 ]; then
+              echo "Got error: $UPDATE_OUT"
+              echo "Trying snake_case column names..."
+              UPDATE_OUT=$($MYSQL -e "UPDATE users
+                            SET password_reset_token = '${TOKEN}',
+                                password_reset_expires = '${EXPIRES}'
+                          WHERE id = ${USER_ID}" 2>&1)
+              UPDATE_RC=$?
+              if [ $UPDATE_RC -ne 0 ]; then
+                echo "❌ Both column-naming conventions failed:"
+                echo "$UPDATE_OUT"
+                echo ""
+                echo "── columns in users table ──"
+                $MYSQL -e "DESCRIBE users" 2>&1 | head -30
+                exit 1
+              fi
+            fi
+
+            # Verify the token was actually persisted
+            VERIFY=$($MYSQL -e "SELECT
+                                  CASE WHEN passwordResetToken = '${TOKEN}' OR password_reset_token = '${TOKEN}'
+                                       THEN 'OK' ELSE 'MISSING' END
+                                FROM users WHERE id = ${USER_ID}" 2>&1)
+            if ! echo "$VERIFY" | grep -q "OK"; then
+              echo "❌ Token not persisted: $VERIFY"
+              exit 1
+            fi
 
             APP_URL_VAL="${APP_URL:-https://marketing-os.sowork.ai}"
             RESET_URL="${APP_URL_VAL}/reset-password?token=${TOKEN}"
 
-            echo "✓ Token written to DB (expires $EXPIRES UTC, ~1 hour from now)"
+            echo "✓ Token verified in DB (expires $EXPIRES UTC)"
             echo ""
             echo "════════════════════════════════════════"
             echo "  RESET URL — open in incognito to set new password:"
