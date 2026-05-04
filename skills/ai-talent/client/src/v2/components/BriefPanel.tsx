@@ -422,6 +422,13 @@ export function BriefPanel({
     : { data: null };
   const brainEntries = (brainQuery.data as any)?.entries ?? {};
 
+  // Web search via Perplexity — called per-field during auto-fill
+  const briefSearchMut = (trpc as any).squadTemplate?.briefSearch?.useMutation
+    ? (trpc as any).squadTemplate.briefSearch.useMutation()
+    : null;
+  const briefSearchRef = useRef<typeof briefSearchMut>(briefSearchMut);
+  useEffect(() => { briefSearchRef.current = briefSearchMut; }, [briefSearchMut]);
+
   const getBrainText = (cat: string): string => {
     const items: any[] = brainEntries[cat] ?? [];
     return items.map((i: any) => i.content ?? i.title ?? "").filter(Boolean).slice(0, 2).join("\n\n");
@@ -447,12 +454,20 @@ export function BriefPanel({
       value = getBrainText(field.brainCategory ?? "positioning");
       if (!value) value = `（尚未有 ${field.label} 資料，請手動填寫）`;
     } else if (field.source === "web_search") {
-      await new Promise(r => setTimeout(r, 1200 + Math.random() * 600));
-      // Simulate — replace with real trpc.briefPanel.searchField when ready
       const q = (field.searchQuery ?? "")
         .replace("{brand_name}",   brandName   ?? "")
         .replace("{product_name}", productName ?? "");
-      value = `（${q} — Web 搜尋結果待接入）`;
+      try {
+        const mut = briefSearchRef.current;
+        if (mut?.mutateAsync) {
+          const res = await mut.mutateAsync({ query: q, brandName: brandName ?? undefined, productName: productName ?? undefined });
+          value = res?.result ?? `（搜尋完成）`;
+        } else {
+          value = `（Web 搜尋：${q}）`;
+        }
+      } catch {
+        value = `（Web 搜尋暫時無法使用：${q}）`;
+      }
     }
 
     setField(field.id, { status: "filled", value, source: field.source });

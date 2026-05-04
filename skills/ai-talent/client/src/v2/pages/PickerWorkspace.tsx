@@ -783,6 +783,16 @@ export default function PickerWorkspace() {
               direction 2026-04-29 — replaces the brand-only switcher so
               /picker matches the global ShellLayout header. */}
           <ScopeBar scope={scope} setScope={setScope} />
+          <Tooltip content="新增品牌 / 產品 / 活動" placement="bottom" radius="sm">
+            <Button
+              size="sm" variant="flat" radius="full" isIconOnly
+              className="text-default-400 hover:text-foreground h-7 w-7 min-w-7"
+              onPress={() => window.location.href = "/settings/brands"}
+              aria-label="新增品牌"
+            >
+              <span className="text-sm font-bold">＋</span>
+            </Button>
+          </Tooltip>
           <Tooltip content="進入專注模式 (F)" placement="bottom" radius="sm">
             <Button
               isIconOnly
@@ -1892,26 +1902,9 @@ function FeedbackPanel({
     <aside className="flex flex-col h-full border-l border-default-200 bg-content1">
       {/* Header */}
       <div className="shrink-0 px-4 pt-4 pb-3 border-b border-default-200">
-        <p className="font-semibold text-small">反饋 / 想法</p>
-        <p className="text-tiny text-default-400 mt-0.5">針對輸出內容提出修改或想法</p>
+        <p className="font-semibold text-small">審閱 &amp; 反饋</p>
+        <p className="text-tiny text-default-400 mt-0.5">對產出內容加註想法，或要求重新生成</p>
       </div>
-
-      {/* Pipeline status */}
-      {isRunning && (
-        <div className="shrink-0 px-4 py-3 border-b border-default-200 space-y-1.5">
-          <div className="flex items-center justify-between text-tiny text-default-500">
-            <span>{isInFlight ? "⚙ 思考中…" : currentStep?.name ?? "進行中"}</span>
-            <span className="tabular-nums">{confirmedCount}/{steps.length}</span>
-          </div>
-          <Progress
-            size="sm"
-            value={pct}
-            color={pct === 100 ? "success" : isInFlight ? "secondary" : "primary"}
-            isIndeterminate={isInFlight && confirmedCount === 0}
-            aria-label="progress"
-          />
-        </div>
-      )}
 
       {/* Tab switcher */}
       <div className="shrink-0 px-4 pt-3 pb-2 border-b border-default-100">
@@ -2393,7 +2386,7 @@ function SquadDetailPanel({
                     agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
                     body={prog?.agentOutput ?? prog?.agent_output ?? null}
                     status={prog?.status ?? "pending"}
-                    isEditable={isIntakeStep}
+                    isEditable={true}
                     onConfirm={handleDocConfirm}
                     onRedo={handleDocRedo}
                     isMutating={stepExecute.isPending}
@@ -2411,6 +2404,7 @@ function SquadDetailPanel({
                     agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
                     body={prog?.agentOutput ?? prog?.agent_output ?? null}
                     status={prog?.status ?? "pending"}
+                    isEditable={true}
                     onConfirm={handleDocConfirm}
                     onRedo={handleDocRedo}
                     isMutating={stepExecute.isPending}

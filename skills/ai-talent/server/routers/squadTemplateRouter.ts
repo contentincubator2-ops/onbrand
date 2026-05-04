@@ -2614,4 +2614,46 @@ ${input.question}`;
 
       return { ok: true, steps };
     }),
+
+  // ── briefSearch ──────────────────────────────────────────────────────────
+  // Real-time web search for BriefPanel fields via Perplexity sonar-pro.
+  // Returns a short plain-text answer (1-3 sentences).
+  briefSearch: protectedProcedure
+    .input(z.object({
+      query:       z.string().min(1).max(400),
+      brandName:   z.string().optional(),
+      productName: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { invokeLLM } = await import("../_core/llm");
+      const q = input.query
+        .replace("{brand_name}",   input.brandName   ?? "")
+        .replace("{product_name}", input.productName ?? "");
+
+      let result = "";
+      try {
+        const res = await (invokeLLM as any)({
+          provider: "perplexity",
+          model:    "sonar-pro",
+          messages: [
+            {
+              role: "system",
+              content: "你是行銷數據研究員。根據搜尋結果，用繁體中文給出簡短、準確的摘要（1-3句）。只回傳內容，不要加前言或解釋。",
+            },
+            { role: "user", content: q },
+          ],
+          maxTokens: 400,
+        } as any);
+        const raw = (res as any)?.choices?.[0]?.message?.content;
+        result = typeof raw === "string"
+          ? raw.trim()
+          : Array.isArray(raw)
+            ? raw.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("").trim()
+            : "";
+      } catch (e: any) {
+        result = `（Web 搜尋失敗：${e?.message ?? "未知錯誤"}）`;
+      }
+
+      return { result };
+    }),
 });
