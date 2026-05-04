@@ -14,7 +14,7 @@ import {
   faHeart, faRepeat, faComment, faUpload, faImages, faEllipsis,
   faChartBar, faBookmark,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
 
 /* ─────────────── Tweet Card ─────────────── */
 
@@ -60,12 +60,12 @@ export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashta
 
             {/* Tweet body */}
             {liveCaption ? (
-              <p className="text-white text-small leading-relaxed whitespace-pre-wrap">
-                {liveCaption}
+              <div>
+                <MarkdownText content={liveCaption} className="text-white text-small leading-relaxed" />
                 {liveHashtags && liveHashtags.length > 0 && (
-                  <span className="text-[#1d9bf0]"> {liveHashtags.slice(0, 4).join(" ")}</span>
+                  <span className="text-[#1d9bf0] text-small"> {liveHashtags.slice(0, 4).join(" ")}</span>
                 )}
-              </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 <Skeleton className="h-3 w-full rounded bg-[#2f3336]" />
@@ -174,7 +174,7 @@ export function XThread({ title, brandName, variantLabel, liveCaption }: MockupF
                   <span className="text-[#71767b] text-tiny">@{handle}</span>
                   <span className="text-[#71767b] text-tiny ml-auto">{i + 1}/{tweets.length}</span>
                 </div>
-                <p className="text-white text-small leading-relaxed">{tw}</p>
+                <MarkdownText content={tw} className="text-white text-small leading-relaxed" />
               </div>
             </div>
           ))

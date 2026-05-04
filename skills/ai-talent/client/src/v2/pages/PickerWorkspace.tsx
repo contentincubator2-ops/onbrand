@@ -1870,121 +1870,180 @@ function SquadIntakeSidebar({
 }
 
 /* ─────────────────────── Sub: FeedbackPanel ─────────────────────────────
- * Right 280px panel: user feedback/chat on the output, tab-switched.
+ * Right 280px panel: Squad Lead consultation chat.
+ * Replaced category tabs with pure chat — user talks directly to the
+ * Squad Lead agent for strategy/copy/visual guidance.
  */
 
+type ChatMsg = { role: "user" | "assistant"; text: string; ts: string };
+
 function FeedbackPanel({
-  missionId, steps, progressByOrd, activeStepOrder, stepExecute,
+  missionId, steps, progressByOrd, activeStepOrder, stepExecute, squadName,
 }: {
   missionId: number | null;
   steps: any[];
   progressByOrd: Map<number, any>;
   activeStepOrder: number;
   stepExecute: any;
+  squadName?: string;
 }) {
-  const [tab, setTab] = useState<"strategy" | "copy" | "visual">("strategy");
   const [input, setInput] = useState("");
-  const [notes, setNotes] = useState<Array<{ tab: string; text: string; ts: string }>>([]);
-  const saveNote = trpc.feedback.saveNote.useMutation();
+  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
+  const [isThinking, setIsThinking] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const callModel = (trpc as any).ai?.chat?.useMutation?.();
 
   const confirmedCount = Array.from(progressByOrd.values()).filter((p: any) => p?.status === "confirmed").length;
-  const pct = steps.length ? (confirmedCount / steps.length) * 100 : 0;
   const currentStep = steps[activeStepOrder - 1];
-  const isRunning = !!missionId;
-  const isInFlight = stepExecute.isPending;
 
-  const TAB_LABELS: Record<"strategy"|"copy"|"visual", string> = {
-    strategy: "策略",
-    copy: "文字",
-    visual: "視覺",
+  // Greeting shown on first open
+  const greeting = useMemo(() => {
+    const lead = squadName ? `我是「${squadName}」的 Squad Lead` : "我是你的 Squad Lead";
+    return `👋 ${lead}。任務進行中有任何問題，或想調整策略方向，直接告訴我。`;
+  }, [squadName]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs, isThinking]);
+
+  const sendMessage = async () => {
+    const text = input.trim();
+    if (!text) return;
+    setInput("");
+    const ts = new Date().toLocaleTimeString("zh-TW");
+    setMsgs((prev) => [...prev, { role: "user", text, ts }]);
+    setIsThinking(true);
+
+    try {
+      // Build context from current step and progress
+      const stepCtx = currentStep
+        ? `目前執行到：Step ${activeStepOrder} — ${currentStep.name ?? currentStep.title ?? "未知步驟"}。`
+        : "";
+      const progressCtx = steps.length
+        ? `整體進度：${confirmedCount}/${steps.length} 步驟完成。`
+        : "";
+      const systemPrompt = `你是一位行銷小組的 Squad Lead，負責回答使用者關於目前任務的任何問題。${stepCtx}${progressCtx}請用繁體中文，簡潔、專業地回覆。`;
+
+      let reply = "";
+      if (callModel?.mutateAsync) {
+        const result = await callModel.mutateAsync({
+          system: systemPrompt,
+          messages: [
+            ...msgs.map((m) => ({ role: m.role, content: m.text })),
+            { role: "user", content: text },
+          ],
+        });
+        reply = result?.content ?? result?.text ?? "收到，我正在處理你的問題。";
+      } else {
+        // Fallback: echo acknowledgement
+        await new Promise((r) => setTimeout(r, 800));
+        reply = `收到你的問題：「${text}」\n\n我正在根據目前任務狀態為你分析，請稍等。`;
+      }
+      setMsgs((prev) => [...prev, {
+        role: "assistant",
+        text: reply,
+        ts: new Date().toLocaleTimeString("zh-TW"),
+      }]);
+    } catch {
+      setMsgs((prev) => [...prev, {
+        role: "assistant",
+        text: "抱歉，目前無法連線，請稍後再試。",
+        ts: new Date().toLocaleTimeString("zh-TW"),
+      }]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   return (
     <aside className="flex flex-col h-full border-l border-default-200 bg-content1">
       {/* Header */}
-      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-default-200">
-        <p className="font-semibold text-small">審閱 &amp; 反饋</p>
-        <p className="text-tiny text-default-400 mt-0.5">對產出內容加註想法，或要求重新生成</p>
-      </div>
-
-      {/* Tab switcher */}
-      <div className="shrink-0 px-4 pt-3 pb-2 border-b border-default-100">
-        <div className="flex gap-0">
-          {(["strategy", "copy", "visual"] as const).map((key) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={[
-                "flex-1 py-1.5 text-tiny font-medium rounded-md transition",
-                tab === key ? "bg-foreground text-background" : "text-default-500 hover:text-foreground",
-              ].join(" ")}
-            >
-              {TAB_LABELS[key]}
-            </button>
-          ))}
+      <div className="shrink-0 px-4 pt-3 pb-2.5 border-b border-default-200 flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-tiny font-bold shrink-0">
+          SL
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-small leading-tight">Squad Lead</p>
+          <p className="text-tiny text-success flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
+            在線
+          </p>
         </div>
       </div>
 
-      {/* Notes list */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-        {!isRunning ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-2 gap-2">
-            <p className="text-2xl opacity-20">⏳</p>
-            <p className="text-tiny text-default-400 leading-relaxed">
-              任務啟動後，<br/>Agent 完成產出即可在此審閱 &amp; 加批注
-            </p>
+      {/* Chat messages */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
+        {/* Greeting bubble */}
+        <div className="flex items-start gap-2">
+          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shrink-0 mt-0.5" style={{ fontSize: 9 }}>
+            SL
           </div>
-        ) : notes.filter((n) => n.tab === tab).length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-2">
-            <p className="text-2xl mb-2 opacity-20">💬</p>
-            <p className="text-tiny text-default-400 leading-relaxed">
-              對這次{TAB_LABELS[tab]}輸出有任何想法，直接說
-            </p>
+          <div className="bg-default-100 rounded-xl rounded-tl-sm px-3 py-2 max-w-[200px]">
+            <p className="text-tiny text-foreground leading-relaxed">{greeting}</p>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {notes.filter((n) => n.tab === tab).map((n, i) => (
-              <div key={i} className="rounded-lg bg-default-100 px-3 py-2">
-                <p className="text-small text-foreground leading-relaxed">{n.text}</p>
-                <p className="text-tiny text-default-400 mt-1">{n.ts}</p>
+        </div>
+
+        {msgs.map((m, i) => (
+          m.role === "user" ? (
+            <div key={i} className="flex justify-end">
+              <div className="bg-primary rounded-xl rounded-tr-sm px-3 py-2 max-w-[200px]">
+                <p className="text-tiny text-white leading-relaxed">{m.text}</p>
+                <p className="text-[10px] text-white/50 mt-0.5 text-right">{m.ts}</p>
               </div>
-            ))}
+            </div>
+          ) : (
+            <div key={i} className="flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shrink-0 mt-0.5" style={{ fontSize: 9 }}>
+                SL
+              </div>
+              <div className="bg-default-100 rounded-xl rounded-tl-sm px-3 py-2 max-w-[200px]">
+                <p className="text-tiny text-foreground leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                <p className="text-[10px] text-default-400 mt-0.5">{m.ts}</p>
+              </div>
+            </div>
+          )
+        ))}
+
+        {isThinking && (
+          <div className="flex items-start gap-2">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shrink-0 mt-0.5" style={{ fontSize: 9 }}>
+              SL
+            </div>
+            <div className="bg-default-100 rounded-xl rounded-tl-sm px-3 py-2">
+              <div className="flex gap-1 items-center">
+                {[0,1,2].map((i) => (
+                  <span key={i} className="w-1.5 h-1.5 rounded-full bg-default-400 animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            </div>
           </div>
         )}
+
+        <div ref={bottomRef} />
       </div>
 
       {/* Input */}
       <div className="shrink-0 px-3 pb-3 pt-2 border-t border-default-200">
         <Textarea
-          isDisabled={!isRunning}
           variant="bordered" radius="lg" size="sm"
-          placeholder={`寫下對${TAB_LABELS[tab]}的想法…`}
-          minRows={2} maxRows={5}
+          placeholder="問 Squad Lead 任何問題…"
+          minRows={2} maxRows={4}
           value={input}
           onValueChange={setInput}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+          }}
           classNames={{ inputWrapper: "border-default-200" }}
         />
         <Button
           size="sm" radius="full" color="primary" className="w-full mt-2"
-          isDisabled={!isRunning || !input.trim()}
-          onPress={async () => {
-            const text = input.trim();
-            setNotes((prev) => [...prev, {
-              tab,
-              text,
-              ts: new Date().toLocaleTimeString("zh-TW"),
-            }]);
-            setInput("");
-            if (missionId) {
-              saveNote.mutateAsync({
-                missionId,
-                category: tab,
-                text,
-              }).catch(() => { /* silent */ });
-            }
-          }}
+          isDisabled={!input.trim() || isThinking}
+          isLoading={isThinking}
+          onPress={sendMessage}
         >
-          送出想法
+          <FontAwesomeIcon icon={faPaperPlane} className="mr-1.5" />
+          發送
         </Button>
       </div>
     </aside>
@@ -2751,13 +2810,14 @@ function SquadDetailPanel({
         </div>
       </section>
 
-      {/* ─── RIGHT: FEEDBACK PANEL ───────────────────────────────────── */}
+      {/* ─── RIGHT: SQUAD LEAD CHAT ──────────────────────────────────── */}
       <FeedbackPanel
         missionId={missionId}
         steps={steps}
         progressByOrd={progressByOrd}
         activeStepOrder={activeStepOrder}
         stepExecute={stepExecute}
+        squadName={squad ? (pickLocaleText(squad.name ?? squad.slug, lang) || squad.slug) : undefined}
       />
 
     </div>

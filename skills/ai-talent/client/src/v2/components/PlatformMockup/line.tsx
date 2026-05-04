@@ -11,7 +11,7 @@ import { Avatar, Button, Chip, Divider, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLine } from "@fortawesome/free-brands-svg-icons";
 import { faImages, faBell, faQrcode, faArrowRight, faGift } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
 
 /* ─────────────── LINE Broadcast Message ─────────────── */
 
@@ -63,7 +63,7 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
               <div className="max-w-[85%]">
                 <div className="bg-white rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
                   {liveCaption ? (
-                    <p className="text-small text-[#333] leading-relaxed whitespace-pre-wrap">{liveCaption}</p>
+                    <MarkdownText content={liveCaption} className="text-small text-[#333] leading-relaxed" />
                   ) : (
                     <div className="space-y-1.5">
                       <Skeleton className="h-3 w-[180px] rounded" />
@@ -135,7 +135,7 @@ export function LINECard({ title, brandName, variantLabel, liveTitle, liveDescri
                   {liveTitle ?? title}
                 </p>
                 {liveDescription ? (
-                  <p className="text-[11px] text-[#757575] line-clamp-3">{liveDescription}</p>
+                  <MarkdownText content={liveDescription} lineClamp={3} className="text-[11px] text-[#757575]" />
                 ) : (
                   <div className="space-y-1">
                     <Skeleton className="h-2.5 w-full rounded" />

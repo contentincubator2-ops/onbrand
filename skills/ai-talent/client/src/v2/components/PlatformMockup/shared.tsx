@@ -2,10 +2,55 @@
  * Shared helpers + types for PlatformMockup family.
  *
  * Session 6: added MockupSlotMap + SlotContent for per-slot loading/filled/empty states.
+ * P0: added MarkdownText for Markdown-formatted social post output.
  */
 import React from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Chip, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+// ── MarkdownText — renders social post content with Markdown formatting ───────
+/**
+ * Renders user-generated or AI-generated social post text.
+ * Supports: **bold**, *italic*, line breaks, bullet lists, numbered lists, #hashtags.
+ * Uses prose-style class overrides tuned for small social preview cards.
+ */
+export function MarkdownText({
+  content,
+  className = "",
+  lineClamp,
+}: {
+  content: string;
+  className?: string;
+  lineClamp?: number;
+}) {
+  const clampClass = lineClamp ? `line-clamp-${lineClamp}` : "";
+  return (
+    <div className={`markdown-text text-small leading-relaxed ${clampClass} ${className}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          ul: ({ children }) => <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>,
+          li: ({ children }) => <li className="text-small">{children}</li>,
+          a: ({ children, href }) => <a href={href} className="text-primary underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+          h1: ({ children }) => <p className="font-bold text-medium mb-1">{children}</p>,
+          h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+          h3: ({ children }) => <p className="font-medium mb-0.5">{children}</p>,
+          code: ({ children }) => <code className="bg-default-100 px-1 rounded text-tiny font-mono">{children}</code>,
+          blockquote: ({ children }) => <blockquote className="border-l-2 border-primary/40 pl-3 text-default-500 italic">{children}</blockquote>,
+          hr: () => <hr className="border-divider my-2" />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 // ── Slot state system (Session 6) ─────────────────────────────────────────────
 

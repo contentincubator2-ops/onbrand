@@ -14,7 +14,7 @@ import {
   faChalkboard, faChevronLeft, faChevronRight, faImages,
   faCircle, faExpand,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -51,9 +51,7 @@ export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCa
 
           {/* Subheadline / lede */}
           {liveDescription ? (
-            <p className="text-[15px] text-default-600 leading-relaxed italic mb-4">
-              {liveDescription}
-            </p>
+            <MarkdownText content={liveDescription} className="text-[15px] text-default-600 leading-relaxed italic mb-4" />
           ) : (
             <div className="space-y-1.5 mb-4">
               <Skeleton className="h-4 w-full rounded" />
@@ -176,7 +174,7 @@ export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCapt
                 {liveTitle ?? title}
               </h1>
               {liveDescription ? (
-                <p className="text-primary-200 text-small max-w-[400px] mx-auto">{liveDescription}</p>
+                <MarkdownText content={liveDescription} className="text-primary-200 text-small max-w-[400px] mx-auto" />
               ) : (
                 <div className="space-y-1.5 max-w-[360px] mx-auto">
                   <Skeleton className="h-3 w-full rounded bg-primary-400/40" />
@@ -217,7 +215,7 @@ export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCapt
                   {liveTitle ? liveTitle.slice(0, 40) : <Skeleton className="h-6 w-[70%] rounded bg-primary-400/40" />}
                 </h2>
                 {liveCaption ? (
-                  <p className="text-primary-100 text-small leading-relaxed line-clamp-6">{liveCaption}</p>
+                  <MarkdownText content={liveCaption} lineClamp={6} className="text-primary-100 text-small leading-relaxed" />
                 ) : (
                   <div className="space-y-2">
                     {[100, 92, 85, 70].map((w, i) => (
@@ -257,7 +255,7 @@ export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCapt
             <div className="text-center text-white px-12">
               <h2 className="text-3xl font-bold mb-4">下一步</h2>
               {liveCaption ? (
-                <p className="text-primary-200 text-small max-w-[400px] mx-auto mb-6">{liveCaption.slice(0, 120)}</p>
+                <MarkdownText content={liveCaption.slice(0, 120)} className="text-primary-200 text-small max-w-[400px] mx-auto mb-6" />
               ) : (
                 <div className="space-y-1.5 max-w-[360px] mx-auto mb-6">
                   <Skeleton className="h-3 w-full rounded bg-primary-400/40" />

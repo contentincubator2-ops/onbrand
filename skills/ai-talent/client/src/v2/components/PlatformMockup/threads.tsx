@@ -12,7 +12,7 @@ import {
   faHeart, faComment, faRepeat, faPaperPlane,
   faEllipsis, faImage,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, handleOf } from "./shared";
+import { type MockupFields, MockupHeader, handleOf, MarkdownText } from "./shared";
 
 const TH_BLACK = "#000000";
 const TH_GRAY  = "#666666";
@@ -76,9 +76,9 @@ function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = fa
 
         {/* Body text */}
         {body ? (
-          <p className="text-[14px] leading-relaxed mb-2 whitespace-pre-line" style={{ color: text }}>
-            {body}
-          </p>
+          <div style={{ color: text }}>
+            <MarkdownText content={body} className="text-[14px] leading-relaxed mb-2" />
+          </div>
         ) : (
           <div className="space-y-1.5 mb-2">
             <Skeleton className="h-3.5 w-full rounded" style={{ opacity: dark ? 0.15 : 1 }} />

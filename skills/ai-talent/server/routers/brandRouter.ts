@@ -256,9 +256,9 @@ export const brandRouter = router({
       if (!db) {
         // fallback 靜態資料
         return [
-          { id: 29, name: "蘇雅玲", title: "公關策略師", specialty: "品牌定位、PR策略", layer: "strategy", taskType: "research" },
-          { id: 26, name: "吳佳穎", title: "META廣告策略師", specialty: "品牌廣告、受眾策略", layer: "strategy", taskType: "strategy" },
-          { id: 32, name: "許雅芳", title: "文案撰寫師", specialty: "廣告文案、品牌語調", layer: "execution", taskType: "copywriting" },
+          { id: 29, name: "Agent Lyra", title: "公關策略師", specialty: "品牌定位、PR策略", layer: "strategy", taskType: "research" },
+          { id: 26, name: "Agent Nova", title: "META廣告策略師", specialty: "品牌廣告、受眾策略", layer: "strategy", taskType: "strategy" },
+          { id: 32, name: "Agent Sage", title: "文案撰寫師", specialty: "廣告文案、品牌語調", layer: "execution", taskType: "copywriting" },
         ];
       }
 

@@ -16,7 +16,7 @@ import {
   faMusic, faVolumeHigh, faXmark, faChevronLeft, faVideo, faHeart,
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./shared";
 
 /* ─────────────── FB Feed ─────────────── */
 
@@ -39,7 +39,7 @@ export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageD
         <div className="px-4 py-2 space-y-2">
           <p className="text-small">{title}</p>
           {liveCaption ? (
-            <p className="text-small whitespace-pre-wrap line-clamp-6">{liveCaption}</p>
+            <MarkdownText content={liveCaption} lineClamp={6} />
           ) : (
             <>
               <Skeleton className="h-2.5 w-[88%] rounded" />

@@ -25,7 +25,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
-  dicebear, handleOf, SlotContent,
+  dicebear, handleOf, SlotContent, MarkdownText,
 } from "./shared";
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
@@ -127,7 +127,7 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
               skeletonLines={3}
               placeholder={
                 effectiveCaption ? (
-                  <p className="whitespace-pre-wrap line-clamp-6 text-foreground">{effectiveCaption}</p>
+                  <MarkdownText content={effectiveCaption} lineClamp={6} className="text-foreground" />
                 ) : (
                   <div className="space-y-1">
                     <Skeleton className="h-2.5 w-[94%] rounded" />
@@ -137,9 +137,7 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
               }
             >
               {(val) => (
-                <p className="whitespace-pre-wrap line-clamp-6 text-foreground">
-                  {(val as string) || effectiveCaption || ""}
-                </p>
+                <MarkdownText content={(val as string) || effectiveCaption || ""} lineClamp={6} className="text-foreground" />
               )}
             </SlotContent>
           </div>
@@ -242,7 +240,7 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
           <span className="font-semibold mr-1.5">{handle}</span>
           <span className="text-foreground">{title}</span>
           {liveCaption ? (
-            <p className="mt-1.5 whitespace-pre-wrap line-clamp-5 text-foreground">{liveCaption}</p>
+            <MarkdownText content={liveCaption} lineClamp={5} className="mt-1.5 text-foreground" />
           ) : (
             <div className="mt-1.5 space-y-1">
               <Skeleton className="h-2.5 w-[94%] rounded" />
@@ -301,7 +299,7 @@ export function IGReels({ title, brandName, variantLabel, liveCaption, liveVideo
             <span className="text-small font-semibold">{handle}</span>
             <Button size="sm" radius="sm" variant="bordered" className="h-6 min-w-0 px-2 text-tiny border-white text-white">追蹤</Button>
           </div>
-          <p className="text-small line-clamp-3 whitespace-pre-wrap">{liveCaption ?? title}</p>
+          <MarkdownText content={liveCaption ?? title ?? ""} lineClamp={3} className="text-small" />
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
             <span>原創音訊 · {handle}</span>

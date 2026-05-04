@@ -14,7 +14,7 @@ import {
   faLocationDot, faSearch, faMagnifyingGlass,
   faPlay, faEllipsis,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, handleOf } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, handleOf, MarkdownText } from "./shared";
 
 /* XHS brand red */
 const XHS_RED = "#FF2442";
@@ -107,9 +107,7 @@ export function XHSNote({
 
             {/* Body */}
             {liveCaption ? (
-              <p className="text-[13px] text-[#333] leading-relaxed line-clamp-3 mb-2">
-                {liveCaption}
-              </p>
+              <MarkdownText content={liveCaption} lineClamp={3} className="text-[13px] text-[#333] leading-relaxed mb-2" />
             ) : (
               <div className="space-y-1.5 mb-2">
                 <Skeleton className="h-3 w-full rounded" />
@@ -248,7 +246,7 @@ export function XHSVideo({
                 {liveTitle ?? title}
               </p>
               {liveDescription ? (
-                <p className="text-white/80 text-[12px] line-clamp-2 mb-2">{liveDescription}</p>
+                <MarkdownText content={liveDescription} lineClamp={2} className="text-white/80 text-[12px] mb-2" />
               ) : (
                 <div className="space-y-1 mb-2">
                   <Skeleton className="h-2.5 w-[85%] rounded bg-white/20" />
