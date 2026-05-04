@@ -687,8 +687,8 @@ ${schemaExample}
         : "s.is_approved = 1";
       const [rows] = await localPool.execute(
         `SELECT s.id, s.slug, s.name, s.description,
-                s.tier, s.strategy_layer, s.is_approved,
-                s.hero_image_url, s.mockup_images
+                s.strategy_layer,
+                NULL AS tier, NULL AS is_approved, NULL AS hero_image_url
            FROM squads s
           WHERE ${filter}
           ORDER BY COALESCE(s.tier, 99) ASC, s.id ASC

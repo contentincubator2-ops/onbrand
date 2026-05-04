@@ -168,13 +168,19 @@ const KIND_LABELS = {
 // ── Squad → HomeEntity ─────────────────────────────────────────────────────
 async function fetchSquadEntities(): Promise<HomeEntity[]> {
   const [rows] = await localPool.execute(
-    `SELECT id, slug, name, name_zh, description, description_zh,
-            agents, steps,
-            strategy_layer, methodology, workspace,
-            task_label_zh, task_label_en, mockup_platform, mockup_format, output_kind,
-            hero_image_url, mockup_images, is_curated
+    `SELECT id, slug, name, description, strategy_layer,
+            NULL AS name_zh, NULL AS description_zh,
+            NULL AS agents, NULL AS steps,
+            NULL AS methodology, NULL AS workspace,
+            NULL AS task_label_zh, NULL AS task_label_en,
+            NULL AS hero_image_url,
+            NULL AS mockup_images,
+            NULL AS mockup_platform,
+            NULL AS mockup_format,
+            NULL AS output_kind,
+            NULL AS is_curated
        FROM squads
-      ORDER BY COALESCE(tier, 99) ASC, id ASC
+      ORDER BY id ASC
       LIMIT 1000`
   ) as any[];
 
