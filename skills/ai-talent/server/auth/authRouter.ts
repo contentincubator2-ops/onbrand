@@ -344,7 +344,9 @@ authRouter.post("/forgotPassword", async (req: Request, res: Response) => {
 
     // Send reset email
     const appUrl = process.env.APP_URL || "http://localhost:3001";
-    const resetUrl = `${appUrl}/reset-password?token=${resetToken}`;
+    // SPA route is /auth/reset-password (see App.tsx + AppV2.tsx). Without
+    // the /auth/ prefix the React Router falls through to a blank page.
+    const resetUrl = `${appUrl}/auth/reset-password?token=${resetToken}`;
 
     try {
       await sendPasswordReset({

@@ -155,7 +155,8 @@ jobs:
             echo "✓ Token confirmed in DB ($([ "$VERIFY_CAMEL" = "OK" ] && echo "passwordResetToken" || echo "password_reset_token") column)"
 
             APP_URL_VAL="${APP_URL:-https://marketing-os.sowork.ai}"
-            RESET_URL="${APP_URL_VAL}/reset-password?token=${TOKEN}"
+            # SPA route is /auth/reset-password (see App.tsx + AppV2.tsx)
+            RESET_URL="${APP_URL_VAL}/auth/reset-password?token=${TOKEN}"
 
             echo "✓ Token verified in DB (expires $EXPIRES UTC)"
             echo ""
