@@ -2633,7 +2633,45 @@ ${input.question}`;
         .replace("{brand_name}",   input.brandName   ?? "")
         .replace("{product_name}", input.productName ?? "");
 
-      // ── 1. Try Tavily (include_answer=true → real-time web answer) ──────
+      const extractText = (raw: any): string => {
+        if (typeof raw === "string") return raw.trim();
+        if (Array.isArray(raw)) return raw.map((p: any) => typeof p === "string" ? p : p?.text ?? "").join("").trim();
+        return "";
+      };
+
+      // ── 1. Gemini 2.0 Flash + Google Search grounding ────────────────────
+      // Uses google_search tool — real-time Google results, no extra key.
+      const geminiKey = (ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "";
+      if (geminiKey) {
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: `用繁體中文，簡短回答（1-3句）：${q}` }] }],
+                tools: [{ google_search: {} }],
+                generationConfig: { maxOutputTokens: 300 },
+              }),
+            }
+          );
+          if (res.ok) {
+            const data = await res.json() as any;
+            const answer = extractText(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "");
+            if (answer) {
+              console.log("[briefSearch] Gemini+Search OK:", q.slice(0, 60));
+              return { result: answer };
+            }
+          } else {
+            console.warn("[briefSearch] Gemini HTTP", res.status);
+          }
+        } catch (e: any) {
+          console.warn("[briefSearch] Gemini error:", e?.message ?? e);
+        }
+      }
+
+      // ── 2. Tavily (dedicated search API) ─────────────────────────────────
       const tavilyKey = ENV.TAVILY_API_KEY ?? "";
       if (tavilyKey) {
         try {
@@ -2654,48 +2692,55 @@ ${input.question}`;
               || (data?.results?.[0]?.content as string | undefined)?.slice(0, 300).trim()
               || "";
             if (answer) {
-              console.log("[briefSearch] Tavily OK for:", q.slice(0, 60));
+              console.log("[briefSearch] Tavily OK:", q.slice(0, 60));
               return { result: answer };
             }
           } else {
-            console.warn("[briefSearch] Tavily HTTP", res.status, "for:", q.slice(0, 60));
+            console.warn("[briefSearch] Tavily HTTP", res.status);
           }
         } catch (e: any) {
           console.warn("[briefSearch] Tavily error:", e?.message ?? e);
         }
-      } else {
-        console.warn("[briefSearch] No TAVILY_API_KEY — skipping to LLM fallback");
       }
 
-      // ── 2. Fallback: Azure AI Foundry (already configured on VM) ─────────
-      // Uses the same model pool as squad agents — no extra key needed.
+      // ── 3. Jina AI Search (free, no key needed) ───────────────────────────
+      try {
+        const jinaRes = await fetch(`https://s.jina.ai/${encodeURIComponent(q)}`, {
+          headers: { "Accept": "application/json", "X-Return-Format": "text" },
+        });
+        if (jinaRes.ok) {
+          const text = await jinaRes.text();
+          const snippet = text.slice(0, 400).trim();
+          if (snippet) {
+            console.log("[briefSearch] Jina OK:", q.slice(0, 60));
+            return { result: snippet };
+          }
+        }
+      } catch (e: any) {
+        console.warn("[briefSearch] Jina error:", e?.message ?? e);
+      }
+
+      // ── 4. Azure AI Foundry (LLM fallback, training data only) ───────────
       try {
         const res = await (invokeLLM as any)({
           provider: "azure-foundry",
           messages: [
-            {
-              role: "system",
-              content: "你是行銷數據研究員。根據你的知識，用繁體中文給出簡短、準確的摘要（1-3句）。只回傳內容，不要加前言或解釋。注意：這是基於訓練資料的回答，非即時資料。",
-            },
+            { role: "system", content: "你是行銷數據研究員。根據訓練知識，用繁體中文給出簡短摘要（1-3句）。只回傳內容。注意：非即時資料。" },
             { role: "user", content: q },
           ],
           maxTokens: 300,
         } as any);
-        const raw = (res as any)?.choices?.[0]?.message?.content;
-        const answer = typeof raw === "string"
-          ? raw.trim()
-          : Array.isArray(raw)
-            ? raw.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("").trim()
-            : "";
+        const answer = extractText((res as any)?.choices?.[0]?.message?.content);
         if (answer) {
-          console.log("[briefSearch] Azure Foundry fallback OK for:", q.slice(0, 60));
+          console.log("[briefSearch] Azure Foundry fallback OK:", q.slice(0, 60));
           return { result: answer };
         }
       } catch (e: any) {
-        console.warn("[briefSearch] Azure Foundry fallback error:", e?.message ?? e);
+        console.warn("[briefSearch] Azure Foundry error:", e?.message ?? e);
       }
 
-      // ── 3. All providers failed — client keeps field idle ─────────────────
+      // ── 5. All failed — client keeps field idle ───────────────────────────
+      console.warn("[briefSearch] All providers failed for:", q.slice(0, 60));
       return { result: "" };
     }),
 });
