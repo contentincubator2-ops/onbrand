@@ -73,23 +73,24 @@ export function detectTaskType(content: string): TaskType {
 
 // ─── Provider selection ───────────────────────────────────────────────────────
 
-// Provider status (probed 2026-05-04):
-//   WORKING:  qwen (200), zhipu (200), tavily-search (200)
-//   MISSING KEY: azure-foundry (AZURE_FOUNDRY_API_KEY not in GitHub Secrets — was baked on VM, now lost)
-//   KEY INVALID: openai (401), perplexity (401 quota exhausted — all 5 keys used up)
-//   DISABLED: google (403 service policy), cohere (401), gemini (400/404)
+// Provider status (probed 2026-05-04, second probe after key restoration):
+//   WORKING (200):  qwen, zhipu, azure-foundry/gpt-4o, azure-foundry/Kimi-K2.5,
+//                   gemini-native (direct API), tavily-search
+//   NOT OpenAI-compat: anthropic (404 — uses /messages not /chat/completions)
+//   KEY INVALID: openai (401 expired), perplexity (401 all 5 quota exhausted), cohere (401)
+//   DISABLED: gemini-openai-compat (400 format mismatch — use native API path instead)
 //
-// Priority order uses only confirmed-working providers.
-// azure-foundry re-enabled automatically once AZURE_FOUNDRY_API_KEY is set in GitHub Secrets
-// and admin-set-all-keys.yml is updated to include it.
+// invokeLLM() uses OpenAI-compatible /chat/completions format.
+// Only providers that speak OpenAI-compat can be listed here.
+// Gemini native API is used directly in perplexityScout (not via invokeLLM).
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
-  chinese_content: ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
-  creative_writing: ["zhipu", "qwen", "azure-foundry", "anthropic", "openai"],
-  search_realtime:  ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
-  analysis:         ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
-  classification:   ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
-  coding:           ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
-  general:          ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
+  chinese_content: ["qwen", "zhipu", "azure-foundry"],
+  creative_writing: ["zhipu", "qwen", "azure-foundry"],
+  search_realtime:  ["qwen", "zhipu", "azure-foundry"],
+  analysis:         ["qwen", "zhipu", "azure-foundry"],
+  classification:   ["qwen", "zhipu", "azure-foundry"],
+  coding:           ["qwen", "zhipu", "azure-foundry"],
+  general:          ["qwen", "zhipu", "azure-foundry"],
 };
 
 const DEFAULT_MODELS: Record<ModelProvider, string> = {
@@ -116,15 +117,15 @@ function getAvailabilityMap(): Record<ModelProvider, boolean> {
     zhipu:           !!ENV.ZHIPU_API_KEY,
     // azure-foundry: key restored 2026-05-04 (AZURE_FOUNDRY_API_KEY written directly to VM .env)
     "azure-foundry": !!(ENV as any).AZURE_FOUNDRY_API_KEY,
-    // anthropic: key exists (CLAUDE_API_KEY_DEFAULT)
-    anthropic:       !!(ENV as any).ANTHROPIC_API_KEY,
     // Force-disabled: confirmed broken via probe 2026-05-04
+    // anthropic: 404 — uses /messages not /chat/completions (not OpenAI-compat)
+    anthropic:       false,
     openai:          false,   // 401 — key expired
     perplexity:      false,   // 401 — all 5 keys quota exhausted
-    google:          false,   // 403 — service policy block
+    google:          false,   // gemini-openai-compat 400; native API works but not via invokeLLM
     cohere:          false,   // 401 — key invalid
     forge:           false,   // no key on VM
-    gemini:          false,   // 400/404 — endpoint mismatch
+    gemini:          false,   // 400/404 — openai-compat endpoint mismatch; native API works in perplexityScout
   };
 }
 
