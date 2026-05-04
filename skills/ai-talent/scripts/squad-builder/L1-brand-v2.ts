@@ -132,7 +132,7 @@ const DUNFORD: SquadSpec = {
       primarySkill: "dunford-positioning-strategist",
       createAgent: makeLead(
         "謝宗翰",
-        "Brian Hsieh",
+        "Brian Wells",
         "Dunford 定位策略副總裁",
         "VP of Dunford Positioning Strategy",
         "Obviously Awesome 方法論實戰派。為 12 家 B2B SaaS 走完 Dunford 5 步驟，擅長從「客戶看不懂在賣什麼」的困境中找到清晰 market category 與 compelling value。",
@@ -185,7 +185,7 @@ const NEUMEIER: SquadSpec = {
       primarySkill: "neumeier-brand-gap-strategist",
       createAgent: makeLead(
         "張語萱",
-        "Yuhsuan Chang",
+        "Chris Hayden",
         "Neumeier 品牌鴻溝策略副總裁",
         "VP of Brand Gap Strategy",
         "Neumeier Method 認證實踐者。擅長連結策略與創意，把左腦分析與右腦美學融合成「charismatic brand」。服務過 10+ 個設計驅動品牌。",
@@ -239,7 +239,7 @@ const SHARP: SquadSpec = {
       primarySkill: "ehrenberg-bass-strategist",
       createAgent: makeLead(
         "郭靜宜",
-        "Claire Kuo",
+        "Claire Morgan",
         "Ehrenberg-Bass 品牌成長策略副總裁",
         "VP of Ehrenberg-Bass Brand Growth",
         "How Brands Grow 學派資深顧問。相信「penetration > loyalty」，為 15+ 個 FMCG 品牌做 mental/physical availability 診斷，找出被忽略的購買場景。",
@@ -297,7 +297,7 @@ const GODIN: SquadSpec = {
       primarySkill: "remarkability-strategist",
       createAgent: makeLead(
         "簡柏翰",
-        "Brandon Chien",
+        "Brandon Pierce",
         "Godin 非凡品牌策略副總裁",
         "VP of Remarkable Brand Strategy",
         "Seth Godin 派系實踐者。相信「普通即消失」，為 8 家新創 + 5 家成熟品牌找到 remarkability hook，把紅海品類的 me-too 轉為 must-talk-about。",

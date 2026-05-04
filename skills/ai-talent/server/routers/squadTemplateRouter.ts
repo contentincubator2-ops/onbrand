@@ -323,7 +323,7 @@ function normalizeWorkspace(ws: string): string {
 // ── Fallback squad lead definition ───────────────────────────────────────────
 
 const FALLBACK_SQUAD_LEAD = {
-  agentName: "劉品妤",
+  agentName: "Jordan Hayes",
   agentTitle: "AI 品牌故事 CMO",
   agentRole: "squad_lead",
   model: "claude-sonnet",
@@ -1607,12 +1607,12 @@ ${schemaExample}
         squadTitle = `${brandName} 品牌定位小組`;
         agentDefs = [
           { agentName: FALLBACK_SQUAD_LEAD.agentName, agentRole: "squad_lead", agentTitle: FALLBACK_SQUAD_LEAD.agentTitle, model: FALLBACK_SQUAD_LEAD.model, skills: FALLBACK_SQUAD_LEAD.skills, isLead: true },
-          { agentName: "Mark Liu",    agentRole: "市場研究員",   agentTitle: "市場研究師",   model: "claude-sonnet", skills: ["產業趨勢", "市場機會"] },
-          { agentName: "Amy Chen",    agentRole: "消費者洞察師", agentTitle: "消費者研究師", model: "claude-sonnet", skills: ["消費者行為", "Persona 設計"] },
-          { agentName: "Sarah Chen",  agentRole: "競品分析師",   agentTitle: "品牌策略師",   model: "claude-sonnet", skills: ["競品研究", "差異化定位"] },
-          { agentName: "David Wang",  agentRole: "定位顧問",     agentTitle: "策略定位師",   model: "claude-sonnet", skills: ["價值主張", "品牌個性"] },
-          { agentName: "Jessica Wu",  agentRole: "創意文案師",   agentTitle: "品牌文案師",   model: "claude-sonnet", skills: ["品牌訊息", "文案策略"] },
-          { agentName: "Tom Lin",     agentRole: "通路策略師",   agentTitle: "行銷通路師",   model: "claude-sonnet", skills: ["通路規劃", "媒體選擇"] },
+          { agentName: "Ryan Torres",    agentRole: "市場研究員",   agentTitle: "市場研究師",   model: "claude-sonnet", skills: ["產業趨勢", "市場機會"] },
+          { agentName: "Priya Nair",    agentRole: "消費者洞察師", agentTitle: "消費者研究師", model: "claude-sonnet", skills: ["消費者行為", "Persona 設計"] },
+          { agentName: "Layla Brooks",  agentRole: "競品分析師",   agentTitle: "品牌策略師",   model: "claude-sonnet", skills: ["競品研究", "差異化定位"] },
+          { agentName: "Marcus Webb",  agentRole: "定位顧問",     agentTitle: "策略定位師",   model: "claude-sonnet", skills: ["價值主張", "品牌個性"] },
+          { agentName: "Claire Sutton",  agentRole: "創意文案師",   agentTitle: "品牌文案師",   model: "claude-sonnet", skills: ["品牌訊息", "文案策略"] },
+          { agentName: "Derek Mills",     agentRole: "通路策略師",   agentTitle: "行銷通路師",   model: "claude-sonnet", skills: ["通路規劃", "媒體選擇"] },
           { agentName: "PM Agent",    agentRole: "行銷計劃師",   agentTitle: "行銷計劃師",   model: "claude-sonnet", skills: ["執行計畫", "KPI 設定"] },
         ];
       }

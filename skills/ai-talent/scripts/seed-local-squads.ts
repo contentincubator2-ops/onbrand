@@ -438,7 +438,7 @@ async function main() {
     //   180376 郭雅慧   市場研究分析師       primarySkill=competitor-analysis
     //   238624 楊承翰   消費者洞察研究小組策略師 primarySkill=consumer-insights
     //   210016 葉宗翰   AI 網站文案策略師    primarySkill=brand-dna
-    //   222934 林雅慧   競品情報分析師       primarySkill=brand-dna
+    //   222934 Linda Hayes   競品情報分析師       primarySkill=brand-dna
 
     const members = [
       { agent_id: 60071,  is_lead: true,  role: "squad_lead",          order: 1 },
@@ -1725,8 +1725,8 @@ async function main() {
     // ⚠️  HARDCODED confirmed agent IDs — DO NOT replace with findAgent()
     //   Lead  180797 Mary Allen  — Intake + Synthesis only (no step execution)
     //   S1    30003  王志豪      — brand_perception_analyst  (Step 1)
-    //   S2    180299 陳怡君      — archetype_selector         (Step 2)
-    //   S3    220839 陳哲宇      — brand_voice_specialist     (Step 3)
+    //   S2    180299 Iris Chen      — archetype_selector         (Step 2)
+    //   S3    220839 Zach Carter      — brand_voice_specialist     (Step 3)
     //   S4    229484 余佳穎      — creative_director          (Step 4)
     //   S5    39     徐俊偉      — consistency_auditor        (Step 5)
     {
@@ -1736,8 +1736,8 @@ async function main() {
       // Hardcoded agent IDs — confirmed and patched in DB
       const LEAD_ID = 180797;  // Mary Allen
       const S1_ID   = 30003;   // 王志豪
-      const S2_ID   = 180299;  // 陳怡君
-      const S3_ID   = 220839;  // 陳哲宇
+      const S2_ID   = 180299;  // Iris Chen
+      const S3_ID   = 220839;  // Zach Carter
       const S4_ID   = 229484;  // 余佳穎
       const S5_ID   = 39;      // 徐俊偉
 

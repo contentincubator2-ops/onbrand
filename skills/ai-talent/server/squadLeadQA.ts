@@ -1,7 +1,7 @@
 /**
  * squadLeadQA.ts  v2
  *
- * 劉品妤 Squad Lead QA 品質控管模組
+ * Jordan Hayes Squad Lead QA 品質控管模組
  * 套用於「所有任務」— Agent 產出後自動審核，通過才交給用戶
  *
  * 審核維度：
@@ -13,7 +13,7 @@
 import { invokeLLM } from "./_core/llm";
 
 export const SQUAD_LEAD = {
-  name: "劉品妤",
+  name: "Jordan Hayes",
   title: "AI 品牌故事 CMO",
   slug: "sarah-brand",
   agentId: 30002,
@@ -36,7 +36,7 @@ export const POSITIONING_STEP_NAMES: Record<number, { title: string; agent: stri
 export interface QAResult {
   status: "pass" | "flag";
   overallScore: number;
-  comment: string;           // 劉品妤對用戶說的話
+  comment: string;           // Jordan Hayes對用戶說的話
   alignmentCheck: string;    // 與客戶需求對齊度
   contextCheck: string;      // 與整體脈絡一致性
   qualityCheck: string;      // 輸出品質評估
@@ -70,7 +70,7 @@ export async function runSquadLeadQA(params: QAParams): Promise<QAResult> {
   const stepDef = params.stepNumber ? POSITIONING_STEP_NAMES[params.stepNumber] : null;
   const sourceLabel = stepDef?.sourceLabel;
 
-  const systemPrompt = `你是劉品妤，AI 品牌故事 CMO，擔任所有任務的 Squad Lead QA 審核官。
+  const systemPrompt = `你是 Jordan Hayes，AI 品牌故事 CMO，擔任所有任務的 Squad Lead QA 審核官。
 
 你的職責：每當 AI 顧問完成一項任務後，對其輸出進行品質控管（QA），確認三個維度：
 1. 【內容品質】完整度、邏輯性、可執行性、是否有具體內容
@@ -121,7 +121,7 @@ ${params.previousContext ? `【前置脈絡】\n${params.previousContext}\n` : '
 【顧問輸出內容】
 ${params.agentOutput.slice(0, 3500)}
 
-請以劉品妤身份 QA 審核，輸出 JSON。`;
+請以Jordan Hayes身份 QA 審核，輸出 JSON。`;
 
   try {
     const result = await invokeLLM({
@@ -165,7 +165,7 @@ ${params.agentOutput.slice(0, 3500)}
 
 /**
  * 格式化 QA 結果為聊天訊息
- * 顯示在聊天視窗中，讓用戶看到劉品妤的審核意見
+ * 顯示在聊天視窗中，讓用戶看到Jordan Hayes的審核意見
  */
 export function formatQAAsMessage(qa: QAResult, opts?: { isLastStep?: boolean }): string {
   const badge = qa.status === "pass"
@@ -173,7 +173,7 @@ export function formatQAAsMessage(qa: QAResult, opts?: { isLastStep?: boolean })
     : `⚠️ QA 注意（${qa.overallScore}分）`;
 
   const lines = [
-    `**劉品妤 · ${SQUAD_LEAD.title}｜${badge}**`,
+    `**Jordan Hayes · ${SQUAD_LEAD.title}｜${badge}**`,
     "",
     qa.comment,
     "",

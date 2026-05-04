@@ -11,9 +11,9 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import AgentNavigation, { type Agent } from "./AgentNavigation";
 
 const AGENTS: Agent[] = [
-  { id: 1, name: "陳映婕", title: "品牌策略總監", avatar: "品", status: "online" },
-  { id: 2, name: "郭書蓉", title: "業務發展總監", avatar: "業", status: "busy" },
-  { id: 3, name: "楊庭志", title: "供應鏈顧問",   avatar: "供", status: "offline" },
+  { id: 1, name: "Nina Park", title: "品牌策略總監", avatar: "品", status: "online" },
+  { id: 2, name: "Sophie Grant", title: "業務發展總監", avatar: "業", status: "busy" },
+  { id: 3, name: "Daniel Young", title: "供應鏈顧問",   avatar: "供", status: "offline" },
 ];
 
 function setup(overrides?: Partial<React.ComponentProps<typeof AgentNavigation>>) {
@@ -35,17 +35,17 @@ function setup(overrides?: Partial<React.ComponentProps<typeof AgentNavigation>>
 describe.skip("AgentNavigation (skipped: React version conflict in vitest)", () => {
   it("renders agent list", () => {
     setup();
-    expect(screen.getByText("陳映婕")).toBeTruthy();
-    expect(screen.getByText("郭書蓉")).toBeTruthy();
-    expect(screen.getByText("楊庭志")).toBeTruthy();
+    expect(screen.getByText("Nina Park")).toBeTruthy();
+    expect(screen.getByText("Sophie Grant")).toBeTruthy();
+    expect(screen.getByText("Daniel Young")).toBeTruthy();
   });
 
   it("filters by search query", () => {
     setup();
     const input = screen.getByPlaceholderText("搜尋 Agent…");
     fireEvent.change(input, { target: { value: "郭" } });
-    expect(screen.getByText("郭書蓉")).toBeTruthy();
-    expect(screen.queryByText("陳映婕")).toBeNull();
+    expect(screen.getByText("Sophie Grant")).toBeTruthy();
+    expect(screen.queryByText("Nina Park")).toBeNull();
   });
 
   it("handles module switch", () => {
@@ -56,7 +56,7 @@ describe.skip("AgentNavigation (skipped: React version conflict in vitest)", () 
 
   it("calls onSelect on agent click", () => {
     const { onSelect } = setup();
-    fireEvent.click(screen.getByText("郭書蓉"));
+    fireEvent.click(screen.getByText("Sophie Grant"));
     expect(onSelect).toHaveBeenCalledWith(2);
   });
 });

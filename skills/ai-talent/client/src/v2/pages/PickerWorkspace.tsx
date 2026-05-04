@@ -1870,12 +1870,21 @@ function SquadIntakeSidebar({
 }
 
 /* ─────────────────────── Sub: FeedbackPanel ─────────────────────────────
- * Right 280px panel: Squad Lead consultation chat.
- * Replaced category tabs with pure chat — user talks directly to the
- * Squad Lead agent for strategy/copy/visual guidance.
+ * Right 280px panel: Squad Lead consultation chat with model selector.
+ * User can pick which LLM powers the Squad Lead — same pattern as image gen.
  */
 
-type ChatMsg = { role: "user" | "assistant"; text: string; ts: string };
+type ChatMsg = { role: "user" | "assistant"; text: string; ts: string; model?: string };
+
+/** Models available for Squad Lead chat */
+const SL_MODELS: Array<{ id: string; label: string; description: string; badge?: string }> = [
+  { id: "auto",               label: "Auto",           description: "自動選擇最佳模型",           badge: "推薦" },
+  { id: "claude-sonnet-4-6",  label: "Claude Sonnet",  description: "策略分析最強，適合深度諮詢" },
+  { id: "gpt-5.4-mini",       label: "GPT-5.4 mini",   description: "快速回覆，適合即時問答" },
+  { id: "Kimi-K2.5",          label: "Kimi K2.5",      description: "繁中最佳，理解品牌語境" },
+  { id: "DeepSeek-V3.2",      label: "DeepSeek V3",    description: "邏輯推理強，適合競品分析" },
+  { id: "qwen-plus",          label: "Qwen Plus",      description: "阿里雲，中文語境優化" },
+];
 
 function FeedbackPanel({
   missionId, steps, progressByOrd, activeStepOrder, stepExecute, squadName,
@@ -1890,11 +1899,15 @@ function FeedbackPanel({
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("auto");
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const callModel = (trpc as any).ai?.chat?.useMutation?.();
 
   const confirmedCount = Array.from(progressByOrd.values()).filter((p: any) => p?.status === "confirmed").length;
   const currentStep = steps[activeStepOrder - 1];
+
+  const activeModelMeta = SL_MODELS.find((m) => m.id === selectedModel) ?? SL_MODELS[0];
 
   // Greeting shown on first open
   const greeting = useMemo(() => {
@@ -1915,7 +1928,6 @@ function FeedbackPanel({
     setIsThinking(true);
 
     try {
-      // Build context from current step and progress
       const stepCtx = currentStep
         ? `目前執行到：Step ${activeStepOrder} — ${currentStep.name ?? currentStep.title ?? "未知步驟"}。`
         : "";
@@ -1923,11 +1935,13 @@ function FeedbackPanel({
         ? `整體進度：${confirmedCount}/${steps.length} 步驟完成。`
         : "";
       const systemPrompt = `你是一位行銷小組的 Squad Lead，負責回答使用者關於目前任務的任何問題。${stepCtx}${progressCtx}請用繁體中文，簡潔、專業地回覆。`;
+      const modelToUse = selectedModel === "auto" ? undefined : selectedModel;
 
       let reply = "";
       if (callModel?.mutateAsync) {
         const result = await callModel.mutateAsync({
           system: systemPrompt,
+          model: modelToUse,
           messages: [
             ...msgs.map((m) => ({ role: m.role, content: m.text })),
             { role: "user", content: text },
@@ -1935,7 +1949,6 @@ function FeedbackPanel({
         });
         reply = result?.content ?? result?.text ?? "收到，我正在處理你的問題。";
       } else {
-        // Fallback: echo acknowledgement
         await new Promise((r) => setTimeout(r, 800));
         reply = `收到你的問題：「${text}」\n\n我正在根據目前任務狀態為你分析，請稍等。`;
       }
@@ -1943,6 +1956,7 @@ function FeedbackPanel({
         role: "assistant",
         text: reply,
         ts: new Date().toLocaleTimeString("zh-TW"),
+        model: activeModelMeta.label,
       }]);
     } catch {
       setMsgs((prev) => [...prev, {
@@ -1958,17 +1972,71 @@ function FeedbackPanel({
   return (
     <aside className="flex flex-col h-full border-l border-default-200 bg-content1">
       {/* Header */}
-      <div className="shrink-0 px-4 pt-3 pb-2.5 border-b border-default-200 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-tiny font-bold shrink-0">
-          SL
+      <div className="shrink-0 px-3 pt-3 pb-2.5 border-b border-default-200">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-tiny font-bold shrink-0">
+            SL
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-small leading-tight">Squad Lead</p>
+            <p className="text-tiny text-success flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
+              在線
+            </p>
+          </div>
+          {/* Model selector trigger */}
+          <Tooltip content="切換 AI 模型" placement="left" size="sm">
+            <button
+              onClick={() => setShowModelPicker((v) => !v)}
+              className={[
+                "shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all border",
+                showModelPicker
+                  ? "bg-primary/10 text-primary border-primary/30"
+                  : "bg-default-100 text-default-500 border-transparent hover:border-default-300",
+              ].join(" ")}
+            >
+              <FontAwesomeIcon icon={faBrain} className="text-[9px]" />
+              {activeModelMeta.label}
+            </button>
+          </Tooltip>
         </div>
-        <div className="min-w-0">
-          <p className="font-semibold text-small leading-tight">Squad Lead</p>
-          <p className="text-tiny text-success flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
-            在線
-          </p>
-        </div>
+
+        {/* Model picker panel */}
+        {showModelPicker && (
+          <div className="mt-2 border border-default-200 rounded-xl overflow-hidden bg-background shadow-sm">
+            <div className="px-3 py-1.5 border-b border-default-100">
+              <p className="text-[10px] text-default-400 font-medium uppercase tracking-wider">選擇 AI 模型</p>
+            </div>
+            <div className="divide-y divide-default-100">
+              {SL_MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => { setSelectedModel(m.id); setShowModelPicker(false); }}
+                  className={[
+                    "w-full text-left px-3 py-2 flex items-start gap-2 transition-colors",
+                    selectedModel === m.id ? "bg-primary/5" : "hover:bg-default-50",
+                  ].join(" ")}
+                >
+                  <div className={[
+                    "w-3.5 h-3.5 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center",
+                    selectedModel === m.id ? "border-primary bg-primary" : "border-default-300",
+                  ].join(" ")}>
+                    {selectedModel === m.id && <span className="w-1.5 h-1.5 rounded-full bg-white block" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-tiny font-medium text-foreground">{m.label}</span>
+                      {m.badge && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">{m.badge}</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-default-400 leading-tight mt-0.5">{m.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Chat messages */}
@@ -1998,7 +2066,12 @@ function FeedbackPanel({
               </div>
               <div className="bg-default-100 rounded-xl rounded-tl-sm px-3 py-2 max-w-[200px]">
                 <p className="text-tiny text-foreground leading-relaxed whitespace-pre-wrap">{m.text}</p>
-                <p className="text-[10px] text-default-400 mt-0.5">{m.ts}</p>
+                <div className="flex items-center justify-between mt-1 gap-1">
+                  {m.model && (
+                    <span className="text-[9px] text-default-300">{m.model}</span>
+                  )}
+                  <p className="text-[10px] text-default-400 ml-auto">{m.ts}</p>
+                </div>
               </div>
             </div>
           )
@@ -2011,10 +2084,11 @@ function FeedbackPanel({
             </div>
             <div className="bg-default-100 rounded-xl rounded-tl-sm px-3 py-2">
               <div className="flex gap-1 items-center">
-                {[0,1,2].map((i) => (
-                  <span key={i} className="w-1.5 h-1.5 rounded-full bg-default-400 animate-bounce"
-                    style={{ animationDelay: `${i * 0.15}s` }} />
+                {[0,1,2].map((idx) => (
+                  <span key={idx} className="w-1.5 h-1.5 rounded-full bg-default-400 animate-bounce"
+                    style={{ animationDelay: `${idx * 0.15}s` }} />
                 ))}
+                <span className="text-[10px] text-default-400 ml-1">{activeModelMeta.label}</span>
               </div>
             </div>
           </div>

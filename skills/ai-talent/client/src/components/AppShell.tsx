@@ -1382,7 +1382,7 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
     ? (trpc as any).squad.squadLeadOpen.useMutation({
         onSuccess: (data: any) => {
           setOpeningMsg(data.message);
-          setOpeningAgent(data.agentName ?? "劉品妤");
+          setOpeningAgent(data.agentName ?? "Jordan Hayes");
           setSquadStatus("running");
         },
       })
@@ -1447,13 +1447,13 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
         {/* 預覽成員陣容 */}
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column" as const, gap: 5 }}>
           {[
-            { name: "劉品妤", role: "Squad Lead · AI 品牌故事 CMO", lead: true },
-            { name: "Mark Liu", role: "市場研究師" },
-            { name: "Amy Chen", role: "消費者洞察師" },
-            { name: "Sarah Chen", role: "品牌策略師" },
-            { name: "David Wang", role: "策略定位師" },
-            { name: "Jessica Wu", role: "品牌文案師" },
-            { name: "Tom Lin", role: "行銷通路師" },
+            { name: "Jordan Hayes", role: "Squad Lead · AI 品牌故事 CMO", lead: true },
+            { name: "Ryan Torres", role: "市場研究師" },
+            { name: "Priya Nair", role: "消費者洞察師" },
+            { name: "Layla Brooks", role: "品牌策略師" },
+            { name: "Marcus Webb", role: "策略定位師" },
+            { name: "Claire Sutton", role: "品牌文案師" },
+            { name: "Derek Mills", role: "行銷通路師" },
           ].map((m, i) => (
             <div key={i} style={{
               display: "flex", alignItems: "center", gap: 8,
@@ -1537,7 +1537,7 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
               fontSize: 10, fontWeight: 700,
             }}>劉</div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{openingAgent || "劉品妤"}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{openingAgent || "Jordan Hayes"}</div>
               <div style={{ fontSize: 9, color: "#9B9990" }}>Squad Lead · AI 品牌故事 CMO</div>
             </div>
           </div>
@@ -1571,12 +1571,12 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
         )) : (
           // Fallback：用靜態清單顯示
           [
-            { name: "Mark Liu", role: "市場研究師" },
-            { name: "Amy Chen", role: "消費者洞察師" },
-            { name: "Sarah Chen", role: "品牌策略師" },
-            { name: "David Wang", role: "策略定位師" },
-            { name: "Jessica Wu", role: "品牌文案師" },
-            { name: "Tom Lin", role: "行銷通路師" },
+            { name: "Ryan Torres", role: "市場研究師" },
+            { name: "Priya Nair", role: "消費者洞察師" },
+            { name: "Layla Brooks", role: "品牌策略師" },
+            { name: "Marcus Webb", role: "策略定位師" },
+            { name: "Claire Sutton", role: "品牌文案師" },
+            { name: "Derek Mills", role: "行銷通路師" },
             { name: "PM Agent", role: "行銷計劃師" },
           ].map((m, i) => (
             <div key={i} style={{

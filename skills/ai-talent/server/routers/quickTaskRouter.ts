@@ -116,7 +116,7 @@ const TASKS: Record<string, TaskDef> = {
         isOrchestrator: true,
         agents: [{
           id: "perf-editor",
-          name: "Sarah Chen", role: "表現優化編輯", skill: "A/B 優化",
+          name: "Layla Brooks", role: "表現優化編輯", skill: "A/B 優化",
           avatar: "SC", tone: "orchestrate", preferredProvider: "forge",
           system: `你是 IG 表現優化編輯，懂 IG 演算法與 hook 的轉換率。從上方 8 個草稿中選 3 個最強的（用「滑動指數 / 留言觸發 / 收藏潛力」三條評分），並對 #1 多寫 1 個 A/B 變體。輸出格式：
 
@@ -180,7 +180,7 @@ B: [變體 — 改了什麼，8 字內說明]
         isOrchestrator: true,
         agents: [{
           id: "campaign-strategist",
-          name: "Mark Liu", role: "Campaign 策略主編", skill: "標語應用策略",
+          name: "Ryan Torres", role: "Campaign 策略主編", skill: "標語應用策略",
           avatar: "ML", tone: "orchestrate", preferredProvider: "forge",
           system: `你是 campaign 策略主編。從上方 10 個 tagline 中：
 1. 挑 1 個「主推」— 最能跑廣告、好記、長壽
@@ -249,7 +249,7 @@ B: [變體 — 改了什麼，8 字內說明]
         isOrchestrator: true,
         agents: [{
           id: "cta-designer",
-          name: "Eric Wong", role: "CTA & 收尾編輯", skill: "CTA 設計",
+          name: "Alex Mercer", role: "CTA & 收尾編輯", skill: "CTA 設計",
           avatar: "EW", tone: "orchestrate", preferredProvider: "forge",
           system: `你是 CTA 設計與收尾編輯。讀上方診斷處方與改寫版本，輸出：
 
@@ -306,7 +306,7 @@ B: [變體 — 改了什麼，8 字內說明]
         isOrchestrator: true,
         agents: [{
           id: "swot-strategist",
-          name: "James Lin", role: "策略整合主編", skill: "策略整合",
+          name: "James Holt", role: "策略整合主編", skill: "策略整合",
           avatar: "JL", tone: "orchestrate", preferredProvider: "forge",
           system: `你是品牌策略主編。整合上方內外部分析師的情報，輸出嚴格 JSON（不要 markdown 圍欄）：
 {

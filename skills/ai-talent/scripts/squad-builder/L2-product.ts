@@ -56,7 +56,7 @@ const L2_01_vpcanvas: SquadSpec = {
       primarySkill: "value-proposition-strategist",
       createAgent: makeLeadAgent(
         "許志誠",
-        "Jason Hsu",
+        "Jason Reid",
         "產品價值主張副總裁",
         "VP of Value Proposition Design",
         "Osterwalder Strategyzer 認證 VP Canvas 實踐者。為 25+ 個 B2B / D2C 產品完成 VP Canvas 診斷，擅長把抽象功能轉譯為可量化的客戶價值。",
@@ -102,7 +102,7 @@ const L2_02_benefit: SquadSpec = {
       primarySkill: "benefit-ladder-strategist",
       createAgent: makeLeadAgent(
         "莊雅筑",
-        "Yachu Chuang",
+        "Rachel Kim",
         "產品利益階梯副總裁",
         "VP of Benefit Ladder Strategy",
         "Means-End Chain 理論專家。曾為 8 個美妝品牌、5 個食品品牌完成 4 層利益階梯映射，把「成分」轉化為「自我實現」敘事。",
@@ -148,7 +148,7 @@ const L2_03_jtbd: SquadSpec = {
       primarySkill: "jtbd-strategist",
       createAgent: makeLeadAgent(
         "鄭文淵",
-        "Wayne Cheng",
+        "Wayne Sullivan",
         "JTBD 產品策略副總裁",
         "VP of JTBD Product Strategy",
         "Innovator's Toolkit 與 Switch Interview 實戰派。協助 10+ 個 SaaS / CPG 產品找到「被雇用的工作」，轉化成 10 倍差異化定位。",
@@ -194,7 +194,7 @@ const L2_04_fab: SquadSpec = {
       primarySkill: "fab-strategist",
       createAgent: makeLeadAgent(
         "洪子翔",
-        "Tommy Hung",
+        "Tommy Lawson",
         "FAB 產品定位副總裁",
         "VP of FAB Product Positioning",
         "B2B / 硬體產品訊息簡化專家。擅長把工程團隊的 spec sheet 轉譯為 sales team 能直接用的 benefit-first 話術。",
@@ -240,7 +240,7 @@ const L2_05_kano: SquadSpec = {
       primarySkill: "kano-strategist",
       createAgent: makeLeadAgent(
         "李思妤",
-        "Tiffany Li",
+        "Tiffany Drake",
         "Kano 產品策略副總裁",
         "VP of Kano Product Strategy",
         "東京理科大學 Kano Model 認證實踐者。曾為 12 個 B2B SaaS + D2C 硬體產品完成 Kano 問卷與五分類分析，為 roadmap 決策提供量化根據。",
@@ -286,7 +286,7 @@ const L2_06_goldencircle: SquadSpec = {
       primarySkill: "product-purpose-strategist",
       createAgent: makeLeadAgent(
         "王宥均",
-        "Yujun Wang",
+        "Leo Wagner",
         "產品使命策略副總裁",
         "VP of Product Purpose Strategy",
         "擅長在產品層級挖掘 Why，把產品從「功能的集合」重新定位為「信念的化身」。服務過 8 個品牌的旗艦產品上市與重塑。",
@@ -332,7 +332,7 @@ const L2_07_chasm: SquadSpec = {
       primarySkill: "gtm-strategist",
       createAgent: makeLeadAgent(
         "高彥均",
-        "Jack Kao",
+        "Jack Brennan",
         "跨越鴻溝 GTM 副總裁",
         "VP of Chasm Crossing GTM",
         "Geoffrey Moore 方法論實戰派。為 5 家 B2B SaaS 從 Early Adopter 階段進入 Early Majority 擬定 beachhead + whole product 策略。",
@@ -378,7 +378,7 @@ const L2_08_4p: SquadSpec = {
       primarySkill: "marketing-mix-strategist",
       createAgent: makeLeadAgent(
         "潘彥廷",
-        "Ethan Pan",
+        "Ethan Cole",
         "4P 行銷組合副總裁",
         "VP of Marketing Mix Strategy",
         "Kotler 派系資深 4P 顧問。為 20+ 個 FMCG / 零售品牌重整 Product / Price / Place / Promotion 四向度平衡，修復 underperforming 產品線。",
@@ -424,7 +424,7 @@ const L2_09_pmf: SquadSpec = {
       primarySkill: "pmf-strategist",
       createAgent: makeLeadAgent(
         "葉宜芳",
-        "Felicia Yeh",
+        "Felicia Hart",
         "PMF 產品驗證副總裁",
         "VP of Product-Market Fit",
         "早期新創 PMF 驗證專家。為 15 家 Seed-A 新創完成 Sean Ellis survey + retention cohort 分析，幫助決策 pivot / persevere / scale。",
@@ -470,7 +470,7 @@ const L2_10_antimarket: SquadSpec = {
       primarySkill: "behavioral-strategist",
       createAgent: makeLeadAgent(
         "紀承勳",
-        "Calvin Chi",
+        "Calvin Moss",
         "行為經濟行銷副總裁",
         "VP of Behavioral Economics Marketing",
         "Kahneman / Ariely / Sutherland 行為經濟學實踐派。擅長把心理學 bias（loss aversion / decoy effect / endowment）轉為可執行的行銷動作。",

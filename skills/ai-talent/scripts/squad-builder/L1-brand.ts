@@ -62,7 +62,7 @@ const L1_02_mind: SquadSpec = {
       primarySkill: "mind-positioning-strategist",
       createAgent: makeLeadAgentCreator(
         "林品睿",
-        "James Lin",
+        "James Holt",
         "心智定位策略副總裁",
         "VP of Mind Positioning Strategy",
         "資深定位策略顧問，專精以 Ries & Trout 心智階梯理論協助品牌在過度競爭市場中找出可防守的認知坐標。服務過 15 個產業的品牌重塑專案。",
@@ -218,7 +218,7 @@ const L1_03_category: SquadSpec = {
       primarySkill: "category-design-strategist",
       createAgent: makeLeadAgentCreator(
         "陳冠豪",
-        "Kevin Chen",
+        "Kevin Rhodes",
         "品類設計策略副總裁",
         "VP of Category Design",
         "Play Bigger 認證品類設計顧問。曾協助 3 家 B2B SaaS 從「產品改良者」轉型為「新品類定義者」，其中 2 家在 18 個月內被分析師列入新品類 Magic Quadrant。",
@@ -362,7 +362,7 @@ const L1_04_diff: SquadSpec = {
       primarySkill: "differentiation-strategist",
       createAgent: makeLeadAgentCreator(
         "黃怡婷",
-        "Emily Huang",
+        "Emily Foster",
         "差異化定位副總裁",
         "VP of Differentiation Strategy",
         "Trout & Rivkin 體系差異化顧問。擅長在 overchoice 市場中協助同質化品牌找出 9 條可防守路徑中的最佳選擇，並建立訊息金字塔與防守戰略。",
@@ -484,7 +484,7 @@ const L1_05_perceptual: SquadSpec = {
       primarySkill: "perceptual-mapping-strategist",
       createAgent: makeLeadAgentCreator(
         "周士豪",
-        "Allen Chou",
+        "Allen Carter",
         "感知地圖策略副總裁",
         "VP of Perceptual Mapping",
         "量化品牌定位研究專家。曾為 20+ 個 FMCG 品牌建立季度感知地圖追蹤系統，將定性洞察轉為可量化、可視覺化的董事會簡報素材。",
@@ -607,7 +607,7 @@ const L1_06_purpose: SquadSpec = {
       primarySkill: "purpose-strategist",
       createAgent: makeLeadAgentCreator(
         "蔡宜庭",
-        "Tina Tsai",
+        "Tina Barrett",
         "品牌目的策略副總裁",
         "VP of Purpose Strategy",
         "Sinek 認證 Golden Circle 實踐者。擅長從創辦人深度訪談中萃取品牌 Why，並轉化為 How 組織獨特做法與 What 產品實證，讓 Purpose 不只是 slogan。",
@@ -730,7 +730,7 @@ const L1_07_blueocean: SquadSpec = {
       primarySkill: "blue-ocean-strategist",
       createAgent: makeLeadAgentCreator(
         "呂思賢",
-        "Sean Lu",
+        "Sean Marsh",
         "藍海策略副總裁",
         "VP of Blue Ocean Strategy",
         "INSEAD 藍海策略認證實踐者。擅長協助成熟產業品牌打破競爭框架，透過四行動框架找出可擴大毛利的新價值曲線。",
@@ -852,7 +852,7 @@ const L1_08_cbbe: SquadSpec = {
       primarySkill: "brand-equity-strategist",
       createAgent: makeLeadAgentCreator(
         "廖曉雯",
-        "Rebecca Liao",
+        "Rebecca Stone",
         "品牌權益副總裁",
         "VP of Brand Equity",
         "Keller CBBE 金字塔資深實踐者。為 12 個消費品牌建立季度品牌健康 tracker，把品牌投資與商業表現連結，證明品牌是可量化資產。",
@@ -974,7 +974,7 @@ const L1_09_storybrand: SquadSpec = {
       primarySkill: "storybrand-strategist",
       createAgent: makeLeadAgentCreator(
         "方志翔",
-        "Henry Fang",
+        "Henry Blake",
         "品牌敘事策略副總裁",
         "VP of Brand Story Strategy",
         "StoryBrand 認證導師。專精將模糊訊息轉化為 SB7 七步清晰敘事，為中小品牌打造官網 BrandScript 與 Sales Funnel Messaging。",
@@ -1098,7 +1098,7 @@ const L1_10_cultural: SquadSpec = {
       primarySkill: "cultural-strategist",
       createAgent: makeLeadAgentCreator(
         "洪詩婷",
-        "Shirley Hung",
+        "Shirley Grant",
         "文化品牌策略副總裁",
         "VP of Cultural Brand Strategy",
         "Harvard Business School《How Brands Become Icons》方法論深耕者。結合社會學、人類學、品牌敘事，為長青品牌打造可回應世代焦慮的 icon myth。",

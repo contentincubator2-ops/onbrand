@@ -5,9 +5,9 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 
-// ── Squad Lead（劉品妤）擔任 QA 審核 + 銜接角色 ───────────────────────────────
+// ── Squad Lead（Jordan Hayes）擔任 QA 審核 + 銜接角色 ───────────────────────────────
 export const SQUAD_LEAD = {
-  name: "劉品妤",
+  name: "Jordan Hayes",
   title: "AI 品牌故事 CMO",
   slug: "sarah-brand",
   agentId: 30002,
@@ -15,15 +15,15 @@ export const SQUAD_LEAD = {
 
 // ── 步驟定義 ──────────────────────────────────────────────────────────────────
 export const POSITIONING_STEPS = [
-  { step: 1,  title: "市場洞察",     agent: "市場研究員", agentName: "Mark Liu",   description: "分析產業趨勢、客戶痛點、市場機會", sourceLabel: "[來源: 業界報告 + 市場數據]",         squadLeadHandoff: "市場洞察已完成，我們掌握了產業趨勢和客戶核心痛點。接下來讓消費者洞察師帶你深入了解目標客群。" },
-  { step: 2,  title: "目標客群",     agent: "消費者洞察師", agentName: "Amy Chen",  description: "定義主要客群、人口特徵、購買行為",  sourceLabel: "[來源: 消費者調查 + 行為數據]",       squadLeadHandoff: "目標客群輪廓已清晰。有了這群人的樣貌，我們可以開始審視競爭格局。" },
-  { step: 3,  title: "競爭格局",     agent: "競品分析師", agentName: "Sarah Chen",   description: "識別競爭者、市場空缺、競爭優勢",   sourceLabel: "[來源: 競品研究 + 市場情報]",         squadLeadHandoff: "競爭格局已釐清，市場空缺找到了。這讓我們更有把握建立品牌核心價值。" },
-  { step: 4,  title: "品牌核心價值",  agent: "品牌策略師", agentName: "Sarah Chen",   description: "建立核心價值、使命願景、黃金圈",   sourceLabel: "[來源: 品牌策略框架 + 黃金圈方法論]", squadLeadHandoff: "品牌的 Why-How-What 已成形。接下來要把這個基礎轉化為市場差異化。" },
-  { step: 5,  title: "差異化定位",   agent: "品牌策略師", agentName: "Sarah Chen",   description: "制定 USP、差異化要素、定位聲明",   sourceLabel: "[來源: 定位聲明框架 + USP 方法論]",  squadLeadHandoff: "差異化定位確立。現在是把定位翻譯成具體價值主張的時刻。" },
-  { step: 6,  title: "價值主張",     agent: "定位顧問", agentName: "David Wang",     description: "建構核心主張、效益證明",           sourceLabel: "[來源: 價值主張畫布 + 客戶效益驗證]", squadLeadHandoff: "價值主張清晰有力。接下來要為品牌注入個性與聲音。" },
-  { step: 7,  title: "品牌個性",     agent: "定位顧問", agentName: "David Wang",     description: "定義品牌原型、語調、溝通風格",     sourceLabel: "[來源: 品牌原型理論 + 語調指南]",     squadLeadHandoff: "品牌個性已定義，聲音有了溫度。現在讓創意文案師把這些轉化為強力訊息。" },
-  { step: 8,  title: "訊息策略",     agent: "創意文案師", agentName: "Jessica Wu",   description: "開發標語、電梯簡報、訊息支柱",     sourceLabel: "[來源: 創意文案框架 + 訊息測試]",     squadLeadHandoff: "訊息策略到位，標語和支柱都準備好了。最後兩步：選對通路、制定行動計畫。" },
-  { step: 9,  title: "通路策略",     agent: "通路策略師", agentName: "Tom Lin",   description: "規劃主要通路、內容策略",           sourceLabel: "[來源: 通路分析 + 內容行銷框架]",     squadLeadHandoff: "通路藍圖完成。最後一步，讓行銷計劃師幫你把策略轉化為可執行的行動計畫。" },
+  { step: 1,  title: "市場洞察",     agent: "市場研究員", agentName: "Ryan Torres",   description: "分析產業趨勢、客戶痛點、市場機會", sourceLabel: "[來源: 業界報告 + 市場數據]",         squadLeadHandoff: "市場洞察已完成，我們掌握了產業趨勢和客戶核心痛點。接下來讓消費者洞察師帶你深入了解目標客群。" },
+  { step: 2,  title: "目標客群",     agent: "消費者洞察師", agentName: "Priya Nair",  description: "定義主要客群、人口特徵、購買行為",  sourceLabel: "[來源: 消費者調查 + 行為數據]",       squadLeadHandoff: "目標客群輪廓已清晰。有了這群人的樣貌，我們可以開始審視競爭格局。" },
+  { step: 3,  title: "競爭格局",     agent: "競品分析師", agentName: "Layla Brooks",   description: "識別競爭者、市場空缺、競爭優勢",   sourceLabel: "[來源: 競品研究 + 市場情報]",         squadLeadHandoff: "競爭格局已釐清，市場空缺找到了。這讓我們更有把握建立品牌核心價值。" },
+  { step: 4,  title: "品牌核心價值",  agent: "品牌策略師", agentName: "Layla Brooks",   description: "建立核心價值、使命願景、黃金圈",   sourceLabel: "[來源: 品牌策略框架 + 黃金圈方法論]", squadLeadHandoff: "品牌的 Why-How-What 已成形。接下來要把這個基礎轉化為市場差異化。" },
+  { step: 5,  title: "差異化定位",   agent: "品牌策略師", agentName: "Layla Brooks",   description: "制定 USP、差異化要素、定位聲明",   sourceLabel: "[來源: 定位聲明框架 + USP 方法論]",  squadLeadHandoff: "差異化定位確立。現在是把定位翻譯成具體價值主張的時刻。" },
+  { step: 6,  title: "價值主張",     agent: "定位顧問", agentName: "Marcus Webb",     description: "建構核心主張、效益證明",           sourceLabel: "[來源: 價值主張畫布 + 客戶效益驗證]", squadLeadHandoff: "價值主張清晰有力。接下來要為品牌注入個性與聲音。" },
+  { step: 7,  title: "品牌個性",     agent: "定位顧問", agentName: "Marcus Webb",     description: "定義品牌原型、語調、溝通風格",     sourceLabel: "[來源: 品牌原型理論 + 語調指南]",     squadLeadHandoff: "品牌個性已定義，聲音有了溫度。現在讓創意文案師把這些轉化為強力訊息。" },
+  { step: 8,  title: "訊息策略",     agent: "創意文案師", agentName: "Claire Sutton",   description: "開發標語、電梯簡報、訊息支柱",     sourceLabel: "[來源: 創意文案框架 + 訊息測試]",     squadLeadHandoff: "訊息策略到位，標語和支柱都準備好了。最後兩步：選對通路、制定行動計畫。" },
+  { step: 9,  title: "通路策略",     agent: "通路策略師", agentName: "Derek Mills",   description: "規劃主要通路、內容策略",           sourceLabel: "[來源: 通路分析 + 內容行銷框架]",     squadLeadHandoff: "通路藍圖完成。最後一步，讓行銷計劃師幫你把策略轉化為可執行的行動計畫。" },
   { step: 10, title: "品牌活化計畫",  agent: "行銷計劃師", agentName: "PM Agent",   description: "制定快速勝利、季度里程碑、KPI",    sourceLabel: "[來源: 行銷規劃框架 + KPI 標準]",     squadLeadHandoff: "恭喜！十步驟品牌定位分析全部完成。你現在擁有一套完整的品牌定位策略，隨時可以啟動。" },
 ];
 
@@ -47,7 +47,7 @@ async function runSquadLeadQA(params: {
   suggestions: string[];
   readyToAdvance: boolean;
 }> {
-  const systemPrompt = `你是劉品妤，AI 品牌故事 CMO，擔任品牌定位 Squad Lead。
+  const systemPrompt = `你是 Jordan Hayes，AI 品牌故事 CMO，擔任品牌定位 Squad Lead。
 你的職責是在每個分析步驟完成後，進行嚴格的 QA 審核：
 1. 確認該步驟的研究結果是否符合客戶品牌的實際情況和需求
 2. 確認與整體品牌定位脈絡的一致性（尤其是前幾步已建立的基礎）
@@ -58,7 +58,7 @@ async function runSquadLeadQA(params: {
 {
   "status": "pass",
   "overallScore": 82,
-  "comment": "（劉品妤的開場評語，100字以內，口氣直接有力，以「我看完了」開頭）",
+  "comment": "（Jordan Hayes的開場評語，100字以內，口氣直接有力，以「我看完了」開頭）",
   "alignmentCheck": "（與客戶需求對齊度，具體指出符合或不符合之處）",
   "contextCheck": "（與整體定位脈絡一致性說明）",
   "suggestions": ["（若有具體改進建議則列出，否則空陣列）"],
@@ -81,7 +81,7 @@ ${params.previousStepsSummary ? `【前幾步已建立的脈絡】\n${params.pre
 【本步驟分析內容】
 ${params.stepContent}
 
-請以劉品妤的角色進行 QA 審核，輸出 JSON。`;
+請以Jordan Hayes的角色進行 QA 審核，輸出 JSON。`;
 
   try {
     const result = await invokeLLM({
