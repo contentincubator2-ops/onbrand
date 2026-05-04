@@ -2625,43 +2625,53 @@ ${input.question}`;
       brandName:   z.string().optional(),
       productName: z.string().optional(),
     }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
+      const { ENV } = await import("../_core/env");
+      const { invokeLLM } = await import("../_core/llm");
+
       const q = input.query
         .replace("{brand_name}",   input.brandName   ?? "")
         .replace("{product_name}", input.productName ?? "");
 
-      // ── 1. Try Tavily (include_answer=true → instant 1-sentence answer) ──
-      const tavilyKey = (process.env as any).TAVILY_API_KEY ?? "";
+      // ── 1. Try Tavily (include_answer=true → real-time web answer) ──────
+      const tavilyKey = ENV.TAVILY_API_KEY ?? "";
       if (tavilyKey) {
         try {
           const res = await fetch("https://api.tavily.com/search", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              api_key:         tavilyKey,
-              query:           q,
-              include_answer:  true,
-              search_depth:    "basic",
-              max_results:     3,
+              api_key:        tavilyKey,
+              query:          q,
+              include_answer: true,
+              search_depth:   "basic",
+              max_results:    3,
             }),
           });
           if (res.ok) {
             const data = await res.json() as any;
-            // Prefer the AI-generated answer; fall back to top snippet
             const answer = (data?.answer as string | undefined)?.trim()
-              || (data?.results?.[0]?.content as string | undefined)?.trim()
+              || (data?.results?.[0]?.content as string | undefined)?.slice(0, 300).trim()
               || "";
-            if (answer) return { result: answer };
+            if (answer) {
+              console.log("[briefSearch] Tavily OK for:", q.slice(0, 60));
+              return { result: answer };
+            }
+          } else {
+            console.warn("[briefSearch] Tavily HTTP", res.status, "for:", q.slice(0, 60));
           }
-        } catch { /* fall through */ }
+        } catch (e: any) {
+          console.warn("[briefSearch] Tavily error:", e?.message ?? e);
+        }
+      } else {
+        console.warn("[briefSearch] No TAVILY_API_KEY — skipping to LLM fallback");
       }
 
-      // ── 2. Fallback: LLM with best available provider (no live search) ──
+      // ── 2. Fallback: Azure AI Foundry (already configured on VM) ─────────
+      // Uses the same model pool as squad agents — no extra key needed.
       try {
-        const { invokeLLM } = await import("../_core/llm");
         const res = await (invokeLLM as any)({
-          provider: "openai",   // fast + cheap for short answers
-          model:    "gpt-4o-mini",
+          provider: "azure-foundry",
           messages: [
             {
               role: "system",
@@ -2677,10 +2687,15 @@ ${input.question}`;
           : Array.isArray(raw)
             ? raw.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("").trim()
             : "";
-        if (answer) return { result: answer };
-      } catch { /* fall through */ }
+        if (answer) {
+          console.log("[briefSearch] Azure Foundry fallback OK for:", q.slice(0, 60));
+          return { result: answer };
+        }
+      } catch (e: any) {
+        console.warn("[briefSearch] Azure Foundry fallback error:", e?.message ?? e);
+      }
 
-      // ── 3. All providers failed — return empty so client stays idle ──
+      // ── 3. All providers failed — client keeps field idle ─────────────────
       return { result: "" };
     }),
 });
