@@ -103,7 +103,22 @@ export default function MethodologyCatalog() {
   const [kindOpen,    setKindOpen]    = useState(false);
   const [selected,    setSelected]    = useState<any | null>(null);
 
-  // ── Data: entity.listForHome → squads+agents+skills with images ───────────
+  // ── Data: squad.listForFront(includeUnapproved) → ALL active squads w/ images
+  // Now returns hero_image_url + mockup_images (added to server query)
+  const squadQuery = trpc.squad.listForFront.useQuery(
+    { includeUnapproved: true } as any,
+    { refetchOnWindowFocus: false, staleTime: 30_000 }
+  );
+
+  // ── Data: agents via trpc.agent.list (typed, reliable — uses getSoworkDb) ──
+  const agentQuery = trpc.agent.list.useQuery(
+    { limit: 200 },
+    { refetchOnWindowFocus: false, staleTime: 30_000 }
+  );
+
+  // ── Data: entity.listForHome → skills + any enrichment ───────────────────
+  // Best-effort: provides skills + agents-from-skills (agent-template category).
+  // Falls back gracefully if localPool/getSoworkDb is unavailable.
   const entityQuery = (trpc as any).entity?.listForHome?.useQuery
     ? (trpc as any).entity.listForHome.useQuery(
         { brandId: brandId ?? null },
@@ -111,47 +126,63 @@ export default function MethodologyCatalog() {
       )
     : { data: null, isLoading: false };
 
-  // ── Data: squad.listForFront(includeUnapproved) → supplement unapproved ───
-  // Used ONLY to add squads that entity.listForHome might miss (unapproved ones)
-  const squadQuery = trpc.squad.listForFront.useQuery(
-    { includeUnapproved: true } as any,
-    { refetchOnWindowFocus: false, staleTime: 30_000 }
-  );
-
-  // ── Merge: entity data (has images) + listForFront supplement ─────────────
-  const allEntities: any[] = useMemo(() => {
-    const entityData: any[] = (entityQuery.data as any[]) ?? [];
-    const entitySlugSet = new Set(entityData.filter(e => e.kind === "squad").map((e: any) => String(e.slug)));
-
-    // Add squads from listForFront that entity missed (unapproved or not yet indexed)
-    const extraSquads: any[] = ((squadQuery.data as any[]) ?? [])
-      .filter((s: any) => !entitySlugSet.has(String(s.slug)))
-      .map((s: any) => ({
+  // ── Normalize squad data (listForFront now has images) ────────────────────
+  const squads: any[] = useMemo(() => {
+    return ((squadQuery.data as any[]) ?? []).map((s: any) => {
+      // Parse mockup_images JSON → pick first as coverImageUrl fallback
+      let mockupImages: string[] = [];
+      try {
+        if (typeof s.mockup_images === "string") mockupImages = JSON.parse(s.mockup_images);
+        else if (Array.isArray(s.mockup_images)) mockupImages = s.mockup_images;
+      } catch {}
+      return {
         id: s.id,
         kind: "squad" as Kind,
         slug: s.slug,
         name: s.name,
         description: s.description,
         strategyLayer: String(s.strategy_layer ?? "L1").slice(0, 2).toUpperCase(),
-        badge: { label: String(s.strategy_layer ?? "L1").slice(0, 2), color: "default" },
-        stats: [],
+        // Three-tier image fallback: hero_image_url → mockupImages[0] → MethodologyGlyph
+        coverImageUrl: s.hero_image_url ?? mockupImages[0] ?? null,
+        mockupImages,
         is_approved: s.is_approved,
-        coverImageUrl: null,
-      }));
+      };
+    });
+  }, [squadQuery.data]);
 
-    return [...entityData, ...extraSquads];
-  }, [entityQuery.data, squadQuery.data]);
+  // ── Normalize agent data ───────────────────────────────────────────────────
+  const agents: any[] = useMemo(() => {
+    const fromAgent = ((agentQuery.data as any[]) ?? []).map((a: any) => ({
+      id: a.id,
+      kind: "agent" as Kind,
+      slug: a.slug ?? `agent-${a.id}`,
+      name: a.name_zh ?? a.name ?? "",
+      subtitle: a.title_zh ?? a.title ?? null,
+      description: a.bio_zh ?? a.bio ?? a.specialty ?? null,
+      strategyLayer: "L4",
+      coverImageUrl: a.avatarUrl ?? null,
+    }));
+    // Also grab agents from entity.listForHome if available (more enriched)
+    const fromEntity = ((entityQuery.data as any[]) ?? []).filter((e: any) => e.kind === "agent");
+    // Merge: entity data wins for slugs that overlap (has more fields)
+    const entitySlugs = new Set(fromEntity.map((e: any) => e.slug));
+    const extra = fromAgent.filter(a => !entitySlugs.has(a.slug));
+    return [...fromEntity, ...extra];
+  }, [agentQuery.data, entityQuery.data]);
 
-  const squads = useMemo(() => allEntities.filter(e => e.kind === "squad"), [allEntities]);
-  const agents = useMemo(() => allEntities.filter(e => e.kind === "agent"), [allEntities]);
-  const skills = useMemo(() => allEntities.filter(e => e.kind === "skill"), [allEntities]);
+  // ── Skills from entity.listForHome ───────────────────────────────────────
+  const skills: any[] = useMemo(() =>
+    ((entityQuery.data as any[]) ?? []).filter((e: any) => e.kind === "skill"),
+  [entityQuery.data]);
 
   const counts = useMemo(() => ({
     squad: squads.length, agent: agents.length, skill: skills.length,
     total: squads.length + agents.length + skills.length,
   }), [squads, agents, skills]);
 
-  const isLoading = entityQuery.isLoading && squadQuery.isLoading;
+  const allEntities: any[] = useMemo(() => [...squads, ...agents, ...skills], [squads, agents, skills]);
+
+  const isLoading = squadQuery.isLoading && agentQuery.isLoading;
 
   // ── Grid filter ───────────────────────────────────────────────────────────
   const gridItems = useMemo(() => {
@@ -449,7 +480,11 @@ function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
 
   const li = layerInfo(entity.strategyLayer ?? entity.strategy_layer);
   const layer = li.key;
-  const coverImageUrl: string | undefined = entity.coverImageUrl ?? entity.heroImageUrl;
+  // Three-tier image fallback: coverImageUrl → mockupImages[0] → MethodologyGlyph
+  const coverImageUrl: string | undefined =
+    entity.coverImageUrl ?? entity.heroImageUrl ??
+    (Array.isArray(entity.mockupImages) ? entity.mockupImages[0] : undefined) ??
+    undefined;
   const kindLabel = entity.kind === "squad" ? "小組" : entity.kind === "agent" ? "Agent" : "技能";
   const titleSize = size === "sm" ? 13 : size === "lg" ? 16 : 14;
   const glyphSize = size === "sm" ? 64 : size === "lg" ? 120 : 88;
@@ -638,7 +673,10 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
 }) {
   const li = layerInfo(entity.strategyLayer ?? entity.strategy_layer);
   const layer = li.key;
-  const coverImageUrl: string | undefined = entity.coverImageUrl ?? entity.heroImageUrl;
+  const coverImageUrl: string | undefined =
+    entity.coverImageUrl ?? entity.heroImageUrl ??
+    (Array.isArray(entity.mockupImages) ? entity.mockupImages[0] : undefined) ??
+    undefined;
   const kindLabel = entity.kind === "squad" ? "方法論小組" : entity.kind === "agent" ? "Agent" : "技能";
   const ctaLabel  = entity.kind === "squad" ? "啟動此小組" : entity.kind === "agent" ? "套用此 Agent" : "套用此技能";
 
