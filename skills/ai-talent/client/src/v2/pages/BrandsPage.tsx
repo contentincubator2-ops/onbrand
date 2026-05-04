@@ -137,16 +137,30 @@ export default function BrandsPage() {
     return items;
   }, [scopeMode, segments]);
 
-  // Default to 速查卡 for all scopes (CJ: 預設為速查卡頁籤).
+  // ── Two-tier navigation ───────────────────────────────────────────────────
+  // category = top-level sidebar choice (大分類)
+  // section  = sub-item within that category (小分類, driven by content-area sub-nav)
+  type Category = "positioning" | "visual" | "settings";
+  const [category, setCategory] = useState<Category>("positioning");
   const defaultSection: SectionId = "card";
   const [section, setSection] = useState<SectionId>(defaultSection);
 
   // Brand-kit dropdown (Canva-style switcher)
   const [brandDropOpen, setBrandDropOpen] = useState(false);
   const [brandSearch, setBrandSearch] = useState("");
-  // Reset section when scope mode changes
+
+  // Switching category resets section to the sensible default for that category
+  const switchCategory = (c: Category) => {
+    setCategory(c);
+    if (c === "positioning") setSection("card");
+    if (c === "visual")      setSection("asset:logo");
+    if (c === "settings")    setSection("settings");
+  };
+
+  // Reset to positioning when scope changes
   React.useEffect(() => {
-    setSection(defaultSection);
+    setCategory("positioning");
+    setSection("card");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
 
@@ -188,9 +202,7 @@ export default function BrandsPage() {
     { id: "asset:fonts",  label: "字型", icon: faFont,    tone: "default", ready: true },
   ];
 
-  const visibleTiles = TILES.filter((t) => t.id === section);
-
-  const onTileClick = (t: Tile) => setSection(t.id);
+  // (tiles and onTileClick replaced by category === "visual" inline rendering)
 
   // ── Pipeline (research mode) — scope-aware (brand 14 / product 5 / event 11) ─
   const pipelineSteps: PipelineStepSpec[] = pipelineFor(scopeMode);
@@ -554,9 +566,9 @@ export default function BrandsPage() {
 
       {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
       <div className="flex-1 flex">
-        {/* ── Canva-faithful brand left rail ── */}
+        {/* ── Brand left rail — two-tier nav ── */}
         <aside style={{
-          width: 240, flexShrink: 0,
+          width: 220, flexShrink: 0,
           borderRight: "1px solid #E4E3E1",
           background: "white",
           display: "flex", flexDirection: "column",
@@ -730,178 +742,233 @@ export default function BrandsPage() {
             )}
           </div>
 
-          {/* ④ Sub-nav — 所有資產 (top) + positioning segments + brand assets */}
-          <nav style={{ flex: 1, padding: "2px 10px 12px", display: "flex", flexDirection: "column", gap: 1 }}>
-            {/* 所有資產 — always first, with + */}
+          {/* ④ 大分類 nav — 品牌定位 / 視覺資產 / 設定 */}
+          <nav style={{ flex: 1, padding: "8px 10px 16px", display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Section label */}
+            <p style={{ fontSize: 10, fontWeight: 700, color: "#A8A29E", letterSpacing: "0.10em", textTransform: "uppercase", padding: "4px 4px 8px", margin: 0 }}>
+              分類
+            </p>
+
+            {/* 品牌 / 產品 / 活動定位 */}
             {(() => {
-              const active = section === "all";
+              const catLabel =
+                scopeMode === "product" ? "產品定位"
+                : scopeMode === "event"   ? "活動定位"
+                : "品牌定位";
+              const active = category === "positioning";
               return (
-                <button onClick={() => setSection("all")} style={{
-                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "7px 10px", borderRadius: 7,
+                <button onClick={() => switchCategory("positioning")} style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 12px", borderRadius: 8,
                   background: active ? "#EDE9FE" : "none",
-                  border: "none", cursor: "pointer",
-                  fontSize: 13, fontWeight: active ? 600 : 400,
-                  color: active ? "#4F46E5" : "#1A1A18",
-                  transition: "background 0.12s",
+                  border: active ? "1px solid #C7D2FE" : "1px solid transparent",
+                  cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
+                  color: active ? "#4F46E5" : "#374151",
+                  textAlign: "left", transition: "all 0.15s",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
                 >
-                  所有資產
-                  <FontAwesomeIcon icon={faPlus} style={{ fontSize: 11, color: active ? "#4F46E5" : "#A8A29E" }} />
+                  <FontAwesomeIcon icon={faBookOpen} style={{ fontSize: 14, width: 16, color: active ? "#4F46E5" : "#6B7280" }} />
+                  {catLabel}
                 </button>
               );
             })()}
 
-            {/* Existing sub-nav entries */}
-            {SUBNAV.map((s) => {
-              const active = section === s.id;
+            {/* 視覺資產 — brand scope only */}
+            {scopeMode === "brand" && (() => {
+              const active = category === "visual";
               return (
-                <button key={s.id} onClick={() => setSection(s.id)} style={{
-                  width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "7px 10px", borderRadius: 7,
+                <button onClick={() => switchCategory("visual")} style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 12px", borderRadius: 8,
                   background: active ? "#EDE9FE" : "none",
-                  border: "none", cursor: "pointer",
-                  fontSize: 13, fontWeight: active ? 600 : 400,
-                  color: active ? "#4F46E5" : "#1A1A18",
-                  textAlign: "left", transition: "background 0.12s",
+                  border: active ? "1px solid #C7D2FE" : "1px solid transparent",
+                  cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
+                  color: active ? "#4F46E5" : "#374151",
+                  textAlign: "left", transition: "all 0.15s",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
                 >
-                  <span style={{ flex: 1 }}>{s.label}</span>
-                  {s.badge && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
-                      background: "#6366F1", color: "white", marginLeft: 4,
-                    }}>{s.badge}</span>
-                  )}
+                  <FontAwesomeIcon icon={faPalette} style={{ fontSize: 14, width: 16, color: active ? "#4F46E5" : "#6B7280" }} />
+                  視覺資產
                 </button>
               );
-            })}
+            })()}
+
+            {/* 設定 — event scope only */}
+            {scopeMode === "event" && (() => {
+              const active = category === "settings";
+              return (
+                <button onClick={() => switchCategory("settings")} style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 12px", borderRadius: 8,
+                  background: active ? "#EDE9FE" : "none",
+                  border: active ? "1px solid #C7D2FE" : "1px solid transparent",
+                  cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
+                  color: active ? "#4F46E5" : "#374151",
+                  textAlign: "left", transition: "all 0.15s",
+                }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "none"; }}
+                >
+                  <FontAwesomeIcon icon={faWandSparkles} style={{ fontSize: 14, width: 16, color: active ? "#4F46E5" : "#6B7280" }} />
+                  設定
+                </button>
+              );
+            })()}
           </nav>
         </aside>
 
         {/* Right: scope-aware content pane */}
-        <div className="flex-1 min-w-0 px-6 py-6 overflow-y-auto flex flex-col gap-4">
-          {scopeMode !== "none" && pipelineSteps.length > 0 && (
-            <PipelineRunner
-              steps={pipelineSteps}
-              state={pipeline}
-              title={
-                scopeMode === "product" ? "產品定位分析"
-                : scopeMode === "event" ? "活動定位分析"
-                : "品牌定位分析"
-              }
-              onStart={startPipeline}
-              onPause={pausePipeline}
-              onResume={resumePipeline}
-              onSkip={skipPipeline}
-              onStop={stopPipeline}
-            />
-          )}
-          {/* SMP checkpoint card — gates auto-advance after event Step 6.
-              User reviews the auto-generated SMP, edits the segment if
-              needed, then presses 繼續 to fire steps 7-11. Per CJ rule
-              2026-04-29: SMP is highest creative principle, can't auto-pass. */}
-          {smpCheckpointActive && (
-            <div className="mt-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-small font-semibold text-primary-800">
-                    🛑 SMP Checkpoint — 請確認單一核心命題
-                  </p>
-                  <p className="text-tiny text-default-600 mt-1">
-                    SMP 是這次活動的最高創意準則，後面 5 個 step（訊息架構、創意概念、規範、管道、旅程）都會圍繞它展開。先確認再繼續。
-                  </p>
-                  {smpData?.singleMindedProposition && (
-                    <div className="mt-2 p-2 rounded bg-white border border-divider">
-                      <p className="text-small font-medium text-foreground">
-                        「{smpData.singleMindedProposition}」
-                      </p>
-                      {smpData.rationale && (
-                        <p className="text-tiny text-default-500 mt-1 leading-relaxed">
-                          {smpData.rationale}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-3 flex items-center gap-2 flex-wrap">
-                    <button
-                      className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90"
-                      onClick={resumeAfterSmp}
+        <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
+          {/* ── 品牌 / 產品 / 活動定位 ── */}
+          {category === "positioning" && (
+            <>
+              {/* Horizontal sub-nav: 速查卡 | AI指令庫 | segments */}
+              <div style={{
+                display: "flex", gap: 0, overflowX: "auto", flexShrink: 0,
+                borderBottom: "1px solid #E4E3E1",
+                padding: "0 24px",
+                scrollbarWidth: "none",
+              }}>
+                {[
+                  { id: "card",    label: "速查卡"   },
+                  { id: "prompts", label: "AI 指令庫" },
+                  ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${s.title}` })),
+                ].map(t => {
+                  const active = section === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setSection(t.id)} style={{
+                      flexShrink: 0, padding: "12px 16px",
+                      background: "none", border: "none", cursor: "pointer",
+                      fontSize: 13, fontWeight: active ? 600 : 400,
+                      color: active ? "#4F46E5" : "#57534E",
+                      borderBottom: active ? "2px solid #4F46E5" : "2px solid transparent",
+                      marginBottom: -1, transition: "color 0.12s, border-color 0.12s",
+                      whiteSpace: "nowrap",
+                    }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.color = "#1A1A18"; }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.color = "#57534E"; }}
                     >
-                      ▶ 繼續（跑 step 7-11）
+                      {t.label}
                     </button>
-                    <button
-                      className="px-3 py-1 rounded-md border border-divider text-tiny hover:bg-default-50"
-                      onClick={() => setSection("seg:smp")}
-                    >
-                      編輯 SMP
-                    </button>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
-            </div>
-          )}
-          {/* Failure trail — shows step ids that errored or returned empty
-              conclusion so user knows which segments to rerun (CJ caught
-              2026-04-29: product step 3-5 silently empty after step 2). */}
-          {failedStepIds.length > 0 && (
-            <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
-              ⚠ 以下 step 沒寫入內容，建議到對應頁籤重跑：
-              {" "}
-              {failedStepIds
-                .map((id) => {
-                  const s = pipelineSteps.find((x) => x.id === id);
-                  return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`;
-                })
-                .join("、")}
-              <button
-                className="ml-2 underline"
-                onClick={() => setFailedStepIds([])}
-              >
-                關閉
-              </button>
-            </div>
-          )}
-          {section.startsWith("asset:") && scopeMode === "brand" && (scope?.brandId ?? brandId) ? (
-            <BrandAssetPanel
-              assetKey={section.slice("asset:".length) as AssetKey}
-              brandId={(scope?.brandId ?? brandId)!}
-            />
-          ) : section === "settings" && scopeMode === "event" && scope?.eventId ? (
-            <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
-          ) : section === "card" || section === "prompts" || section.startsWith("seg:") ? (
-            <PositioningPanel
-              section={section}
-              scopeMode={scopeMode}
-              scopeName={scopeName}
-              scopeBrandId={scope?.brandId ?? null}
-              scopeProductId={scope?.productId ?? null}
-              scopeEventId={scope?.eventId ?? null}
-              pipelineThinking={
-                pipelineThinking && pipelineThinking.segmentTarget === section
-                  ? pipelineThinking
-                  : null
-              }
-              onAutoFill={runSegmentAutoFill}
-            />
-          ) : visibleTiles.length === 0 ? (
-            <Card shadow="none" className="border-2 border-dashed border-divider">
-              <CardBody className="py-16 items-center text-center gap-3">
-                <FontAwesomeIcon icon={faShapes} className="text-3xl text-default-300" />
-                <p className="text-medium font-medium">這個區塊還沒有資產</p>
-              </CardBody>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {visibleTiles.map((t) => (
-                <BrandAssetTile key={t.id} tile={t} onClick={() => onTileClick(t)} />
-              ))}
 
+              {/* Positioning content */}
+              <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                {scopeMode !== "none" && pipelineSteps.length > 0 && (
+                  <PipelineRunner
+                    steps={pipelineSteps}
+                    state={pipeline}
+                    title={
+                      scopeMode === "product" ? "產品定位分析"
+                      : scopeMode === "event" ? "活動定位分析"
+                      : "品牌定位分析"
+                    }
+                    onStart={startPipeline}
+                    onPause={pausePipeline}
+                    onResume={resumePipeline}
+                    onSkip={skipPipeline}
+                    onStop={stopPipeline}
+                  />
+                )}
+                {smpCheckpointActive && (
+                  <div className="mt-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-small font-semibold text-primary-800">🛑 SMP Checkpoint — 請確認單一核心命題</p>
+                        <p className="text-tiny text-default-600 mt-1">SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。</p>
+                        {smpData?.singleMindedProposition && (
+                          <div className="mt-2 p-2 rounded bg-white border border-divider">
+                            <p className="text-small font-medium text-foreground">「{smpData.singleMindedProposition}」</p>
+                            {smpData.rationale && <p className="text-tiny text-default-500 mt-1 leading-relaxed">{smpData.rationale}</p>}
+                          </div>
+                        )}
+                        <div className="mt-3 flex items-center gap-2 flex-wrap">
+                          <button className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90" onClick={resumeAfterSmp}>▶ 繼續（跑 step 7-11）</button>
+                          <button className="px-3 py-1 rounded-md border border-divider text-tiny hover:bg-default-50" onClick={() => setSection("seg:smp")}>編輯 SMP</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {failedStepIds.length > 0 && (
+                  <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
+                    ⚠ 以下 step 沒寫入內容，建議到對應頁籤重跑：{" "}
+                    {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`; }).join("、")}
+                    <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>關閉</button>
+                  </div>
+                )}
+                <PositioningPanel
+                  section={section}
+                  scopeMode={scopeMode}
+                  scopeName={scopeName}
+                  scopeBrandId={scope?.brandId ?? null}
+                  scopeProductId={scope?.productId ?? null}
+                  scopeEventId={scope?.eventId ?? null}
+                  pipelineThinking={pipelineThinking && pipelineThinking.segmentTarget === section ? pipelineThinking : null}
+                  onAutoFill={runSegmentAutoFill}
+                />
+              </div>
+            </>
+          )}
+
+          {/* ── 視覺資產 ── */}
+          {category === "visual" && scopeMode === "brand" && (
+            <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Asset type tabs */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[
+                  { id: "asset:logo",   label: "標誌",  icon: faPenNib  },
+                  { id: "asset:colors", label: "顏色",  icon: faPalette },
+                  { id: "asset:fonts",  label: "字型",  icon: faFont    },
+                ].map(t => {
+                  const active = section === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setSection(t.id)} style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "8px 18px", borderRadius: 50,
+                      background: active ? "#4F46E5" : "white",
+                      border: `1.5px solid ${active ? "#4F46E5" : "#E4E3E1"}`,
+                      cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 500,
+                      color: active ? "white" : "#374151",
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "#F5F4F2"; } }}
+                      onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "white"; } }}
+                    >
+                      <FontAwesomeIcon icon={t.icon} style={{ fontSize: 12 }} />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Asset editor */}
+              {(scope?.brandId ?? brandId) ? (
+                <BrandAssetPanel
+                  assetKey={section.slice("asset:".length) as AssetKey}
+                  brandId={(scope?.brandId ?? brandId)!}
+                />
+              ) : (
+                <Card shadow="none" className="border-2 border-dashed border-divider">
+                  <CardBody className="py-16 items-center text-center gap-3">
+                    <FontAwesomeIcon icon={faShapes} className="text-3xl text-default-300" />
+                    <p className="text-medium font-medium">請先選擇品牌</p>
+                  </CardBody>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* ── 設定（活動限定）── */}
+          {category === "settings" && scopeMode === "event" && scope?.eventId && (
+            <div style={{ padding: "24px" }}>
+              <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
             </div>
           )}
         </div>
