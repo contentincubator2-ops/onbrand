@@ -54,7 +54,8 @@ export const squadLeadRouter = router({
           messages: fullMessages,
           maxTokens: 1024,
         });
-        content = result.choices?.[0]?.message?.content ?? "";
+        const raw = result.choices?.[0]?.message?.content;
+        content = typeof raw === "string" ? raw : Array.isArray(raw) ? raw.map((c: any) => c.text ?? "").join("") : "";
       } else {
         // Auto-route via multiModelRouter
         const result = await callModel(
