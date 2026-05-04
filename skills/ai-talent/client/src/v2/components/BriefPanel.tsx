@@ -500,12 +500,22 @@ export function BriefPanel({
         const mut = briefSearchRef.current;
         if (mut?.mutateAsync) {
           const res = await mut.mutateAsync({ query: q, brandName: brandName ?? undefined, productName: productName ?? undefined });
-          value = res?.result ?? `（搜尋完成）`;
+          value = res?.result ?? "";
         } else {
-          value = `（Web 搜尋：${q}）`;
+          value = ""; // mutation not available — leave blank
         }
       } catch {
-        value = `（Web 搜尋暫時無法使用：${q}）`;
+        // Web search failed — reset field to idle so user can fill manually
+        setField(field.id, { status: "idle", value: "" });
+        setTypingFieldId(null);
+        setActiveFieldId(null);
+        return;
+      }
+      // If we got empty result, also keep idle
+      if (!value.trim()) {
+        setField(field.id, { status: "idle", value: "" });
+        setTypingFieldId(null);
+        return;
       }
     }
 

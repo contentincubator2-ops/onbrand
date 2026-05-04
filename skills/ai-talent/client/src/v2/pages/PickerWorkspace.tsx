@@ -596,7 +596,7 @@ export default function PickerWorkspace() {
   );
 
   // Compute primaryOutputKind from selectedSquad for SquadIntakeSidebar
-  const primaryOutputKind_outer: "calendar" | "pillar" | "research" | "qa" | "post" = useMemo(() => {
+  const primaryOutputKind_outer: "calendar" | "pillar" | "research" | "qa" | "doc" | "post" = useMemo(() => {
     const stepsArr: any[] = Array.isArray(selectedSquad?.steps) ? selectedSquad.steps : [];
     const allVariants: string[] = stepsArr.map((s: any) => s.mockupVariant ?? "").filter(Boolean);
     if (allVariants.some((v: string) => v.includes("Calendar"))) return "calendar";
@@ -678,6 +678,10 @@ export default function PickerWorkspace() {
 
   // ── Pretty channel/layer titles for header ──────────────────────────
   const headerTitle = (() => {
+    if (activeMissionId && selectedSquad) {
+      const squadName = pickLocaleText(selectedSquad.name, lang) || selectedSquad.slug;
+      return `任務執行中 — ${squadName}`;
+    }
     if (channelFilter !== "all") {
       const c = CHANNEL_OPTIONS.find((x) => x.key === channelFilter);
       return c ? `挑選方法論 — ${c.label}` : "挑選方法論";
@@ -1616,7 +1620,7 @@ function SquadIntakeSidebar({
   missionId: number | null;
   onLaunch: () => void;
   onBack: () => void;
-  primaryOutputKind: "calendar" | "pillar" | "research" | "qa" | "post";
+  primaryOutputKind: "calendar" | "pillar" | "research" | "qa" | "doc" | "post";
 }) {
   const lk = resolveLayer(squad.strategyLayer);
   const tone = LAYER_TOKENS[lk];
@@ -1926,7 +1930,14 @@ function FeedbackPanel({
 
       {/* Notes list */}
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-        {notes.filter((n) => n.tab === tab).length === 0 ? (
+        {!isRunning ? (
+          <div className="h-full flex flex-col items-center justify-center text-center px-2 gap-2">
+            <p className="text-2xl opacity-20">⏳</p>
+            <p className="text-tiny text-default-400 leading-relaxed">
+              任務啟動後，<br/>Agent 完成產出即可在此審閱 &amp; 加批注
+            </p>
+          </div>
+        ) : notes.filter((n) => n.tab === tab).length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-2">
             <p className="text-2xl mb-2 opacity-20">💬</p>
             <p className="text-tiny text-default-400 leading-relaxed">
@@ -1948,6 +1959,7 @@ function FeedbackPanel({
       {/* Input */}
       <div className="shrink-0 px-3 pb-3 pt-2 border-t border-default-200">
         <Textarea
+          isDisabled={!isRunning}
           variant="bordered" radius="lg" size="sm"
           placeholder={`寫下對${TAB_LABELS[tab]}的想法…`}
           minRows={2} maxRows={5}
@@ -1957,7 +1969,7 @@ function FeedbackPanel({
         />
         <Button
           size="sm" radius="full" color="primary" className="w-full mt-2"
-          isDisabled={!input.trim()}
+          isDisabled={!isRunning || !input.trim()}
           onPress={async () => {
             const text = input.trim();
             setNotes((prev) => [...prev, {
@@ -2098,6 +2110,13 @@ function SquadDetailPanel({
     return stepsArr.length; // all done
   }, [stepsArr, progressByOrd]);
 
+  // User can manually click any step chip to view its output
+  const [viewingStepOrder, setViewingStepOrder] = useState<number | null>(null);
+  // Auto-reset viewingStep when activeStepOrder advances (new step becomes active)
+  useEffect(() => { setViewingStepOrder(null); }, [activeStepOrder]);
+  // The step order actually rendered in the canvas = user selection OR auto-active
+  const displayStepOrder = viewingStepOrder ?? activeStepOrder;
+
   // ── Step-execution error surfacing ────────────────────────────────────
   // Previously the auto-trigger swallowed errors with `.catch(() => {})`,
   // which meant if the LLM call failed (e.g. all providers down) the launch
@@ -2156,7 +2175,7 @@ function SquadDetailPanel({
   // If the squad's final meaningful step is a calendar/report/pillar table,
   // show that mockup in the center instead of a single-post PlatformMockup.
   // Priority: check last non-QA step's mockupVariant first.
-  const primaryOutputKind: "calendar" | "pillar" | "research" | "qa" | "post" = useMemo(() => {
+  const primaryOutputKind: "calendar" | "pillar" | "research" | "qa" | "doc" | "post" = useMemo(() => {
     const allVariants: string[] = stepsArr
       .map((s: any) => s.mockupVariant ?? "")
       .filter(Boolean);
@@ -2164,8 +2183,21 @@ function SquadDetailPanel({
     if (allVariants.some((v: string) => v.includes("Pillar")))   return "pillar";
     if (allVariants.some((v: string) => v.includes("Research"))) return "research";
     if (allVariants.every((v: string) => v.includes("QA") || v.includes("Intake"))) return "qa";
+    // Detect doc/strategic squads: majority of steps are strategic kind
+    const strategicCount = stepsArr.filter((s: any) => {
+      const k = inferStepKind(s);
+      return k === "strategic" || k === "intake" || k === "qa";
+    }).length;
+    if (strategicCount > stepsArr.length / 2) return "doc";
+    // Also detect by squad/step name keywords
+    const squadNameHay = [
+      pickLocaleText(squad.name ?? squad.slug, lang),
+      ...(stepsArr.map((s: any) => s.name ?? s.title ?? "")),
+    ].join(" ").toLowerCase();
+    const docKeywords = ["報告", "report", "audit", "分析", "analysis", "研究", "research", "策略", "strategy", "月度", "monthly", "週報", "週期"];
+    if (docKeywords.some(kw => squadNameHay.includes(kw))) return "doc";
     return "post";
-  }, [stepsArr]);
+  }, [stepsArr, squad, lang]);
 
   // User-overridable preview variant (defaults to inferred)
   const [previewFormatKey, setPreviewFormatKey] = useState<string>(mockupVariant.format);
@@ -2220,6 +2252,7 @@ function SquadDetailPanel({
               {primaryOutputKind === "calendar" ? "📅 月行事曆輸出"
                : primaryOutputKind === "pillar"   ? "🏛 內容支柱輸出"
                : primaryOutputKind === "research" ? "🔍 研究報告輸出"
+               : primaryOutputKind === "doc"      ? "📄 策略文件輸出"
                : "📋 報告輸出"}
             </Chip>
           </div>
@@ -2244,16 +2277,9 @@ function SquadDetailPanel({
                       role="button"
                       tabIndex={0}
                       onClick={() => {
-                        if (!missionId || isStepStreaming) return;
-                        startStep({
-                          missionId,
-                          squadSlug: squad.slug,
-                          stepOrder: ord,
-                          step: s,
-                          scopeBrandId:   scope.brandId   ?? null,
-                          scopeProductId: scope.productId ?? null,
-                          scopeEventId:   scope.eventId   ?? null,
-                        });
+                        if (!missionId) return;
+                        // Single click → view that step's output in canvas
+                        setViewingStepOrder(ord === displayStepOrder ? null : ord);
                       }}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.currentTarget.click(); }}
                       className={[
@@ -2261,6 +2287,8 @@ function SquadDetailPanel({
                         missionId && !isStepStreaming ? "cursor-pointer hover:opacity-80" : "cursor-default",
                         isActive
                           ? "bg-primary/10 text-primary border border-primary/30"
+                          : displayStepOrder === ord && !isActive
+                          ? "bg-secondary/10 text-secondary border border-secondary/30 ring-1 ring-secondary/40"
                           : isConfirmed
                           ? "bg-success/10 text-success border border-success/20"
                           : isDone
@@ -2343,6 +2371,19 @@ function SquadDetailPanel({
 
         <div className="flex-1 flex items-start justify-center p-6 lg:p-10">
           {(() => {
+            // ── Doc/strategic squad: show DocMockup placeholder ──────
+            if (primaryOutputKind === "doc" && !missionId) {
+              return (
+                <DocMockup
+                  title={pickLocaleText(squad.name, lang) || squad.slug}
+                  brief={safeLocalizedText(squad.description, lang) ?? ""}
+                  brandName={brandName}
+                  stepName="策略文件預覽"
+                  status="pending"
+                />
+              );
+            }
+
             // ── Calendar squad: always show CalendarGridMockup ────────
             if (primaryOutputKind === "calendar") {
               // Post-launch: try to parse calendar data from confirmed steps
@@ -2374,10 +2415,10 @@ function SquadDetailPanel({
             }
 
             // Post-launch: switch middle based on active step kind
-            if (missionId && stepsArr[activeStepOrder - 1]) {
-              const activeStep = stepsArr[activeStepOrder - 1];
+            if (missionId && stepsArr[displayStepOrder - 1]) {
+              const activeStep = stepsArr[displayStepOrder - 1];
               const kind = inferStepKind(activeStep);
-              const prog = progressByOrd.get(activeStepOrder);
+              const prog = progressByOrd.get(displayStepOrder);
 
               // ── Intake / Decision / QA steps → always DocMockup ──────
               // CJ direction 2026-05-02: "一開始 intake 的時候，都用這個格式"
@@ -2396,10 +2437,10 @@ function SquadDetailPanel({
               const handleDocConfirm = async (editedContent: string) => {
                 if (!missionId) return;
                 await stepExecuteWithScope.mutateAsync({
-                  missionId, squadSlug: squad.slug, stepOrder: activeStepOrder,
+                  missionId, squadSlug: squad.slug, stepOrder: displayStepOrder,
                   mode: "confirm", userInput: editedContent,
                 });
-                const next = activeStepOrder + 1;
+                const next = displayStepOrder + 1;
                 if (next <= steps.length) {
                   await stepExecuteWithScope.mutateAsync({
                     missionId, squadSlug: squad.slug, stepOrder: next,
@@ -2411,7 +2452,7 @@ function SquadDetailPanel({
               const handleDocRedo = async () => {
                 if (!missionId) return;
                 await stepExecuteWithScope.mutateAsync({
-                  missionId, squadSlug: squad.slug, stepOrder: activeStepOrder,
+                  missionId, squadSlug: squad.slug, stepOrder: displayStepOrder,
                   mode: "run", userInput: "",
                 });
                 await progressQuery.refetch?.();
@@ -2423,7 +2464,7 @@ function SquadDetailPanel({
                     title={activeStep.name ?? activeStep.title ?? name}
                     brief={description ?? ""}
                     brandName={brandName}
-                    stepName={activeStep.name ?? activeStep.title ?? `Step ${activeStepOrder}`}
+                    stepName={activeStep.name ?? activeStep.title ?? `Step ${displayStepOrder}`}
                     agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
                     body={prog?.agentOutput ?? prog?.agent_output ?? null}
                     status={prog?.status ?? "pending"}
@@ -2441,7 +2482,7 @@ function SquadDetailPanel({
                     title={name}
                     brief={description ?? ""}
                     brandName={brandName}
-                    stepName={activeStep.name ?? activeStep.title ?? `Step ${activeStepOrder}`}
+                    stepName={activeStep.name ?? activeStep.title ?? `Step ${displayStepOrder}`}
                     agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
                     body={prog?.agentOutput ?? prog?.agent_output ?? null}
                     status={prog?.status ?? "pending"}
@@ -2467,10 +2508,10 @@ function SquadDetailPanel({
 
             // Session 7: build imageSlotFlow node when active step is a visual step.
             // Rendered INSIDE the mockup image slot, not as a floating wizard.
-            const activeStep = missionId ? stepsArr[activeStepOrder - 1] : null;
+            const activeStep = missionId ? stepsArr[displayStepOrder - 1] : null;
             const activeKind = activeStep ? inferStepKind(activeStep) : null;
             const isVisualStep = activeKind === "image" || activeKind === "video";
-            const activeProg = missionId ? progressByOrd.get(activeStepOrder) : null;
+            const activeProg = missionId ? progressByOrd.get(displayStepOrder) : null;
             const visualBrief = activeProg
               ? (activeProg.agentOutput ?? activeProg.agent_output ?? "").toString().trim()
               : `${activeStep?.name ?? ""}\n${activeStep?.description ?? ""}`.trim();
@@ -2480,7 +2521,7 @@ function SquadDetailPanel({
               [];
             const imageSlotFlowNode = missionId && isVisualStep ? (
               <ImageSlotFlow
-                key={`${missionId}-step${activeStepOrder}`}
+                key={`${missionId}-step${displayStepOrder}`}
                 brief={visualBrief || (description ?? "")}
                 brandContext={brandName ?? undefined}
                 kind={activeKind as "image" | "video"}
@@ -2491,7 +2532,7 @@ function SquadDetailPanel({
                   const payload = `__media_url__: ${url}\n__model__: ${modelId}\n__prompt__: ${promptEn}\n\n${visualBrief}`;
                   await stepExecuteWithScope.mutateAsync({
                     missionId, squadSlug: squad.slug,
-                    stepOrder: activeStepOrder, mode: "run", userInput: payload,
+                    stepOrder: displayStepOrder, mode: "run", userInput: payload,
                   }).catch(() => {});
                   await progressQuery.refetch?.();
                 }}
