@@ -59,7 +59,7 @@ export type ToolChoice =
 export type InvokeParams = {
   messages: Message[];
   // Note: "openrouter" is deprecated — at runtime it's silently routed to LLM_DEFAULT_PROVIDER.
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "google-vertex" | "gemini";
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "azure-position" | "azure-claude" | "azure-northcentral" | "azure-canada" | "google-vertex" | "gemini";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
