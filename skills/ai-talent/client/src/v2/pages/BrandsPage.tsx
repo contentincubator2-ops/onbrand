@@ -498,75 +498,51 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Top header — scope-aware, centred, 180px, composite gradient ── */}
-      <header style={{
-        height: 180,
-        background: [
-          "radial-gradient(ellipse at 72% 0%,   rgba(139,92,246,0.28) 0%, transparent 56%)",
-          "radial-gradient(ellipse at 18% 110%,  rgba(99,102,241,0.18) 0%, transparent 52%)",
-          "linear-gradient(135deg, #EDE9FE 0%, #E0E7FF 48%, #F0F9FF 100%)",
-        ].join(", "),
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        borderBottom: "1px solid var(--heroui-divider, #E4E3E1)",
-        position: "relative",
-        overflow: "hidden",
-      }}>
-        {/* ⋯ menu — top-right */}
-        <button
-          title="更多選項"
-          style={{
-            position: "absolute", top: 14, right: 18,
-            width: 32, height: 32, borderRadius: 8,
-            background: "rgba(255,255,255,0.60)", border: "1px solid rgba(0,0,0,0.08)",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#57534E", fontSize: 14, backdropFilter: "blur(4px)",
-            transition: "background 0.15s",
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.90)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.60)")}
-        >
-          <FontAwesomeIcon icon={faEllipsis} />
-        </button>
+      {/* ─── Hero header — 首頁同款三層漸層 ── */}
+      <section
+        className="relative px-8 pt-10 pb-8 overflow-hidden"
+        style={{
+          boxShadow: "0 6px 24px rgba(0,0,0,0.07)",
+          backgroundImage: [
+            "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",
+            "linear-gradient(rgba(255,255,255,0.96), rgba(255,255,255,0.96))",
+            "linear-gradient(135deg, #00b4bc 0%, #8b5cf6 60%, #4c1d95 100%)",
+          ].join(", "),
+        }}
+      >
+        <div className="relative z-10 flex flex-col items-center text-center">
+          {/* Eyebrow */}
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "rgba(99,102,241,0.7)" }}>
+            SoWork · {scopeEyebrow}
+          </p>
 
-        {/* Info tooltip — bottom-right corner, replaces the noisy subtitle */}
-        <div style={{ position: "absolute", bottom: 12, right: 16 }}
-          title="請於右上 ScopeBar 切換 品牌 / 產品 / 活動">
-          <FontAwesomeIcon icon={faCircleInfo}
-            style={{ color: "rgba(99,102,241,0.45)", fontSize: 13, cursor: "default" }} />
+          {/* Brand icon */}
+          <div style={{
+            width: 48, height: 48, borderRadius: 14,
+            background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 12,
+            boxShadow: "0 4px 16px rgba(124,58,237,0.30)",
+          }}>
+            <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 20 }} />
+          </div>
+
+          {/* Main title — gradient text, 首頁同款 */}
+          <h1
+            className="font-semibold tracking-tight leading-tight"
+            style={{
+              fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              margin: 0,
+            }}
+          >
+            {scopeName}
+          </h1>
         </div>
-
-        {/* Square brand-block icon */}
-        <div style={{
-          width: 52, height: 52, borderRadius: 14,
-          background: "linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginBottom: 10,
-          boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
-        }}>
-          <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 22 }} />
-        </div>
-
-        {/* Eyebrow */}
-        <p style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
-          color: "rgba(99,102,241,0.75)", textTransform: "uppercase",
-          margin: "0 0 5px",
-        }}>
-          {scopeEyebrow}
-        </p>
-
-        {/* Main title — 32px / 600 */}
-        <h1 style={{
-          fontSize: 32, fontWeight: 600, letterSpacing: "-0.02em",
-          color: "#1A1A18", margin: 0, textAlign: "center",
-          maxWidth: 520, lineHeight: 1.2,
-        }}>
-          {scopeName}
-        </h1>
-      </header>
+      </section>
 
       {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
       <div className="flex-1 flex">
