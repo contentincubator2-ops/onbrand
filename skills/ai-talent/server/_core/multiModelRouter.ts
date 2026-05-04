@@ -73,21 +73,23 @@ export function detectTaskType(content: string): TaskType {
 
 // ─── Provider selection ───────────────────────────────────────────────────────
 
-// NOTE: google + cohere removed from priority lists — Google generative API
-// key is blocked by service policy (API_KEY_SERVICE_BLOCKED 403) and Cohere
-// key in prod env returns 401. Re-enable once those are fixed.
-// Azure Foundry is the canonical "always works" route on the SoWork VM
-// (project endpoint + AZURE_FOUNDRY_API_KEY are baked in to llm.ts default).
-// We list it FIRST for every task type so the boardroom never silently dies
-// when forge / qwen / zhipu env keys aren't set on a deployment.
+// Provider status (probed 2026-05-04):
+//   WORKING:  qwen (200), zhipu (200), tavily-search (200)
+//   MISSING KEY: azure-foundry (AZURE_FOUNDRY_API_KEY not in GitHub Secrets — was baked on VM, now lost)
+//   KEY INVALID: openai (401), perplexity (401 quota exhausted — all 5 keys used up)
+//   DISABLED: google (403 service policy), cohere (401), gemini (400/404)
+//
+// Priority order uses only confirmed-working providers.
+// azure-foundry re-enabled automatically once AZURE_FOUNDRY_API_KEY is set in GitHub Secrets
+// and admin-set-all-keys.yml is updated to include it.
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
-  chinese_content: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
-  creative_writing: ["azure-foundry", "zhipu", "qwen", "forge", "openai"],
-  search_realtime: ["gemini", "perplexity", "azure-foundry", "forge", "openai"],
-  analysis: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
-  classification: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
-  coding: ["azure-foundry", "forge", "openai"],
-  general: ["azure-foundry", "forge", "qwen", "zhipu", "openai"],
+  chinese_content: ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
+  creative_writing: ["zhipu", "qwen", "azure-foundry", "anthropic", "openai"],
+  search_realtime:  ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
+  analysis:         ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
+  classification:   ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
+  coding:           ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
+  general:          ["qwen", "zhipu", "azure-foundry", "anthropic", "openai"],
 };
 
 const DEFAULT_MODELS: Record<ModelProvider, string> = {
@@ -109,19 +111,20 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
  */
 function getAvailabilityMap(): Record<ModelProvider, boolean> {
   return {
-    qwen:           !!ENV.QWEN_API_KEY,
-    zhipu:          !!ENV.ZHIPU_API_KEY,
-    perplexity:     !!ENV.PERPLEXITY_API_KEY,
-    // google + cohere are force-disabled — see TASK_PRIORITY_MAP comment
-    google:         false,
-    cohere:         false,
-    openai:         !!ENV.OPENAI_API_KEY,
-    forge:          !!ENV.BUILT_IN_FORGE_API_KEY,
-    // Azure Foundry: project endpoint defaults via llm.ts even without env;
-    // only a missing API key truly breaks it.
+    // Confirmed WORKING (probed 2026-05-04)
+    qwen:            !!ENV.QWEN_API_KEY,
+    zhipu:           !!ENV.ZHIPU_API_KEY,
+    // azure-foundry: key was baked on VM, now lost. Re-enable via GitHub Secret AZURE_FOUNDRY_API_KEY
     "azure-foundry": !!(ENV as any).AZURE_FOUNDRY_API_KEY,
-    anthropic:      !!(ENV as any).ANTHROPIC_API_KEY,
-    gemini:         !!((ENV as any).GEMINI_API_KEY || (ENV as any).GOOGLE_AI_API_KEY),
+    // anthropic: key exists (CLAUDE_API_KEY_DEFAULT), probe gave 404 due to wrong model name in probe script
+    anthropic:       !!(ENV as any).ANTHROPIC_API_KEY,
+    // Force-disabled: key missing or confirmed broken
+    openai:          false,   // 401 — key expired
+    perplexity:      false,   // 401 — all 5 keys quota exhausted
+    google:          false,   // 403 — service policy block
+    cohere:          false,   // 401 — key invalid
+    forge:           false,   // no key on VM
+    gemini:          false,   // 400/404 — endpoint mismatch
   };
 }
 
@@ -134,10 +137,11 @@ function selectProvider(taskType: TaskType): ModelProvider {
   for (const provider of TASK_PRIORITY_MAP[taskType]) {
     if (availability[provider]) return provider;
   }
-  // Last-resort fallback: azure-foundry has a baked-in endpoint default in
-  // llm.ts and is the only provider that works on the SoWork VM out-of-the-box
-  // when other env keys aren't set.
-  return "azure-foundry";
+  // Last-resort fallback: qwen and zhipu are confirmed-working on VM (probed 2026-05-04).
+  // Use qwen if key exists, otherwise zhipu, otherwise fail loudly.
+  if (ENV.QWEN_API_KEY) return "qwen";
+  if (ENV.ZHIPU_API_KEY) return "zhipu";
+  return "qwen"; // will throw with clear error if key missing
 }
 
 /**

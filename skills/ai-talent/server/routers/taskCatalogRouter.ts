@@ -338,12 +338,13 @@ export const taskCatalogRouter = router({
         [input.taskId],
       ).then((r) => r[0]);
       if (!task) throw new TRPCError({ code: "NOT_FOUND", message: `task ${input.taskId} not found` });
-      // Allow atomic tasks OR bypassable squad tasks (bypassable = "can run without intake form")
-      const canRunAtomic = task.impl_kind === "atomic" || task.bypassable === 1 || task.bypassable === true;
-      if (!canRunAtomic) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: `task ${task.slug} is impl_kind=${task.impl_kind} and not bypassable. Use squad.stepExecute.` });
+      // Only impl_kind=atomic tasks may run here. Squad tasks must use squad.stepExecute.
+      if (task.impl_kind !== "atomic") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `task ${task.slug} is impl_kind=${task.impl_kind}, not atomic. Use squad flow in PickerWorkspace instead.` });
       }
-      // agent_id is optional for bypassable squad tasks — fallback to generic persona
+      if (!task.agent_id_resolved) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `task ${task.slug} has no bound agent — set agent_id in task_catalog DB row.` });
+      }
       const agentName  = task.agent_name  ?? task.name_zh ?? "行銷 Agent";
       const agentTitle = task.agent_title ?? "內容創作專家";
       const agentSkill = task.agent_skill ?? task.description ?? "社群內容創作";

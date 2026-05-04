@@ -229,39 +229,10 @@ export const perplexityScout: Scout = {
       console.warn("[perplexityScout] Tavily failed:", (e as Error).message);
     }
 
-    // 3. Perplexity sonar-pro (if key is valid — 401 means bad key not quota)
-    const perplexityKey = (process.env.PERPLEXITY_API_KEY ?? "").trim();
-    if (perplexityKey) {
-      try {
-        const { system, userMsg } = buildPrompts(ctx);
-        const res = await fetch("https://api.perplexity.ai/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${perplexityKey}` },
-          body: JSON.stringify({
-            model: "sonar-pro",
-            messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
-            max_tokens: 2400,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json() as any;
-          const raw = (data?.choices?.[0]?.message?.content as string | undefined) ?? "";
-          if (raw.trim()) {
-            const items = parseItems(raw, ctx.limit, "perplexity");
-            if (items.length > 0) {
-              console.log("[perplexityScout] Perplexity OK, items:", items.length);
-              return items;
-            }
-          }
-        } else {
-          console.warn("[perplexityScout] Perplexity HTTP", res.status, "— update PERPLEXITY_API_KEY if 401");
-        }
-      } catch (e) {
-        console.warn("[perplexityScout] Perplexity failed:", (e as Error).message);
-      }
-    }
+    // 3. Perplexity — DISABLED: all 5 keys quota-exhausted (probed 2026-05-04, all 401)
+    // Re-enable by uncommenting when new keys available.
 
-    // 4. Azure Foundry (knowledge-only, no live web)
+    // 4. Qwen/Zhipu/Azure Foundry via invokeLLM (knowledge-only, no live web)
     try {
       const items = await fetchViaAzure(ctx);
       if (items.length > 0) return items;

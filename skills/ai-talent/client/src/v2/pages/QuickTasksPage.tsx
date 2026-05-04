@@ -286,8 +286,10 @@ export default function QuickTasksPage() {
         <section className="px-8 mt-14">
           {/* Atomic tasks only — all cards open modal directly, no picker navigation */}
           {(() => {
+            // Only show tasks explicitly marked impl_kind=atomic in the DB.
+            // bypassable=true means "can skip intake form in PickerWorkspace" — different concept.
             const atomicTasks = catalogTasks.filter(
-              (t: any) => t.impl_kind === "atomic" || t.bypassable
+              (t: any) => t.impl_kind === "atomic"
             );
             if (atomicTasks.length === 0) return null;
             return (
