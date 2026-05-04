@@ -338,12 +338,16 @@ export const taskCatalogRouter = router({
         [input.taskId],
       ).then((r) => r[0]);
       if (!task) throw new TRPCError({ code: "NOT_FOUND", message: `task ${input.taskId} not found` });
+      // Block "coming soon" tasks — they exist in catalog but aren't ready to run.
+      if (task.status === "coming_soon") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `「${task.name_zh ?? task.slug}」即將推出，尚未開放。請選擇其他任務。` });
+      }
       // Only impl_kind=atomic tasks may run here. Squad tasks must use squad.stepExecute.
       if (task.impl_kind !== "atomic") {
         throw new TRPCError({ code: "BAD_REQUEST", message: `task ${task.slug} is impl_kind=${task.impl_kind}, not atomic. Use squad flow in PickerWorkspace instead.` });
       }
       if (!task.agent_id_resolved) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `task ${task.slug} has no bound agent — set agent_id in task_catalog DB row.` });
+        throw new TRPCError({ code: "BAD_REQUEST", message: `「${task.name_zh ?? task.slug}」尚未綁定 Agent，請先在後台設定 agent_id。` });
       }
       const agentName  = task.agent_name  ?? task.name_zh ?? "行銷 Agent";
       const agentTitle = task.agent_title ?? "內容創作專家";

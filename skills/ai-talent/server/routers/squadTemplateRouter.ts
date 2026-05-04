@@ -602,7 +602,9 @@ export const squadTemplateRouter = router({
 conclusion 範例（outputKind = "${step.outputKind}", mockup = "${step.mockupVariant ?? ""}"; 依此 keys 填入真實內容）：
 ${schemaExample}
 
-注意：直接 raw JSON，不要 \`\`\`json 圍籬，不要 prose 前綴。conclusion 不能是空 object。`;
+注意：直接 raw JSON，不要 \`\`\`json 圍籬，不要 prose 前綴。conclusion 不能是空 object。
+
+⚠️【數據真實性規則】任何具體數字（百分比、互動率、發布數量、粉絲數、曝光數等），必須來自用戶提供的資料或上游步驟輸出。若無法取得真實數據，請以「（需提供真實 API 數據）」標示佔位符，不可虛構或假設任何具體數值。違反此規則比輸出空白更嚴重。`;
 
       const userPrompt = [
         `【執行 Scope】${scopeLabel}`,
@@ -2735,10 +2737,10 @@ ${input.question}`;
   // Provider cascade (in order):
   //   0. Vertex AI Grounding    (GOOGLE_APPLICATION_CREDENTIALS / GOOGLE_VERTEX_TOKEN)
   //   1. Gemini 2.0 Flash + Google Search  (GEMINI_API_KEY / GOOGLE_AI_API_KEY)
-  //   2a. Tavily               (TAVILY_API_KEY)
-  //   2b. Perplexity sonar-pro (PERPLEXITY_API_KEY — if key is valid)
+  //   2. Tavily               (TAVILY_API_KEY)
   //   3. Jina AI               (free, no key)
   //   4. Azure AI Foundry      (knowledge fallback, no live data)
+  //   [Perplexity REMOVED — all 5 keys quota-exhausted 2026-05-04, causes 401 on every call]
   // Returns a short plain-text answer; empty string → client keeps field idle.
   briefSearch: protectedProcedure
     .input(z.object({
@@ -2841,40 +2843,6 @@ ${input.question}`;
           }
         } catch (e: any) {
           console.warn("[briefSearch] Tavily error:", e?.message ?? e);
-        }
-      }
-
-      // ── 2b. Perplexity sonar-pro (real-time web search) ──────────────────
-      const perplexityKey = (ENV as any).PERPLEXITY_API_KEY ?? "";
-      if (perplexityKey) {
-        try {
-          const res = await fetch("https://api.perplexity.ai/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${perplexityKey}`,
-            },
-            body: JSON.stringify({
-              model: "sonar-pro",
-              messages: [
-                { role: "system", content: "用繁體中文回答，1-3 句，只回傳答案本身，不要前言。" },
-                { role: "user", content: q },
-              ],
-              max_tokens: 300,
-            }),
-          });
-          if (res.ok) {
-            const data = await res.json() as any;
-            const answer = (data?.choices?.[0]?.message?.content as string | undefined)?.trim() ?? "";
-            if (answer) {
-              console.log("[briefSearch] Perplexity OK:", q.slice(0, 60));
-              return { result: answer };
-            }
-          } else {
-            console.warn("[briefSearch] Perplexity HTTP", res.status, "— key may be invalid");
-          }
-        } catch (e: any) {
-          console.warn("[briefSearch] Perplexity error:", e?.message ?? e);
         }
       }
 

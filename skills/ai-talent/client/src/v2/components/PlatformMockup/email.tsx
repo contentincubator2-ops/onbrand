@@ -10,7 +10,7 @@ import React from "react";
 import { Button, Chip, Divider, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faImages, faArrowRight, faAt, faInbox } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, handleOf } from "./shared";
+import { type MockupFields, MockupHeader, handleOf, MarkdownText } from "./shared";
 
 /* ─────────────── EDM / Full Email ─────────────── */
 
@@ -70,7 +70,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
             {liveTitle ?? title ?? <Skeleton className="h-6 w-[70%] rounded" />}
           </h1>
           {liveCaption ? (
-            <p className="text-small text-default-600 leading-relaxed whitespace-pre-wrap">{liveCaption}</p>
+            <MarkdownText content={liveCaption} className="text-small text-default-600 leading-relaxed" />
           ) : (
             <div className="space-y-2 mt-2">
               <Skeleton className="h-3 w-full rounded" />
@@ -146,7 +146,7 @@ export function EmailNewsletterMockup({ title, brandName, variantLabel, liveCapt
           <p className="text-tiny text-default-400 uppercase tracking-widest font-semibold">本期重點</p>
           <h2 className="text-2xl font-bold leading-snug">{liveTitle ?? title}</h2>
           {liveCaption ? (
-            <p className="text-small text-default-600 leading-relaxed">{liveCaption}</p>
+            <MarkdownText content={liveCaption} className="text-small text-default-600 leading-relaxed" />
           ) : (
             <div className="space-y-2">
               {[100, 95, 88, 70].map((w, i) => (

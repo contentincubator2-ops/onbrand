@@ -2618,14 +2618,14 @@ function SquadDetailPanel({
 
         <div className="flex-1 flex items-start justify-center p-6 lg:p-10">
           {(() => {
-            // ── Doc/strategic squad: show DocMockup placeholder ──────
-            if (primaryOutputKind === "doc" && !missionId) {
+            // ── Doc/strategic/research squad: show DocMockup placeholder ──────
+            if ((primaryOutputKind === "doc" || primaryOutputKind === "research") && !missionId) {
               return (
                 <DocMockup
                   title={pickLocaleText(squad.name, lang) || squad.slug}
                   brief={safeLocalizedText(squad.description, lang) ?? ""}
                   brandName={brandName}
-                  stepName="策略文件預覽"
+                  stepName={primaryOutputKind === "research" ? "分析報告預覽" : "策略文件預覽"}
                   status="pending"
                 />
               );
@@ -2690,7 +2690,13 @@ function SquadDetailPanel({
                 ["decision", "intake"].includes(
                   String(activeStep.outputKind ?? "").toLowerCase()
                 ) || activeStep.mockupVariant === "IntakeFormMockup";
-              const isDocStep = isIntakeStep ||
+              const isResearchStep =
+                (activeStep.mockupVariant ?? "").includes("Research") ||
+                (activeStep.mockupVariant ?? "").includes("Report") ||
+                ["text_strategic", "research", "analysis"].includes(
+                  String(activeStep.outputKind ?? "").toLowerCase()
+                );
+              const isDocStep = isIntakeStep || isResearchStep ||
                 ["qa_review", "qa"].includes(String(activeStep.outputKind ?? "").toLowerCase()) ||
                 activeStep.mockupVariant === "QAReportMockup";
 
