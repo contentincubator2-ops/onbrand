@@ -216,53 +216,109 @@ export default function QuickTasksPage() {
     }
   }, [activeId]);
 
+  // ── Category tabs for filtering catalog tasks
+  const CATALOG_TABS = [
+    { key: "all",      label: "為你推薦" },
+    { key: "文案",     label: "文案創作" },
+    { key: "分析",     label: "市場分析" },
+    { key: "社群",     label: "社群行銷" },
+    { key: "活動",     label: "活動企劃" },
+    { key: "電商",     label: "電商行銷" },
+    { key: "影音",     label: "影音腳本" },
+  ] as const;
+  const [catalogTab, setCatalogTab] = useState<string>("all");
+  const [catalogSearch, setCatalogSearch] = useState("");
+
   return (
     <main className="bg-background pb-24">
-      {/* HERO */}
-      <section className="border-b border-divider bg-content1">
-        <div className="px-8 pt-10 pb-10">
-          <div className="flex items-start justify-between gap-6 flex-wrap">
-            <div>
-              <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
-                QUICK · 30s DELIVERY
-              </Chip>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                30 秒產出
-              </h1>
-            </div>
-            {currentBrand && (
-              <Card shadow="none" className="border border-divider">
-                <CardBody className="flex flex-row items-center gap-3 px-4 py-3">
-                  <Badge content="" color="default" placement="top-right" shape="circle">
-                    <Avatar name={currentBrand.name} size="sm" radius="full" />
-                  </Badge>
-                  <div>
-                    <p className="text-tiny tracking-wider uppercase text-default-500">
-                      BRAND BRAIN · 已連線
-                    </p>
-                    <p className="text-small font-medium">{currentBrand.name}</p>
-                  </div>
-                  <p className="text-tiny text-default-500 ml-2 max-w-[200px]">
-                    全部 agents 自動帶入此品牌的定位、TA、語氣
-                  </p>
-                </CardBody>
-              </Card>
-            )}
-          </div>
 
-          <p className="mt-4 text-medium leading-relaxed text-default-600 max-w-[720px]">
-            每件任務都是一個分工好的 Squad — 研究員、寫手、主編各司其職。
-            按 Squad 內建 workflow 接力完成，最後 orchestrator 收尾，交一份可用的稿。
+      {/* ══ HERO — mirrors MissionsHome gradient hero ═══════════════════════ */}
+      <section
+        className="relative px-8 pt-12 pb-10 overflow-hidden"
+        style={{
+          backgroundImage: [
+            "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",
+            "linear-gradient(rgba(255,255,255,0.96), rgba(255,255,255,0.96))",
+            "linear-gradient(135deg, #00b4bc 0%, #8b5cf6 60%, #4c1d95 100%)",
+          ].join(", "),
+          boxShadow: "0 6px 24px rgba(0,0,0,0.07)",
+        }}
+      >
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
+            SoWork · Marketing OS
           </p>
+          <h1
+            className="font-semibold tracking-tight leading-tight"
+            style={{
+              fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            一鍵產出，30 秒交稿
+          </h1>
+          <p className="mt-2 text-small text-default-500 max-w-lg">
+            每件任務背後是一組分工好的 Agent Squad — 按下即自動接力完成，不需填表單。
+          </p>
+          {currentBrand && (
+            <div className="mt-3 flex items-center gap-2 text-tiny text-default-500">
+              <Avatar name={currentBrand.name} size="sm" radius="full" className="shrink-0" />
+              <span>品牌腦：<strong className="text-default-700">{currentBrand.name}</strong>・已自動帶入定位 TA 語氣</span>
+            </div>
+          )}
 
-          <FreeInputBar
-            onRoute={(taskId, inputs) => { setPrefilled(inputs); setActiveId(taskId); }}
-            disabled={tasksQuery.isLoading}
-          />
+          {/* ── Search bar ── */}
+          <div className="w-full mt-6" style={{ maxWidth: 640 }}>
+            <div style={{
+              borderRadius: 20,
+              boxShadow: "rgba(139,92,246,0.18) 0 0 0 3px, rgba(0,0,0,0.06) 0 8px 32px",
+              background: "white",
+            }}>
+              <Input
+                size="lg"
+                radius="full"
+                variant="flat"
+                value={catalogSearch}
+                onValueChange={setCatalogSearch}
+                isClearable
+                onClear={() => setCatalogSearch("")}
+                placeholder="搜尋任務、功能…"
+                classNames={{
+                  inputWrapper: "h-14 bg-white border-none shadow-none rounded-full",
+                }}
+                startContent={
+                  <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 16 }} />
+                }
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* INLINE RUN VIEW or TILE GRID */}
+      {/* ══ CATEGORY TABS (Canva-style pill row) ════════════════════════════ */}
+      <div className="px-8 pt-5 pb-2 border-b border-divider overflow-x-auto">
+        <div className="flex gap-2 min-w-max">
+          {CATALOG_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setCatalogTab(tab.key)}
+              className="shrink-0 px-4 py-1.5 rounded-full text-small font-medium transition"
+              style={{
+                background: catalogTab === tab.key ? "#7c3aed" : "transparent",
+                color:      catalogTab === tab.key ? "white"    : "#6b7280",
+                border:     catalogTab === tab.key ? "none"     : "1px solid #e5e7eb",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* INLINE RUN VIEW or CATALOG */}
       {activeTask ? (
         <section ref={runRef} className="px-8 pt-8">
           <Button
@@ -283,81 +339,124 @@ export default function QuickTasksPage() {
           </div>
         </section>
       ) : (
-        <section className="px-8 mt-14">
-          {/* Atomic tasks only — all cards open modal directly, no picker navigation */}
+        <section className="px-8 mt-8">
+          {/* ── Atomic tasks — Canva horizontal-scroll card row ── */}
           {(() => {
-            // Only show tasks explicitly marked impl_kind=atomic in the DB.
-            // bypassable=true means "can skip intake form in PickerWorkspace" — different concept.
-            const atomicTasks = catalogTasks.filter(
-              (t: any) => t.impl_kind === "atomic"
-            );
+            const atomicTasks = catalogTasks.filter((t: any) => {
+              if (t.impl_kind !== "atomic") return false;
+              if (catalogSearch) {
+                const q = catalogSearch.toLowerCase();
+                return (t.name_zh ?? "").toLowerCase().includes(q) ||
+                       (t.description ?? "").toLowerCase().includes(q);
+              }
+              if (catalogTab !== "all") {
+                const haystack = ((t.workspace ?? "") + " " + (t.description ?? "") + " " + (t.name_zh ?? "")).toLowerCase();
+                return haystack.includes(catalogTab);
+              }
+              return true;
+            });
             if (atomicTasks.length === 0) return null;
+
+            // Cycle through Canva-style gradient palettes per card
+            const CARD_PALETTES = [
+              { from: "#fde68a", to: "#fbbf24", text: "#92400e" }, // amber
+              { from: "#a5f3fc", to: "#22d3ee", text: "#164e63" }, // cyan
+              { from: "#c4b5fd", to: "#8b5cf6", text: "#4c1d95" }, // purple
+              { from: "#bbf7d0", to: "#34d399", text: "#064e3b" }, // green
+              { from: "#fecaca", to: "#f87171", text: "#7f1d1d" }, // red
+              { from: "#fed7aa", to: "#fb923c", text: "#7c2d12" }, // orange
+              { from: "#bfdbfe", to: "#60a5fa", text: "#1e3a8a" }, // blue
+              { from: "#f5d0fe", to: "#c084fc", text: "#581c87" }, // pink
+            ];
+
             return (
               <div className="mb-12">
-                <div className="flex items-end justify-between mb-4">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="font-semibold text-xl tracking-tight">⚡ 一鍵任務</h2>
+                    <h2 className="font-semibold text-lg tracking-tight">精選任務</h2>
                     <p className="text-tiny text-default-400 mt-0.5">按下即產出，不需填寫表單</p>
                   </div>
-                  <Chip size="sm" variant="flat" color="secondary">
-                    {atomicTasks.length} 件
-                  </Chip>
+                  <Chip size="sm" variant="flat" color="secondary">{atomicTasks.length} 件</Chip>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {atomicTasks.map((t: any) => (
-                    <Card
-                      key={`task-${t.id}`}
-                      isPressable
-                      shadow="sm"
-                      radius="lg"
-                      onPress={() => void runAtomic(t)}
-                      className="border border-secondary-200 hover:border-secondary-400 transition"
-                    >
-                      <CardBody className="p-4 gap-2">
-                        <div className="flex items-start gap-2 flex-wrap">
-                          <span className="text-medium font-semibold flex-1 min-w-0 line-clamp-1">{t.name_zh}</span>
-                          <Chip size="sm" variant="flat" color="secondary">⚡</Chip>
+
+                {/* Canva-style horizontal scroll row */}
+                <div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: "none" }}>
+                  {atomicTasks.map((t: any, idx: number) => {
+                    const pal = CARD_PALETTES[idx % CARD_PALETTES.length];
+                    return (
+                      <button
+                        key={`task-${t.id}`}
+                        onClick={() => void runAtomic(t)}
+                        className="shrink-0 flex flex-col rounded-2xl overflow-hidden text-left transition hover:scale-[1.02] hover:shadow-lg"
+                        style={{ width: 220, border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
+                      >
+                        {/* Preview area — gradient */}
+                        <div
+                          className="flex items-center justify-center"
+                          style={{
+                            height: 120,
+                            background: `linear-gradient(135deg, ${pal.from} 0%, ${pal.to} 100%)`,
+                            position: "relative",
+                          }}
+                        >
+                          <span style={{ fontSize: 40 }}>⚡</span>
+                          <span
+                            className="absolute top-2 right-2 text-tiny font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: "rgba(255,255,255,0.8)", color: pal.text }}
+                          >
+                            即時
+                          </span>
                         </div>
-                        <p className="text-tiny text-default-500 line-clamp-2 min-h-[2.4em]">{t.description}</p>
-                        <div className="flex items-center gap-2 text-tiny text-default-400 mt-1">
-                          {t.estimated_minutes && <span>約 {t.estimated_minutes} 分鐘</span>}
-                          <span className="ml-auto text-secondary font-medium">立即產出 →</span>
+                        {/* Card info */}
+                        <div className="p-3 flex flex-col gap-1 flex-1">
+                          <p className="text-small font-semibold leading-tight line-clamp-2" style={{ color: "#111" }}>
+                            {t.name_zh}
+                          </p>
+                          <p className="text-tiny text-default-500 line-clamp-2">{t.description}</p>
+                          <p className="text-tiny mt-auto pt-1" style={{ color: pal.to, fontWeight: 600 }}>
+                            立即產出 →
+                          </p>
                         </div>
-                      </CardBody>
-                    </Card>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
           })()}
-          <div className="flex items-end justify-between mb-6">
-            <h2 className="font-semibold text-2xl tracking-tight">所有 Squads</h2>
-            <Chip size="sm" variant="flat">
-              {tasks.length} SQUADS · 全部 &lt; 30s
-            </Chip>
-          </div>
 
-          {tasksQuery.isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} shadow="sm" className="p-6 gap-3">
-                  <Skeleton className="h-8 w-12 rounded" />
-                  <Skeleton className="h-5 w-3/5 rounded" />
-                  <Skeleton className="h-3 w-4/5 rounded" />
-                  <Skeleton className="h-8 w-32 rounded mt-2" />
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tasks.map((t, i) => (
-                <SquadTile
-                  key={t.id}
-                  task={t}
-                  index={i}
-                  onPress={() => { setPrefilled({}); setActiveId(t.id); }}
-                />
-              ))}
+          {/* ── Squads — Canva "收藏" style collection cards ── */}
+          {tasks.length > 0 && (
+            <div className="mb-10">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-semibold text-lg tracking-tight">Squad 作業</h2>
+                  <p className="text-tiny text-default-400 mt-0.5">多 Agent 接力，深度產出</p>
+                </div>
+                <Chip size="sm" variant="flat">{tasks.length} 組</Chip>
+              </div>
+              {tasksQuery.isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Card key={i} shadow="none" className="border border-divider p-5 gap-3">
+                      <Skeleton className="h-5 w-3/5 rounded" />
+                      <Skeleton className="h-3 w-4/5 rounded" />
+                      <Skeleton className="h-8 w-32 rounded mt-2" />
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {tasks.map((t, i) => (
+                    <SquadTile
+                      key={t.id}
+                      task={t}
+                      index={i}
+                      onPress={() => { setPrefilled({}); setActiveId(t.id); }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
