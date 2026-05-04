@@ -730,24 +730,21 @@ export default function PickerWorkspace() {
     return null;
   }, [channelFilter, selectedSquad]);
 
-  /** Currently visible rail items (top + brief tabs when squad selected + layer-specific middle + bottom). */
+  /** Currently visible rail items — simplified:
+   *  範本 | 摘要 (when squad selected) | 品牌 · 成員 · 我的 · 上傳
+   *  Layer-specific drawers (頻道/素材/行事曆…) removed per CJ 2026-05-04:
+   *  all brief info lives in the single 摘要 panel. */
   const railItems = useMemo(() => {
-    const base = resolveRailItems(effectiveLayer, effectiveChannel);
-    if (!selectedSquad) return base;
-    // Build brief tab items from selected squad's layer
-    const layerKey = String(selectedSquad.strategy_layer ?? selectedSquad.strategyLayer ?? "L1").slice(0, 2).toUpperCase();
-    const tabs = LAYER_TAB_IDS[layerKey] ?? LAYER_TAB_IDS.L1;
-    const briefItems: RailItem[] = tabs.map(t => ({
-      key: `brief_${t.id}`,
-      label: t.label,
-      icon: BRIEF_TAB_ICONS[t.id] ?? faClipboardCheck,
-      kind: "brief" as RailKind,
-    }));
-    const topItems       = base.filter(it => it.kind === "global");
-    const layerItems     = base.filter(it => it.kind === "layer");
-    const connectionItems = base.filter(it => it.kind === "connections");
-    return [...topItems, ...briefItems, ...layerItems, ...connectionItems];
-  }, [effectiveLayer, effectiveChannel, selectedSquad]);
+    const topItems: RailItem[]        = RAIL_TOP;  // 範本
+    const briefItems: RailItem[]      = selectedSquad ? [{
+      key:   "brief__summary",
+      label: "摘要",
+      icon:  faClipboardCheck,
+      kind:  "brief" as RailKind,
+    }] : [];
+    const connectionItems: RailItem[] = RAIL_BOTTOM; // 品牌 · 成員 · 我的 · 上傳
+    return [...topItems, ...briefItems, ...connectionItems];
+  }, [selectedSquad]);
 
   /** The rail item the user has clicked into. Drives middle column mode. */
   const activeRailItem = useMemo(

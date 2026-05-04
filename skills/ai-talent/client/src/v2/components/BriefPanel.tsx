@@ -418,9 +418,25 @@ export function BriefPanel({
   onLaunch, onBack, activeTabId: externalActiveTabId, onTabChange,
 }: BriefPanelProps) {
   const layerKey = String(layer ?? "L1").slice(0, 2).toUpperCase();
-  const contentTabs: BriefTab[] = LAYER_TABS[layerKey] ?? LAYER_TABS.L1;
 
-  // Full tab list: 摘要 always first
+  // Layer-specific tabs + always-on "其他補充" free-text section at the end
+  const contentTabs: BriefTab[] = useMemo(() => [
+    ...(LAYER_TABS[layerKey] ?? LAYER_TABS.L1),
+    {
+      id: "_notes",
+      label: "其他補充",
+      fields: [{
+        id: "user_notes",
+        label: "想告訴 Agent 的話",
+        source: "user_input" as FieldSource,
+        type: "textarea" as FieldType,
+        icon: faAlignLeft,
+        placeholder: "例：這次強調夏季新品、語調輕鬆活潑、目標是 25-35 歲女性、不要提到競品名稱…",
+      }],
+    },
+  ], [layerKey]);
+
+  // Full tab list: 摘要 always first (used only in non-controlled / internal tab strip)
   const allTabs = useMemo(() => [
     { id: "_summary", label: "摘要" } as BriefTab & { fields: BriefField[] },
     ...contentTabs,
