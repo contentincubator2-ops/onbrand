@@ -95,7 +95,7 @@ import {
 // now — content gets populated as the underlying tables land in later
 // sprints. Clicking 範本 returns to the squad list.
 
-type RailKind = "global" | "layer";
+type RailKind = "global" | "layer" | "connections";
 type RailItem = {
   key: string;
   label: string;
@@ -108,16 +108,22 @@ type RailItem = {
 // Note: FA icons imported below in a single block, used as `icon` field
 // (was previously hand-typed unicode glyphs — replaced 2026-04-28).
 
+// Section labels shown above each group in the icon rail
+const RAIL_SECTION_LABELS: Partial<Record<RailKind, string>> = {
+  global: "詳情",
+  connections: "連結",
+};
+
 const RAIL_TOP: RailItem[] = [
   { key: "templates", label: "範本", icon: faTableCells,      kind: "global" },
   { key: "detail",    label: "詳情", icon: faClipboardCheck,  kind: "global" },
 ];
 
 const RAIL_BOTTOM: RailItem[] = [
-  { key: "brand",   label: "品牌", icon: faPalette,        kind: "global" },
-  { key: "members", label: "成員", icon: faUserGroup,      kind: "global" },
-  { key: "recent",  label: "我的", icon: faClockRotateLeft, kind: "global" },
-  { key: "upload",  label: "上傳", icon: faUpload,         kind: "global" },
+  { key: "brand",   label: "品牌", icon: faPalette,        kind: "connections" },
+  { key: "members", label: "成員", icon: faUserGroup,      kind: "connections" },
+  { key: "recent",  label: "我的", icon: faClockRotateLeft, kind: "connections" },
+  { key: "upload",  label: "上傳", icon: faUpload,         kind: "connections" },
 ];
 
 /** Per-layer middle-band rail items. Keys for L4 use `L4-${channel}` format. */
@@ -780,11 +786,17 @@ export default function PickerWorkspace() {
           {railItems.map((it, i) => {
             const active = activeRailKey === it.key;
             const prev = railItems[i - 1];
-            const showSeparatorAbove = !!prev && prev.kind !== it.kind;
+            const isNewSection = !prev || prev.kind !== it.kind;
+            const sectionLabel = isNewSection ? RAIL_SECTION_LABELS[it.kind] : undefined;
             return (
               <React.Fragment key={it.key}>
-                {showSeparatorAbove && (
-                  <div className="mx-3 my-1 border-t border-divider/60" />
+                {isNewSection && !!prev && (
+                  <div className="mx-3 mt-2 mb-0.5 border-t border-divider/60" />
+                )}
+                {sectionLabel && (
+                  <p className="text-[9px] font-semibold text-default-400 uppercase tracking-widest text-center mt-1 mb-0.5 leading-none">
+                    {sectionLabel}
+                  </p>
                 )}
                 <Tooltip content={it.label} placement="right" radius="sm" delay={150}>
                   <button
