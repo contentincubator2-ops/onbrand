@@ -1,0 +1,106 @@
+name: Admin — Issue password reset link
+
+# Workaround for the broken forgot-password email flow.
+#
+# What this does:
+#   1. Confirms whether SENDGRID_API_KEY / RESEND_API_KEY is set on the VM
+#      (this is why the email never arrived)
+#   2. Generates a fresh reset token directly in the DB for the given email
+#   3. Prints the reset URL — the user clicks it to set a new password
+#
+# Security:
+#   - I (Claude) NEVER see or set the password — only the user does, via the
+#     same /reset-password page the email link would have opened
+#   - Token expires in 1 hour, same as normal flow
+#   - URL is printed to GitHub Actions logs (only repo admins see them)
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Account email to issue reset link for"
+        required: true
+        default: "cjwang@sowork.tw"
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: TARGET_EMAIL
+          script: |
+            set +e
+            AI=/opt/marketing-os/app/skills/ai-talent
+            ENV_FILE="$AI/.env"
+            EMAIL="${{ github.event.inputs.email }}"
+
+            echo "════════════════════════════════════════"
+            echo "  Issue reset link for: $EMAIL"
+            echo "  $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "════════════════════════════════════════"
+
+            # ── 1. Why didn't the email arrive? ─────────────────────────────
+            echo ""
+            echo "── 1. Mail provider config ──"
+            for k in SENDGRID_API_KEY RESEND_API_KEY EMAIL_FROM APP_URL; do
+              if grep -qE "^${k}=." "$ENV_FILE" 2>/dev/null; then
+                LEN=$(grep -E "^${k}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r\n' | wc -c)
+                if [ "$k" = "EMAIL_FROM" ] || [ "$k" = "APP_URL" ]; then
+                  VAL=$(grep -E "^${k}=" "$ENV_FILE" | head -1 | cut -d= -f2-)
+                  echo "  $k = $VAL"
+                else
+                  echo "  $k = (set, $LEN chars)"
+                fi
+              else
+                echo "  $k = (NOT SET)"
+              fi
+            done
+
+            echo ""
+            echo "── 2. Recent mail errors in PM2 log ──"
+            tail -2000 ~/.pm2/logs/marketing-os-error.log 2>/dev/null \
+              | grep -iE "Failed to send email|sendgrid|resend|sgMail|password reset" \
+              | tail -20 \
+              || echo "(no recent mail errors)"
+
+            # ── 3. Issue reset token directly in DB ─────────────────────────
+            set -a
+            source "$ENV_FILE" 2>/dev/null
+            set +a
+            MYSQL="mysql -h ${DB_HOST:-localhost} -u ${DB_USER:-root} -p${DB_PASSWORD} ${DB_NAME:-marketing_os} -B -N --silent"
+
+            echo ""
+            echo "── 3. Look up user ──"
+            USER_ROW=$($MYSQL -e "SELECT id, email, name FROM users WHERE email = '${EMAIL}' LIMIT 1" 2>&1)
+            if [ -z "$USER_ROW" ]; then
+              echo "❌ No user found with email $EMAIL"
+              exit 1
+            fi
+            USER_ID=$(echo "$USER_ROW" | awk '{print $1}')
+            USER_NAME=$(echo "$USER_ROW" | awk '{print $3}')
+            echo "✓ User id=$USER_ID name=$USER_NAME"
+
+            echo ""
+            echo "── 4. Generate fresh reset token ──"
+            # 64-char URL-safe random token (matches nanoid(64) used in code)
+            TOKEN=$(openssl rand -hex 32)
+            EXPIRES=$(date -u -d "+1 hour" '+%Y-%m-%d %H:%M:%S')
+            $MYSQL -e "UPDATE users
+                          SET passwordResetToken = '${TOKEN}',
+                              passwordResetExpires = '${EXPIRES}'
+                        WHERE id = ${USER_ID}" 2>&1
+
+            APP_URL_VAL="${APP_URL:-https://marketing-os.sowork.ai}"
+            RESET_URL="${APP_URL_VAL}/reset-password?token=${TOKEN}"
+
+            echo "✓ Token written to DB (expires $EXPIRES UTC, ~1 hour from now)"
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "  RESET URL — open in incognito to set new password:"
+            echo "  $RESET_URL"
+            echo "════════════════════════════════════════"

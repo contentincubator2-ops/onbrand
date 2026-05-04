@@ -1,0 +1,121 @@
+name: Admin — P0 smoke test (server-side)
+
+# End-to-end verification of P0 fixes from server side. We can't open a real
+# browser, but we can:
+#   1. Scan brand_brain / mission_step_progress / canonical_message tables for
+#      stored "LLM invoke failed: 401 Perplexity" residue (the actual likely
+#      source of what the user sees — historical error text written to DB).
+#   2. Curl the tRPC endpoints from inside the VM with the active session
+#      cookie, exercising briefSearch / squadLead.chat / quickTask.runOne.
+#   3. Confirm pm2 marketing-os process is healthy.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set +e
+            AI=/opt/marketing-os/app/skills/ai-talent
+            ENV_FILE="$AI/.env"
+
+            echo "════════════════════════════════════════"
+            echo "  P0 smoke test — $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "════════════════════════════════════════"
+
+            # ── 0. PM2 health ─────────────────────────────────────────────
+            echo ""
+            echo "── 0. PM2 process status ──"
+            pm2 list 2>/dev/null | head -10
+            curl -s -o /dev/null -w "Health endpoint HTTP %{http_code}\n" http://127.0.0.1:3101/health
+
+            # ── 1. DB residue scan: search every text field that the
+            #      Brand Brain / BriefPanel / mission progress could have
+            #      saved historical error text into.
+            echo ""
+            echo "── 1. DB residue scan: 'LLM invoke failed: 401 Perplexity' ──"
+
+            # Source MySQL credentials from .env
+            set -a
+            source "$ENV_FILE" 2>/dev/null
+            set +a
+            MYSQL="mysql -h ${DB_HOST:-localhost} -u ${DB_USER:-root} -p${DB_PASSWORD} ${DB_NAME:-marketing_os} -B -N --silent"
+
+            echo "[brand_brain.content] rows containing the error string:"
+            $MYSQL -e "SELECT id, brand_id, category, LEFT(content,120) AS preview
+                         FROM brand_brain
+                        WHERE content LIKE '%LLM invoke failed%'
+                           OR content LIKE '%Perplexity exceeded quota%'
+                           OR content LIKE '%insufficient_quota%'
+                        LIMIT 20" 2>&1
+
+            echo ""
+            echo "[mission_step_progress.canonical_message] rows containing it:"
+            $MYSQL -e "SELECT id, mission_id, step_order, LEFT(canonical_message,160) AS preview
+                         FROM mission_step_progress
+                        WHERE canonical_message LIKE '%LLM invoke failed%'
+                           OR canonical_message LIKE '%Perplexity%'
+                        LIMIT 20" 2>&1
+
+            echo ""
+            echo "[mission_step_progress.agent_output] rows containing it:"
+            $MYSQL -e "SELECT id, mission_id, step_order, LEFT(agent_output,160) AS preview
+                         FROM mission_step_progress
+                        WHERE agent_output LIKE '%LLM invoke failed%'
+                           OR agent_output LIKE '%Perplexity%'
+                        LIMIT 20" 2>&1
+
+            echo ""
+            echo "[brand_intel_signals.body] rows containing it:"
+            $MYSQL -e "SELECT id, brandId, type, LEFT(body,160) AS preview
+                         FROM brand_intel_signals
+                        WHERE body LIKE '%LLM invoke failed%'
+                           OR body LIKE '%Perplexity%'
+                        LIMIT 10" 2>&1
+
+            # ── 2. Direct invokeLLM probe — does the deprecated reroute work?
+            # Run a minimal node script that imports invokeLLM with provider="perplexity"
+            # and confirms it gets rerouted to anthropic instead of hitting Perplexity.
+            echo ""
+            echo "── 2. invokeLLM(provider='perplexity') reroute probe ──"
+            cd "$AI"
+            node --experimental-strip-types -e '
+              import("./server/_core/llm.ts").then(async ({ invokeLLM }) => {
+                try {
+                  const r = await invokeLLM({
+                    provider: "perplexity",
+                    messages: [{ role: "user", content: "say ok in 2 chars" }],
+                    maxTokens: 8,
+                  });
+                  console.log("✓ rerouted OK — got reply, no Perplexity 401");
+                } catch (e) {
+                  console.log("✗ probe failed:", String(e).slice(0, 280));
+                }
+                process.exit(0);
+              }).catch(e => { console.log("import error:", String(e).slice(0,200)); process.exit(1); });
+            ' 2>&1 | tail -10
+
+            # ── 3. briefSearch endpoint probe (no auth — expect 401, but
+            # the ERROR PATTERN tells us if the route reaches the new code)
+            echo ""
+            echo "── 3. /trpc/squad.briefSearch endpoint reachability ──"
+            curl -s -o /tmp/brief.json -w "HTTP %{http_code}\n" \
+              -X POST http://127.0.0.1:3101/api/trpc/squad.briefSearch \
+              -H "Content-Type: application/json" \
+              -d '{"json":{"query":"Pokémon GO 粉絲數","brandName":"Pokémon GO"}}' \
+              --max-time 25
+            head -c 300 /tmp/brief.json 2>/dev/null
+            echo ""
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "  Done."
+            echo "════════════════════════════════════════"

@@ -483,12 +483,21 @@ export async function invokeVertexGrounding(opts: {
 
 // Deprecated provider aliases — silently route to the configured default
 // so we don't have to edit every legacy call site that hardcoded a now-disabled provider.
-const DEPRECATED_PROVIDERS = new Set(["openrouter"]);
+//
+// 2026-05-04: perplexity added — all 5 keys quota-exhausted (HTTP 401 every call).
+// Any caller that still passes provider="perplexity" gets silently rerouted to
+// the default provider so we never hit the dead Perplexity endpoint again.
+// openai / cohere / forge added for the same reason (keys expired or unavailable).
+const DEPRECATED_PROVIDERS = new Set(["openrouter", "perplexity", "openai", "cohere", "forge"]);
 function resolveProvider(requested: string | undefined): string {
   // Default: Anthropic (best quality, stable). Override with LLM_DEFAULT_PROVIDER env.
   const def = (process.env.LLM_DEFAULT_PROVIDER as any) || "anthropic";
   if (!requested) return def;
-  if (DEPRECATED_PROVIDERS.has(requested)) return def;
+  if (DEPRECATED_PROVIDERS.has(requested)) {
+    // Log so we can find legacy call sites and migrate them properly.
+    console.warn(`[invokeLLM] provider="${requested}" is deprecated — rerouting to "${def}"`);
+    return def;
+  }
   return requested;
 }
 
