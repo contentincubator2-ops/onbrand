@@ -2650,8 +2650,9 @@ ${input.question}`;
           : Array.isArray(raw)
             ? raw.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("").trim()
             : "";
-      } catch (e: any) {
-        result = `（Web 搜尋失敗：${e?.message ?? "未知錯誤"}）`;
+      } catch {
+        // Return empty string — client will keep field idle so user can fill manually
+        return { result: "" };
       }
 
       return { result };
