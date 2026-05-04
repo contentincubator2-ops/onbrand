@@ -337,14 +337,39 @@ export default function MethodologyCatalog() {
             const active = t.layer ? (activeKind === t.kind && layerFilter === t.layer) : activeKind === t.kind;
             return (
               <button key={t.key} onClick={() => applyTile(t)}
-                style={{ flexShrink: 0, width: 168, height: 92, borderRadius: 12, padding: "14px 16px", background: active ? li.text : li.bg, border: `1.5px solid ${active ? li.text : "transparent"}`, cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column", justifyContent: "space-between", boxSizing: "border-box", transition: "all 0.15s", boxShadow: active ? `0 4px 16px ${li.text}40` : "none" }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ""; }}
+                style={{
+                  flexShrink: 0, width: 200, height: 100, borderRadius: 12,
+                  background: active ? li.text : li.bg,
+                  border: `1.5px solid ${active ? li.text : "transparent"}`,
+                  cursor: "pointer", boxSizing: "border-box", overflow: "hidden",
+                  display: "flex", flexDirection: "row", alignItems: "stretch",
+                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                  boxShadow: active ? `0 4px 16px ${li.text}40` : "0 1px 4px rgba(0,0,0,0.06)",
+                  transform: "translateY(0)",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = active
+                    ? `0 8px 24px ${li.text}50`
+                    : "0 6px 18px rgba(0,0,0,0.12)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = active ? `0 4px 16px ${li.text}40` : "0 1px 4px rgba(0,0,0,0.06)";
+                }}
               >
-                <FontAwesomeIcon icon={li.icon} style={{ fontSize: 18, color: active ? "rgba(255,255,255,0.85)" : li.text }} />
-                <div>
+                {/* 左側：文字區 */}
+                <div style={{ flex: 1, padding: "14px 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, textAlign: "left" }}>
                   <p style={{ fontSize: 13, fontWeight: 700, color: active ? "white" : "#1A1A18", margin: 0, lineHeight: 1.2 }}>{t.label}</p>
-                  <p style={{ fontSize: 11, color: active ? "rgba(255,255,255,0.65)" : "#A8A29E", margin: "2px 0 0" }}>{t.hint}</p>
+                  <p style={{ fontSize: 10, color: active ? "rgba(255,255,255,0.65)" : "#A8A29E", margin: 0, lineHeight: 1.4 }}>{t.hint}</p>
+                </div>
+                {/* 右側：色塊 + icon */}
+                <div style={{
+                  width: 56, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: active ? "rgba(255,255,255,0.15)" : `${li.text}18`,
+                  borderLeft: `1px solid ${active ? "rgba(255,255,255,0.15)" : `${li.text}20`}`,
+                }}>
+                  <FontAwesomeIcon icon={li.icon} style={{ fontSize: 20, color: active ? "rgba(255,255,255,0.9)" : li.text }} />
                 </div>
               </button>
             );
