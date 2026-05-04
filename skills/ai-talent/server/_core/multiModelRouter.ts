@@ -101,7 +101,10 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
   cohere: "command-r-plus",
   openai: "gpt-4o-mini",
   forge: "gemini-2.5-flash",
-  "azure-foundry": "gpt-4o",
+  // "gpt-4o" deployment not found in proj-mkt-agent-law (404).
+  // Kimi-K2.5 confirmed 200. Claude Sonnet / GPT-5.4 also deployed —
+  // override with AZURE_FOUNDRY_MODEL env var once deployment name is known.
+  "azure-foundry": "Kimi-K2.5",
   anthropic: "claude-sonnet-4-6",
   gemini: "gemini-2.5-flash",
 };
