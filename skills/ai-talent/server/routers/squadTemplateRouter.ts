@@ -1903,6 +1903,22 @@ ${agentCtx.systemPromptPrefix}`;
         }
       }).catch(() => { /* already added or alter not allowed; ignore */ });
 
+      // Auto-create overrides table — stores planner step decisions
+      // (quantity per step, custom instructions, themes)
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS mission_step_overrides (
+          mission_id            INT           NOT NULL,
+          step_order            INT           NOT NULL,
+          override_name         VARCHAR(200)  NULL,
+          override_instructions MEDIUMTEXT    NULL,
+          quantity              INT           NOT NULL DEFAULT 1,
+          themes                JSON          NULL,
+          updated_at            DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                                             ON UPDATE CURRENT_TIMESTAMP(3),
+          PRIMARY KEY (mission_id, step_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `).catch(() => { /* table exists */ });
+
       // Load squad row + steps + agents (localPool — same shape as listByBrand)
       const [sqRows] = await localPool.execute(
         `SELECT id, slug, name, agents, steps, methodology
@@ -1973,6 +1989,26 @@ ${agentCtx.systemPromptPrefix}`;
       const prevOutputs = (prevRows as any[]).map((r: any) =>
         `【Step ${r.step_order} 結果】\n${(r.agent_output ?? "").slice(0, 1500)}`
       ).join("\n\n");
+
+      // Load planner override for this specific step (if a plan step ran earlier)
+      let stepOverride: { override_name: string | null; override_instructions: string | null; quantity: number; themes: any } | null = null;
+      try {
+        const [overrideRows] = await db.execute(sql`
+          SELECT override_name, override_instructions, quantity, themes
+            FROM mission_step_overrides
+           WHERE mission_id = ${input.missionId} AND step_order = ${input.stepOrder}
+           LIMIT 1
+        `) as any[];
+        const ov = (overrideRows as any[])[0];
+        if (ov) {
+          stepOverride = {
+            override_name: ov.override_name ?? null,
+            override_instructions: ov.override_instructions ?? null,
+            quantity: Number(ov.quantity ?? 1),
+            themes: safeJsonParse(ov.themes, null),
+          };
+        }
+      } catch { /* overrides table may not exist yet on first run */ }
 
       // Mission context
       const [mRows] = await db.execute(sql`
@@ -2108,6 +2144,12 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
       const isStrategic = !isVisual && !isContent &&
         /swot|persona|icp|research|analysis|brand|context|interview|competitor|strategy|plan|brief|outline|framework|insight|positioning|methodology|doc|report|matrix|mapping|journey|研究|分析|策略|框架|計畫|報告|訪談|競品|定位|脈絡|洞察|矩陣|藍圖/i.test(`${ot} ${stepName}`);
 
+      // Plan step: agent reads all context and outputs an execution plan JSON.
+      // Detected via explicit outputKind="plan" OR step name keywords.
+      const isPlanStep = explicitKind === "plan"
+        || /^plan$/i.test(outputType)
+        || /執行計畫|execution.?plan|動態計畫|planner/i.test(`${ot} ${stepName}`);
+
       // ── Visual step short-circuit: agent produces the visual BRIEF only.
       // The actual image/video is generated client-side via the 3-step
       // MediaGenFlow (設計方向 → AI prompt → 模型選擇) — server must NOT
@@ -2164,6 +2206,28 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
 - 用 markdown 結構（## 大標 / - 條列）
 - 每個段落要寫具體內容，不是描述「我會做什麼」
 - 例如要做 SWOT 就直接寫 4 格的具體內容；要做 Persona 就直接寫角色檔案`
+        : isPlanStep
+        ? `這是「執行計畫」步驟 — 你需要讀取上游所有輸出（品牌研究、策略文件、用戶摘要），制定出後續步驟的具體執行計畫。
+
+輸出格式：嚴格輸出 JSON，格式如下：
+{
+  "plan": [
+    {
+      "step_order": <整數，對應此 squad 的後續步驟順序>,
+      "name": "<此步驟的具體名稱，例如『Dragon Day 教育型貼文 - 活動攻略篇』>",
+      "quantity": <整數，要產出幾個版本，通常 1-3>,
+      "theme": "<主題摘要，一句話>",
+      "instructions": "<給執行 agent 的詳細指示，包含：主題、TA、CTA、必須提及的活動細節、禁忌事項>"
+    }
+  ],
+  "summary": "<用一段話說明你的計畫邏輯，給用戶看的>"
+}
+
+規則：
+- 只計劃你認為真正需要的步驟（可以比 squad 預設少）
+- quantity 最多 3，如果策略說「3 篇貼文」就對那個步驟設 quantity=3
+- instructions 要夠詳細，讓 agent 不需要回頭看策略就能執行
+- 如果策略已確認了具體的發文主題、日期、TA，一定要寫進 instructions`
         : `直接寫出成品內容，不要寫「我會...」這種方法論說明。`;
 
       const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
@@ -2181,13 +2245,20 @@ ${outputGuide}
 用繁體中文。產出類型：${outputType || "適中"}。
 ${brandContext ? `\n【強制】這一步是為以下品牌服務，所有舉例、語氣、產品、受眾都必須緊扣這個品牌，禁止通用範本：\n${brandContext}\n如果你產出的內容換到別的品牌也成立，就是失敗。` : `\n【警告】此任務沒有綁定品牌，請提示使用者先到右上角選擇品牌再執行。`}`;
 
+      const targetQuantity = stepOverride?.quantity ?? 1;
+      const quantityGuide = targetQuantity > 1
+        ? `\n【重要】請產出 ${targetQuantity} 個獨立版本的完整內容。每個版本之間用「---VERSION---」這個分隔符隔開（單獨一行）。版本之間不要有編號前言，直接是第一個版本的內容，分隔符，第二個版本的內容。`
+        : "";
+
       const userPrompt = `${missionContext}
 ${brandContext ? `\n${brandContext}\n` : ""}
 方法論參考：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}
-此步驟說明：${stepDesc || stepName}
+此步驟說明：${stepOverride?.override_name ?? stepDesc ?? stepName}
 預期產出類型：${outputType || "(未指定)"}
+${stepOverride?.override_instructions ? `\n【執行計畫指示】（優先遵從）：\n${stepOverride.override_instructions}` : ""}
 ${prevOutputs ? `\n上游步驟成果（直接接續使用，不要重述）：\n${prevOutputs}` : ""}
 ${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
+${quantityGuide}
 
 請直接交付【成品內容】 — 不是「我會這樣做」的說明。所有舉例必須來自上面這個 scope（活動 > 產品 > 品牌 cascade）的真實內容；如果有【活動】，舉例必須緊扣此活動的時間 / 主題 / TA / 商品 / CTA，不要拿品牌的其他活動或泛用例子代替。
 若產出類型是貼文文案：禁止 markdown 標題符號（#）、禁止內部標籤（Jab 1: / Step 1:）、禁止前言。直接從第一句開始寫貼文本體。`;
@@ -2218,7 +2289,51 @@ ${input.userInput ? `\n使用者補充：\n${input.userInput}` : ""}
           .replace(/^(?:以下(?:是|為)|這(?:是|篇是)|我(?:會|將)|這篇貼文(?:的目的)?是)[^\n]*\n+/m, "")
           .trim();
       };
-      const output = isContent ? stripContentArtifacts(rawOutput) : rawOutput;
+      let output = isContent ? stripContentArtifacts(rawOutput) : rawOutput;
+
+      // ── Plan step: parse JSON output → write mission_step_overrides ──────────
+      if (isPlanStep) {
+        try {
+          const cleaned = output.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+          const planJson = JSON.parse(cleaned);
+          const planItems: any[] = Array.isArray(planJson.plan) ? planJson.plan : (Array.isArray(planJson) ? planJson : []);
+          for (const item of planItems) {
+            const so = Number(item.step_order);
+            if (!so || isNaN(so)) continue;
+            await db.execute(sql`
+              INSERT INTO mission_step_overrides
+                (mission_id, step_order, override_name, override_instructions, quantity, themes)
+              VALUES
+                (${input.missionId}, ${so},
+                 ${item.name ?? null},
+                 ${item.instructions ?? null},
+                 ${Math.min(Math.max(Number(item.quantity ?? 1), 1), 5)},
+                 ${item.theme ? JSON.stringify({ theme: item.theme }) : null})
+              ON DUPLICATE KEY UPDATE
+                override_name = VALUES(override_name),
+                override_instructions = VALUES(override_instructions),
+                quantity = VALUES(quantity),
+                themes = VALUES(themes)
+            `).catch((e: any) => console.warn("[planStep] override upsert failed:", e?.message));
+          }
+          // Keep the plan output readable for the user (use summary + pretty JSON)
+          if (planJson.summary) {
+            output = `## 執行計畫摘要\n${planJson.summary}\n\n## 詳細計畫\n\`\`\`json\n${JSON.stringify(planJson, null, 2)}\n\`\`\``;
+          }
+        } catch (e) {
+          console.warn("[planStep] failed to parse plan JSON:", (e as Error).message);
+        }
+      }
+
+      // ── Multi-version: if quantity > 1, split by separator → JSON ───────────
+      const targetQty = stepOverride?.quantity ?? 1;
+      if (!isPlanStep && targetQty > 1) {
+        const parts = output.split(/^---VERSION---$/m).map((p: string) => p.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          output = JSON.stringify({ __versions__: true, items: parts });
+        }
+        // If LLM didn't use separators but we expected multiple, keep raw output as single version
+      }
 
       // Push the previous draft (if any) into history so the user can undo.
       // history is a JSON array of { output, userInput, ts }.

@@ -2116,6 +2116,8 @@ function SquadDetailPanel({
   // ── Auto-run all: executes every step sequentially, auto-confirming each ──
   const [autoRunning, setAutoRunning] = useState(false);
   const autoRunRef = useRef(false);
+  // Track which version the user has selected for each step (stepOrder → versionIndex)
+  const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
 
   const handleAutoRunAll = async () => {
     if (!missionId || autoRunning || isStepStreaming) return;
@@ -2515,6 +2517,20 @@ function SquadDetailPanel({
               const kind = inferStepKind(activeStep);
               const prog = progressByOrd.get(displayStepOrder);
 
+              // ── Multi-version detection ───────────────────────────────
+              // When server produces { __versions__: true, items: [...] },
+              // render version-picker tabs so the user can select one.
+              const rawOutput = prog?.agentOutput ?? prog?.agent_output ?? "";
+              let versionItems: string[] | null = null;
+              if (rawOutput && rawOutput.trimStart().startsWith("{")) {
+                try {
+                  const parsed = JSON.parse(rawOutput);
+                  if (parsed.__versions__ && Array.isArray(parsed.items) && parsed.items.length > 1) {
+                    versionItems = parsed.items as string[];
+                  }
+                } catch { /* not JSON */ }
+              }
+
               // ── Intake / Decision / QA steps → always DocMockup ──────
               // CJ direction 2026-05-02: "一開始 intake 的時候，都用這個格式"
               // Any step with outputKind=decision/qa_review or mockupVariant=
@@ -2527,6 +2543,71 @@ function SquadDetailPanel({
               const isDocStep = isIntakeStep ||
                 ["qa_review", "qa"].includes(String(activeStep.outputKind ?? "").toLowerCase()) ||
                 activeStep.mockupVariant === "QAReportMockup";
+
+              // ── Multi-version: render version-picker tabs ─────────────
+              if (versionItems && prog?.status === "drafted") {
+                const selectedIdx = selectedVersions[displayStepOrder] ?? 0;
+                const selectedBody = versionItems[selectedIdx] ?? "";
+                return (
+                  <div className="w-full max-w-[760px] mx-auto space-y-3">
+                    {/* Version selector tabs */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-small font-medium text-default-600">選擇版本：</span>
+                      {versionItems.map((_, idx) => (
+                        <Button
+                          key={idx}
+                          size="sm"
+                          variant={selectedIdx === idx ? "solid" : "bordered"}
+                          color={selectedIdx === idx ? "primary" : "default"}
+                          radius="full"
+                          onPress={() => setSelectedVersions(prev => ({ ...prev, [displayStepOrder]: idx }))}
+                        >
+                          版本 {idx + 1}
+                        </Button>
+                      ))}
+                      <span className="text-tiny text-default-400 ml-auto">
+                        共 {versionItems.length} 個版本，選一個確認後繼續
+                      </span>
+                    </div>
+                    {/* Show selected version in DocMockup */}
+                    <DocMockup
+                      title={activeStep.name ?? activeStep.title ?? name}
+                      brief={description ?? ""}
+                      brandName={brandName}
+                      stepName={`${activeStep.name ?? activeStep.title ?? `Step ${displayStepOrder}`} · 版本 ${selectedIdx + 1}`}
+                      agentName={prog?.agentName ?? prog?.agent_name ?? activeStep.assignedAgentName ?? null}
+                      body={selectedBody}
+                      status={prog?.status ?? "pending"}
+                      isEditable={true}
+                      onConfirm={async (editedContent: string) => {
+                        if (!missionId) return;
+                        // Save selected version as the confirmed output
+                        await stepExecuteWithScope.mutateAsync({
+                          missionId, squadSlug: squad.slug, stepOrder: displayStepOrder,
+                          mode: "confirm", userInput: editedContent,
+                        });
+                        const next = displayStepOrder + 1;
+                        if (next <= steps.length) {
+                          await stepExecuteWithScope.mutateAsync({
+                            missionId, squadSlug: squad.slug, stepOrder: next,
+                            mode: "run", userInput: "",
+                          });
+                        }
+                        await progressQuery.refetch?.();
+                      }}
+                      onRedo={async () => {
+                        if (!missionId) return;
+                        await stepExecuteWithScope.mutateAsync({
+                          missionId, squadSlug: squad.slug, stepOrder: displayStepOrder,
+                          mode: "run", userInput: "",
+                        });
+                        await progressQuery.refetch?.();
+                      }}
+                      isMutating={stepExecute.isPending}
+                    />
+                  </div>
+                );
+              }
 
               // Shared confirm/redo callbacks for all doc-style steps
               const handleDocConfirm = async (editedContent: string) => {
