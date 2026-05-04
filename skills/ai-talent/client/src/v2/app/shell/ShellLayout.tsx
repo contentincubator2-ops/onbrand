@@ -706,7 +706,7 @@ function SlidePanel({
                         <button key={b.id}
                           onClick={() => {
                             setBrandId(b.id);
-                            setScope({ ...scope, brandId: b.id, productId: undefined, eventId: undefined });
+                            setScope({ ...scope, brandId: b.id, productId: null, eventId: null });
                             setBrandDropOpen(false);
                             onNavigate("/brands");
                           }}
