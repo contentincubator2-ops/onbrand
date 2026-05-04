@@ -1,0 +1,72 @@
+name: Admin — Diagnose PM2 marketing-os restarts (B-03)
+
+# Smoke test showed `marketing-os` PM2 process restarted 87 times in
+# 3 days = ~1.2 crashes per hour. This workflow surfaces the actual
+# crash causes from PM2 logs so we can fix root cause(s).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set +e
+            ERR=~/.pm2/logs/marketing-os-error.log
+            OUT=~/.pm2/logs/marketing-os-out.log
+
+            echo "════════════════════════════════════════"
+            echo "  PM2 marketing-os restart diagnosis"
+            echo "  $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "════════════════════════════════════════"
+
+            echo ""
+            echo "── PM2 status ──"
+            pm2 jlist 2>/dev/null | python3 -c "
+            import sys, json
+            data = json.loads(sys.stdin.read())
+            for p in data:
+                if p['name'] == 'marketing-os':
+                    print(f\"  pid={p['pid']}\")
+                    print(f\"  status={p['pm2_env']['status']}\")
+                    print(f\"  uptime_ms={p['pm2_env']['pm_uptime']}\")
+                    print(f\"  restarts={p['pm2_env']['restart_time']}\")
+                    print(f\"  unstable_restarts={p['pm2_env']['unstable_restarts']}\")
+                    print(f\"  last_exit_code={p['pm2_env'].get('exit_code', 'n/a')}\")
+            " 2>/dev/null
+
+            echo ""
+            echo "── Last 5 stack traces (Error / TypeError / ReferenceError) ──"
+            tail -10000 "$ERR" 2>/dev/null \
+              | grep -B 1 -A 15 "^\(Error:\|TypeError:\|ReferenceError:\|RangeError:\|Cannot find module\|UnhandledPromiseRejection\|Process exited\|FATAL\)" \
+              | tail -120 \
+              || echo "(no stack traces in error log)"
+
+            echo ""
+            echo "── Last 5 'process exit' lines ──"
+            tail -10000 "$ERR" 2>/dev/null \
+              | grep -B 2 -A 5 "exited\|exit code\|killed" \
+              | tail -60 \
+              || echo "(no exit lines)"
+
+            echo ""
+            echo "── Last 30 lines of error log (raw tail) ──"
+            tail -30 "$ERR" 2>/dev/null
+
+            echo ""
+            echo "── Restart frequency: count of 'PM2 starting' or process-start lines ──"
+            tail -10000 "$OUT" 2>/dev/null \
+              | grep -c "Server listening\|app listening\|express\|server started" \
+              | head -1 || true
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "  Done."
+            echo "════════════════════════════════════════"
