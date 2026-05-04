@@ -237,50 +237,91 @@ export default function MethodologyCatalog() {
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAF9", paddingBottom: 64 }}>
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <div style={{
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: "48px 40px 56px", position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: -80, right: -80, width: 320, height: 320, borderRadius: "50%", background: "rgba(255,255,255,0.05)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: -50, left: "35%", width: 240, height: 240, borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
-        <div style={{ maxWidth: 860, position: "relative", zIndex: 1 }}>
-          <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px" }}>TEMPLATES · 範本庫</p>
-          <h1 style={{ color: "white", fontSize: 38, fontWeight: 800, letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1 }}>什麼都可以做到</h1>
-          <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 15, margin: "0 0 30px", lineHeight: 1.6 }}>
+      {/* ── Hero — 與首頁相同的 3 層漸層設計 ──────────────────────────── */}
+      <div
+        className="relative px-8 pt-12 pb-10 overflow-hidden"
+        style={{
+          boxShadow: "0 6px 24px rgba(0,0,0,0.07)",
+          backgroundImage: [
+            "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",
+            "linear-gradient(rgba(255,255,255,0.96), rgba(255,255,255,0.96))",
+            "linear-gradient(135deg, #00b4bc 0%, #8b5cf6 60%, #4c1d95 100%)",
+          ].join(", "),
+        }}
+      >
+        <div className="relative z-10 flex flex-col items-center text-center">
+          {/* 小標 */}
+          <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
+            SoWork · Marketing OS
+          </p>
+
+          {/* 主標題 — 漸層文字，與首頁風格一致 */}
+          <h1
+            className="font-semibold tracking-tight leading-tight text-center mb-3"
+            style={{
+              fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            什麼都可以做到。應該吧!
+          </h1>
+
+          {/* 統計數字 */}
+          <p className="text-small text-default-500 mb-6">
             {counts.total > 0
-              ? `${counts.squad} 個方法論小組 · ${counts.agent} 個 Agents · ${counts.skill} 個技能`
+              ? `${counts.squad} 個方法論小組（共 ${squads.length}）・${counts.agent} 個 Agents・${counts.skill} 個技能`
               : isLoading ? "載入中…" : "瀏覽我們的 Squad、Agent、Skill 目錄"}
           </p>
 
-          {/* Search */}
-          <div style={{ position: "relative", maxWidth: 580 }}>
-            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", fontSize: 16, zIndex: 1 }} />
-            <input
-              value={searchQ}
-              onChange={e => setSearchQ(e.target.value)}
-              placeholder="搜尋方法論小組、Agent、技能…"
-              style={{ width: "100%", padding: "14px 48px 14px 50px", borderRadius: 50, border: "none", fontSize: 15, outline: "none", background: "white", color: "#1A1A18", boxSizing: "border-box", boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}
-            />
-            {searchQ && (
-              <button onClick={() => setSearchQ("")} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "#E5E5E3", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", color: "#57534E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
-                <FontAwesomeIcon icon={faXmark} />
-              </button>
-            )}
+          {/* Search — 與首頁同款白底圓角搜尋框 */}
+          <div className="w-full" style={{ maxWidth: 800 }}>
+            <div style={{
+              borderRadius: 20, background: "white",
+              boxShadow: ["rgba(249,115,22,0.15) 6px 3px 12px 0px", "rgba(234,88,12,0.15) -6px -3px 12px 0px"].join(", "),
+            }}>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ position: "absolute", left: 20, color: "#9CA3AF", fontSize: 18, zIndex: 1 }} />
+                <input
+                  value={searchQ}
+                  onChange={e => setSearchQ(e.target.value)}
+                  placeholder="搜尋 Squad、Agent、技能…"
+                  style={{ width: "100%", height: 64, padding: "0 48px 0 52px", borderRadius: 20, border: "none", fontSize: 16, outline: "none", background: "transparent", color: "#1A1A18", boxSizing: "border-box" }}
+                />
+                {searchQ && (
+                  <button onClick={() => setSearchQ("")} style={{ position: "absolute", right: 16, background: "#E5E5E3", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", color: "#57534E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
+                    <FontAwesomeIcon icon={faXmark} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Kind pills */}
-          <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
             {KIND_TABS.map(t => (
               <button key={t.id}
                 onClick={() => { setActiveKind(t.id); setSearchQ(""); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
-                style={{ padding: "7px 16px", borderRadius: 50, fontSize: 13, background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)", color: "white", cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 7, transition: "background 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
-                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.18)"}
+                style={{
+                  padding: "7px 16px", borderRadius: 50, fontSize: 13, cursor: "pointer", fontWeight: 500,
+                  display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s",
+                  background: activeKind === t.id ? "#7c3aed" : "rgba(0,0,0,0.06)",
+                  border: activeKind === t.id ? "1px solid #7c3aed" : "1px solid transparent",
+                  color: activeKind === t.id ? "white" : "#57534E",
+                }}
+                onMouseEnter={e => { if (activeKind !== t.id) e.currentTarget.style.background = "rgba(0,0,0,0.1)"; }}
+                onMouseLeave={e => { if (activeKind !== t.id) e.currentTarget.style.background = "rgba(0,0,0,0.06)"; }}
               >
                 <FontAwesomeIcon icon={t.icon} style={{ fontSize: 11 }} />
                 {t.label}
-                {counts[t.id] > 0 && <span style={{ background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>{counts[t.id]}</span>}
+                {counts[t.id] > 0 && (
+                  <span style={{
+                    background: activeKind === t.id ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.08)",
+                    borderRadius: 10, padding: "1px 7px", fontSize: 11,
+                  }}>{counts[t.id]}</span>
+                )}
               </button>
             ))}
           </div>
