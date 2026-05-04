@@ -10,10 +10,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
+      # Legacy DB_* (kept for back-compat with older tests)
       DB_HOST: localhost
       DB_USER: test
       DB_PASSWORD: test
       DB_NAME: test
+      # LOCAL_DB_* — the actual env vars db.ts / localDb.ts read.
+      # Required after B-02 removed the hardcoded "mos_secure_2026" fallback.
+      LOCAL_DB_HOST: localhost
+      LOCAL_DB_PORT: "3306"
+      LOCAL_DB_USER: test
+      LOCAL_DB_PASSWORD: test
+      LOCAL_DB_NAME: test
       JWT_SECRET: ci-test-secret-at-least-32-chars-long
       NODE_ENV: test
     steps:
