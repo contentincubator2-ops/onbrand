@@ -121,6 +121,9 @@ export default function ShellLayout() {
         onClose={toggleCollapsed}
         brands={brands}
         brandId={brandId}
+        setBrandId={setBrandId}
+        scope={scope}
+        setScope={setScope}
         onNavigate={(to) => navigate(to)}
         currentPath={loc.pathname}
       />
@@ -460,12 +463,15 @@ function TrashButton({ onNavigate }: { onNavigate: (to: string) => void }) {
    SlidePanel — Canva-faithful per-page sidebar content
 ══════════════════════════════════════════════════════════════════ */
 function SlidePanel({
-  open, onClose, brands, brandId, onNavigate, currentPath,
+  open, onClose, brands, brandId, setBrandId, scope, setScope, onNavigate, currentPath,
 }: {
   open: boolean;
   onClose: () => void;
   brands: any[];
   brandId: number | null;
+  setBrandId: (id: number | null) => void;
+  scope: ScopeState;
+  setScope: (s: ScopeState) => void;
   onNavigate: (to: string) => void;
   currentPath: string;
 }) {
@@ -698,7 +704,12 @@ function SlidePanel({
                       const isActive = b.id === brandId;
                       return (
                         <button key={b.id}
-                          onClick={() => { onNavigate("/brands"); setBrandDropOpen(false); }}
+                          onClick={() => {
+                            setBrandId(b.id);
+                            setScope({ ...scope, brandId: b.id, productId: undefined, eventId: undefined });
+                            setBrandDropOpen(false);
+                            onNavigate("/brands");
+                          }}
                           style={{
                             width: "100%", display: "flex", alignItems: "center", gap: 8,
                             padding: "7px 10px", background: isActive ? "#EDE9FE" : "none",

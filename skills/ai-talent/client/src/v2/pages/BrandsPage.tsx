@@ -160,9 +160,7 @@ export default function BrandsPage() {
     }
   }, [category]);
 
-  // Brand-kit dropdown (Canva-style switcher)
-  const [brandDropOpen, setBrandDropOpen] = useState(false);
-  const [brandSearch, setBrandSearch] = useState("");
+  // (brand dropdown moved to ShellLayout sidebar)
 
   // Reset to positioning when scope changes
   React.useEffect(() => {
@@ -572,183 +570,16 @@ export default function BrandsPage() {
 
       {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
       <div className="flex-1 flex">
-        {/* ── Brand left rail — two-tier nav ── */}
+        {/* ── Brand left rail — sub-nav only (你的方案/品牌選擇器 已移至收放側邊欄) ── */}
         <aside style={{
-          width: 220, flexShrink: 0,
+          width: 200, flexShrink: 0,
           borderRight: "1px solid #E4E3E1",
           background: "white",
           display: "flex", flexDirection: "column",
           overflowY: "auto",
           fontFamily: "Inter, system-ui, sans-serif",
         }}>
-
-          {/* ① 你的方案 + 邀請使用者 */}
-          <div style={{ padding: "12px 10px 10px", display: "flex", flexDirection: "column", gap: 5, borderBottom: "1px solid #F0EFED" }}>
-            {[
-              { icon: faCrown,    label: "你的方案" },
-              { icon: faUserPlus, label: "邀請使用者" },
-            ].map(({ icon, label }) => (
-              <button key={label} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "8px 12px", borderRadius: 8,
-                background: "white", border: "1px solid #E4E3E1",
-                cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18",
-                width: "100%", textAlign: "left", transition: "background 0.12s",
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
-                onMouseLeave={e => e.currentTarget.style.background = "white"}
-              >
-                <FontAwesomeIcon icon={icon} style={{ fontSize: 13, color: "#78716C", width: 14 }} />
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* ② 所有品牌範本 */}
-          <button style={{
-            display: "flex", alignItems: "center",
-            padding: "10px 16px", fontSize: 13, fontWeight: 500,
-            color: "#1A1A18", background: "none", border: "none",
-            cursor: "pointer", textAlign: "left", width: "100%",
-            transition: "background 0.12s",
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
-            onMouseLeave={e => e.currentTarget.style.background = "none"}
-          >
-            所有品牌範本
-          </button>
-
-          {/* ③ 品牌工具組 dropdown trigger */}
-          <div style={{ padding: "0 10px 6px", position: "relative" }}>
-            <button
-              onClick={() => { setBrandDropOpen(v => !v); setBrandSearch(""); }}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "8px 10px", borderRadius: 8,
-                background: brandDropOpen ? "#EDE9FE" : "#F5F4F2",
-                border: brandDropOpen ? "1.5px solid #6366F1" : "1.5px solid transparent",
-                cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#1A1A18",
-                transition: "all 0.15s", textAlign: "left",
-              }}
-            >
-              {/* Brand colour swatch thumbnail */}
-              <div style={{
-                width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-                background: "linear-gradient(135deg, #7C3AED, #6366F1)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 2px 6px rgba(99,102,241,0.30)",
-              }}>
-                <span style={{ color: "white", fontSize: 11, fontWeight: 700 }}>
-                  {(scopeName.charAt(0) || "B").toUpperCase()}
-                </span>
-              </div>
-              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                品牌工具組
-              </span>
-              <FontAwesomeIcon icon={faChevronDown} style={{
-                fontSize: 10, color: "#78716C",
-                transform: brandDropOpen ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s",
-              }} />
-            </button>
-
-            {/* Dropdown panel — Canva screenshot 5 */}
-            {brandDropOpen && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 10, right: 10,
-                background: "white", borderRadius: 10,
-                border: "1px solid #E4E3E1",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                zIndex: 200, overflow: "hidden",
-              }}>
-                {/* Search */}
-                <div style={{ padding: "8px 10px", borderBottom: "1px solid #F0EFED", position: "relative" }}>
-                  <FontAwesomeIcon icon={faMagnifyingGlass} style={{
-                    position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)",
-                    color: "#A8A29E", fontSize: 12, pointerEvents: "none",
-                  }} />
-                  <input
-                    autoFocus
-                    value={brandSearch}
-                    onChange={e => setBrandSearch(e.target.value)}
-                    placeholder="搜尋品牌工具組"
-                    style={{
-                      width: "100%", padding: "6px 8px 6px 26px",
-                      borderRadius: 6, border: "1px solid #E4E3E1",
-                      fontSize: 12, color: "#1A1A18", outline: "none",
-                      background: "#FAFAF9", boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                {/* Brand list */}
-                <div style={{ maxHeight: 200, overflowY: "auto" }}>
-                  {((scopeBrands as any[]).filter((b: any) =>
-                    !brandSearch || b.name?.toLowerCase().includes(brandSearch.toLowerCase())
-                  ) as any[]).map((b: any) => {
-                    const isActive = b.id === (scope?.brandId ?? brandId);
-                    return (
-                      <button key={b.id}
-                        onClick={() => { setBrandId(b.id); setBrandDropOpen(false); }}
-                        style={{
-                          width: "100%", display: "flex", alignItems: "center", gap: 10,
-                          padding: "8px 12px", background: isActive ? "#EDE9FE" : "none",
-                          border: "none", cursor: "pointer", textAlign: "left",
-                          transition: "background 0.12s", fontSize: 13,
-                        }}
-                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#F5F4F2"; }}
-                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "none"; }}
-                      >
-                        {/* Mini swatch */}
-                        <div style={{
-                          width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-                          background: "linear-gradient(135deg, #7C3AED, #6366F1)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                          <span style={{ color: "white", fontSize: 10, fontWeight: 700 }}>
-                            {(b.name?.charAt(0) || "B").toUpperCase()}
-                          </span>
-                        </div>
-                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1A1A18", fontWeight: isActive ? 600 : 400 }}>
-                          {b.name}
-                        </span>
-                        {isActive && <FontAwesomeIcon icon={faCheck} style={{ color: "#6366F1", fontSize: 11 }} />}
-                      </button>
-                    );
-                  })}
-                  {(scopeBrands as any[]).filter((b: any) =>
-                    !brandSearch || b.name?.toLowerCase().includes(brandSearch.toLowerCase())
-                  ).length === 0 && (
-                    <p style={{ padding: "10px 14px", fontSize: 12, color: "#A8A29E" }}>找不到品牌</p>
-                  )}
-                </div>
-
-                {/* Divider + create/settings actions */}
-                <div style={{ borderTop: "1px solid #F0EFED", padding: "6px 0" }}>
-                  {[
-                    { icon: faPlus, label: "建立新的品牌工具組" },
-                    { icon: faPlus, label: "建立個人品牌工具組" },
-                    { icon: faGear, label: "品牌控制" },
-                  ].map(({ icon, label }) => (
-                    <button key={label} style={{
-                      width: "100%", display: "flex", alignItems: "center", gap: 10,
-                      padding: "8px 14px", background: "none", border: "none",
-                      cursor: "pointer", fontSize: 12, color: "#57534E", textAlign: "left",
-                      transition: "background 0.12s",
-                    }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
-                      onMouseLeave={e => e.currentTarget.style.background = "none"}
-                    >
-                      <FontAwesomeIcon icon={icon} style={{ fontSize: 11, width: 12 }} />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ④ Sub-nav — items for the active category (set by ShellLayout sidebar via ?cat=) */}
+          {/* Sub-nav — items for the active category (set by ShellLayout sidebar via ?cat=) */}
           <nav style={{ flex: 1, padding: "6px 8px 16px", display: "flex", flexDirection: "column", gap: 0, overflowY: "auto" }}>
             <p style={{
               fontSize: 10, fontWeight: 700, color: "#A8A29E",
