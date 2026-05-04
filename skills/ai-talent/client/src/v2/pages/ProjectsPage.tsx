@@ -497,8 +497,8 @@ export default function ProjectsPage() {
                 {foldersOpen && (
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                    gap: 2,
+                    gridTemplateColumns: "repeat(6, 1fr)",
+                    gap: "2px 0",
                   }}>
                     {/* Static upload folder */}
                     <FolderRow icon={faCloudArrowUp} label="上傳" count={null} color="#9CA3AF"
@@ -772,52 +772,94 @@ function SortDropdown({ open, onToggle, onClose, value, onChange, options }: {
 }
 
 /* ──────────────────────── FolderRow ─────────────────────────────────── */
+/* Canva spec: horizontal list — 64×64 thumbnail + name + privacy badge + count
+ * Row height ~72px, 6-column grid, thumbnail shows folder content mini-preview */
 function FolderRow({ icon, label, count, color, onClick }: {
   icon?: any; label: string; count: number | null; color: string; onClick?: () => void;
 }) {
   const [hov, setHov] = React.useState(false);
+
+  // Derive 2–4 mini content squares for the folder thumbnail (simulates Canva's
+  // "folder content preview" — tinted squares derived from the brand color)
+  const miniColors = React.useMemo(() => {
+    if (icon) return [];           // upload folder: just show icon
+    const base = color ?? "#9CA3AF";
+    // Simple alpha variants of the brand color for a "content grid" feel
+    return [base, `${base}BB`, `${base}88`, `${base}55`];
+  }, [icon, color]);
+
   return (
     <div
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+        height: 72,
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "0 12px", borderRadius: 8, cursor: "pointer",
         background: hov ? "#F5F4F2" : "transparent",
         transition: "background 0.12s",
       }}
     >
-      {/* Thumbnail */}
+      {/* ── 64×64 Thumbnail ───────────────────────────────── */}
       <div style={{
-        width: 40, height: 40, borderRadius: 6, flexShrink: 0,
-        background: hov ? "#EEECE9" : "#F2F1EF",
+        width: 64, height: 64, borderRadius: 8, flexShrink: 0,
+        background: hov ? "#EDECEA" : "#F2F1EF",
         display: "flex", alignItems: "center", justifyContent: "center",
-        transition: "background 0.12s", overflow: "hidden",
-        border: "1px solid #E9E8E6",
+        overflow: "hidden", border: "1px solid #E4E3E1",
+        transition: "background 0.12s", position: "relative",
       }}>
         {icon ? (
-          <FontAwesomeIcon icon={icon} style={{ fontSize: 16, color: "#9CA3AF" }} />
-        ) : (
+          /* Upload / special folder: centred icon */
+          <FontAwesomeIcon icon={icon} style={{ fontSize: 22, color: "#9CA3AF" }} />
+        ) : miniColors.length === 4 ? (
+          /* Brand folder: 2×2 content-preview grid */
           <div style={{
-            width: "100%", height: "100%", background: color,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 14, fontWeight: 700, color: "white",
+            display: "grid", gridTemplateColumns: "1fr 1fr",
+            width: "100%", height: "100%", gap: 2, padding: 6, boxSizing: "border-box",
           }}>
-            {label.slice(0, 1).toUpperCase()}
+            {miniColors.map((c, i) => (
+              <div key={i} style={{
+                borderRadius: 3, background: c,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {/* Smallest brand initial on the top-left square only */}
+                {i === 0 && (
+                  <span style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.85)", lineHeight: 1 }}>
+                    {label.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
-        )}
+        ) : null}
       </div>
-      {/* Text */}
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1A1A18", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+
+      {/* ── Text block ───────────────────────────────────── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          fontSize: 13.5, fontWeight: 600, color: "#1A1A18",
+          margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
           {label}
         </p>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-          <FontAwesomeIcon icon={faLock} style={{ fontSize: 9, color: "#9CA3AF" }} />
-          <span style={{ fontSize: 11.5, color: "#9CA3AF" }}>
-            隱藏{count !== null ? `　· ${count} 個項目` : ""}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Privacy badge */}
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 3,
+            padding: "2px 6px", borderRadius: 4,
+            background: "#F5F4F2", fontSize: 11, color: "#9CA3AF",
+            border: "1px solid #E9E8E6",
+          }}>
+            <FontAwesomeIcon icon={faLock} style={{ fontSize: 9 }} />
+            隱藏
           </span>
+          {/* Item count */}
+          {count !== null && (
+            <span style={{ fontSize: 11.5, color: "#A8A29E" }}>
+              {count} 個項目
+            </span>
+          )}
         </div>
       </div>
     </div>
