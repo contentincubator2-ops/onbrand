@@ -83,7 +83,7 @@ export function detectTaskType(content: string): TaskType {
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
   chinese_content: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
   creative_writing: ["azure-foundry", "zhipu", "qwen", "forge", "openai"],
-  search_realtime: ["gemini", "azure-foundry", "forge", "openai", "perplexity"],
+  search_realtime: ["gemini", "perplexity", "azure-foundry", "forge", "openai"],
   analysis: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
   classification: ["azure-foundry", "qwen", "zhipu", "forge", "openai"],
   coding: ["azure-foundry", "forge", "openai"],
