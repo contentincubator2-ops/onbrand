@@ -137,13 +137,28 @@ async function callOneVariant(args: {
 
   // Critical ordering: urlContext goes AFTER brandPrefix so URL content is
   // the most recent context the LLM sees. Plus explicit precedence rule.
+  //
+  // 2026-05-06: Hard-found bug — brand_brain prefix says "所有產出都要符合
+  // 下面的定位" which overrode URL content (e.g. cars video → Shopee
+  // shopping copy because user's brand was Shopee-related). When URL is
+  // present, wrap brandPrefix with a hard override: subject = URL, brand
+  // = voice-only, ignore brand positioning / products / services.
   const hasUrl = urlContext.length > 0;
+  const brandSection = hasUrl
+    ? brandPrefix
+      ? `\n# 品牌（**只取語氣參考，主題請看下面 URL**）\n` +
+        `⚠️ 重要：以下品牌資訊「**只用於語氣 / 用詞 / 受眾**」。` +
+        `絕對不要把品牌的定位、產品、服務塞進這次的 caption。` +
+        `若 URL 是談汽車、品牌是 Shopee 工具 — caption 必須關於汽車，跟 Shopee 無關。\n` +
+        `（以下品牌大腦摘要原本要求「所有產出都要符合定位」，但本次任務 URL 已指定主題，這條規則暫時關閉。）\n` +
+        brandPrefix
+      : ""
+    : `\n# 品牌語氣參考\n${brandPrefix}`;
   const subjectRule = hasUrl
     ? `\n【主題優先序 — 最重要】\n` +
-      `本次任務的「主題」是上面 URL 抓到的內容。品牌資訊只用作「語氣 / 用詞 / 受眾」參考。\n` +
-      `**絕對不要**把品牌的主商品 / 主主題塞進這個任務 — 例如品牌賣減肥課程，但 URL 是 Shopee 教學影片，` +
-      `caption 必須關於 Shopee 影片的內容，不是減肥課程。\n` +
-      `caption 必須具體呼應 URL 內容（提到影片裡的事件、數字、名稱），不要寫通用模板。\n`
+      `本次任務的「主題」=上面 URL 抓到的內容。品牌不是主題。\n` +
+      `caption 必須具體呼應 URL 內容（提到影片裡的事件、數字、名稱、人事物），不要寫通用模板，不要繞回品牌主商品。\n` +
+      `若 URL 抓到的內容跟品牌領域不相關，那就照 URL 主題寫，不要硬扯品牌。\n`
     : "";
 
   const system =
@@ -169,10 +184,8 @@ async function callOneVariant(args: {
     `輸出嚴格 JSON 物件（不是陣列）：\n` +
     `{"caption":"<完整貼文>","hashtags":["..."]}\n` +
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
-    `\n# 品牌語氣參考（輔助，非主題）\n` +
-    brandPrefix +
-    `\n# URL 抓到的內容（本次主題來源）\n` +
-    urlContext;
+    brandSection +
+    (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
 
   const provider: ModelProvider =
     template.preferredModel === "any" ? "qwen" : (template.preferredModel as any);
@@ -255,8 +268,13 @@ async function callImageDirector(args: {
   const variantSpec = config.variantLabels.slice(0, config.images).map((l, i) => `  ${i + 1}. ${l}`).join("\n");
 
   const hasUrl = urlContext.length > 0;
+  const brandSection = hasUrl
+    ? brandPrefix
+      ? `\n# 品牌（**只取語氣參考，主題請看 URL**）\n⚠️ 視覺主題=URL 內容，不是品牌主商品。\n${brandPrefix}`
+      : ""
+    : `\n# 品牌語氣參考\n${brandPrefix}`;
   const subjectRule = hasUrl
-    ? `\n【主題優先序】視覺要呼應 URL 抓到的內容（影片 / 文章主題），不要把品牌的主商品塞進視覺。\n`
+    ? `\n【主題優先序】視覺主題=URL 抓到的影片 / 文章內容。**不要**把品牌主商品畫進視覺。若 URL 跟品牌無關（汽車 vs 蝦皮），視覺就照 URL 主題畫。\n`
     : "";
   const system =
     imagePersona +
@@ -272,10 +290,8 @@ async function callImageDirector(args: {
     `- 風格要呼應該口吻\n\n` +
     `輸出嚴格 JSON 陣列：["中文描述 1", "中文描述 2", ...]（${config.images} 條）\n` +
     `不要 markdown code fence。直接 JSON。第一個字元就是 [。\n` +
-    `\n# 品牌語氣參考\n` +
-    brandPrefix +
-    `\n# URL 抓到的內容（主題來源）\n` +
-    urlContext;
+    brandSection +
+    (hasUrl ? `\n# URL 抓到的內容（主題來源）\n${urlContext}` : "");
 
   const r = await Promise.race([
     callModel(
