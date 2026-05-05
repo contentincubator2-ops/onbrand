@@ -1,7 +1,4 @@
-name: Admin — Snapshot current taxonomy (squads / agents / skills)
-
-# Pulls counts + distribution to answer "if we shrink to 50 squads /
-# 300 agents / 800 skills, can we still cover the work?"
+name: Admin — Snapshot taxonomy
 
 on:
   workflow_dispatch:
@@ -21,113 +18,45 @@ jobs:
             export MYSQL_PWD="mos_secure_2026"
             MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
 
-            echo "════════════════════════════════════════"
-            echo "  Marketing OS taxonomy snapshot"
-            echo "  $(date -u '+%Y-%m-%d %H:%M UTC')"
-            echo "════════════════════════════════════════"
+            echo "=== Total counts ==="
+            echo "squads (active+approved): $($MYSQL -e 'SELECT COUNT(*) FROM squads WHERE is_active=1 AND is_approved=1')"
+            echo "squads (active total):    $($MYSQL -e 'SELECT COUNT(*) FROM squads WHERE is_active=1')"
+            echo "squads (all rows):        $($MYSQL -e 'SELECT COUNT(*) FROM squads')"
+            echo "agents (available):       $($MYSQL -e 'SELECT COUNT(*) FROM agents WHERE isAvailable=1')"
+            echo "agents (all rows):        $($MYSQL -e 'SELECT COUNT(*) FROM agents')"
+            echo "skill_catalog rows:       $($MYSQL -e 'SELECT COUNT(*) FROM skill_catalog' 2>/dev/null)"
 
             echo ""
-            echo "── Total counts ──"
-            echo "squads (active+approved):  $($MYSQL -e 'SELECT COUNT(*) FROM squads WHERE is_active=1 AND is_approved=1')"
-            echo "squads (active total):     $($MYSQL -e 'SELECT COUNT(*) FROM squads WHERE is_active=1')"
-            echo "squads (all rows):         $($MYSQL -e 'SELECT COUNT(*) FROM squads')"
-            echo "agents (available):        $($MYSQL -e 'SELECT COUNT(*) FROM agents WHERE isAvailable=1')"
-            echo "agents (all rows):         $($MYSQL -e 'SELECT COUNT(*) FROM agents')"
-
-            # skill_catalog table — name varies by deployment
-            for tbl in skill_catalog skills agent_skills; do
-              CNT=$($MYSQL -e "SELECT COUNT(*) FROM $tbl" 2>/dev/null)
-              [ -n "$CNT" ] && echo "$tbl rows:               $CNT"
-            done
+            echo "=== Squads by workspace ==="
+            $MYSQL -e "SELECT workspace, COUNT(*) AS n FROM squads WHERE is_active=1 AND is_approved=1 GROUP BY workspace ORDER BY n DESC LIMIT 20"
 
             echo ""
-            echo "── Squads by workspace (top 15) ──"
-            $MYSQL -e "
-              SELECT workspace, COUNT(*) AS n
-                FROM squads
-               WHERE is_active=1 AND is_approved=1
-               GROUP BY workspace
-               ORDER BY n DESC
-               LIMIT 15
-            " 2>/dev/null | head -20
+            echo "=== Squads by strategy_layer ==="
+            $MYSQL -e "SELECT strategy_layer, COUNT(*) AS n FROM squads WHERE is_active=1 AND is_approved=1 GROUP BY strategy_layer ORDER BY n DESC"
 
             echo ""
-            echo "── Squads by strategy_layer ──"
-            $MYSQL -e "
-              SELECT strategy_layer, COUNT(*) AS n
-                FROM squads
-               WHERE is_active=1 AND is_approved=1
-               GROUP BY strategy_layer
-               ORDER BY n DESC
-            " 2>/dev/null
+            echo "=== Squads by missionType (top 25) ==="
+            $MYSQL -e "SELECT missionType, COUNT(*) AS n FROM squads WHERE is_active=1 AND is_approved=1 AND missionType IS NOT NULL GROUP BY missionType ORDER BY n DESC LIMIT 25"
 
             echo ""
-            echo "── Squads by missionType (top 20) ──"
-            $MYSQL -e "
-              SELECT missionType, COUNT(*) AS n
-                FROM squads
-               WHERE is_active=1 AND is_approved=1 AND missionType IS NOT NULL
-               GROUP BY missionType
-               ORDER BY n DESC
-               LIMIT 20
-            " 2>/dev/null
+            echo "=== Agents by primarySkill (top 30) ==="
+            $MYSQL -e "SELECT primarySkill, COUNT(*) AS n FROM agents WHERE isAvailable=1 AND primarySkill IS NOT NULL GROUP BY primarySkill ORDER BY n DESC LIMIT 30"
 
             echo ""
-            echo "── Agents by primarySkill (top 25) ──"
-            $MYSQL -e "
-              SELECT primarySkill, COUNT(*) AS n
-                FROM agents
-               WHERE isAvailable=1 AND primarySkill IS NOT NULL
-               GROUP BY primarySkill
-               ORDER BY n DESC
-               LIMIT 25
-            " 2>/dev/null
+            echo "=== Agents by layer ==="
+            $MYSQL -e "SELECT layer, COUNT(*) AS n FROM agents WHERE isAvailable=1 GROUP BY layer ORDER BY n DESC"
 
             echo ""
-            echo "── Agents by layer ──"
-            $MYSQL -e "
-              SELECT layer, COUNT(*) AS n
-                FROM agents
-               WHERE isAvailable=1
-               GROUP BY layer
-               ORDER BY n DESC
-            " 2>/dev/null
+            echo "=== Skill catalog by category (top 30) ==="
+            $MYSQL -e "SELECT category, COUNT(*) AS n FROM skill_catalog WHERE category IS NOT NULL GROUP BY category ORDER BY n DESC LIMIT 30" 2>/dev/null
 
             echo ""
-            echo "── Skill catalog by category (top 25) ──"
-            $MYSQL -e "
-              SELECT category, COUNT(*) AS n
-                FROM skill_catalog
-               WHERE category IS NOT NULL
-               GROUP BY category
-               ORDER BY n DESC
-               LIMIT 25
-            " 2>/dev/null | head -30
+            echo "=== Most-used squads (last 30 days) ==="
+            $MYSQL -e "SELECT s.slug AS slug, COUNT(m.id) AS missions FROM squads s LEFT JOIN missions m ON m.squadSlug = s.slug AND m.createdAt > DATE_SUB(NOW(), INTERVAL 30 DAY) WHERE s.is_active=1 AND s.is_approved=1 GROUP BY s.slug ORDER BY missions DESC LIMIT 25"
 
             echo ""
-            echo "── Most-used squads (last 30 days, by mission count) ──"
-            $MYSQL -e "
-              SELECT s.slug, s.name, COUNT(m.id) AS missions
-                FROM squads s
-           LEFT JOIN missions m ON m.squadSlug = s.slug
-                                AND m.createdAt > DATE_SUB(NOW(), INTERVAL 30 DAY)
-               WHERE s.is_active=1 AND s.is_approved=1
-               GROUP BY s.slug, s.name
-               ORDER BY missions DESC
-               LIMIT 20
-            " 2>/dev/null | head -25
+            echo "=== Squads NEVER used (zero missions ever) ==="
+            $MYSQL -e "SELECT COUNT(*) FROM squads s LEFT JOIN missions m ON m.squadSlug = s.slug WHERE s.is_active=1 AND s.is_approved=1 AND m.id IS NULL"
 
             echo ""
-            echo "── Squads with zero missions (candidates to cut) ──"
-            $MYSQL -e "
-              SELECT COUNT(*)
-                FROM squads s
-           LEFT JOIN missions m ON m.squadSlug = s.slug
-               WHERE s.is_active=1 AND s.is_approved=1 AND m.id IS NULL
-            " 2>/dev/null
-            echo "(↑ count of squads that have NEVER been used)"
-
-            echo ""
-            echo "════════════════════════════════════════"
-            echo "  Done."
-            echo "════════════════════════════════════════"
+            echo "=== Done ==="
