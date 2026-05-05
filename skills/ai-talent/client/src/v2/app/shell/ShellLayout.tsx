@@ -36,12 +36,10 @@ interface NavItem {
   matchPrefix?: string;
 }
 
-// 2026-05-05 pivot: 快派 is now the home (/) entry. /squads is the
-// "advanced mode" Canva-style task wall (was at /).
-// /fb is the BETA new-schema FB home (Phase D) — promote to / once validated.
+// 2026-05-05 pivot: 快派 (QuickTask30sPage at /) is the main entry,
+// data-driven by listFB + agent persona. /squads is the advanced mode.
 const NAV_ITEMS: NavItem[] = [
   { to: "/",          label: "快派",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
-  { to: "/fb",        label: "FB Beta",  icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
   { to: "/templates", label: "範本",     matchPrefix: "/templates", icon: <FontAwesomeIcon icon={faTableCells} /> },

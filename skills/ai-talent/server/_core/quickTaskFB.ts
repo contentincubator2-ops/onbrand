@@ -15,8 +15,20 @@ export interface FBTaskTemplate {
   postType: string;                        // matches mockup format key
   label: string;                           // user-facing chip label
   description: string;                     // 1-line UI hint
+  /**
+   * 2026-05-05: agent_id is the existing agents.id in mos_db whose persona,
+   * bio, methodology and system_prompt drive this task. Loaded at runtime
+   * by runQuick mutation and injected into the LLM call. The card UI shows
+   * this agent's avatar + name as the "who's writing for you".
+   * Optional during incremental rollout — 60s/90s tier tasks may not have
+   * been mapped yet. UI falls back to generic when undefined.
+   */
+  agent_id?: number;
+  skill_slug?: string;
+  primary_question?: string;
+  primary_input?: { key: string; placeholder?: string; type: "text" | "textarea" };
   inputs: Array<{ key: string; label: string; type: "text" | "textarea"; required: boolean; placeholder?: string }>;
-  systemPrompt: string;                    // LLM system message; output spec appended by runQuick
+  systemPrompt: string;                    // task-specific instruction, appended AFTER agent persona
   preferredModel: "qwen" | "zhipu" | "azure-foundry" | "azure-position" | "hermes" | "any";
   /** maxTokens cap — 30s aim ~400, 60s ~900, 90s ~1800 */
   maxTokens: number;
@@ -39,10 +51,14 @@ export const FB_30S_TASKS: FBTaskTemplate[] = [
     postType: "feed",
     label: "FB 短貼文 caption",
     description: "100-200 字單張圖文 caption，含 1 句 hook + 1 個 CTA",
+    agent_id: 239183,             // Aiden Hsu — fb-brief-writer
+    skill_slug: "fb-copywriting",
+    primary_question: "今天這篇貼文要講什麼？貼上原文、主題或新品名稱即可",
+    primary_input: { key: "topic", placeholder: "例：春季新品上市 / 母親節活動 / 客戶感謝", type: "textarea" },
     inputs: [
       { key: "topic", label: "今天要講什麼？", type: "textarea", required: true, placeholder: "例：春季新品上市 / 母親節活動 / 客戶感謝" },
     ],
-    systemPrompt: `你是 FB 社群編輯。產出單張圖文 FB 貼文 caption，100-200 字。
+    systemPrompt: `產出單張圖文 FB 貼文 caption，100-200 字。
 結構：第 1 句 hook 拉注意 / 中間 1-2 段內容鋪陳 / 最後 1 句 CTA。
 ${FB_TONE_SUFFIX}
 另外給 1 句 image_style_direction.summary 描述配圖風格方向（不是 prompt，只是風格描述）。`,
@@ -56,6 +72,10 @@ ${FB_TONE_SUFFIX}
     postType: "feed",
     label: "FB 純文字 hook 5 種",
     description: "5 個不同口吻的開場 hook（無圖）",
+    agent_id: 239183,             // Aiden Hsu — hook-writing
+    skill_slug: "hook-writing",
+    primary_question: "你想用什麼角度開場？告訴我貼文主題或想 tease 的事",
+    primary_input: { key: "topic", placeholder: "例：新品上市 / 限時優惠 / 經驗分享", type: "textarea" },
     inputs: [
       { key: "topic", label: "貼文主題", type: "textarea", required: true },
     ],
@@ -73,6 +93,10 @@ ${FB_TONE_SUFFIX}
     postType: "feed",
     label: "FB 連結貼文 caption",
     description: "分享網址時的引言文（含 OG 預覽期待）",
+    agent_id: 60021,              // Tina Ji — Facebook/Instagram Social Copywriter
+    skill_slug: "social-copy",
+    primary_question: "貼上你要分享的連結網址",
+    primary_input: { key: "url", placeholder: "https://...", type: "text" },
     inputs: [
       { key: "url", label: "連結網址", type: "text", required: true, placeholder: "https://…" },
       { key: "topic", label: "為什麼分享這個？", type: "textarea", required: false },
@@ -90,6 +114,10 @@ ${FB_TONE_SUFFIX}
     postType: "comment",
     label: "FB 留言回覆（一般）",
     description: "正面 / 中性留言的品牌回覆",
+    agent_id: 60021,              // Tina Ji — Social Copywriter, brand voice
+    skill_slug: "social-copy",
+    primary_question: "貼上原始用戶留言，或留言所在的貼文連結",
+    primary_input: { key: "user_comment", placeholder: "用戶說了什麼？整段留言貼進來", type: "textarea" },
     inputs: [
       { key: "user_comment", label: "用戶留言", type: "textarea", required: true },
       { key: "tone", label: "回覆口吻（warm / professional / playful）", type: "text", required: false, placeholder: "warm" },
@@ -108,6 +136,10 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     postType: "comment",
     label: "FB 危機 / 客訴回覆（短）",
     description: "Lagadec 4 段壓縮版（致歉+解釋+承諾+私訊邀請）",
+    agent_id: 239185,             // Brian Chou — fb-crisis-comms
+    skill_slug: "crisis-communication",
+    primary_question: "貼上客戶抱怨內容（或留言截圖文字）",
+    primary_input: { key: "user_complaint", placeholder: "客戶說了什麼？盡可能完整貼進來", type: "textarea" },
     inputs: [
       { key: "user_complaint", label: "客戶抱怨內容", type: "textarea", required: true },
       { key: "context", label: "已知事實 / 處理狀態（可選）", type: "textarea", required: false },
@@ -126,6 +158,10 @@ output: caption 放回覆文，description 放原始抱怨內容。`,
     postType: "pinned",
     label: "FB 釘選貼文短文案",
     description: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」",
+    agent_id: 239183,             // Aiden Hsu — brand voice + atomized-content
+    skill_slug: "fb-copywriting",
+    primary_question: "想讓第一次來粉專的人，3 秒內知道你做什麼？",
+    primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼值得追蹤", type: "textarea" },
     inputs: [
       { key: "brand_focus", label: "想讓新訪客知道什麼？", type: "textarea", required: true },
     ],
@@ -143,6 +179,10 @@ output: caption 放回覆文，description 放原始抱怨內容。`,
     postType: "story",
     label: "FB Story 文案",
     description: "9:16 ephemeral 配文 + overlay 主標",
+    agent_id: 30002,              // Sarah Liu — AI Brand Story CMO
+    skill_slug: "fb-copywriting",
+    primary_question: "今天的 Story 想說什麼？",
+    primary_input: { key: "topic", placeholder: "例：幕後花絮 / 限時優惠 / 提問 sticker", type: "textarea" },
     inputs: [
       { key: "topic", label: "Story 想傳達什麼", type: "textarea", required: true },
     ],
@@ -159,6 +199,10 @@ output: caption 放完整 Story 文（30-60 字，會疊在圖片上） / title 
     postType: "feed", // pre-live announcement post is feed-shaped
     label: "FB 直播標題 + 預告短文",
     description: "直播開始前 1-2 小時的預告 caption",
+    agent_id: 60021,              // Tina Ji — Social copywriter (no dedicated live agent)
+    skill_slug: "social-copy",
+    primary_question: "今天的直播要講什麼？",
+    primary_input: { key: "live_topic", placeholder: "例：產品試用、新品發表、Q&A", type: "text" },
     inputs: [
       { key: "live_topic", label: "直播主題", type: "text", required: true },
       { key: "live_time", label: "直播時間（可選）", type: "text", required: false, placeholder: "例：今晚 8:00" },
@@ -176,6 +220,10 @@ output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"�
     postType: "feed",
     label: "FB hashtag 建議組",
     description: "10-15 個分層 hashtag（核心 / 中型 / 長尾）",
+    agent_id: 60021,              // Tina Ji — social copywriter
+    skill_slug: "fb-best-practices",
+    primary_question: "貼文主題或品牌產業是？",
+    primary_input: { key: "topic", placeholder: "例：手沖咖啡 / B2B SaaS / 母嬰用品", type: "textarea" },
     inputs: [
       { key: "topic", label: "貼文主題 / 產業", type: "textarea", required: true },
     ],
@@ -192,6 +240,10 @@ output: hashtags 陣列（不要含 # 前綴），caption 放 1 句使用建議�
     postType: "feed",
     label: "FB 活動倒數一句 hype",
     description: "倒數 N 天的單篇推文（系列中的一篇）",
+    agent_id: 180159,             // Claire Hsu — fb-countdown-series lead
+    skill_slug: "social-media-manager",
+    primary_question: "活動名稱 + 還剩幾天？",
+    primary_input: { key: "event_name", placeholder: "例：週年慶 / 新品上市 / 限時優惠", type: "text" },
     inputs: [
       { key: "event_name", label: "活動名稱", type: "text", required: true },
       { key: "days_left", label: "剩幾天", type: "text", required: true, placeholder: "3" },

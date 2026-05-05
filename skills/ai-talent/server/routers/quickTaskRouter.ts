@@ -670,6 +670,7 @@ import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 // 2026-05-05 quick-task pivot
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
 import { FB_30S_TASKS, FB_60S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
+import localPool from "../localDb";
 
 function tryParseJson(s: string): any | null {
   if (!s) return null;
@@ -815,15 +816,34 @@ export const quickTaskRouter = router({
 
   // ─── Quick-task pivot 2026-05-05 ───────────────────────────────────
   // listFB: returns the entire FB task catalog (30s/60s/90s) for the new
-  // home page chips. Stable shape independent of legacy TASKS registry.
-  listFB: protectedProcedure.query(() => {
-    return listAllFBTasks().map((t) => {
+  // home page chips. Includes bound agent metadata (avatar/name/title)
+  // so cards can render the agent face as the thumbnail.
+  listFB: protectedProcedure.query(async () => {
+    const tasks = listAllFBTasks();
+    // Collect unique agent_ids that need lookup
+    const agentIds = Array.from(new Set(
+      tasks.flatMap((t: any) => (t.agent_id ? [t.agent_id] : []))
+    ));
+    const agentMap: Record<number, { id: number; name: string; title: string; avatarUrl: string | null }> = {};
+    if (agentIds.length > 0) {
+      const placeholders = agentIds.map(() => "?").join(",");
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT id, name, title, avatarUrl FROM agents WHERE id IN (${placeholders})`,
+          agentIds,
+        );
+        for (const r of (rows as any[])) {
+          agentMap[r.id] = { id: r.id, name: r.name, title: r.title, avatarUrl: r.avatarUrl ?? null };
+        }
+      } catch { /* agent metadata failure non-fatal — UI shows fallback */ }
+    }
+    return tasks.map((t) => {
       const base = {
         id: t.id, tier: t.tier, postType: t.postType,
         label: t.label, description: t.description, kind: t.kind,
       };
       if (t.kind === "squad") {
-        return { ...base, squad_slug: (t as any).squad_slug, inputs: [] };
+        return { ...base, squad_slug: (t as any).squad_slug, inputs: [], agent: null, skill_slug: null };
       }
       const tt = t as any;
       return {
@@ -831,6 +851,11 @@ export const quickTaskRouter = router({
         inputs: tt.inputs ?? [],
         eta_seconds: t.tier === "30s" ? 30 : 60,
         preferredModel: tt.preferredModel,
+        agent_id: tt.agent_id ?? null,
+        skill_slug: tt.skill_slug ?? null,
+        primary_question: tt.primary_question ?? null,
+        primary_input: tt.primary_input ?? null,
+        agent: tt.agent_id ? (agentMap[tt.agent_id] ?? null) : null,
       };
     });
   }),
@@ -862,6 +887,29 @@ export const quickTaskRouter = router({
         }
       }
 
+      // 2026-05-05: load the bound agent persona (if set) and prepend to
+      // the system prompt so the output really sounds like that agent.
+      let agentPersona = "";
+      let agentMeta: { id: number; name: string; title: string; avatarUrl: string | null } | null = null;
+      if (template.agent_id) {
+        try {
+          const [agentRows]: any = await localPool.execute(
+            `SELECT id, name, title, bio, specialty, methodology, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+            [template.agent_id],
+          );
+          const a = (agentRows as any[])?.[0];
+          if (a) {
+            agentMeta = { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null };
+            agentPersona =
+              `你是 ${a.name}，${a.title}。\n` +
+              (a.bio ? `背景：${a.bio}\n` : "") +
+              (a.specialty ? `專長：${a.specialty}\n` : "") +
+              (a.methodology ? `方法論：${a.methodology}\n` : "") +
+              `用你的口氣寫，不要寫得像通用 AI。\n\n`;
+          }
+        } catch { /* persona load failure is non-fatal */ }
+      }
+
       // Build prompt
       const brandPrefix = await buildBrandContext(input.brandId);
       const userMsg =
@@ -869,6 +917,7 @@ export const quickTaskRouter = router({
           .map(([k, v]) => `[${k}] ${v}`)
           .join("\n") || "(no extra inputs)";
       const systemFull =
+        agentPersona +
         template.systemPrompt +
         "\n" +
         quickTaskOutputSpec(template.tier) +
@@ -909,6 +958,8 @@ export const quickTaskRouter = router({
         output: parsed.ok ? parsed.data : (parsed.partial as Partial<QuickTaskOutput>),
         validationErrors: parsed.ok ? undefined : parsed.errors,
         rawText: result.content, // for debugging / regenerate
+        agent: agentMeta,        // {id, name, title, avatarUrl} or null
+        skill_slug: template.skill_slug ?? null,
       };
     }),
 

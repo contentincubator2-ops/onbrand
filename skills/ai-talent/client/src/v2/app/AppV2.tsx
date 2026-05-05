@@ -40,7 +40,7 @@ import PickerWorkspace from "../pages/PickerWorkspace";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
-import QuickTaskFBHome from "../pages/QuickTaskFBHome";
+import QuickTask30sPage from "../pages/QuickTask30sPage";
 import BoardroomPage from "../pages/BoardroomPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
@@ -138,11 +138,14 @@ export default function AppV2() {
           {/* 2026-05-05 pivot: 快派 (QuickTask) is now the main entry.
               Current MissionsHome moved to /squads; /quicktask kept as
               alias so any existing links still work. */}
-          <Route path="/" element={<QuickTasksPage />} />
+          {/* 2026-05-05: / is the new 30 秒 home using listFB + agent persona.
+              /quicktask-legacy keeps the old TASKS-driven page for back-compat
+              if needed. /squads is the Canva-style task wall (advanced). */}
+          <Route path="/" element={<QuickTask30sPage />} />
           <Route path="/squads" element={<MissionsHome />} />
           <Route path="/quicktask" element={<Navigate to="/" replace />} />
-          {/* 2026-05-05 quick-task pivot beta — FB-only home using new schema */}
-          <Route path="/fb" element={<QuickTaskFBHome />} />
+          <Route path="/fb" element={<Navigate to="/" replace />} />
+          <Route path="/quicktask-legacy" element={<QuickTasksPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
