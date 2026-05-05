@@ -40,12 +40,13 @@ export interface LIFeedImageGenProps {
 }
 
 export function LIFeed({
-  title, brandName, variantLabel, liveCaption, liveHashtags,
+  title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags,
   imageGenPhase, imageGenDesignDirection, imageGenAiPrompt,
   imageGenModelName, imageGenResultUrl, imageGenErrorMsg, onImageRetry,
 }: MockupFields & LIFeedImageGenProps) {
   // LinkedIn blue per brand guidelines
   const LI_BLUE = "#0A66C2";
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
 
   return (
     <div className="w-full max-w-[548px] mx-auto font-sans">
@@ -74,7 +75,7 @@ export function LIFeed({
             ))}
           </div>
           {/* Avatar */}
-          <Avatar src={dicebear(brandName ?? "brand")} size="sm" className="w-7 h-7" />
+          <Avatar src={avatarSrc} size="sm" className="w-7 h-7" />
         </div>
       </div>
 
@@ -87,7 +88,7 @@ export function LIFeed({
             {/* Avatar with connection ring */}
             <div className="relative">
               <Avatar
-                src={dicebear(brandName ?? "brand")}
+                src={avatarSrc}
                 size="md"
                 className="w-12 h-12"
                 style={{ border: `2px solid ${LI_BLUE}` }}
@@ -203,41 +204,48 @@ export function LIFeed({
 
 /* ─────────────── LI Article ─────────────── */
 
-export function LIArticle({ title, brandName, variantLabel }: MockupFields) {
+export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
+  const headline = title || lines[0] || "Article 標題";
+  const body = title ? liveCaption ?? "" : lines.slice(1).join("\n");
   return (
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <ImageGenSlot phase="idle" aspectRatio="3/1" />
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <div className="aspect-[3/1] bg-default-100 overflow-hidden">
+            <img src={liveImageUrl} alt="" className="w-full h-full object-cover" />
+          </div>
+        ) : liveImageStyle ? (
+          <div className="aspect-[3/1] bg-default-100 flex items-center justify-center p-4 text-default-500">
+            <div className="text-center max-w-[80%]">
+              <p className="text-tiny font-semibold mb-1">封面風格方向</p>
+              <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
+            </div>
+          </div>
+        ) : (
+          <ImageGenSlot phase="idle" aspectRatio="3/1" />
+        )}
         <div className="px-8 py-6 space-y-3">
-          <h2 className="text-2xl font-semibold leading-tight tracking-tight">{title}</h2>
+          <h2 className="text-2xl font-semibold leading-tight tracking-tight">{headline}</h2>
           <div className="flex items-center gap-3 pt-1">
-            <Avatar src={dicebear(brandName ?? "brand")} size="md" isBordered color="primary" />
+            <Avatar src={avatarSrc} size="md" isBordered color="primary" />
             <div>
               <p className="text-small font-semibold">{brandName ?? "Your Brand"}</p>
               <p className="text-tiny text-default-500">3,456 位追蹤者 · 5 分鐘閱讀</p>
             </div>
           </div>
           <Divider />
-          <div className="space-y-2.5">
-            <Skeleton className="h-3 w-full rounded" />
-            <Skeleton className="h-3 w-[96%] rounded" />
-            <Skeleton className="h-3 w-[92%] rounded" />
-          </div>
-          <div className="pt-2">
-            <p className="text-medium font-semibold mb-1.5">章節一</p>
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-[90%] rounded" />
-              <Skeleton className="h-3 w-[85%] rounded" />
+          {body ? (
+            <p className="text-medium text-default-800 whitespace-pre-line leading-relaxed">{body}</p>
+          ) : (
+            <div className="space-y-2.5">
+              <Skeleton className="h-3 w-full rounded" />
+              <Skeleton className="h-3 w-[96%] rounded" />
+              <Skeleton className="h-3 w-[92%] rounded" />
             </div>
-          </div>
-          <div className="pt-2">
-            <p className="text-medium font-semibold mb-1.5">章節二</p>
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-[88%] rounded" />
-              <Skeleton className="h-3 w-[80%] rounded" />
-            </div>
-          </div>
+          )}
         </div>
         <div className="px-8 py-3 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
           <span>👍 喜歡</span>
@@ -252,7 +260,12 @@ export function LIArticle({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── LI Newsletter (article + subscribe CTA) ─────────────── */
 
-export function LINewsletter({ title, brandName, variantLabel }: MockupFields) {
+export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  void avatarSrc;
+  const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
+  const headline = title || lines[0] || "Newsletter 標題";
+  const body = title ? liveCaption ?? "" : lines.slice(1).join("\n");
   return (
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
@@ -268,17 +281,31 @@ export function LINewsletter({ title, brandName, variantLabel }: MockupFields) {
           </div>
           <Button color="primary" size="sm" radius="full">訂閱</Button>
         </div>
-        <ImageGenSlot phase="idle" aspectRatio="3/1" />
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <div className="aspect-[3/1] bg-default-100 overflow-hidden">
+            <img src={liveImageUrl} alt="" className="w-full h-full object-cover" />
+          </div>
+        ) : liveImageStyle ? (
+          <div className="aspect-[3/1] bg-default-100 flex items-center justify-center p-4 text-default-500">
+            <div className="text-center max-w-[80%]"><p className="text-tiny font-semibold mb-1">封面風格</p><p className="text-tiny line-clamp-3">{liveImageStyle}</p></div>
+          </div>
+        ) : (
+          <ImageGenSlot phase="idle" aspectRatio="3/1" />
+        )}
         <div className="px-8 py-6 space-y-3">
           <p className="text-tiny text-default-500 uppercase tracking-wider">第 042 期 · 5 月 15 日</p>
-          <h2 className="text-2xl font-semibold leading-tight tracking-tight">{title}</h2>
+          <h2 className="text-2xl font-semibold leading-tight tracking-tight">{headline}</h2>
           <Divider />
-          <div className="space-y-2.5">
-            <Skeleton className="h-3 w-full rounded" />
-            <Skeleton className="h-3 w-[96%] rounded" />
-            <Skeleton className="h-3 w-[88%] rounded" />
-            <Skeleton className="h-3 w-[72%] rounded" />
-          </div>
+          {body ? (
+            <p className="text-medium text-default-800 whitespace-pre-line leading-relaxed">{body}</p>
+          ) : (
+            <div className="space-y-2.5">
+              <Skeleton className="h-3 w-full rounded" />
+              <Skeleton className="h-3 w-[96%] rounded" />
+              <Skeleton className="h-3 w-[88%] rounded" />
+              <Skeleton className="h-3 w-[72%] rounded" />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -287,13 +314,21 @@ export function LINewsletter({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── LI Poll ─────────────── */
 
-export function LIPoll({ title, brandName, variantLabel }: MockupFields) {
-  const options = [
-    { text: "選項 A", pct: 42, leading: true },
-    { text: "選項 B", pct: 28, leading: false },
-    { text: "選項 C", pct: 18, leading: false },
-    { text: "選項 D", pct: 12, leading: false },
-  ];
+export function LIPoll({ title, brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  // Parse poll from liveCaption: line 1 = question, lines 2-5 = options
+  const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
+  const question = lines[0] || title || "問題";
+  const optTexts = lines.slice(1, 5);
+  const optPcts = [42, 28, 18, 12];
+  const options = optTexts.length >= 2
+    ? optTexts.map((text, i) => ({ text: text.replace(/^[•\-\d.\)）\s]+/, ""), pct: optPcts[i] ?? 5, leading: i === 0 }))
+    : [
+        { text: "選項 A", pct: 42, leading: true },
+        { text: "選項 B", pct: 28, leading: false },
+        { text: "選項 C", pct: 18, leading: false },
+        { text: "選項 D", pct: 12, leading: false },
+      ];
   return (
     <div className="w-full max-w-[540px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
@@ -302,12 +337,12 @@ export function LIPoll({ title, brandName, variantLabel }: MockupFields) {
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
             description={<span className="text-tiny text-default-500">追蹤者 1,234 · 投票 · 結束於 6 天後</span>}
-            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+            avatarProps={{ src: avatarSrc, size: "md", isBordered: true, color: "primary" }}
           />
           <FontAwesomeIcon icon={faChartSimple} className="text-default-400" />
         </div>
         <div className="px-4 pb-3 space-y-3">
-          <p className="text-medium font-medium">{title}</p>
+          <p className="text-medium font-medium">{question}</p>
           <div className="space-y-2">
             {options.map((opt, i) => (
               <button
@@ -350,7 +385,12 @@ export function LIPoll({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── LI Document (PDF carousel) ─────────────── */
 
-export function LIDocument({ title, brandName, variantLabel }: MockupFields) {
+export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  // First page text from liveCaption (split by ---)
+  const pages = (liveCaption ?? "").split(/---+/).map(p => p.trim()).filter(Boolean);
+  const totalPages = pages.length || 12;
+  const pageOneText = pages[0] || title || "PDF 文件";
   return (
     <div className="w-full max-w-[540px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
@@ -359,27 +399,29 @@ export function LIDocument({ title, brandName, variantLabel }: MockupFields) {
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
             description={<span className="text-tiny text-default-500">追蹤者 1,234 · 1 小時前</span>}
-            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+            avatarProps={{ src: avatarSrc, size: "md", isBordered: true, color: "primary" }}
           />
         </div>
         <div className="px-4 pb-3">
-          <p className="text-small">{title}</p>
+          <p className="text-small">{title || pageOneText.slice(0, 30)}</p>
         </div>
-        {/* Document viewer */}
+        {/* Document viewer — show first page text content */}
         <div className="relative aspect-[4/5] bg-default-100 mx-4 rounded-medium overflow-hidden border border-divider">
-          {/* Stacked page effect */}
-          <div className="absolute inset-3 bg-content1 border border-divider rounded-medium shadow-sm">
-            <div className="absolute inset-0 flex items-center justify-center text-default-400">
-              <div className="text-center">
-                <FontAwesomeIcon icon={faFileLines} className="text-5xl mb-3" />
-                <p className="text-small font-medium">第 1 / 12 頁</p>
-                <p className="text-tiny mt-1">PDF 文件 · 等待 craft agent</p>
-              </div>
+          <div className="absolute inset-3 bg-content1 border border-divider rounded-medium shadow-sm overflow-hidden">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-default-700 p-4">
+              {pages.length > 0 ? (
+                <p className="text-small whitespace-pre-line text-center leading-relaxed">{pageOneText}</p>
+              ) : (
+                <div className="text-center text-default-400">
+                  <FontAwesomeIcon icon={faFileLines} className="text-5xl mb-3" />
+                  <p className="text-small font-medium">第 1 / {totalPages} 頁</p>
+                  <p className="text-tiny mt-1">PDF 文件 · 等待 craft agent</p>
+                </div>
+              )}
             </div>
           </div>
-          {/* Page counter */}
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-tiny px-3 py-1 rounded-full backdrop-blur-sm">
-            1 / 12
+            1 / {totalPages}
           </div>
           {/* Side nav arrows */}
           <button className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-content1 border border-divider shadow flex items-center justify-center text-default-500">‹</button>
