@@ -325,7 +325,21 @@ interface PiapiSpec {
 
 const PIAPI_MAP: Record<string, PiapiSpec> = {
   "piapi/flux-pro": {
-    model: "Qubico/flux1-pro",
+    // 2026-05-05: PiAPI deprecated "Qubico/flux1-pro" model id. The verified
+    // working FLUX endpoint via PiAPI is Qubico/flux1-schnell (4-step, fast).
+    // We keep the public id "piapi/flux-pro" for backward compatibility and
+    // route it under the schnell model.
+    model: "Qubico/flux1-schnell",
+    task_type: "txt2img",
+    sync: true,
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      width:  o.aspectRatio === "9:16" ? 768  : o.aspectRatio === "16:9" ? 1344 : 1024,
+      height: o.aspectRatio === "9:16" ? 1344 : o.aspectRatio === "16:9" ? 768  : 1024,
+    }),
+  },
+  "piapi/flux-schnell": {
+    model: "Qubico/flux1-schnell",
     task_type: "txt2img",
     sync: true,
     buildInput: (o) => ({
