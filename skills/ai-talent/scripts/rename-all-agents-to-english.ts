@@ -75,52 +75,55 @@ async function main() {
     return;
   }
 
-  let updated = 0;
-  let failed = 0;
-  let preserved = 0;
-  for (const r of candidates) {
-    try {
-      // Build UPDATE SET clauses
-      const sets: string[] = [];
-      const params: any[] = [];
+  // 2026-05-05: switched from per-row UPDATE loop to 4 bulk UPDATE statements.
+  // Per-row was too slow at 15K rows (timed out in CI at 3 min). Bulk runs
+  // in seconds. Each statement is idempotent — re-running is safe.
+  console.log("\nApplying 4 bulk UPDATE statements...\n");
 
-      if (r.englishName && r.englishName !== r.name) {
-        sets.push("name = ?");
-        params.push(r.englishName);
-        // Preserve old Chinese name in name_zh if not already populated
-        if (!r.name_zh && r.name) {
-          sets.push("name_zh = ?");
-          params.push(r.name);
-          preserved++;
-        }
-      }
-      if (r.englishTitle && r.englishTitle !== r.title) {
-        sets.push("title = ?");
-        params.push(r.englishTitle);
-        if (!r.title_zh && r.title) {
-          sets.push("title_zh = ?");
-          params.push(r.title);
-        }
-      }
+  const t0 = Date.now();
 
-      if (sets.length === 0) continue;
-      params.push(r.id);
-      await pool.query(
-        `UPDATE agents SET ${sets.join(", ")} WHERE id = ?`,
-        params,
-      );
-      updated++;
-    } catch (err: any) {
-      failed++;
-      console.error(`  ✗ id=${r.id}: ${err.message}`);
-    }
-  }
+  // Step 1: preserve Chinese name into name_zh (only where not already set)
+  const [r1]: any = await pool.query(
+    `UPDATE agents SET name_zh = name
+      WHERE englishName IS NOT NULL AND englishName != ''
+        AND englishName != name
+        AND (name_zh IS NULL OR name_zh = '')`,
+  );
+  console.log(`  ✓ backfilled name_zh: ${r1.affectedRows} rows`);
 
-  // Summary
+  // Step 2: preserve Chinese title into title_zh
+  const [r2]: any = await pool.query(
+    `UPDATE agents SET title_zh = title
+      WHERE englishTitle IS NOT NULL AND englishTitle != ''
+        AND englishTitle != title
+        AND (title_zh IS NULL OR title_zh = '')`,
+  );
+  console.log(`  ✓ backfilled title_zh: ${r2.affectedRows} rows`);
+
+  // Step 3: rename name → englishName
+  const [r3]: any = await pool.query(
+    `UPDATE agents SET name = englishName
+      WHERE englishName IS NOT NULL AND englishName != ''
+        AND englishName != name`,
+  );
+  console.log(`  ✓ renamed name: ${r3.affectedRows} rows`);
+
+  // Step 4: rename title → englishTitle
+  const [r4]: any = await pool.query(
+    `UPDATE agents SET title = englishTitle
+      WHERE englishTitle IS NOT NULL AND englishTitle != ''
+        AND englishTitle != title`,
+  );
+  console.log(`  ✓ renamed title: ${r4.affectedRows} rows`);
+
+  const elapsedMs = Date.now() - t0;
+
   console.log(`\n════════════════════════════════════════`);
-  console.log(`  Updated:   ${updated}`);
-  console.log(`  Preserved: ${preserved} (Chinese name → name_zh)`);
-  console.log(`  Failed:    ${failed}`);
+  console.log(`  Total elapsed:   ${elapsedMs} ms`);
+  console.log(`  name_zh backfilled:    ${r1.affectedRows}`);
+  console.log(`  title_zh backfilled:   ${r2.affectedRows}`);
+  console.log(`  name renamed:          ${r3.affectedRows}`);
+  console.log(`  title renamed:         ${r4.affectedRows}`);
   console.log(`════════════════════════════════════════\n`);
 
   // Sanity check — count remaining Chinese-named agents

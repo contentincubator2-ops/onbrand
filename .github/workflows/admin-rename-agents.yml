@@ -21,7 +21,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 180s
+          command_timeout: 600s
           script: |
             set -e
             AI=/opt/marketing-os/app/skills/ai-talent
