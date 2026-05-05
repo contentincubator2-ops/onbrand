@@ -207,16 +207,11 @@ export function MockupHeader({
   variantLabel?: string;
 }) {
   return (
-    <div className="text-center mb-4">
-      <Chip
-        size="sm" variant="flat" color="secondary"
-        startContent={<FontAwesomeIcon icon={icon} className="ml-1" />}
-        className="uppercase tracking-wider"
-      >
+    <div className="text-center mb-3">
+      <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-default-500">
+        <FontAwesomeIcon icon={icon} className="text-default-400" />
         {variantLabel ?? `${label} 預覽`}
-      </Chip>
-      {/* "agent 完成各階段後..." 是 squad-mode 提示，quick-task 已產出時會誤導，
-          所以拿掉。需要的話之後可改成傳 prop 控制顯隱。 */}
+      </span>
     </div>
   );
 }

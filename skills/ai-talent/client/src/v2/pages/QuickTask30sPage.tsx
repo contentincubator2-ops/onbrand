@@ -426,8 +426,6 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                     <Avatar
                       src={activeTask.agent.avatarUrl || dicebear(activeTask.agent.name)}
                       size="md"
-                      isBordered
-                      color="primary"
                     />
                   )}
                   <div className="min-w-0 flex-1">
@@ -436,7 +434,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                       {activeTask.agent ? `${activeTask.agent.name} · ${activeTask.agent.title}` : activeTask.description}
                     </p>
                   </div>
-                  <Chip size="sm" variant="flat" color="primary">{activeTask.tier}</Chip>
+                  <span className="text-tiny text-default-400 tabular-nums">{activeTask.tier}</span>
                 </div>
               </ModalHeader>
               <ModalBody>
@@ -633,44 +631,35 @@ function OutputCarousel({
         )}
       </div>
 
-      {/* Orchestra stage ribbon — shows what the parallel agents did */}
+      {/* Orchestra stage ribbon — Notion 風格：灰階為主，顏色只在 failed 時出現 */}
       {orchestraStages && orchestraStages.length > 0 && (
-        <div className="bg-default-50 border border-default-200 rounded-medium p-2.5">
-          <p className="text-[10px] uppercase tracking-wider text-default-500 mb-1.5">Orchestra · 平行階段</p>
-          <div className="flex flex-wrap gap-1.5">
-            {orchestraStages.map((s: any) => (
-              <div
-                key={s.key}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-tiny border ${
-                  s.status === "done" ? "bg-success-50 border-success-200 text-success-700"
-                  : s.status === "failed" ? "bg-danger-50 border-danger-200 text-danger-700"
-                  : "bg-default-100 border-default-200 text-default-600"
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  s.status === "done" ? "bg-success-500" : s.status === "failed" ? "bg-danger-500" : "bg-default-400"
-                }`} />
-                <span className="truncate max-w-[200px]">{s.label}</span>
+        <div className="border-t border-b border-default-100 py-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-tiny text-default-500">
+            <span className="text-[10px] uppercase tracking-wider text-default-400">Orchestra</span>
+            {orchestraStages.map((s: any, i: number) => (
+              <span key={s.key} className="flex items-center gap-1.5">
+                {i > 0 && <span className="text-default-300">·</span>}
+                <span className={s.status === "failed" ? "text-danger-600" : "text-default-600"}>
+                  {s.label}
+                </span>
                 {s.completedAt != null && (
-                  <span className="text-[10px] opacity-60">{(s.completedAt / 1000).toFixed(1)}s</span>
+                  <span className="text-default-400 tabular-nums">{(s.completedAt / 1000).toFixed(1)}s</span>
                 )}
-              </div>
+              </span>
             ))}
           </div>
         </div>
       )}
 
-      {/* URL provenance — show when agent actually fetched + read a link */}
+      {/* URL provenance — 已讀的連結，灰階呈現 */}
       {fetchedUrl && (
-        <Card className="bg-success-50 border border-success-200">
-          <CardBody className="py-2 px-3 flex flex-row items-center gap-2 text-tiny">
-            <span className="text-success-700 font-semibold">✓ 已讀過你給的連結</span>
-            <span className="text-default-500 truncate flex-1">
-              {fetchedUrl.title ?? fetchedUrl.url}
-            </span>
-            <Chip size="sm" variant="flat" color="success">{fetchedUrl.chars.toLocaleString()} 字</Chip>
-          </CardBody>
-        </Card>
+        <div className="flex items-center gap-2 text-tiny text-default-500 border-b border-default-100 pb-2">
+          <span className="text-default-700">✓ 已讀過連結</span>
+          <span className="text-default-400 truncate flex-1">
+            {fetchedUrl.title ?? fetchedUrl.url}
+          </span>
+          <span className="text-default-400 tabular-nums">{fetchedUrl.chars.toLocaleString()} 字</span>
+        </div>
       )}
 
       {!slide.caption && (
@@ -681,30 +670,30 @@ function OutputCarousel({
         </Card>
       )}
 
-      {/* Carousel — chevrons + dots */}
+      {/* Carousel — Notion 風格：灰階單色，無漸層、無 primary chip */}
       {total > 1 && (
-        <div className="flex items-center justify-between bg-default-50 rounded-medium px-3 py-2">
+        <div className="flex items-center justify-between px-1 py-1">
           <Button
             isIconOnly
             size="sm"
-            variant="flat"
+            variant="light"
             isDisabled={idx === 0}
             onPress={() => setIdx(Math.max(0, idx - 1))}
           >
-            <FontAwesomeIcon icon={faChevronLeft} />
+            <FontAwesomeIcon icon={faChevronLeft} className="text-default-500" />
           </Button>
-          <div className="flex items-center gap-2">
-            <Chip size="sm" variant="flat" color="primary">{slide.label}</Chip>
-            <span className="text-tiny text-default-500">
+          <div className="flex items-center gap-3">
+            <span className="text-small font-medium text-default-700">{slide.label}</span>
+            <span className="text-tiny text-default-400 tabular-nums">
               {idx + 1} / {total}
             </span>
-            <div className="flex gap-1 ml-2">
+            <div className="flex gap-1">
               {slides.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setIdx(i)}
-                  className={`w-1.5 h-1.5 rounded-full transition ${
-                    i === idx ? "bg-primary-500 w-4" : "bg-default-300"
+                  className={`h-1 rounded-full transition ${
+                    i === idx ? "bg-default-700 w-4" : "bg-default-200 w-1"
                   }`}
                   aria-label={`切到版本 ${i + 1}`}
                 />
@@ -714,11 +703,11 @@ function OutputCarousel({
           <Button
             isIconOnly
             size="sm"
-            variant="flat"
+            variant="light"
             isDisabled={idx === total - 1}
             onPress={() => setIdx(Math.min(total - 1, idx + 1))}
           >
-            <FontAwesomeIcon icon={faChevronRight} />
+            <FontAwesomeIcon icon={faChevronRight} className="text-default-500" />
           </Button>
         </div>
       )}
