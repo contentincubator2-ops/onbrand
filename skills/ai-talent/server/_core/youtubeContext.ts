@@ -65,14 +65,23 @@ function pluckJson(html: string, key: string): string | null {
   }
 }
 
+// YouTube blocks identified bot UAs aggressively — we need a real Chrome UA
+// + cookie-consent state to get the watch page with captionTracks intact.
+const REAL_CHROME_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+
 async function fetchWatchPage(videoId: string): Promise<string | null> {
   try {
-    const r = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=zh-TW`, {
+    const r = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=zh-TW&persist_hl=1`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; MarketingOS-Bot/1.0; +https://marketing-os.sowork.ai)",
+        "User-Agent": REAL_CHROME_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        // CONSENT cookie skips the EU consent wall that returns a stub page
+        Cookie: "CONSENT=YES+cb; SOCS=CAISEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiAlqayBg",
       },
     });
     if (!r.ok) return null;
@@ -82,20 +91,43 @@ async function fetchWatchPage(videoId: string): Promise<string | null> {
   }
 }
 
-/** Extract captionTracks[0].baseUrl from watch-page HTML. */
+/**
+ * Extract captionTracks baseUrl, with auto-translate fallback.
+ * Returns the URL most likely to give us readable transcript text:
+ *   1. Native zh-TW / zh / zh-Hant caption track
+ *   2. English native track
+ *   3. ANY track + &tlang=zh-Hant for YouTube's auto-translation
+ *   4. First available track raw
+ */
 function findCaptionUrl(html: string): string | null {
   const m = html.match(/"captionTracks":\s*(\[[^\]]+\])/);
   if (!m || !m[1]) return null;
   try {
     const tracks = JSON.parse(m[1]);
     if (!Array.isArray(tracks) || tracks.length === 0) return null;
-    // Prefer zh-TW, fall back to zh, then English, then first available
-    const prefs = ["zh-TW", "zh", "zh-Hant", "zh-Hans", "en"];
-    for (const lang of prefs) {
-      const found = tracks.find((t: any) => t?.languageCode === lang || (t?.vssId ?? "").includes(lang));
+
+    // 1. Native zh / en preference
+    const nativePrefs = ["zh-TW", "zh", "zh-Hant", "zh-Hans"];
+    for (const lang of nativePrefs) {
+      const found = tracks.find((t: any) =>
+        t?.languageCode === lang || (t?.vssId ?? "").includes(lang),
+      );
       if (found?.baseUrl) return found.baseUrl;
     }
-    return tracks[0]?.baseUrl ?? null;
+    // 2. Native English
+    const enTrack = tracks.find((t: any) =>
+      t?.languageCode === "en" || (t?.vssId ?? "").startsWith(".en"),
+    );
+    if (enTrack?.baseUrl) {
+      // 3. Auto-translate English → 中文 (YT supports tlang param)
+      return `${enTrack.baseUrl}&tlang=zh-Hant`;
+    }
+    // 4. First available + auto-translate to Chinese
+    const first = tracks[0];
+    if (first?.baseUrl) {
+      return `${first.baseUrl}&tlang=zh-Hant`;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -103,8 +135,15 @@ function findCaptionUrl(html: string): string | null {
 
 async function fetchTranscript(captionUrl: string): Promise<{ text: string; segments: Array<{ start: number; text: string }> } | null> {
   try {
+    // YT timedtext also wants a real UA + Origin to avoid bot detection
     const r = await fetch(`${captionUrl}&fmt=json3`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: {
+        "User-Agent": REAL_CHROME_UA,
+        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        "Origin": "https://www.youtube.com",
+        "Referer": "https://www.youtube.com/",
+      },
     });
     if (!r.ok) return null;
     const data: any = await r.json();

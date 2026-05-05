@@ -135,6 +135,17 @@ async function callOneVariant(args: {
       ? `字數 ${config.captionMinChars}-${config.captionMaxChars} 字。`
       : "字數依任務本身規範。";
 
+  // Critical ordering: urlContext goes AFTER brandPrefix so URL content is
+  // the most recent context the LLM sees. Plus explicit precedence rule.
+  const hasUrl = urlContext.length > 0;
+  const subjectRule = hasUrl
+    ? `\n【主題優先序 — 最重要】\n` +
+      `本次任務的「主題」是上面 URL 抓到的內容。品牌資訊只用作「語氣 / 用詞 / 受眾」參考。\n` +
+      `**絕對不要**把品牌的主商品 / 主主題塞進這個任務 — 例如品牌賣減肥課程，但 URL 是 Shopee 教學影片，` +
+      `caption 必須關於 Shopee 影片的內容，不是減肥課程。\n` +
+      `caption 必須具體呼應 URL 內容（提到影片裡的事件、數字、名稱），不要寫通用模板。\n`
+    : "";
+
   const system =
     `# 你的角色 / 寫作風格參考\n` +
     captionPersona +
@@ -143,10 +154,11 @@ async function callOneVariant(args: {
     `\n\n【本次任務】只寫 1 個變體：**${label}** 口吻。\n` +
     `${lengthHint}\n\n` +
     `【角色 vs 主角 — 重要】\n` +
-    `上面的「角色」只是給你**寫作口吻**參考。**主角永遠是用戶**（用戶資訊在 user message）。\n` +
+    `上面的「角色」只是給你**寫作口吻**參考。**主角永遠是用戶或用戶輸入的內容**（在 user message + URL context）。\n` +
     `絕對不要把你（agent）的職稱、姓名、服務描述、自我介紹寫進輸出。\n` +
-    `不要寫「我是 ___」或「___ 專家，幫 ___ 做 ___」這種自我介紹 — 那是你，不是用戶。\n\n` +
-    `【格式要求 — 重要】\n` +
+    `不要寫「我是 ___」、「___ 專家，幫 ___ 做 ___」、不要把你的姓名（例如 #NinaYeh / @JanetChang）寫成 hashtag、@mention 或 caption 內任何形式。\n` +
+    subjectRule +
+    `\n【格式要求 — 重要】\n` +
     `- caption 欄位**絕對不要**寫「${template.label}」、「${label}」或任務 / label 名稱。\n` +
     `- caption 欄位**絕對不要**夾雜視覺描述、英文 prompt、「image_style:」、「visual:」等技術註記。圖片風格由另一位 agent 獨立處理，這裡只放最終發到平台的純文字內容。\n` +
     `- 用自然斷行（兩個 newline 分段）。**不要**用「｜」全形管道符號當分隔線。\n` +
@@ -157,7 +169,9 @@ async function callOneVariant(args: {
     `輸出嚴格 JSON 物件（不是陣列）：\n` +
     `{"caption":"<完整貼文>","hashtags":["..."]}\n` +
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
+    `\n# 品牌語氣參考（輔助，非主題）\n` +
     brandPrefix +
+    `\n# URL 抓到的內容（本次主題來源）\n` +
     urlContext;
 
   const provider: ModelProvider =
@@ -240,20 +254,27 @@ async function callImageDirector(args: {
 
   const variantSpec = config.variantLabels.slice(0, config.images).map((l, i) => `  ${i + 1}. ${l}`).join("\n");
 
+  const hasUrl = urlContext.length > 0;
+  const subjectRule = hasUrl
+    ? `\n【主題優先序】視覺要呼應 URL 抓到的內容（影片 / 文章主題），不要把品牌的主商品塞進視覺。\n`
+    : "";
   const system =
     imagePersona +
     `任務：你是視覺方向設計師。為 ${config.images} 個不同口吻的 caption 各寫 1 條**繁體中文**的視覺方向描述。\n\n` +
     `每條描述的口吻順序：\n${variantSpec}\n\n` +
-    `比例：${config.aspectRatio ?? "1:1"}\n\n` +
-    `規則：\n` +
+    `比例：${config.aspectRatio ?? "1:1"}\n` +
+    subjectRule +
+    `\n規則：\n` +
     `- 每條描述 30-60 字**繁體中文**（之後系統會自動翻成英文 Flux prompt — 你只負責給用戶看的中文方向）\n` +
     `- 涵蓋：主體 / 構圖 / 光線 / 色彩 / 氛圍\n` +
     `- 不要寫「圖中疊上文字」（生圖模型對文字不在行）\n` +
     `- 不要用品牌 logo（除非用戶明確要求）\n` +
-    `- 風格要呼應該口吻（情感版＝溫暖光線柔色／數據版＝clean infographic／故事版＝生活感場景等）\n\n` +
+    `- 風格要呼應該口吻\n\n` +
     `輸出嚴格 JSON 陣列：["中文描述 1", "中文描述 2", ...]（${config.images} 條）\n` +
     `不要 markdown code fence。直接 JSON。第一個字元就是 [。\n` +
+    `\n# 品牌語氣參考\n` +
     brandPrefix +
+    `\n# URL 抓到的內容（主題來源）\n` +
     urlContext;
 
   const r = await Promise.race([

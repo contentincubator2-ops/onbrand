@@ -889,7 +889,13 @@ function OutputCarousel({
         >
           🔄 換個語氣
         </Button>
-        {slide.imageStyle && !fetchedUrl?.og && (
+        {/* Show "用此風格生圖" whenever we have a style brief and no real
+            image yet. Previously hidden when fetchedUrl.og existed (FB link
+            posts use OG card → no image needed) but YT fetchedUrl also
+            populates og.image with the YT thumbnail, which incorrectly hid
+            this button for all YT tasks. New rule: hide only when slide has
+            an actual generated image already (slide.imageUrl). */}
+        {slide.imageStyle && !slide.imageUrl && (
           <Button
             variant="flat"
             size="sm"
