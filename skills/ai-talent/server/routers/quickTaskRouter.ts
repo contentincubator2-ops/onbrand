@@ -864,6 +864,43 @@ export const quickTaskRouter = router({
   // runQuick: execute a 30s or 60s FB task with a single LLM call.
   // Returns canonical QuickTaskOutput (see quickTaskOutput.ts). For 90s
   // tasks, frontend should call squad.stepExecute (existing pipeline).
+  // ── Plan B 20s orchestra (2026-05-05) ──────────────────────────────
+  // Parallel fanout: caption_writer + image_director + N×Flux Schnell.
+  // Returns OrchestraResult — variants[] each with {caption, image:{url,status}}.
+  // 20s hard budget; per-image 7s; degrades gracefully (timeout chips).
+  runOrchestra: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().min(1).max(64),
+        inputs: z.record(z.string(), z.string()).default({}),
+        brandId: z.number().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+      const { getOrchestraConfig } = await import("../_core/quickTaskFB");
+      const template = FB_30S_TASKS.find((t) => t.id === input.taskId);
+      if (!template) {
+        throw new Error(`Unknown 30s quick task id: ${input.taskId} (orchestra is 30s-only).`);
+      }
+      const config = getOrchestraConfig(input.taskId);
+      if (!config) {
+        throw new Error(`No orchestra config for task ${input.taskId}.`);
+      }
+      // Required-field check
+      for (const f of template.inputs) {
+        if (f.required && !input.inputs[f.key]?.trim()) {
+          throw new Error(`Missing required input: ${f.key} (${f.label})`);
+        }
+      }
+      return runOrchestra({
+        template,
+        config,
+        inputs: input.inputs,
+        brandId: input.brandId,
+      });
+    }),
+
   runQuick: protectedProcedure
     .input(
       z.object({

@@ -230,6 +230,64 @@ async function genFalFlux(opts: GenOptions): Promise<GenResult> {
   throw new Error("fal generation timed out");
 }
 
+// ── 5b. fal.ai Flux SCHNELL (fast: 4 inference steps, 3-5s) ──────────────
+//
+// Plan B 20s orchestra uses this — much faster than flux-dev (28 steps, ~10s).
+// Caller may pass options.quality='high' to bump steps to 8 for premium tasks
+// like 釘選 (long-shelf-life pinned posts).
+async function genFalFluxSchnell(opts: GenOptions): Promise<GenResult> {
+  const key = process.env.FAL_API_KEY ?? process.env.FAL_AI_API_KEY ?? "";
+  if (!key) throw new Error("FAL_API_KEY missing");
+  const steps = opts.quality === "high" ? 8 : 4;
+  // Submit
+  const submitResp = await fetch("https://queue.fal.run/fal-ai/flux/schnell", {
+    method: "POST",
+    headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: opts.prompt,
+      image_size: opts.aspectRatio === "9:16" ? "portrait_9_16"
+        : opts.aspectRatio === "16:9" ? "landscape_16_9"
+        : opts.aspectRatio === "4:3" ? "landscape_4_3"
+        : "square_hd",
+      num_inference_steps: steps,
+      enable_safety_checker: true,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!submitResp.ok) {
+    const t = await submitResp.text();
+    throw new Error(`fal-schnell submit ${submitResp.status}: ${t.slice(0, 200)}`);
+  }
+  const submitted: any = await submitResp.json();
+  const requestId = submitted?.request_id;
+  if (!requestId) throw new Error("fal-schnell: no request_id");
+
+  // Poll (Schnell finishes in ~3-5s) — short interval, hard 12s ceiling
+  const start = Date.now();
+  while (Date.now() - start < 12_000) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const statusResp = await fetch(
+      `https://queue.fal.run/fal-ai/flux/schnell/requests/${requestId}/status`,
+      { headers: { Authorization: `Key ${key}` } },
+    );
+    if (!statusResp.ok) continue;
+    const s: any = await statusResp.json();
+    if (s?.status === "COMPLETED") {
+      const resultResp = await fetch(
+        `https://queue.fal.run/fal-ai/flux/schnell/requests/${requestId}`,
+        { headers: { Authorization: `Key ${key}` } },
+      );
+      const result: any = await resultResp.json();
+      const remoteUrl = result?.images?.[0]?.url;
+      if (!remoteUrl) throw new Error("fal-schnell: no image url in completed result");
+      const localUrl = await downloadAndSave(remoteUrl, "img");
+      return { status: "ready", modelId: "fal/flux-schnell", url: localUrl, meta: { remoteUrl, requestId, steps } };
+    }
+    if (s?.status === "FAILED") throw new Error("fal-schnell generation failed");
+  }
+  throw new Error("fal-schnell generation timed out (12s)");
+}
+
 // ── 6. Hailuo t2v / i2v (async, returns taskId) ──────────────────────────
 async function submitHailuoVideo(opts: GenOptions, mode: "t2v" | "i2v"): Promise<GenResult> {
   const key = process.env.HAILUO_API_KEY ?? process.env.MINIMAX_API_KEY ?? "";
@@ -557,6 +615,7 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
     case "google/imagen-4-ultra":   return genImagen4(opts, "ultra");
     case "hailuo/image":           return genHailuoImage(opts);
     case "fal/flux-dev":           return genFalFlux(opts);
+    case "fal/flux-schnell":       return genFalFluxSchnell(opts);
     case "hailuo/t2v":             return submitHailuoVideo(opts, "t2v");
     case "hailuo/i2v":             return submitHailuoVideo(opts, "i2v");
     case "google/veo-3":           return submitVeo3(opts, false);

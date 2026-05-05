@@ -20,7 +20,7 @@ import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./share
 
 /* ─────────────── FB Feed ─────────────── */
 
-export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveHashtags, ogCard }: MockupFields) {
+export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard }: MockupFields) {
   // 2026-05-05: liveImageStyle takes priority over liveImageDesc — it's the
   // "style direction" the quick-task agent produced, kept inside the image
   // slot as a brief for the user to carry into MediaGenFlow.
@@ -92,21 +92,47 @@ export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageD
             </div>
           </a>
         ) : (
-          <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
-            {!hasContent && <Skeleton className="absolute inset-0" />}
-            <div className={`text-center relative z-10 p-4 ${hasContent ? "bg-default-50/80 backdrop-blur-sm rounded-medium m-3" : ""}`}>
-              <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
-              {liveImageStyle ? (
-                <>
-                  <p className="text-tiny font-semibold text-default-600 mb-1">圖片風格方向</p>
-                  <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
-                  <p className="text-[10px] text-default-400 mt-2">點此用 MediaGenFlow 生圖</p>
-                </>
-              ) : (
-                <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+          liveImageUrl && liveImageStatus === "ready" ? (
+            // Plan B: real generated image (Flux Schnell) — render directly
+            <div className="aspect-[16/9] bg-default-100 overflow-hidden relative">
+              <img
+                src={liveImageUrl}
+                alt={liveImageStyle ?? "Generated image"}
+                className="w-full h-full object-cover"
+              />
+              {liveImageStyle && (
+                <div className="absolute bottom-2 left-2 right-2 bg-black/55 backdrop-blur-sm rounded px-2 py-1">
+                  <p className="text-[10px] text-white/90 line-clamp-2">{liveImageStyle}</p>
+                </div>
               )}
             </div>
-          </div>
+          ) : (
+            <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
+              {!hasContent && <Skeleton className="absolute inset-0" />}
+              <div className={`text-center relative z-10 p-4 ${hasContent ? "bg-default-50/80 backdrop-blur-sm rounded-medium m-3" : ""}`}>
+                <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
+                {liveImageStatus === "timeout" ? (
+                  <>
+                    <p className="text-tiny font-semibold text-warning-600 mb-1">補完中…（20s 已超）</p>
+                    <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>
+                  </>
+                ) : liveImageStatus === "failed" ? (
+                  <>
+                    <p className="text-tiny font-semibold text-danger-600 mb-1">生圖失敗</p>
+                    <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>
+                  </>
+                ) : liveImageStyle ? (
+                  <>
+                    <p className="text-tiny font-semibold text-default-600 mb-1">圖片風格方向</p>
+                    <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
+                    <p className="text-[10px] text-default-400 mt-2">點此用 MediaGenFlow 生圖</p>
+                  </>
+                ) : (
+                  <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+                )}
+              </div>
+            </div>
+          )
         )}
         <div className="px-4 py-2 border-t border-divider flex items-center justify-between text-default-500 text-tiny">
           <span>👍❤️🎉 1,234</span>

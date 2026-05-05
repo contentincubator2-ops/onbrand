@@ -208,7 +208,7 @@ output: caption 放完整 Story 文（30-60 字，會疊在圖片上） / title 
     postType: "feed", // pre-live announcement post is feed-shaped
     label: "FB 直播標題 + 預告短文",
     description: "直播開始前 1-2 小時的預告 caption",
-    agent_id: 60021,              // Tina Ji — Social copywriter (no dedicated live agent)
+    agent_id: 40,                 // Vicky Feng — Live Stream Host (Plan B, 2026-05-05)
     skill_slug: "social-copy",
     primary_question: "今天的直播要講什麼？",
     primary_input: { key: "live_topic", placeholder: "例：產品試用、新品發表、Q&A", type: "text" },
@@ -266,6 +266,153 @@ output: hashtags 陣列（不要含 # 前綴），caption 放 1 句使用建議�
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
 ];
+
+// ─── Plan B Orchestra config (2026-05-05) ──────────────────────────────────
+//
+// 20-second parallel-fanout spec. For each 30s task we declare:
+//   - variants:           how many caption deliverables (3 or 5)
+//   - images:             how many real-generated images (0, 1, or 5)
+//   - imageDirectorId:    agent that writes the visual briefs (null = no images)
+//   - aspectRatio:        Flux Schnell aspect ratio
+//   - fluxSize:           explicit pixel size for the image_size param
+//   - imageQualitySteps:  inference steps (4 = fast, 8 = higher quality for 釘選)
+//   - variantLabels:      口吻 names — drives the LLM's variant slots + UI chips
+//
+// Tasks not listed (4, 5, 9 — 留言/客訴/hashtag) need no image gen — orchestra
+// just runs caption_writer and skips image_director entirely.
+
+export interface OrchestraConfig {
+  variants: number;
+  images: number;
+  imageDirectorId: number | null;
+  aspectRatio: "1:1" | "1.91:1" | "9:16" | "16:9" | null;
+  fluxSize: "square_hd" | "landscape_4_3" | "portrait_9_16" | "landscape_16_9" | null;
+  imageQualitySteps: number; // Flux Schnell: 4 default, 8 for higher quality
+  variantLabels: string[];
+  /** Caption length range hint (chars, lower bound) for prompt + UI badge */
+  captionMinChars: number;
+  captionMaxChars: number;
+}
+
+const MANDY_ID = 239184; // FB Visual Direction Lead
+
+export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "fb-30-caption-short": {
+    variants: 5,
+    images: 5,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    fluxSize: "square_hd",
+    imageQualitySteps: 4,
+    variantLabels: ["情感版", "理性版", "幽默版", "故事版", "數據版"],
+    captionMinChars: 100,
+    captionMaxChars: 200,
+  },
+  "fb-30-pure-text-hook": {
+    variants: 5,
+    images: 5,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    fluxSize: "landscape_4_3",
+    imageQualitySteps: 4,
+    variantLabels: ["反問式", "數字式", "反差式", "故事式", "挑釁式"],
+    captionMinChars: 30, // hook only — full caption = hook + user article
+    captionMaxChars: 60,
+  },
+  "fb-30-link-caption": {
+    variants: 3,
+    images: 1, // alt cover, in case OG image is bad
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    fluxSize: "landscape_4_3",
+    imageQualitySteps: 4,
+    variantLabels: ["資訊式", "故事式", "問題式"],
+    captionMinChars: 80,
+    captionMaxChars: 150,
+  },
+  "fb-30-comment-reply": {
+    variants: 5,
+    images: 0,
+    imageDirectorId: null,
+    aspectRatio: null,
+    fluxSize: null,
+    imageQualitySteps: 0,
+    variantLabels: ["溫暖式", "專業式", "俏皮式", "共鳴式", "反問式"],
+    captionMinChars: 30,
+    captionMaxChars: 80,
+  },
+  "fb-30-crisis-reply-short": {
+    variants: 3,
+    images: 0,
+    imageDirectorId: null,
+    aspectRatio: null,
+    fluxSize: null,
+    imageQualitySteps: 0,
+    variantLabels: ["克制式", "標準式", "具體承諾式"],
+    captionMinChars: 80,
+    captionMaxChars: 150,
+  },
+  "fb-30-pinned-short": {
+    variants: 5,
+    images: 5,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    fluxSize: "landscape_4_3",
+    imageQualitySteps: 8, // higher quality — 釘選曝光長
+    variantLabels: ["功能訴求", "情感訴求", "數據訴求", "故事訴求", "反差訴求"],
+    captionMinChars: 150,
+    captionMaxChars: 250,
+  },
+  "fb-30-story-text": {
+    variants: 5,
+    images: 5,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "9:16",
+    fluxSize: "portrait_9_16",
+    imageQualitySteps: 4,
+    variantLabels: ["驚喜式", "親密式", "懸念式", "教學式", "幕後式"],
+    captionMinChars: 30,
+    captionMaxChars: 60,
+  },
+  "fb-30-live-title": {
+    variants: 5,
+    images: 5,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "16:9",
+    fluxSize: "landscape_16_9",
+    imageQualitySteps: 4,
+    variantLabels: ["懸念式", "數據式", "反差式", "共鳴式", "直球式"],
+    captionMinChars: 8, // title only
+    captionMaxChars: 25,
+  },
+  "fb-30-hashtag-set": {
+    variants: 3, // 3 hashtag sets (different strategies)
+    images: 0,
+    imageDirectorId: null,
+    aspectRatio: null,
+    fluxSize: null,
+    imageQualitySteps: 0,
+    variantLabels: ["曝光導向 (20)", "品牌導向 (8)", "利基導向 (12)"],
+    captionMinChars: 0,
+    captionMaxChars: 600, // hashtag string list
+  },
+  "fb-30-countdown-1day": {
+    variants: 5,
+    images: 5,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    fluxSize: "square_hd",
+    imageQualitySteps: 4,
+    variantLabels: ["焦慮式", "FOMO式", "期待式", "提醒式", "反差式"],
+    captionMinChars: 60,
+    captionMaxChars: 120,
+  },
+};
+
+/** Resolve a task id to its orchestra config; null if task isn't Plan-B-ready. */
+export function getOrchestraConfig(taskId: string): OrchestraConfig | null {
+  return FB_30S_ORCHESTRA[taskId] ?? null;
+}
 
 // ─── 60s tier (13 tasks — 2-3 step or richer single-call) ──────────────────
 

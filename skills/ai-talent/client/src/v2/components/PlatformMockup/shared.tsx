@@ -156,6 +156,13 @@ export interface MockupFields {
   liveImageStyle?: string;
   liveVideoStyle?: string;
   /**
+   * Plan B (2026-05-05): when the orchestra has a real generated image URL,
+   * we pass it here. Mockups render the actual <img> instead of the style-
+   * direction text. Falls back to liveImageStyle when missing or status≠ready.
+   */
+  liveImageUrl?: string;
+  liveImageStatus?: "ready" | "failed" | "skipped" | "timeout";
+  /**
    * Quick-task link-post pivot (2026-05-05): when caption contains a URL the
    * server already fetched, this carries the OG card metadata so the mockup
    * renders an actual link preview (image + title + description + domain)

@@ -151,6 +151,10 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     : "今天，要交付哪一個 90 秒級的策略產出？";
 
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
+  // Plan B 20s parallel orchestra (caption_writer + image_director + Flux Schnell ×N)
+  const runOrchestraMut = (trpc as any).quickTask?.runOrchestra?.useMutation();
+  const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
+  const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
 
   const openTask = (t: FBTaskCard) => {
     setActiveTask(t);
@@ -184,6 +188,40 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         return;
       }
       const inputKey = activeTask.primary_input?.key ?? "topic";
+      // Plan B: 30s tasks go through orchestra (parallel fanout). 60s/90s
+      // fall back to legacy runQuick for now until those tiers are wired.
+      if (activeTask.tier === "30s" && runOrchestraMut) {
+        const r = await runOrchestraMut.mutateAsync({
+          taskId: activeTask.id,
+          inputs: { [inputKey]: primaryAnswer },
+          brandId: brandId ?? undefined,
+        });
+        // Transform OrchestraResult → OutputCarousel-compatible shape
+        const transformedOutput = {
+          platform: "facebook",
+          post_type: activeTask.postType ?? "feed",
+          caption: r.variants?.[0]?.caption ?? "",
+          hashtags: r.variants?.[0]?.hashtags ?? [],
+          variants: (r.variants ?? []).map((v: any) => ({
+            label: v.label,
+            caption: v.caption,
+            hashtags: v.hashtags,
+            image_style_direction: v.image?.style ? { summary: v.image.style } : undefined,
+            imageUrl: v.image?.url ?? null,
+            imageStatus: v.image?.status ?? "skipped",
+          })),
+        };
+        setOutput(transformedOutput);
+        setLatencyMs(r.totalLatencyMs);
+        setAgentMeta(r.captionAgent ?? null);
+        setImageAgentMeta(r.imageAgent ?? null);
+        setOrchestraStages(r.stages ?? null);
+        setFetchedUrl(r.fetchedUrl ?? null);
+        if (!r.ok) {
+          setErrorMsg(`Orchestra 部分階段失敗：${(r.errors ?? []).slice(0, 1).join("")}`);
+        }
+        return;
+      }
       const r = await runQuickMut.mutateAsync({
         taskId: activeTask.id,
         inputs: { [inputKey]: primaryAnswer },
@@ -216,7 +254,9 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     return { platform, format, label: `${platform}/${format}` };
   }, [output]);
 
-  const expectedSec = activeTask?.tier === "30s" ? 30 : activeTask?.tier === "60s" ? 60 : 90;
+  // Plan B: 30s tier now runs the 20-second parallel orchestra, not the
+  // legacy 30s single-call flow. Other tiers keep their original budgets.
+  const expectedSec = activeTask?.tier === "30s" ? 20 : activeTask?.tier === "60s" ? 60 : 90;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
   return (
@@ -470,6 +510,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                     mockupVariant={mockupVariant}
                     latencyMs={latencyMs}
                     agentMeta={agentMeta}
+                    imageAgentMeta={imageAgentMeta}
+                    orchestraStages={orchestraStages}
                     fetchedUrl={fetchedUrl}
                     errorMsg={errorMsg}
                   />
@@ -518,7 +560,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
  * If output has 0 variants (just top-level caption), shows a single mockup.
  */
 function OutputCarousel({
-  output, activeTask, brandName, mockupVariant, latencyMs, agentMeta, fetchedUrl, errorMsg,
+  output, activeTask, brandName, mockupVariant, latencyMs, agentMeta, imageAgentMeta, orchestraStages, fetchedUrl, errorMsg,
 }: {
   output: any;
   activeTask: FBTaskCard;
@@ -526,14 +568,31 @@ function OutputCarousel({
   mockupVariant: MockupVariant | null;
   latencyMs: number | null;
   agentMeta: any;
+  imageAgentMeta?: any;
+  orchestraStages?: any[] | null;
   fetchedUrl: { url: string; title: string | null; chars: number; og?: { image: string | null; title: string | null; description: string | null; site_name: string | null; domain: string } } | null;
   errorMsg: string | null;
 }) {
-  // Build the slide list — slide 0 = main output; slides 1+ = variants
+  // Build the slide list. Plan B (orchestra) returns variants[] already as
+  // the authoritative slide list — no separate "main"; first variant IS the
+  // main. Legacy runQuick path uses [main, ...variants] as before.
   const slides: Array<{
     label: string; caption: string; hashtags?: string[]; imageStyle?: string;
+    imageUrl?: string | null; imageStatus?: "ready" | "failed" | "skipped" | "timeout";
   }> = useMemo(() => {
     const topStyle = output.image_style_direction?.summary;
+    const orchestraMode = (output.variants ?? []).some((v: any) => v.imageUrl !== undefined || v.imageStatus !== undefined);
+    if (orchestraMode) {
+      return (output.variants ?? []).map((v: any, i: number) => ({
+        label: v.label || `版本 ${i + 1}`,
+        caption: v.caption ?? "",
+        hashtags: v.hashtags ?? [],
+        imageStyle: v.image_style_direction?.summary || topStyle,
+        imageUrl: v.imageUrl ?? null,
+        imageStatus: v.imageStatus ?? "skipped",
+      }));
+    }
+    // Legacy path
     const main = {
       label: "主版本",
       caption: output.caption ?? "",
@@ -544,7 +603,6 @@ function OutputCarousel({
       label: v.label || `版本 ${i + 2}`,
       caption: v.caption ?? "",
       hashtags: v.hashtags ?? output.hashtags ?? [],
-      // Per-variant style direction wins; fallback to top-level
       imageStyle: v.image_style_direction?.summary || topStyle,
     }));
     return [main, ...vars];
@@ -567,7 +625,41 @@ function OutputCarousel({
             <span>{agentMeta.name}</span>
           </>
         )}
+        {imageAgentMeta && (
+          <>
+            <span>+</span>
+            <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-4 h-4" />
+            <span>{imageAgentMeta.name}</span>
+          </>
+        )}
       </div>
+
+      {/* Orchestra stage ribbon — shows what the parallel agents did */}
+      {orchestraStages && orchestraStages.length > 0 && (
+        <div className="bg-default-50 border border-default-200 rounded-medium p-2.5">
+          <p className="text-[10px] uppercase tracking-wider text-default-500 mb-1.5">Orchestra · 平行階段</p>
+          <div className="flex flex-wrap gap-1.5">
+            {orchestraStages.map((s: any) => (
+              <div
+                key={s.key}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-tiny border ${
+                  s.status === "done" ? "bg-success-50 border-success-200 text-success-700"
+                  : s.status === "failed" ? "bg-danger-50 border-danger-200 text-danger-700"
+                  : "bg-default-100 border-default-200 text-default-600"
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  s.status === "done" ? "bg-success-500" : s.status === "failed" ? "bg-danger-500" : "bg-default-400"
+                }`} />
+                <span className="truncate max-w-[200px]">{s.label}</span>
+                {s.completedAt != null && (
+                  <span className="text-[10px] opacity-60">{(s.completedAt / 1000).toFixed(1)}s</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* URL provenance — show when agent actually fetched + read a link */}
       {fetchedUrl && (
@@ -647,6 +739,8 @@ function OutputCarousel({
           liveCta={output.cta}
           liveHashtags={slide.hashtags}
           liveImageStyle={slide.imageStyle}
+          liveImageUrl={slide.imageUrl ?? undefined}
+          liveImageStatus={slide.imageStatus}
           liveVideoStyle={output.video_style_direction?.summary}
           ogCard={fetchedUrl?.og ? {
             url: fetchedUrl.url,
