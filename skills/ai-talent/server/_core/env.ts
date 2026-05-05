@@ -72,6 +72,7 @@ const envSchema = z.object({
 
   // AI Video Generation
   // FAL_API_KEY removed 2026-05-05 — fal.ai disabled site-wide.
+  PIAPI_KEY:            z.string().optional(), // PiAPI aggregator (Flux Pro / Kling / Runway / SDXL …)
   ELEVENLABS_API_KEY:   z.string().optional(), // ElevenLabs TTS
   CREATOMATE_API_KEY:   z.string().optional(), // Creatomate video composition
 
