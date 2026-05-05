@@ -1,0 +1,72 @@
+name: Admin — Find Instagram 30s task agents (13 different + 1 image dir)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+
+            echo "=== A. IG copywriting / caption agents (基底) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (slug LIKE 'ig-%' OR slug LIKE 'instagram-%' OR LOWER(title) LIKE '%instagram%' OR LOWER(primarySkill) LIKE '%instagram%' OR LOWER(primarySkill) LIKE 'ig-%') ORDER BY id LIMIT 40"
+
+            echo ""
+            echo "=== B. Hook / 短文案 / 微內容 (任務 2 IG hook) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(primarySkill) LIKE '%hook%' OR LOWER(primarySkill) LIKE '%micro-content%' OR LOWER(primarySkill) LIKE '%attention%' OR LOWER(title) LIKE '%hook%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== C. Reel / Short-video / 短影片腳本 (任務 3, 4) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (slug LIKE '%reel%' OR slug LIKE '%short%' OR LOWER(title) LIKE '%reel%' OR LOWER(title) LIKE '%short video%' OR LOWER(title) LIKE '%短影片%' OR LOWER(primarySkill) LIKE '%reel%' OR LOWER(primarySkill) LIKE '%short-form%' OR LOWER(primarySkill) LIKE '%video-script%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== D. Story / Ephemeral / 限時動態 (任務 5, 12) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (slug LIKE '%story%' OR LOWER(title) LIKE '%story%' OR LOWER(primarySkill) LIKE '%ephemeral%' OR LOWER(primarySkill) LIKE '%story-%' OR LOWER(primarySkill) LIKE '%24h%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== E. Carousel / 教育型 / 長文圖卡 (任務 6) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (slug LIKE '%carousel%' OR LOWER(primarySkill) LIKE '%carousel%' OR LOWER(primarySkill) LIKE '%educational%' OR LOWER(primarySkill) LIKE '%longform%' OR LOWER(title) LIKE '%教育%' OR LOWER(primarySkill) LIKE '%save-worthy%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== F. Bio / 個人品牌 / Profile (任務 7) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(slug) LIKE '%bio%' OR LOWER(title) LIKE '%bio%' OR LOWER(title) LIKE '%personal brand%' OR LOWER(primarySkill) LIKE '%bio%' OR LOWER(primarySkill) LIKE '%personal-branding%' OR LOWER(primarySkill) LIKE '%profile%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== G. Hashtag / discoverability / SEO (任務 8) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(slug) LIKE '%hashtag%' OR LOWER(primarySkill) LIKE '%hashtag%' OR LOWER(primarySkill) LIKE '%discoverability%' OR LOWER(primarySkill) LIKE '%seo%' OR LOWER(title) LIKE '%seo%' OR LOWER(title) LIKE '%discover%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== H. Community / 留言互動 / Comment-reply (任務 9) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(primarySkill) LIKE '%community%' OR LOWER(primarySkill) LIKE '%comment%' OR LOWER(primarySkill) LIKE '%engagement%' OR LOWER(title) LIKE '%community manager%' OR LOWER(title) LIKE '%社群經理%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== I. DM / Customer Service / Inquiry (任務 10) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(slug) LIKE '%dm%' OR LOWER(slug) LIKE '%cs-%' OR LOWER(slug) LIKE '%inquiry%' OR LOWER(title) LIKE '%customer%' OR LOWER(title) LIKE '%客服%' OR LOWER(primarySkill) LIKE '%dm%' OR LOWER(primarySkill) LIKE '%inquiry%' OR LOWER(primarySkill) LIKE '%customer-service%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== J. Live / Host / 直播 (任務 11) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(slug) LIKE '%live%' OR LOWER(title) LIKE '%live%' OR LOWER(title) LIKE '%host%' OR LOWER(title) LIKE '%直播%' OR LOWER(primarySkill) LIKE '%live%' OR LOWER(primarySkill) LIKE '%livestream%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== K. Threads / Cross-platform / Repurpose (任務 13) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(slug) LIKE '%threads%' OR LOWER(slug) LIKE '%cross-%' OR LOWER(primarySkill) LIKE '%threads%' OR LOWER(primarySkill) LIKE '%cross-platform%' OR LOWER(primarySkill) LIKE '%repurpose%' OR LOWER(title) LIKE '%threads%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== L. IG visual director / art-direction (任務全部的 image_director — 要 ≠ Mandy 239184) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id != 239184 AND ((slug LIKE '%ig-%' AND (LOWER(primarySkill) LIKE '%visual%' OR LOWER(primarySkill) LIKE '%art%' OR LOWER(primarySkill) LIKE '%aesthetic%' OR LOWER(primarySkill) LIKE '%moodboard%')) OR (LOWER(title) LIKE '%instagram%' AND LOWER(title) LIKE '%design%') OR JSON_SEARCH(skills, 'one', 'ig-aesthetic') IS NOT NULL OR JSON_SEARCH(skills, 'one', 'instagram-visual') IS NOT NULL OR LOWER(primarySkill) LIKE '%ig-aesthetic%' OR LOWER(primarySkill) LIKE '%instagram-visual%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== M. Squad lead agents — IG-tagged squads (補洞用) ==="
+            $MYSQL -e "SELECT s.slug AS squad_slug, a.id, a.name, a.title, a.primarySkill FROM squads s JOIN agents a ON a.id=s.lead_agent_id WHERE s.is_active=1 AND s.is_approved=1 AND (s.slug LIKE 'ig-%' OR s.workspace LIKE '%instagram%') ORDER BY s.slug LIMIT 25"
+
+            echo ""
+            echo "=== Done ==="
