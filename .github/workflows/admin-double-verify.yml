@@ -185,19 +185,40 @@ jobs:
             ##### npm CVE: production audit zero vulns #####
             echo ""
             echo "── npm CVE: production audit ──"
-            cd "$AI"
-            SERVER_VULN=$(npm audit --omit=dev 2>&1 | grep -oE "[0-9]+ vulnerabilities" | head -1)
-            if [ "$SERVER_VULN" = "0 vulnerabilities" ] || npm audit --omit=dev 2>&1 | grep -q "found 0 vulnerabilities"; then
+            # Use --json for stable parsing (text output format flakes intermittently)
+            check_audit_json() {
+              local where=$1
+              cd "$where"
+              # --json gives us a stable shape we can parse with python
+              local out
+              out=$(npm audit --omit=dev --json 2>/dev/null)
+              # Some npm versions exit non-zero when vulnerabilities exist; that's fine.
+              if [ -z "$out" ]; then
+                # Network blip — try once more
+                sleep 2
+                out=$(npm audit --omit=dev --json 2>/dev/null)
+              fi
+              if [ -z "$out" ]; then
+                echo "(npm audit returned empty output — likely registry network blip)"
+                return 1
+              fi
+              local high mod tot
+              high=$(echo "$out" | python3 -c "import sys, json; d=json.loads(sys.stdin.read()); print(d.get('metadata',{}).get('vulnerabilities',{}).get('high',0))" 2>/dev/null)
+              mod=$(echo "$out" | python3 -c "import sys, json; d=json.loads(sys.stdin.read()); print(d.get('metadata',{}).get('vulnerabilities',{}).get('moderate',0))" 2>/dev/null)
+              tot=$(echo "$out" | python3 -c "import sys, json; d=json.loads(sys.stdin.read()); print(sum(d.get('metadata',{}).get('vulnerabilities',{}).values()))" 2>/dev/null)
+              echo "  $where: total=$tot high=$high moderate=$mod"
+              [ "$tot" = "0" ]
+            }
+
+            if check_audit_json "$AI"; then
               pass "server prod audit: 0 vulnerabilities"
             else
-              fail "server prod audit: $SERVER_VULN"
+              fail "server prod audit: NON-ZERO vulnerabilities"
             fi
-            cd "$AI/client"
-            CLIENT_VULN=$(npm audit --omit=dev 2>&1 | grep -oE "[0-9]+ vulnerabilities" | head -1)
-            if [ "$CLIENT_VULN" = "0 vulnerabilities" ] || npm audit --omit=dev 2>&1 | grep -q "found 0 vulnerabilities"; then
+            if check_audit_json "$AI/client"; then
               pass "client prod audit: 0 vulnerabilities"
             else
-              fail "client prod audit: $CLIENT_VULN"
+              fail "client prod audit: NON-ZERO vulnerabilities"
             fi
             # Confirm drizzle-orm version
             DRIZZLE=$(node -p "require('$AI/node_modules/drizzle-orm/package.json').version" 2>/dev/null)
