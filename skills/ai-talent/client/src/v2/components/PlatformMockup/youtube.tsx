@@ -19,35 +19,50 @@ import { type MockupFields, MockupHeader, dicebear } from "./shared";
 
 /* ─────────────── YT Video Card ─────────────── */
 
-export function YTVideoCard({ title, brandName, variantLabel }: MockupFields) {
+export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="relative aspect-video bg-default-100 flex items-center justify-center">
-          <Skeleton className="absolute inset-0" />
-          <div className="text-center text-default-400 relative z-10">
-            <FontAwesomeIcon icon={faVideo} className="text-5xl mb-2" />
-            <p className="text-tiny">縮圖 · 等待 craft agent</p>
-          </div>
+        <div className="relative aspect-video bg-default-100 flex items-center justify-center overflow-hidden">
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <>
+              <Skeleton className="absolute inset-0" />
+              <div className="text-center text-default-500 relative z-10 p-4 max-w-[80%]">
+                <FontAwesomeIcon icon={faVideo} className="text-3xl mb-2" />
+                {liveImageStyle ? (
+                  <>
+                    <p className="text-tiny font-semibold mb-1">縮圖風格方向</p>
+                    <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
+                  </>
+                ) : (
+                  <p className="text-tiny">縮圖 · 等待 craft agent</p>
+                )}
+              </div>
+            </>
+          )}
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">12:34</div>
-          <Button isIconOnly radius="full" size="lg" color="danger" className="absolute opacity-90" aria-label="play">
-            <FontAwesomeIcon icon={faPlay} />
-          </Button>
         </div>
         <div className="p-4 space-y-2">
-          <p className="text-medium font-semibold leading-snug line-clamp-2">{title}</p>
+          <p className="text-medium font-semibold leading-snug line-clamp-2">{title || (liveCaption ? liveCaption.split("\n")[0] : "影片標題")}</p>
           <User
             name={<span className="text-small">{brandName ?? "Your Channel"}</span>}
             description={<span className="text-tiny text-default-500">12K 訂閱者 · 剛剛 · 1.2K 次觀看</span>}
-            avatarProps={{ src: dicebear(brandName ?? "channel"), size: "sm" }}
+            avatarProps={{ src: avatarSrc, size: "sm" }}
           />
           <Divider />
-          <p className="text-tiny text-default-500">影片描述</p>
-          <Skeleton className="h-2.5 w-[90%] rounded" />
-          <Skeleton className="h-2.5 w-[78%] rounded" />
-          <p className="text-tiny text-default-500 mt-2">章節時間軸</p>
-          <Skeleton className="h-2 w-full rounded-full" />
+          {liveCaption ? (
+            <div className="text-tiny text-default-700 whitespace-pre-line leading-relaxed">{liveCaption}</div>
+          ) : (
+            <>
+              <p className="text-tiny text-default-500">影片描述</p>
+              <Skeleton className="h-2.5 w-[90%] rounded" />
+              <Skeleton className="h-2.5 w-[78%] rounded" />
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -56,21 +71,37 @@ export function YTVideoCard({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── YT Watch (player + meta + actions) ─────────────── */
 
-export function YTWatch({ title, brandName, variantLabel }: MockupFields) {
+export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
+  // For YT tasks the caption typically IS the deliverable (title list / chapter
+  // list / description / opening script). First line → big title; rest → body.
+  const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
+  const headline = title || lines[0] || "影片標題";
+  const body = title ? liveCaption ?? "" : lines.slice(1).join("\n");
   return (
     <div className="w-full max-w-[800px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         {/* Player */}
-        <div className="relative aspect-video bg-black flex items-center justify-center">
-          <div className="text-center text-white/50 relative z-10">
-            <FontAwesomeIcon icon={faVideo} className="text-6xl mb-2" />
-            <p className="text-tiny">影片播放器 · 等待 craft agent</p>
-          </div>
+        <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="text-center text-white/70 relative z-10 p-4 max-w-[70%]">
+              <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
+              {liveImageStyle ? (
+                <>
+                  <p className="text-tiny font-semibold mb-1 text-white">縮圖風格方向</p>
+                  <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
+                </>
+              ) : (
+                <p className="text-tiny">影片播放器 · 等待 craft agent</p>
+              )}
+            </div>
+          )}
           <Button isIconOnly radius="full" size="lg" color="danger" className="absolute opacity-90" aria-label="play">
             <FontAwesomeIcon icon={faPlay} />
           </Button>
-          {/* Progress bar */}
           <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20">
             <div className="h-full w-1/3 bg-danger" />
           </div>
@@ -78,13 +109,13 @@ export function YTWatch({ title, brandName, variantLabel }: MockupFields) {
 
         {/* Title */}
         <div className="px-4 pt-4 space-y-2">
-          <h2 className="text-xl font-semibold leading-tight tracking-tight line-clamp-2">{title}</h2>
+          <h2 className="text-xl font-semibold leading-tight tracking-tight line-clamp-2">{headline}</h2>
         </div>
 
         {/* Channel row + actions */}
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Avatar src={dicebear(brandName ?? "channel")} size="md" />
+            <Avatar src={avatarSrc} size="md" />
             <div className="min-w-0 flex-1">
               <p className="text-small font-semibold truncate">{brandName ?? "Your Channel"}</p>
               <p className="text-tiny text-default-500">12K 訂閱者</p>
@@ -105,16 +136,21 @@ export function YTWatch({ title, brandName, variantLabel }: MockupFields) {
           </div>
         </div>
 
-        {/* Description */}
-        <div className="mx-4 mb-4 p-3 bg-default-100 rounded-medium space-y-1.5">
-          <div className="flex items-center gap-2 text-tiny text-default-700">
+        {/* Description / caption body — renders the bulk of the YT task output */}
+        <div className="mx-4 mb-4 p-3 bg-default-100 rounded-medium">
+          <div className="flex items-center gap-2 text-tiny text-default-700 mb-2">
             <span className="font-semibold">1.2K 次觀看</span>
             <span>· 5 分鐘前</span>
           </div>
-          <Skeleton className="h-2.5 w-[90%] rounded" />
-          <Skeleton className="h-2.5 w-[78%] rounded" />
-          <Skeleton className="h-2.5 w-[60%] rounded" />
-          <p className="text-tiny font-medium pt-1">…顯示完整資訊</p>
+          {body ? (
+            <p className="text-small text-default-800 whitespace-pre-line leading-relaxed">{body}</p>
+          ) : (
+            <>
+              <Skeleton className="h-2.5 w-[90%] rounded mb-1" />
+              <Skeleton className="h-2.5 w-[78%] rounded mb-1" />
+              <Skeleton className="h-2.5 w-[60%] rounded" />
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -132,21 +168,28 @@ function ActionPill({ icon, label }: { icon: any; label?: string }) {
 
 /* ─────────────── YT Community post ─────────────── */
 
-export function YTCommunity({ title, brief, brandName, variantLabel }: MockupFields) {
+export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
     <div className="w-full max-w-[600px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         <div className="px-4 py-3 flex items-center gap-3">
-          <Avatar src={dicebear(brandName ?? "channel")} size="md" />
+          <Avatar src={avatarSrc} size="md" />
           <div>
             <p className="text-small font-semibold">{brandName ?? "Your Channel"}</p>
             <p className="text-tiny text-default-500">5 分鐘前</p>
           </div>
         </div>
-        <div className="px-4 pb-3 space-y-2">
-          <p className="text-small">{title}</p>
-          {brief && <p className="text-tiny text-default-500 line-clamp-3">{brief}</p>}
+        <div className="px-4 pb-3">
+          {liveCaption ? (
+            <p className="text-small whitespace-pre-line leading-relaxed">{liveCaption}</p>
+          ) : (
+            <>
+              {title && <p className="text-small">{title}</p>}
+              {brief && <p className="text-tiny text-default-500 line-clamp-3 mt-1">{brief}</p>}
+            </>
+          )}
         </div>
         {/* Optional poll */}
         <div className="mx-4 mb-3 p-3 border border-divider rounded-medium space-y-2">
@@ -179,7 +222,8 @@ export function YTCommunity({ title, brief, brandName, variantLabel }: MockupFie
 
 /* ─────────────── YT Shorts ─────────────── */
 
-export function YTShorts({ title, brandName, variantLabel }: MockupFields) {
+export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
     <div className="w-full max-w-[280px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
@@ -188,16 +232,31 @@ export function YTShorts({ title, brandName, variantLabel }: MockupFields) {
           <span className="text-small font-semibold">Shorts</span>
           <span className="text-medium">⋯</span>
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-            <p className="text-tiny">9:16 短片 · 等待 craft agent</p>
+        {/* Background — generated cover OR style brief OR skeleton */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="absolute inset-0 opacity-30" />
+            {liveImageStyle && (
+              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
+                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
+                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
+        {/* Script overlay — render the Shorts script body so user sees the deliverable */}
+        {liveCaption && (
+          <div className="absolute top-12 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto pr-12">
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">Shorts 腳本</p>
+            <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
+          </div>
+        )}
         <div className="absolute right-2 bottom-20 z-10 flex flex-col items-center gap-3.5">
           <div className="relative">
-            <Avatar src={dicebear(brandName ?? "channel")} size="md" isBordered color="danger" />
+            <Avatar src={avatarSrc} size="md" isBordered color="danger" />
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center text-tiny font-bold border-2 border-black">+</span>
           </div>
           <VerticalActionItem icon={faThumbsUp} count="12K" />
