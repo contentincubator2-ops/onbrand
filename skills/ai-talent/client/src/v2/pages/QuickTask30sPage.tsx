@@ -51,6 +51,8 @@ interface FBTaskCard {
   id: string;
   tier: "30s" | "60s" | "90s";
   postType: string;
+  /** Platform — FB / IG / Threads / etc. Surfaced by listFB since 2026-05-05. */
+  platform?: string;
   label: string;
   description: string;
   kind: "fast" | "mid" | "squad";
@@ -212,10 +214,23 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
           inputs: { [inputKey]: primaryAnswer },
           brandId: brandId ?? undefined,
         });
-        // Transform OrchestraResult → OutputCarousel-compatible shape
+        // Transform OrchestraResult → OutputCarousel-compatible shape.
+        // Platform comes from the task itself (FB / IG / Threads). The
+        // mockup variant inferer keys on platform:postType; hardcoding
+        // "facebook" would route all IG tasks to FBFeed (regression).
+        const taskPlatform =
+          (activeTask as any).platform ??
+          (activeTask.id?.startsWith("ig-") ? "instagram"
+            : activeTask.id?.startsWith("fb-") ? "facebook"
+            : "facebook");
+        // Threads task uses platform="threads" + post_type="post" — preserve.
+        const platformOverride =
+          activeTask.id === "ig-30-threads-cross-post" ? "threads" : taskPlatform;
+        const postTypeOverride =
+          activeTask.id === "ig-30-threads-cross-post" ? "post" : (activeTask.postType ?? "feed");
         const transformedOutput = {
-          platform: "facebook",
-          post_type: activeTask.postType ?? "feed",
+          platform: platformOverride,
+          post_type: postTypeOverride,
           caption: r.variants?.[0]?.caption ?? "",
           hashtags: r.variants?.[0]?.hashtags ?? [],
           variants: (r.variants ?? []).map((v: any) => ({

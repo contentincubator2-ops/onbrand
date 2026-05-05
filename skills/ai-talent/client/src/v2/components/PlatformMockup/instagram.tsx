@@ -30,8 +30,9 @@ import {
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
-export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc, slotMap, imageSlotFlow }: MockupFields) {
+export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, slotMap, imageSlotFlow }: MockupFields) {
   const handle = handleOf(brandName);
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
 
   // Resolve caption: slotMap "caption" wins over legacy liveCaption prop
   const captionSlot = slotMap?.caption;
@@ -49,7 +50,7 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         <div className="flex items-center justify-between px-3 py-2.5">
           <div className="flex items-center gap-2.5 min-w-0">
-            <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={36} />
+            <StoryRingAvatar src={avatarSrc} size={36} />
             <div className="min-w-0">
               <div className="flex items-center gap-1 text-small font-semibold leading-tight truncate">
                 {handle}
@@ -63,10 +64,18 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
           </Button>
         </div>
 
-        {/* Image slot — Session 7: imageSlotFlow embedded | loading spinner | skeleton placeholder */}
+        {/* Image slot — priorities: liveImageUrl > imageSlotFlow > slotMap > liveImageStyle text > skeleton */}
         <div className="relative aspect-square bg-default-100 overflow-hidden">
-          {imageSlotFlow ? (
-            // Session 7: 3-step media gen flow lives inside the slot
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <>
+              <img src={liveImageUrl} alt={liveImageStyle ?? "generated"} className="absolute inset-0 w-full h-full object-cover" />
+              {liveImageStyle && (
+                <div className="absolute bottom-2 left-2 right-2 bg-black/55 backdrop-blur-sm rounded px-2 py-1">
+                  <p className="text-[10px] text-white/90 line-clamp-2">{liveImageStyle}</p>
+                </div>
+              )}
+            </>
+          ) : imageSlotFlow ? (
             imageSlotFlow
           ) : imageSlot?.status === "loading" ? (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -76,15 +85,21 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
               </div>
             </div>
           ) : imageSlot?.status === "filled" && typeof imageSlot.value === "string" && imageSlot.value.startsWith("http") ? (
-            // Filled with an actual image URL — show the image
             <img src={imageSlot.value as string} alt="generated" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             <>
               <Skeleton className="absolute inset-0" />
               <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
-                <div className="text-center">
-                  <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-                  <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+                <div className="text-center bg-default-50/80 backdrop-blur-sm rounded-medium m-3 p-3">
+                  <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
+                  {liveImageStyle ? (
+                    <>
+                      <p className="text-tiny font-semibold text-default-600 mb-1">圖片風格方向</p>
+                      <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
+                    </>
+                  ) : (
+                    <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+                  )}
                 </div>
               </div>
             </>
@@ -185,8 +200,9 @@ export function IGFeed({ title, brandName, variantLabel, liveCaption, liveHashta
 
 /* ─────────────── IG Carousel ─────────────── */
 
-export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc }: MockupFields) {
+export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const handle = handleOf(brandName);
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   const carouselCount = 9;
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -194,7 +210,7 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         <div className="flex items-center justify-between px-3 py-2.5">
           <div className="flex items-center gap-2.5 min-w-0">
-            <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={36} />
+            <StoryRingAvatar src={avatarSrc} size={36} />
             <div className="min-w-0">
               <div className="flex items-center gap-1 text-small font-semibold leading-tight truncate">
                 {handle}
@@ -208,14 +224,27 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
           </Button>
         </div>
 
-        <div className="relative aspect-square bg-default-100">
-          <Skeleton className="absolute inset-0" />
-          <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
-            <div className="text-center">
-              <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-              <p className="text-tiny line-clamp-3">{liveImageDesc ?? `輪播 1 / ${carouselCount} · 等待 craft agent`}</p>
-            </div>
-          </div>
+        <div className="relative aspect-square bg-default-100 overflow-hidden">
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <>
+              <Skeleton className="absolute inset-0" />
+              <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
+                <div className="text-center bg-default-50/80 backdrop-blur-sm rounded-medium m-3 p-3">
+                  <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
+                  {liveImageStyle ? (
+                    <>
+                      <p className="text-tiny font-semibold text-default-600 mb-1">每頁視覺風格</p>
+                      <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
+                    </>
+                  ) : (
+                    <p className="text-tiny line-clamp-3">{liveImageDesc ?? `輪播 1 / ${carouselCount} · 等待 craft agent`}</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
           <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-tiny font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
             1/{carouselCount}
           </div>
@@ -262,7 +291,7 @@ export function IGCarousel({ title, brandName, variantLabel, liveCaption, liveHa
 
 /* ─────────────── IG Reels (9:16 + side action rail) ─────────────── */
 
-export function IGReels({ title, brandName, variantLabel, liveCaption, liveVideoDesc }: MockupFields) {
+export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveVideoDesc, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const handle = handleOf(brandName);
   return (
     <div className="w-full max-w-[280px] mx-auto">
@@ -274,13 +303,28 @@ export function IGReels({ title, brandName, variantLabel, liveCaption, liveVideo
           <FontAwesomeIcon icon={faImages} />
         </div>
 
-        {/* Video placeholder */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60 p-4">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny line-clamp-3">{liveVideoDesc ?? "9:16 影片 · 等待 craft agent"}</p>
+        {/* Cover / video placeholder — uses generated image when available, else style brief */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="absolute inset-0 opacity-30" />
+            <div className="relative z-10 text-center text-white/80 p-4 max-w-[80%]">
+              <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
+              {liveImageStyle ? (
+                <>
+                  <p className="text-tiny font-semibold mb-1 text-white">封面風格方向</p>
+                  <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
+                </>
+              ) : (
+                <p className="text-tiny line-clamp-3">{liveVideoDesc ?? "9:16 影片 · 等待 craft agent"}</p>
+              )}
+            </div>
           </div>
+        )}
+        {/* Avatar overlay so brand logo is visible */}
+        <div className="absolute top-12 left-3 z-10">
+          <img src={brandLogoUrl || dicebear(brandName ?? "brand")} alt="" className="w-9 h-9 rounded-full border-2 border-white/40" />
         </div>
 
         {/* Right action rail */}
@@ -312,9 +356,14 @@ export function IGReels({ title, brandName, variantLabel, liveCaption, liveVideo
 
 /* ─────────────── IG Stories (top progress bars + 9:16) ─────────────── */
 
-export function IGStories({ title, brandName, variantLabel }: MockupFields) {
+export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const handle = handleOf(brandName);
   const segCount = 5;
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  // Caption first line treated as the overlay 主標 (large text), rest = sub-content
+  const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
+  const overlayMain = lines[0] ?? title;
+  const overlaySub = lines.slice(1).join("\n");
   return (
     <div className="w-full max-w-[280px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
@@ -332,7 +381,7 @@ export function IGStories({ title, brandName, variantLabel }: MockupFields) {
         {/* Top bar */}
         <div className="absolute top-5 inset-x-0 z-20 flex items-center justify-between px-3 pt-2 text-white">
           <div className="flex items-center gap-2">
-            <img src={dicebear(brandName ?? "brand")} alt="" className="w-7 h-7 rounded-full border border-white/40" />
+            <img src={avatarSrc} alt="" className="w-7 h-7 rounded-full border border-white/40" />
             <span className="text-small font-semibold">{handle}</span>
             <span className="text-tiny opacity-80">5 分鐘前</span>
           </div>
@@ -342,20 +391,32 @@ export function IGStories({ title, brandName, variantLabel }: MockupFields) {
           </div>
         </div>
 
-        {/* Image placeholder */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">限動圖 · 等待 craft agent</p>
+        {/* Background — generated image OR style brief OR skeleton */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-95" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="absolute inset-0 opacity-30" />
+            {liveImageStyle && (
+              <div className="relative z-10 text-center text-white/80 px-6 max-w-[80%]">
+                <FontAwesomeIcon icon={faImages} className="text-2xl mb-2" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">背景風格</p>
+                <p className="text-tiny line-clamp-4">{liveImageStyle}</p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
-        {/* Bottom caption / sticker placeholder */}
-        <div className="absolute bottom-16 inset-x-3 z-10">
-          <div className="bg-white/20 backdrop-blur-sm rounded-medium p-2 text-white text-small line-clamp-2">
-            {title}
-          </div>
+        {/* Overlay text — large main 主標 (caption line 1), small sub (rest) */}
+        <div className="absolute top-1/2 -translate-y-1/2 inset-x-4 z-10 text-center">
+          <p className="text-white font-bold text-2xl drop-shadow-md leading-tight" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
+            {overlayMain}
+          </p>
+          {overlaySub && (
+            <p className="text-white text-small mt-3 leading-relaxed whitespace-pre-line drop-shadow-md" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
+              {overlaySub}
+            </p>
+          )}
         </div>
 
         {/* Reply input */}
@@ -378,8 +439,9 @@ export function IGStories({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── IG Profile (3-col grid) ─────────────── */
 
-export function IGProfile({ brandName, variantLabel }: MockupFields) {
+export function IGProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
   const handle = handleOf(brandName);
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
     <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
@@ -389,7 +451,7 @@ export function IGProfile({ brandName, variantLabel }: MockupFields) {
           <span className="text-medium tracking-tighter">⋯</span>
         </div>
         <div className="px-4 py-3 flex items-center gap-5">
-          <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={84} />
+          <StoryRingAvatar src={avatarSrc} size={84} />
           <div className="flex-1 grid grid-cols-3 gap-2 text-center text-small">
             <div><div className="font-bold">42</div><div className="text-tiny text-default-500">貼文</div></div>
             <div><div className="font-bold">12.3K</div><div className="text-tiny text-default-500">粉絲</div></div>
@@ -401,7 +463,12 @@ export function IGProfile({ brandName, variantLabel }: MockupFields) {
             {brandName ?? "Your Brand"}
             <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
           </p>
-          <p className="text-tiny text-default-500">藝術家・創作者・分享靈感</p>
+          {/* Bio = liveCaption (the rewritten bio). Preserve user's line breaks. */}
+          {liveCaption ? (
+            <p className="text-tiny text-default-700 whitespace-pre-line leading-relaxed">{liveCaption}</p>
+          ) : (
+            <p className="text-tiny text-default-400">（bio 等待 agent 寫入）</p>
+          )}
           <p className="text-tiny text-primary">your-brand.com</p>
         </div>
         <div className="px-4 pb-3 grid grid-cols-3 gap-2">
@@ -437,8 +504,9 @@ export function IGProfile({ brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── IG Live (9:16 + LIVE chip + viewers + chat) ─────────────── */
 
-export function IGLive({ title, brandName, variantLabel }: MockupFields) {
+export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const handle = handleOf(brandName);
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
     <div className="w-full max-w-[280px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
@@ -455,18 +523,32 @@ export function IGLive({ title, brandName, variantLabel }: MockupFields) {
         </div>
         {/* Host info top-left */}
         <div className="absolute top-12 left-3 z-10 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full pl-1 pr-2 py-0.5">
-          <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={24} />
+          <StoryRingAvatar src={avatarSrc} size={24} />
           <span className="text-white text-tiny font-semibold">{handle}</span>
           <button className="bg-white text-black text-tiny font-bold px-2 py-0.5 rounded-full">追蹤</button>
         </div>
-        {/* Video placeholder */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-            <p className="text-tiny">直播中 · 等待 craft agent</p>
+        {/* Background — generated cover image OR style brief OR skeleton */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="absolute inset-0 opacity-30" />
+            {liveImageStyle && (
+              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
+                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
+                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
+        {/* Live opening script overlay — shows the caption (host's opening 30s) */}
+        {liveCaption && (
+          <div className="absolute top-24 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto">
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">開場腳本</p>
+            <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
+          </div>
+        )}
         {/* Floating chat bubbles bottom-left */}
         <div className="absolute bottom-16 left-3 z-10 space-y-1.5 max-w-[60%]">
           {["太精彩了!", "什麼時候下一場?", "❤️❤️❤️"].map((m, i) => (
