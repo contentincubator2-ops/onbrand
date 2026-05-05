@@ -1,0 +1,28 @@
+name: Admin — Probe orchestra E2E (server-side smoke test)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set +e
+            cd /opt/marketing-os/app/skills/ai-talent
+            # Pull all env vars from .env into the process
+            set -a
+            . ./.env
+            set +a
+            # Run the in-process probe
+            npx tsx scripts/probe-orchestra.ts 2>&1
+            exit_code=$?
+            echo ""
+            echo "exit_code=$exit_code"
+            exit $exit_code
