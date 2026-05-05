@@ -1,0 +1,410 @@
+/**
+ * Instagram quick-task templates (2026-05-05).
+ *
+ * 13 IG 30s tasks following the FB SOP (per project_30s_task_sop.md).
+ * Each task uses a DIFFERENT caption_writer agent (zero overlap with FB
+ * agents) and a single shared image_director (Nancy Yeh, ≠ Mandy from FB).
+ *
+ * postType naming aligns with PlatformMockup/index.tsx case keys:
+ *   feed / reel / story / carousel / profile / live (+ threads:post for #13)
+ */
+
+import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
+
+const FB_TONE_SUFFIX = `
+語氣要求：自然、像真人朋友的口吻。不要 "親愛的客戶" 罐頭。
+品牌語氣若 system context 已給，務必貼合。`;
+
+// ─── 30s tier (13 tasks) ────────────────────────────────────────────────────
+
+export const IG_30S_TASKS: FBTaskTemplate[] = [
+  {
+    id: "ig-30-caption-short",
+    tier: "30s",
+    postType: "feed",
+    label: "IG 短貼文 caption（單圖）",
+    description: "80–150 字 IG feed caption + 5-10 個 hashtag",
+    agent_id: 180166, // Iris Liang — Instagram Marketing Specialist
+    skill_slug: "instagram-copywriting",
+    primary_question: "今天這篇 IG 貼文要講什麼？",
+    primary_input: { key: "topic", placeholder: "例：新品上市 / 客戶分享 / 幕後花絮", type: "textarea" },
+    inputs: [{ key: "topic", label: "貼文主題", type: "textarea", required: true }],
+    systemPrompt: `產出 IG 單圖文 caption（80–150 字）。
+結構：第 1 句 hook 拉注意 → 中間 1 段內容（不要太長 — IG 用戶會跳過長文） → 結尾 1 句邀請（留言 / 收藏 / 分享）。
+${FB_TONE_SUFFIX}
+另外給 1 句 image_style_direction.summary（aspect_ratio="1:1"）。`,
+    preferredModel: "qwen",
+    maxTokens: 400,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  {
+    id: "ig-30-pure-text-hook",
+    tier: "30s",
+    postType: "feed",
+    label: "IG hook 5 種（搭配你的原文）",
+    description: "5 種開場 hook，自動接你原本的貼文內容",
+    agent_id: 229985, // 許怡君 — Hook Copywriter – Instagram × 科技
+    skill_slug: "hook-copywriter",
+    primary_question: "貼上你原本要發的貼文 / 文章內容，我會寫不同口吻的 IG 開場接上去",
+    primary_input: { key: "article_body", placeholder: "貼上完整的貼文內文（hook 會接在最前面）", type: "textarea" },
+    inputs: [{ key: "article_body", label: "原本的貼文內容", type: "textarea", required: true }],
+    systemPrompt: `任務：用戶提供「原本要發的 IG 貼文內文」(article_body)。
+你只要寫 hook（開場句），**不要重複貼用戶的原文** — orchestra 會在後端自動把原文接到你寫的 hook 後面。
+
+每個 variant.caption = 那個口吻的 hook（30-60 字，1-2 句即可）。
+${FB_TONE_SUFFIX}`,
+    preferredModel: "qwen",
+    maxTokens: 400,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  {
+    id: "ig-30-reel-hook",
+    tier: "30s",
+    postType: "reel",
+    label: "IG Reel 開場 hook（前 3 秒）",
+    description: "前 3 秒口播 + 字幕節奏 + 視覺開場 brief",
+    agent_id: 60029, // Siyu Lin — TikTok/Reels Short Video Scriptwriter
+    skill_slug: "short-video-scriptwriter",
+    primary_question: "這支 Reel 的主題 / 賣點是？",
+    primary_input: { key: "topic", placeholder: "例：30 秒教學 / 開箱 / 反差展示", type: "textarea" },
+    inputs: [{ key: "topic", label: "Reel 主題", type: "textarea", required: true }],
+    systemPrompt: `產出 IG Reel 前 3 秒 hook（給開場用）。
+caption 結構（每變體）：
+  口播原話（粗體）：[15-25 字，第 0-1 秒就要說]
+  螢幕字幕：[搭配口播的字幕，可比口播再簡短]
+  視覺開場（給拍攝者）：[1 句鏡頭建議]
+不要長句 / 不要文謅謅 / 不要客套開場。前 3 秒沒抓到注意力 = 完蛋。
+另外給 image_style_direction.summary（封面圖風格，9:16）。`,
+    preferredModel: "qwen",
+    maxTokens: 350,
+    outputDefaults: { platform: "instagram", post_type: "reel" },
+  },
+  {
+    id: "ig-30-reel-script-full",
+    tier: "30s",
+    postType: "reel",
+    label: "IG Reel 完整腳本（15-30s）",
+    description: "結構化分鏡：hook→承諾→3 段內容→CTA",
+    agent_id: 35, // Jason Fang — Short Video Scriptwriter (exec)
+    skill_slug: "short-video-scriptwriter",
+    primary_question: "這支 Reel 想傳達什麼價值？",
+    primary_input: { key: "topic", placeholder: "例：3 個 IG 演算法迷思 / 我如何用 90 天從 0 到 10K", type: "textarea" },
+    inputs: [{ key: "topic", label: "Reel 主題 / 想傳達的價值", type: "textarea", required: true }],
+    systemPrompt: `產出 IG Reel 完整腳本（15-30 秒）。
+caption 結構（每變體）：
+  [0-3s] HOOK：[一句懸念 / 反差 / 數字 hook]
+  [3-10s] 承諾：[告訴觀眾接下來會看到什麼價值]
+  [10-25s] 3 段內容：
+    • Beat 1: [內容 1，5 秒內]
+    • Beat 2: [內容 2，5 秒內]
+    • Beat 3: [內容 3，5 秒內]
+  [25-30s] CTA：[追蹤 / 留言關鍵字 / 收藏]
+
+每個 Beat 寫得具體（"用這 3 個 hashtag" 比 "用對 hashtag" 好）。
+另外給 image_style_direction.summary（封面圖風格，9:16）。`,
+    preferredModel: "azure-position", // longer / structured — better with Claude
+    maxTokens: 800,
+    outputDefaults: { platform: "instagram", post_type: "reel" },
+  },
+  {
+    id: "ig-30-story-text",
+    tier: "30s",
+    postType: "story",
+    label: "IG Story 文案 + sticker 建議",
+    description: "9:16 主標 + 內文 + 推薦 sticker",
+    agent_id: 60068, // Yizhen Lai — Brand Story Copy
+    skill_slug: "brand-story",
+    primary_question: "今天的 Story 想說什麼？",
+    primary_input: { key: "topic", placeholder: "例：幕後 / 限時優惠 / 提問 / 投票", type: "textarea" },
+    inputs: [{ key: "topic", label: "Story 主題", type: "textarea", required: true }],
+    systemPrompt: `產出 IG Story 文案。
+caption 結構（每變體）：
+  主標（5-12 字，疊在圖上）：[最大字]
+  內文（30-60 字）：[補充訊息]
+  推薦 sticker：[從 poll / question / quiz / countdown / emoji-slider / link 選 1-2 個 + 寫上 sticker 的具體文字]
+不要長文。9:16 高度有限，文字要能 1 秒讀完。
+另外給 image_style_direction.summary（aspect_ratio="9:16"）。`,
+    preferredModel: "qwen",
+    maxTokens: 300,
+    outputDefaults: { platform: "instagram", post_type: "story" },
+  },
+  {
+    id: "ig-30-carousel-structure",
+    tier: "30s",
+    postType: "carousel",
+    label: "IG Carousel 10 頁結構",
+    description: "1 標題頁 + 8 內容頁 + 1 CTA 頁，每頁文字",
+    agent_id: 224294, // Tyler Brooks — Short-Form Marketing Copywriter
+    skill_slug: "short-form-copywriting",
+    primary_question: "想做什麼主題的 carousel？（教學 / 清單 / 反差 / 故事）",
+    primary_input: { key: "topic", placeholder: "例：5 個被低估的 IG 演算法技巧 / 我從 0 學設計的 3 個錯誤", type: "textarea" },
+    inputs: [{ key: "topic", label: "Carousel 主題", type: "textarea", required: true }],
+    systemPrompt: `產出 IG Carousel（10 頁）的每頁文字。
+caption 結構（每變體）：
+
+頁 1（標題）：[3-7 字大標 + 1 句副標]
+頁 2-9（內容 8 頁）：[每頁 1 個重點 + 30-50 字補充。標號從 #1 到 #8]
+頁 10（CTA）：[總結 1 句 + 邀請動作（收藏 / 分享 / 留言）]
+
+caption 欄位請用「---」分隔每一頁。標號用 1. 2. 3. 結構清楚。
+另外給 image_style_direction.summary（每頁同一視覺風格，aspect_ratio="1:1"）。`,
+    preferredModel: "azure-position",
+    maxTokens: 1200,
+    outputDefaults: { platform: "instagram", post_type: "carousel" },
+  },
+  {
+    id: "ig-30-bio-rewrite",
+    tier: "30s",
+    postType: "profile",
+    label: "IG bio 改寫",
+    description: "150 字 bio 含 emoji + 換行 + CTA",
+    agent_id: 180168, // Wendy Su — Link in Bio Specialist
+    skill_slug: "link-in-bio",
+    primary_question: "你的 IG 帳號是誰、做什麼、想吸引誰？",
+    primary_input: { key: "context", placeholder: "例：『我是 ___，幫 ___ 解決 ___，過去 ___』", type: "textarea" },
+    inputs: [{ key: "context", label: "你 / 品牌簡介", type: "textarea", required: true }],
+    systemPrompt: `產出 IG bio（150 字內）。
+caption 結構（每變體，用換行排版）：
+  L1: 一句 positioning（你是誰 + 做什麼 + 為誰）
+  L2-3: 2-3 個亮點（用 emoji 條列）
+  L4: CTA（"👇 點 link in bio" 或 "📩 DM 我「____」")
+
+emoji 適度，不要每行都塞。bio 有字數限制，每字都要算。
+不需要 image_style_direction（profile 沒有 main image）。`,
+    preferredModel: "qwen",
+    maxTokens: 350,
+    outputDefaults: { platform: "instagram", post_type: "profile" },
+  },
+  {
+    id: "ig-30-hashtag-set",
+    tier: "30s",
+    postType: "feed",
+    label: "IG hashtag 30 個套組",
+    description: "3 階分層：核心 5 / 中型 15 / 長尾 10",
+    agent_id: 30005, // Emma Zhang — SEO Strategy PM
+    skill_slug: "hashtag-discoverability",
+    primary_question: "貼文主題 / 你的利基領域是？",
+    primary_input: { key: "topic", placeholder: "例：手沖咖啡 / 北美室內設計 / SaaS B2B", type: "textarea" },
+    inputs: [{ key: "topic", label: "主題 / 利基", type: "textarea", required: true }],
+    systemPrompt: `產出 IG hashtag 30 個套組。
+caption 結構（每變體用不同策略）：
+變體 1（曝光導向 20 個）：大流量 hashtag (1M+ post)
+變體 2（品牌導向 8 個）：偏品牌 / 利基 (50K-500K post)
+變體 3（利基導向 12 個）：小眾高匹配 (5K-50K post)
+
+caption 直接列 hashtag（每個 # 前綴 + 空格分隔，可換行）。
+不需要 image_style_direction。`,
+    preferredModel: "qwen",
+    maxTokens: 600,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  {
+    id: "ig-30-comment-reply",
+    tier: "30s",
+    postType: "feed",
+    label: "IG 留言回覆",
+    description: "5 種口吻回覆（粉絲 / 客訴 / 同行 / KOL / 沉默）",
+    agent_id: 180143, // Emily Wang — Community Manager
+    skill_slug: "community-manager",
+    primary_question: "貼上原始用戶留言（或留言情境）",
+    primary_input: { key: "user_comment", placeholder: "用戶說了什麼？整段貼進來", type: "textarea" },
+    inputs: [{ key: "user_comment", label: "用戶留言", type: "textarea", required: true }],
+    systemPrompt: `產出 IG 對留言的回覆（30-80 字）。
+規則：
+- 先呼應對方訊息（不是貼罐頭「謝謝您」）
+- 給 1 個有溫度的小細節
+- 結尾不要結束話題（"下次再聊" 比 "祝您愉快" 好）
+
+caption 放回覆文。description 可放原始用戶留言（mockup 顯示用）。
+不需要 image_style_direction。`,
+    preferredModel: "qwen",
+    maxTokens: 250,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  {
+    id: "ig-30-dm-script",
+    tier: "30s",
+    postType: "feed", // no dedicated DM mockup yet — fallback to feed
+    label: "IG DM 自動回覆腳本",
+    description: "3 種情境：詢價 / 售後 / 合作邀約",
+    agent_id: 60056, // Derek Tang — Customer Service Copywriter (E-commerce)
+    skill_slug: "customer-service-copy",
+    primary_question: "你想處理哪類 DM？貼上常見訊息範例",
+    primary_input: { key: "scenario", placeholder: "例：『請問還有貨嗎？』 / 『產品不滿意』 / 『想合作』", type: "textarea" },
+    inputs: [{ key: "scenario", label: "DM 情境 / 範例訊息", type: "textarea", required: true }],
+    systemPrompt: `產出 IG DM 自動回覆腳本（每變體針對 1 種情境）。
+caption 結構：
+1. 開場（個人化，不要 "Hi 您好"）
+2. 直接給答案 / 動作（不要繞）
+3. 下一步（連結 / 表單 / 真人接手指示）
+
+字數 60-150。語氣要像真人，不要 "親愛的"。
+不需要 image_style_direction。`,
+    preferredModel: "qwen",
+    maxTokens: 500,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  {
+    id: "ig-30-live-opening",
+    tier: "30s",
+    postType: "live",
+    label: "IG Live 開場 30 秒",
+    description: "開場詞 + 暖場互動 + CTA 引留言",
+    agent_id: 60072, // Yiting Tsai — Live Shopping Script (Beauty)
+    skill_slug: "live-shopping-script",
+    primary_question: "今晚直播主題 / 想聊什麼？",
+    primary_input: { key: "topic", placeholder: "例：新品試色 / Q&A / 開箱 / 教學", type: "textarea" },
+    inputs: [{ key: "topic", label: "直播主題", type: "textarea", required: true }],
+    systemPrompt: `產出 IG Live 開場 30 秒腳本。
+caption 結構（每變體）：
+[0-10s] 開場詞：[第一句要 hook，不要 "大家好我是 ___"]
+[10-20s] 暖場：[1 個讓觀眾留言的問題 / 投票，明確說 "在留言打 ___"]
+[20-30s] 預告：[今晚會講什麼，給留下來的理由]
+
+不要過度親切，要像 KOL 不像主持人。
+另外給 image_style_direction.summary（直播封面圖風格，aspect_ratio="16:9"）。`,
+    preferredModel: "qwen",
+    maxTokens: 500,
+    outputDefaults: { platform: "instagram", post_type: "live" },
+  },
+  {
+    id: "ig-30-story-repost-strategy",
+    tier: "30s",
+    postType: "story",
+    label: "IG 限動 24h 後重發策略",
+    description: "限動失效後該怎麼接（精選 / 改編 feed / 新限動）",
+    agent_id: 220751, // Jake Chou — Insights Storyteller
+    skill_slug: "insights-storyteller",
+    primary_question: "原本那則限動是什麼內容？",
+    primary_input: { key: "original_story", placeholder: "貼上限動文字 / 主題", type: "textarea" },
+    inputs: [{ key: "original_story", label: "原限動內容", type: "textarea", required: true }],
+    systemPrompt: `產出限動 24h 失效後的「重發 3 路徑」（每變體 1 路徑）。
+caption 結構（每變體）：
+
+路徑 1：精選到 Highlight（給「分類名稱」+「封面圖建議」+「保留哪些 sticker」）
+路徑 2：改編成 Feed Post（給「caption 節錄」+「視覺改造方向」）
+路徑 3：發後續限動（給「下一則限動文字」+「sticker 建議」+「掛 stories link / mention」）
+
+直接給可動作的內容（不要寫「思考一下要不要…」這種廢話）。
+另外給 image_style_direction.summary（路徑 1 / 2 用，aspect_ratio="9:16"）。`,
+    preferredModel: "qwen",
+    maxTokens: 600,
+    outputDefaults: { platform: "instagram", post_type: "story" },
+  },
+  {
+    id: "ig-30-threads-cross-post",
+    tier: "30s",
+    postType: "post", // threads:post mockup
+    label: "IG → Threads 跨平台改寫",
+    description: "把 IG 貼文改寫成 Threads 風格",
+    agent_id: 60022, // Kevin Huang — LINE/Threads Social Copywriter
+    skill_slug: "threads-copywriter",
+    primary_question: "貼上 IG 那篇 caption（要改寫成 Threads 版本）",
+    primary_input: { key: "ig_caption", placeholder: "整段 IG caption 貼進來", type: "textarea" },
+    inputs: [{ key: "ig_caption", label: "原 IG caption", type: "textarea", required: true }],
+    systemPrompt: `把 IG caption 改寫成 Threads 風格。Threads ≠ IG：
+- 文字優先，不依賴 hashtag
+- 對話感重（像在 Twitter，不像 IG 廣告）
+- 短文 + 引發討論的 hook（提問 / 反差 / 觀點）
+- 不要 IG 的 emoji 海
+
+每變體用不同策略：
+變體 1：純觀點貼文（150-250 字，像在發見解）
+變體 2：提問式（拋問題 + 自己 1-2 句看法，引討論）
+變體 3：故事縮短版（IG 1000 字精煉到 200 字）
+
+不需要 image_style_direction（Threads 也不依賴主圖）。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "threads", post_type: "post" },
+  },
+];
+
+// ─── Plan B Orchestra config ────────────────────────────────────────────────
+
+const NANCY_ID = 180170; // Nancy Yeh — Social Media Visual Designer (≠ Mandy)
+
+export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "ig-30-caption-short": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    variantLabels: ["生活感版", "品牌感版", "問句式"],
+    captionMinChars: 80, captionMaxChars: 150,
+  },
+  "ig-30-pure-text-hook": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    variantLabels: ["反問式", "數字式", "反差式"],
+    captionMinChars: 30, captionMaxChars: 60,
+  },
+  "ig-30-reel-hook": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["懸念開場", "反差開場", "直接挑釁"],
+    captionMinChars: 30, captionMaxChars: 80,
+  },
+  "ig-30-reel-script-full": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["教學型", "故事型", "反差型"],
+    captionMinChars: 200, captionMaxChars: 600,
+  },
+  "ig-30-story-text": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["驚奇式", "提問式", "幕後式"],
+    captionMinChars: 30, captionMaxChars: 80,
+  },
+  "ig-30-carousel-structure": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    variantLabels: ["教學清單型", "故事型", "反差型"],
+    captionMinChars: 400, captionMaxChars: 1500,
+  },
+  "ig-30-bio-rewrite": {
+    variants: 3, images: 0, runImageGen: false,
+    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["專家定位", "個性風格", "結果導向"],
+    captionMinChars: 80, captionMaxChars: 150,
+  },
+  "ig-30-hashtag-set": {
+    variants: 3, images: 0, runImageGen: false,
+    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["曝光導向 (20)", "品牌導向 (8)", "利基導向 (12)"],
+    captionMinChars: 0, captionMaxChars: 600,
+  },
+  "ig-30-comment-reply": {
+    variants: 3, images: 0, runImageGen: false,
+    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["溫暖式", "幽默式", "邀請式"],
+    captionMinChars: 30, captionMaxChars: 80,
+  },
+  "ig-30-dm-script": {
+    variants: 3, images: 0, runImageGen: false,
+    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["詢價回覆", "售後安撫", "合作回覆"],
+    captionMinChars: 60, captionMaxChars: 150,
+  },
+  "ig-30-live-opening": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
+    variantLabels: ["懸念式", "互動式", "直球式"],
+    captionMinChars: 100, captionMaxChars: 300,
+  },
+  "ig-30-story-repost-strategy": {
+    variants: 3, images: 3, runImageGen: false,
+    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["精選封面型", "Feed 改編型", "後續限動型"],
+    captionMinChars: 100, captionMaxChars: 400,
+  },
+  "ig-30-threads-cross-post": {
+    variants: 3, images: 0, runImageGen: false,
+    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["觀點式", "提問式", "故事縮短"],
+    captionMinChars: 100, captionMaxChars: 400,
+  },
+};
+
+export function getIGOrchestraConfig(taskId: string): OrchestraConfig | null {
+  return IG_30S_ORCHESTRA[taskId] ?? null;
+}

@@ -670,6 +670,7 @@ import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 // 2026-05-05 quick-task pivot
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
 import { FB_30S_TASKS, FB_60S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
+import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 
@@ -820,10 +821,19 @@ export const quickTaskRouter = router({
   // home page chips. Includes bound agent metadata (avatar/name/title)
   // so cards can render the agent face as the thumbnail.
   listFB: protectedProcedure.query(async () => {
-    const tasks = listAllFBTasks();
-    // Collect unique agent_ids that need lookup
-    const agentIds = Array.from(new Set(
-      tasks.flatMap((t: any) => (t.agent_id ? [t.agent_id] : []))
+    // Despite the name, this catalog now spans FB + IG (and other channels
+    // as they ship). Frontend channel-icon row filters by task.platform /
+    // postType prefix.
+    const fbTasks = listAllFBTasks();
+    const igTasks = IG_30S_TASKS.map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      platform: "instagram",
+    }));
+    const tasks: any[] = [...fbTasks, ...igTasks];
+    // Collect unique agent_ids that need lookup (covers both fb + ig)
+    const agentIds: number[] = Array.from(new Set(
+      tasks.flatMap((t: any) => (t.agent_id ? [Number(t.agent_id)] : []))
     ));
     const agentMap: Record<number, { id: number; name: string; title: string; avatarUrl: string | null }> = {};
     if (agentIds.length > 0) {
@@ -838,25 +848,31 @@ export const quickTaskRouter = router({
         }
       } catch { /* agent metadata failure non-fatal — UI shows fallback */ }
     }
-    return tasks.map((t) => {
+    return tasks.map((t: any) => {
+      // Derive platform: explicit override (IG tasks) wins; else infer from
+      // task id prefix (fb-* / ig-*) for back-compat with older FB rows.
+      const platform =
+        t.platform ??
+        (t.id?.startsWith("ig-") ? "instagram"
+          : t.id?.startsWith("fb-") ? "facebook"
+          : "facebook");
       const base = {
-        id: t.id, tier: t.tier, postType: t.postType,
+        id: t.id, tier: t.tier, postType: t.postType, platform,
         label: t.label, description: t.description, kind: t.kind,
       };
       if (t.kind === "squad") {
-        return { ...base, squad_slug: (t as any).squad_slug, inputs: [], agent: null, skill_slug: null };
+        return { ...base, squad_slug: t.squad_slug, inputs: [], agent: null, skill_slug: null };
       }
-      const tt = t as any;
       return {
         ...base,
-        inputs: tt.inputs ?? [],
+        inputs: t.inputs ?? [],
         eta_seconds: t.tier === "30s" ? 30 : 60,
-        preferredModel: tt.preferredModel,
-        agent_id: tt.agent_id ?? null,
-        skill_slug: tt.skill_slug ?? null,
-        primary_question: tt.primary_question ?? null,
-        primary_input: tt.primary_input ?? null,
-        agent: tt.agent_id ? (agentMap[tt.agent_id] ?? null) : null,
+        preferredModel: t.preferredModel,
+        agent_id: t.agent_id ?? null,
+        skill_slug: t.skill_slug ?? null,
+        primary_question: t.primary_question ?? null,
+        primary_input: t.primary_input ?? null,
+        agent: t.agent_id ? (agentMap[t.agent_id] ?? null) : null,
       };
     });
   }),
@@ -879,11 +895,14 @@ export const quickTaskRouter = router({
     .mutation(async ({ input }) => {
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const { getOrchestraConfig } = await import("../_core/quickTaskFB");
-      const template = FB_30S_TASKS.find((t) => t.id === input.taskId);
+      // Look up template + config in both FB and IG catalogs
+      const template =
+        FB_30S_TASKS.find((t) => t.id === input.taskId) ??
+        IG_30S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId} (orchestra is 30s-only).`);
       }
-      const config = getOrchestraConfig(input.taskId);
+      const config = getOrchestraConfig(input.taskId) ?? getIGOrchestraConfig(input.taskId);
       if (!config) {
         throw new Error(`No orchestra config for task ${input.taskId}.`);
       }
@@ -910,9 +929,10 @@ export const quickTaskRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      // Look up template
+      // Look up template (FB / IG / FB-60s)
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??
+        IG_30S_TASKS.find((t) => t.id === input.taskId) ??
         FB_60S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s/60s quick task id: ${input.taskId}. (90s tasks must use squad.stepExecute.)`);

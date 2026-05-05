@@ -32,8 +32,13 @@ export interface FBTaskTemplate {
   preferredModel: "qwen" | "zhipu" | "azure-foundry" | "azure-position" | "hermes" | "any";
   /** maxTokens cap — 30s aim ~400, 60s ~900, 90s ~1800 */
   maxTokens: number;
-  /** Default platform & post_type the quickTask output should embed */
-  outputDefaults: { platform: "facebook"; post_type: string };
+  /** Default platform & post_type the quickTask output should embed.
+   * Widened 2026-05-05 to support IG / Threads / etc. as channel rollout
+   * progresses (see project_30s_task_sop.md). */
+  outputDefaults: {
+    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press";
+    post_type: string;
+  };
 }
 
 // Helper to keep prompt blocks tidy

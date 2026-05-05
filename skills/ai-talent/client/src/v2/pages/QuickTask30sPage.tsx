@@ -77,7 +77,7 @@ interface ChannelTile {
 const CHANNEL_TILES: ChannelTile[] = [
   { id: "all",        label: "全部",       icon: faStar,        bg: "#7C3AED", enabled: true  },
   { id: "facebook",   label: "Facebook",   icon: faFacebookF,   bg: "#1877F2", enabled: true  },
-  { id: "instagram",  label: "Instagram",  icon: faInstagram,   bg: "#E4405F", enabled: false },
+  { id: "instagram",  label: "Instagram",  icon: faInstagram,   bg: "#E4405F", enabled: true  },
   { id: "youtube",    label: "YouTube",    icon: faYoutube,     bg: "#FF0000", enabled: false },
   { id: "tiktok",     label: "TikTok",     icon: faTiktok,      bg: "#010101", enabled: false },
   { id: "linkedin",   label: "LinkedIn",   icon: faLinkedinIn,  bg: "#0A66C2", enabled: false },
@@ -139,8 +139,14 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   // Apply channel + search filters
   const visibleTasks = useMemo(() => {
     let list = tasksThisTier;
-    // For now all 30s tasks are FB; ignore channel filter when "all" or "facebook"
-    if (channel !== "all" && channel !== "facebook") list = [];
+    // Filter by platform field returned by listFB. Tasks without platform
+    // fall back to id-prefix inference (fb-* / ig-*).
+    if (channel !== "all") {
+      list = list.filter((t: any) => {
+        const platform = t.platform ?? (t.id?.startsWith("ig-") ? "instagram" : "facebook");
+        return platform === channel;
+      });
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter((t) =>
@@ -351,7 +357,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
             <CardBody className="text-center text-default-500 py-12">
               <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
               <p>
-                {channel !== "facebook" && channel !== "all"
+                {channel !== "facebook" && channel !== "instagram" && channel !== "all"
                   ? `${CHANNEL_TILES.find((c) => c.id === channel)?.label} 通路的 ${tierLabel} 任務製作中…`
                   : `沒有匹配 "${searchQuery}" 的任務`}
               </p>
