@@ -32,7 +32,7 @@ jobs:
               -H "x-api-key: $PIAPI_KEY" \
               -H "Content-Type: application/json" \
               -d '{
-                "model": "Qubico/flux1-pro",
+                "model": "Qubico/flux1-schnell",
                 "task_type": "txt2img",
                 "input": {
                   "prompt": "warm minimalist cafe interior, soft morning light, 1024x1024",
