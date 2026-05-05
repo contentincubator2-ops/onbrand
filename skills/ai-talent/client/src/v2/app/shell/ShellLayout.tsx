@@ -36,12 +36,14 @@ interface NavItem {
   matchPrefix?: string;
 }
 
+// 2026-05-05 pivot: 快派 is now the home (/) entry. /squads is the
+// "advanced mode" Canva-style task wall (was at /).
 const NAV_ITEMS: NavItem[] = [
-  { to: "/",          label: "首頁",     icon: <FontAwesomeIcon icon={faHouse} /> },
+  { to: "/",          label: "快派",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
+  { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
   { to: "/templates", label: "範本",     matchPrefix: "/templates", icon: <FontAwesomeIcon icon={faTableCells} /> },
   { to: "/brands",    label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
-  { to: "/quicktask", label: "快派",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/boardroom", label: "比稿",     icon: <FontAwesomeIcon icon={faMicrophone} /> },
   { to: "/playbooks", label: "案例",     icon: <FontAwesomeIcon icon={faBookBookmark} /> },
 ];

@@ -134,10 +134,14 @@ export default function AppV2() {
             </RequireAuthV2>
           }
         >
-          <Route path="/" element={<MissionsHome />} />
+          {/* 2026-05-05 pivot: 快派 (QuickTask) is now the main entry.
+              Current MissionsHome moved to /squads; /quicktask kept as
+              alias so any existing links still work. */}
+          <Route path="/" element={<QuickTasksPage />} />
+          <Route path="/squads" element={<MissionsHome />} />
+          <Route path="/quicktask" element={<Navigate to="/" replace />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/brands" element={<BrandsPage />} />
-          <Route path="/quicktask" element={<QuickTasksPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
