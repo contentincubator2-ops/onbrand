@@ -65,7 +65,7 @@ interface FBTaskCard {
   squad_slug?: string;
 }
 
-type Tier = "30s" | "60s" | "90s";
+type Tier = "30s" | "60s" | "100s";
 type Channel = "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin" | "email" | "pr" | "audience" | "brand" | "all";
 
 interface ChannelTile {
@@ -133,8 +133,11 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     : { data: [] };
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
 
+  // 60s and 100s tier reuse the same 30s task pool; orchestra scales output
+  // (5 variants + QA for 60s; +scout/video for 100s). All "30s" tasks show
+  // on /60s and /100s pages with the tier-appropriate orchestra.
   const tasksThisTier = useMemo(
-    () => allTasks.filter((t) => t.tier === tier),
+    () => tier === "30s" ? allTasks.filter((t) => t.tier === "30s") : allTasks.filter((t) => t.tier === "30s"),
     [allTasks, tier],
   );
 
@@ -171,7 +174,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     return list;
   }, [tasksThisTier, channel, searchQuery]);
 
-  const tierLabel = tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "90 秒";
+  const tierLabel = tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "100 秒";
   const tierTagline = tier === "30s"
     ? "今天，要寫哪一篇 30 秒搞定的貼文？"
     : tier === "60s"
@@ -181,6 +184,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
   // Plan B 20s parallel orchestra (caption_writer + image_director + Flux Schnell ×N)
   const runOrchestraMut = (trpc as any).quickTask?.runOrchestra?.useMutation();
+  const runOrchestra60Mut = (trpc as any).quickTask?.runOrchestra60?.useMutation();
+  const runOrchestra100Mut = (trpc as any).quickTask?.runOrchestra100?.useMutation();
   const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
 
@@ -216,10 +221,14 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         return;
       }
       const inputKey = activeTask.primary_input?.key ?? "topic";
-      // Plan B: 30s tasks go through orchestra (parallel fanout). 60s/90s
-      // fall back to legacy runQuick for now until those tiers are wired.
-      if (activeTask.tier === "30s" && runOrchestraMut) {
-        const r = await runOrchestraMut.mutateAsync({
+      // 30s / 60s / 100s — all route through orchestra with tier-specific
+      // mutation. Tier scales variants (3 → 5) + adds QA stage (60s+).
+      const tierMut =
+        tier === "60s" ? runOrchestra60Mut :
+        tier === "100s" ? runOrchestra100Mut :
+        runOrchestraMut;
+      if (tierMut) {
+        const r = await tierMut.mutateAsync({
           taskId: activeTask.id,
           inputs: { [inputKey]: primaryAnswer },
           brandId: brandId ?? undefined,
@@ -303,7 +312,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   }, [output]);
 
   // 倒數仍對用戶承諾 30s（CJ direction 2026-05-05 — 20s 是後端的內部安全上限）
-  const expectedSec = activeTask?.tier === "30s" ? 30 : activeTask?.tier === "60s" ? 60 : 90;
+  const expectedSec = tier === "30s" ? 30 : tier === "60s" ? 60 : 100;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
   return (
@@ -379,7 +388,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
               <p className="font-semibold mb-1">{tierLabel} 任務製作中</p>
               <p className="text-tiny text-default-400">
                 {tier === "60s" && "60 秒任務（含完整視覺 brief）將於下一波上線"}
-                {tier === "90s" && "90 秒任務會接到既有 squad 的完整流程"}
+                {tier === "100s" && "100 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）"}
                 {tier === "30s" && "請稍候，Agent 正在準備中"}
               </p>
             </CardBody>

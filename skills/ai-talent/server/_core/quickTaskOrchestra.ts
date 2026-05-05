@@ -22,9 +22,14 @@ import { buildBrandPrefix as buildBrandContext } from "./brandContext";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
-const HARD_BUDGET_MS  = 20_000;
-const PER_IMAGE_MS    = 10_000; // PiAPI Flux Schnell: 3–7s typical
+const HARD_BUDGET_MS  = 20_000; // 30s tier
+const HARD_BUDGET_60S = 50_000; // 60s tier (5 variants + QA)
+const HARD_BUDGET_100S= 100_000;// 100s tier (scout + video)
+const PER_IMAGE_MS    = 10_000;
 const LLM_BUDGET_MS   = 10_000;
+const QA_BUDGET_MS    = 12_000;
+
+export type OrchestraTier = "30s" | "60s" | "100s";
 
 export interface AgentMeta {
   id: number;
@@ -366,7 +371,24 @@ export async function runOrchestra(args: {
   config: OrchestraConfig;
   inputs: Record<string, string>;
   brandId?: number;
+  /** Tier override — 60s/100s scale variants + add QA stage. Default 30s. */
+  tier?: OrchestraTier;
 }): Promise<OrchestraResult> {
+  // Tier-based config scaling (additive, doesn't mutate original config)
+  const tier: OrchestraTier = args.tier ?? "30s";
+  if (tier === "60s") {
+    args = {
+      ...args,
+      config: { ...args.config, variants: 5, images: args.config.images > 0 ? 5 : 0 },
+    };
+  } else if (tier === "100s") {
+    args = {
+      ...args,
+      config: { ...args.config, variants: 5, images: args.config.images > 0 ? 5 : 0 },
+    };
+  }
+  const tierBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "100s" ? HARD_BUDGET_100S : HARD_BUDGET_MS;
+
   const startedAt = Date.now();
   const stages: OrchestraStage[] = [];
   const errors: string[] = [];
@@ -532,6 +554,50 @@ export async function runOrchestra(args: {
       });
     }
 
+    // ── Stage 4: QA review (60s/100s tier only, parallel per variant) ─────
+    // Jordan Hayes (squadLeadQA) reviews each variant against task + brand.
+    // QA runs AFTER caption assembly so it sees the final user-facing text.
+    if (tier === "60s" || tier === "100s") {
+      const stQA = stage("qa", `Jordan Hayes 審核 ${variants.length} 個變體`);
+      try {
+        const { runSquadLeadQA } = await import("../squadLeadQA");
+        const qaResults = await Promise.allSettled(
+          variants.map((v) =>
+            Promise.race([
+              runSquadLeadQA({
+                agentName: captionLoad.meta?.name ?? "caption_writer",
+                agentTitle: captionLoad.meta?.title,
+                taskTitle: args.template.label,
+                agentOutput: v.caption,
+                brandName: args.brandId ? `Brand #${args.brandId}` : undefined,
+                userRequest: userMsg.slice(0, 500),
+              }),
+              timeoutPromise<never>(QA_BUDGET_MS, `qa[${v.label}]`),
+            ]),
+          ),
+        );
+        // Attach QA result to each variant for client display
+        for (let i = 0; i < variants.length; i++) {
+          const r = qaResults[i];
+          if (r?.status === "fulfilled" && r.value) {
+            (variants[i] as any).qa = {
+              status: r.value.status,
+              comment: r.value.comment,
+              score: r.value.overallScore,
+              suggestions: r.value.suggestions,
+            };
+          }
+        }
+        const passed = qaResults.filter((r) => r?.status === "fulfilled" && (r.value as any)?.status === "pass").length;
+        stQA.status = passed > 0 ? "done" : "failed";
+        stQA.completedAt = Date.now() - startedAt;
+      } catch (e: any) {
+        stQA.status = "failed";
+        stQA.completedAt = Date.now() - startedAt;
+        errors.push(`qa: ${String(e?.message ?? e)}`);
+      }
+    }
+
     return {
       taskId: args.template.id,
       totalLatencyMs: Date.now() - startedAt,
@@ -553,7 +619,7 @@ export async function runOrchestra(args: {
         setTimeout(() => {
           resolve({
             taskId: args.template.id,
-            totalLatencyMs: HARD_BUDGET_MS,
+            totalLatencyMs: tierBudget,
             fetchedUrl: null,
             captionAgent: null,
             imageAgent: null,
@@ -565,9 +631,9 @@ export async function runOrchestra(args: {
             })),
             stages,
             ok: false,
-            errors: ["orchestra: hard 20s budget exceeded"],
+            errors: [`orchestra: hard ${Math.round(tierBudget / 1000)}s budget exceeded`],
           });
-        }, HARD_BUDGET_MS),
+        }, tierBudget),
       ),
     ]);
   } catch (e: any) {

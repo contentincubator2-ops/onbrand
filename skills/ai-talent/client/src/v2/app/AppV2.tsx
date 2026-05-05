@@ -144,7 +144,8 @@ export default function AppV2() {
           <Route path="/" element={<Navigate to="/30s" replace />} />
           <Route path="/30s" element={<QuickTask30sPage tier="30s" />} />
           <Route path="/60s" element={<QuickTask30sPage tier="60s" />} />
-          <Route path="/90s" element={<QuickTask30sPage tier="90s" />} />
+          <Route path="/100s" element={<QuickTask30sPage tier="100s" />} />
+          <Route path="/90s" element={<Navigate to="/100s" replace />} />
           <Route path="/squads" element={<MissionsHome />} />
           <Route path="/quicktask" element={<Navigate to="/30s" replace />} />
           <Route path="/fb" element={<Navigate to="/30s" replace />} />

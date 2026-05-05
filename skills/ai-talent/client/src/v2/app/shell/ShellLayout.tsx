@@ -42,7 +42,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: "/30s",       label: "30S",      icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/60s",       label: "60S",      icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
-  { to: "/90s",       label: "90S",      icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
+  { to: "/100s",      label: "100S",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
   { to: "/templates", label: "範本",     matchPrefix: "/templates", icon: <FontAwesomeIcon icon={faTableCells} /> },

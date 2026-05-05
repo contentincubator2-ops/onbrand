@@ -933,6 +933,58 @@ export const quickTaskRouter = router({
   // Parallel fanout: caption_writer + image_director + N×Flux Schnell.
   // Returns OrchestraResult — variants[] each with {caption, image:{url,status}}.
   // 20s hard budget; per-image 7s; degrades gracefully (timeout chips).
+  // 60s tier — same task pool as 30s, but orchestra scales: 5 variants +
+  // QA reviewer (Jordan Hayes) + 50s budget. User sees richer output.
+  runOrchestra60: protectedProcedure
+    .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
+    .mutation(async ({ input }) => {
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+      const template =
+        FB_30S_TASKS.find((t) => t.id === input.taskId) ??
+        IG_30S_TASKS.find((t) => t.id === input.taskId) ??
+        YT_30S_TASKS.find((t) => t.id === input.taskId) ??
+        TT_30S_TASKS.find((t) => t.id === input.taskId) ??
+        LI_30S_TASKS.find((t) => t.id === input.taskId) ??
+        EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
+        PR_30S_TASKS.find((t) => t.id === input.taskId) ??
+        BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
+        RESEARCH_30S_TASKS.find((t) => t.id === input.taskId);
+      if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
+      const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
+      const config =
+        _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
+        getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
+        getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId);
+      if (!config) throw new Error(`No config for: ${input.taskId}`);
+      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
+    }),
+
+  // 100s tier — research-validated + video-where-applicable. Same task pool.
+  // Currently just bumps tier flag; scout / video integration is Phase 3 build.
+  runOrchestra100: protectedProcedure
+    .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
+    .mutation(async ({ input }) => {
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+      const template =
+        FB_30S_TASKS.find((t) => t.id === input.taskId) ??
+        IG_30S_TASKS.find((t) => t.id === input.taskId) ??
+        YT_30S_TASKS.find((t) => t.id === input.taskId) ??
+        TT_30S_TASKS.find((t) => t.id === input.taskId) ??
+        LI_30S_TASKS.find((t) => t.id === input.taskId) ??
+        EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
+        PR_30S_TASKS.find((t) => t.id === input.taskId) ??
+        BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
+        RESEARCH_30S_TASKS.find((t) => t.id === input.taskId);
+      if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
+      const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
+      const config =
+        _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
+        getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
+        getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId);
+      if (!config) throw new Error(`No config for: ${input.taskId}`);
+      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, tier: "100s" });
+    }),
+
   runOrchestra: protectedProcedure
     .input(
       z.object({
