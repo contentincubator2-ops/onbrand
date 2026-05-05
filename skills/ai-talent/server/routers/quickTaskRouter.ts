@@ -676,6 +676,8 @@ import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
 import { LI_30S_TASKS, getLIOrchestraConfig } from "../_core/quickTaskLI";
 import { EMAIL_30S_TASKS, getEmailOrchestraConfig } from "../_core/quickTaskEmail";
 import { PR_30S_TASKS, getPROrchestraConfig } from "../_core/quickTaskPR";
+import { BRAND_30S_TASKS, getBrandOrchestraConfig } from "../_core/quickTaskBrand";
+import { RESEARCH_30S_TASKS, getResearchOrchestraConfig } from "../_core/quickTaskResearch";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 
@@ -860,7 +862,17 @@ export const quickTaskRouter = router({
       kind: "fast" as const,
       platform: "pr",
     }));
-    const tasks: any[] = [...fbTasks, ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks];
+    const brTasks = BRAND_30S_TASKS.map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      platform: "brand",
+    }));
+    const rsTasks = RESEARCH_30S_TASKS.map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      platform: "audience",
+    }));
+    const tasks: any[] = [...fbTasks, ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks];
     // Collect unique agent_ids that need lookup (covers both fb + ig)
     const agentIds: number[] = Array.from(new Set(
       tasks.flatMap((t: any) => (t.agent_id ? [Number(t.agent_id)] : []))
@@ -889,6 +901,8 @@ export const quickTaskRouter = router({
           : t.id?.startsWith("li-") ? "linkedin"
           : t.id?.startsWith("em-") ? "email"
           : t.id?.startsWith("pr-") ? "pr"
+          : t.id?.startsWith("br-") ? "brand"
+          : t.id?.startsWith("rs-") ? "audience"
           : t.id?.startsWith("fb-") ? "facebook"
           : "facebook");
       const base = {
@@ -938,7 +952,9 @@ export const quickTaskRouter = router({
         TT_30S_TASKS.find((t) => t.id === input.taskId) ??
         LI_30S_TASKS.find((t) => t.id === input.taskId) ??
         EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
-        PR_30S_TASKS.find((t) => t.id === input.taskId);
+        PR_30S_TASKS.find((t) => t.id === input.taskId) ??
+        BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
+        RESEARCH_30S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId} (orchestra is 30s-only).`);
       }
@@ -949,7 +965,9 @@ export const quickTaskRouter = router({
         getTTOrchestraConfig(input.taskId) ??
         getLIOrchestraConfig(input.taskId) ??
         getEmailOrchestraConfig(input.taskId) ??
-        getPROrchestraConfig(input.taskId);
+        getPROrchestraConfig(input.taskId) ??
+        getBrandOrchestraConfig(input.taskId) ??
+        getResearchOrchestraConfig(input.taskId);
       if (!config) {
         throw new Error(`No orchestra config for task ${input.taskId}.`);
       }
@@ -985,6 +1003,8 @@ export const quickTaskRouter = router({
         LI_30S_TASKS.find((t) => t.id === input.taskId) ??
         EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
         PR_30S_TASKS.find((t) => t.id === input.taskId) ??
+        BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
+        RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
         FB_60S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s/60s quick task id: ${input.taskId}. (90s tasks must use squad.stepExecute.)`);

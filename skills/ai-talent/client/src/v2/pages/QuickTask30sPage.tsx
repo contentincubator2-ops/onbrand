@@ -84,9 +84,9 @@ const CHANNEL_TILES: ChannelTile[] = [
   { id: "tiktok",     label: "TikTok",     icon: faTiktok,      bg: "#010101", enabled: true  },
   { id: "linkedin",   label: "LinkedIn",   icon: faLinkedinIn,  bg: "#0A66C2", enabled: true  },
   { id: "email",      label: "電子報",     icon: faEnvelope,    bg: "#7B5BC8", enabled: true  },
-  { id: "brand",      label: "品牌定位",   icon: faRocket,      bg: "#7C3AED", enabled: false },
+  { id: "brand",      label: "品牌定位",   icon: faRocket,      bg: "#7C3AED", enabled: true  },
   { id: "pr",         label: "新聞稿",     icon: faBullhorn,    bg: "#475569", enabled: true  },
-  { id: "audience",   label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: false },
+  { id: "audience",   label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: true  },
 ];
 
 export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
@@ -153,6 +153,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
             : t.id?.startsWith("li-") ? "linkedin"
             : t.id?.startsWith("em-") ? "email"
             : t.id?.startsWith("pr-") ? "pr"
+            : t.id?.startsWith("br-") ? "brand"
+            : t.id?.startsWith("rs-") ? "audience"
             : "facebook");
         return platform === channel;
       });
@@ -234,6 +236,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
             : activeTask.id?.startsWith("li-") ? "linkedin"
             : activeTask.id?.startsWith("em-") ? "email"
             : activeTask.id?.startsWith("pr-") ? "press"
+            : activeTask.id?.startsWith("br-") ? "press"
+            : activeTask.id?.startsWith("rs-") ? "press"
             : activeTask.id?.startsWith("fb-") ? "facebook"
             : "facebook");
         // Threads task uses platform="threads" + post_type="post" — preserve.
@@ -385,7 +389,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
             <CardBody className="text-center text-default-500 py-12">
               <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
               <p>
-                {!["facebook","instagram","youtube","tiktok","linkedin","email","pr","all"].includes(channel)
+                {!["facebook","instagram","youtube","tiktok","linkedin","email","pr","brand","audience","all"].includes(channel)
                   ? `${CHANNEL_TILES.find((c) => c.id === channel)?.label} 通路的 ${tierLabel} 任務製作中…`
                   : `沒有匹配 "${searchQuery}" 的任務`}
               </p>
