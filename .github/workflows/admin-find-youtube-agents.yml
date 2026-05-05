@@ -1,0 +1,60 @@
+name: Admin — Find YouTube 30s task agents (10 different + 1 thumbnail dir)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+
+            echo "=== A. YouTube creators / channel managers ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(slug) LIKE '%youtube%' OR LOWER(slug) LIKE 'yt-%' OR LOWER(title) LIKE '%youtube%' OR LOWER(title) LIKE '%youtuber%' OR LOWER(primarySkill) LIKE '%youtube%') ORDER BY id LIMIT 40"
+
+            echo ""
+            echo "=== B. Long-form video script / video creator ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND ((LOWER(title) LIKE '%video%' AND LOWER(title) NOT LIKE '%short%') OR LOWER(title) LIKE '%videographer%' OR LOWER(title) LIKE '%filmmaker%' OR LOWER(primarySkill) LIKE '%video-script%' OR LOWER(primarySkill) LIKE '%longform%' OR LOWER(slug) LIKE '%video-script%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== C. Shorts / vertical short-video specialists (避開已用過 60029 Siyu, 35 Jason) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN (35, 60029, 30007, 30011) AND (LOWER(slug) LIKE '%short%' OR LOWER(title) LIKE '%shorts%' OR LOWER(primarySkill) LIKE '%shorts%' OR LOWER(primarySkill) LIKE '%youtube-shorts%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== D. Thumbnail / video thumbnail designer (image_director — 避開 239184 Mandy, 180170 Nancy) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN (239184, 180170) AND (LOWER(slug) LIKE '%thumb%' OR LOWER(title) LIKE '%thumbnail%' OR LOWER(title) LIKE '%video%design%' OR LOWER(title) LIKE '%video%visual%' OR LOWER(primarySkill) LIKE '%thumbnail%' OR LOWER(primarySkill) LIKE '%video-design%' OR LOWER(primarySkill) LIKE '%motion-graphic%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== E. SEO / description / tag writer (任務 3 / 4) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN (30005, 25, 37, 60013, 60043, 60044) AND (LOWER(primarySkill) LIKE '%seo%' OR LOWER(primarySkill) LIKE '%video-seo%' OR LOWER(title) LIKE '%seo%' OR LOWER(slug) LIKE '%seo%' OR LOWER(primarySkill) LIKE '%description%' OR LOWER(primarySkill) LIKE '%metadata%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== F. Hook / opening / first-15-seconds specialists (任務 6) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN (239183, 229985) AND (LOWER(primarySkill) LIKE '%hook%' OR LOWER(primarySkill) LIKE '%attention%' OR LOWER(primarySkill) LIKE '%opening%' OR LOWER(title) LIKE '%hook%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== G. CTA / end-screen / conversion specialists (任務 7) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(primarySkill) LIKE '%cta%' OR LOWER(primarySkill) LIKE '%conversion%' OR LOWER(primarySkill) LIKE '%end-screen%' OR LOWER(primarySkill) LIKE '%subscribe%' OR LOWER(title) LIKE '%conversion%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== H. Community / social media manager (任務 8 / 10 — 避開 180143 Emily, 180157 Nina) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN (180143, 180157, 180163) AND (LOWER(primarySkill) LIKE '%community%' OR LOWER(primarySkill) LIKE '%engagement%' OR LOWER(title) LIKE '%community%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== I. Squad lead agents — YT-tagged squads ==="
+            $MYSQL -e "SELECT s.slug AS squad_slug, a.id, a.name, a.title, a.primarySkill FROM squads s JOIN agents a ON a.id=s.lead_agent_id WHERE s.is_active=1 AND s.is_approved=1 AND (s.slug LIKE 'yt-%' OR s.slug LIKE 'youtube-%' OR s.workspace LIKE '%youtube%') ORDER BY s.slug LIMIT 25"
+
+            echo ""
+            echo "=== J. Cross-pillar 'video' agents (chapter / timestamp / audio specialists) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (LOWER(primarySkill) LIKE '%chapter%' OR LOWER(primarySkill) LIKE '%timestamp%' OR LOWER(primarySkill) LIKE '%transcription%' OR LOWER(primarySkill) LIKE '%audio%' OR LOWER(title) LIKE '%podcast%' OR LOWER(title) LIKE '%audio%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== Done ==="
