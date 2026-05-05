@@ -29,6 +29,8 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
+import MediaGenFlow from "../components/media/MediaGenFlow";
+import { faPalette } from "@fortawesome/free-solid-svg-icons";
 
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
@@ -528,16 +530,22 @@ function OutputCarousel({
   errorMsg: string | null;
 }) {
   // Build the slide list — slide 0 = main output; slides 1+ = variants
-  const slides: Array<{ label: string; caption: string; hashtags?: string[] }> = useMemo(() => {
+  const slides: Array<{
+    label: string; caption: string; hashtags?: string[]; imageStyle?: string;
+  }> = useMemo(() => {
+    const topStyle = output.image_style_direction?.summary;
     const main = {
       label: "主版本",
       caption: output.caption ?? "",
       hashtags: output.hashtags ?? [],
+      imageStyle: topStyle,
     };
     const vars = (output.variants ?? []).map((v: any, i: number) => ({
       label: v.label || `版本 ${i + 2}`,
       caption: v.caption ?? "",
       hashtags: v.hashtags ?? output.hashtags ?? [],
+      // Per-variant style direction wins; fallback to top-level
+      imageStyle: v.image_style_direction?.summary || topStyle,
     }));
     return [main, ...vars];
   }, [output]);
@@ -545,6 +553,7 @@ function OutputCarousel({
   const [idx, setIdx] = useState(0);
   const slide = slides[idx];
   const total = slides.length;
+  const [mediaGenOpen, setMediaGenOpen] = useState(false);
 
   return (
     <div className="space-y-3">
@@ -637,17 +646,33 @@ function OutputCarousel({
           liveDescription={output.description}
           liveCta={output.cta}
           liveHashtags={slide.hashtags}
-          liveImageStyle={output.image_style_direction?.summary}
+          liveImageStyle={slide.imageStyle}
           liveVideoStyle={output.video_style_direction?.summary}
         />
       )}
 
-      {/* Click prompt for the image area — phase E will wire to MediaGenFlow */}
-      {output.image_style_direction?.summary && (
-        <p className="text-tiny text-default-400 text-center">
-          要實際生圖？點上方 mockup 圖片框 開啟 MediaGenFlow（即將推出）
-        </p>
+      {/* MediaGenFlow trigger — uses the active slide's style direction */}
+      {slide.imageStyle && (
+        <div className="flex justify-center">
+          <Button
+            color="secondary"
+            variant="flat"
+            size="sm"
+            startContent={<FontAwesomeIcon icon={faPalette} />}
+            onPress={() => setMediaGenOpen(true)}
+          >
+            用此風格生圖（提示詞 + AI 模型）
+          </Button>
+        </div>
       )}
+
+      <MediaGenFlow
+        open={mediaGenOpen}
+        onClose={() => setMediaGenOpen(false)}
+        kind="image"
+        initialBrief={slide.imageStyle ?? ""}
+        brandContext={brandName ?? undefined}
+      />
 
       {errorMsg && (
         <Card className="bg-warning-50 border border-warning-200">
@@ -657,3 +682,4 @@ function OutputCarousel({
     </div>
   );
 }
+

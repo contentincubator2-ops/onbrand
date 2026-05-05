@@ -71,18 +71,27 @@ ${FB_TONE_SUFFIX}
     tier: "30s",
     postType: "feed",
     label: "FB 純文字 hook 5 種",
-    description: "5 個不同口吻的開場 hook（無圖）",
+    description: "5 個不同口吻的開場 hook，自動接上你原本的貼文內容",
     agent_id: 239183,             // Aiden Hsu — hook-writing
     skill_slug: "hook-writing",
-    primary_question: "你想用什麼角度開場？告訴我貼文主題或想 tease 的事",
-    primary_input: { key: "topic", placeholder: "例：新品上市 / 限時優惠 / 經驗分享", type: "textarea" },
+    primary_question: "貼上你原本要發的貼文 / 文章內容，我會幫你寫 5 種不同口吻的開場接上去",
+    primary_input: { key: "article_body", placeholder: "貼上完整的貼文內文（hook 會接在最前面）", type: "textarea" },
     inputs: [
-      { key: "topic", label: "貼文主題", type: "textarea", required: true },
+      { key: "article_body", label: "原本的貼文內容", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 5 個不同口吻的 FB 純文字貼文 hook（每個獨立可用）。
-口吻分別：① 反問式 ② 數字式 ③ 反差式 ④ 故事開頭式 ⑤ 直接挑釁式。
-每個 hook 30-60 字，緊接著一句 follow-up（共 60-100 字）。
-放進 variants[]，label 寫口吻名。caption 主欄位放最強那一版。`,
+    systemPrompt: `任務：用戶提供了一段「原本要發的貼文內文」（在 article_body 輸入裡）。
+你要寫 5 種不同口吻的 FB 開場 hook，每一個 hook 都接上**用戶提供的原文**，組成 5 個完整可發的貼文版本。
+
+放進 variants[]：5 個物件，label 分別為：
+  ① 反問式  ② 數字式  ③ 反差式  ④ 故事開頭式  ⑤ 直接挑釁式
+每個 variant.caption 結構：
+  [hook 30-60 字]\\n\\n[使用者原文逐字保留，不要改寫、不要省略]
+
+caption 主欄位放「反問式」那一版（含 hook + 原文）。
+
+每個 variant 都附 image_style_direction.summary（1 句配圖風格建議，呼應該口吻 — 例：反問式給冷色 minimal、數字式給數據視覺、故事式給生活感場景）。
+另外 top-level 也給一個整體的 image_style_direction（fallback）。
+${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
     maxTokens: 600,
     outputDefaults: { platform: "facebook", post_type: "feed" },

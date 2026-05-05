@@ -54,7 +54,12 @@ const stringOrArray = (max: number) =>
  * z.enum) so a slightly-off LLM value ("9x16" instead of "9:16") still
  * survives — UI can normalize on its end.
  */
-export const imageStyleDirectionSchema = z.object({
+/**
+ * Tolerant string→object coercer for image_style_direction.
+ * Some LLMs emit `"image_style_direction": "warm pastel, soft lighting"` instead
+ * of an object. We accept that and lift the string into `{summary: <string>}`.
+ */
+const imageStyleObjectShape = {
   /** Plain-text style summary — shown inside mockup image placeholder. */
   summary: stringOrArray(280),
   /** Mood / tone keywords — used by MediaGenFlow step 2 prompt builder */
@@ -78,7 +83,16 @@ export const imageStyleDirectionSchema = z.object({
   aspect_ratio: z.string().max(20).optional(),
   /** Suggested model — open string */
   model_suggestion: z.string().max(40).optional(),
-});
+};
+
+export const imageStyleDirectionSchema = z.preprocess(
+  (v) => {
+    if (typeof v === "string") return { summary: v };
+    if (Array.isArray(v)) return { summary: v.filter(Boolean).map(String).join(" · ") };
+    return v;
+  },
+  z.object(imageStyleObjectShape),
+);
 export type ImageStyleDirection = z.infer<typeof imageStyleDirectionSchema>;
 
 /**
@@ -112,6 +126,8 @@ export const variantSchema = z.object({
   label: z.string().max(80).optional().default(""),
   caption: z.string().max(2000),
   hashtags: z.array(z.string().max(50)).max(15).optional(),
+  /** Per-variant image style direction (e.g. each hook gets its own visual). */
+  image_style_direction: imageStyleDirectionSchema.optional(),
 });
 export type Variant = z.infer<typeof variantSchema>;
 
@@ -211,7 +227,10 @@ hashtags 是 string[] 不含 # 前綴.
 唯一例外：tone 可以是 string[] 也可以是 string.
 variants[] 每個物件需含 label（如 "情感版" / "理性版" / "幽默版"）和 caption.
 
-caption 是必填。**用戶看到的「主要產出」就是 caption 欄位**。一定要寫滿，不要只給 image_style_direction 而忘記 caption。`;
+caption 是必填。**用戶看到的「主要產出」就是 caption 欄位**。一定要寫滿，不要只給 image_style_direction 而忘記 caption。
+
+⚠️ caption / variants[].caption **不要把任務標題（如 "FB 純文字 hook 5 種"）寫進文字裡**。
+caption 直接就是貼文本身，不是「給這個任務取的名字」。`;
   if (tier === "30s") {
     return base + `
 【30s tier 規則】
