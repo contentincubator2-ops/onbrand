@@ -332,14 +332,20 @@ export async function runOrchestra(args: {
         : Promise.resolve<string[]>([]),
     ]);
 
-    // ── Stage 3: parallel image gen ────────────────────────────────────
-    const stGen = args.config.images > 0
+    // ── Stage 3: parallel image gen — only when runImageGen=true ───────
+    // 30s tier: runImageGen=false → briefs are written but no Flux call.
+    // The carousel renders style direction text in the mockup image slot;
+    // user clicks "用此風格生圖" per variant to opt into MediaGenFlow.
+    const willRender = args.config.runImageGen && args.config.images > 0;
+    const stGen = willRender
       ? stage("gen", `Flux Schnell ×${args.config.images} 平行生圖`)
       : null;
 
-    const images: OrchestraVariant["image"][] = briefs.length
+    const images: OrchestraVariant["image"][] = willRender && briefs.length
       ? await Promise.all(briefs.map((b) => genOneImage(b, args.config)))
-      : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
+      : briefs.length
+        ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
+        : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
 
     if (stGen) {
       const ok = images.filter((i) => i.status === "ready").length;

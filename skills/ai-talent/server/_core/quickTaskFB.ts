@@ -283,7 +283,16 @@ output: hashtags 陣列（不要含 # 前綴），caption 放 1 句使用建議�
 
 export interface OrchestraConfig {
   variants: number;
+  /** Number of image style briefs to write (separate from whether we render). */
   images: number;
+  /**
+   * 2026-05-05 (CJ direction): 30s tier returns style direction text only,
+   * no real image generation. The "用此風格生圖" button below each variant
+   * lets the user opt into MediaGenFlow when they actually want a render.
+   * - false → image_director writes briefs, Flux is NOT called (default 30s)
+   * - true  → image_director writes briefs + Flux Schnell renders them
+   */
+  runImageGen: boolean;
   imageDirectorId: number | null;
   aspectRatio: "1:1" | "1.91:1" | "9:16" | "16:9" | null;
   fluxSize: "square_hd" | "landscape_4_3" | "portrait_9_16" | "landscape_16_9" | null;
@@ -296,32 +305,39 @@ export interface OrchestraConfig {
 
 const MANDY_ID = 239184; // FB Visual Direction Lead
 
+// 2026-05-05 v2: variants 3 across the board, runImageGen=false for 30s.
+// Image briefs are still written by Mandy so users see direction text inside
+// each mockup; clicking "用此風格生圖" opens MediaGenFlow on demand.
+
 export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "fb-30-caption-short": {
-    variants: 5,
-    images: 5,
+    variants: 3,
+    images: 3,
+    runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
-    variantLabels: ["情感版", "理性版", "幽默版", "故事版", "數據版"],
+    variantLabels: ["情感版", "理性版", "數據版"],
     captionMinChars: 100,
     captionMaxChars: 200,
   },
   "fb-30-pure-text-hook": {
-    variants: 5,
-    images: 5,
+    variants: 3,
+    images: 3,
+    runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1.91:1",
     fluxSize: "landscape_4_3",
     imageQualitySteps: 4,
-    variantLabels: ["反問式", "數字式", "反差式", "故事式", "挑釁式"],
-    captionMinChars: 30, // hook only — full caption = hook + user article
+    variantLabels: ["反問式", "數字式", "反差式"],
+    captionMinChars: 30,
     captionMaxChars: 60,
   },
   "fb-30-link-caption": {
     variants: 3,
-    images: 1, // alt cover, in case OG image is bad
+    images: 1, // alt cover only (in case OG image is bad)
+    runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1.91:1",
     fluxSize: "landscape_4_3",
@@ -331,19 +347,21 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMaxChars: 150,
   },
   "fb-30-comment-reply": {
-    variants: 5,
+    variants: 3,
     images: 0,
+    runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
     imageQualitySteps: 0,
-    variantLabels: ["溫暖式", "專業式", "俏皮式", "共鳴式", "反問式"],
+    variantLabels: ["溫暖式", "專業式", "反問式"],
     captionMinChars: 30,
     captionMaxChars: 80,
   },
   "fb-30-crisis-reply-short": {
     variants: 3,
     images: 0,
+    runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
@@ -353,57 +371,62 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMaxChars: 150,
   },
   "fb-30-pinned-short": {
-    variants: 5,
-    images: 5,
+    variants: 3,
+    images: 3,
+    runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1.91:1",
     fluxSize: "landscape_4_3",
-    imageQualitySteps: 8, // higher quality — 釘選曝光長
-    variantLabels: ["功能訴求", "情感訴求", "數據訴求", "故事訴求", "反差訴求"],
+    imageQualitySteps: 8,
+    variantLabels: ["功能訴求", "情感訴求", "故事訴求"],
     captionMinChars: 150,
     captionMaxChars: 250,
   },
   "fb-30-story-text": {
-    variants: 5,
-    images: 5,
+    variants: 3,
+    images: 3,
+    runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "9:16",
     fluxSize: "portrait_9_16",
     imageQualitySteps: 4,
-    variantLabels: ["驚喜式", "親密式", "懸念式", "教學式", "幕後式"],
+    variantLabels: ["驚喜式", "親密式", "教學式"],
     captionMinChars: 30,
     captionMaxChars: 60,
   },
   "fb-30-live-title": {
-    variants: 5,
-    images: 5,
+    variants: 3,
+    images: 3,
+    runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "16:9",
     fluxSize: "landscape_16_9",
     imageQualitySteps: 4,
-    variantLabels: ["懸念式", "數據式", "反差式", "共鳴式", "直球式"],
-    captionMinChars: 8, // title only
+    variantLabels: ["懸念式", "數據式", "直球式"],
+    captionMinChars: 8,
     captionMaxChars: 25,
   },
   "fb-30-hashtag-set": {
-    variants: 3, // 3 hashtag sets (different strategies)
+    variants: 3,
     images: 0,
+    runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
     imageQualitySteps: 0,
     variantLabels: ["曝光導向 (20)", "品牌導向 (8)", "利基導向 (12)"],
     captionMinChars: 0,
-    captionMaxChars: 600, // hashtag string list
+    captionMaxChars: 600,
   },
   "fb-30-countdown-1day": {
-    variants: 5,
-    images: 5,
+    variants: 3,
+    images: 3,
+    runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
-    variantLabels: ["焦慮式", "FOMO式", "期待式", "提醒式", "反差式"],
+    variantLabels: ["焦慮式", "FOMO式", "期待式"],
     captionMinChars: 60,
     captionMaxChars: 120,
   },
