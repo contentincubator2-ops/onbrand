@@ -15,8 +15,9 @@ import { type MockupFields, MockupHeader, dicebear } from "./shared";
 
 /* ─────────────── TT For-You ─────────────── */
 
-export function TTForYou({ title, brandName, variantLabel }: MockupFields) {
+export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
     <div className="w-full max-w-[280px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
@@ -25,16 +26,28 @@ export function TTForYou({ title, brandName, variantLabel }: MockupFields) {
           <span className="opacity-60">追蹤中</span>
           <span className="font-semibold border-b-2 border-white pb-1">為你推薦</span>
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-            <p className="text-tiny">9:16 影片 · 等待 craft agent</p>
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="absolute inset-0 opacity-30" />
+            {liveImageStyle && (
+              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
+                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
+                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
+        {liveCaption && (
+          <div className="absolute top-12 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2 max-h-[55%] overflow-y-auto pr-12">
+            <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
+          </div>
+        )}
         <div className="absolute right-2 bottom-24 z-10 flex flex-col items-center gap-4">
           <div className="relative">
-            <Avatar src={dicebear(brandName ?? "brand")} size="md" isBordered color="danger" />
+            <Avatar src={avatarSrc} size="md" isBordered color="danger" />
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-[#FE2C55] text-white flex items-center justify-center text-tiny font-bold border-2 border-black">
               <FontAwesomeIcon icon={faPlus} className="text-tiny" />
             </span>
@@ -48,7 +61,7 @@ export function TTForYou({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1 bg-gradient-to-t from-black/80 to-transparent">
           <p className="text-small font-semibold">@{handle}</p>
-          <p className="text-small line-clamp-2">{title}</p>
+          {title && <p className="text-small line-clamp-2">{title}</p>}
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
             <span>原創音訊 · @{handle}</span>
@@ -70,8 +83,9 @@ function RailIcon({ icon, count }: { icon: any; count: string }) {
 
 /* ─────────────── TT Profile (3-col grid) ─────────────── */
 
-export function TTProfile({ brandName, variantLabel }: MockupFields) {
+export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
     <div className="w-full max-w-[360px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
@@ -84,7 +98,7 @@ export function TTProfile({ brandName, variantLabel }: MockupFields) {
         </div>
         {/* Profile */}
         <div className="text-center px-4 py-3 space-y-2">
-          <Avatar src={dicebear(brandName ?? "brand")} size="lg" className="mx-auto" />
+          <Avatar src={avatarSrc} size="lg" className="mx-auto" />
           <p className="text-medium font-bold">@{handle}</p>
           <div className="flex items-center justify-center gap-4 text-small">
             <div><span className="font-bold">12</span> <span className="text-default-500">追蹤中</span></div>
@@ -95,7 +109,11 @@ export function TTProfile({ brandName, variantLabel }: MockupFields) {
             <Button color="danger" size="sm" radius="md" className="bg-[#FE2C55]">追蹤</Button>
             <Button variant="bordered" size="sm" radius="md">傳訊息</Button>
           </div>
-          <p className="text-tiny text-default-500 pt-1">{brandName ?? "Your Brand"} · 點擊查看簡介</p>
+          {liveCaption ? (
+            <p className="text-tiny text-default-700 whitespace-pre-line leading-relaxed pt-1">{liveCaption}</p>
+          ) : (
+            <p className="text-tiny text-default-500 pt-1">{brandName ?? "Your Brand"} · 點擊查看簡介</p>
+          )}
         </div>
         {/* Tabs */}
         <div className="flex items-center justify-around border-t border-divider text-default-500">
@@ -181,8 +199,10 @@ function RailItem({ icon, count }: { icon: any; count: string }) {
 
 /* ─────────────── TT Live (LIVE chip + viewers + gifts) ─────────────── */
 
-export function TTLive({ title, brandName, variantLabel }: MockupFields) {
+export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  void title;
   return (
     <div className="w-full max-w-[280px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
@@ -190,7 +210,7 @@ export function TTLive({ title, brandName, variantLabel }: MockupFields) {
         {/* Top: host pill + LIVE + viewers */}
         <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between">
           <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full pl-1 pr-2 py-0.5">
-            <Avatar src={dicebear(brandName ?? "brand")} size="sm" classNames={{ base: "w-5 h-5" }} />
+            <Avatar src={avatarSrc} size="sm" classNames={{ base: "w-5 h-5" }} />
             <span className="text-white text-tiny font-semibold">{handle}</span>
             <span className="bg-[#FE2C55] text-white text-tiny font-bold px-1.5 py-0 rounded uppercase">LIVE</span>
           </div>
@@ -198,14 +218,26 @@ export function TTLive({ title, brandName, variantLabel }: MockupFields) {
             👁 8,432
           </span>
         </div>
-        {/* Stream placeholder */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-            <p className="text-tiny">直播中 · 等待 craft agent</p>
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="absolute inset-0 opacity-30" />
+            {liveImageStyle && (
+              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
+                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
+                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
+        {liveCaption && (
+          <div className="absolute top-12 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto">
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">開場腳本</p>
+            <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
+          </div>
+        )}
         {/* Floating gift animations */}
         <div className="absolute right-3 bottom-32 z-10 space-y-2">
           {["🌹", "💎", "🚀"].map((g, i) => (

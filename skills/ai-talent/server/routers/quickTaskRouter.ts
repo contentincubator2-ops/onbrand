@@ -672,6 +672,7 @@ import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from 
 import { FB_30S_TASKS, FB_60S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
+import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 
@@ -836,7 +837,12 @@ export const quickTaskRouter = router({
       kind: "fast" as const,
       platform: "youtube",
     }));
-    const tasks: any[] = [...fbTasks, ...igTasks, ...ytTasks];
+    const ttTasks = TT_30S_TASKS.map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      platform: "tiktok",
+    }));
+    const tasks: any[] = [...fbTasks, ...igTasks, ...ytTasks, ...ttTasks];
     // Collect unique agent_ids that need lookup (covers both fb + ig)
     const agentIds: number[] = Array.from(new Set(
       tasks.flatMap((t: any) => (t.agent_id ? [Number(t.agent_id)] : []))
@@ -861,6 +867,7 @@ export const quickTaskRouter = router({
         t.platform ??
         (t.id?.startsWith("ig-") ? "instagram"
           : t.id?.startsWith("yt-") ? "youtube"
+          : t.id?.startsWith("tt-") ? "tiktok"
           : t.id?.startsWith("fb-") ? "facebook"
           : "facebook");
       const base = {
@@ -906,14 +913,16 @@ export const quickTaskRouter = router({
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??
         IG_30S_TASKS.find((t) => t.id === input.taskId) ??
-        YT_30S_TASKS.find((t) => t.id === input.taskId);
+        YT_30S_TASKS.find((t) => t.id === input.taskId) ??
+        TT_30S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId} (orchestra is 30s-only).`);
       }
       const config =
         getOrchestraConfig(input.taskId) ??
         getIGOrchestraConfig(input.taskId) ??
-        getYTOrchestraConfig(input.taskId);
+        getYTOrchestraConfig(input.taskId) ??
+        getTTOrchestraConfig(input.taskId);
       if (!config) {
         throw new Error(`No orchestra config for task ${input.taskId}.`);
       }
@@ -940,11 +949,12 @@ export const quickTaskRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      // Look up template (FB / IG / YT / FB-60s)
+      // Look up template (FB / IG / YT / TT / FB-60s)
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??
         IG_30S_TASKS.find((t) => t.id === input.taskId) ??
         YT_30S_TASKS.find((t) => t.id === input.taskId) ??
+        TT_30S_TASKS.find((t) => t.id === input.taskId) ??
         FB_60S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s/60s quick task id: ${input.taskId}. (90s tasks must use squad.stepExecute.)`);
