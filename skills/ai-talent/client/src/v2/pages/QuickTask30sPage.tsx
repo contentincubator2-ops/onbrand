@@ -21,7 +21,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBolt, faClipboard, faClipboardCheck, faClock, faPaperPlane,
-  faRotateRight, faXmark, faStar,
+  faRotateRight, faXmark, faStar, faChevronLeft, faChevronRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
@@ -78,6 +78,7 @@ export default function QuickTask30sPage() {
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [agentMeta, setAgentMeta] = useState<any | null>(null);
+  const [fetchedUrl, setFetchedUrl] = useState<{ url: string; title: string | null; chars: number } | null>(null);
 
   // Countdown overlay (visual SLA — counts up to expected eta)
   const [countdownStart, setCountdownStart] = useState<number | null>(null);
@@ -140,6 +141,7 @@ export default function QuickTask30sPage() {
       setOutput(r.output);
       setLatencyMs(r.latencyMs);
       setAgentMeta(r.agent ?? null);
+      setFetchedUrl(r.fetchedUrl ?? null);
       if (!r.ok) {
         setErrorMsg(`部分欄位 LLM 輸出格式有差異，UI 已盡量呈現：${(r.validationErrors ?? []).slice(0, 1).join("")}`);
       }
@@ -391,100 +393,20 @@ export default function QuickTask30sPage() {
                     )}
                   </>
                 ) : (
-                  /* Output: live mockup + ALWAYS-VISIBLE caption panel + style direction */
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-tiny text-default-500">
-                      <FontAwesomeIcon icon={faClock} />
-                      <span>{latencyMs != null ? `${(latencyMs / 1000).toFixed(1)}s 完成` : ""}</span>
-                      {agentMeta && (
-                        <>
-                          <span>·</span>
-                          <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-4 h-4" />
-                          <span>{agentMeta.name}</span>
-                        </>
-                      )}
-                    </div>
-
-                    {/* ALWAYS show caption text first — primary output, must never get hidden by a broken mockup */}
-                    {output.caption ? (
-                      <Card>
-                        <CardBody className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <p className="text-tiny font-semibold text-default-600 uppercase tracking-wider">貼文文案</p>
-                            <Chip size="sm" variant="flat" color="success">{output.caption.length} 字</Chip>
-                          </div>
-                          <p className="text-small whitespace-pre-wrap leading-relaxed">{output.caption}</p>
-                          {output.cta && (
-                            <p className="text-small text-primary-700 font-medium pt-2 border-t border-default-100">
-                              CTA：{output.cta}
-                            </p>
-                          )}
-                          {output.hashtags && output.hashtags.length > 0 && (
-                            <p className="text-tiny text-primary-500 pt-2 border-t border-default-100">
-                              {output.hashtags.map((t: string) => `#${t.replace(/^#/, "")}`).join(" ")}
-                            </p>
-                          )}
-                        </CardBody>
-                      </Card>
-                    ) : (
-                      <Card className="bg-warning-50 border border-warning-200">
-                        <CardBody className="text-warning-800 text-small">
-                          ⚠️ Agent 沒有產出 caption — 這通常是 LLM 輸出格式漂移。試試「重做」按鈕再生一次。
-                        </CardBody>
-                      </Card>
-                    )}
-
-                    {mockupVariant && (
-                      <PlatformMockup
-                        variant={mockupVariant}
-                        title={output.title ?? activeTask.label}
-                        brief={output.description ?? ""}
-                        brandName={brandName}
-                        liveCaption={output.caption}
-                        liveTitle={output.title}
-                        liveDescription={output.description}
-                        liveCta={output.cta}
-                        liveHashtags={output.hashtags}
-                        liveImageStyle={output.image_style_direction?.summary}
-                        liveVideoStyle={output.video_style_direction?.summary}
-                      />
-                    )}
-
-                    {output.image_style_direction && (
-                      <Card>
-                        <CardBody className="space-y-1.5">
-                          <p className="text-tiny font-semibold text-default-600">配圖風格方向（給 MediaGenFlow）</p>
-                          <p className="text-small">{output.image_style_direction.summary}</p>
-                          {output.image_style_direction.aspect_ratio && (
-                            <Chip size="sm" variant="flat">{output.image_style_direction.aspect_ratio}</Chip>
-                          )}
-                          <p className="text-tiny text-default-400 pt-1 border-t border-default-100 mt-2">
-                            要實際生圖，請從圖片框點開 MediaGenFlow（Phase E 串接中）
-                          </p>
-                        </CardBody>
-                      </Card>
-                    )}
-
-                    {output.variants && output.variants.length > 0 && (
-                      <Card>
-                        <CardBody className="space-y-2">
-                          <p className="text-tiny font-semibold text-default-600">替代版本（{output.variants.length}）</p>
-                          {output.variants.map((v: any, i: number) => (
-                            <div key={i} className="border-l-2 border-primary-200 pl-3">
-                              <p className="text-tiny font-semibold text-primary-700">{v.label || `版本 ${i + 1}`}</p>
-                              <p className="text-small line-clamp-3">{v.caption}</p>
-                            </div>
-                          ))}
-                        </CardBody>
-                      </Card>
-                    )}
-
-                    {errorMsg && (
-                      <Card className="bg-warning-50 border border-warning-200">
-                        <CardBody className="text-warning-800 text-tiny">{errorMsg}</CardBody>
-                      </Card>
-                    )}
-                  </div>
+                  /* Output: variants as swipeable mockup carousel.
+                     The "main" caption is variant[0] (or the top-level caption
+                     if no variants). Use chevron arrows to swipe between.
+                     Style direction lives INSIDE each mockup's image slot. */
+                  <OutputCarousel
+                    output={output}
+                    activeTask={activeTask}
+                    brandName={brandName}
+                    mockupVariant={mockupVariant}
+                    latencyMs={latencyMs}
+                    agentMeta={agentMeta}
+                    fetchedUrl={fetchedUrl}
+                    errorMsg={errorMsg}
+                  />
                 )}
               </ModalBody>
               <ModalFooter>
@@ -519,6 +441,155 @@ export default function QuickTask30sPage() {
           )}
         </ModalContent>
       </Modal>
+    </div>
+  );
+}
+
+/* ──────────────────────────── Output Carousel ────────────────────────────
+ * Each variant becomes its own complete mockup. Left/right chevrons swap
+ * between them. Style direction shows INSIDE each mockup's image slot.
+ *
+ * If output has 0 variants (just top-level caption), shows a single mockup.
+ */
+function OutputCarousel({
+  output, activeTask, brandName, mockupVariant, latencyMs, agentMeta, fetchedUrl, errorMsg,
+}: {
+  output: any;
+  activeTask: FBTaskCard;
+  brandName: string | null;
+  mockupVariant: MockupVariant | null;
+  latencyMs: number | null;
+  agentMeta: any;
+  fetchedUrl: { url: string; title: string | null; chars: number } | null;
+  errorMsg: string | null;
+}) {
+  // Build the slide list — slide 0 = main output; slides 1+ = variants
+  const slides: Array<{ label: string; caption: string; hashtags?: string[] }> = useMemo(() => {
+    const main = {
+      label: "主版本",
+      caption: output.caption ?? "",
+      hashtags: output.hashtags ?? [],
+    };
+    const vars = (output.variants ?? []).map((v: any, i: number) => ({
+      label: v.label || `版本 ${i + 2}`,
+      caption: v.caption ?? "",
+      hashtags: v.hashtags ?? output.hashtags ?? [],
+    }));
+    return [main, ...vars];
+  }, [output]);
+
+  const [idx, setIdx] = useState(0);
+  const slide = slides[idx];
+  const total = slides.length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-tiny text-default-500 flex-wrap">
+        <FontAwesomeIcon icon={faClock} />
+        <span>{latencyMs != null ? `${(latencyMs / 1000).toFixed(1)}s 完成` : ""}</span>
+        {agentMeta && (
+          <>
+            <span>·</span>
+            <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-4 h-4" />
+            <span>{agentMeta.name}</span>
+          </>
+        )}
+      </div>
+
+      {/* URL provenance — show when agent actually fetched + read a link */}
+      {fetchedUrl && (
+        <Card className="bg-success-50 border border-success-200">
+          <CardBody className="py-2 px-3 flex flex-row items-center gap-2 text-tiny">
+            <span className="text-success-700 font-semibold">✓ 已讀過你給的連結</span>
+            <span className="text-default-500 truncate flex-1">
+              {fetchedUrl.title ?? fetchedUrl.url}
+            </span>
+            <Chip size="sm" variant="flat" color="success">{fetchedUrl.chars.toLocaleString()} 字</Chip>
+          </CardBody>
+        </Card>
+      )}
+
+      {!slide.caption && (
+        <Card className="bg-warning-50 border border-warning-200">
+          <CardBody className="text-warning-800 text-small">
+            ⚠️ Agent 沒有產出 caption — 試「重做」按鈕。
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Carousel — chevrons + dots */}
+      {total > 1 && (
+        <div className="flex items-center justify-between bg-default-50 rounded-medium px-3 py-2">
+          <Button
+            isIconOnly
+            size="sm"
+            variant="flat"
+            isDisabled={idx === 0}
+            onPress={() => setIdx(Math.max(0, idx - 1))}
+          >
+            <FontAwesomeIcon icon={faChevronLeft} />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Chip size="sm" variant="flat" color="primary">{slide.label}</Chip>
+            <span className="text-tiny text-default-500">
+              {idx + 1} / {total}
+            </span>
+            <div className="flex gap-1 ml-2">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  className={`w-1.5 h-1.5 rounded-full transition ${
+                    i === idx ? "bg-primary-500 w-4" : "bg-default-300"
+                  }`}
+                  aria-label={`切到版本 ${i + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="flat"
+            isDisabled={idx === total - 1}
+            onPress={() => setIdx(Math.min(total - 1, idx + 1))}
+          >
+            <FontAwesomeIcon icon={faChevronRight} />
+          </Button>
+        </div>
+      )}
+
+      {/* The mockup — caption swaps per variant, image style is shared (one
+          image style direction applies across all caption variants since
+          they're verbal alternatives of the same post) */}
+      {mockupVariant && (
+        <PlatformMockup
+          variant={mockupVariant}
+          title={output.title ?? activeTask.label}
+          brief={output.description ?? ""}
+          brandName={brandName}
+          liveCaption={slide.caption}
+          liveTitle={output.title}
+          liveDescription={output.description}
+          liveCta={output.cta}
+          liveHashtags={slide.hashtags}
+          liveImageStyle={output.image_style_direction?.summary}
+          liveVideoStyle={output.video_style_direction?.summary}
+        />
+      )}
+
+      {/* Click prompt for the image area — phase E will wire to MediaGenFlow */}
+      {output.image_style_direction?.summary && (
+        <p className="text-tiny text-default-400 text-center">
+          要實際生圖？點上方 mockup 圖片框 開啟 MediaGenFlow（即將推出）
+        </p>
+      )}
+
+      {errorMsg && (
+        <Card className="bg-warning-50 border border-warning-200">
+          <CardBody className="text-warning-800 text-tiny">{errorMsg}</CardBody>
+        </Card>
+      )}
     </div>
   );
 }

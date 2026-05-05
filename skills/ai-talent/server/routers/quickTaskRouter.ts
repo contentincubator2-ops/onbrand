@@ -670,6 +670,7 @@ import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 // 2026-05-05 quick-task pivot
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
 import { FB_30S_TASKS, FB_60S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
+import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 
 function tryParseJson(s: string): any | null {
@@ -910,6 +911,25 @@ export const quickTaskRouter = router({
         } catch { /* persona load failure is non-fatal */ }
       }
 
+      // 2026-05-05 fix: if any input contains a URL, fetch the page and
+      // inject a summary so the agent actually READS what the user shared
+      // (vs writing a generic post that ignores the link content).
+      let urlContext = "";
+      let fetchedUrl: { url: string; title: string | null; chars: number } | null = null;
+      for (const v of Object.values(input.inputs)) {
+        if (typeof v === "string") {
+          const url = findFirstUrl(v);
+          if (url) {
+            const summary = await fetchUrlSummary(url);
+            if (summary) {
+              urlContext = "\n\n" + formatUrlSummaryForPrompt(summary) + "\n\n";
+              fetchedUrl = { url: summary.url, title: summary.title, chars: summary.fetched_chars };
+              break; // first URL only — keep prompt budget reasonable
+            }
+          }
+        }
+      }
+
       // Build prompt
       const brandPrefix = await buildBrandContext(input.brandId);
       const userMsg =
@@ -921,7 +941,8 @@ export const quickTaskRouter = router({
         template.systemPrompt +
         "\n" +
         quickTaskOutputSpec(template.tier) +
-        brandPrefix;
+        brandPrefix +
+        urlContext;
 
       const messages = [
         { role: "system" as const, content: systemFull },
@@ -965,6 +986,7 @@ export const quickTaskRouter = router({
         rawText: result.content, // for debugging / regenerate
         agent: agentMeta,        // {id, name, title, avatarUrl} or null
         skill_slug: template.skill_slug ?? null,
+        fetchedUrl,              // {url, title, chars} or null — was a URL read?
       };
     }),
 

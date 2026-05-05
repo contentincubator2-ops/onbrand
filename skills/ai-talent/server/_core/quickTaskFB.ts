@@ -53,8 +53,8 @@ export const FB_30S_TASKS: FBTaskTemplate[] = [
     description: "100-200 字單張圖文 caption，含 1 句 hook + 1 個 CTA",
     agent_id: 239183,             // Aiden Hsu — fb-brief-writer
     skill_slug: "fb-copywriting",
-    primary_question: "今天這篇貼文要講什麼？貼上原文、主題或新品名稱即可",
-    primary_input: { key: "topic", placeholder: "例：春季新品上市 / 母親節活動 / 客戶感謝", type: "textarea" },
+    primary_question: "今天這篇貼文要講什麼？可以貼網址（會自動讀取）、原文、或主題描述",
+    primary_input: { key: "topic", placeholder: "例：https://your-blog.com/article  /  春季新品上市  /  母親節活動", type: "textarea" },
     inputs: [
       { key: "topic", label: "今天要講什麼？", type: "textarea", required: true, placeholder: "例：春季新品上市 / 母親節活動 / 客戶感謝" },
     ],
