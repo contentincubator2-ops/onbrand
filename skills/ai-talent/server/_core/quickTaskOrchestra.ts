@@ -254,6 +254,64 @@ async function callCaptionWriter(args: {
 
 // ── Image director LLM call ─────────────────────────────────────────────
 
+// Per-variant fanout: same reliability play as caption_writer. Each brief
+// is its own tiny LLM call (~100 tokens). Failure isolated, retry per slot.
+async function callOneBrief(args: {
+  template: FBTaskTemplate;
+  config: OrchestraConfig;
+  label: string;
+  imagePersona: string;
+  brandPrefix: string;
+  urlContext: string;
+  userMsg: string;
+}): Promise<string> {
+  const { config, label, imagePersona, brandPrefix, urlContext, userMsg } = args;
+  const hasUrl = urlContext.length > 0;
+  const subjectRule = hasUrl
+    ? `視覺主題=URL 抓到的影片 / 文章內容。**不要**把品牌主商品畫進視覺。\n`
+    : "";
+  const system =
+    imagePersona +
+    `任務：寫 1 條**繁體中文**視覺方向描述，呼應「${label}」這個口吻。\n` +
+    `比例：${config.aspectRatio ?? "1:1"}\n` +
+    subjectRule +
+    `規則：30-60 字繁中、涵蓋主體 / 構圖 / 光線 / 色彩 / 氛圍、不要疊文字、不要 logo。\n\n` +
+    `輸出嚴格 JSON 物件：{"summary":"<中文視覺描述>"}\n` +
+    `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
+    (hasUrl ? brandPrefix : `\n${brandPrefix}`) +
+    (hasUrl ? `\n# URL 抓到的內容（主題來源）\n${urlContext}` : "");
+
+  let attempt = 0;
+  let lastErr: any = null;
+  while (attempt < 2) {
+    attempt++;
+    try {
+      const r = await Promise.race([
+        callModel(
+          [
+            { role: "system", content: system },
+            { role: "user", content: userMsg },
+          ],
+          undefined,
+          "qwen",
+        ),
+        timeoutPromise<never>(LLM_BUDGET_MS, `brief[${label}]`),
+      ]);
+      const parsed = tryParseJson(r.content);
+      const summary =
+        typeof (parsed as any)?.summary === "string" ? (parsed as any).summary.trim() : "";
+      if (summary.length > 0) return summary;
+      // sometimes LLM returns string directly
+      if (typeof r.content === "string" && r.content.trim().length > 0 && !r.content.includes("{")) {
+        return r.content.trim().slice(0, 280);
+      }
+      lastErr = new Error(`empty brief for ${label}`);
+    } catch (e) { lastErr = e; }
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 200));
+  }
+  throw lastErr ?? new Error(`brief[${label}] exhausted retries`);
+}
+
 async function callImageDirector(args: {
   template: FBTaskTemplate;
   config: OrchestraConfig;
@@ -262,54 +320,17 @@ async function callImageDirector(args: {
   urlContext: string;
   userMsg: string;
 }): Promise<string[]> {
-  const { template, config, imagePersona, brandPrefix, urlContext, userMsg } = args;
+  const { config } = args;
   if (!config.imageDirectorId || config.images === 0) return [];
 
-  const variantSpec = config.variantLabels.slice(0, config.images).map((l, i) => `  ${i + 1}. ${l}`).join("\n");
-
-  const hasUrl = urlContext.length > 0;
-  const brandSection = hasUrl
-    ? brandPrefix
-      ? `\n# 品牌（**只取語氣參考，主題請看 URL**）\n⚠️ 視覺主題=URL 內容，不是品牌主商品。\n${brandPrefix}`
-      : ""
-    : `\n# 品牌語氣參考\n${brandPrefix}`;
-  const subjectRule = hasUrl
-    ? `\n【主題優先序】視覺主題=URL 抓到的影片 / 文章內容。**不要**把品牌主商品畫進視覺。若 URL 跟品牌無關（汽車 vs 蝦皮），視覺就照 URL 主題畫。\n`
-    : "";
-  const system =
-    imagePersona +
-    `任務：你是視覺方向設計師。為 ${config.images} 個不同口吻的 caption 各寫 1 條**繁體中文**的視覺方向描述。\n\n` +
-    `每條描述的口吻順序：\n${variantSpec}\n\n` +
-    `比例：${config.aspectRatio ?? "1:1"}\n` +
-    subjectRule +
-    `\n規則：\n` +
-    `- 每條描述 30-60 字**繁體中文**（之後系統會自動翻成英文 Flux prompt — 你只負責給用戶看的中文方向）\n` +
-    `- 涵蓋：主體 / 構圖 / 光線 / 色彩 / 氛圍\n` +
-    `- 不要寫「圖中疊上文字」（生圖模型對文字不在行）\n` +
-    `- 不要用品牌 logo（除非用戶明確要求）\n` +
-    `- 風格要呼應該口吻\n\n` +
-    `輸出嚴格 JSON 陣列：["中文描述 1", "中文描述 2", ...]（${config.images} 條）\n` +
-    `不要 markdown code fence。直接 JSON。第一個字元就是 [。\n` +
-    brandSection +
-    (hasUrl ? `\n# URL 抓到的內容（主題來源）\n${urlContext}` : "");
-
-  const r = await Promise.race([
-    callModel(
-      [
-        { role: "system", content: system },
-        { role: "user", content: userMsg },
-      ],
-      undefined,
-      "qwen", // fast model for visual briefs
-    ),
-    timeoutPromise<never>(LLM_BUDGET_MS, "image_director LLM"),
-  ]);
-
-  const parsed = tryParseJson(r.content);
-  if (!Array.isArray(parsed)) {
-    throw new Error("image_director LLM did not return a JSON array");
-  }
-  return parsed.slice(0, config.images).map((p: any) => (typeof p === "string" ? p : String(p ?? "")).trim()).filter(Boolean);
+  // Per-variant fanout — same reliability mechanism as caption_writer.
+  const labels = config.variantLabels.slice(0, config.images);
+  const settled = await Promise.allSettled(
+    labels.map((label) => callOneBrief({ ...args, label })),
+  );
+  return settled.map((s, i) =>
+    s.status === "fulfilled" ? s.value : `（${labels[i] ?? `brief ${i + 1}`} brief 生成失敗 — 請點「用此風格生圖」自己描述）`,
+  );
 }
 
 // ── Single image gen with per-image timeout ─────────────────────────────

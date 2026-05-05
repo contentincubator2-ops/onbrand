@@ -53,16 +53,15 @@ ${YT_TONE_SUFFIX}
     primary_question: "貼影片網址或描述影片主題",
     primary_input: { key: "topic_or_url", placeholder: "https://youtu.be/...  或  影片主題", type: "textarea" },
     inputs: [{ key: "topic_or_url", label: "影片網址或主題", type: "textarea", required: true }],
-    systemPrompt: `產出 YouTube 縮圖文案 + 視覺 brief。
-caption 結構：
-  縮圖大字選項：[3 個候選，每個 5-8 字，要強對比 / 數字 / 反差]
-  推薦選哪個 + 理由
-  字體建議：[粗黑體 / 手寫感 / 科技感等]
-  色塊建議：[1-2 句配色方向]
-  人臉 / 物件 / icon 建議：[1 句]
+    systemPrompt: `產出 YouTube 縮圖大字。caption 只放**用戶會疊在縮圖上的那幾個字**，視覺風格由另一位 agent 獨立處理（不要寫進 caption）。
 
-${YT_TONE_SUFFIX}
-image_style_direction.summary 給整體 16:9 縮圖視覺風格描述。`,
+caption 結構（每變體 1 種）：
+  主大字（5-8 字，最大那個字）
+  輔字（可選，1-3 字，例：「→」「！」「？」等強調）
+  推薦理由（1 句解釋為何選這個切角）
+
+絕對不要寫：字體建議 / 色塊建議 / 人臉建議 / 構圖建議 — 那些是視覺 agent 的事。
+${YT_TONE_SUFFIX}`,
     preferredModel: "qwen",
     maxTokens: 600,
     outputDefaults: { platform: "youtube", post_type: "video-card" },

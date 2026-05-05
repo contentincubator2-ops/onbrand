@@ -195,14 +195,44 @@ export async function fetchYouTubeContext(input: string): Promise<YouTubeContext
   const durationSeconds = lengthMatch && lengthMatch[1] ? parseInt(lengthMatch[1], 10) : null;
 
   // Transcript — best-effort, takes 2-4s
+  // 2026-05-06: try npm `youtube-transcript` first (actively maintained,
+  // handles YT format changes better than our hand-rolled impl). Fall back
+  // to our captionTracks parser if pkg returns nothing.
   let transcript: string | null = null;
   let transcriptSegments: Array<{ start: number; text: string }> | null = null;
-  const captionUrl = findCaptionUrl(html);
-  if (captionUrl) {
-    const t = await fetchTranscript(captionUrl);
-    if (t) {
-      transcript = t.text;
-      transcriptSegments = t.segments;
+
+  try {
+    // Dynamic import — typed as any since this pkg is added at runtime via
+    // npm install during deploy. tsc local check skipped.
+    const mod: any = await import(/* @vite-ignore */ "youtube-transcript" as string);
+    const YoutubeTranscript = mod.YoutubeTranscript ?? mod.default?.YoutubeTranscript ?? mod.default;
+    const segs = await Promise.race([
+      YoutubeTranscript.fetchTranscript(videoId, { lang: "zh-TW" }).catch(() =>
+        YoutubeTranscript.fetchTranscript(videoId, { lang: "zh" }).catch(() =>
+          YoutubeTranscript.fetchTranscript(videoId).catch(() => null),
+        ),
+      ),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+    ]);
+    if (Array.isArray(segs) && segs.length > 0) {
+      transcriptSegments = segs.map((s: any) => ({
+        start: Math.round((s.offset ?? 0) / 1000),
+        text: decodeHtml(String(s.text ?? "")).trim(),
+      })).filter((s) => s.text.length > 0);
+      const fullText = transcriptSegments.map((s) => s.text).join(" ");
+      transcript = fullText.slice(0, TRANSCRIPT_MAX_CHARS);
+    }
+  } catch { /* fall through to manual path */ }
+
+  // Fallback: our hand-rolled captionTracks parser
+  if (!transcript) {
+    const captionUrl = findCaptionUrl(html);
+    if (captionUrl) {
+      const t = await fetchTranscript(captionUrl);
+      if (t) {
+        transcript = t.text;
+        transcriptSegments = t.segments;
+      }
     }
   }
 
