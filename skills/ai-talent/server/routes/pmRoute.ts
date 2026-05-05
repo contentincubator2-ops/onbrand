@@ -21,9 +21,15 @@ const DEFAULT_AGENT = "openclaw/pm";
 async function queryDbAgents(keyword: string): Promise<string> {
   let conn;
   try {
+    // SEC-B-02 (2026-05-05): hardcoded password literal removed.
+    const password = process.env.LOCAL_DB_PASSWORD;
+    if (!password) throw new Error("[pmRoute] LOCAL_DB_PASSWORD env var is required.");
     conn = await createConnection({
-      host: "localhost", user: "mos_user",
-      password: "mos_secure_2026", database: "mos_db", connectTimeout: 3000,
+      host: process.env.LOCAL_DB_HOST || "localhost",
+      user: process.env.LOCAL_DB_USER || "mos_user",
+      password,
+      database: process.env.LOCAL_DB_NAME || "mos_db",
+      connectTimeout: 3000,
     });
     const kw = `%${keyword}%`;
     const [rows] = await conn.execute(

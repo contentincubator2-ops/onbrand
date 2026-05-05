@@ -15,10 +15,15 @@ import mysql from "mysql2/promise";
 // ─── DB 連線 ───────────────────────────────────────────────────────────────────
 
 function getDbPool() {
+  // SEC-B-02 (2026-05-05): no hardcoded password fallback. See db.ts.
+  const password = process.env.LOCAL_DB_PASSWORD;
+  if (!password) {
+    throw new Error("[tenStepPositioning] LOCAL_DB_PASSWORD env var is required.");
+  }
   return mysql.createPool({
     host:     process.env.LOCAL_DB_HOST     || "localhost",
     user:     process.env.LOCAL_DB_USER     || "mos_user",
-    password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+    password,
     database: process.env.LOCAL_DB_NAME     || "mos_db",
     connectionLimit: 5,
   });

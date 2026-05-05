@@ -35,11 +35,14 @@ jobs:
 
             ##### B-01: encryption.ts no insecure-fallback literal #####
             echo ""
-            echo "── B-01: encryption fail-fast (no 'default-insecure-key' literal) ──"
-            if grep -q "default-insecure-key" "$AI/server/_core/encryption.ts" "$AI/server/_core/tokenEncryption.ts" 2>/dev/null; then
-              fail "B-01 literal still present"
+            echo "── B-01: encryption fail-fast (no 'default-insecure-key' literal in CODE) ──"
+            # Only count occurrences NOT in comments. Lines starting with // or  *  are comments.
+            CODE_HITS=$(grep -n "default-insecure-key" "$AI/server/_core/encryption.ts" "$AI/server/_core/tokenEncryption.ts" 2>/dev/null | grep -v ":[[:space:]]*//\|:[[:space:]]*\*" | wc -l)
+            if [ "$CODE_HITS" -gt 0 ]; then
+              fail "B-01 literal still present in code (not just comment)"
+              grep -n "default-insecure-key" "$AI/server/_core/encryption.ts" "$AI/server/_core/tokenEncryption.ts" 2>/dev/null
             else
-              pass "B-01 literal removed from encryption.ts + tokenEncryption.ts"
+              pass "B-01 literal removed from code (any occurrence is in a comment)"
             fi
             if grep -q "JWT_SECRET (≥32 chars) must be set" "$AI/server/_core/encryption.ts" 2>/dev/null; then
               pass "B-01 fail-fast throw present"
@@ -47,13 +50,16 @@ jobs:
               fail "B-01 fail-fast throw NOT present"
             fi
 
-            ##### B-02: db.ts no hardcoded password fallback #####
+            ##### B-02: no hardcoded password literal in source CODE (not comments) #####
             echo ""
-            echo "── B-02: no hardcoded 'mos_secure_2026' in source ──"
-            if grep -rn "mos_secure_2026" "$AI/server" 2>/dev/null | grep -v ".test.\|//.*mos_secure" >/dev/null; then
-              fail "B-02 hardcoded password still in db.ts/localDb.ts"
+            echo "── B-02: no hardcoded 'mos_secure_2026' literal in CODE ──"
+            # Match: literal "mos_secure_2026" with surrounding quotes used as a value (not in a comment).
+            CODE_HITS=$(grep -rn '"mos_secure_2026"' "$AI/server" 2>/dev/null | grep -v ":[[:space:]]*//\|:[[:space:]]*\*\|^.* \\* ")
+            if [ -n "$CODE_HITS" ]; then
+              fail "B-02 hardcoded password literal still in CODE:"
+              echo "$CODE_HITS" | head -10
             else
-              pass "B-02 hardcoded password removed"
+              pass "B-02 hardcoded password removed from all server code"
             fi
             # Confirm app is actually using DB (HTTP 200 implies DB works)
             HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3101/health --max-time 5)
@@ -95,7 +101,7 @@ jobs:
             echo ""
             echo "── B-04: workflow.start requires auth ──"
             HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-              "http://127.0.0.1:3101/api/trpc/workflow.start?batch=1" \
+              "http://127.0.0.1:3101/trpc/workflow.start?batch=1" \
               -H "Content-Type: application/json" \
               -d '{"0":{"json":{"userRequest":"test"}}}' --max-time 8)
             if [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ]; then
@@ -108,7 +114,7 @@ jobs:
             echo ""
             echo "── B-05: feedback.saveNote requires auth ──"
             HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-              "http://127.0.0.1:3101/api/trpc/feedback.saveNote?batch=1" \
+              "http://127.0.0.1:3101/trpc/feedback.saveNote?batch=1" \
               -H "Content-Type: application/json" \
               -d '{"0":{"json":{"missionId":1,"category":"strategy","text":"x"}}}' --max-time 8)
             if [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ]; then
@@ -146,7 +152,7 @@ jobs:
             # Generate 1.5 MB payload and POST it
             BIG=$(python3 -c "print('x' * 1500000)")
             HTTP=$(printf '{"x":"%s"}' "$BIG" | curl -s -o /dev/null -w "%{http_code}" -X POST \
-              "http://127.0.0.1:3101/api/trpc/workflow.start" \
+              "http://127.0.0.1:3101/trpc/workflow.start" \
               -H "Content-Type: application/json" -d @- --max-time 10)
             if [ "$HTTP" = "413" ] || [ "$HTTP" = "401" ]; then
               # 413 = body too large, 401 = auth check fired before body read in some configs

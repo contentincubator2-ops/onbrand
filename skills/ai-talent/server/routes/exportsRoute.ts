@@ -14,10 +14,15 @@ export const exportsRouter = Router();
 let _pool: mysql.Pool | null = null;
 function getPool(): mysql.Pool {
   if (!_pool) {
+    // SEC-B-02 (2026-05-05): no hardcoded password fallback. See db.ts.
+    const password = process.env.LOCAL_DB_PASSWORD;
+    if (!password) {
+      throw new Error("[exportsRoute] LOCAL_DB_PASSWORD env var is required.");
+    }
     _pool = mysql.createPool({
       host:     process.env.LOCAL_DB_HOST     || "localhost",
       user:     process.env.LOCAL_DB_USER     || "mos_user",
-      password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+      password,
       database: process.env.LOCAL_DB_NAME     || "mos_db",
       connectionLimit: 5,
     });

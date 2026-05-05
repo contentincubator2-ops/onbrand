@@ -25,10 +25,13 @@ const pendingStates = new Set<string>();
 
 // ─── Lazy DB helper ───────────────────────────────────────────────────────────
 function makePool() {
+  // SEC-B-02 (2026-05-05): no hardcoded password fallback. See db.ts.
+  const password = process.env.LOCAL_DB_PASSWORD;
+  if (!password) throw new Error("[slackOAuthRoute] LOCAL_DB_PASSWORD env var is required.");
   return createPool({
     host:            process.env.LOCAL_DB_HOST     || "localhost",
     user:            process.env.LOCAL_DB_USER     || "mos_user",
-    password:        process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+    password,
     database:        process.env.LOCAL_DB_NAME     || "mos_db",
     connectionLimit: 2,
     connectTimeout:  10_000,
