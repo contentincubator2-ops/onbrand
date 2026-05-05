@@ -938,12 +938,17 @@ export const quickTaskRouter = router({
 
       // Parse + soft-validate output
       const parsedJson = tryParseJson(result.content);
+      // 2026-05-05 fix: spread LLM output FIRST, then OVERRIDE the routing
+      // fields with template defaults. Otherwise LLMs that emit Chinese
+      // post_type (e.g. "图文貼文") break the mockup variant routing because
+      // PlatformMockup's switch is keyed on English format slugs (feed /
+      // carousel / reel / story / etc).
       const parsed = parseQuickTaskOutput({
-        // Inject defaults so the output is always at minimum well-formed.
+        ...(parsedJson ?? {}),
+        // System overrides — LLM doesn't get to mutate routing keys
         tier: template.tier,
         platform: template.outputDefaults.platform,
         post_type: template.outputDefaults.post_type,
-        ...(parsedJson ?? {}),
       });
 
       return {

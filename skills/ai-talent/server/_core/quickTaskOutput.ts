@@ -196,13 +196,22 @@ export function quickTaskOutputSpec(tier: "30s" | "60s" | "90s"): string {
   const base = `
 【輸出格式 — 嚴格 JSON，無 markdown code fence、無 \`\`\`json 圍籬】
 必填: tier, platform, post_type, caption.
+
+⚠️ platform 和 post_type 是「系統用的英文 slug」，不要翻譯：
+  - platform: "facebook" / "instagram" / "linkedin" / "youtube" / "tiktok" / "threads" / "twitter" / "xiaohongshu" / "pinterest" / "podcast" / "line" / "email"
+  - post_type: "feed" / "carousel" / "reel" / "story" / "live" / "event" / "ad" / "marketplace" / "cover" / "poll" / "comment" / "group" / "recommendation" / "pinned" / "album"
+  ❌ 不要寫成「图文貼文」「短影片」「貼文」這種中文（會打壞 UI mockup 路由）
+  ✅ 一律小寫英文 slug；caller 已經告訴你正確值，照填即可
+
 可選: title, description, cta, hashtags, image_style_direction, video_style_direction.
 hashtags 是 string[] 不含 # 前綴.
 所有 image_style_direction / video_style_direction 子欄位都是「字串」（不是陣列、不是物件）.
 若你想給多個元素（如多個顏色），用「·」或「、」連接成單一字串.
 例：color_palette 寫 "粉櫻 · 暖陽 · 寶藍"，不要寫 ["粉櫻","暖陽","寶藍"].
 唯一例外：tone 可以是 string[] 也可以是 string.
-variants[] 每個物件需含 label（如 "情感版" / "理性版" / "幽默版"）和 caption.`;
+variants[] 每個物件需含 label（如 "情感版" / "理性版" / "幽默版"）和 caption.
+
+caption 是必填。**用戶看到的「主要產出」就是 caption 欄位**。一定要寫滿，不要只給 image_style_direction 而忘記 caption。`;
   if (tier === "30s") {
     return base + `
 【30s tier 規則】

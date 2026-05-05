@@ -391,7 +391,7 @@ export default function QuickTask30sPage() {
                     )}
                   </>
                 ) : (
-                  /* Output: live mockup + style direction sidebar */
+                  /* Output: live mockup + ALWAYS-VISIBLE caption panel + style direction */
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-tiny text-default-500">
                       <FontAwesomeIcon icon={faClock} />
@@ -404,6 +404,35 @@ export default function QuickTask30sPage() {
                         </>
                       )}
                     </div>
+
+                    {/* ALWAYS show caption text first — primary output, must never get hidden by a broken mockup */}
+                    {output.caption ? (
+                      <Card>
+                        <CardBody className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <p className="text-tiny font-semibold text-default-600 uppercase tracking-wider">貼文文案</p>
+                            <Chip size="sm" variant="flat" color="success">{output.caption.length} 字</Chip>
+                          </div>
+                          <p className="text-small whitespace-pre-wrap leading-relaxed">{output.caption}</p>
+                          {output.cta && (
+                            <p className="text-small text-primary-700 font-medium pt-2 border-t border-default-100">
+                              CTA：{output.cta}
+                            </p>
+                          )}
+                          {output.hashtags && output.hashtags.length > 0 && (
+                            <p className="text-tiny text-primary-500 pt-2 border-t border-default-100">
+                              {output.hashtags.map((t: string) => `#${t.replace(/^#/, "")}`).join(" ")}
+                            </p>
+                          )}
+                        </CardBody>
+                      </Card>
+                    ) : (
+                      <Card className="bg-warning-50 border border-warning-200">
+                        <CardBody className="text-warning-800 text-small">
+                          ⚠️ Agent 沒有產出 caption — 這通常是 LLM 輸出格式漂移。試試「重做」按鈕再生一次。
+                        </CardBody>
+                      </Card>
+                    )}
 
                     {mockupVariant && (
                       <PlatformMockup
