@@ -138,13 +138,16 @@ export default function AppV2() {
           {/* 2026-05-05 pivot: 快派 (QuickTask) is now the main entry.
               Current MissionsHome moved to /squads; /quicktask kept as
               alias so any existing links still work. */}
-          {/* 2026-05-05: / is the new 30 秒 home using listFB + agent persona.
-              /quicktask-legacy keeps the old TASKS-driven page for back-compat
-              if needed. /squads is the Canva-style task wall (advanced). */}
-          <Route path="/" element={<QuickTask30sPage />} />
+          {/* 2026-05-05 pivot v2: tier = top-level route. 30S/60S/90S are
+              siblings, each rendering QuickTask30sPage with a different
+              tier prop. / redirects to /30s. */}
+          <Route path="/" element={<Navigate to="/30s" replace />} />
+          <Route path="/30s" element={<QuickTask30sPage tier="30s" />} />
+          <Route path="/60s" element={<QuickTask30sPage tier="60s" />} />
+          <Route path="/90s" element={<QuickTask30sPage tier="90s" />} />
           <Route path="/squads" element={<MissionsHome />} />
-          <Route path="/quicktask" element={<Navigate to="/" replace />} />
-          <Route path="/fb" element={<Navigate to="/" replace />} />
+          <Route path="/quicktask" element={<Navigate to="/30s" replace />} />
+          <Route path="/fb" element={<Navigate to="/30s" replace />} />
           <Route path="/quicktask-legacy" element={<QuickTasksPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/brands" element={<BrandsPage />} />

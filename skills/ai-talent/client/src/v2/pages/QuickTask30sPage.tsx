@@ -16,13 +16,17 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Avatar, Badge, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Progress, Skeleton, Spinner,
-  Tab, Tabs, Textarea,
+  Textarea,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBolt, faClipboard, faClipboardCheck, faClock, faPaperPlane,
   faRotateRight, faXmark, faStar, faChevronLeft, faChevronRight,
+  faMagnifyingGlass, faEnvelope, faRocket, faBullhorn, faUsers,
 } from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
+} from "@fortawesome/free-brands-svg-icons";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 
@@ -56,10 +60,31 @@ interface FBTaskCard {
   squad_slug?: string;
 }
 
-type Tier = "30s" | "60s" | "90s" | "case";
-type Channel = "facebook" | "instagram" | "edm" | "all";
+type Tier = "30s" | "60s" | "90s";
+type Channel = "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin" | "email" | "pr" | "audience" | "brand" | "all";
 
-export default function QuickTask30sPage() {
+interface ChannelTile {
+  id: Channel;
+  label: string;
+  icon: any;
+  bg: string;
+  enabled: boolean;
+}
+
+const CHANNEL_TILES: ChannelTile[] = [
+  { id: "all",        label: "全部",       icon: faStar,        bg: "#7C3AED", enabled: true  },
+  { id: "facebook",   label: "Facebook",   icon: faFacebookF,   bg: "#1877F2", enabled: true  },
+  { id: "instagram",  label: "Instagram",  icon: faInstagram,   bg: "#E4405F", enabled: false },
+  { id: "youtube",    label: "YouTube",    icon: faYoutube,     bg: "#FF0000", enabled: false },
+  { id: "tiktok",     label: "TikTok",     icon: faTiktok,      bg: "#010101", enabled: false },
+  { id: "linkedin",   label: "LinkedIn",   icon: faLinkedinIn,  bg: "#0A66C2", enabled: false },
+  { id: "email",      label: "電子報",     icon: faEnvelope,    bg: "#7B5BC8", enabled: false },
+  { id: "brand",      label: "品牌定位",   icon: faRocket,      bg: "#7C3AED", enabled: false },
+  { id: "pr",         label: "新聞稿",     icon: faBullhorn,    bg: "#475569", enabled: false },
+  { id: "audience",   label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: false },
+];
+
+export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   const ctx = useOutletContext<ShellOutletCtx>();
   const brandId = (ctx?.brandId as number | null) ?? null;
   const brandName = useMemo(() => {
@@ -67,8 +92,8 @@ export default function QuickTask30sPage() {
     return list.find((b) => b?.id === brandId)?.name ?? null;
   }, [ctx, brandId]);
 
-  const [tier, setTier] = useState<Tier>("30s");
   const [channel, setChannel] = useState<Channel>("facebook");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Modal + run state
   const [activeTask, setActiveTask] = useState<FBTaskCard | null>(null);
@@ -95,9 +120,33 @@ export default function QuickTask30sPage() {
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
 
   const tasksThisTier = useMemo(
-    () => allTasks.filter((t) => t.tier === (tier === "case" ? "90s" : tier)),
+    () => allTasks.filter((t) => t.tier === tier),
     [allTasks, tier],
   );
+
+  // Apply channel + search filters
+  const visibleTasks = useMemo(() => {
+    let list = tasksThisTier;
+    // For now all 30s tasks are FB; ignore channel filter when "all" or "facebook"
+    if (channel !== "all" && channel !== "facebook") list = [];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((t) =>
+        t.label.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q) ||
+        (t.agent?.name ?? "").toLowerCase().includes(q) ||
+        (t.skill_slug ?? "").toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [tasksThisTier, channel, searchQuery]);
+
+  const tierLabel = tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "90 秒";
+  const tierTagline = tier === "30s"
+    ? "今天，要寫哪一篇 30 秒搞定的貼文？"
+    : tier === "60s"
+    ? "今天，要做哪一個 60 秒搞定的內容？"
+    : "今天，要交付哪一個 90 秒級的策略產出？";
 
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
 
@@ -170,91 +219,107 @@ export default function QuickTask30sPage() {
 
   return (
     <div>
-      {/* HERO */}
+      {/* ─── HERO (mirrors MissionsHome layout) ─────────────────────────── */}
       <div
-        style={{
-          background: [
-            "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",
-            "linear-gradient(rgba(255,255,255,0.96), rgba(255,255,255,0.96))",
-            "linear-gradient(135deg, #00b4bc 0%, #8b5cf6 60%, #4c1d95 100%)",
-          ].join(","),
-        }}
-        className="px-6 lg:px-12 pt-16 pb-12 text-center"
+        className="relative pt-16 pb-12 px-6 text-center"
+        style={{ background: "linear-gradient(180deg, rgba(124,58,237,0.04) 0%, transparent 100%)" }}
       >
-        <h1 className="text-4xl font-bold tracking-tight mb-2">
+        <p className="text-tiny font-semibold tracking-[0.18em] text-default-500 uppercase mb-3">
+          SOWORK · MARKETING OS · {tierLabel.toUpperCase()}
+        </p>
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
           <span style={{ background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            一鍵產出，30 秒文稿
+            {tierTagline}
           </span>
         </h1>
         <p className="text-default-500 text-small">
-          每件任務背後是一組分工好的 Agent — 按下即自動接力完成，不需填表單。
+          {tasksThisTier.length} 個 {tierLabel} 任務 ·{" "}
+          {new Set(tasksThisTier.map((t) => t.agent_id).filter(Boolean)).size} 位專屬 Agent · 品牌腦：
+          <span className="font-medium text-default-700">{brandName ?? "（未選）"}</span>
         </p>
-        <p className="text-tiny text-default-400 mt-2">
-          <FontAwesomeIcon icon={faStar} className="text-warning-500 mr-1" />
-          品牌腦：<span className="font-medium text-default-700">{brandName ?? "（未選）"}</span>
-        </p>
-      </div>
 
-      <div className="max-w-[1200px] mx-auto px-6 -mt-4 pb-20">
-        {/* Tier tabs */}
-        <Tabs
-          selectedKey={tier}
-          onSelectionChange={(k) => setTier(k as Tier)}
-          variant="solid"
-          color="primary"
-          radius="full"
-          size="md"
-          classNames={{ tabList: "gap-2", tab: "h-10 px-4" }}
-        >
-          <Tab key="30s" title={<><FontAwesomeIcon icon={faBolt} className="mr-1" /> 30 秒</>} />
-          <Tab key="60s" title="60 秒" />
-          <Tab key="90s" title="90 秒（接既有 squad）" />
-          <Tab key="case" title="成功案例" />
-        </Tabs>
-
-        {/* Channel filter chips */}
-        <div className="flex gap-2 mt-4 flex-wrap">
-          <Chip
-            color={channel === "facebook" ? "primary" : "default"}
-            variant={channel === "facebook" ? "solid" : "flat"}
-            onClick={() => setChannel("facebook")}
-            className="cursor-pointer"
-          >Facebook</Chip>
-          <Chip variant="flat" className="opacity-50 cursor-not-allowed">Instagram（敬請期待）</Chip>
-          <Chip variant="flat" className="opacity-50 cursor-not-allowed">LinkedIn（敬請期待）</Chip>
-          <Chip variant="flat" className="opacity-50 cursor-not-allowed">EDM（敬請期待）</Chip>
+        {/* Search bar */}
+        <div className="max-w-[640px] mx-auto mt-8">
+          <Input
+            size="lg"
+            radius="full"
+            placeholder={`搜尋 ${tierLabel} 任務、Agent 或 skill...`}
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+            startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
+            classNames={{
+              inputWrapper: "bg-white shadow-md border border-default-100 h-14",
+              input: "text-medium",
+            }}
+          />
         </div>
 
-        {/* Catalog */}
-        <div className="mt-8">
-          {tier === "case" ? (
-            <Card><CardBody className="text-center text-default-500 py-12">
-              <FontAwesomeIcon icon={faStar} className="text-3xl mb-2" />
-              <p>成功案例（預錄 case study gallery）正在製作中。</p>
-            </CardBody></Card>
-          ) : tasksThisTier.length === 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-44 rounded-2xl" />
-              ))}
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="font-semibold text-lg tracking-tight">精選任務</h2>
-                  <p className="text-tiny text-default-400 mt-0.5">按下即產出，先回答 1 個關鍵問題</p>
+        {/* Channel icon row (mirrors MissionsHome QUICK_TILES) */}
+        <div className="max-w-[800px] mx-auto mt-8 grid grid-cols-5 md:grid-cols-10 gap-3">
+          {CHANNEL_TILES.map((c) => {
+            const active = channel === c.id;
+            const disabled = !c.enabled;
+            return (
+              <button
+                key={c.id}
+                onClick={() => c.enabled && setChannel(c.id)}
+                disabled={disabled}
+                className={`flex flex-col items-center gap-1.5 transition ${disabled ? "opacity-30 cursor-not-allowed" : "hover:scale-105 cursor-pointer"}`}
+              >
+                <div
+                  className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white shadow-sm ${active ? "ring-4 ring-primary-200" : ""}`}
+                  style={{ background: c.bg }}
+                >
+                  <FontAwesomeIcon icon={c.icon} className="text-lg md:text-xl" />
                 </div>
-                <Chip size="sm" variant="flat" color="secondary">{tasksThisTier.length} 件</Chip>
-              </div>
+                <span className={`text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
+                  {c.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* Card grid — agent avatar as thumbnail, gradient bg */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {tasksThisTier.map((t, idx) => {
-                  const pal = CARD_PALETTES[idx % CARD_PALETTES.length];
-                  const agentName = t.agent?.name ?? "AI Agent";
-                  const agentTitle = t.agent?.title ?? "";
-                  const avatarSrc = t.agent?.avatarUrl || dicebear(agentName);
+      {/* ─── Catalog ───────────────────────────────────────────────────── */}
+      <div className="max-w-[1200px] mx-auto px-6 pb-20">
+        {tasksThisTier.length === 0 ? (
+          <Card>
+            <CardBody className="text-center text-default-500 py-12">
+              <FontAwesomeIcon icon={faBolt} className="text-3xl mb-2 text-default-300" />
+              <p className="font-semibold mb-1">{tierLabel} 任務製作中</p>
+              <p className="text-tiny text-default-400">
+                {tier === "60s" && "60 秒任務（含完整視覺 brief）將於下一波上線"}
+                {tier === "90s" && "90 秒任務會接到既有 squad 的完整流程"}
+                {tier === "30s" && "請稍候，Agent 正在準備中"}
+              </p>
+            </CardBody>
+          </Card>
+        ) : visibleTasks.length === 0 ? (
+          <Card>
+            <CardBody className="text-center text-default-500 py-12">
+              <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
+              <p>
+                {channel !== "facebook" && channel !== "all"
+                  ? `${CHANNEL_TILES.find((c) => c.id === channel)?.label} 通路的 ${tierLabel} 任務製作中…`
+                  : `沒有匹配 "${searchQuery}" 的任務`}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold text-lg tracking-tight">精選任務</h2>
+                <p className="text-tiny text-default-400 mt-0.5">按下即產出，先回答 1 個關鍵問題</p>
+              </div>
+              <Chip size="sm" variant="flat" color="secondary">{visibleTasks.length} 件</Chip>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {visibleTasks.map((t, idx) => {
+                const pal = CARD_PALETTES[idx % CARD_PALETTES.length];
+                const agentName = t.agent?.name ?? "AI Agent";
+                const avatarSrc = t.agent?.avatarUrl || dicebear(agentName);
                   return (
                     <button
                       key={t.id}
@@ -302,7 +367,6 @@ export default function QuickTask30sPage() {
             </>
           )}
         </div>
-      </div>
 
       {/* ─── Modal: primary question + countdown + live mockup result ─── */}
       <Modal
