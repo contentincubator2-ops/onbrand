@@ -36,7 +36,7 @@ import { YT_30S_TASKS, YT_30S_ORCHESTRA } from "../server/_core/quickTaskYT";
 
   console.log(`\nProbing orchestra: ${taskId}`);
   console.log(`Config: ${config.variants} variants, runImageGen=${config.runImageGen}`);
-  console.log(`Input article_body length: ${inputs.article_body.length} chars\n`);
+  console.log(`Input [${inputKey}]: ${(inputs[inputKey] ?? "").slice(0, 80)}…\n`);
 
   const startedAt = Date.now();
   const result = await runOrchestra({ template, config, inputs });
