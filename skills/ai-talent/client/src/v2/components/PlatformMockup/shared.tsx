@@ -147,6 +147,15 @@ export interface MockupFields {
   liveVideoDesc?: string;
   liveCta?: string;
   /**
+   * Quick-task pivot (2026-05-05): structured style direction shown inside
+   * image / video placeholder slots until the user opts into MediaGenFlow
+   * to render the actual asset. Mirrors `imageStyleDirectionSchema` from
+   * server/_core/quickTaskOutput.ts. Plain string here for cross-mockup
+   * compatibility — full structured form lives in the slotMap payload.
+   */
+  liveImageStyle?: string;
+  liveVideoStyle?: string;
+  /**
    * Session 6: per-slot state map.
    * When provided, variants use SlotContent to show loading/filled/empty per slot.
    * Falls back gracefully to liveXxx props when absent.

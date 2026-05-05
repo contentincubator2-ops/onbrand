@@ -30,6 +30,11 @@ import {
 import {
   FBFeed, FBReel, FBStory, FBMarketplace, FBEvent, FBAd, FBCarousel,
 } from "./facebook";
+// 2026-05-05 quick-task pivot: 8 new FB variants
+import {
+  FBLive, FBCover, FBPoll, FBComment, FBGroup, FBRecommendation,
+  FBPinned, FBAlbum,
+} from "./facebook-quicktask";
 import {
   LIFeed, LIArticle, LINewsletter, LIPoll, LIDocument,
   LINativeVideo, LIAd, LIEvent,
@@ -69,14 +74,23 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "instagram:live":      return <IGLive     {...f} />;
     case "instagram:ad":        return <IGAd       {...f} />;
 
-    // ── Facebook (7) ──────────────────────────────────────────────────
-    case "facebook:feed":        return <FBFeed        {...f} />;
-    case "facebook:reel":        return <FBReel        {...f} />;
-    case "facebook:story":       return <FBStory       {...f} />;
-    case "facebook:marketplace": return <FBMarketplace {...f} />;
-    case "facebook:event":       return <FBEvent       {...f} />;
-    case "facebook:ad":          return <FBAd          {...f} />;
-    case "facebook:carousel":    return <FBCarousel    {...f} />;
+    // ── Facebook (15) ─────────────────────────────────────────────────
+    case "facebook:feed":           return <FBFeed           {...f} />;
+    case "facebook:reel":           return <FBReel           {...f} />;
+    case "facebook:story":          return <FBStory          {...f} />;
+    case "facebook:marketplace":    return <FBMarketplace    {...f} />;
+    case "facebook:event":          return <FBEvent          {...f} />;
+    case "facebook:ad":             return <FBAd             {...f} />;
+    case "facebook:carousel":       return <FBCarousel       {...f} />;
+    // ↓ Quick-task pivot 2026-05-05
+    case "facebook:live":           return <FBLive           {...f} />;
+    case "facebook:cover":          return <FBCover          {...f} />;
+    case "facebook:poll":           return <FBPoll           {...f} />;
+    case "facebook:comment":        return <FBComment        {...f} />;
+    case "facebook:group":          return <FBGroup          {...f} />;
+    case "facebook:recommendation": return <FBRecommendation {...f} />;
+    case "facebook:pinned":         return <FBPinned         {...f} />;
+    case "facebook:album":          return <FBAlbum          {...f} />;
 
     // ── LinkedIn (8) ──────────────────────────────────────────────────
     case "linkedin:feed":          return <LIFeed        {...f} />;

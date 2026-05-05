@@ -55,9 +55,15 @@ export type Format =
   | "poll"            // radio + progress
   | "document"        // PDF carousel
   | "native-video"    // video post
-  // Facebook
+  // Facebook (original 2 + 8 quick-task pivot variants 2026-05-05)
   | "marketplace"     // listing card
   | "event"           // event card
+  | "cover"           // FB cover photo (851×315)
+  | "comment"         // FB comment reply (one-reply chrome)
+  | "group"           // FB group post (group chrome)
+  | "recommendation"  // FB recommendation reply (with star rating)
+  | "pinned"          // FB pinned post (FBFeed + pin badge)
+  | "album"           // FB multi-image album (4-grid)
   // TikTok
   | "foryou"          // FYP video w/ side action rail
   // Email / EDM
@@ -350,8 +356,15 @@ const FORMAT_RULES: FormatRule[] = [
   { format: "premiere",  keywords: ["premiere", "countdown"],                          platforms: ["youtube"] },
 
   // ── 6. Facebook specials ──────────────────────────────────────────────────
-  { format: "marketplace", keywords: ["marketplace", "listing"],                      platforms: ["facebook"] },
-  { format: "event",       keywords: ["event", "facebook-event"],                     platforms: ["facebook", "linkedin"] },
+  { format: "marketplace",    keywords: ["marketplace", "listing"],                       platforms: ["facebook"] },
+  { format: "event",          keywords: ["event", "facebook-event"],                      platforms: ["facebook", "linkedin"] },
+  // 2026-05-05 quick-task pivot — 6 new FB-only formats
+  { format: "cover",          keywords: ["cover", "cover-photo", "fb-cover", "banner"],  platforms: ["facebook"] },
+  { format: "comment",        keywords: ["comment-reply", "fb-comment", "crisis-reply"], platforms: ["facebook"] },
+  { format: "group",          keywords: ["group-post", "fb-group", "community-group"],   platforms: ["facebook"] },
+  { format: "recommendation", keywords: ["recommendation", "review-reply", "fb-review"], platforms: ["facebook"] },
+  { format: "pinned",         keywords: ["pinned-post", "pin-post", "fb-pinned"],        platforms: ["facebook"] },
+  { format: "album",          keywords: ["album", "multi-photo", "photo-album"],         platforms: ["facebook"] },
 
   // ── 7. Carousel ───────────────────────────────────────────────────────────
   { format: "carousel",  keywords: ["carousel", "multi-image", "swipe-post"] },

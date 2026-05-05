@@ -20,7 +20,12 @@ import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./share
 
 /* ─────────────── FB Feed ─────────────── */
 
-export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageDesc }: MockupFields) {
+export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveHashtags }: MockupFields) {
+  // 2026-05-05: liveImageStyle takes priority over liveImageDesc — it's the
+  // "style direction" the quick-task agent produced, kept inside the image
+  // slot as a brief for the user to carry into MediaGenFlow.
+  const styleText = liveImageStyle || liveImageDesc;
+  const hasContent = !!styleText;
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -46,12 +51,25 @@ export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageD
               <Skeleton className="h-2.5 w-[75%] rounded" />
             </>
           )}
+          {liveHashtags && liveHashtags.length > 0 && (
+            <p className="text-tiny text-primary-500 break-words">
+              {liveHashtags.map(t => `#${t.replace(/^#/, "")}`).join(" ")}
+            </p>
+          )}
         </div>
         <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
-          <Skeleton className="absolute inset-0" />
-          <div className="text-center relative z-10 p-4">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+          {!hasContent && <Skeleton className="absolute inset-0" />}
+          <div className={`text-center relative z-10 p-4 ${hasContent ? "bg-default-50/80 backdrop-blur-sm rounded-medium m-3" : ""}`}>
+            <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
+            {liveImageStyle ? (
+              <>
+                <p className="text-tiny font-semibold text-default-600 mb-1">圖片風格方向</p>
+                <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
+                <p className="text-[10px] text-default-400 mt-2">點此用 MediaGenFlow 生圖</p>
+              </>
+            ) : (
+              <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+            )}
           </div>
         </div>
         <div className="px-4 py-2 border-t border-divider flex items-center justify-between text-default-500 text-tiny">

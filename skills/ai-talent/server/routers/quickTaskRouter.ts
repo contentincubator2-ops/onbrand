@@ -667,6 +667,9 @@ function fillTemplate(tpl: string, inputs: Record<string, string | number | unde
 // Brand context now lives in _core/brandContext.ts so every router
 // uses the same source of truth + same 1-min cache.
 import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
+// 2026-05-05 quick-task pivot
+import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
+import { FB_30S_TASKS, FB_60S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
 
 function tryParseJson(s: string): any | null {
   if (!s) return null;
@@ -807,6 +810,105 @@ export const quickTaskRouter = router({
         fellBack: result.fellBack,
         tookMs,
         brandInjected: brandPrefix.length > 0,
+      };
+    }),
+
+  // ─── Quick-task pivot 2026-05-05 ───────────────────────────────────
+  // listFB: returns the entire FB task catalog (30s/60s/90s) for the new
+  // home page chips. Stable shape independent of legacy TASKS registry.
+  listFB: protectedProcedure.query(() => {
+    return listAllFBTasks().map((t) => {
+      const base = {
+        id: t.id, tier: t.tier, postType: t.postType,
+        label: t.label, description: t.description, kind: t.kind,
+      };
+      if (t.kind === "squad") {
+        return { ...base, squad_slug: (t as any).squad_slug, inputs: [] };
+      }
+      const tt = t as any;
+      return {
+        ...base,
+        inputs: tt.inputs ?? [],
+        eta_seconds: t.tier === "30s" ? 30 : 60,
+        preferredModel: tt.preferredModel,
+      };
+    });
+  }),
+
+  // runQuick: execute a 30s or 60s FB task with a single LLM call.
+  // Returns canonical QuickTaskOutput (see quickTaskOutput.ts). For 90s
+  // tasks, frontend should call squad.stepExecute (existing pipeline).
+  runQuick: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().min(1).max(64),
+        inputs: z.record(z.string(), z.string()).default({}),
+        brandId: z.number().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      // Look up template
+      const template =
+        FB_30S_TASKS.find((t) => t.id === input.taskId) ??
+        FB_60S_TASKS.find((t) => t.id === input.taskId);
+      if (!template) {
+        throw new Error(`Unknown 30s/60s quick task id: ${input.taskId}. (90s tasks must use squad.stepExecute.)`);
+      }
+
+      // Required-field check
+      for (const f of template.inputs) {
+        if (f.required && !input.inputs[f.key]?.trim()) {
+          throw new Error(`Missing required input: ${f.key} (${f.label})`);
+        }
+      }
+
+      // Build prompt
+      const brandPrefix = await buildBrandContext(input.brandId);
+      const userMsg =
+        Object.entries(input.inputs)
+          .map(([k, v]) => `[${k}] ${v}`)
+          .join("\n") || "(no extra inputs)";
+      const systemFull =
+        template.systemPrompt +
+        "\n" +
+        quickTaskOutputSpec(template.tier) +
+        brandPrefix;
+
+      const messages = [
+        { role: "system" as const, content: systemFull },
+        { role: "user" as const, content: userMsg },
+      ];
+
+      // Call LLM with the template's preferred fast model
+      const startedAt = Date.now();
+      const result = await callWithFallback(
+        messages,
+        template.preferredModel === "any" ? "qwen" : (template.preferredModel as any),
+      );
+      const latencyMs = Date.now() - startedAt;
+
+      // Parse + soft-validate output
+      const parsedJson = tryParseJson(result.content);
+      const parsed = parseQuickTaskOutput({
+        // Inject defaults so the output is always at minimum well-formed.
+        tier: template.tier,
+        platform: template.outputDefaults.platform,
+        post_type: template.outputDefaults.post_type,
+        ...(parsedJson ?? {}),
+      });
+
+      return {
+        taskId: template.id,
+        tier: template.tier,
+        postType: template.postType,
+        latencyMs,
+        provider: result.provider,
+        model: result.model,
+        fellBack: result.fellBack,
+        ok: parsed.ok,
+        output: parsed.ok ? parsed.data : (parsed.partial as Partial<QuickTaskOutput>),
+        validationErrors: parsed.ok ? undefined : parsed.errors,
+        rawText: result.content, // for debugging / regenerate
       };
     }),
 
