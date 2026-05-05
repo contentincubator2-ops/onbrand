@@ -1,0 +1,46 @@
+name: Admin — Find LinkedIn 30s task agents
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+
+            EXCLUDED="(239183, 60021, 239185, 30002, 40, 180159, 239184, 180166, 229985, 60029, 35, 60068, 224294, 180168, 30005, 180143, 60056, 60072, 220751, 60022, 180170, 24, 36, 30013, 180268, 60030, 30014, 30004, 180157, 210252, 180186, 210220, 30011, 180167, 60033, 220949, 222392, 60055, 60031, 210310, 180158, 60073, 180165)"
+
+            echo "=== A. LinkedIn-tagged agents ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(slug) LIKE '%linkedin%' OR LOWER(slug) LIKE 'li-%' OR LOWER(title) LIKE '%linkedin%' OR LOWER(primarySkill) LIKE '%linkedin%') ORDER BY id LIMIT 40"
+
+            echo ""
+            echo "=== B. B2B / thought-leadership / executive content ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%b2b%' OR LOWER(primarySkill) LIKE '%thought-leadership%' OR LOWER(primarySkill) LIKE '%executive%' OR LOWER(title) LIKE '%executive%' OR LOWER(title) LIKE '%thought leader%' OR LOWER(primarySkill) LIKE '%professional%') ORDER BY id LIMIT 30"
+
+            echo ""
+            echo "=== C. Article / longform writer ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%article%' OR LOWER(primarySkill) LIKE '%longform%' OR LOWER(primarySkill) LIKE '%blog%' OR LOWER(title) LIKE '%journalist%' OR LOWER(title) LIKE '%editor%' OR LOWER(title) LIKE '%content writer%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== D. PR / media relations ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(slug) LIKE '%pr-%' OR LOWER(title) LIKE '%public relations%' OR LOWER(title) LIKE '%PR %' OR LOWER(primarySkill) LIKE '%pr-%' OR LOWER(primarySkill) LIKE '%press%' OR LOWER(primarySkill) LIKE '%media-relations%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== E. Newsletter / event invite ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%newsletter%' OR LOWER(primarySkill) LIKE '%event-invite%' OR LOWER(title) LIKE '%newsletter%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== F. SaaS / industry analyst ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%saas%' OR LOWER(title) LIKE '%saas%' OR LOWER(title) LIKE '%industry analyst%' OR LOWER(primarySkill) LIKE '%enterprise%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== Done ==="
