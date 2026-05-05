@@ -80,7 +80,7 @@ const CHANNEL_TILES: ChannelTile[] = [
   { id: "all",        label: "全部",       icon: faStar,        bg: "#7C3AED", enabled: true  },
   { id: "facebook",   label: "Facebook",   icon: faFacebookF,   bg: "#1877F2", enabled: true  },
   { id: "instagram",  label: "Instagram",  icon: faInstagram,   bg: "#E4405F", enabled: true  },
-  { id: "youtube",    label: "YouTube",    icon: faYoutube,     bg: "#FF0000", enabled: false },
+  { id: "youtube",    label: "YouTube",    icon: faYoutube,     bg: "#FF0000", enabled: true  },
   { id: "tiktok",     label: "TikTok",     icon: faTiktok,      bg: "#010101", enabled: false },
   { id: "linkedin",   label: "LinkedIn",   icon: faLinkedinIn,  bg: "#0A66C2", enabled: false },
   { id: "email",      label: "電子報",     icon: faEnvelope,    bg: "#7B5BC8", enabled: false },
@@ -145,7 +145,11 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     // fall back to id-prefix inference (fb-* / ig-*).
     if (channel !== "all") {
       list = list.filter((t: any) => {
-        const platform = t.platform ?? (t.id?.startsWith("ig-") ? "instagram" : "facebook");
+        const platform =
+          t.platform ??
+          (t.id?.startsWith("ig-") ? "instagram"
+            : t.id?.startsWith("yt-") ? "youtube"
+            : "facebook");
         return platform === channel;
       });
     }
@@ -221,6 +225,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         const taskPlatform =
           (activeTask as any).platform ??
           (activeTask.id?.startsWith("ig-") ? "instagram"
+            : activeTask.id?.startsWith("yt-") ? "youtube"
             : activeTask.id?.startsWith("fb-") ? "facebook"
             : "facebook");
         // Threads task uses platform="threads" + post_type="post" — preserve.
@@ -372,7 +377,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
             <CardBody className="text-center text-default-500 py-12">
               <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
               <p>
-                {channel !== "facebook" && channel !== "instagram" && channel !== "all"
+                {channel !== "facebook" && channel !== "instagram" && channel !== "youtube" && channel !== "all"
                   ? `${CHANNEL_TILES.find((c) => c.id === channel)?.label} 通路的 ${tierLabel} 任務製作中…`
                   : `沒有匹配 "${searchQuery}" 的任務`}
               </p>

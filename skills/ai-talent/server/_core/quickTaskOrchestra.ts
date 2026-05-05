@@ -17,6 +17,7 @@
 import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate } from "./mediaGen";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
+import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { buildBrandPrefix as buildBrandContext } from "./brandContext";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
@@ -320,12 +321,22 @@ export async function runOrchestra(args: {
     // ── Stage 1: parallel pre-work (URL fetch, persona loads, brand) ──
     const stPre = stage("pre", "URL / persona / brand");
 
-    const [captionLoad, imageLoad, urlSummary, brandPrefix] = await Promise.all([
+    // YT-first URL detection: if any input has a YouTube URL, fetch
+    // metadata + transcript (richer context than generic urlContext).
+    // Otherwise fall back to generic urlContext for non-YT links.
+    const inputValues = Object.values(args.inputs).filter((v): v is string => typeof v === "string");
+    const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
+
+    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix] = await Promise.all([
       loadAgent(args.template.agent_id),
       loadAgent(args.config.imageDirectorId),
+      ytUrlInput
+        ? (async () => { try { return await fetchYouTubeContext(ytUrlInput); } catch { return null; } })()
+        : Promise.resolve(null),
+      // Generic URL fetch only when there's a non-YT URL
       (async () => {
-        for (const v of Object.values(args.inputs)) {
-          if (typeof v !== "string") continue;
+        if (ytUrlInput) return null; // skip — YT path handles it
+        for (const v of inputValues) {
           const url = findFirstUrl(v);
           if (url) {
             try { return await fetchUrlSummary(url); } catch { return null; }
@@ -338,10 +349,29 @@ export async function runOrchestra(args: {
     stPre.status = "done";
     stPre.completedAt = Date.now() - startedAt;
 
-    const fetchedUrl = urlSummary
-      ? { url: urlSummary.url, title: urlSummary.title, chars: urlSummary.fetched_chars, og: urlSummary.og }
-      : null;
-    const urlContext = urlSummary ? "\n\n" + formatUrlSummaryForPrompt(urlSummary) + "\n\n" : "";
+    // YT path takes priority — it surfaces transcript + metadata, much
+    // richer than urlContext. fetchedUrl carries either YT or generic.
+    const fetchedUrl = ytContext
+      ? {
+          url: ytContext.url,
+          title: ytContext.title,
+          chars: ytContext.transcript?.length ?? 0,
+          og: {
+            image: ytContext.thumbnail,
+            title: ytContext.title,
+            description: ytContext.description,
+            site_name: ytContext.channelTitle,
+            domain: "youtube.com",
+          },
+        }
+      : urlSummary
+        ? { url: urlSummary.url, title: urlSummary.title, chars: urlSummary.fetched_chars, og: urlSummary.og }
+        : null;
+    const urlContext = ytContext
+      ? "\n\n" + formatYouTubeContextForPrompt(ytContext) + "\n\n"
+      : urlSummary
+        ? "\n\n" + formatUrlSummaryForPrompt(urlSummary) + "\n\n"
+        : "";
 
     // ── Stage 2: caption + image briefs in parallel ───────────────────
     const stCap = stage("caption", `${captionLoad.meta?.name ?? "Caption agent"} 寫 ${args.config.variants} 個變體`);
