@@ -132,14 +132,15 @@ function deepCheckStringLengths(obj: any, path: string = ""): string | null {
   }
   return null;
 }
-app.use((req, res, next) => {
+app.use((req, res, next): void => {
   if (req.body && typeof req.body === "object") {
     const violation = deepCheckStringLengths(req.body);
     if (violation) {
-      return res.status(413).json({
+      res.status(413).json({
         error: "PAYLOAD_FIELD_TOO_LARGE",
         detail: violation,
       });
+      return;
     }
   }
   next();
