@@ -1,4 +1,4 @@
-name: Admin — FB agent/skill mapping for 30s tasks
+name: Admin — FB agent/skill mapping for 30s tasks (deep dive)
 
 on:
   workflow_dispatch:
@@ -35,6 +35,28 @@ jobs:
             echo ""
             echo "=== E. Existing FB squads (for 90s tier mapping) ==="
             $MYSQL -e "SELECT id, slug, name, missionType, JSON_LENGTH(steps) AS step_count FROM squads WHERE is_active=1 AND is_approved=1 AND (slug LIKE 'fb-%' OR workspace='[\"facebook\"]' OR workspace='facebook') ORDER BY slug LIMIT 30"
+
+            echo ""
+            echo "=== F. Agents whose skills[] (JSON array) contains hook / story / hashtag / countdown / pinned ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (JSON_SEARCH(skills, 'one', 'hook-writing') IS NOT NULL OR JSON_SEARCH(skills, 'one', 'fb-copywriting') IS NOT NULL OR JSON_SEARCH(skills, 'one', 'social-copy') IS NOT NULL OR JSON_SEARCH(skills, 'one', 'brand-voice-consistency') IS NOT NULL OR JSON_SEARCH(skills, 'one', 'crisis-communication') IS NOT NULL) ORDER BY name LIMIT 30"
+
+            echo ""
+            echo "=== G. fb-livestream-prep squad row + its lead agent ==="
+            $MYSQL -e "SELECT id, slug, name, lead_agent_id, JSON_LENGTH(steps) AS step_count, is_approved FROM squads WHERE slug = 'fb-livestream-prep' OR slug LIKE '%livestream%' OR slug LIKE '%live-prep%'"
+            echo ""
+            $MYSQL -e "SELECT a.id, a.slug, a.name, a.title, a.primarySkill FROM squads s JOIN agents a ON a.id = s.lead_agent_id WHERE s.slug = 'fb-livestream-prep' LIMIT 1"
+
+            echo ""
+            echo "=== H. fb-countdown-series + fb-carousel + fb-reels-script lead agents ==="
+            $MYSQL -e "SELECT s.slug, a.id AS agent_id, a.name, a.title, a.primarySkill FROM squads s JOIN agents a ON a.id = s.lead_agent_id WHERE s.slug IN ('fb-countdown-series','fb-carousel','fb-reels-script','fb-crisis-reply','fb-crisis-comms')"
+
+            echo ""
+            echo "=== I. Agents whose name contains 'Story' or whose title contains 'Story / hashtag / pinned / countdown' ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND (title LIKE '%Story%' OR title LIKE '%hashtag%' OR title LIKE '%倒數%' OR title LIKE '%Hashtag%' OR title LIKE '%Pinned%' OR title LIKE '%釘選%' OR title LIKE '%Countdown%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== J. Aiden Hsu's full record (verify skills array) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill, skills FROM agents WHERE slug = 'fb-brief-writer' OR (name = 'Aiden Hsu') LIMIT 5" | head -10
 
             echo ""
             echo "=== Done ==="
