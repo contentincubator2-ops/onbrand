@@ -105,7 +105,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [agentMeta, setAgentMeta] = useState<any | null>(null);
-  const [fetchedUrl, setFetchedUrl] = useState<{ url: string; title: string | null; chars: number } | null>(null);
+  const [fetchedUrl, setFetchedUrl] = useState<{ url: string; title: string | null; chars: number; og?: { image: string | null; title: string | null; description: string | null; site_name: string | null; domain: string } } | null>(null);
 
   // Countdown overlay (visual SLA — counts up to expected eta)
   const [countdownStart, setCountdownStart] = useState<number | null>(null);
@@ -526,7 +526,7 @@ function OutputCarousel({
   mockupVariant: MockupVariant | null;
   latencyMs: number | null;
   agentMeta: any;
-  fetchedUrl: { url: string; title: string | null; chars: number } | null;
+  fetchedUrl: { url: string; title: string | null; chars: number; og?: { image: string | null; title: string | null; description: string | null; site_name: string | null; domain: string } } | null;
   errorMsg: string | null;
 }) {
   // Build the slide list — slide 0 = main output; slides 1+ = variants
@@ -648,11 +648,20 @@ function OutputCarousel({
           liveHashtags={slide.hashtags}
           liveImageStyle={slide.imageStyle}
           liveVideoStyle={output.video_style_direction?.summary}
+          ogCard={fetchedUrl?.og ? {
+            url: fetchedUrl.url,
+            image: fetchedUrl.og.image,
+            title: fetchedUrl.og.title,
+            description: fetchedUrl.og.description,
+            siteName: fetchedUrl.og.site_name,
+            domain: fetchedUrl.og.domain,
+          } : undefined}
         />
       )}
 
-      {/* MediaGenFlow trigger — uses the active slide's style direction */}
-      {slide.imageStyle && (
+      {/* MediaGenFlow trigger — uses the active slide's style direction.
+          Hidden when post is a link share (OG card replaces the image slot). */}
+      {slide.imageStyle && !fetchedUrl?.og && (
         <div className="flex justify-center">
           <Button
             color="secondary"

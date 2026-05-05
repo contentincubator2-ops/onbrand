@@ -156,6 +156,21 @@ export interface MockupFields {
   liveImageStyle?: string;
   liveVideoStyle?: string;
   /**
+   * Quick-task link-post pivot (2026-05-05): when caption contains a URL the
+   * server already fetched, this carries the OG card metadata so the mockup
+   * renders an actual link preview (image + title + description + domain)
+   * instead of an empty "等待 craft agent" image slot. Real FB behaviour is
+   * to auto-render OG cards for link posts; we mirror that.
+   */
+  ogCard?: {
+    url: string;
+    image: string | null;
+    title: string | null;
+    description: string | null;
+    siteName: string | null;
+    domain: string;
+  };
+  /**
    * Session 6: per-slot state map.
    * When provided, variants use SlotContent to show loading/filled/empty per slot.
    * Falls back gracefully to liveXxx props when absent.

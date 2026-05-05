@@ -29,6 +29,16 @@ export interface UrlSummary {
   h1: string | null;
   body_excerpt: string;
   fetched_chars: number;
+  /** OG card metadata — used by FBLinkCard mockup to render the link preview
+   * exactly as Facebook would (so user sees what the OG-rendered post looks
+   * like instead of a blank "等待 craft agent" image slot). */
+  og: {
+    image: string | null;
+    title: string | null;
+    description: string | null;
+    site_name: string | null;
+    domain: string;
+  };
 }
 
 /** Extract the first URL from a free-form string. */
@@ -106,6 +116,24 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
       pluck(html, /<meta\s+name=["']description["']\s+content=["']([\s\S]*?)["']/i) ||
       pluck(html, /<meta\s+property=["']og:description["']\s+content=["']([\s\S]*?)["']/i);
     const h1 = pluck(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i);
+
+    // OG card extraction — these power FBLinkCard / IGLinkCard mockups so
+    // users see the actual OG preview Facebook would auto-generate.
+    const ogMeta = (prop: string) =>
+      pluck(html, new RegExp(`<meta\\s+property=["']${prop}["']\\s+content=["']([\\s\\S]*?)["']`, "i")) ||
+      pluck(html, new RegExp(`<meta\\s+name=["']${prop}["']\\s+content=["']([\\s\\S]*?)["']`, "i"));
+    const ogImageRaw = ogMeta("og:image") || ogMeta("twitter:image") || ogMeta("twitter:image:src");
+    const ogTitle = ogMeta("og:title") || title;
+    const ogDescription = ogMeta("og:description") || description;
+    const ogSiteName = ogMeta("og:site_name");
+    let domain = "";
+    try { domain = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
+    // Resolve relative og:image against page url
+    let ogImage: string | null = null;
+    if (ogImageRaw) {
+      try { ogImage = new URL(ogImageRaw, url).toString(); } catch { ogImage = ogImageRaw; }
+    }
+
     const fullText = htmlToText(html);
     const excerpt = fullText.slice(0, MAX_BODY_CHARS);
 
@@ -116,6 +144,13 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
       h1: h1?.slice(0, 280) ?? null,
       body_excerpt: excerpt,
       fetched_chars: fullText.length,
+      og: {
+        image: ogImage,
+        title: ogTitle?.slice(0, 280) ?? null,
+        description: ogDescription?.slice(0, 600) ?? null,
+        site_name: ogSiteName?.slice(0, 80) ?? null,
+        domain,
+      },
     };
   } catch {
     clearTimeout(timer);

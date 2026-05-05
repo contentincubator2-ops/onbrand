@@ -915,7 +915,18 @@ export const quickTaskRouter = router({
       // inject a summary so the agent actually READS what the user shared
       // (vs writing a generic post that ignores the link content).
       let urlContext = "";
-      let fetchedUrl: { url: string; title: string | null; chars: number } | null = null;
+      let fetchedUrl: {
+        url: string;
+        title: string | null;
+        chars: number;
+        og: {
+          image: string | null;
+          title: string | null;
+          description: string | null;
+          site_name: string | null;
+          domain: string;
+        };
+      } | null = null;
       for (const v of Object.values(input.inputs)) {
         if (typeof v === "string") {
           const url = findFirstUrl(v);
@@ -923,7 +934,12 @@ export const quickTaskRouter = router({
             const summary = await fetchUrlSummary(url);
             if (summary) {
               urlContext = "\n\n" + formatUrlSummaryForPrompt(summary) + "\n\n";
-              fetchedUrl = { url: summary.url, title: summary.title, chars: summary.fetched_chars };
+              fetchedUrl = {
+                url: summary.url,
+                title: summary.title,
+                chars: summary.fetched_chars,
+                og: summary.og,
+              };
               break; // first URL only — keep prompt budget reasonable
             }
           }
