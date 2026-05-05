@@ -12,20 +12,26 @@
  */
 import { runOrchestra } from "../server/_core/quickTaskOrchestra";
 import { FB_30S_TASKS, FB_30S_ORCHESTRA } from "../server/_core/quickTaskFB";
+import { IG_30S_TASKS, IG_30S_ORCHESTRA } from "../server/_core/quickTaskIG";
 
 (async () => {
-  const taskId = "fb-30-pure-text-hook";
-  const template = FB_30S_TASKS.find((t) => t.id === taskId);
-  const config = FB_30S_ORCHESTRA[taskId];
+  // Pass taskId via env: TASK_ID=ig-30-caption-short npx tsx ...
+  const taskId = process.env.TASK_ID || "fb-30-pure-text-hook";
+  const template =
+    FB_30S_TASKS.find((t) => t.id === taskId) ??
+    IG_30S_TASKS.find((t) => t.id === taskId);
+  const config =
+    FB_30S_ORCHESTRA[taskId] ?? IG_30S_ORCHESTRA[taskId];
   if (!template || !config) {
     console.error("✗ template or config missing for", taskId);
     process.exit(1);
   }
 
-  const inputs = {
-    article_body:
-      "桂冠『美味健力餐任選14包』直接解決：一包=24g 蛋白質+7.5g 膳食纖維，無防腐劑、無味精、無香料。現在 64 折只要 1888 元（省 1052 元），剩最後 161 件——點連結，10 秒完成組合，冷凍宅配到府，明天早餐就喝上番茄蔬菜牛肉湯。",
-  };
+  // Default inputs vary by task input key. Caller can override via env.
+  const inputs: Record<string, string> = {};
+  const inputKey = template.primary_input?.key ?? template.inputs[0]?.key ?? "topic";
+  inputs[inputKey] = process.env.TASK_INPUT ||
+    "桂冠『美味健力餐任選14包』：一包=24g 蛋白質+7.5g 膳食纖維，無防腐劑、無味精、無香料。64 折只要 1888 元，剩最後 161 件——10 秒完成組合，冷凍宅配到府。";
 
   console.log(`\nProbing orchestra: ${taskId}`);
   console.log(`Config: ${config.variants} variants, runImageGen=${config.runImageGen}`);

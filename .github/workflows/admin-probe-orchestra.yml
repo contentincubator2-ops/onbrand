@@ -2,6 +2,15 @@ name: Admin — Probe orchestra E2E (server-side smoke test)
 
 on:
   workflow_dispatch:
+    inputs:
+      task_id:
+        description: "task id to probe (default fb-30-pure-text-hook)"
+        required: false
+        type: string
+      task_input:
+        description: "primary input value (override)"
+        required: false
+        type: string
 
 jobs:
   probe:
@@ -20,7 +29,9 @@ jobs:
             set -a
             . ./.env
             set +a
-            # Run the in-process probe
+            # Run the in-process probe (task_id passed via env)
+            export TASK_ID="${{ github.event.inputs.task_id }}"
+            export TASK_INPUT="${{ github.event.inputs.task_input }}"
             npx tsx scripts/probe-orchestra.ts 2>&1
             exit_code=$?
             echo ""
