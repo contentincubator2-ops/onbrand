@@ -108,7 +108,85 @@ function timeoutPromise<T>(ms: number, label: string): Promise<T> {
   );
 }
 
-// ── Caption writer LLM call ──────────────────────────────────────────────
+// ── Caption writer — N parallel LLM calls, one per variant ──────────────
+//
+// Design (CJ direction 2026-05-05): instead of 1 LLM call producing N JSON
+// variants (which truncates / drops a variant when tokens get tight), we
+// fan out N small calls. Each writes EXACTLY one variant. Failures are
+// isolated; one missing variant gets retried once, rather than poisoning
+// the whole batch. Wall time stays the same because they run in parallel.
+//
+// Each single-variant call is tiny (~150-300 tokens) so it never truncates.
+
+async function callOneVariant(args: {
+  template: FBTaskTemplate;
+  config: OrchestraConfig;
+  label: string;
+  captionPersona: string;
+  brandPrefix: string;
+  urlContext: string;
+  userMsg: string;
+}): Promise<{ label: string; caption: string; hashtags?: string[] }> {
+  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg } = args;
+
+  const lengthHint =
+    config.captionMaxChars > 0
+      ? `字數 ${config.captionMinChars}-${config.captionMaxChars} 字。`
+      : "字數依任務本身規範。";
+
+  const system =
+    captionPersona +
+    template.systemPrompt +
+    `\n\n【本次任務】只寫 1 個變體：**${label}** 口吻。\n` +
+    `${lengthHint}\n` +
+    `caption 欄位**絕對不要**寫「${template.label}」、「${label}」或任何任務 / label 名稱 — caption 就是直接發到 FB 的貼文。\n\n` +
+    `輸出嚴格 JSON 物件（不是陣列）：\n` +
+    `{"caption":"<完整貼文>","hashtags":["..."]}\n` +
+    `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
+    brandPrefix +
+    urlContext;
+
+  const provider: ModelProvider =
+    template.preferredModel === "any" ? "qwen" : (template.preferredModel as any);
+
+  // First attempt
+  let attempt = 0;
+  let lastErr: any = null;
+  while (attempt < 2) {
+    attempt++;
+    try {
+      const r = await Promise.race([
+        callModel(
+          [
+            { role: "system", content: system },
+            { role: "user", content: userMsg },
+          ],
+          undefined,
+          provider,
+        ),
+        timeoutPromise<never>(LLM_BUDGET_MS, `caption[${label}]`),
+      ]);
+      const parsed = tryParseJson(r.content);
+      const caption =
+        typeof (parsed as any)?.caption === "string" ? (parsed as any).caption.trim() : "";
+      if (caption.length > 0) {
+        return {
+          label,
+          caption,
+          hashtags: Array.isArray((parsed as any)?.hashtags)
+            ? (parsed as any).hashtags.slice(0, 15).map(String)
+            : undefined,
+        };
+      }
+      lastErr = new Error(`empty caption for ${label}`);
+    } catch (e) {
+      lastErr = e;
+    }
+    // brief backoff before retry
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 250));
+  }
+  throw lastErr ?? new Error(`caption[${label}] exhausted retries`);
+}
 
 async function callCaptionWriter(args: {
   template: FBTaskTemplate;
@@ -118,55 +196,19 @@ async function callCaptionWriter(args: {
   urlContext: string;
   userMsg: string;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
-  const { template, config, captionPersona, brandPrefix, urlContext, userMsg } = args;
-
-  const variantSpec = config.variantLabels.map((l, i) => `  ${i + 1}. ${l}`).join("\n");
-  const lengthHint =
-    config.captionMaxChars > 0
-      ? `每則 caption 控制在 ${config.captionMinChars}-${config.captionMaxChars} 字。`
-      : "";
-
-  const system =
-    captionPersona +
-    template.systemPrompt +
-    `\n\n【Plan B 強制規則】\n` +
-    `1. 必須產出**完整 ${config.variants} 個** caption 變體，每個都要有實際文字（不能空白、不能 "（待補）"、不能只有 label）。\n` +
-    `2. 變體口吻順序：\n${variantSpec}\n` +
-    `3. ${lengthHint || "字數依任務本身規範。"}\n` +
-    `4. **caption 欄位裡絕對不要寫「${template.label}」或任何任務名稱、label 名稱**。caption 就是要直接發到 FB 的貼文本身。\n` +
-    `5. 輸出嚴格 JSON 陣列：\n` +
-    `   [{"label":"<口吻名>","caption":"<完整貼文>","hashtags":["..."]}, ...]\n` +
-    `6. 不要 markdown code fence、不要前言、不要解釋。第一個字元就是 [。\n` +
-    brandPrefix +
-    urlContext;
-
-  const provider: ModelProvider =
-    template.preferredModel === "any" ? "qwen" : (template.preferredModel as any);
-  const r = await Promise.race([
-    callModel(
-      [
-        { role: "system", content: system },
-        { role: "user", content: userMsg },
-      ],
-      undefined,
-      provider,
+  const labels = args.config.variantLabels.slice(0, args.config.variants);
+  // Parallel fanout — each variant in its own LLM call.
+  // Promise.allSettled so one failure doesn't kill the others.
+  const settled = await Promise.allSettled(
+    labels.map((label) =>
+      callOneVariant({ ...args, label }),
     ),
-    timeoutPromise<never>(LLM_BUDGET_MS, "caption_writer LLM"),
-  ]);
-
-  const parsed = tryParseJson(r.content);
-  if (!Array.isArray(parsed)) {
-    // Fallback: single-caption format — wrap into one-variant array
-    if (parsed && typeof parsed === "object" && typeof (parsed as any).caption === "string") {
-      return [{ label: config.variantLabels[0] ?? "版本 1", caption: (parsed as any).caption, hashtags: (parsed as any).hashtags }];
-    }
-    throw new Error("caption_writer LLM did not return a JSON array");
-  }
-  return parsed.slice(0, config.variants).map((v: any, i: number) => ({
-    label: typeof v?.label === "string" && v.label ? v.label : (config.variantLabels[i] ?? `版本 ${i + 1}`),
-    caption: typeof v?.caption === "string" ? v.caption : "",
-    hashtags: Array.isArray(v?.hashtags) ? v.hashtags.slice(0, 15).map(String) : undefined,
-  }));
+  );
+  return settled.map((s, i) =>
+    s.status === "fulfilled"
+      ? s.value
+      : { label: labels[i] ?? `版本 ${i + 1}`, caption: "", hashtags: undefined },
+  );
 }
 
 // ── Image director LLM call ─────────────────────────────────────────────
@@ -354,13 +396,36 @@ export async function runOrchestra(args: {
     }
 
     // ── Assemble variants ──────────────────────────────────────────────
+    // Hook-task post-processing: each variant's caption from the LLM is
+    // just the hook (30-60 chars) — orchestra appends the user's original
+    // article verbatim. This keeps each LLM call tiny (high reliability)
+    // and preserves the article exactly as user wrote it.
+    //
+    // No silent quality-fallback: if a variant LLM call failed both
+    // attempts, the variant ships with empty caption + the per-slide
+    // warning UI tells the user to retry. We never hide the failure with
+    // a clone of another variant.
+    const isHookTask = args.template.id === "fb-30-pure-text-hook";
+    const articleBody =
+      isHookTask
+        ? (args.inputs["article_body"] ?? args.inputs["topic"] ?? "").trim()
+        : "";
+
     const variants: OrchestraVariant[] = [];
-    const N = Math.max(captions.length, args.config.variants);
+    const N = args.config.variants;
     for (let i = 0; i < N; i++) {
       const cap = captions[i];
+      const label = cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`;
+      let caption = (cap?.caption ?? "").trim();
+      if (caption && isHookTask && articleBody) {
+        caption = `${caption}\n\n${articleBody}`;
+      }
+      if (!caption) {
+        errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
+      }
       variants.push({
-        label: cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`,
-        caption: cap?.caption ?? "",
+        label,
+        caption,
         hashtags: cap?.hashtags ?? [],
         image: images[i] ?? { style: briefs[i] ?? null, url: null, status: args.config.images > 0 ? "failed" : "skipped" },
       });

@@ -80,17 +80,11 @@ ${FB_TONE_SUFFIX}
       { key: "article_body", label: "原本的貼文內容", type: "textarea", required: true },
     ],
     systemPrompt: `任務：用戶提供了一段「原本要發的貼文內文」（在 article_body 輸入裡）。
-你要寫 5 種不同口吻的 FB 開場 hook，每一個 hook 都接上**用戶提供的原文**，組成 5 個完整可發的貼文版本。
+你只要寫 hook（開場句），**不要重複貼用戶的原文** — orchestra 會在後端自動把原文接到你寫的 hook 後面。
 
-放進 variants[]：5 個物件，label 分別為：
-  ① 反問式  ② 數字式  ③ 反差式  ④ 故事開頭式  ⑤ 直接挑釁式
-每個 variant.caption 結構：
-  [hook 30-60 字]\\n\\n[使用者原文逐字保留，不要改寫、不要省略]
-
-caption 主欄位放「反問式」那一版（含 hook + 原文）。
-
-每個 variant 都附 image_style_direction.summary（1 句配圖風格建議，呼應該口吻 — 例：反問式給冷色 minimal、數字式給數據視覺、故事式給生活感場景）。
-另外 top-level 也給一個整體的 image_style_direction（fallback）。
+每個 variant.caption = 那個口吻的 hook（30-60 字，1-2 句即可）。
+不要寫成 "[hook]\\n\\n[原文]"，只寫 hook。
+口吻分別：反問式 / 數字式 / 反差式（依 Plan B 強制規則的順序）。
 ${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
     maxTokens: 600,
