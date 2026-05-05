@@ -1,0 +1,47 @@
+name: Admin — Find TikTok 30s task agents (10 different + 1 image dir)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+
+            # Excluded: FB+IG+YT pool (caption_writers + image_dirs already used)
+            EXCLUDED="(239183, 60021, 239185, 30002, 40, 180159, 239184, 180166, 229985, 60029, 35, 60068, 224294, 180168, 30005, 180143, 60056, 60072, 220751, 60022, 180170, 24, 36, 30013, 180268, 60030, 30014, 30004, 180157, 210252, 180186, 210220)"
+
+            echo "=== A. TikTok-tagged agents ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(slug) LIKE '%tiktok%' OR LOWER(slug) LIKE 'tt-%' OR LOWER(title) LIKE '%tiktok%' OR LOWER(primarySkill) LIKE '%tiktok%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== B. Vertical short-video / trend specialists ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%trend%' OR LOWER(primarySkill) LIKE '%shorts%' OR LOWER(primarySkill) LIKE '%vertical%' OR LOWER(slug) LIKE '%shortvideo%' OR LOWER(title) LIKE '%short%' OR LOWER(title) LIKE '%trend%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== C. Hook / opening specialists ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%hook%' OR LOWER(title) LIKE '%hook%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== D. Live / streaming hosts ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(slug) LIKE '%live%' OR LOWER(title) LIKE '%live%' OR LOWER(title) LIKE '%host%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== E. Visual / motion-graphics designers (image_director candidates) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(title) LIKE '%motion%' OR LOWER(title) LIKE '%visual%' OR LOWER(title) LIKE '%art director%' OR LOWER(primarySkill) LIKE '%visual%' OR LOWER(primarySkill) LIKE '%art%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== F. Community / engagement (留言任務) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%community%' OR LOWER(primarySkill) LIKE '%engagement%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== Done ==="
