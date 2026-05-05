@@ -49,7 +49,12 @@ export async function getDb(): Promise<DB> {
     keepAliveInitialDelay: 10_000,
   });
 
-  db = drizzle(pool, { schema, mode: "default" });
+  // 2026-05-04: drizzle-orm bumped to 0.45.2 (CVE GHSA-gpj5-g38j-94v9 fix).
+  // Two copies of drizzle-orm exist in node_modules (one nested under
+  // drizzle-kit), so the structural types disagree even though runtime is
+  // identical. Cast through DB resolves the spurious "Two different types"
+  // error at the assignment site without changing behavior.
+  db = drizzle(pool, { schema, mode: "default" }) as unknown as DB;
   return db;
 }
 
