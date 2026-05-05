@@ -40,6 +40,7 @@ import PickerWorkspace from "../pages/PickerWorkspace";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
+import QuickTaskFBHome from "../pages/QuickTaskFBHome";
 import BoardroomPage from "../pages/BoardroomPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
@@ -140,6 +141,8 @@ export default function AppV2() {
           <Route path="/" element={<QuickTasksPage />} />
           <Route path="/squads" element={<MissionsHome />} />
           <Route path="/quicktask" element={<Navigate to="/" replace />} />
+          {/* 2026-05-05 quick-task pivot beta — FB-only home using new schema */}
+          <Route path="/fb" element={<QuickTaskFBHome />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
