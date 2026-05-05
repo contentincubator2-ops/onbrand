@@ -1,0 +1,45 @@
+name: Admin — Find Brand Positioning + User Research agents
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+
+            EXCLUDED="(239183, 60021, 239185, 30002, 40, 180159, 239184, 180166, 229985, 60029, 35, 60068, 224294, 180168, 30005, 180143, 60056, 60072, 220751, 60022, 180170, 24, 36, 30013, 180268, 60030, 30014, 30004, 180157, 210252, 180186, 210220, 30011, 180167, 60033, 220949, 222392, 60055, 60031, 210310, 180158, 60073, 180165, 30018, 229905, 180172, 180173, 180176, 180197, 180203, 180199, 180009, 220862, 60071, 30017, 60012, 60060, 60061, 60062, 180039, 180054, 180062, 180068, 221080, 60063, 29, 30008, 60035, 60036, 60037, 60038, 180175, 180182, 210266, 180193, 60011)"
+
+            echo "=== A. Brand strategist / positioning ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(slug) LIKE '%brand-strat%' OR LOWER(title) LIKE '%brand strategist%' OR LOWER(title) LIKE '%brand director%' OR LOWER(primarySkill) LIKE '%brand-dna%' OR LOWER(primarySkill) LIKE '%positioning%' OR LOWER(primarySkill) LIKE '%brand-strategy%' OR LOWER(title) LIKE '%品牌策略%') ORDER BY id LIMIT 30"
+
+            echo ""
+            echo "=== B. Tagline / naming / value prop ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%tagline%' OR LOWER(primarySkill) LIKE '%naming%' OR LOWER(primarySkill) LIKE '%value-prop%' OR LOWER(primarySkill) LIKE '%manifesto%' OR LOWER(title) LIKE '%copy chief%' OR LOWER(title) LIKE '%creative director%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== C. UX / user research / interview ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(slug) LIKE '%ux-research%' OR LOWER(slug) LIKE '%user-research%' OR LOWER(title) LIKE '%user research%' OR LOWER(title) LIKE '%ux researcher%' OR LOWER(primarySkill) LIKE '%user-research%' OR LOWER(primarySkill) LIKE '%ux-research%' OR LOWER(primarySkill) LIKE '%interview%' OR LOWER(primarySkill) LIKE '%customer-research%') ORDER BY id LIMIT 30"
+
+            echo ""
+            echo "=== D. Persona / segmentation ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%persona%' OR LOWER(primarySkill) LIKE '%segmentation%' OR LOWER(primarySkill) LIKE '%audience-research%' OR LOWER(title) LIKE '%audience%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== E. Insights / synthesis / qualitative ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%insights%' OR LOWER(primarySkill) LIKE '%synthesis%' OR LOWER(primarySkill) LIKE '%qualitative%' OR LOWER(title) LIKE '%insights%' OR LOWER(title) LIKE '%qualitative%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== F. Brand voice / archetype ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%brand-voice%' OR LOWER(primarySkill) LIKE '%archetype%' OR LOWER(primarySkill) LIKE '%brand-tone%' OR LOWER(title) LIKE '%brand voice%') ORDER BY id LIMIT 20"
+
+            echo "=== Done ==="
