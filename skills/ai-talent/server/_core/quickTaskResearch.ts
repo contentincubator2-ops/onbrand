@@ -22,7 +22,7 @@ export const RESEARCH_30S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出訪談 10 題訪綱。每變體 1 種 framework（Jobs-to-be-Done / 5 Whys / 旅程地圖式）。
 規則：開放式問題（"請告訴我..."）、不要誘導性、含 1 個破冰題 + 8 個核心 + 1 個 wrap-up。
 ${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 1000,
+    preferredModel: "qwen", maxTokens: 1000,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {
@@ -37,7 +37,7 @@ ${RES_TONE}`,
     systemPrompt: `產出 persona 卡片。每變體 1 個 persona（不同 segment）。
 結構：姓名 + 年齡 + 職業 → 1 句生活情境 → 主要 goals (3) → pain points (3) → 一週中的典型一天 → 用什麼 tool / 媒體 / KOL → 對你品牌的關鍵問題。
 ${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 800,
+    preferredModel: "qwen", maxTokens: 800,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {
@@ -52,7 +52,7 @@ ${RES_TONE}`,
     systemPrompt: `產出 survey 問卷（10 題）。每變體 1 種題型組合（NPS-led / decision-journey / brand-tracking）。
 規則：含 demographics 2 題 + 核心 6 題 + open-ended 2 題。每題給：問題 + 題型（單選 / 多選 / Likert / 數字 / 開放）+ 選項。
 ${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 1200,
+    preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {
@@ -72,7 +72,7 @@ ${RES_TONE}`,
 - 你能介入的機會點
 
 每變體 1 種 customer segment 視角。${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 1200,
+    preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {
@@ -87,7 +87,7 @@ ${RES_TONE}`,
     systemPrompt: `產出 win/loss interview 訪綱（8-10 題）。
 結構：背景 (2) → 評估過程（看了哪些選項、依據是？）(3) → 最終決定（為何選 X？）(2) → 反思 (2) → wrap-up。
 規則：避免問「為什麼不選我們」，要問「你最後選 X 的關鍵時刻」。${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 800,
+    preferredModel: "qwen", maxTokens: 800,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {
@@ -102,7 +102,7 @@ ${RES_TONE}`,
     systemPrompt: `產出 JTBD 訪談大綱。
 結構：第一次想到要解決這問題（when / where）→ 之前用什麼 → 切換的觸發點 → 評估了什麼 → 用了之後（what changed）。
 每變體 1 種 framing（functional / emotional / social job）。${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 800,
+    preferredModel: "qwen", maxTokens: 800,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {
@@ -117,7 +117,7 @@ ${RES_TONE}`,
     systemPrompt: `產出 synthesis 模板。每變體 1 種 framework（affinity mapping / themes-evidence-implications / how-might-we）。
 結構：主題分類 → 每主題下：證據 quote、出現頻率、影響嚴重度 → implications + recommendations。
 ${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 1000,
+    preferredModel: "qwen", maxTokens: 1000,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {
@@ -147,7 +147,7 @@ ${RES_TONE}`,
     systemPrompt: `產出 usability test 腳本。每變體 1 種重點（first-impression / task completion / error recovery）。
 結構：開場（介紹 / 暖身 / think-aloud 引導）→ 任務 1-7（每任務含 scenario + 完成標準 + 觀察重點）→ wrap-up（SUS 量表 + 開放回饋）。
 ${RES_TONE}`,
-    preferredModel: "azure-position", maxTokens: 1200,
+    preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "generic" },
   },
   {

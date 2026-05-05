@@ -88,7 +88,7 @@ caption 結構：
 
 不要寫得像範本。每個欄位要根據用戶內容客製。
 不需要 image_style_direction（description 不出現在縮圖）。`,
-    preferredModel: "azure-position",
+    preferredModel: "qwen",
     maxTokens: 900,
     outputDefaults: { platform: "youtube", post_type: "watch" },
   },
@@ -121,7 +121,7 @@ caption 結構：
 
 如果 transcript 沒抓到，告訴用戶 "這支影片沒有字幕可抓 — 請先給字幕或主題"。
 不需要 image_style_direction。`,
-    preferredModel: "azure-position",
+    preferredModel: "qwen",
     maxTokens: 800,
     outputDefaults: { platform: "youtube", post_type: "watch" },
   },
@@ -149,7 +149,7 @@ caption 結構：
 不要 "大家好" 開頭。不要「最後」結尾。
 ${YT_TONE_SUFFIX}
 image_style_direction.summary 給縮圖風格（9:16）。`,
-    preferredModel: "azure-position",
+    preferredModel: "qwen",
     maxTokens: 1000,
     outputDefaults: { platform: "youtube", post_type: "shorts" },
   },
@@ -178,7 +178,7 @@ caption 結構：
 規則：第一句不要 "Hi 大家好我是..."，YouTube 演算法看頭 5 秒留存率，不要浪費。
 ${YT_TONE_SUFFIX}
 image_style_direction.summary 給縮圖風格（16:9）。`,
-    preferredModel: "azure-position",
+    preferredModel: "qwen",
     maxTokens: 700,
     outputDefaults: { platform: "youtube", post_type: "watch" },
   },

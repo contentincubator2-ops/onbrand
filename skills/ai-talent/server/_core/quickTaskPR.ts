@@ -52,7 +52,7 @@ ${PR_TONE}`,
     systemPrompt: `產出新聞稿第一段（lead，80-150 字）。
 規則：第一句必須包含 What + Who + When + Where；第二句補 Why；第三句補 How（如果重要）。
 不要繞、不要鋪陳、不要"近年來..."這種廢話開頭。${PR_TONE}`,
-    preferredModel: "azure-position", maxTokens: 400,
+    preferredModel: "qwen", maxTokens: 400,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {
@@ -128,7 +128,7 @@ ${PR_TONE}`,
     systemPrompt: `產出危機聲明（200-350 字）。
 結構：1 句承認事件 + 致歉 → 已知事實（具體、不含糊）→ 已採取的行動 → 後續承諾 + 時程 → 聯絡管道。
 不要試圖淡化、不要找藉口、不要拖延。${PR_TONE}`,
-    preferredModel: "azure-position", maxTokens: 600,
+    preferredModel: "qwen", maxTokens: 600,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {
@@ -143,7 +143,7 @@ ${PR_TONE}`,
     systemPrompt: `產出媒體 Q&A（5-8 組）。每變體 1 種風格（防禦型 / 透明型 / 主動引導型）。
 結構：Q: [問題] / A: [80 字內答案，含具體事實 / 數字 / 不繞 / 不空話]
 針對最尖銳的問題練最仔細。${PR_TONE}`,
-    preferredModel: "azure-position", maxTokens: 1200,
+    preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {

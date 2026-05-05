@@ -22,7 +22,7 @@ export const LI_30S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 LI 觀點貼文（150-300 字）。
 結構：1 句鉤子（拋一個反共識觀點）→ 2-3 段論述（含 1 個數據 / 案例）→ 收尾（提問引留言）。
 ${LI_TONE}`,
-    preferredModel: "azure-position", maxTokens: 700,
+    preferredModel: "qwen", maxTokens: 700,
     outputDefaults: { platform: "linkedin", post_type: "feed" },
   },
   {
@@ -51,7 +51,7 @@ LI 演算法看頭 2 行決定要不要展開（"see more"），鉤子要強。$
     systemPrompt: `產出 LinkedIn Article 開頭（150-250 字）。
 結構：1 段強烈場景或 1 個事實 → 1 段個人連結 / 為何寫這篇 → 1 段這篇會談的 3 個重點。
 不要 "在這篇文章中我會分享..." 這種範本式起手。${LI_TONE}`,
-    preferredModel: "azure-position", maxTokens: 600,
+    preferredModel: "qwen", maxTokens: 600,
     outputDefaults: { platform: "linkedin", post_type: "article" },
   },
   {
@@ -138,7 +138,7 @@ LI 留言能帶曝光 — 要寫得讓原 PO 想回覆你（給連結機會）�
     systemPrompt: `產出 LI Newsletter 標題（30 字內）+ 第一段開頭（150-250 字）。
 標題：要 specific（含具體數字 / 反差 / 問題），不要 "Weekly Digest" 這種。
 開頭：1 句鉤子 + 為什麼這期值得讀完。${LI_TONE}`,
-    preferredModel: "azure-position", maxTokens: 500,
+    preferredModel: "qwen", maxTokens: 500,
     outputDefaults: { platform: "linkedin", post_type: "newsletter" },
   },
   {
@@ -156,7 +156,7 @@ caption 用 "---" 分隔每一頁：
 頁 2-7（內容 6 頁）：每頁 1 個重點 + 30-50 字補充（標號 #1-#6）
 頁 8（CTA）：總結 1 句 + 邀請動作（追蹤 / 留言 / 連結）
 ${LI_TONE}`,
-    preferredModel: "azure-position", maxTokens: 1200,
+    preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "linkedin", post_type: "document" },
   },
 ];

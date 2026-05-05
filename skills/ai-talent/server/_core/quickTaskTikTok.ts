@@ -46,7 +46,7 @@ ${TT_SUFFIX}`,
 [25-40s] 反差或高潮
 [40-60s] CTA
 每段含：口播原話、字幕、鏡頭。${TT_SUFFIX}`,
-    preferredModel: "azure-position", maxTokens: 1000,
+    preferredModel: "qwen", maxTokens: 1000,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {

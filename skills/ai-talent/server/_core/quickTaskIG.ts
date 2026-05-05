@@ -102,7 +102,7 @@ caption 結構（每變體）：
 
 每個 Beat 寫得具體（"用這 3 個 hashtag" 比 "用對 hashtag" 好）。
 另外給 image_style_direction.summary（封面圖風格，9:16）。`,
-    preferredModel: "azure-position", // longer / structured — better with Claude
+    preferredModel: "qwen", // longer / structured — better with Claude
     maxTokens: 800,
     outputDefaults: { platform: "instagram", post_type: "reel" },
   },
@@ -149,7 +149,7 @@ caption 結構（每變體）：
 
 caption 欄位請用「---」分隔每一頁。標號用 1. 2. 3. 結構清楚。
 另外給 image_style_direction.summary（每頁同一視覺風格，aspect_ratio="1:1"）。`,
-    preferredModel: "azure-position",
+    preferredModel: "qwen",
     maxTokens: 1200,
     outputDefaults: { platform: "instagram", post_type: "carousel" },
   },
