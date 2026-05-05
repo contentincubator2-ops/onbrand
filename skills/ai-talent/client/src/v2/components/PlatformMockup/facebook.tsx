@@ -44,7 +44,7 @@ export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageD
           />
         </div>
         <div className="px-4 py-2 space-y-2">
-          <p className="text-small">{title}</p>
+          {title && <p className="text-small font-medium">{title}</p>}
           {liveCaption ? (
             <MarkdownText content={liveCaption} lineClamp={6} />
           ) : (

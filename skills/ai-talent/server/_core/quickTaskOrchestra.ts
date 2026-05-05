@@ -129,11 +129,14 @@ async function callCaptionWriter(args: {
   const system =
     captionPersona +
     template.systemPrompt +
-    `\n\n【Plan B 強制規則】產出 ${config.variants} 個 caption 變體，按以下口吻順序：\n${variantSpec}\n${lengthHint}\n\n` +
-    `輸出嚴格 JSON 陣列：\n` +
-    `[{"label":"<口吻名>", "caption":"<文案>", "hashtags":["..."]}, ...]\n\n` +
-    `不要 markdown code fence、不要前言、不要解釋。直接 JSON。\n` +
-    `caption 內不要重複任務標題或 label 名稱。\n` +
+    `\n\n【Plan B 強制規則】\n` +
+    `1. 必須產出**完整 ${config.variants} 個** caption 變體，每個都要有實際文字（不能空白、不能 "（待補）"、不能只有 label）。\n` +
+    `2. 變體口吻順序：\n${variantSpec}\n` +
+    `3. ${lengthHint || "字數依任務本身規範。"}\n` +
+    `4. **caption 欄位裡絕對不要寫「${template.label}」或任何任務名稱、label 名稱**。caption 就是要直接發到 FB 的貼文本身。\n` +
+    `5. 輸出嚴格 JSON 陣列：\n` +
+    `   [{"label":"<口吻名>","caption":"<完整貼文>","hashtags":["..."]}, ...]\n` +
+    `6. 不要 markdown code fence、不要前言、不要解釋。第一個字元就是 [。\n` +
     brandPrefix +
     urlContext;
 

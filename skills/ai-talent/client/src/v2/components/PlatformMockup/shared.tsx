@@ -215,9 +215,8 @@ export function MockupHeader({
       >
         {variantLabel ?? `${label} 預覽`}
       </Chip>
-      <p className="text-tiny text-default-500 mt-2">
-        agent 完成各階段後，內容會逐欄淡入填到下方
-      </p>
+      {/* "agent 完成各階段後..." 是 squad-mode 提示，quick-task 已產出時會誤導，
+          所以拿掉。需要的話之後可改成傳 prop 控制顯隱。 */}
     </div>
   );
 }

@@ -254,9 +254,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     return { platform, format, label: `${platform}/${format}` };
   }, [output]);
 
-  // Plan B: 30s tier now runs the 20-second parallel orchestra, not the
-  // legacy 30s single-call flow. Other tiers keep their original budgets.
-  const expectedSec = activeTask?.tier === "30s" ? 20 : activeTask?.tier === "60s" ? 60 : 90;
+  // 倒數仍對用戶承諾 30s（CJ direction 2026-05-05 — 20s 是後端的內部安全上限）
+  const expectedSec = activeTask?.tier === "30s" ? 30 : activeTask?.tier === "60s" ? 60 : 90;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
   return (
@@ -676,8 +675,8 @@ function OutputCarousel({
 
       {!slide.caption && (
         <Card className="bg-warning-50 border border-warning-200">
-          <CardBody className="text-warning-800 text-small">
-            ⚠️ Agent 沒有產出 caption — 試「重做」按鈕。
+          <CardBody className="text-warning-800 text-tiny py-2 px-3">
+            這個版本（{slide.label}）LLM 沒生出文字，先看其他版本，或按「重做」。
           </CardBody>
         </Card>
       )}
@@ -730,7 +729,9 @@ function OutputCarousel({
       {mockupVariant && (
         <PlatformMockup
           variant={mockupVariant}
-          title={output.title ?? activeTask.label}
+          // 不再 fallback 到 activeTask.label — 那會把任務名稱（"FB 純文字 hook 5 種"）
+          // 印在 mockup 內文上方。沒 title 就讓 mockup 自己 hide。
+          title={output.title ?? ""}
           brief={output.description ?? ""}
           brandName={brandName}
           liveCaption={slide.caption}
