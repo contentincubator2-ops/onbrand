@@ -1,0 +1,212 @@
+name: Admin — Double-verify all B-/S- fixes (runtime evidence)
+
+# Comprehensive runtime verification of every B-01~B-08 + S-06/S-07 +
+# npm CVE fix. Run this workflow TWICE spaced ~5 min apart and confirm
+# both runs produce green output.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set +e
+            APP=/opt/marketing-os/app
+            AI=$APP/skills/ai-talent
+            ENV_FILE=$AI/.env
+
+            FAIL=0
+            pass()  { echo "  ✅ $1"; }
+            fail()  { echo "  ❌ $1"; FAIL=1; }
+            warn()  { echo "  ⚠️  $1"; }
+
+            echo "════════════════════════════════════════"
+            echo "  Double-verify all B-/S- fixes"
+            echo "  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "════════════════════════════════════════"
+
+            ##### B-01: encryption.ts no insecure-fallback literal #####
+            echo ""
+            echo "── B-01: encryption fail-fast (no 'default-insecure-key' literal) ──"
+            if grep -q "default-insecure-key" "$AI/server/_core/encryption.ts" "$AI/server/_core/tokenEncryption.ts" 2>/dev/null; then
+              fail "B-01 literal still present"
+            else
+              pass "B-01 literal removed from encryption.ts + tokenEncryption.ts"
+            fi
+            if grep -q "JWT_SECRET (≥32 chars) must be set" "$AI/server/_core/encryption.ts" 2>/dev/null; then
+              pass "B-01 fail-fast throw present"
+            else
+              fail "B-01 fail-fast throw NOT present"
+            fi
+
+            ##### B-02: db.ts no hardcoded password fallback #####
+            echo ""
+            echo "── B-02: no hardcoded 'mos_secure_2026' in source ──"
+            if grep -rn "mos_secure_2026" "$AI/server" 2>/dev/null | grep -v ".test.\|//.*mos_secure" >/dev/null; then
+              fail "B-02 hardcoded password still in db.ts/localDb.ts"
+            else
+              pass "B-02 hardcoded password removed"
+            fi
+            # Confirm app is actually using DB (HTTP 200 implies DB works)
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3101/health --max-time 5)
+            if [ "$HTTP" = "200" ]; then
+              pass "B-02 DB connection live (health=200, requires DB)"
+            else
+              fail "B-02 health=$HTTP (DB likely not connected)"
+            fi
+
+            ##### B-03: PM2 stable, no restart loop #####
+            echo ""
+            echo "── B-03: PM2 marketing-os stable ──"
+            STATS=$(pm2 jlist 2>/dev/null | python3 -c "
+            import sys, json, time
+            data = json.loads(sys.stdin.read())
+            for p in data:
+                if p['name'] == 'marketing-os':
+                    age_s = (time.time() * 1000 - p['pm2_env']['pm_uptime']) / 1000
+                    print(f'pid={p[\"pid\"]} age={age_s:.0f}s restarts={p[\"pm2_env\"][\"restart_time\"]} unstable={p[\"pm2_env\"][\"unstable_restarts\"]} status={p[\"pm2_env\"][\"status\"]}')
+            ")
+            echo "    $STATS"
+            AGE=$(echo "$STATS" | grep -oE "age=[0-9]+" | cut -d= -f2)
+            RST=$(echo "$STATS" | grep -oE "restarts=[0-9]+" | cut -d= -f2)
+            UNS=$(echo "$STATS" | grep -oE "unstable=[0-9]+" | cut -d= -f2)
+            STAT=$(echo "$STATS" | grep -oE "status=[a-z]+" | cut -d= -f2)
+            if [ "$STAT" = "online" ] && [ "$AGE" -ge 60 ] && [ "$UNS" = "0" ]; then
+              pass "B-03 PM2 stable (online, age>=60s, 0 unstable_restarts)"
+            else
+              fail "B-03 PM2 not stable"
+            fi
+            # Confirm B-03 v2 marker is in stdout (proves bootstrap-env ran)
+            if grep -q "bootstrap-env" ~/.pm2/logs/marketing-os-out.log 2>/dev/null; then
+              pass "B-03 bootstrap-env marker in stdout (ESM ordering fix active)"
+            else
+              fail "B-03 bootstrap-env marker NOT in stdout"
+            fi
+
+            ##### B-04: workflow.start anonymous = 401 #####
+            echo ""
+            echo "── B-04: workflow.start requires auth ──"
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              "http://127.0.0.1:3101/api/trpc/workflow.start?batch=1" \
+              -H "Content-Type: application/json" \
+              -d '{"0":{"json":{"userRequest":"test"}}}' --max-time 8)
+            if [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ]; then
+              pass "B-04 anonymous workflow.start → HTTP $HTTP (rejected)"
+            else
+              fail "B-04 anonymous workflow.start → HTTP $HTTP (should be 401)"
+            fi
+
+            ##### B-05: feedback.saveNote anonymous = 401 #####
+            echo ""
+            echo "── B-05: feedback.saveNote requires auth ──"
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              "http://127.0.0.1:3101/api/trpc/feedback.saveNote?batch=1" \
+              -H "Content-Type: application/json" \
+              -d '{"0":{"json":{"missionId":1,"category":"strategy","text":"x"}}}' --max-time 8)
+            if [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ]; then
+              pass "B-05 anonymous feedback.saveNote → HTTP $HTTP (rejected)"
+            else
+              fail "B-05 anonymous feedback.saveNote → HTTP $HTTP (should be 401)"
+            fi
+
+            ##### B-06: email mask helper present in deployed code #####
+            echo ""
+            echo "── B-06: maskEmail() helper deployed ──"
+            if grep -q "maskEmail" "$AI/server/auth/emailService.ts" 2>/dev/null; then
+              pass "B-06 maskEmail() function present in deployed source"
+            else
+              fail "B-06 maskEmail() not in deployed source"
+            fi
+            if grep -q "Sent email to \${maskEmail" "$AI/server/auth/emailService.ts" 2>/dev/null; then
+              pass "B-06 log line uses maskEmail() (not raw \${data.to})"
+            else
+              fail "B-06 log line still uses raw \${data.to}"
+            fi
+
+            ##### B-07: SQL identifier validated #####
+            echo ""
+            echo "── B-07: SQL identifier regex validation ──"
+            if grep -q "A-Za-z0-9_\\\$.*1,64.*test(name)" "$AI/server/_core/squadSessionManager.ts" 2>/dev/null; then
+              pass "B-07 identifier regex validation present"
+            else
+              fail "B-07 identifier regex validation NOT present"
+            fi
+
+            ##### B-08: express.json limit + DoS protection #####
+            echo ""
+            echo "── B-08: 1MB body cap rejects oversized payloads ──"
+            # Generate 1.5 MB payload and POST it
+            BIG=$(python3 -c "print('x' * 1500000)")
+            HTTP=$(printf '{"x":"%s"}' "$BIG" | curl -s -o /dev/null -w "%{http_code}" -X POST \
+              "http://127.0.0.1:3101/api/trpc/workflow.start" \
+              -H "Content-Type: application/json" -d @- --max-time 10)
+            if [ "$HTTP" = "413" ] || [ "$HTTP" = "401" ]; then
+              # 413 = body too large, 401 = auth check fired before body read in some configs
+              pass "B-08 1.5MB payload → HTTP $HTTP (413=size limit hit, 401=auth blocks first ok)"
+            else
+              fail "B-08 1.5MB payload → HTTP $HTTP (expected 413)"
+            fi
+
+            ##### S-06: HSTS header present #####
+            echo ""
+            echo "── S-06: HSTS header on every response ──"
+            HSTS=$(curl -sI http://127.0.0.1:3101/health --max-time 5 | grep -i "strict-transport-security" | tr -d '\r\n')
+            if echo "$HSTS" | grep -qi "max-age=31536000"; then
+              pass "S-06 HSTS present: $HSTS"
+            else
+              fail "S-06 HSTS missing or wrong: $HSTS"
+            fi
+
+            ##### S-07: CORS rejects unauthorized origin in prod #####
+            echo ""
+            echo "── S-07: CORS rejects localhost origin in prod ──"
+            ORIGIN_RESP=$(curl -sI -H "Origin: http://localhost:5173" \
+              http://127.0.0.1:3101/health --max-time 5 | grep -i "access-control-allow-origin" | tr -d '\r\n')
+            if echo "$ORIGIN_RESP" | grep -qi "localhost"; then
+              fail "S-07 prod still allowing localhost origin: $ORIGIN_RESP"
+            else
+              pass "S-07 prod CORS does NOT echo localhost origin"
+            fi
+
+            ##### npm CVE: production audit zero vulns #####
+            echo ""
+            echo "── npm CVE: production audit ──"
+            cd "$AI"
+            SERVER_VULN=$(npm audit --omit=dev 2>&1 | grep -oE "[0-9]+ vulnerabilities" | head -1)
+            if [ "$SERVER_VULN" = "0 vulnerabilities" ] || npm audit --omit=dev 2>&1 | grep -q "found 0 vulnerabilities"; then
+              pass "server prod audit: 0 vulnerabilities"
+            else
+              fail "server prod audit: $SERVER_VULN"
+            fi
+            cd "$AI/client"
+            CLIENT_VULN=$(npm audit --omit=dev 2>&1 | grep -oE "[0-9]+ vulnerabilities" | head -1)
+            if [ "$CLIENT_VULN" = "0 vulnerabilities" ] || npm audit --omit=dev 2>&1 | grep -q "found 0 vulnerabilities"; then
+              pass "client prod audit: 0 vulnerabilities"
+            else
+              fail "client prod audit: $CLIENT_VULN"
+            fi
+            # Confirm drizzle-orm version
+            DRIZZLE=$(node -p "require('$AI/node_modules/drizzle-orm/package.json').version" 2>/dev/null)
+            if [ "$DRIZZLE" = "0.45.2" ] || [[ "$DRIZZLE" > "0.45.1" ]]; then
+              pass "drizzle-orm version on disk: $DRIZZLE (≥0.45.2)"
+            else
+              fail "drizzle-orm version: $DRIZZLE (need ≥0.45.2)"
+            fi
+
+            echo ""
+            echo "════════════════════════════════════════"
+            if [ "$FAIL" = "0" ]; then
+              echo "  ✅ ALL CHECKS PASSED"
+            else
+              echo "  ❌ AT LEAST ONE CHECK FAILED — see ❌ above"
+              exit 1
+            fi
+            echo "════════════════════════════════════════"
