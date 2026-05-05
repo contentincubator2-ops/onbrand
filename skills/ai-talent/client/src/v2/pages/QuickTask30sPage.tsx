@@ -23,6 +23,7 @@ import {
   faBolt, faClipboard, faClipboardCheck, faClock, faPaperPlane,
   faRotateRight, faXmark, faStar, faChevronLeft, faChevronRight,
   faMagnifyingGlass, faEnvelope, faRocket, faBullhorn, faUsers,
+  faFolderPlus, faCompass,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -606,9 +607,13 @@ function OutputCarousel({
   }, [output]);
 
   const [idx, setIdx] = useState(0);
-  const slide = slides[idx];
   const total = slides.length;
   const [mediaGenOpen, setMediaGenOpen] = useState(false);
+  // Per-slide caption edits (keyed by slide index). Empty = use original.
+  const [edits, setEdits] = useState<Record<number, string>>({});
+  const baseSlide = slides[idx];
+  const slide = baseSlide ? { ...baseSlide, caption: edits[idx] ?? baseSlide.caption } : baseSlide;
+  const isEdited = edits[idx] != null && edits[idx] !== baseSlide?.caption;
 
   return (
     <div className="space-y-3">
@@ -743,21 +748,72 @@ function OutputCarousel({
         />
       )}
 
-      {/* MediaGenFlow trigger — uses the active slide's style direction.
-          Hidden when post is a link share (OG card replaces the image slot). */}
-      {slide.imageStyle && !fetchedUrl?.og && (
-        <div className="flex justify-center">
+      {/* Inline editor — change caption and see the mockup update in real time */}
+      {slide?.caption && (
+        <div className="space-y-2 border border-default-200 rounded-medium p-3 bg-default-50">
+          <div className="flex items-center justify-between">
+            <span className="text-tiny font-medium text-default-700">編輯這個版本</span>
+            {isEdited && (
+              <button
+                onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
+                className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
+              >
+                還原 AI 原版
+              </button>
+            )}
+          </div>
+          <Textarea
+            value={slide.caption}
+            onValueChange={(v) => setEdits((e) => ({ ...e, [idx]: v }))}
+            minRows={4}
+            classNames={{ input: "text-small leading-relaxed font-sans" }}
+          />
+          <p className="text-[10px] text-default-400">改完直接看上面 mockup，覺得 OK 按下方「複製全文」帶走</p>
+        </div>
+      )}
+
+      {/* Actions row — next to mockup */}
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <Button
+          variant="flat"
+          size="sm"
+          startContent={<FontAwesomeIcon icon={faClipboard} />}
+          onPress={() => {
+            if (slide?.caption) navigator.clipboard.writeText(slide.caption);
+          }}
+        >
+          複製這版{isEdited ? "（已編輯）" : ""}
+        </Button>
+        <Button
+          variant="flat"
+          size="sm"
+          startContent={<FontAwesomeIcon icon={faFolderPlus} />}
+          onPress={() => {
+            // TODO Phase next: open project picker modal
+            window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。\n目前可先「複製這版」貼到專案文件。");
+          }}
+        >
+          加到專案
+        </Button>
+        <Button
+          variant="flat"
+          size="sm"
+          startContent={<FontAwesomeIcon icon={faCompass} />}
+          onPress={() => { window.location.href = "/brands"; }}
+        >
+          語氣不對 → 調整品牌定位
+        </Button>
+        {slide.imageStyle && !fetchedUrl?.og && (
           <Button
-            color="secondary"
             variant="flat"
             size="sm"
             startContent={<FontAwesomeIcon icon={faPalette} />}
             onPress={() => setMediaGenOpen(true)}
           >
-            用此風格生圖（提示詞 + AI 模型）
+            用此風格生圖
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <MediaGenFlow
         open={mediaGenOpen}

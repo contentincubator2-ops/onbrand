@@ -140,6 +140,11 @@ async function callOneVariant(args: {
     `\n\n【本次任務】只寫 1 個變體：**${label}** 口吻。\n` +
     `${lengthHint}\n` +
     `caption 欄位**絕對不要**寫「${template.label}」、「${label}」或任何任務 / label 名稱 — caption 就是直接發到 FB 的貼文。\n\n` +
+    `【格式要求 — 重要】\n` +
+    `- 用自然斷行（兩個 newline 分段）。**不要**用「｜」全形管道符號當分隔線（看起來很擠很 AI）。\n` +
+    `- emoji 點綴用就好，**不要**每段開頭都塞 emoji（像「💪 xxx｜🌿 yyy」這樣會看起來像範本）。\n` +
+    `- hashtag 集中放在文末**最後一行**，不要散落在文中或當分節符號。\n` +
+    `- 段落像真人朋友寫的貼文，不要排成「標題｜內文｜hashtag」這種結構化卡片格式。\n\n` +
     `輸出嚴格 JSON 物件（不是陣列）：\n` +
     `{"caption":"<完整貼文>","hashtags":["..."]}\n` +
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
