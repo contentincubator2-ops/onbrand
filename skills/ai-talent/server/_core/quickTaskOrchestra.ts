@@ -136,16 +136,24 @@ async function callOneVariant(args: {
       : "字數依任務本身規範。";
 
   const system =
+    `# 你的角色 / 寫作風格參考\n` +
     captionPersona +
+    `\n# 任務說明\n` +
     template.systemPrompt +
     `\n\n【本次任務】只寫 1 個變體：**${label}** 口吻。\n` +
-    `${lengthHint}\n` +
-    `caption 欄位**絕對不要**寫「${template.label}」、「${label}」或任何任務 / label 名稱 — caption 就是直接發到 FB 的貼文。\n\n` +
+    `${lengthHint}\n\n` +
+    `【角色 vs 主角 — 重要】\n` +
+    `上面的「角色」只是給你**寫作口吻**參考。**主角永遠是用戶**（用戶資訊在 user message）。\n` +
+    `絕對不要把你（agent）的職稱、姓名、服務描述、自我介紹寫進輸出。\n` +
+    `不要寫「我是 ___」或「___ 專家，幫 ___ 做 ___」這種自我介紹 — 那是你，不是用戶。\n\n` +
     `【格式要求 — 重要】\n` +
-    `- 用自然斷行（兩個 newline 分段）。**不要**用「｜」全形管道符號當分隔線（看起來很擠很 AI）。\n` +
-    `- emoji 點綴用就好，**不要**每段開頭都塞 emoji（像「💪 xxx｜🌿 yyy」這樣會看起來像範本）。\n` +
-    `- hashtag 集中放在文末**最後一行**，不要散落在文中或當分節符號。\n` +
-    `- 段落像真人朋友寫的貼文，不要排成「標題｜內文｜hashtag」這種結構化卡片格式。\n\n` +
+    `- caption 欄位**絕對不要**寫「${template.label}」、「${label}」或任務 / label 名稱。\n` +
+    `- caption 欄位**絕對不要**夾雜視覺描述、英文 prompt、「image_style:」、「visual:」等技術註記。圖片風格由另一位 agent 獨立處理，這裡只放最終發到平台的純文字內容。\n` +
+    `- 用自然斷行（兩個 newline 分段）。**不要**用「｜」全形管道符號當分隔線。\n` +
+    `- emoji 點綴用就好，不要每段開頭都塞 emoji。\n` +
+    `- hashtag 集中放在文末**最後一行**，不要散落文中。\n` +
+    `- 段落像真人寫的，不要排成「標題｜內文｜hashtag」結構化卡片。\n` +
+    `- 若任務有時間戳結構（如 [0-3s]），務必保留每段秒數標記，不要省略。\n\n` +
     `輸出嚴格 JSON 物件（不是陣列）：\n` +
     `{"caption":"<完整貼文>","hashtags":["..."]}\n` +
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
@@ -234,17 +242,17 @@ async function callImageDirector(args: {
 
   const system =
     imagePersona +
-    `任務：你是 FB 視覺方向設計師。為 ${config.images} 個不同口吻的 caption 各寫 1 條 Flux Schnell 用的英文 image prompt。\n\n` +
-    `每個 prompt 的口吻順序：\n${variantSpec}\n\n` +
-    `比例：${config.aspectRatio ?? "1:1"}（畫面構圖要明確支撐這個比例）\n\n` +
+    `任務：你是視覺方向設計師。為 ${config.images} 個不同口吻的 caption 各寫 1 條**繁體中文**的視覺方向描述。\n\n` +
+    `每條描述的口吻順序：\n${variantSpec}\n\n` +
+    `比例：${config.aspectRatio ?? "1:1"}\n\n` +
     `規則：\n` +
-    `- 每條 prompt 30-60 字英文（不要中文）\n` +
-    `- 描述 subject + composition + lighting + color palette + mood\n` +
-    `- 不要寫文字疊圖（Flux 不擅長文字）\n` +
-    `- 不要用品牌 logo（除非用戶有明確要求）\n` +
-    `- 風格要呼應該口吻（情感版=溫暖光線/柔色，數據版=clean infographic 感，故事版=生活感場景）\n\n` +
-    `輸出嚴格 JSON 陣列：["prompt 1", "prompt 2", ...]（${config.images} 條）\n` +
-    `不要 markdown code fence。直接 JSON。\n` +
+    `- 每條描述 30-60 字**繁體中文**（之後系統會自動翻成英文 Flux prompt — 你只負責給用戶看的中文方向）\n` +
+    `- 涵蓋：主體 / 構圖 / 光線 / 色彩 / 氛圍\n` +
+    `- 不要寫「圖中疊上文字」（生圖模型對文字不在行）\n` +
+    `- 不要用品牌 logo（除非用戶明確要求）\n` +
+    `- 風格要呼應該口吻（情感版＝溫暖光線柔色／數據版＝clean infographic／故事版＝生活感場景等）\n\n` +
+    `輸出嚴格 JSON 陣列：["中文描述 1", "中文描述 2", ...]（${config.images} 條）\n` +
+    `不要 markdown code fence。直接 JSON。第一個字元就是 [。\n` +
     brandPrefix +
     urlContext;
 

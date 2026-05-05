@@ -41,8 +41,8 @@ ${FB_TONE_SUFFIX}
     id: "ig-30-pure-text-hook",
     tier: "30s",
     postType: "feed",
-    label: "IG hook 5 種（搭配你的原文）",
-    description: "5 種開場 hook，自動接你原本的貼文內容",
+    label: "IG hook 3 種（搭配你的原文）",
+    description: "3 種不同口吻 hook，自動接你原本的貼文內容",
     agent_id: 229985, // 許怡君 — Hook Copywriter – Instagram × 科技
     skill_slug: "hook-copywriter",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會寫不同口吻的 IG 開場接上去",
@@ -117,13 +117,14 @@ caption 結構（每變體）：
     primary_question: "今天的 Story 想說什麼？",
     primary_input: { key: "topic", placeholder: "例：幕後 / 限時優惠 / 提問 / 投票", type: "textarea" },
     inputs: [{ key: "topic", label: "Story 主題", type: "textarea", required: true }],
-    systemPrompt: `產出 IG Story 文案。
-caption 結構（每變體）：
-  主標（5-12 字，疊在圖上）：[最大字]
-  內文（30-60 字）：[補充訊息]
-  推薦 sticker：[從 poll / question / quiz / countdown / emoji-slider / link 選 1-2 個 + 寫上 sticker 的具體文字]
+    systemPrompt: `產出 IG Story 文案。caption 純文字，**絕對不要**夾雜視覺描述、英文 prompt。
+caption 結構（每變體）— 用換行分段：
+  主標（5-12 字，疊在圖上 — 最大字）
+  內文（30-60 字，補充訊息）
+  推薦 sticker：[poll / question / quiz / countdown / emoji-slider / link 選 1-2 個 + sticker 上的文字]
+
 不要長文。9:16 高度有限，文字要能 1 秒讀完。
-另外給 image_style_direction.summary（aspect_ratio="9:16"）。`,
+（圖片風格由另一位 agent 獨立處理，不要寫進 caption）`,
     preferredModel: "qwen",
     maxTokens: 300,
     outputDefaults: { platform: "instagram", post_type: "story" },
@@ -163,14 +164,17 @@ caption 欄位請用「---」分隔每一頁。標號用 1. 2. 3. 結構清楚�
     primary_question: "你的 IG 帳號是誰、做什麼、想吸引誰？",
     primary_input: { key: "context", placeholder: "例：『我是 ___，幫 ___ 解決 ___，過去 ___』", type: "textarea" },
     inputs: [{ key: "context", label: "你 / 品牌簡介", type: "textarea", required: true }],
-    systemPrompt: `產出 IG bio（150 字內）。
+    systemPrompt: `任務：根據用戶在 [context] 提供的資訊，幫**用戶**改寫 IG bio。
+⚠️ 主角永遠是用戶，不是你（agent）。bio 是寫給用戶的 IG profile 用的。
+絕對不要寫「我是 Wendy Su」、「Link in Bio 專家」、「幫小品牌做 ___」等任何關於你 / agent 的描述。
+讀 [context]：用戶是誰、做什麼、想吸引誰 → 寫的是**那個人**的 bio。
+
 caption 結構（每變體，用換行排版）：
-  L1: 一句 positioning（你是誰 + 做什麼 + 為誰）
+  L1: 一句 positioning（**用戶**是誰 + 做什麼 + 為誰）
   L2-3: 2-3 個亮點（用 emoji 條列）
   L4: CTA（"👇 點 link in bio" 或 "📩 DM 我「____」")
 
-emoji 適度，不要每行都塞。bio 有字數限制，每字都要算。
-不需要 image_style_direction（profile 沒有 main image）。`,
+emoji 適度，不要每行都塞。bio 有字數限制，每字都要算。`,
     preferredModel: "qwen",
     maxTokens: 350,
     outputDefaults: { platform: "instagram", post_type: "profile" },

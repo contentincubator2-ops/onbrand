@@ -885,8 +885,9 @@ function OutputCarousel({
           size="sm"
           startContent={<FontAwesomeIcon icon={faCompass} />}
           onPress={() => { window.location.href = "/brands"; }}
+          title="會根據你的品牌設定重新調整口吻 — 不會重設帳號"
         >
-          語氣不對 → 調整品牌定位
+          🔄 換個語氣
         </Button>
         {slide.imageStyle && !fetchedUrl?.og && (
           <Button

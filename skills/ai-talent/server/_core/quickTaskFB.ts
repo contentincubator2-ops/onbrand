@@ -75,8 +75,8 @@ ${FB_TONE_SUFFIX}
     id: "fb-30-pure-text-hook",
     tier: "30s",
     postType: "feed",
-    label: "FB 純文字 hook 5 種",
-    description: "5 個不同口吻的開場 hook，自動接上你原本的貼文內容",
+    label: "FB 純文字 hook 3 種",
+    description: "3 種不同口吻的開場 hook，自動接上你原本的貼文內容",
     agent_id: 239183,             // Aiden Hsu — hook-writing
     skill_slug: "hook-writing",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會幫你寫 5 種不同口吻的開場接上去",

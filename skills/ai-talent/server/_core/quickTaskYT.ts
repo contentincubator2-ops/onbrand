@@ -21,8 +21,8 @@ export const YT_30S_TASKS: FBTaskTemplate[] = [
     id: "yt-30-title-strategies",
     tier: "30s",
     postType: "watch",
-    label: "YT 影片標題（5 種策略）",
-    description: "SEO / 反差 / 數字 / 懸念 / 直球 各 1 種變體",
+    label: "YT 影片標題（3 種策略）",
+    description: "SEO 友善 / 反差數字 / 懸念式 各 1 種",
     agent_id: 24, // Janet Chang — YouTube Strategist
     skill_slug: "youtube-publisher",
     primary_question: "貼影片網址（會自動讀取）或描述影片主題",
