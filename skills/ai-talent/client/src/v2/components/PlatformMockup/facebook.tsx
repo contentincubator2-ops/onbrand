@@ -20,7 +20,7 @@ import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./share
 
 /* ─────────────── FB Feed ─────────────── */
 
-export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard }: MockupFields) {
+export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard }: MockupFields) {
   // 2026-05-05: liveImageStyle takes priority over liveImageDesc — it's the
   // "style direction" the quick-task agent produced, kept inside the image
   // slot as a brief for the user to carry into MediaGenFlow.
@@ -40,7 +40,7 @@ export function FBFeed({ title, brandName, variantLabel, liveCaption, liveImageD
                 贊助 · 剛剛 · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
               </span>
             }
-            avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
+            avatarProps={{ src: brandLogoUrl || dicebear(brandName ?? "brand"), size: "md", isBordered: !!brandLogoUrl, color: brandLogoUrl ? "default" : "primary" }}
           />
         </div>
         <div className="px-4 py-2 space-y-2">

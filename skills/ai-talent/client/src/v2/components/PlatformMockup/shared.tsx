@@ -163,6 +163,13 @@ export interface MockupFields {
   liveImageUrl?: string;
   liveImageStatus?: "ready" | "failed" | "skipped" | "timeout";
   /**
+   * Brand profile picture URL — when present, mockups use it for the
+   * "posting as" avatar instead of dicebear placeholder. Source is
+   * `brands.logoUrl` (which can be auto-filled from FB Graph picture
+   * endpoint via brand.fetchFacebookAvatar mutation).
+   */
+  brandLogoUrl?: string | null;
+  /**
    * Quick-task link-post pivot (2026-05-05): when caption contains a URL the
    * server already fetched, this carries the OG card metadata so the mockup
    * renders an actual link preview (image + title + description + domain)

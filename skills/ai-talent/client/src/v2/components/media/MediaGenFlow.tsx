@@ -129,7 +129,8 @@ export default function MediaGenFlow({
         kind,
         direction: d,
         brief: brief.trim(),
-        modelId: modelHint ?? (kind === "video" ? "fal/seedance-v1-5-lite" : "openai/gpt-image-1"),
+        // 2026-05-05: fal removed; default video → piapi/kling-v2-master
+        modelId: modelHint ?? (kind === "video" ? "piapi/kling-v2-master" : "openai/gpt-image-1"),
       });
       setPromptEn(String(res?.promptEn ?? ""));
       setSummaryZh(String(res?.summaryZh ?? ""));

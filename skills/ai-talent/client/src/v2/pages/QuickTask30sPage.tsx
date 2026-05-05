@@ -94,6 +94,15 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     const list = (ctx?.brands as any[]) ?? [];
     return list.find((b) => b?.id === brandId)?.name ?? null;
   }, [ctx, brandId]);
+  // Pull the active brand row to access logoUrl. Refetched every 30s so a
+  // freshly-saved FB logo shows up without a full page reload.
+  const brandQuery = (trpc as any).brand?.get?.useQuery
+    ? (trpc as any).brand.get.useQuery(
+        { id: brandId ?? 0 },
+        { enabled: !!brandId, refetchInterval: 30_000, refetchOnWindowFocus: false },
+      )
+    : { data: null, refetch: () => {} };
+  const brandLogoUrl: string | null = (brandQuery.data as any)?.logoUrl ?? null;
 
   const [channel, setChannel] = useState<Channel>("facebook");
   const [searchQuery, setSearchQuery] = useState("");
@@ -505,6 +514,9 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                     output={output}
                     activeTask={activeTask}
                     brandName={brandName}
+                    brandId={brandId}
+                    brandLogoUrl={brandLogoUrl}
+                    onBrandLogoUpdated={() => brandQuery.refetch?.()}
                     mockupVariant={mockupVariant}
                     latencyMs={latencyMs}
                     agentMeta={agentMeta}
@@ -558,11 +570,15 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
  * If output has 0 variants (just top-level caption), shows a single mockup.
  */
 function OutputCarousel({
-  output, activeTask, brandName, mockupVariant, latencyMs, agentMeta, imageAgentMeta, orchestraStages, fetchedUrl, errorMsg,
+  output, activeTask, brandName, brandId, brandLogoUrl, onBrandLogoUpdated,
+  mockupVariant, latencyMs, agentMeta, imageAgentMeta, orchestraStages, fetchedUrl, errorMsg,
 }: {
   output: any;
   activeTask: FBTaskCard;
   brandName: string | null;
+  brandId: number | null;
+  brandLogoUrl: string | null;
+  onBrandLogoUpdated?: () => void;
   mockupVariant: MockupVariant | null;
   latencyMs: number | null;
   agentMeta: any;
@@ -609,6 +625,24 @@ function OutputCarousel({
   const [idx, setIdx] = useState(0);
   const total = slides.length;
   const [mediaGenOpen, setMediaGenOpen] = useState(false);
+  const [fbLogoModalOpen, setFbLogoModalOpen] = useState(false);
+  const [fbHandle, setFbHandle] = useState("");
+  const [fbBusy, setFbBusy] = useState(false);
+  const [fbErr, setFbErr] = useState<string | null>(null);
+  const fetchFbAvatarMut = (trpc as any).brand?.fetchFacebookAvatar?.useMutation();
+  const onSubmitFbHandle = async () => {
+    if (!brandId) return;
+    if (!fbHandle.trim()) { setFbErr("請輸入 FB 粉專網址或 handle"); return; }
+    setFbBusy(true); setFbErr(null);
+    try {
+      await fetchFbAvatarMut.mutateAsync({ brandId, handleOrUrl: fbHandle.trim() });
+      onBrandLogoUpdated?.();
+      setFbLogoModalOpen(false);
+      setFbHandle("");
+    } catch (e: any) {
+      setFbErr(e?.message ?? String(e));
+    } finally { setFbBusy(false); }
+  };
   // Per-slide caption edits (keyed by slide index). Empty = use original.
   const [edits, setEdits] = useState<Record<number, string>>({});
   const baseSlide = slides[idx];
@@ -717,6 +751,20 @@ function OutputCarousel({
         </div>
       )}
 
+      {/* Hint when brand has no logo — points to one-click FB fetch */}
+      {brandId && !brandLogoUrl && (
+        <button
+          onClick={() => setFbLogoModalOpen(true)}
+          className="w-full flex items-center gap-2 text-tiny text-default-500 bg-default-50 hover:bg-default-100 transition border border-dashed border-default-300 rounded-medium px-3 py-2"
+        >
+          <FontAwesomeIcon icon={faFacebookF} className="text-default-400" />
+          <span className="flex-1 text-left">
+            這個品牌還沒粉專頭像 — <span className="text-default-700 font-medium">點此一鍵抓取</span>
+          </span>
+          <FontAwesomeIcon icon={faChevronRight} className="text-default-400 text-[10px]" />
+        </button>
+      )}
+
       {/* The mockup — caption swaps per variant, image style is shared (one
           image style direction applies across all caption variants since
           they're verbal alternatives of the same post) */}
@@ -728,6 +776,7 @@ function OutputCarousel({
           title={output.title ?? ""}
           brief={output.description ?? ""}
           brandName={brandName}
+          brandLogoUrl={brandLogoUrl}
           liveCaption={slide.caption}
           liveTitle={output.title}
           liveDescription={output.description}
@@ -821,7 +870,43 @@ function OutputCarousel({
         kind="image"
         initialBrief={slide.imageStyle ?? ""}
         brandContext={brandName ?? undefined}
+        brandId={brandId ?? undefined}
       />
+
+      {/* FB avatar picker — minimal modal that triggers brand.fetchFacebookAvatar */}
+      <Modal isOpen={fbLogoModalOpen} onClose={() => setFbLogoModalOpen(false)} size="md" backdrop="blur">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <p className="font-semibold">從 FB 粉專抓 logo</p>
+            <p className="text-tiny text-default-500 font-normal">
+              貼上你 FB 粉專網址，系統會抓回頭像存進「{brandName ?? "品牌"}」。
+            </p>
+          </ModalHeader>
+          <ModalBody>
+            <Input
+              autoFocus
+              size="sm"
+              placeholder="https://www.facebook.com/桂冠營養研究室"
+              value={fbHandle}
+              onValueChange={setFbHandle}
+              startContent={<FontAwesomeIcon icon={faFacebookF} className="text-default-400" />}
+              isDisabled={fbBusy}
+            />
+            <p className="text-tiny text-default-400">
+              也接受純 handle（例：<code>桂冠營養研究室</code>）。粉專必須是公開的。
+            </p>
+            {fbErr && (
+              <p className="text-tiny text-danger-600 mt-1">{fbErr}</p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={() => setFbLogoModalOpen(false)} isDisabled={fbBusy}>取消</Button>
+            <Button color="primary" onPress={onSubmitFbHandle} isLoading={fbBusy}>
+              抓取
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {errorMsg && (
         <Card className="bg-warning-50 border border-warning-200">

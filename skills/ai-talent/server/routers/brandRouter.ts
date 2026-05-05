@@ -200,6 +200,88 @@ export const brandRouter = router({
       return { success: true };
     }),
 
+  /**
+   * Fetch a brand's Facebook page profile picture and save it as the brand
+   * logo. Uses Facebook's public Graph picture endpoint — no token needed
+   * for public pages: graph.facebook.com/{handle}/picture?width=400&redirect=true
+   *
+   * Input accepts either a bare handle ("桂冠營養研究室") or a full URL
+   * ("https://www.facebook.com/桂冠營養研究室"). We extract the handle.
+   *
+   * 2026-05-05 — see project_design_system memory for FB avatar Layer 1 plan.
+   */
+  fetchFacebookAvatar: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      handleOrUrl: z.string().min(1).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { brands } = await import("../../drizzle/schema");
+
+      // Authorize — must be a brand the user owns or is a member of
+      try {
+        await assertBrandOwner(input.brandId, ctx.user.id);
+      } catch {
+        throw new TRPCError({ code: "FORBIDDEN", message: "你沒有這個 brand 的編輯權限" });
+      }
+
+      // Extract handle from URL if a URL was given
+      let handle = input.handleOrUrl.trim();
+      const m = handle.match(/facebook\.com\/(?:pg\/|pages\/[^/]+\/)?([^/?#]+)/i);
+      if (m && m[1]) handle = m[1];
+      handle = decodeURIComponent(handle).replace(/^@/, "");
+      if (!handle) throw new TRPCError({ code: "BAD_REQUEST", message: "無法從輸入抽出 FB 粉專 handle" });
+
+      // Hit Graph picture endpoint — public pages return 302 to CDN
+      const graphUrl = `https://graph.facebook.com/${encodeURIComponent(handle)}/picture?width=400&redirect=true`;
+      let imageUrl: string;
+      try {
+        const r = await fetch(graphUrl, { redirect: "follow" });
+        if (!r.ok) {
+          throw new Error(`graph ${r.status}`);
+        }
+        // r.url is the final URL after redirects (the CDN image URL)
+        imageUrl = r.url;
+        if (!imageUrl || !/^https?:\/\//.test(imageUrl)) {
+          throw new Error("graph returned no usable image url");
+        }
+
+        // Download + persist
+        const { mkdirSync, writeFileSync } = await import("fs");
+        const { join } = await import("path");
+        const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/marketing-os/covers";
+        const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
+        mkdirSync(COVERS_DIR, { recursive: true });
+        const fileId = `brand-${input.brandId}-fb-${Date.now()}.jpg`;
+        const filePath = join(COVERS_DIR, fileId);
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length < 200) {
+          throw new Error("downloaded image suspiciously small (likely a 404 placeholder)");
+        }
+        writeFileSync(filePath, buf);
+        const localUrl = `${COVERS_URL_PREFIX}/${fileId}`;
+
+        // Update brand.logoUrl
+        await db.update(brands).set({ logoUrl: localUrl })
+          .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
+
+        return {
+          ok: true,
+          handle,
+          logoUrl: localUrl,
+          remoteUrl: imageUrl,
+          bytes: buf.length,
+        };
+      } catch (e: any) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `FB 粉專頭像抓取失敗：${e?.message ?? String(e)}（檢查 handle 拼字、粉專是否公開）`,
+        });
+      }
+    }),
+
   runOnboarding: protectedProcedure
     .input(z.object({
       brandName: z.string().min(1),
