@@ -1,0 +1,45 @@
+name: Admin — Rename agents to English (P0-06)
+
+# Runs scripts/rename-all-agents-to-english.ts on the VM.
+# - dry-run mode by default (no DB writes)
+# - apply mode when input apply=yes (writes to DB)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Set to 'yes' to actually update DB (otherwise dry-run)"
+        required: true
+        default: "no"
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set -e
+            AI=/opt/marketing-os/app/skills/ai-talent
+            cd "$AI"
+            set -a
+            source "$AI/.env" 2>/dev/null
+            set +a
+
+            # Map LOCAL_DB_* → DB_* (the script reads DB_*)
+            export DB_HOST="${LOCAL_DB_HOST:-localhost}"
+            export DB_USER="${LOCAL_DB_USER:-mos_user}"
+            export DB_PASSWORD="${LOCAL_DB_PASSWORD}"
+            export DB_NAME="${LOCAL_DB_NAME:-mos_db}"
+
+            if [ "${{ github.event.inputs.apply }}" = "yes" ]; then
+              echo "════ APPLY MODE — writing to DB ════"
+              npx tsx scripts/rename-all-agents-to-english.ts --apply
+            else
+              echo "════ DRY-RUN — no DB writes ════"
+              npx tsx scripts/rename-all-agents-to-english.ts --dry-run
+            fi

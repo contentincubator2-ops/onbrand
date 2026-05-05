@@ -354,13 +354,26 @@ export const workflowRouter = router({
 
   /**
    * status — 輪詢任務狀態
-   * SEC-B-04: protected so anonymous callers can't enumerate jobIds.
+   * SEC-B-04 v2 (2026-05-05): protected + per-user ownership scope.
+   * Previously any authenticated user could poll any jobId (horizontal
+   * privilege escalation — see other users' job results, error messages,
+   * input prompts). Now we verify the job's userId tag matches the caller.
    */
   status: protectedProcedure
     .input(z.object({ jobId: z.string().min(1).max(128) }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const job = await marketingQueue.getJob(input.jobId);
       if (!job) return { status: 'not_found' };
+
+      // Ownership check — `start` tags every job with userId
+      const callerId = String((ctx as any)?.user?.id ?? "");
+      const jobOwnerId = String((job.data as any)?.userId ?? "");
+      if (jobOwnerId && callerId !== jobOwnerId) {
+        // Pretend not found rather than 403 — don't leak whether the
+        // jobId is valid for someone else.
+        return { status: 'not_found' };
+      }
+
       const state = await job.getState();
       const progress = job.progress;
       const result = job.returnvalue;

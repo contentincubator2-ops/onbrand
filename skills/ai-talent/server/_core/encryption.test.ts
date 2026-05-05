@@ -81,4 +81,21 @@ describe("encryption", () => {
     const ciphertext = encrypt(plaintext);
     expect(decrypt(ciphertext)).toBe(plaintext);
   });
+
+  // SEC-B-01 (2026-05-04): behavioral tests for fail-fast
+  it("[B-01] throws when neither ENCRYPTION_KEY nor JWT_SECRET is set", async () => {
+    delete process.env.ENCRYPTION_KEY;
+    delete process.env.JWT_SECRET;
+    vi.resetModules();
+    const { encrypt } = await import("./encryption");
+    expect(() => encrypt("anything")).toThrow(/JWT_SECRET .*must be set/);
+  });
+
+  it("[B-01] throws when JWT_SECRET is too short (<32 chars)", async () => {
+    delete process.env.ENCRYPTION_KEY;
+    process.env.JWT_SECRET = "short-secret";
+    vi.resetModules();
+    const { encrypt } = await import("./encryption");
+    expect(() => encrypt("anything")).toThrow(/JWT_SECRET .*must be set/);
+  });
 });

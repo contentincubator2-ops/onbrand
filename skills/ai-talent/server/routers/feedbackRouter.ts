@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import localPool from "../localDb.js";
 
@@ -32,13 +33,35 @@ async function ensureTable() {
 }
 ensureTable();
 
+/**
+ * SEC-B-05 v2 (2026-05-05): assert the caller owns the given mission.
+ * Throws TRPCError("FORBIDDEN") if not. Used by saveNote + listNotes.
+ */
+async function assertMissionOwner(userId: number | null, missionId: number): Promise<void> {
+  if (!userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Login required" });
+  }
+  const [rows]: any = await localPool.execute(
+    "SELECT userId FROM missions WHERE id = ? LIMIT 1",
+    [missionId],
+  );
+  const row = (rows as any[])?.[0];
+  if (!row) {
+    // Don't leak whether the mission exists — generic forbidden
+    throw new TRPCError({ code: "FORBIDDEN", message: "Not allowed" });
+  }
+  if (Number(row.userId) !== Number(userId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Not allowed" });
+  }
+}
+
 export const feedbackRouter = router({
   /**
    * Save (insert) a note for a mission.
-   * SEC-B-05 (2026-05-04): changed from publicProcedure → protectedProcedure.
-   * Anyone with a missionId could previously write arbitrary notes (vandalism
-   * + storage abuse vector). The notes table also has no per-user scope, so
-   * audit ownership is not enforced — flagged for follow-up (S-02 audit log).
+   * SEC-B-05 v1: changed from publicProcedure → protectedProcedure.
+   * SEC-B-05 v2: also asserts the caller owns the mission (no horizontal
+   * privilege escalation — previously any authenticated user could write
+   * notes against any missionId).
    */
   saveNote: protectedProcedure
     .input(z.object({
@@ -48,6 +71,7 @@ export const feedbackRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = (ctx as any)?.user?.id ?? null;
+      await assertMissionOwner(userId, input.missionId);
       await localPool.execute(
         `INSERT INTO mission_feedback_notes (mission_id, category, text, user_id)
          VALUES (?, ?, ?, ?)`,
@@ -65,11 +89,13 @@ export const feedbackRouter = router({
 
   /**
    * List all notes for a mission, newest first.
-   * SEC-B-05: protected so callers can't enumerate notes for arbitrary missionIds.
+   * SEC-B-05 v2: ownership scope enforced.
    */
   listNotes: protectedProcedure
     .input(z.object({ missionId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const userId = (ctx as any)?.user?.id ?? null;
+      await assertMissionOwner(userId, input.missionId);
       const [rows]: any = await localPool.execute(
         `SELECT id, category, text, created_at
            FROM mission_feedback_notes

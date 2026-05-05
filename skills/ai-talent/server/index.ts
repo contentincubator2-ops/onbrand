@@ -102,6 +102,49 @@ app.use(cookieParser());
 // upload routes if/when needed.
 app.use(express.json({ limit: '1mb' }));
 
+// SEC-B-08 v2 (2026-05-05): per-field string cap. The 1MB body limit alone
+// allowed e.g. a 999KB string in a single field to slip through and burn
+// memory in zod / db / LLM downstream. We recursively walk req.body and
+// reject any string > MAX_FIELD_CHARS chars. 50000 is generous for the
+// largest legit input we have (markdown / prompt / brief) — easily 10x
+// any realistic content while still preventing pathological payloads.
+const MAX_FIELD_CHARS = 50_000;
+function deepCheckStringLengths(obj: any, path: string = ""): string | null {
+  if (obj == null) return null;
+  if (typeof obj === "string") {
+    if (obj.length > MAX_FIELD_CHARS) {
+      return `${path || "(root)"} string is ${obj.length} chars (max ${MAX_FIELD_CHARS})`;
+    }
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const r = deepCheckStringLengths(obj[i], `${path}[${i}]`);
+      if (r) return r;
+    }
+    return null;
+  }
+  if (typeof obj === "object") {
+    for (const k of Object.keys(obj)) {
+      const r = deepCheckStringLengths(obj[k], path ? `${path}.${k}` : k);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === "object") {
+    const violation = deepCheckStringLengths(req.body);
+    if (violation) {
+      return res.status(413).json({
+        error: "PAYLOAD_FIELD_TOO_LARGE",
+        detail: violation,
+      });
+    }
+  }
+  next();
+});
+
 // DEBT-3: Request logging — minimal, no PII logged
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
