@@ -71,7 +71,7 @@ const envSchema = z.object({
   TAVILY_API_KEY: z.string().optional(),
 
   // AI Video Generation
-  FAL_API_KEY:          z.string().optional(), // fal.ai — Seedance 2.0
+  // FAL_API_KEY removed 2026-05-05 — fal.ai disabled site-wide.
   ELEVENLABS_API_KEY:   z.string().optional(), // ElevenLabs TTS
   CREATOMATE_API_KEY:   z.string().optional(), // Creatomate video composition
 

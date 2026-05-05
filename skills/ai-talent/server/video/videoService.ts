@@ -112,68 +112,17 @@ async function generateScript(input: VideoJobInput): Promise<VideoScript> {
   };
 }
 
-// ─── Step 2: Seedance 2.0 via fal.ai ─────────────────────────────────────────
+// ─── Step 2: Seedance 2.0 — DISABLED 2026-05-05 ──────────────────────────
+//
+// fal.ai removed site-wide (CJ direction — billing dispute irrecoverable).
+// This function now throws so the videoRouter surfaces a clear error.
+// TODO: replace with piapi/kling-v2-master or hailuo/t2v for short clips.
 
-async function generateScene(scene: SceneScript, platform: string): Promise<string> {
-  const FAL_API_KEY = process.env.FAL_API_KEY;
-  if (!FAL_API_KEY) throw new Error("FAL_API_KEY not set");
-
-  const aspectRatio = (platform === "youtube" || platform === "facebook") ? "16:9" : "9:16";
-
-  // Submit job
-  const submitRes = await fetch(
-    "https://queue.fal.run/fal-ai/bytedance/seedance-v1-5-lite/text-to-video",
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${FAL_API_KEY}`,
-        "Content-Type":  "application/json",
-      },
-      body: JSON.stringify({
-        prompt:       scene.visualPrompt,
-        aspect_ratio: aspectRatio,
-        duration:     scene.durationSec,
-        resolution:   "720p",
-        camera_fixed: scene.cameraMove === "static",
-        seed:         -1,
-      }),
-    }
+async function generateScene(_scene: SceneScript, _platform: string): Promise<string> {
+  throw new Error(
+    "Seedance video generation is disabled (fal.ai removed 2026-05-05). " +
+    "Use piapi/kling-v2-master or hailuo/t2v via mediaGen.dispatchGenerate instead.",
   );
-
-  if (!submitRes.ok) {
-    const err = await submitRes.text();
-    throw new Error(`Seedance submit failed: ${submitRes.status} ${err}`);
-  }
-
-  const submitData = await submitRes.json() as { request_id: string };
-  const requestId = submitData.request_id;
-
-  // Poll until complete (max 3 minutes)
-  const maxAttempts = 60;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await new Promise(r => setTimeout(r, 3000)); // 3s delay
-
-    const pollRes = await fetch(
-      `https://queue.fal.run/fal-ai/bytedance/seedance-v1-5-lite/requests/${requestId}`,
-      { headers: { "Authorization": `Key ${FAL_API_KEY}` } }
-    );
-
-    if (!pollRes.ok) continue;
-
-    const pollData = await pollRes.json() as {
-      status: string;
-      output?: { video?: { url: string } };
-    };
-
-    if (pollData.status === "COMPLETED" && pollData.output?.video?.url) {
-      return pollData.output.video.url;
-    }
-    if (pollData.status === "FAILED") {
-      throw new Error(`Seedance scene ${scene.sceneIndex} generation failed`);
-    }
-  }
-
-  throw new Error(`Seedance scene ${scene.sceneIndex} timed out`);
 }
 
 // ─── Step 3: ElevenLabs TTS ──────────────────────────────────────────────────

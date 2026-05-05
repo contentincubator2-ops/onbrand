@@ -124,19 +124,8 @@ export const IMAGE_MODELS: MediaModel[] = [
     formats: ["1024×1024", "1024×1792"],
     tags: ["asian-face", "chinese-text"],
   },
-  {
-    id: "fal/flux-dev",
-    name: "FLUX.1 [dev] (fal.ai)",
-    vendor: "Black Forest Labs via fal.ai",
-    provider: "fal-direct",
-    kind: "image",
-    status: "soon", // VERIFY: fal.ai account is admin-locked. Needs to contact support@fal.ai
-    strengths: "風格多樣、藝術插畫品質高、寫實 / 抽象都強",
-    costEstimateUsd: 0.025,
-    durationSecEstimate: 8,
-    formats: ["1024×1024", "1024×1792", "1792×1024"],
-    tags: ["illustration", "stylized"],
-  },
+  // fal/flux-dev removed 2026-05-05 — fal.ai account permanently disabled.
+  // Use piapi/flux-pro (below) for the same FLUX family.
   // ── PiAPI aggregator (62a5ff21…) ──
   {
     id: "piapi/flux-pro",
@@ -237,19 +226,8 @@ export const VIDEO_MODELS: MediaModel[] = [
     formats: ["8s", "1080p"],
     tags: ["fast", "social-reel"],
   },
-  {
-    id: "fal/seedance-v1-5-lite",
-    name: "Seedance 2.0",
-    vendor: "ByteDance via fal.ai",
-    provider: "fal-direct",
-    kind: "video",
-    status: "soon", // fal.ai account locked
-    strengths: "8 秒場景、1080p、東方臉孔 / 動作流暢",
-    costEstimateUsd: 0.20,
-    durationSecEstimate: 90,
-    formats: ["8s", "1080p"],
-    tags: ["asian-face", "short-clip"],
-  },
+  // fal/seedance-v1-5-lite removed 2026-05-05 — fal.ai removed site-wide.
+  // Use Hailuo t2v / piapi/kling-v2-master for video instead.
   {
     id: "hailuo/i2v",
     name: "Hailuo i2v (MiniMax)",

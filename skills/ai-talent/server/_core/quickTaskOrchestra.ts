@@ -22,8 +22,8 @@ import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
 const HARD_BUDGET_MS  = 20_000;
-const PER_IMAGE_MS    = 7_000;
-const LLM_BUDGET_MS   = 12_000;
+const PER_IMAGE_MS    = 14_000; // PiAPI Flux Pro sync: 5–13s typical
+const LLM_BUDGET_MS   = 10_000;
 
 export interface AgentMeta {
   id: number;
@@ -221,13 +221,16 @@ async function callImageDirector(args: {
 async function genOneImage(prompt: string, config: OrchestraConfig): Promise<OrchestraVariant["image"]> {
   if (!prompt) return { style: null, url: null, status: "skipped" };
   try {
+    // 2026-05-05: switched from fal/flux-schnell to piapi/flux-pro
+    // (CJ direction — fal.ai account was billing-locked, refund irrecoverable;
+    // PiAPI Flux Pro is sync, ~5–13s per image, no fal dependency).
     const r = await Promise.race([
-      dispatchGenerate("fal/flux-schnell", {
+      dispatchGenerate("piapi/flux-pro", {
         prompt,
-        aspectRatio: (config.aspectRatio === "1.91:1" ? "4:3" : config.aspectRatio) as any,
+        aspectRatio: (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any,
         quality: config.imageQualitySteps >= 8 ? "high" : "medium",
       }),
-      timeoutPromise<never>(PER_IMAGE_MS, "flux-schnell"),
+      timeoutPromise<never>(PER_IMAGE_MS, "piapi-flux-pro"),
     ]);
     if (r.status === "ready" && r.url) {
       return { style: prompt, url: r.url, status: "ready" };

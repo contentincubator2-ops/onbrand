@@ -179,114 +179,26 @@ async function genHailuoImage(opts: GenOptions): Promise<GenResult> {
 }
 
 // ── 5. fal.ai FLUX.1 dev ──────────────────────────────────────────────────
-async function genFalFlux(opts: GenOptions): Promise<GenResult> {
-  const key = process.env.FAL_API_KEY ?? process.env.FAL_AI_API_KEY ?? "";
-  if (!key) throw new Error("FAL_API_KEY missing");
-  // Submit
-  const submitResp = await fetch("https://queue.fal.run/fal-ai/flux/dev", {
-    method: "POST",
-    headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt: opts.prompt,
-      image_size: opts.aspectRatio === "9:16" ? "portrait_9_16"
-        : opts.aspectRatio === "16:9" ? "landscape_16_9"
-        : "square_hd",
-      num_inference_steps: 28,
-      guidance_scale: 3.5,
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!submitResp.ok) {
-    const t = await submitResp.text();
-    throw new Error(`fal submit ${submitResp.status}: ${t.slice(0, 200)}`);
-  }
-  const submitted: any = await submitResp.json();
-  const requestId = submitted?.request_id;
-  if (!requestId) throw new Error("fal: no request_id");
-
-  // Poll (FLUX dev finishes in ~5-10s)
-  const start = Date.now();
-  while (Date.now() - start < 120_000) {
-    await new Promise((r) => setTimeout(r, 2500));
-    const statusResp = await fetch(
-      `https://queue.fal.run/fal-ai/flux/dev/requests/${requestId}/status`,
-      { headers: { Authorization: `Key ${key}` } }
-    );
-    if (!statusResp.ok) continue;
-    const s: any = await statusResp.json();
-    if (s?.status === "COMPLETED") {
-      const resultResp = await fetch(
-        `https://queue.fal.run/fal-ai/flux/dev/requests/${requestId}`,
-        { headers: { Authorization: `Key ${key}` } }
-      );
-      const result: any = await resultResp.json();
-      const remoteUrl = result?.images?.[0]?.url;
-      if (!remoteUrl) throw new Error("fal: no image url in completed result");
-      const localUrl = await downloadAndSave(remoteUrl, "img");
-      return { status: "ready", modelId: "fal/flux-dev", url: localUrl, meta: { remoteUrl, requestId } };
-    }
-    if (s?.status === "FAILED") throw new Error("fal generation failed");
-  }
-  throw new Error("fal generation timed out");
+// ── DISABLED 2026-05-05 ──────────────────────────────────────────────────
+// fal.ai removed site-wide per CJ direction (billing dispute irrecoverable).
+// Use piapi/flux-pro for image gen and azure/gpt-image-2 for high-quality.
+// Function bodies kept as failed stubs so any stray caller fails loudly.
+async function genFalFlux(_opts: GenOptions): Promise<GenResult> {
+  return {
+    status: "failed",
+    modelId: "fal/flux-dev",
+    errorMsg: "fal.ai removed site-wide 2026-05-05. Use piapi/flux-pro or azure/gpt-image-2.",
+  };
+}
+async function genFalFluxSchnell(_opts: GenOptions): Promise<GenResult> {
+  return {
+    status: "failed",
+    modelId: "fal/flux-schnell",
+    errorMsg: "fal.ai removed site-wide 2026-05-05. Use piapi/flux-pro or azure/gpt-image-2.",
+  };
 }
 
-// ── 5b. fal.ai Flux SCHNELL (fast: 4 inference steps, 3-5s) ──────────────
-//
-// Plan B 20s orchestra uses this — much faster than flux-dev (28 steps, ~10s).
-// Caller may pass options.quality='high' to bump steps to 8 for premium tasks
-// like 釘選 (long-shelf-life pinned posts).
-async function genFalFluxSchnell(opts: GenOptions): Promise<GenResult> {
-  const key = process.env.FAL_API_KEY ?? process.env.FAL_AI_API_KEY ?? "";
-  if (!key) throw new Error("FAL_API_KEY missing");
-  const steps = opts.quality === "high" ? 8 : 4;
-  // Submit
-  const submitResp = await fetch("https://queue.fal.run/fal-ai/flux/schnell", {
-    method: "POST",
-    headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt: opts.prompt,
-      image_size: opts.aspectRatio === "9:16" ? "portrait_9_16"
-        : opts.aspectRatio === "16:9" ? "landscape_16_9"
-        : opts.aspectRatio === "4:3" ? "landscape_4_3"
-        : "square_hd",
-      num_inference_steps: steps,
-      enable_safety_checker: true,
-    }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!submitResp.ok) {
-    const t = await submitResp.text();
-    throw new Error(`fal-schnell submit ${submitResp.status}: ${t.slice(0, 200)}`);
-  }
-  const submitted: any = await submitResp.json();
-  const requestId = submitted?.request_id;
-  if (!requestId) throw new Error("fal-schnell: no request_id");
-
-  // Poll (Schnell finishes in ~3-5s) — short interval, hard 12s ceiling
-  const start = Date.now();
-  while (Date.now() - start < 12_000) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const statusResp = await fetch(
-      `https://queue.fal.run/fal-ai/flux/schnell/requests/${requestId}/status`,
-      { headers: { Authorization: `Key ${key}` } },
-    );
-    if (!statusResp.ok) continue;
-    const s: any = await statusResp.json();
-    if (s?.status === "COMPLETED") {
-      const resultResp = await fetch(
-        `https://queue.fal.run/fal-ai/flux/schnell/requests/${requestId}`,
-        { headers: { Authorization: `Key ${key}` } },
-      );
-      const result: any = await resultResp.json();
-      const remoteUrl = result?.images?.[0]?.url;
-      if (!remoteUrl) throw new Error("fal-schnell: no image url in completed result");
-      const localUrl = await downloadAndSave(remoteUrl, "img");
-      return { status: "ready", modelId: "fal/flux-schnell", url: localUrl, meta: { remoteUrl, requestId, steps } };
-    }
-    if (s?.status === "FAILED") throw new Error("fal-schnell generation failed");
-  }
-  throw new Error("fal-schnell generation timed out (12s)");
-}
+// (Original fal.ai bodies removed 2026-05-05 — see git history for reference.)
 
 // ── 6. Hailuo t2v / i2v (async, returns taskId) ──────────────────────────
 async function submitHailuoVideo(opts: GenOptions, mode: "t2v" | "i2v"): Promise<GenResult> {
@@ -581,10 +493,11 @@ async function genPiapi(modelId: string, opts: GenOptions): Promise<GenResult> {
   if (!spec) return { status: "failed", modelId, errorMsg: `PiAPI: unknown modelId ${modelId}` };
   const { taskId } = await piapiSubmit(modelId, opts);
   if (!spec.sync) return { status: "submitted", modelId, taskId, meta: { provider: "piapi" } };
-  // Inline-poll for sync image (image gen finishes in 5–15s)
+  // Inline-poll for sync image. Tightened to 1s for orchestra responsiveness
+  // (image gen finishes in 5–15s; coarser intervals waste 20s budget).
   const start = Date.now();
   while (Date.now() - start < 120_000) {
-    await new Promise((r) => setTimeout(r, 2500));
+    await new Promise((r) => setTimeout(r, 1000));
     const r = await piapiPoll(modelId, taskId);
     if (r.status !== "submitted") return r;
   }
