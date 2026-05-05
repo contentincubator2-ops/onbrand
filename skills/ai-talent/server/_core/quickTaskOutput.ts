@@ -28,82 +28,88 @@ import { z } from "zod";
 // ─── Style direction sub-schemas ────────────────────────────────────────────
 
 /**
+ * Tolerant string coercer — accepts either a string or an array of strings
+ * (LLMs frequently emit arrays for fields like "color_palette" / "tone" /
+ * "lighting" even when the schema asks for prose). Joins arrays with " · ".
+ */
+const stringOrArray = (max: number) =>
+  z.preprocess(
+    (v) => {
+      if (Array.isArray(v)) return v.filter(Boolean).map(String).join(" · ").slice(0, max);
+      if (typeof v === "string") return v.slice(0, max);
+      if (v == null) return undefined;
+      return String(v).slice(0, max);
+    },
+    z.string().max(max).optional(),
+  );
+
+/**
  * Image style direction — NOT a prompt. A descriptive brief for the user to
  * carry into MediaGenFlow step 1 (設計方向). MediaGenFlow's step 2 (AI prompt)
  * is generated from this; step 3 picks the model.
+ *
+ * 2026-05-05: schema is intentionally tolerant. Any field that an LLM might
+ * be tempted to give as array-instead-of-string gets auto-joined. Aspect
+ * ratio and model suggestion are open enums (string instead of strict
+ * z.enum) so a slightly-off LLM value ("9x16" instead of "9:16") still
+ * survives — UI can normalize on its end.
  */
 export const imageStyleDirectionSchema = z.object({
-  /** Plain-text style summary — shown inside mockup image placeholder. e.g.
-   * "warm golden-hour, hand-held casual lifestyle, soft focus on hands" */
-  summary: z.string().min(8).max(280),
+  /** Plain-text style summary — shown inside mockup image placeholder. */
+  summary: stringOrArray(280),
   /** Mood / tone keywords — used by MediaGenFlow step 2 prompt builder */
-  tone: z.array(z.string().max(40)).max(8).optional(),
-  /** What the image actually shows (subject) — keep concrete and visible */
-  subject: z.string().max(280).optional(),
-  /** Composition cues — angle, framing, perspective */
-  composition: z.string().max(140).optional(),
-  /** Lighting cues — golden-hour, studio, neon, candid, etc. */
-  lighting: z.string().max(140).optional(),
-  /** Color palette in plain text — "粉櫻 + 暖陽 + 寶藍" or "monochrome navy" */
-  color_palette: z.string().max(140).optional(),
-  /** Aspect ratio preset for the platform variant */
-  aspect_ratio: z.enum([
-    "1:1",      // FB feed square, IG feed
-    "4:5",      // FB / IG portrait feed
-    "16:9",     // FB feed landscape, YT thumbnail, FB cover-narrow
-    "9:16",     // FB Reels, IG Reels, Story
-    "851:315",  // FB cover photo
-    "1200:630", // FB / OG link preview
-    "1080:1080",// IG square absolute
-  ]).optional(),
-  /** Suggested model — quick-task only suggests, MediaGenFlow lets user override */
-  model_suggestion: z.enum([
-    "gpt-image-1",      // OpenAI, best prompt adherence
-    "imagen-4-fast",    // Google Imagen 4 fast
-    "imagen-4-ultra",   // Google Imagen 4 ultra (slow but premium)
-    "flux-kontext",     // Azure Foundry FLUX
-    "hailuo-image",     // Hailuo
-    "any",              // let user pick
-  ]).default("any"),
+  tone: z.preprocess(
+    (v) => {
+      if (Array.isArray(v)) return v.map(String).slice(0, 8);
+      if (typeof v === "string") return v.split(/[,，;；·、]+/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
+      return undefined;
+    },
+    z.array(z.string().max(60)).max(8).optional(),
+  ),
+  /** What the image actually shows (subject) */
+  subject: stringOrArray(280),
+  /** Composition cues */
+  composition: stringOrArray(280),
+  /** Lighting cues */
+  lighting: stringOrArray(280),
+  /** Color palette — accepts string OR array of color names */
+  color_palette: stringOrArray(280),
+  /** Aspect ratio — open string (recommend the 7 known presets but don't reject) */
+  aspect_ratio: z.string().max(20).optional(),
+  /** Suggested model — open string */
+  model_suggestion: z.string().max(40).optional(),
 });
 export type ImageStyleDirection = z.infer<typeof imageStyleDirectionSchema>;
 
 /**
  * Video style direction — same idea for short-form video (Reels / Shorts /
- * TikTok). Descriptive brief, not a prompt.
+ * TikTok). Tolerant coercion same as image schema.
  */
 export const videoStyleDirectionSchema = z.object({
-  /** Plain-text style summary — shown in video placeholder. */
-  summary: z.string().min(8).max(280),
-  /** Duration target in seconds */
-  duration_seconds: z.number().min(3).max(90).optional(),
-  /** Pacing — fast / medium / slow + cuts per 10s */
-  pacing: z.string().max(80).optional(),
-  /** Camera style — handheld / locked-off / drone / first-person etc. */
-  camera_style: z.string().max(140).optional(),
-  /** Hook beat (first 1-2s) — what grabs attention */
-  hook_beat: z.string().max(280).optional(),
-  /** Structural arc — hook→build→turn→payoff or jab-jab-right-hook etc. */
-  structural_arc: z.string().max(280).optional(),
-  /** Music / sound style — upbeat / cinematic / native-audio etc. */
-  audio_style: z.string().max(140).optional(),
-  /** Aspect ratio — Reels/TikTok/Shorts are 9:16, FB feed video is 16:9 or 1:1 */
-  aspect_ratio: z.enum(["9:16", "1:1", "16:9", "4:5"]).default("9:16"),
-  /** Suggested model */
-  model_suggestion: z.enum([
-    "hailuo-video",   // text-to-video / image-to-video
-    "veo",            // Google Veo
-    "seedance-2",     // fal.ai Seedance 2.0
-    "any",
-  ]).default("any"),
+  summary: stringOrArray(280),
+  duration_seconds: z.preprocess(
+    (v) => (typeof v === "string" ? Number(v.replace(/[^\d.]/g, "")) : v),
+    z.number().min(1).max(90).optional(),
+  ),
+  pacing: stringOrArray(140),
+  camera_style: stringOrArray(280),
+  hook_beat: stringOrArray(280),
+  structural_arc: stringOrArray(280),
+  audio_style: stringOrArray(280),
+  aspect_ratio: z.string().max(20).optional(),
+  model_suggestion: z.string().max(40).optional(),
 });
 export type VideoStyleDirection = z.infer<typeof videoStyleDirectionSchema>;
 
 // ─── Tier-specific extras ───────────────────────────────────────────────────
 
-/** Variants — lighter for 30s (1-2), richer for 60s (3-5). */
+/**
+ * Variants — lighter for 30s (1-2), richer for 60s (3-5).
+ * 2026-05-05: label auto-filled with "版本 N" if LLM omits — this happens
+ * often. caption is the only truly required field.
+ */
 export const variantSchema = z.object({
-  label: z.string().max(80),     // "情感版" / "理性版" / "幽默版"
+  label: z.string().max(80).optional().default(""),
   caption: z.string().max(2000),
   hashtags: z.array(z.string().max(50)).max(15).optional(),
 });
@@ -167,7 +173,16 @@ export function parseQuickTaskOutput(
   raw: unknown,
 ): { ok: true; data: QuickTaskOutput } | { ok: false; errors: string[]; partial: Partial<QuickTaskOutput> } {
   const result = quickTaskOutputSchema.safeParse(raw);
-  if (result.success) return { ok: true, data: result.data };
+  if (result.success) {
+    // Backfill missing variant labels with "版本 N"
+    if (result.data.variants) {
+      result.data.variants = result.data.variants.map((v, i) => ({
+        ...v,
+        label: v.label && v.label.length > 0 ? v.label : `版本 ${i + 1}`,
+      }));
+    }
+    return { ok: true, data: result.data };
+  }
   const errors = result.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`);
   return { ok: false, errors, partial: (raw ?? {}) as Partial<QuickTaskOutput> };
 }
@@ -179,32 +194,36 @@ export function parseQuickTaskOutput(
  */
 export function quickTaskOutputSpec(tier: "30s" | "60s" | "90s"): string {
   const base = `
-【輸出格式 — 嚴格 JSON，無 markdown code fence】
+【輸出格式 — 嚴格 JSON，無 markdown code fence、無 \`\`\`json 圍籬】
 必填: tier, platform, post_type, caption.
 可選: title, description, cta, hashtags, image_style_direction, video_style_direction.
-hashtags 不要 # 前綴。caption 可用 markdown。`;
+hashtags 是 string[] 不含 # 前綴.
+所有 image_style_direction / video_style_direction 子欄位都是「字串」（不是陣列、不是物件）.
+若你想給多個元素（如多個顏色），用「·」或「、」連接成單一字串.
+例：color_palette 寫 "粉櫻 · 暖陽 · 寶藍"，不要寫 ["粉櫻","暖陽","寶藍"].
+唯一例外：tone 可以是 string[] 也可以是 string.
+variants[] 每個物件需含 label（如 "情感版" / "理性版" / "幽默版"）和 caption.`;
   if (tier === "30s") {
     return base + `
 【30s tier 規則】
 - variants[] 留空或最多 1 個替代版.
-- image_style_direction 給 1 句 summary 就好（不必填全欄位）.
+- image_style_direction 至少給 summary（1 句）+ aspect_ratio.
 - 不要 kpi_prediction.
 - caption 控制在 600 字內.`;
   }
   if (tier === "60s") {
     return base + `
 【60s tier 規則】
-- variants[] 給 1-3 個明顯不同口吻 / 情感版本.
-- image_style_direction 至少給 summary + tone[] + composition + aspect_ratio.
-- video_style_direction 若 post_type 是 reel / video, 也填.
+- variants[] 給 1-3 個明顯不同口吻 / 情感版本，每個必須有 label 和 caption.
+- image_style_direction 至少給 summary + tone + composition + aspect_ratio.
+- video_style_direction 若 post_type 是 reel / video，也填.
 - 不要 kpi_prediction.
 - caption 可到 2000 字.`;
   }
-  // 90s
   return base + `
 【90s tier 規則】
-- variants[] 給 3-5 個版本.
-- image_style_direction / video_style_direction 全欄位填.
+- variants[] 給 3-5 個版本，每個必須有 label.
+- image_style_direction / video_style_direction 全欄位填（字串型態）.
 - kpi_prediction 必填（reach + engagement_rate + best_post_time + reasoning）.
 - 可用 extra{} 攜帶 pillar_mapping / competitor_benchmark 等富資料.`;
 }
