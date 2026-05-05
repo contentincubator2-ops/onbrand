@@ -857,6 +857,16 @@ export default function BrandsPage() {
               <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
             </div>
           )}
+
+          {/* ── 設定（品牌 — 含 FB 自動抓 logo）── */}
+          {derivedCategory === "settings" && scopeMode === "brand" && (scope?.brandId ?? brandId) && (
+            <div style={{ padding: "24px" }}>
+              <BrandLogoSettings
+                brandId={(scope?.brandId ?? brandId) as number}
+                brandName={currentBrand?.name ?? null}
+              />
+            </div>
+          )}
         </div>
       </div>
     </main>
@@ -1514,6 +1524,87 @@ function EventSettingsPanel({
           </div>
         </CardBody>
       </Card>
+    </div>
+  );
+}
+
+/* ─────────────────── BrandLogoSettings ─────────────────── */
+/**
+ * Brand logo block (2026-05-05): preview current logoUrl + 一鍵抓 FB 粉專
+ * 大頭貼 + 換一張. Used in BrandsPage settings tab.
+ */
+function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName: string | null }) {
+  const brandQuery = (trpc as any).brand?.get?.useQuery
+    ? (trpc as any).brand.get.useQuery({ id: brandId }, { refetchOnWindowFocus: false })
+    : { data: null, refetch: () => {} };
+  const logoUrl: string | null = (brandQuery.data as any)?.logoUrl ?? null;
+
+  const [handle, setHandle] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const fetchMut = (trpc as any).brand?.fetchFacebookAvatar?.useMutation();
+
+  const submit = async () => {
+    if (!handle.trim()) { setErr("請輸入 FB 粉專網址或 handle"); return; }
+    setBusy(true); setErr(null); setOkMsg(null);
+    try {
+      const r = await fetchMut.mutateAsync({ brandId, handleOrUrl: handle.trim() });
+      setOkMsg(`已抓取 (${r.bytes.toLocaleString()} bytes)`);
+      setHandle("");
+      await brandQuery.refetch?.();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="max-w-[640px] mx-auto space-y-4">
+      <div>
+        <h3 className="text-medium font-semibold">品牌 logo / 頭像</h3>
+        <p className="text-tiny text-default-500 mt-1">
+          mockup 顯示用的「{brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。
+        </p>
+      </div>
+
+      <div className="flex items-center gap-4 border border-default-200 rounded-medium p-4 bg-default-50">
+        <Avatar
+          src={logoUrl ?? `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(brandName ?? "brand")}`}
+          size="lg"
+          className="w-20 h-20"
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-small font-medium">
+            {logoUrl ? "目前 logo" : "尚未設定 logo（顯示 dicebear 預設圖）"}
+          </p>
+          {logoUrl && (
+            <p className="text-tiny text-default-400 truncate">{logoUrl}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 border border-default-200 rounded-medium p-4">
+        <p className="text-small font-medium">
+          {logoUrl ? "換一張（從 FB 粉專重抓）" : "從 FB 粉專自動抓"}
+        </p>
+        <p className="text-tiny text-default-500">
+          貼粉專網址或純 handle。粉專必須是公開的。會覆蓋現有 logo。
+        </p>
+        <Input
+          size="sm"
+          placeholder="https://www.facebook.com/桂冠營養研究室"
+          value={handle}
+          onValueChange={setHandle}
+          isDisabled={busy}
+        />
+        <div className="flex items-center gap-2">
+          <Button color="primary" size="sm" onPress={submit} isLoading={busy}>
+            {logoUrl ? "重新抓取" : "抓取 logo"}
+          </Button>
+          {okMsg && <span className="text-tiny text-success-600">✓ {okMsg}</span>}
+          {err && <span className="text-tiny text-danger-600">{err}</span>}
+        </div>
+      </div>
     </div>
   );
 }

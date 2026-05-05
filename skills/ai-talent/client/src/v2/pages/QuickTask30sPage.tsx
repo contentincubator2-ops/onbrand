@@ -625,6 +625,9 @@ function OutputCarousel({
   const [idx, setIdx] = useState(0);
   const total = slides.length;
   const [mediaGenOpen, setMediaGenOpen] = useState(false);
+  // Per-slide image overrides — set when MediaGenFlow finishes generating.
+  // { [slideIdx]: imageUrl } merged on top of slide.imageUrl from orchestra.
+  const [imageOverrides, setImageOverrides] = useState<Record<number, string>>({});
   const [fbLogoModalOpen, setFbLogoModalOpen] = useState(false);
   const [fbHandle, setFbHandle] = useState("");
   const [fbBusy, setFbBusy] = useState(false);
@@ -646,7 +649,14 @@ function OutputCarousel({
   // Per-slide caption edits (keyed by slide index). Empty = use original.
   const [edits, setEdits] = useState<Record<number, string>>({});
   const baseSlide = slides[idx];
-  const slide = baseSlide ? { ...baseSlide, caption: edits[idx] ?? baseSlide.caption } : baseSlide;
+  const slide = baseSlide
+    ? {
+        ...baseSlide,
+        caption: edits[idx] ?? baseSlide.caption,
+        imageUrl: imageOverrides[idx] ?? baseSlide.imageUrl,
+        imageStatus: imageOverrides[idx] ? "ready" as const : baseSlide.imageStatus,
+      }
+    : baseSlide;
   const isEdited = edits[idx] != null && edits[idx] !== baseSlide?.caption;
 
   return (
@@ -871,6 +881,13 @@ function OutputCarousel({
         initialBrief={slide.imageStyle ?? ""}
         brandContext={brandName ?? undefined}
         brandId={brandId ?? undefined}
+        onComplete={(r) => {
+          // Auto-attach generated image to the active slide's mockup
+          if (r?.url) {
+            setImageOverrides((o) => ({ ...o, [idx]: r.url }));
+            setMediaGenOpen(false); // close modal so user sees mockup updated
+          }
+        }}
       />
 
       {/* FB avatar picker — minimal modal that triggers brand.fetchFacebookAvatar */}
