@@ -354,6 +354,14 @@ export interface OrchestraConfig {
    * for launch-kit). Drives variant labels when extras.postsCount is set.
    */
   postLabels?: string[];
+  /**
+   * 100s tier — kind of real-time data scout fetches:
+   *   viral (default) / festivals / trending / news
+   * - festivals: 月曆 / 季度 — scout 抓即將到來的節慶
+   * - trending: 時事改寫 / 跟風 — scout 抓目前熱門
+   * - news: thought-leadership / quarterly — scout 抓產業最新
+   */
+  scoutKind?: "viral" | "festivals" | "trending" | "news";
 }
 
 const MANDY_ID = 239184; // FB Visual Direction Lead

@@ -197,14 +197,13 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     : { data: [] };
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
 
-  // 30s tier: filter by tier="30s" (simple/quick tasks).
-  // 60s tier: filter by tier="60s" (production-package multi-agent tasks).
-  // 100s tier: also use 60s pool — 100s = 60s + scout + video gen layered
-  // on top, so same task definitions apply (per architectural plan).
+  // 30s tier: simple/quick tasks (3 variants, no extras).
+  // 60s tier: production-package multi-agent (5 variants + extras + QA).
+  // 100s tier: campaign-level deliverables (multi-week / month-long / series)
+  //            with REAL-TIME scout (festivals / trending / news) — distinct
+  //            task pool (quickTask100.ts), NOT 60s pool.
   const tasksThisTier = useMemo(
-    () => (tier === "60s" || tier === "100s")
-      ? allTasks.filter((t) => t.tier === "60s")
-      : allTasks.filter((t) => t.tier === "30s"),
+    () => allTasks.filter((t) => t.tier === tier),
     [allTasks, tier],
   );
 
@@ -408,10 +407,10 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
       }
     : {
         emoji: "🔬",
-        kicker: "RESEARCH-VALIDATED",
-        headline: "100 秒做出有真實爆款數據根據的內容",
-        sub: "Scout 爬近 30 天通路爆款 → 多 Agent 製作包 → 影片（適用時）",
-        bullets: ["真實爆款數據", "5 變體 + 真生圖", "8-10 位 agent 協作", "影片生成（reel/shorts）"],
+        kicker: "CAMPAIGN-LEVEL · REAL-TIME DATA",
+        headline: "100 秒交付 campaign 級別內容",
+        sub: "整月月曆 / 14 天倒數 / 完整 launch toolkit — Scout 即時抓節慶 / 時事 / 趨勢，貼回真實時間軸",
+        bullets: ["即時抓節慶 / 時事", "campaign 級別產出（7-30 篇）", "8-10 位 agent 協作", "對應既有 squad 配置"],
         accent: "#f59e0b",
         gradientFrom: "rgba(245,158,11,0.10)",
       };

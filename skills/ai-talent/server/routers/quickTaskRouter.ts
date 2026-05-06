@@ -674,6 +674,7 @@ import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA, getFB60OrchestraConfig, getFB60Templ
 import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../_core/quickTaskIG60";
 import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../_core/quickTaskYT60";
 import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../_core/quickTaskMulti60";
+import { ALL_100S_TASKS, get100Template, get100OrchestraConfig } from "../_core/quickTask100";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -880,6 +881,21 @@ export const quickTaskRouter = router({
     const fb60Tasks = FB_60S_TASKS_V2.map((t) => ({ ...t, kind: "fast" as const, platform: "facebook" }));
     const ig60Tasks = IG_60S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "instagram" }));
     const yt60Tasks = YT_60S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "youtube" }));
+    // 100s tasks (campaign-level, real-time data)
+    const tasks100 = ALL_100S_TASKS.map((t) => {
+      const id = t.id;
+      const platform =
+        id.startsWith("ig-") ? "instagram"
+        : id.startsWith("yt-") ? "youtube"
+        : id.startsWith("tt-") ? "tiktok"
+        : id.startsWith("li-") ? "linkedin"
+        : id.startsWith("em-") ? "email"
+        : id.startsWith("pr-") ? "pr"
+        : id.startsWith("br-") ? "brand"
+        : id.startsWith("rs-") ? "audience"
+        : "facebook";
+      return { ...t, kind: "fast" as const, platform };
+    });
     const multi60Tasks = MULTI_60S_TASKS.map((t) => {
       const id = t.id;
       const platform =
@@ -894,6 +910,7 @@ export const quickTaskRouter = router({
     });
     const tasks: any[] = [
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
+      ...tasks100,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks,
     ];
     // 60s production-package universal team agent IDs (used by orchestra)
@@ -1025,7 +1042,13 @@ export const quickTaskRouter = router({
     .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
     .mutation(async ({ input }) => {
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
-      // Try 60s production-package pools first (FB60V2 / IG60 / YT60 / Multi60)
+      // Priority 1: 100s campaign-level tasks (FB100/IG100/YT100/Multi100)
+      const tier100Template = get100Template(input.taskId);
+      const tier100Config = get100OrchestraConfig(input.taskId);
+      if (tier100Template && tier100Config) {
+        return runOrchestra({ template: tier100Template, config: tier100Config, inputs: input.inputs, brandId: input.brandId, tier: "100s" });
+      }
+      // Priority 2: 60s production-package pools (legacy fallback)
       const tier60Template =
         getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
         getYT60Template(input.taskId) ?? getMulti60Template(input.taskId);

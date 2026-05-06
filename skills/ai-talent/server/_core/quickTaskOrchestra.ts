@@ -691,11 +691,17 @@ export async function runOrchestra(args: {
         return null;
       })(),
       buildBrandContext(args.brandId).catch(() => ""),
-      // Scout stage — only fires for 100s tier
+      // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
+      // viral (default) / festivals (calendar tasks) / trending (時事改寫) / news.
       isResearchTier
         ? (async () => {
             try {
-              return await fetchViralPatterns({ channel: taskChannel, topic: taskTopic, brandId: args.brandId });
+              return await fetchViralPatterns({
+                channel: taskChannel,
+                topic: taskTopic,
+                brandId: args.brandId,
+                kind: args.config.scoutKind ?? "viral",
+              });
             } catch { return null; }
           })()
         : Promise.resolve(null),
@@ -741,7 +747,7 @@ export async function runOrchestra(args: {
     // Append viral patterns research to urlContext (so it gets injected
     // alongside URL content, downstream of brand)
     if (viralPatterns && viralPatterns.patterns.length > 0) {
-      urlContext += "\n\n" + formatViralPatternsForPrompt(viralPatterns) + "\n\n";
+      urlContext += "\n\n" + formatViralPatternsForPrompt(viralPatterns, args.config.scoutKind ?? "viral") + "\n\n";
     }
 
     // ── Stage 1.5: Strategist (FB 60s narrativeArc tasks) ─────────────
