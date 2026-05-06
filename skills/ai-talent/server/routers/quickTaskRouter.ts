@@ -1107,6 +1107,55 @@ export const quickTaskRouter = router({
       return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
     }),
 
+  // refineCaption — AI chat-style refinement. User sees the current caption +
+  // gives feedback ("更年輕一點" / "把第二段刪掉" / "加入媽媽節情緒"), the
+  // agent rewrites it inline. Replaces the old "換語氣 → 跳到 /brands" flow.
+  refineCaption: protectedProcedure
+    .input(z.object({
+      currentCaption: z.string().min(1).max(5000),
+      userFeedback: z.string().min(1).max(1000),
+      agentName: z.string().max(120).optional(),
+      agentTitle: z.string().max(200).optional(),
+      brandId: z.number().optional(),
+      // Conversation history (optional) — last 6 turns
+      history: z.array(z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().max(3000),
+      })).max(12).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { callModel } = await import("../_core/multiModelRouter");
+      const { buildBrandPrefix } = await import("../_core/brandContext");
+      const brandPrefix = await buildBrandPrefix(input.brandId).catch(() => "");
+
+      const system =
+        `你是 ${input.agentName ?? "資深文案"}（${input.agentTitle ?? "Brand Copywriter"}），正在跟用戶討論這篇文案的修改方向。\n` +
+        `任務：根據用戶的修改意見，**重寫**整篇文案。輸出格式：\n` +
+        `1. 第一段：1-2 句說明你怎麼理解用戶的意見、改了什麼\n` +
+        `2. 接著 3 個 newline 分隔\n` +
+        `3. 最後是完整的**修改後文案**（不要省略，不要寫 "如下"，直接給完整版）\n\n` +
+        `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
+        brandPrefix;
+
+      const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+        { role: "system", content: system },
+        { role: "user", content: `這是目前的文案：\n\n${input.currentCaption}` },
+        ...(input.history ?? []),
+        { role: "user", content: input.userFeedback },
+      ];
+      try {
+        const r = await callModel(messages, undefined, "qwen");
+        const text = (r.content ?? "").trim();
+        // Split on triple newline to separate explanation from rewritten caption
+        const parts = text.split(/\n\n\n+/);
+        const explanation = parts.length > 1 ? parts[0].trim() : "";
+        const rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
+        return { explanation, rewritten, ok: true };
+      } catch (e: any) {
+        return { explanation: "", rewritten: "", ok: false, error: e?.message ?? String(e) };
+      }
+    }),
+
   // 100s squad auto-run — sequentially executes all steps of a real squad
   // inline (no /picker redirect, no DB mission). Returns OrchestraResult-shaped
   // variants[] where each variant = one step's output, so the existing

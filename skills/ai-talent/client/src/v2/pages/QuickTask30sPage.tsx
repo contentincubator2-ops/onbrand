@@ -33,6 +33,12 @@ import type { MockupVariant } from "../lib/inferMockup";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { StagePipelineView } from "../components/quickTask/StagePipelineView";
 import { faPalette, faPenNib, faFilm, faWandMagicSparkles, faSliders, faTerminal, faImage, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+// Lucide outline icons — Notion-style (CJ direction 2026-05-06).
+// Toolbar uses these instead of FontAwesome solid for cleaner, more modern feel.
+import {
+  Pencil, Image as LucideImage, Video, Wand2, MessageCircle,
+  Save, Sliders as LucideSliders, Copy, Sparkles,
+} from "lucide-react";
 
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
@@ -854,6 +860,77 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
  *
  * If output has 0 variants (just top-level caption), shows a single mockup.
  */
+/** SavePanel — picks a project to attach the current variant to.
+ *  Lists user's projects (via trpc.project.list if available) + 「新增專案」.
+ *  Falls back to a placeholder message when projects API isn't wired yet. */
+function SavePanel({ slide, accent, onClose }: {
+  slide: any;
+  pageTier: "30s" | "60s" | "100s";
+  accent: string;
+  brandId: number | null;
+  onClose: () => void;
+}) {
+  const listQuery = (trpc as any).project?.list?.useQuery
+    ? (trpc as any).project.list.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: null, isLoading: false };
+  const projects: any[] = listQuery.data ?? [];
+  const projectsAvailable = (trpc as any).project?.list?.useQuery != null;
+  const [savedProjectId, setSavedProjectId] = useState<number | null>(null);
+
+  return (
+    <div className="space-y-2">
+      {!projectsAvailable && (
+        <div className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-tiny text-warning-800">
+          <p className="font-semibold mb-1">專案功能正在接後端</p>
+          <p>目前可以先用「複製文案」帶到你自己的文件。專案 API 上線後此處就會顯示專案清單。</p>
+        </div>
+      )}
+      {projectsAvailable && (
+        <>
+          <p className="text-[10px] text-default-500">挑一個專案，把這個版本的文案 + 圖片風格存進去：</p>
+          {projects.length === 0 && !listQuery.isLoading && (
+            <p className="text-tiny text-default-400 italic py-3 text-center">尚未建立專案</p>
+          )}
+          <div className="space-y-1">
+            {projects.map((p: any) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  // TODO: call project.attachOutput mutation when available
+                  setSavedProjectId(p.id);
+                  setTimeout(onClose, 1200);
+                }}
+                disabled={savedProjectId === p.id}
+                className={`w-full flex items-center gap-2 p-2 rounded-lg border transition text-left ${
+                  savedProjectId === p.id
+                    ? "border-success-300 bg-success-50"
+                    : "border-default-200 hover:bg-default-50"
+                }`}
+              >
+                <span className="w-7 h-7 rounded-md flex items-center justify-center text-tiny font-bold text-white"
+                  style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }}>
+                  {p.name?.charAt(0) ?? "P"}
+                </span>
+                <span className="flex-1 min-w-0 truncate text-tiny font-semibold text-default-800">{p.name}</span>
+                {savedProjectId === p.id && <span className="text-success-600 text-tiny">✓ 已存</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <Button
+        size="sm"
+        variant="flat"
+        className="w-full"
+        startContent={<FontAwesomeIcon icon={faFolderPlus} />}
+        onPress={() => { window.location.href = "/projects"; }}
+      >
+        新增專案
+      </Button>
+    </div>
+  );
+}
+
 function OutputCarousel({
   output, activeTask, pageTier, brandName, brandId, brandLogoUrl, onBrandLogoUpdated,
   mockupVariant, latencyMs, agentMeta, imageAgentMeta, orchestraStages, fetchedUrl, errorMsg,
@@ -963,54 +1040,91 @@ function OutputCarousel({
   // Canva-style modal state. Single activeTool drives the right panel content.
   // null = no panel (mockup max width); other values toggle a context-sensitive
   // drawer to the right (edit / style / video / details / prompt).
-  type ToolKind = null | "edit" | "style" | "video" | "details" | "prompt";
+  type ToolKind = null | "edit" | "style" | "video" | "details" | "prompt" | "chat" | "save";
   const [activeTool, setActiveTool] = useState<ToolKind>(null);
+  // Image gen flow inline state — 3 steps: brief → confirm prompt → generate
+  const [imageStep, setImageStep] = useState<"brief" | "prompt">("brief");
+  const [editablePrompt, setEditablePrompt] = useState("");
+  const [imageModel, setImageModel] = useState<"piapi/flux-schnell" | "piapi/flux-pro" | "openai/gpt-image-1" | "google/imagen-3">("piapi/flux-schnell");
+  // Video gen flow — mirrors image gen
+  const [videoStep, setVideoStep] = useState<"brief" | "prompt">("brief");
+  const [editableVideoPrompt, setEditableVideoPrompt] = useState("");
+  const [videoModel, setVideoModel] = useState<"hailuo/t2v" | "piapi/kling-v2-master">("hailuo/t2v");
+  // Agents: clicking an avatar in toolbar opens a popover showing that agent's contribution
+  const [openAgentPopover, setOpenAgentPopover] = useState<number | null>(null);
+  // AI chat panel state — replaces 換語氣
+  const [chatHistory, setChatHistory] = useState<Array<{ role: "user" | "assistant"; content: string; rewritten?: string }>>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+  const refineCaptionMut = (trpc as any).quickTask?.refineCaption?.useMutation();
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || !slide?.caption || chatBusy) return;
+    const userMsg = chatInput.trim();
+    setChatInput("");
+    setChatHistory((h) => [...h, { role: "user", content: userMsg }]);
+    setChatBusy(true);
+    try {
+      const r = await refineCaptionMut?.mutateAsync({
+        currentCaption: slide.caption,
+        userFeedback: userMsg,
+        agentName: agentMeta?.name,
+        agentTitle: agentMeta?.title,
+        brandId: brandId ?? undefined,
+        history: chatHistory.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+      });
+      if (r?.ok && r.rewritten) {
+        setChatHistory((h) => [...h, {
+          role: "assistant",
+          content: r.explanation || `根據你的意見改寫：`,
+          rewritten: r.rewritten,
+        }]);
+      } else {
+        setChatHistory((h) => [...h, { role: "assistant", content: `（沒寫成功：${r?.error ?? "未知錯誤"}）` }]);
+      }
+    } catch (e: any) {
+      setChatHistory((h) => [...h, { role: "assistant", content: `（出錯：${e?.message ?? e}）` }]);
+    } finally {
+      setChatBusy(false);
+    }
+  };
   const stageCount = orchestraStages?.length ?? 0;
   const doneStages = orchestraStages?.filter((s: any) => s.status === "done").length ?? 0;
   const hasDetails = !!(slide?.qa?.comment || slide?.extras || (orchestraStages && orchestraStages.length > 0) || fetchedUrl);
   const toggleTool = (t: ToolKind) => setActiveTool((cur) => (cur === t ? null : t));
 
   // Tool rail button — icon-only, Canva-style. Active = tier-color gradient.
-  const ToolBtn = ({ icon, label, active, onPress, disabled }: { icon: any; label: string; active?: boolean; onPress: () => void; disabled?: boolean }) => (
+  // ToolBtn accepts either a FontAwesome icon (legacy) or a Lucide React component.
+  // Pass `lucide={Pencil}` for Lucide outline (Notion-style); `icon={faPenNib}` for legacy FA.
+  const ToolBtn = ({ icon, lucide: LucideIcon, label, active, onPress, disabled }: {
+    icon?: any;
+    lucide?: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+    label: string;
+    active?: boolean;
+    onPress: () => void;
+    disabled?: boolean;
+  }) => (
     <button
       onClick={onPress}
       disabled={disabled}
       title={label}
-      className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center transition relative ${
+      className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center transition relative ${
         disabled ? "opacity-30 cursor-not-allowed"
           : active ? "shadow-md text-white scale-105"
-          : "bg-default-50 text-default-600 hover:bg-default-100 hover:scale-105"
+          : "text-default-600 hover:bg-default-100 hover:scale-105"
       }`}
       style={active && !disabled ? { background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}cc)` } : undefined}
     >
-      <FontAwesomeIcon icon={icon} className="text-medium" />
+      {LucideIcon ? (
+        <LucideIcon size={18} strokeWidth={1.8} />
+      ) : (
+        <FontAwesomeIcon icon={icon} className="text-medium" />
+      )}
     </button>
   );
 
   return (
     <div className="space-y-2">
-      {/* Minimal info strip — single muted line, latency + agents only */}
-      <div className="flex items-center gap-2 text-[10px] text-default-400 px-1">
-        {latencyMs != null && (
-          <span className="tabular-nums">{(latencyMs / 1000).toFixed(1)}s</span>
-        )}
-        {agentMeta && (
-          <>
-            <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-3.5 h-3.5" />
-            <span>{agentMeta.name}</span>
-          </>
-        )}
-        {imageAgentMeta && (
-          <>
-            <span>+</span>
-            <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-3.5 h-3.5" />
-            <span>{imageAgentMeta.name}</span>
-          </>
-        )}
-        {orchestraStages && orchestraStages.length > 0 && pageTier !== "30s" && (
-          <span className="ml-auto">{doneStages}/{stageCount} agents · 點 📊 看細節</span>
-        )}
-      </div>
+      {/* (Minimal info strip removed — redundant with toolbar latency token + 👥 agents button) */}
 
       {!slide.caption && (
         <Card className="bg-warning-50 border border-warning-200">
@@ -1020,39 +1134,113 @@ function OutputCarousel({
         </Card>
       )}
 
-      {/* ═══ CANVA TOP TOOLBAR — horizontal icon row above the asset ═══ */}
-      <div className="flex items-center gap-1 px-1 py-1 border-b border-default-100">
-        {slide?.caption && (
-          <ToolBtn icon={faPenNib} label="編輯文案" active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
-        )}
-        <ToolBtn icon={faImage} label="AI 生圖" active={activeTool === "style"}
-          disabled={!slide?.imageStyle} onPress={() => toggleTool("style")} />
-        <ToolBtn icon={faFilm} label="AI 生影片（即將推出）" active={activeTool === "video"}
-          disabled onPress={() => toggleTool("video")} />
-        <ToolBtn icon={faWandMagicSparkles} label="AI prompt / 視覺方向" active={activeTool === "prompt"}
-          disabled={!slide?.imageStyle} onPress={() => toggleTool("prompt")} />
-        <ToolBtn icon={faSliders} label="細節" active={activeTool === "details"}
-          disabled={!hasDetails} onPress={() => toggleTool("details")} />
-        <span className="w-px h-6 bg-default-200 mx-1" />
-        <ToolBtn icon={faFolderPlus} label="加到專案"
-          onPress={() => window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。")} />
-        <ToolBtn icon={faCompass} label="換個語氣"
-          onPress={() => { window.location.href = "/brands"; }} />
-        {/* Right side: latency + agents micro-info, very faint */}
-        <div className="ml-auto flex items-center gap-1.5 text-[10px] text-default-400 pr-1">
-          {latencyMs != null && <span className="tabular-nums">{(latencyMs / 1000).toFixed(1)}s</span>}
-          {agentMeta && (
-            <>
-              <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{agentMeta.name}</span>
-            </>
+      {/* ═══ FLOATING TOOLBAR — Notion-style Lucide outline icons ═══
+          Group A (修改文案): 編輯 / AI 對話 / AI 生圖 / AI 生影片
+          ── divider ──
+          Group B (Agent 頭像): toolbar 直接顯示頭像 — 點頭像 popover
+          ── divider ──
+          Group C (看細節): 視覺方向 / QA / Production
+          ── divider ──
+          Group D (拿走): 複製 / 儲存到專案  */}
+      <div className="sticky top-1 z-30 flex justify-center pointer-events-none mb-1">
+        <div className="pointer-events-auto inline-flex items-center gap-0.5 bg-white border border-default-200 rounded-full shadow-lg px-2 py-1.5">
+          {/* GROUP A: 修改 / 生產 */}
+          {slide?.caption && (
+            <ToolBtn lucide={Pencil} label="編輯文案" active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
           )}
-          {imageAgentMeta && (
-            <>
-              <span>+</span>
-              <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-3.5 h-3.5" />
-            </>
+          {slide?.caption && (
+            <ToolBtn lucide={MessageCircle} label="跟 AI 改文案（對話迭代）" active={activeTool === "chat"}
+              onPress={() => toggleTool("chat")} />
           )}
+          <ToolBtn lucide={LucideImage} label="AI 生圖" active={activeTool === "style"}
+            disabled={!slide?.imageStyle} onPress={() => { setImageStep("brief"); toggleTool("style"); }} />
+          <ToolBtn lucide={Video} label="AI 生影片" active={activeTool === "video"}
+            onPress={() => { setVideoStep("brief"); toggleTool("video"); }} />
+
+          <span className="w-px h-5 bg-default-200 mx-1" />
+          {/* GROUP B: Agent 頭像（直接 inline toolbar）— 點頭像看那位 agent 做了什麼 */}
+          {(() => {
+            const allAgents: Array<{ id: number; name: string; title?: string; avatarUrl?: string | null; role: string; output?: string }> = [];
+            if (agentMeta) allAgents.push({ id: agentMeta.id, name: agentMeta.name, title: agentMeta.title, avatarUrl: agentMeta.avatarUrl, role: "文案主寫" });
+            if (imageAgentMeta) allAgents.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: "視覺方向" });
+            for (const v of slides) {
+              const va = (v as any).agent;
+              if (va && !allAgents.find((a) => a.id === va.id)) {
+                allAgents.push({ id: va.id, name: va.name, title: va.title, avatarUrl: va.avatarUrl, role: v.label ?? "Squad agent", output: v.caption });
+              }
+            }
+            const visibleAgents = allAgents.slice(0, 3);
+            const overflowCount = Math.max(0, allAgents.length - 3);
+            if (allAgents.length === 0) return null;
+            return (
+              <>
+                {visibleAgents.map((a) => {
+                  const isOpen = openAgentPopover === a.id;
+                  return (
+                    <div key={a.id} className="relative">
+                      <button
+                        onClick={() => setOpenAgentPopover(isOpen ? null : a.id)}
+                        title={`${a.name} · ${a.role}`}
+                        className={`w-9 h-9 rounded-full overflow-hidden transition flex items-center justify-center ${
+                          isOpen ? "ring-2 scale-105" : "hover:scale-105 ring-1 ring-default-200"
+                        }`}
+                        style={isOpen ? { borderColor: tierAccent(pageTier), boxShadow: `0 0 0 2px ${tierAccent(pageTier)}` } : undefined}
+                      >
+                        <Avatar src={a.avatarUrl || dicebear(a.name)} size="sm" className="w-9 h-9" />
+                      </button>
+                      {isOpen && (
+                        <div
+                          className="absolute top-12 left-1/2 -translate-x-1/2 z-50 w-64 bg-white border border-default-200 rounded-xl shadow-lg p-3 space-y-1.5"
+                          style={{ borderColor: `${tierAccent(pageTier)}50` }}
+                        >
+                          <div className="flex items-center gap-2 pb-2 border-b border-default-100">
+                            <Avatar src={a.avatarUrl || dicebear(a.name)} size="sm" className="w-7 h-7" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-tiny font-semibold truncate">{a.name}</p>
+                              <p className="text-[10px] text-default-500 truncate">{a.title ?? a.role}</p>
+                            </div>
+                            <button onClick={() => setOpenAgentPopover(null)} className="text-default-400 hover:text-default-700">
+                              <FontAwesomeIcon icon={faXmark} className="text-tiny" />
+                            </button>
+                          </div>
+                          <p className="text-[10px] font-semibold text-default-500">完成的事：</p>
+                          <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed max-h-40 overflow-y-auto">
+                            {a.output ? a.output.slice(0, 360) + (a.output.length > 360 ? "…" : "")
+                              : a.role === "文案主寫" ? `撰寫了 ${slides.length} 個變體的 caption。當前版本「${slide?.label}」：\n${slide?.caption?.slice(0, 200) ?? ""}…`
+                              : a.role === "視覺方向" ? `產出視覺風格 brief：\n${slide?.imageStyle?.slice(0, 200) ?? "（沒有 brief）"}`
+                              : "（無單獨輸出記錄）"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {overflowCount > 0 && (
+                  <button
+                    onClick={() => toggleTool("details")}
+                    title={`還有 ${overflowCount} 位 agent，點開看完整協作流程`}
+                    className="w-9 h-9 rounded-full bg-default-100 text-default-600 text-tiny font-bold hover:bg-default-200 transition flex items-center justify-center"
+                  >
+                    +{overflowCount}
+                  </button>
+                )}
+              </>
+            );
+          })()}
+
+          <span className="w-px h-5 bg-default-200 mx-1" />
+          {/* GROUP C: 看細節 */}
+          <ToolBtn lucide={Wand2} label="視覺方向 / hashtag" active={activeTool === "prompt"}
+            disabled={!slide?.imageStyle} onPress={() => toggleTool("prompt")} />
+          <ToolBtn lucide={LucideSliders} label="QA / Production package / 連結" active={activeTool === "details"}
+            disabled={!hasDetails} onPress={() => toggleTool("details")} />
+
+          <span className="w-px h-5 bg-default-200 mx-1" />
+          {/* GROUP D: 拿走 */}
+          <ToolBtn lucide={Copy} label="複製文案"
+            onPress={() => { if (slide?.caption) navigator.clipboard.writeText(slide.caption); }} />
+          <ToolBtn lucide={Save} label="儲存 / 加到專案" active={activeTool === "save"}
+            onPress={() => toggleTool("save")} />
         </div>
       </div>
 
@@ -1084,7 +1272,8 @@ function OutputCarousel({
                     className="rounded-2xl overflow-hidden"
                     style={{
                       background: "white",
-                      boxShadow: `0 12px 40px -12px ${tierAccent(pageTier)}50, 0 0 0 1px ${tierAccent(pageTier)}25`,
+                      // Beefier shadow per CJ: prominent depth, mockup floats above grey canvas
+                      boxShadow: `0 24px 48px -16px ${tierAccent(pageTier)}55, 0 8px 24px -8px rgba(0,0,0,0.10), 0 0 0 1px ${tierAccent(pageTier)}25`,
                     }}
                   >
                   <PlatformMockup
@@ -1185,50 +1374,272 @@ function OutputCarousel({
             {/* Panel header with close button */}
             <div className="sticky top-0 bg-white pb-2 flex items-center justify-between border-b border-default-100 z-10">
               <span className="text-tiny font-bold tracking-wider uppercase" style={{ color: tierAccent(pageTier) }}>
-                {activeTool === "style" && "🎨 視覺方向 + AI 生圖"}
+                {activeTool === "style" && "🎨 AI 生圖"}
                 {activeTool === "video" && "🎬 AI 影片生成"}
-                {activeTool === "prompt" && "🪄 AI Prompt"}
+                {activeTool === "prompt" && "🪄 視覺方向 / hashtag"}
                 {activeTool === "details" && "📊 細節資訊"}
+                {activeTool === "chat" && `💬 跟 ${agentMeta?.name ?? "AI"} 改文案`}
+                {activeTool === "save" && "💾 儲存 / 加到專案"}
               </span>
               <button onClick={() => setActiveTool(null)} className="text-default-400 hover:text-default-700">
                 <FontAwesomeIcon icon={faXmark} className="text-tiny" />
               </button>
             </div>
 
-            {/* STYLE panel — image style brief + 用此風格生圖 button */}
+            {/* STYLE panel — 3-step image gen flow: brief → confirm prompt → generate */}
             {activeTool === "style" && (
               <div className="space-y-3">
+                {/* Step 1: 中文 brief (always shown) */}
                 <div className="rounded-xl border border-default-200 bg-default-50 p-3">
-                  <p className="text-[10px] text-default-500 mb-1">當前 image style brief</p>
+                  <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-default-200 text-default-700 text-[9px] flex items-center justify-center">1</span>
+                    中文視覺風格建議
+                  </p>
                   <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line">
                     {slide?.imageStyle ?? "（無視覺方向 brief）"}
                   </p>
                 </div>
-                {slide?.imageStyle && !slide.imageUrl && (
+
+                {/* Step 1 → Step 2 transition */}
+                {imageStep === "brief" && slide?.imageStyle && !slide.imageUrl && (
                   <Button
-                    color="primary"
                     size="sm"
                     className="w-full font-semibold"
                     style={{ background: tierAccent(pageTier), color: "white" }}
-                    startContent={<FontAwesomeIcon icon={faImage} />}
-                    onPress={() => setMediaGenOpen(true)}
+                    onPress={() => {
+                      setEditablePrompt(slide.imageStyle ?? "");
+                      setImageStep("prompt");
+                    }}
+                    endContent={<FontAwesomeIcon icon={faChevronRight} />}
                   >
-                    用此風格 AI 生圖（Flux）
+                    下一步：產出 AI 指令
                   </Button>
                 )}
+
+                {/* Step 2: AI prompt confirmation + model selection + generate */}
+                {imageStep === "prompt" && (
+                  <>
+                    <div className="rounded-xl border border-default-200 bg-default-50 p-3">
+                      <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>2</span>
+                        確認 / 編輯 AI 指令
+                      </p>
+                      <Textarea
+                        value={editablePrompt}
+                        onValueChange={setEditablePrompt}
+                        minRows={4}
+                        maxRows={8}
+                        classNames={{ input: "text-tiny leading-relaxed" }}
+                      />
+                    </div>
+                    <div className="rounded-xl border border-default-200 bg-default-50 p-3 space-y-2">
+                      <p className="text-[10px] font-semibold text-default-500 flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>3</span>
+                        選擇 AI 模型
+                      </p>
+                      <select
+                        value={imageModel}
+                        onChange={(e) => setImageModel(e.target.value as any)}
+                        className="w-full text-tiny border border-default-200 rounded-md px-2 py-1.5 bg-white"
+                      >
+                        <option value="piapi/flux-schnell">⚡ Flux Schnell（快、便宜）</option>
+                        <option value="piapi/flux-pro">✨ Flux Pro（高品質）</option>
+                        <option value="openai/gpt-image-1">🧠 GPT Image 1（OpenAI）</option>
+                        <option value="google/imagen-3">🌈 Imagen 3（Google）</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        className="flex-1"
+                        onPress={() => setImageStep("brief")}
+                      >
+                        ‹ 上一步
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 font-semibold"
+                        style={{ background: tierAccent(pageTier), color: "white" }}
+                        startContent={<FontAwesomeIcon icon={faImage} />}
+                        onPress={() => setMediaGenOpen(true)}
+                      >
+                        生成
+                      </Button>
+                    </div>
+                  </>
+                )}
+
                 {slide?.imageUrl && (
                   <p className="text-tiny text-success-600">✓ 此版本已有真生圖</p>
                 )}
               </div>
             )}
 
-            {/* VIDEO panel — phase 2 placeholder */}
+            {/* (Old AGENTS slide-out panel removed — agents are now inline in
+                the floating toolbar. Click any agent avatar in toolbar →
+                popover shows what that agent did.) */}
+
+            {/* VIDEO panel — same 3-step flow as image gen */}
             {activeTool === "video" && (
-              <div className="rounded-xl border border-dashed border-default-300 bg-default-50 p-4 text-center">
-                <FontAwesomeIcon icon={faFilm} className="text-3xl text-default-300 mb-2" />
-                <p className="text-tiny text-default-500">AI 影片生成（Hailuo / Kling）</p>
-                <p className="text-[10px] text-default-400 mt-1">Phase 2 啟用中</p>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-default-200 bg-default-50 p-3">
+                  <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-default-200 text-default-700 text-[9px] flex items-center justify-center">1</span>
+                    影片風格建議
+                  </p>
+                  <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line">
+                    {(output as any)?.video_style_direction?.summary ?? slide?.imageStyle ?? "（沒有 video brief，會用 image brief 當基礎）"}
+                  </p>
+                </div>
+                {videoStep === "brief" && (
+                  <Button
+                    size="sm"
+                    className="w-full font-semibold"
+                    style={{ background: tierAccent(pageTier), color: "white" }}
+                    onPress={() => {
+                      setEditableVideoPrompt(((output as any)?.video_style_direction?.summary ?? slide?.imageStyle) ?? "");
+                      setVideoStep("prompt");
+                    }}
+                    endContent={<FontAwesomeIcon icon={faChevronRight} />}
+                  >
+                    下一步：產出 AI 指令
+                  </Button>
+                )}
+                {videoStep === "prompt" && (
+                  <>
+                    <div className="rounded-xl border border-default-200 bg-default-50 p-3">
+                      <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>2</span>
+                        確認 / 編輯影片 AI 指令
+                      </p>
+                      <Textarea
+                        value={editableVideoPrompt}
+                        onValueChange={setEditableVideoPrompt}
+                        minRows={4}
+                        maxRows={8}
+                        classNames={{ input: "text-tiny leading-relaxed" }}
+                      />
+                    </div>
+                    <div className="rounded-xl border border-default-200 bg-default-50 p-3 space-y-2">
+                      <p className="text-[10px] font-semibold text-default-500 flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>3</span>
+                        選擇 AI 模型
+                      </p>
+                      <select
+                        value={videoModel}
+                        onChange={(e) => setVideoModel(e.target.value as any)}
+                        className="w-full text-tiny border border-default-200 rounded-md px-2 py-1.5 bg-white"
+                      >
+                        <option value="hailuo/t2v">⚡ Hailuo T2V（快、便宜）</option>
+                        <option value="piapi/kling-v2-master">✨ Kling v2 Master（高品質）</option>
+                      </select>
+                      <p className="text-[10px] text-default-400">影片產生需 60-180 秒，會在背景跑</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="flat" className="flex-1" onPress={() => setVideoStep("brief")}>
+                        ‹ 上一步
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 font-semibold"
+                        style={{ background: tierAccent(pageTier), color: "white" }}
+                        startContent={<FontAwesomeIcon icon={faFilm} />}
+                        onPress={() => setMediaGenOpen(true)}
+                      >
+                        生成影片
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
+            )}
+
+            {/* CHAT panel — AI 對話迭代調整文案（取代換語氣） */}
+            {activeTool === "chat" && (
+              <div className="space-y-2 flex flex-col" style={{ minHeight: 320 }}>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1" style={{ maxHeight: 380 }}>
+                  {chatHistory.length === 0 && (
+                    <div className="rounded-xl bg-default-50 p-3 text-tiny text-default-700 leading-relaxed">
+                      <p className="font-semibold mb-1">{agentMeta?.name ?? "Aiden Hsu"}：</p>
+                      <p>目前的文案已經寫好（看左邊 mockup）。告訴我你想怎麼調整？例如：</p>
+                      <ul className="mt-1.5 space-y-0.5 text-[11px] text-default-600 list-disc list-inside">
+                        <li>「希望更年輕、學生族群一點」</li>
+                        <li>「把第二段刪掉，太囉嗦」</li>
+                        <li>「加入媽媽節情緒」</li>
+                        <li>「結尾的 CTA 改成限時優惠」</li>
+                      </ul>
+                    </div>
+                  )}
+                  {chatHistory.map((m, i) => (
+                    <div key={i} className={`rounded-xl p-2.5 text-tiny leading-relaxed ${
+                      m.role === "user"
+                        ? "ml-6 bg-primary-50 text-default-800"
+                        : "mr-2 bg-default-50"
+                    }`}>
+                      {m.role === "assistant" && (
+                        <p className="text-[10px] font-semibold text-default-500 mb-1">{agentMeta?.name ?? "AI"}：</p>
+                      )}
+                      <p className="whitespace-pre-line">{m.content}</p>
+                      {m.rewritten && (
+                        <>
+                          <div className="mt-2 p-2 bg-white rounded-md border border-default-200">
+                            <p className="text-[10px] font-semibold text-default-500 mb-1">改寫後：</p>
+                            <p className="text-default-800 whitespace-pre-line text-[11px]">{m.rewritten}</p>
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 text-tiny font-semibold"
+                              style={{ background: tierAccent(pageTier), color: "white" }}
+                              onPress={() => {
+                                setEdits((e) => ({ ...e, [idx]: m.rewritten! }));
+                              }}
+                            >
+                              ✓ 採用這版
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  {chatBusy && (
+                    <div className="rounded-xl bg-default-50 p-2.5 text-tiny text-default-500 italic">
+                      {agentMeta?.name ?? "AI"} 思考中…
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-2 border-t border-default-100">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
+                    placeholder="說明你想怎麼改…"
+                    className="flex-1 text-tiny border border-default-200 rounded-md px-2 py-1.5 focus:outline-none focus:border-primary-400"
+                    disabled={chatBusy}
+                  />
+                  <Button
+                    size="sm"
+                    onPress={handleChatSend}
+                    isDisabled={!chatInput.trim() || chatBusy}
+                    style={{ background: tierAccent(pageTier), color: "white" }}
+                  >
+                    送出
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* SAVE panel — pick a project to attach this output */}
+            {activeTool === "save" && (
+              <SavePanel
+                slide={slide}
+                pageTier={pageTier}
+                accent={tierAccent(pageTier)}
+                brandId={brandId}
+                onClose={() => setActiveTool(null)}
+              />
             )}
 
             {/* PROMPT panel — show what was sent to LLM */}
