@@ -1,0 +1,21 @@
+name: Admin — Check listFB output (FB 60s sanity)
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            npx tsx -e "
+            import('./server/_core/quickTaskFB60.ts').then(m => {
+              console.log('FB60 tasks:', m.FB_60S_TASKS_V2.length);
+              console.log('First 3 ids:', m.FB_60S_TASKS_V2.slice(0,3).map((t:any)=>t.id+' tier='+t.tier));
+            }).catch(e => console.error('FB60 import error:', e.message));
+            " 2>&1
