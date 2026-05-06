@@ -11,7 +11,7 @@
 
 export interface FBTaskTemplate {
   id: string;                              // e.g. "fb-30-caption-short"
-  tier: "30s" | "60s" | "90s";
+  tier: "30s" | "60s" | "90s" | "100s";
   postType: string;                        // matches mockup format key
   label: string;                           // user-facing chip label
   description: string;                     // 1-line UI hint
