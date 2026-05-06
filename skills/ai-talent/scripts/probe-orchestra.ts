@@ -20,6 +20,7 @@ import { EMAIL_30S_TASKS, EMAIL_30S_ORCHESTRA } from "../server/_core/quickTaskE
 import { PR_30S_TASKS, PR_30S_ORCHESTRA } from "../server/_core/quickTaskPR";
 import { BRAND_30S_TASKS, BRAND_30S_ORCHESTRA } from "../server/_core/quickTaskBrand";
 import { RESEARCH_30S_TASKS, RESEARCH_30S_ORCHESTRA } from "../server/_core/quickTaskResearch";
+import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA as FB60_ORCH } from "../server/_core/quickTaskFB60";
 
 (async () => {
   const taskId = process.env.TASK_ID || "fb-30-pure-text-hook";
@@ -32,9 +33,10 @@ import { RESEARCH_30S_TASKS, RESEARCH_30S_ORCHESTRA } from "../server/_core/quic
     EMAIL_30S_TASKS.find((t) => t.id === taskId) ??
     PR_30S_TASKS.find((t) => t.id === taskId) ??
     BRAND_30S_TASKS.find((t) => t.id === taskId) ??
-    RESEARCH_30S_TASKS.find((t) => t.id === taskId);
+    RESEARCH_30S_TASKS.find((t) => t.id === taskId) ??
+    FB_60S_TASKS_V2.find((t) => t.id === taskId);
   const config =
-    FB_30S_ORCHESTRA[taskId] ?? IG_30S_ORCHESTRA[taskId] ?? YT_30S_ORCHESTRA[taskId] ?? TT_30S_ORCHESTRA[taskId] ?? LI_30S_ORCHESTRA[taskId] ?? EMAIL_30S_ORCHESTRA[taskId] ?? PR_30S_ORCHESTRA[taskId] ?? BRAND_30S_ORCHESTRA[taskId] ?? RESEARCH_30S_ORCHESTRA[taskId];
+    FB_30S_ORCHESTRA[taskId] ?? IG_30S_ORCHESTRA[taskId] ?? YT_30S_ORCHESTRA[taskId] ?? TT_30S_ORCHESTRA[taskId] ?? LI_30S_ORCHESTRA[taskId] ?? EMAIL_30S_ORCHESTRA[taskId] ?? PR_30S_ORCHESTRA[taskId] ?? BRAND_30S_ORCHESTRA[taskId] ?? RESEARCH_30S_ORCHESTRA[taskId] ?? FB60_ORCH[taskId];
   if (!template || !config) {
     console.error("✗ template or config missing for", taskId);
     process.exit(1);
