@@ -1052,6 +1052,67 @@ function OutputCarousel({
   const [videoModel, setVideoModel] = useState<"hailuo/t2v" | "piapi/kling-v2-master">("hailuo/t2v");
   // Agents: clicking an avatar in toolbar opens a popover showing that agent's contribution
   const [openAgentPopover, setOpenAgentPopover] = useState<number | null>(null);
+  // Inline image / video gen — generates directly in the right panel,
+  // no MediaGenFlow modal popup (per CJ direction).
+  const [imageGenStatus, setImageGenStatus] = useState<"idle" | "generating" | "ready" | "failed">("idle");
+  const [imageGenError, setImageGenError] = useState<string | null>(null);
+  const [videoGenStatus, setVideoGenStatus] = useState<"idle" | "generating" | "ready" | "failed" | "submitted">("idle");
+  const [videoGenError, setVideoGenError] = useState<string | null>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const mediaGenerateMut = (trpc as any).media?.generate?.useMutation();
+  const handleInlineImageGen = async () => {
+    if (!editablePrompt.trim() || !mediaGenerateMut) return;
+    setImageGenStatus("generating");
+    setImageGenError(null);
+    try {
+      const r = await mediaGenerateMut.mutateAsync({
+        kind: "image",
+        modelId: imageModel,
+        promptEn: editablePrompt,
+        brandId: brandId ?? null,
+        aspectRatio: "1:1" as const,
+        quality: "medium" as const,
+      });
+      if (r?.ok && r.url) {
+        setImageOverrides((o) => ({ ...o, [idx]: r.url }));
+        setImageGenStatus("ready");
+      } else {
+        setImageGenStatus("failed");
+        setImageGenError(r?.message ?? "生成失敗");
+      }
+    } catch (e: any) {
+      setImageGenStatus("failed");
+      setImageGenError(e?.message ?? String(e));
+    }
+  };
+  const handleInlineVideoGen = async () => {
+    if (!editableVideoPrompt.trim() || !mediaGenerateMut) return;
+    setVideoGenStatus("generating");
+    setVideoGenError(null);
+    setGeneratedVideoUrl(null);
+    try {
+      const r = await mediaGenerateMut.mutateAsync({
+        kind: "video",
+        modelId: videoModel,
+        promptEn: editableVideoPrompt,
+        brandId: brandId ?? null,
+        aspectRatio: "9:16" as const,
+      });
+      if (r?.ok && r.url) {
+        setGeneratedVideoUrl(r.url);
+        setVideoGenStatus("ready");
+      } else if (r?.status === "submitted") {
+        setVideoGenStatus("submitted");
+        setVideoGenError("影片在背景生成中（60-180 秒），請耐心等候。");
+      } else {
+        setVideoGenStatus("failed");
+        setVideoGenError(r?.message ?? "生成失敗");
+      }
+    } catch (e: any) {
+      setVideoGenStatus("failed");
+      setVideoGenError(e?.message ?? String(e));
+    }
+  };
   // AI chat panel state — replaces 換語氣
   const [chatHistory, setChatHistory] = useState<Array<{ role: "user" | "assistant"; content: string; rewritten?: string }>>([]);
   const [chatInput, setChatInput] = useState("");
@@ -1454,6 +1515,7 @@ function OutputCarousel({
                         variant="flat"
                         className="flex-1"
                         onPress={() => setImageStep("brief")}
+                        isDisabled={imageGenStatus === "generating"}
                       >
                         ‹ 上一步
                       </Button>
@@ -1462,15 +1524,48 @@ function OutputCarousel({
                         className="flex-1 font-semibold"
                         style={{ background: tierAccent(pageTier), color: "white" }}
                         startContent={<FontAwesomeIcon icon={faImage} />}
-                        onPress={() => setMediaGenOpen(true)}
+                        onPress={handleInlineImageGen}
+                        isLoading={imageGenStatus === "generating"}
+                        isDisabled={imageGenStatus === "generating"}
                       >
-                        生成
+                        {imageGenStatus === "generating" ? "生成中…" : "生成"}
                       </Button>
                     </div>
+                    {/* Inline result — image appears here when ready, no popup */}
+                    {imageGenStatus === "ready" && imageOverrides[idx] && (
+                      <div className="rounded-xl border border-success-200 bg-success-50 p-3 space-y-2">
+                        <p className="text-tiny font-semibold text-success-700">✓ 已套用到 mockup</p>
+                        <img
+                          src={imageOverrides[idx]}
+                          alt="generated"
+                          className="w-full rounded-lg shadow-sm"
+                        />
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          className="w-full"
+                          onPress={handleInlineImageGen}
+                          startContent={<FontAwesomeIcon icon={faRotateRight} />}
+                        >
+                          再生一張
+                        </Button>
+                      </div>
+                    )}
+                    {imageGenStatus === "generating" && (
+                      <div className="rounded-xl border border-default-200 bg-default-50 p-3 flex items-center gap-2">
+                        <Spinner size="sm" />
+                        <span className="text-tiny text-default-600">{imageModel.includes("flux-pro") ? "Flux Pro 生圖中（10-15 秒）…" : "生圖中（5-10 秒）…"}</span>
+                      </div>
+                    )}
+                    {imageGenStatus === "failed" && (
+                      <div className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-tiny text-warning-800">
+                        ✗ 生成失敗：{imageGenError}
+                      </div>
+                    )}
                   </>
                 )}
 
-                {slide?.imageUrl && (
+                {slide?.imageUrl && imageGenStatus === "idle" && (
                   <p className="text-tiny text-success-600">✓ 此版本已有真生圖</p>
                 )}
               </div>
@@ -1537,7 +1632,9 @@ function OutputCarousel({
                       <p className="text-[10px] text-default-400">影片產生需 60-180 秒，會在背景跑</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="flat" className="flex-1" onPress={() => setVideoStep("brief")}>
+                      <Button size="sm" variant="flat" className="flex-1"
+                        onPress={() => setVideoStep("brief")}
+                        isDisabled={videoGenStatus === "generating"}>
                         ‹ 上一步
                       </Button>
                       <Button
@@ -1545,11 +1642,50 @@ function OutputCarousel({
                         className="flex-1 font-semibold"
                         style={{ background: tierAccent(pageTier), color: "white" }}
                         startContent={<FontAwesomeIcon icon={faFilm} />}
-                        onPress={() => setMediaGenOpen(true)}
+                        onPress={handleInlineVideoGen}
+                        isLoading={videoGenStatus === "generating"}
+                        isDisabled={videoGenStatus === "generating"}
                       >
-                        生成影片
+                        {videoGenStatus === "generating" ? "生成中…" : "生成影片"}
                       </Button>
                     </div>
+                    {/* Inline video result */}
+                    {videoGenStatus === "ready" && generatedVideoUrl && (
+                      <div className="rounded-xl border border-success-200 bg-success-50 p-3 space-y-2">
+                        <p className="text-tiny font-semibold text-success-700">✓ 影片完成</p>
+                        <video
+                          src={generatedVideoUrl}
+                          controls
+                          className="w-full rounded-lg shadow-sm"
+                        />
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          className="w-full"
+                          onPress={handleInlineVideoGen}
+                          startContent={<FontAwesomeIcon icon={faRotateRight} />}
+                        >
+                          再生一支
+                        </Button>
+                      </div>
+                    )}
+                    {videoGenStatus === "generating" && (
+                      <div className="rounded-xl border border-default-200 bg-default-50 p-3 flex items-center gap-2">
+                        <Spinner size="sm" />
+                        <span className="text-tiny text-default-600">影片生成中（60-180 秒）…</span>
+                      </div>
+                    )}
+                    {videoGenStatus === "submitted" && (
+                      <div className="rounded-xl border border-default-200 bg-default-50 p-3 text-tiny text-default-700">
+                        ⏳ 影片已提交，背景生成中（{videoModel.includes("kling") ? "120-180" : "60-90"} 秒）
+                        <p className="text-[10px] text-default-400 mt-1">{videoGenError}</p>
+                      </div>
+                    )}
+                    {videoGenStatus === "failed" && (
+                      <div className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-tiny text-warning-800">
+                        ✗ 生成失敗：{videoGenError}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
