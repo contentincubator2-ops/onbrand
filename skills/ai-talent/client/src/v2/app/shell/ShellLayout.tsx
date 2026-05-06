@@ -45,9 +45,9 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/100s",      label: "100S",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
-  { to: "/templates", label: "範本",     matchPrefix: "/templates", icon: <FontAwesomeIcon icon={faTableCells} /> },
+  // 範本 / 比稿 hidden per CJ direction 2026-05-06 — focus narrows to
+  // tier tasks + projects + brands. Routes still exist for direct URL access.
   { to: "/brands",    label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
-  { to: "/boardroom", label: "比稿",     icon: <FontAwesomeIcon icon={faMicrophone} /> },
   { to: "/playbooks", label: "案例",     icon: <FontAwesomeIcon icon={faBookBookmark} /> },
 ];
 
@@ -225,6 +225,46 @@ function IconBar({
           </button>
         </Tooltip>
       </div>
+
+      {/* Brand switcher — top-left prominent (CJ direction 2026-05-06)
+          Shows current brand initial; click opens slide panel with brand list */}
+      {(() => {
+        const activeBrand = brands.find((b: any) => b.id === scope.brandId);
+        const initial = activeBrand?.name?.charAt(0) ?? "?";
+        return (
+          <div style={{ padding: "0 13px 10px", flexShrink: 0 }}>
+            <Tooltip content={activeBrand ? `品牌：${activeBrand.name}（點擊切換）` : "選擇品牌"} placement="right">
+              <button
+                onClick={() => {
+                  // Open slide panel — brand list is at top of panel
+                  if (collapsed) onToggle();
+                }}
+                aria-label="切換品牌"
+                style={{
+                  width: 44, height: 44, borderRadius: 12, border: "2px solid rgba(124,58,237,0.18)",
+                  background: activeBrand
+                    ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
+                    : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
+                  color: "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto", fontSize: 16, fontWeight: 800, cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(124,58,237,0.25)",
+                  transition: "transform 0.07s, box-shadow 0.1s",
+                  overflow: "hidden",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 16px rgba(124,58,237,0.4)"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 12px rgba(124,58,237,0.25)"; }}
+              >
+                {activeBrand?.logoUrl ? (
+                  <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <span>{initial}</span>
+                )}
+              </button>
+            </Tooltip>
+          </div>
+        );
+      })()}
 
       {/* 建立 circle */}
       <div style={{ padding: "0 13px 12px", flexShrink: 0 }}>
@@ -1041,7 +1081,14 @@ function GlobalScopeBar({ scope, setScope, brands }: {
                     selectedId={scope.eventId}
                     color="#2563eb"
                     emptyText="此品牌尚無活動"
-                    onSelect={(id) => { setScope({ ...scope, eventId: id }); setOpen(false); }}
+                    onSelect={(id) => {
+                      // 修：選 event 自動帶入該 event 的 brand（之前只更新 eventId
+                      // 不動 brandId，造成 brand stale 不會跟著事件切換）
+                      const ev = events.find((x: any) => x.id === id);
+                      const evBrandId = ev?.brandId ?? scope.brandId;
+                      setScope({ brandId: evBrandId, productId: scope.productId, eventId: id });
+                      setOpen(false);
+                    }}
                     onClear={scope.eventId ? () => setScope({ ...scope, eventId: null }) : undefined}
                   />
             )}
