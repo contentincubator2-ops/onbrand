@@ -138,27 +138,93 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     maxTokens: 300,
     outputDefaults: { platform: "facebook", post_type: "comment" },
   },
+  // FB Ad Asset tasks — replace 危機/客訴回覆 (P0 risk per CJ QA, 2026-05-06).
+  // LLM has high variance on crisis comms (real reputational risk if mis-fire).
+  // Ad asset tasks are safer + LLM strength: produce N differentiated options.
   {
-    id: "fb-30-crisis-reply-short",
+    id: "fb-30-ad-headline",
     tier: "30s",
-    postType: "comment",
-    label: "FB 危機 / 客訴回覆（短）",
-    description: "Lagadec 4 段壓縮版（致歉+解釋+承諾+私訊邀請）",
-    agent_id: 239185,             // Brian Chou — fb-crisis-comms
-    skill_slug: "crisis-communication",
-    primary_question: "貼上客戶抱怨內容（或留言截圖文字）",
-    primary_input: { key: "user_complaint", placeholder: "客戶說了什麼？盡可能完整貼進來", type: "textarea" },
+    postType: "ad",
+    label: "FB 廣告 Headline 5 種",
+    description: "5 種切角的廣告標題（25 字內），直接複製到 Ads Manager 用",
+    agent_id: 239183,             // Aiden Hsu
+    skill_slug: "fb-ad-copy",
+    primary_question: "這檔廣告主推什麼？產品 / 賣點 / 受眾簡述",
+    primary_input: { key: "product_focus", placeholder: "例：母親節健力餐高蛋白系列，給沒時間煮飯的職業媽媽", type: "textarea" },
     inputs: [
-      { key: "user_complaint", label: "客戶抱怨內容", type: "textarea", required: true },
-      { key: "context", label: "已知事實 / 處理狀態（可選）", type: "textarea", required: false },
+      { key: "product_focus", label: "產品 / 賣點 / 受眾", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 FB 客訴留言的「壓縮版 Lagadec 4 段」回覆（80-150 字）。
-規則：① 真誠致歉（不要 "若有造成困擾" 推託式）② 簡短解釋發生什麼 ③ 具體承諾 + 時程 ④ 提供私訊管道。
-不要承諾無法做到的事。語氣專業但有人味。
-output: caption 放回覆文，description 放原始抱怨內容。`,
-    preferredModel: "azure-position", // Claude — 客訴敏感度需要好點的模型
+    systemPrompt: `產出 5 個 FB 廣告 headline。每個 25 字以內、有 hook、口語感、不要官腔。
+5 種切角分別：
+- 痛點挑戰式（戳中受眾煩惱）
+- 數據驚奇式（具體數字 / 反差）
+- 反問引發式（讓人停下滑動）
+- 情境共鳴式（描述用戶生活場景）
+- 結果承諾式（明確利益）
+caption 欄位放這 5 個 headline（編號 1-5，每個一行）。${FB_TONE_SUFFIX}`,
+    preferredModel: "qwen",
     maxTokens: 400,
-    outputDefaults: { platform: "facebook", post_type: "comment" },
+    outputDefaults: { platform: "facebook", post_type: "ad" },
+  },
+  {
+    id: "fb-30-ad-primary",
+    tier: "30s",
+    postType: "ad",
+    label: "FB 廣告 Primary Text 5 種",
+    description: "5 種口吻的廣告主內文（80-150 字），對應不同受眾心理",
+    agent_id: 60021,              // Tina Ji
+    skill_slug: "fb-ad-copy",
+    primary_question: "這檔廣告的主題 / 產品 / 受眾？",
+    primary_input: { key: "topic", placeholder: "例：健力餐母親節組合，職業媽媽 35-50 歲", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "主題 / 產品 / 受眾", type: "textarea", required: true },
+    ],
+    systemPrompt: `產出 5 個 FB 廣告 primary text（80-150 字 / 個）。
+5 種版本：① 故事式 ② 數據式 ③ 反差式 ④ 見證式（用第三人稱描述用戶體驗）⑤ 簡短直球式
+每個版本獨立完整、各有自己的 hook + body + CTA。caption 欄位放這 5 個（每個之間用 "---" 分隔）。${FB_TONE_SUFFIX}`,
+    preferredModel: "qwen",
+    maxTokens: 1200,
+    outputDefaults: { platform: "facebook", post_type: "ad" },
+  },
+  {
+    id: "fb-30-ad-cta",
+    tier: "30s",
+    postType: "ad",
+    label: "FB 廣告 CTA 5 種",
+    description: "5 個 CTA 按鈕文字 + 每個 CTA 的搭配情境建議",
+    agent_id: 239183,             // Aiden Hsu
+    skill_slug: "fb-ad-copy",
+    primary_question: "想引導用戶做什麼動作？（購買 / 加入會員 / 預約 / 試用）",
+    primary_input: { key: "goal", placeholder: "例：希望用戶點到產品頁加入購物車", type: "text" },
+    inputs: [
+      { key: "goal", label: "廣告目標", type: "text", required: true },
+    ],
+    systemPrompt: `產出 5 個 FB 廣告 CTA 按鈕文字（每個 6-12 字）+ 50 字搭配情境說明。
+5 種 CTA 風格：① 急迫感（限時/數量）② 利益強調 ③ 軟性邀請（試/看/體驗）④ 對話感（聊聊/談談）⑤ 直接動作（購買/加入）
+caption 欄位用清單格式：「① CTA 文字 — 適合：（情境）」每行一個。${FB_TONE_SUFFIX}`,
+    preferredModel: "qwen",
+    maxTokens: 500,
+    outputDefaults: { platform: "facebook", post_type: "ad" },
+  },
+  {
+    id: "fb-30-ad-description",
+    tier: "30s",
+    postType: "ad",
+    label: "FB 連結廣告 Description 5 種",
+    description: "連結廣告下方 description（30 字內），5 種切入角度",
+    agent_id: 60021,              // Tina Ji
+    skill_slug: "fb-ad-copy",
+    primary_question: "連結要導向哪？產品頁 / 活動頁 / 文章 / app 下載？",
+    primary_input: { key: "link_purpose", placeholder: "例：導到健力餐 14 包組合產品頁", type: "textarea" },
+    inputs: [
+      { key: "link_purpose", label: "連結目的 / 著陸頁主題", type: "textarea", required: true },
+    ],
+    systemPrompt: `產出 5 個 FB 連結廣告 description（每個 30 字內）。
+5 種切角：① 數據（價格/數量/時效）② 利益強調 ③ 信任強化（保固/評價）④ 急迫感 ⑤ 簡短直白
+caption 欄位放 5 個編號 description（每行一個）。${FB_TONE_SUFFIX}`,
+    preferredModel: "qwen",
+    maxTokens: 350,
+    outputDefaults: { platform: "facebook", post_type: "ad" },
   },
   {
     id: "fb-30-pinned-short",
@@ -419,17 +485,55 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMinChars: 30,
     captionMaxChars: 80,
   },
-  "fb-30-crisis-reply-short": {
-    variants: 3,
+  // Ad asset configs — single LLM call per task returns N options inline in caption.
+  // (1 variant because the LLM emits all 5 options at once; we don't fan out.)
+  "fb-30-ad-headline": {
+    variants: 1,
     images: 0,
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
     imageQualitySteps: 0,
-    variantLabels: ["克制式", "標準式", "具體承諾式"],
-    captionMinChars: 80,
-    captionMaxChars: 150,
+    variantLabels: ["5 種 headline"],
+    captionMinChars: 30,
+    captionMaxChars: 400,
+  },
+  "fb-30-ad-primary": {
+    variants: 1,
+    images: 0,
+    runImageGen: false,
+    imageDirectorId: null,
+    aspectRatio: null,
+    fluxSize: null,
+    imageQualitySteps: 0,
+    variantLabels: ["5 種 primary text"],
+    captionMinChars: 200,
+    captionMaxChars: 1200,
+  },
+  "fb-30-ad-cta": {
+    variants: 1,
+    images: 0,
+    runImageGen: false,
+    imageDirectorId: null,
+    aspectRatio: null,
+    fluxSize: null,
+    imageQualitySteps: 0,
+    variantLabels: ["5 種 CTA"],
+    captionMinChars: 50,
+    captionMaxChars: 500,
+  },
+  "fb-30-ad-description": {
+    variants: 1,
+    images: 0,
+    runImageGen: false,
+    imageDirectorId: null,
+    aspectRatio: null,
+    fluxSize: null,
+    imageQualitySteps: 0,
+    variantLabels: ["5 種 description"],
+    captionMinChars: 30,
+    captionMaxChars: 350,
   },
   "fb-30-pinned-short": {
     variants: 3,
