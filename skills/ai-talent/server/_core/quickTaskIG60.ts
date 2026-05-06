@@ -267,9 +267,8 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["教學版", "故事版", "反差版", "節奏版", "懸念版"],
-    captionMinChars: 300, captionMaxChars: 500,
-    strategistAgentId: 180030, // Kevin Lin — Content Strategy
-    extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
+    captionMinChars: 200, captionMaxChars: 400,
+    extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
   "ig-60-carousel-7": {

@@ -118,7 +118,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: NINA_FALLBACK,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
     variantLabels: ["教學版", "故事版", "數據版", "懸念版", "對比版"],
-    captionMinChars: 800, captionMaxChars: 1500,
+    captionMinChars: 400, captionMaxChars: 800,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "yt-60-shorts-script": {
@@ -140,7 +140,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: NINA_FALLBACK,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
     variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
-    captionMinChars: 600, captionMaxChars: 1000,
+    captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 220863, // Nelson Chen
     postLabels: ["第 1 集", "第 2 集", "第 3 集"],
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
@@ -156,7 +156,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: NINA_FALLBACK,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
-    captionMinChars: 600, captionMaxChars: 1000,
+    captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 180142, // Kevin Liu
     specialtyAgentId: 220504, // Cheng-Tse Liao
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
