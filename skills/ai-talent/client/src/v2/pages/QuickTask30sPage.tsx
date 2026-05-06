@@ -573,12 +573,6 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                         >
                           {tier}
                         </span>
-                        {/* 100s squad tasks: show "真實 Squad" badge so user knows it's a multi-step pipeline */}
-                        {(t as any).kind === "squad" && (
-                          <span className="absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/90 text-default-700 shadow-sm">
-                            🎯 真實 Squad
-                          </span>
-                        )}
                       </div>
                       {/* Card info */}
                       <div className="p-3 flex flex-col gap-1 flex-1">
@@ -591,7 +585,6 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                           <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
                           <span className="text-tiny font-medium text-default-700 truncate">
                             {agentName}
-                            {(t as any).kind === "squad" && <span className="text-default-400"> · squad lead</span>}
                           </span>
                         </div>
                         {/* 60s tier: show full collab team avatar stack + count */}
