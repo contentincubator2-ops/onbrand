@@ -116,21 +116,8 @@ ${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 500,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
-  {
-    id: "pr-30-crisis-statement",
-    tier: "30s", postType: "press-release",
-    label: "危機聲明",
-    description: "資安 / 召回 / 客訴等危機事件的對外聲明",
-    agent_id: 180182, skill_slug: "media-relations",
-    primary_question: "危機事件是？已知事實 + 已採取行動？",
-    primary_input: { key: "context", placeholder: "事件 + 影響範圍 + 已採取的行動", type: "textarea" },
-    inputs: [{ key: "context", label: "危機資訊", type: "textarea", required: true }],
-    systemPrompt: `產出危機聲明（200-350 字）。
-結構：1 句承認事件 + 致歉 → 已知事實（具體、不含糊）→ 已採取的行動 → 後續承諾 + 時程 → 聯絡管道。
-不要試圖淡化、不要找藉口、不要拖延。${PR_TONE}`,
-    preferredModel: "qwen", maxTokens: 600,
-    outputDefaults: { platform: "press", post_type: "press-release" },
-  },
+  // pr-30-crisis-statement removed per CJ direction 2026-05-06 — risky for
+  // LLM to draft crisis comms unsupervised. Use real PR squad workflow instead.
   {
     id: "pr-30-spokesperson-qa",
     tier: "30s", postType: "press-release",
@@ -172,7 +159,6 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "pr-30-boilerplate":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品導向", "規模導向", "里程碑導向"], captionMinChars: 150, captionMaxChars: 300 },
   "pr-30-fact-sheet":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品優先", "公司優先", "市場優先"], captionMinChars: 200, captionMaxChars: 600 },
   "pr-30-media-pitch":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共同議題切入", "獨家數據切入", "採訪邀請切入"], captionMinChars: 100, captionMaxChars: 250 },
-  "pr-30-crisis-statement":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["克制", "標準", "全面承諾"], captionMinChars: 200, captionMaxChars: 400 },
   "pr-30-spokesperson-qa":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["防禦型", "透明型", "主動引導"], captionMinChars: 300, captionMaxChars: 1000 },
   "pr-30-launch-social":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: VINCENT_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["FB 口吻", "LinkedIn 口吻", "Threads 口吻"], captionMinChars: 100, captionMaxChars: 250 },
 };

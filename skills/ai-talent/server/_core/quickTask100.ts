@@ -329,20 +329,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     preferredModel: "qwen", maxTokens: 1300,
     outputDefaults: { platform: "press", post_type: "press" },
   },
-  {
-    id: "pr-100-crisis-toolkit",
-    tier: "100s", postType: "press",
-    label: "PR 完整危機 Toolkit",
-    description: "前期偵測 + 第一份聲明 + 中期更新 ×3 + 後期 follow-up + 內部 SOP",
-    agent_id: 60036, skill_slug: "pr-writing",
-    primary_question: "事件內容？",
-    primary_input: { key: "incident", placeholder: "完整描述事件", type: "textarea" },
-    inputs: [{ key: "incident", label: "事件", type: "textarea", required: true }],
-    systemPrompt: `產出 PR 危機 toolkit 其中 1 部分（300-600 字）。
-本次你寫的是「{label}」。Lagadec 4 段框架。${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1200,
-    outputDefaults: { platform: "press", post_type: "press" },
-  },
+  // pr-100-crisis-toolkit removed per CJ direction 2026-05-06 — risky.
   {
     id: "br-100-reposition-toolkit",
     tier: "100s", postType: "press",
@@ -636,16 +623,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "news",
     extras: { postsCount: 5, replyTemplates: 3 },
   },
-  "pr-100-crisis-toolkit": {
-    variants: 6, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    variantLabels: ["前期偵測", "第一份聲明", "24h 更新", "48h 更新", "後期 follow-up", "內部 SOP"],
-    captionMinChars: 300, captionMaxChars: 600,
-    specialtyAgentId: 180855,
-    postLabels: ["前期偵測", "第一份聲明", "24h 更新", "48h 更新", "後期 follow-up", "內部 SOP"],
-    scoutKind: "trending",
-    extras: { postsCount: 6, legalAssistant: true, replyTemplates: 3 },
-  },
+  // pr-100-crisis-toolkit orchestra config removed.
   "br-100-reposition-toolkit": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,

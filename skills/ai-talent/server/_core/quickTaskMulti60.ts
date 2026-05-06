@@ -259,23 +259,7 @@ export const PR_60S_TASKS: FBTaskTemplate[] = [
     preferredModel: "qwen", maxTokens: 1800,
     outputDefaults: { platform: "press", post_type: "press" },
   },
-  {
-    id: "pr-60-crisis-statement",
-    tier: "60s", postType: "press",
-    label: "危機聲明稿",
-    description: "Lagadec 4 段完整版 + 法務檢核",
-    agent_id: 60036, skill_slug: "pr-writing",
-    primary_question: "事件 / 危機內容？",
-    primary_input: { key: "incident", placeholder: "完整描述事件 + 已知事實", type: "textarea" },
-    inputs: [
-      { key: "incident", label: "事件內容", type: "textarea", required: true },
-      { key: "facts", label: "已知事實 / 已處理項", type: "textarea", required: false },
-    ],
-    systemPrompt: `產出危機聲明稿（500-800 字）。
-Lagadec 4 段：致歉 / 解釋 / 承諾 / 私訊管道。語氣專業有人味、不推託。${TONE("Press")}`,
-    preferredModel: "qwen", maxTokens: 1300,
-    outputDefaults: { platform: "press", post_type: "press" },
-  },
+  // pr-60-crisis-statement removed per CJ direction 2026-05-06.
 ];
 
 export const PR_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
@@ -286,14 +270,7 @@ export const PR_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMinChars: 400, captionMaxChars: 700,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
-  "pr-60-crisis-statement": {
-    variants: 3, images: 3, runImageGen: true, imageDirectorId: PR_IMG,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["克制版", "標準版", "具體承諾版"],
-    captionMinChars: 300, captionMaxChars: 500,
-    specialtyAgentId: 180855,
-    extras: { legalAssistant: true, replyTemplates: 5, postingTime: true, followupPost: true },
-  },
+  // pr-60-crisis-statement orchestra config removed.
 };
 
 // ─── Brand Positioning 60s ──────────────────────────────────────────────
