@@ -22,6 +22,7 @@ import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Avatar, Button, Spinner } from "@heroui/react";
+import { PlatformMockup } from "../components/PlatformMockup";
 import {
   Sparkles,
   Calendar as CalendarIcon,
@@ -183,6 +184,8 @@ function PlatformCell({
   caption,
   writerAvatar,
   imageDirAvatar,
+  brandName,
+  brandLogoUrl,
   onRedo,
   onCopy,
 }: {
@@ -191,6 +194,8 @@ function PlatformCell({
   caption: string;
   writerAvatar: string | null;
   imageDirAvatar: string | null;
+  brandName: string | null;
+  brandLogoUrl: string | null;
   onRedo?: () => void;
   onCopy?: () => void;
 }) {
@@ -199,6 +204,7 @@ function PlatformCell({
   const isWriting = state.status === "writing";
   const isImaging = state.status === "imaging";
   const isDone    = state.status === "done";
+  const hasContent = isWriting || isImaging || isDone;
 
   return (
     <div
@@ -206,7 +212,6 @@ function PlatformCell({
       style={{
         border: "1.5px solid #111",
         boxShadow: isDone ? `3px 3px 0 ${meta.accent}33` : "none",
-        minHeight: 280,
       }}
     >
       {/* header strip */}
@@ -228,71 +233,76 @@ function PlatformCell({
         </span>
       </div>
 
-      {/* image area */}
-      <div
-        className="aspect-square bg-neutral-50 flex items-center justify-center relative"
-        style={{ borderBottom: isDone ? "1.5px solid #111" : "1.5px dashed #d4d4d4" }}
-      >
-        {state.imageUrl ? (
-          <img src={state.imageUrl} alt="" className="w-full h-full object-cover" />
-        ) : isImaging ? (
-          <div className="flex flex-col items-center gap-2">
-            <Avatar src={imageDirAvatar ?? undefined} size="sm" className="w-8 h-8" />
-            <Spinner size="sm" />
-            <p className="text-[10px] text-neutral-500">視覺指導生圖中…</p>
+      {/* Real platform mockup — scaled to fit calendar grid */}
+      {hasContent ? (
+        <div className="relative bg-neutral-50 overflow-hidden" style={{ minHeight: 240 }}>
+          <div
+            style={{
+              transform: "scale(0.55)",
+              transformOrigin: "top left",
+              width: "182%",
+              pointerEvents: "none",
+            }}
+          >
+            <PlatformMockup
+              variant={meta.mockup as any}
+              title={caption.split("\n")[0]?.slice(0, 40) ?? ""}
+              brief={caption}
+              brandName={brandName}
+              brandLogoUrl={brandLogoUrl ?? null}
+              liveCaption={caption}
+              liveImageUrl={state.imageUrl ?? undefined}
+              liveImageStatus={state.imageUrl ? "ready" : (isImaging ? undefined : "skipped")}
+            />
           </div>
-        ) : (
-          <p className="text-[10px] text-neutral-400">{isIdle ? "待產出" : "—"}</p>
-        )}
-      </div>
-
-      {/* caption area */}
-      <div className="p-3 flex-1 min-h-[80px] flex flex-col">
-        {(isWriting || isImaging || isDone) && caption ? (
-          <p className="text-[12px] text-neutral-800 leading-relaxed whitespace-pre-wrap flex-1">
-            {caption}
-            {isWriting && (
-              <span
-                className="inline-block w-[1.5px] h-[12px] ml-0.5 align-middle bg-neutral-700"
-                style={{ animation: "blink 1s steps(2) infinite" }}
-              />
-            )}
+          {isImaging && !state.imageUrl && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
+              <Avatar src={imageDirAvatar ?? undefined} size="sm" className="w-8 h-8" />
+              <Spinner size="sm" />
+              <p className="text-[10px] text-neutral-600">視覺指導生圖中…</p>
+            </div>
+          )}
+          {isWriting && !caption && (
+            <div className="absolute inset-0 bg-white/80 flex items-center gap-2 justify-center">
+              <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
+              <p className="text-[11px] text-neutral-600">caption writer 撰寫中…</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-neutral-50 flex items-center gap-2 justify-center" style={{ minHeight: 240 }}>
+          <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
+          <p className="text-[10px] text-neutral-400">
+            {isIdle ? "等候接棒…" : "—"}
           </p>
-        ) : (
-          <div className="flex items-center gap-2 flex-1">
-            <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
-            <p className="text-[10px] text-neutral-400">
-              {isIdle ? "等候 caption writer 接棒…" : "—"}
-            </p>
-          </div>
-        )}
+        </div>
+      )}
 
-        {/* Action row — only on done */}
-        {isDone && caption && (
-          <div className="mt-2 pt-2 border-t border-neutral-100 flex items-center gap-1.5">
-            {onCopy && (
-              <button
-                onClick={onCopy}
-                className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
-                title="複製 caption"
-              >
-                <Copy size={11} strokeWidth={2} />
-                複製
-              </button>
-            )}
-            {onRedo && (
-              <button
-                onClick={onRedo}
-                className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
-                title="重新生成這一格"
-              >
-                <RefreshCw size={11} strokeWidth={2} />
-                重做
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Action row (only on done) */}
+      {isDone && caption && (
+        <div className="px-2 py-2 border-t border-neutral-100 flex items-center gap-1.5">
+          {onCopy && (
+            <button
+              onClick={onCopy}
+              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+              title="複製 caption"
+            >
+              <Copy size={11} strokeWidth={2} />
+              複製
+            </button>
+          )}
+          {onRedo && (
+            <button
+              onClick={onRedo}
+              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+              title="重新生成這一格"
+            >
+              <RefreshCw size={11} strokeWidth={2} />
+              重做
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -869,6 +879,8 @@ export default function TheaterPage() {
                           caption={state.caption ?? ""}
                           writerAvatar={avatarOf(getPlatformWriter(p))}
                           imageDirAvatar={avatarOf(getPlatformImage(p))}
+                          brandName={brandName}
+                          brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
                           onCopy={() => copyCaption(key)}
                           onRedo={() => redoCell(key, p)}
                         />

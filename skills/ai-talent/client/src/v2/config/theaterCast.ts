@@ -29,17 +29,42 @@ export interface CastMember {
   platform: TheaterPlatform | null; // null for chief / qa
 }
 
-/** Platform display metadata. */
+/** Platform display metadata + the canonical mockup variant for Theater cells. */
 export const PLATFORM_META: Record<
   TheaterPlatform,
-  { label: string; short: string; accent: string; emoji: string }
+  {
+    label: string;
+    short: string;
+    accent: string;
+    emoji: string;
+    /** PlatformMockup variant key — see PlatformMockup/index.tsx switch. */
+    mockup: { platform: string; format: string; label: string };
+  }
 > = {
-  facebook:  { label: "Facebook",  short: "FB",      accent: "#1877F2", emoji: "📘" },
-  instagram: { label: "Instagram", short: "IG",      accent: "#E1306C", emoji: "📸" },
-  youtube:   { label: "YouTube",   short: "YT",      accent: "#FF0000", emoji: "▶️" },
-  threads:   { label: "Threads",   short: "Threads", accent: "#000000", emoji: "🧵" },
-  line:      { label: "LINE",      short: "LINE",    accent: "#06C755", emoji: "💬" },
-  blog:      { label: "Blog 長文", short: "Blog",    accent: "#F97316", emoji: "📝" },
+  facebook:  {
+    label: "Facebook", short: "FB", accent: "#1877F2", emoji: "📘",
+    mockup: { platform: "facebook", format: "feed", label: "Facebook 貼文" },
+  },
+  instagram: {
+    label: "Instagram", short: "IG", accent: "#E1306C", emoji: "📸",
+    mockup: { platform: "instagram", format: "feed", label: "Instagram 貼文" },
+  },
+  youtube:   {
+    label: "YouTube", short: "YT", accent: "#FF0000", emoji: "▶️",
+    mockup: { platform: "youtube", format: "video-card", label: "YouTube 影片卡" },
+  },
+  threads:   {
+    label: "Threads", short: "Threads", accent: "#000000", emoji: "🧵",
+    mockup: { platform: "threads", format: "post", label: "Threads 貼文" },
+  },
+  line:      {
+    label: "LINE", short: "LINE", accent: "#06C755", emoji: "💬",
+    mockup: { platform: "line", format: "broadcast", label: "LINE 廣播" },
+  },
+  blog:      {
+    label: "Blog 長文", short: "Blog", accent: "#F97316", emoji: "📝",
+    mockup: { platform: "web", format: "blog", label: "Web Blog" },
+  },
 };
 
 export const THEATER_CAST: CastMember[] = [
