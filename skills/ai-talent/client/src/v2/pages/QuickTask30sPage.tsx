@@ -590,7 +590,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                         <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                           <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
                           <span className="text-tiny font-medium text-default-700 truncate">
-                            {(t as any).kind === "squad" ? "多步驟 squad pipeline" : agentName}
+                            {agentName}
+                            {(t as any).kind === "squad" && <span className="text-default-400"> · squad lead</span>}
                           </span>
                         </div>
                         {/* 60s tier: show full collab team avatar stack + count */}

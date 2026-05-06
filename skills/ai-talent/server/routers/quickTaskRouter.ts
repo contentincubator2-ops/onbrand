@@ -886,17 +886,48 @@ export const quickTaskRouter = router({
     //  - SQUAD-based (FB + IG with full multi-step squad infrastructure):
     //    runs via squad.stepExecute → /picker workspace UI
     //  - Orchestra-based fallback (other channels — Phase 2: build squads)
-    const tasks100Squads = ALL_100S_SQUADS.map((s) => ({
-      id: s.id,
-      tier: "100s" as const,
-      postType: s.postType,
-      platform: s.platform,
-      label: s.label,
-      description: s.description,
-      kind: "squad" as const,
-      squad_slug: s.squad_slug,
-      methodology: s.methodology,
-    }));
+    // Resolve real squad rosters from DB so each card shows its actual lead
+    // agent + team members (not generic AI Agent avatar).
+    const squadSlugs = ALL_100S_SQUADS.map((s) => s.squad_slug);
+    const squadAgentMap: Record<string, { leadAgentId: number | null; agentIds: number[] }> = {};
+    if (squadSlugs.length > 0) {
+      try {
+        const placeholders = squadSlugs.map(() => "?").join(",");
+        const [rows]: any = await localPool.execute(
+          `SELECT slug, lead_agent_id, agents FROM squads WHERE slug IN (${placeholders})`,
+          squadSlugs,
+        );
+        for (const r of rows as any[]) {
+          let agentIds: number[] = [];
+          try {
+            const parsed = typeof r.agents === "string" ? JSON.parse(r.agents) : r.agents;
+            if (Array.isArray(parsed)) {
+              agentIds = parsed
+                .map((a: any) => Number(a?.id ?? a?.agent_id))
+                .filter((n: number) => Number.isFinite(n) && n > 0);
+            }
+          } catch { /* ignore parse errors */ }
+          squadAgentMap[r.slug] = { leadAgentId: r.lead_agent_id ?? null, agentIds };
+        }
+      } catch { /* squads table query failure non-fatal */ }
+    }
+    const tasks100Squads = ALL_100S_SQUADS.map((s) => {
+      const sq = squadAgentMap[s.squad_slug];
+      return {
+        id: s.id,
+        tier: "100s" as const,
+        postType: s.postType,
+        platform: s.platform,
+        label: s.label,
+        description: s.description,
+        kind: "squad" as const,
+        squad_slug: s.squad_slug,
+        methodology: s.methodology,
+        // attach lead agent for hero avatar + member ids for team stack
+        agent_id: sq?.leadAgentId ?? null,
+        squad_member_ids: sq?.agentIds ?? [],
+      };
+    });
     // Orchestra-based 100s tasks for channels without squads yet (filtered to
     // exclude FB + IG since those now have proper squads above)
     const tasks100Orchestra = ALL_100S_TASKS.filter((t) => !t.id.startsWith("fb-") && !t.id.startsWith("ig-")).map((t) => {
@@ -951,9 +982,17 @@ export const quickTaskRouter = router({
       ids.push(...UNIVERSAL_60S_IDS.slice(0, 5)); // Emma/Helen/David/Sophie/Jordan core 5
       teamIdsByTask[t.id] = Array.from(new Set(ids));
     }
+    // Also collect squad team member IDs so each 100s squad card can render
+    // a proper team avatar stack (lead + first 4 members).
+    const squadTeamIds: number[] = [];
+    for (const sq of Object.values(squadAgentMap)) {
+      if (sq.leadAgentId) squadTeamIds.push(sq.leadAgentId);
+      squadTeamIds.push(...sq.agentIds.slice(0, 5));
+    }
     const agentIds: number[] = Array.from(new Set([
       ...tasks.flatMap((t: any) => (t.agent_id ? [Number(t.agent_id)] : [])),
       ...Object.values(teamIdsByTask).flat(),
+      ...squadTeamIds,
     ]));
     const agentMap: Record<number, { id: number; name: string; title: string; avatarUrl: string | null }> = {};
     if (agentIds.length > 0) {
@@ -988,7 +1027,20 @@ export const quickTaskRouter = router({
         label: t.label, description: t.description, kind: t.kind,
       };
       if (t.kind === "squad") {
-        return { ...base, squad_slug: t.squad_slug, methodology: t.methodology ?? null, inputs: [], agent: null, skill_slug: null };
+        // 100s squad tasks: surface lead agent + team roster from DB so card
+        // shows real diverse faces (not generic AI Agent avatar).
+        const leadId = t.agent_id ?? null;
+        const memberIds: number[] = Array.isArray(t.squad_member_ids) ? t.squad_member_ids : [];
+        const team = memberIds.map((id: number) => agentMap[id]).filter(Boolean);
+        return {
+          ...base,
+          squad_slug: t.squad_slug,
+          methodology: t.methodology ?? null,
+          inputs: [],
+          agent: leadId ? (agentMap[leadId] ?? null) : null,
+          team: team.length > 0 ? team : undefined,
+          skill_slug: null,
+        };
       }
       // For 60s tasks, surface the full collab team so cards can show
       // "8 位 agent 協作" badge + tooltip with team roster.
