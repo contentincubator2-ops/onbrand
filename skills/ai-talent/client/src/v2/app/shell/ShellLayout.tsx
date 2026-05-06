@@ -152,8 +152,12 @@ export default function ShellLayout() {
         </>
       )}
 
-      {/* Global scope bar — fixed top-right, always visible */}
-      <GlobalScopeBar scope={scope} setScope={setScope} brands={brands} />
+      {/* Global scope bar removed 2026-05-06 per CJ — brand picker is now
+          top-left in the IconBar (BrandSwitcherButton with popover). The
+          right-top scope bar was redundant and visually competed with the
+          brand button. Product / event sub-scope still accessible via the
+          per-page ScopeBar component (e.g. PickerWorkspace). */}
+      {/* <GlobalScopeBar scope={scope} setScope={setScope} brands={brands} /> */}
 
       {/* Main content */}
       <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
@@ -226,67 +230,16 @@ function IconBar({
         </Tooltip>
       </div>
 
-      {/* Brand switcher — top-left prominent (CJ direction 2026-05-06)
-          Shows current brand initial; click opens slide panel with brand list */}
-      {(() => {
-        const activeBrand = brands.find((b: any) => b.id === scope.brandId);
-        const initial = activeBrand?.name?.charAt(0) ?? "?";
-        return (
-          <div style={{ padding: "0 13px 10px", flexShrink: 0 }}>
-            <Tooltip content={activeBrand ? `品牌：${activeBrand.name}（點擊切換）` : "選擇品牌"} placement="right">
-              <button
-                onClick={() => {
-                  // Open slide panel — brand list is at top of panel
-                  if (collapsed) onToggle();
-                }}
-                aria-label="切換品牌"
-                style={{
-                  width: 44, height: 44, borderRadius: 12, border: "2px solid rgba(124,58,237,0.18)",
-                  background: activeBrand
-                    ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
-                    : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
-                  color: "#fff",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  margin: "0 auto", fontSize: 16, fontWeight: 800, cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(124,58,237,0.25)",
-                  transition: "transform 0.07s, box-shadow 0.1s",
-                  overflow: "hidden",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 16px rgba(124,58,237,0.4)"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 12px rgba(124,58,237,0.25)"; }}
-              >
-                {activeBrand?.logoUrl ? (
-                  <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <span>{initial}</span>
-                )}
-              </button>
-            </Tooltip>
-          </div>
-        );
-      })()}
-
-      {/* 建立 circle */}
-      <div style={{ padding: "0 13px 12px", flexShrink: 0 }}>
-        <Tooltip content="建立任務" placement="right">
-          <button
-            onClick={() => onNavigate("/")}
-            aria-label="建立任務"
-            style={{
-              width: 44, height: 44, borderRadius: "50%", border: "none",
-              background: "#F97316", color: "#fff",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto", fontSize: 18, cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(249,115,22,0.35)",
-              transition: "background 0.1s, transform 0.07s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#ea6c0a")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#F97316")}
-          >
-            <FontAwesomeIcon icon={faPlus} />
-          </button>
-        </Tooltip>
-      </div>
+      {/* Brand switcher — top-left prominent. Shows brand logo (collapsed) or
+          logo + name (when sidebar expanded). Click opens brand-picker popover.
+          Removed orange '+' build-task button (was nav to '/' with no purpose). */}
+      <BrandSwitcherButton
+        brands={brands}
+        activeBrandId={scope.brandId}
+        sidebarCollapsed={collapsed}
+        onPickBrand={(id) => setScope({ brandId: id, productId: null, eventId: null })}
+        onAddBrand={() => onNavigate("/brands")}
+      />
 
       {/* Nav icons */}
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px" }}>
@@ -376,6 +329,171 @@ function IconBar({
 }
 
 /* ── Icon nav link (collapsed icon+label) ── */
+
+/* ─────────────────────── Brand Switcher Button ───────────────────────
+   Top-left prominent brand picker. Two states:
+   - sidebar collapsed: shows just the logo/initial in 44px circle
+   - sidebar expanded: shows logo + brand NAME in a horizontal pill
+   Click → popover with brand list + 「新增品牌」 entry.
+*/
+function BrandSwitcherButton({
+  brands, activeBrandId, sidebarCollapsed, onPickBrand, onAddBrand,
+}: {
+  brands: any[];
+  activeBrandId: number | null;
+  sidebarCollapsed: boolean;
+  onPickBrand: (id: number) => void;
+  onAddBrand: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const activeBrand = brands.find((b: any) => b.id === activeBrandId);
+  const initial = activeBrand?.name?.charAt(0) ?? "?";
+  const truncatedName = activeBrand?.name && activeBrand.name.length > 8
+    ? activeBrand.name.slice(0, 7) + "…"
+    : activeBrand?.name ?? "選擇品牌";
+
+  return (
+    <div ref={ref} style={{ padding: "0 8px 12px", flexShrink: 0, position: "relative" }}>
+      <Tooltip content={activeBrand ? `品牌：${activeBrand.name}（點擊切換）` : "選擇品牌"} placement="right">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-label="切換品牌"
+          style={{
+            width: "100%", minHeight: 48, borderRadius: 10,
+            border: open ? "2px solid #7c3aed" : "1px solid rgba(124,58,237,0.2)",
+            background: activeBrand ? "rgba(124,58,237,0.06)" : "rgba(156,163,175,0.08)",
+            display: "flex", alignItems: "center", gap: 8, padding: "6px 8px",
+            cursor: "pointer",
+            transition: "background 0.1s, border-color 0.1s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(124,58,237,0.10)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = activeBrand ? "rgba(124,58,237,0.06)" : "rgba(156,163,175,0.08)"; }}
+        >
+          {/* Logo / initial circle */}
+          <span style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            background: activeBrand
+              ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
+              : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
+            color: "#fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, fontWeight: 800,
+            overflow: "hidden",
+            boxShadow: "0 2px 6px rgba(124,58,237,0.3)",
+          }}>
+            {activeBrand?.logoUrl ? (
+              <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : initial}
+          </span>
+          {/* Show brand name when sidebar collapsed (icon-only mode hides text) — keep tiny label below logo */}
+          {sidebarCollapsed ? (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
+              <span style={{ fontSize: 9, color: "#7c3aed", fontWeight: 700, letterSpacing: "0.5px" }}>品牌</span>
+              <span style={{ fontSize: 11, color: "#1f2937", fontWeight: 600, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {truncatedName}
+              </span>
+            </div>
+          ) : (
+            <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+              <span style={{ fontSize: 10, color: "#7c3aed", fontWeight: 700, display: "block", letterSpacing: "0.5px" }}>品牌</span>
+              <span style={{ fontSize: 13, color: "#1f2937", fontWeight: 700, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {activeBrand?.name ?? "選擇品牌"}
+              </span>
+            </div>
+          )}
+          <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 10, color: "#9ca3af", transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "none" }} />
+        </button>
+      </Tooltip>
+
+      {/* Popover */}
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            left: "calc(100% + 8px)",
+            top: 0,
+            zIndex: 50,
+            width: 240,
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            boxShadow: "0 10px 28px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.04)",
+            padding: 6,
+          }}
+        >
+          <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>切換品牌</p>
+          {brands.length === 0 && (
+            <p style={{ fontSize: 12, color: "#9ca3af", padding: "8px 10px" }}>還沒建立品牌</p>
+          )}
+          {brands.map((b: any) => {
+            const isActive = b.id === activeBrandId;
+            const bInit = b.name?.charAt(0) ?? "?";
+            return (
+              <button
+                key={b.id}
+                onClick={() => { onPickBrand(b.id); setOpen(false); }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 10px", border: "none", borderRadius: 8,
+                  background: isActive ? "rgba(124,58,237,0.08)" : "transparent",
+                  cursor: "pointer", textAlign: "left",
+                  transition: "background 0.08s",
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f9fafb"; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{
+                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                  background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                  color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 12, fontWeight: 800, overflow: "hidden",
+                }}>
+                  {b.logoUrl ? <img src={b.logoUrl} alt={b.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : bInit}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: isActive ? 700 : 500, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {b.name}
+                </span>
+                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 11, color: "#7c3aed" }} />}
+              </button>
+            );
+          })}
+          <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
+          <button
+            onClick={() => { onAddBrand(); setOpen(false); }}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "8px 10px", border: "none", borderRadius: 8,
+              background: "transparent", cursor: "pointer", textAlign: "left",
+              transition: "background 0.08s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          >
+            <span style={{
+              width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+              background: "#f3f4f6", color: "#6b7280",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 13,
+            }}>
+              <FontAwesomeIcon icon={faPlus} />
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>新增品牌 / 管理</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
   return (
