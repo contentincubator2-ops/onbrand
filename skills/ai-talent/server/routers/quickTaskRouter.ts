@@ -669,7 +669,7 @@ function fillTemplate(tpl: string, inputs: Record<string, string | number | unde
 import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 // 2026-05-05 quick-task pivot
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
-import { FB_30S_TASKS, FB_60S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
+import { FB_30S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
 import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA, getFB60OrchestraConfig, getFB60Template } from "../_core/quickTaskFB60";
 import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../_core/quickTaskIG60";
 import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../_core/quickTaskYT60";
@@ -1115,10 +1115,9 @@ export const quickTaskRouter = router({
         EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
         PR_30S_TASKS.find((t) => t.id === input.taskId) ??
         BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
-        RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-        FB_60S_TASKS.find((t) => t.id === input.taskId);
+        RESEARCH_30S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
-        throw new Error(`Unknown 30s/60s quick task id: ${input.taskId}. (90s tasks must use squad.stepExecute.)`);
+        throw new Error(`Unknown 30s quick task id: ${input.taskId}. (60s uses runOrchestra60; 90s uses squad.stepExecute.)`);
       }
 
       // Required-field check
