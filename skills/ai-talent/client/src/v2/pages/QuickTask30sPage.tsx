@@ -253,18 +253,15 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   const runOrchestraMut = (trpc as any).quickTask?.runOrchestra?.useMutation();
   const runOrchestra60Mut = (trpc as any).quickTask?.runOrchestra60?.useMutation();
   const runOrchestra100Mut = (trpc as any).quickTask?.runOrchestra100?.useMutation();
+  const runSquadAutoMut = (trpc as any).quickTask?.runSquadAuto?.useMutation();
   const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
 
   const openTask = (t: FBTaskCard) => {
-    // 100s squad tasks (FB + IG) launch the full squad pipeline in /picker
-    // workspace — multi-step deliverable (calendar / toolkit / strategy)
-    // produced by real squad agents, not orchestra variants.
-    if (t.kind === "squad" && (t as any).squad_slug) {
-      const slug = (t as any).squad_slug;
-      window.location.href = `/picker?workspace=ai-talent&slug=${encodeURIComponent(slug)}`;
-      return;
-    }
+    // Per CJ direction: 100s squad tasks now auto-run inline (same modal UX
+    // as 30s/60s) instead of redirecting to /picker workspace. The squad
+    // pipeline runs all steps sequentially via runSquadAuto and returns the
+    // result as variant[] (each variant = one step output).
     setActiveTask(t);
     setPrimaryAnswer("");
     setOutput(null);
@@ -291,8 +288,45 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     setCountdownStart(Date.now());
 
     try {
-      if (activeTask.kind === "squad") {
-        setErrorMsg("90 秒任務（深度 squad）會接到完整 squad 流程，敬請期待 Phase E。");
+      // 100s squad tasks (FB + IG): auto-run inline via runSquadAuto.
+      // Each squad step → 1 variant in the result. Same modal UX as 30s/60s.
+      if (activeTask.kind === "squad" && (activeTask as any).squad_slug) {
+        if (runSquadAutoMut) {
+          const r = await runSquadAutoMut.mutateAsync({
+            squadSlug: (activeTask as any).squad_slug,
+            topic: primaryAnswer || activeTask.label,
+            brandId: brandId ?? undefined,
+          });
+          const platform = (activeTask as any).platform ?? "facebook";
+          const transformedOutput = {
+            platform,
+            post_type: activeTask.postType ?? "feed",
+            caption: r.variants?.[0]?.caption ?? "",
+            hashtags: [],
+            variants: (r.variants ?? []).map((v: any) => ({
+              label: v.label,
+              caption: v.caption,
+              hashtags: [],
+              image_style_direction: undefined,
+              imageUrl: null,
+              imageStatus: "skipped" as const,
+              qa: null,
+              extras: null,
+              agent: v.agent ?? null,
+            })),
+          };
+          setOutput(transformedOutput);
+          setLatencyMs(r.totalLatencyMs);
+          setAgentMeta(r.captionAgent ?? null);
+          setImageAgentMeta(null);
+          setOrchestraStages(r.stages ?? null);
+          setFetchedUrl(null);
+          if (!r.ok) {
+            setErrorMsg(`Squad 部分步驟失敗：${(r.errors ?? []).slice(0, 1).join("")}`);
+          }
+          return;
+        }
+        setErrorMsg("Squad 自動執行 mutation 暫不可用");
         return;
       }
       const inputKey = activeTask.primary_input?.key ?? "topic";

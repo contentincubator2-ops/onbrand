@@ -1027,8 +1027,9 @@ export const quickTaskRouter = router({
         label: t.label, description: t.description, kind: t.kind,
       };
       if (t.kind === "squad") {
-        // 100s squad tasks: surface lead agent + team roster from DB so card
-        // shows real diverse faces (not generic AI Agent avatar).
+        // 100s squad tasks: surface lead agent + team roster + a primary
+        // input so user can provide brief context (auto-injected as topic
+        // when squad runs inline via runSquadAuto).
         const leadId = t.agent_id ?? null;
         const memberIds: number[] = Array.isArray(t.squad_member_ids) ? t.squad_member_ids : [];
         const team = memberIds.map((id: number) => agentMap[id]).filter(Boolean);
@@ -1036,7 +1037,9 @@ export const quickTaskRouter = router({
           ...base,
           squad_slug: t.squad_slug,
           methodology: t.methodology ?? null,
-          inputs: [],
+          inputs: [{ key: "topic", label: "本次活動 / 主題 / 重點", type: "textarea", required: true }],
+          primary_question: "本次想交付什麼？簡單說明主題、活動、目標即可（agents 會自己找節慶、趨勢資料）",
+          primary_input: { key: "topic", placeholder: "例：5 月母親節限時優惠 / 新品上市 / 客戶見證輯", type: "textarea" as const },
           agent: leadId ? (agentMap[leadId] ?? null) : null,
           team: team.length > 0 ? team : undefined,
           skill_slug: null,
@@ -1102,6 +1105,164 @@ export const quickTaskRouter = router({
         getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId);
       if (!config) throw new Error(`No config for: ${input.taskId}`);
       return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
+    }),
+
+  // 100s squad auto-run — sequentially executes all steps of a real squad
+  // inline (no /picker redirect, no DB mission). Returns OrchestraResult-shaped
+  // variants[] where each variant = one step's output, so the existing
+  // OutputCarousel UI renders it the same as 30s/60s.
+  runSquadAuto: protectedProcedure
+    .input(z.object({
+      squadSlug: z.string().min(1).max(80),
+      topic:     z.string().max(2000).default(""),
+      brandId:   z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const startedAt = Date.now();
+      // 1. Load squad + agents + steps
+      const [sqRows]: any = await localPool.execute(
+        `SELECT id, slug, name, agents, steps, methodology, lead_agent_id
+           FROM squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
+        [input.squadSlug],
+      );
+      const squad = (sqRows as any[])?.[0];
+      if (!squad) throw new Error(`squad ${input.squadSlug} not found`);
+      let stepsRaw: any[] = [];
+      try { stepsRaw = typeof squad.steps === "string" ? JSON.parse(squad.steps) : squad.steps; } catch {}
+      stepsRaw = Array.isArray(stepsRaw) ? stepsRaw : [];
+      if (stepsRaw.length === 0) throw new Error(`squad ${input.squadSlug} has no steps`);
+
+      // 2. Build brand context
+      const { buildBrandPrefix } = await import("../_core/brandContext");
+      const brandPrefix = await buildBrandPrefix(input.brandId).catch(() => "");
+
+      // 3. Inject 100s scout data (real-time festivals/trending/news)
+      let scoutBlock = "";
+      try {
+        const { ALL_100S_SQUADS } = await import("../_core/quickTask100Squads");
+        const matched = ALL_100S_SQUADS.find((s) => s.squad_slug === input.squadSlug);
+        if (matched) {
+          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../_core/socialListeningScout");
+          const kind: "festivals" | "trending" | "news" | "viral" =
+            matched.squad_slug.includes("monthly-calendar") || matched.squad_slug.includes("countdown") ? "festivals"
+            : matched.squad_slug.includes("crisis") || matched.squad_slug.includes("kern-mass-control") ? "trending"
+            : matched.squad_slug.includes("quarterly") || matched.squad_slug.includes("analytics") || matched.squad_slug.includes("reposition") ? "news"
+            : "viral";
+          const viral = await fetchViralPatterns({
+            channel: matched.platform,
+            topic: `${matched.label} ${input.topic}`.slice(0, 120),
+            brandId: input.brandId,
+            kind,
+          });
+          if (viral && viral.patterns.length > 0) {
+            scoutBlock = "\n\n" + formatViralPatternsForPrompt(viral, kind) + "\n\n";
+          }
+        }
+      } catch { /* non-fatal */ }
+
+      // 4. Run each step in sequence — collect outputs as variants
+      const { callModel } = await import("../_core/multiModelRouter");
+      const variants: any[] = [];
+      const errors: string[] = [];
+      const stages: any[] = [];
+      const prevOutputs: string[] = [];
+
+      // Resolve all unique step agent IDs in one query
+      const agentIds = Array.from(new Set(stepsRaw
+        .map((s: any) => Number(s.assignedAgentId))
+        .filter((n: number) => Number.isFinite(n) && n > 0)));
+      const agentMap: Record<number, { name: string; title: string; specialty?: string; methodology?: string; avatarUrl?: string | null }> = {};
+      if (agentIds.length > 0) {
+        const ph = agentIds.map(() => "?").join(",");
+        const [aRows]: any = await localPool.execute(
+          `SELECT id, name, title, specialty, methodology, avatarUrl FROM agents WHERE id IN (${ph})`,
+          agentIds,
+        );
+        for (const a of aRows as any[]) {
+          agentMap[a.id] = { name: a.name, title: a.title, specialty: a.specialty, methodology: a.methodology, avatarUrl: a.avatarUrl ?? null };
+        }
+      }
+
+      for (let i = 0; i < stepsRaw.length; i++) {
+        const step = stepsRaw[i];
+        const stageStart = Date.now() - startedAt;
+        const stageKey = `step${i + 1}`;
+        const stageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
+        const aid = Number(step.assignedAgentId);
+        const a = agentMap[aid];
+        const agentName = a?.name ?? step.assignedAgentName ?? "Squad Agent";
+        const agentTitle = a?.title ?? "";
+
+        const persona = a
+          ? `你是 ${a.name}，${a.title}。${a.specialty ? `\n專長：${a.specialty}。` : ""}${a.methodology ? `\n方法論：${a.methodology}。` : ""}`
+          : `你是 ${agentName}。`;
+
+        const system = `${persona}\nSquad「${squad.name}」步驟「${stageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}\n步驟說明：${step.description ?? ""}\n預期產出：${step.outputType ?? step.outputKind ?? "(未指定)"}\n\n用繁體中文輸出，扣回品牌語氣與真實市場數據（如下方注入）。直接給結果，不要前言、不要 markdown 圍籬。`;
+
+        const userMsg = [
+          `【任務主題】${input.topic || "(未指定)"}`,
+          brandPrefix ? `\n${brandPrefix}` : "",
+          scoutBlock,
+          prevOutputs.length > 0 ? `\n【上游 step 已產出】\n${prevOutputs.slice(-2).join("\n\n").slice(0, 2000)}` : "",
+          `\n請執行此步驟。`,
+        ].filter(Boolean).join("\n");
+
+        try {
+          const r = await Promise.race([
+            callModel([{ role: "system", content: system }, { role: "user", content: userMsg }], undefined, "qwen"),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`step ${i+1} timeout`)), 25_000)),
+          ]);
+          const text = (r.content ?? "").trim();
+          prevOutputs.push(`【${stageLabel}】${text.slice(0, 800)}`);
+          variants.push({
+            label: stageLabel,
+            caption: text,
+            hashtags: [],
+            image: { style: null, url: null, status: "skipped" },
+            agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+          });
+          stages.push({ key: stageKey, label: stageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
+        } catch (e: any) {
+          errors.push(`step ${i+1} (${stageLabel}): ${e?.message ?? e}`);
+          variants.push({
+            label: stageLabel,
+            caption: "",
+            hashtags: [],
+            image: { style: null, url: null, status: "failed" },
+            agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+          });
+          stages.push({ key: stageKey, label: stageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
+        }
+      }
+
+      // 5. Look up squad lead for captionAgent slot
+      let captionAgent: any = null;
+      if (squad.lead_agent_id) {
+        const lead = agentMap[squad.lead_agent_id];
+        if (lead) captionAgent = { id: squad.lead_agent_id, name: lead.name, title: lead.title, avatarUrl: lead.avatarUrl };
+        else {
+          try {
+            const [r]: any = await localPool.execute(
+              `SELECT id, name, title, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+              [squad.lead_agent_id],
+            );
+            const a = (r as any[])?.[0];
+            if (a) captionAgent = { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null };
+          } catch {}
+        }
+      }
+
+      return {
+        taskId: input.squadSlug,
+        totalLatencyMs: Date.now() - startedAt,
+        fetchedUrl: null,
+        captionAgent,
+        imageAgent: null,
+        variants,
+        stages,
+        ok: variants.some((v) => v.caption.length > 0),
+        errors,
+      };
     }),
 
   // 100s tier — research-validated (scout) + video-where-applicable.
