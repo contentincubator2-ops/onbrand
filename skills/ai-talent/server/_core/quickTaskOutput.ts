@@ -143,7 +143,7 @@ export const kpiPredictionSchema = z.object({
 
 export const quickTaskOutputSchema = z.object({
   /** Tier tag — frontend uses this for color / SLA badge */
-  tier: z.enum(["30s", "60s", "90s"]),
+  tier: z.enum(["30s", "60s", "90s", "100s"]),
   /** Platform tag — drives mockup variant selection */
   platform: z.enum([
     "facebook", "instagram", "linkedin", "youtube", "tiktok",
@@ -208,7 +208,7 @@ export function parseQuickTaskOutput(
  * Use as the LAST line of your prompt. Tier-aware so the model knows what's
  * required (e.g. variants[] for 60s, kpi_prediction for 90s).
  */
-export function quickTaskOutputSpec(tier: "30s" | "60s" | "90s"): string {
+export function quickTaskOutputSpec(tier: "30s" | "60s" | "90s" | "100s"): string {
   const base = `
 【輸出格式 — 嚴格 JSON，無 markdown code fence、無 \`\`\`json 圍籬】
 必填: tier, platform, post_type, caption.
