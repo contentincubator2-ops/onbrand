@@ -62,25 +62,49 @@ function tierAccent(tier: "30s" | "60s" | "90s" | "100s" | undefined | null): st
 /**
  * Synthesize live stages while orchestra is running (no streaming yet).
  * Maps elapsed ms → which stages should be "running" / "done".
- * Schedule (matches orchestra.ts wall-clock pattern):
- *   0-3s:    pre (URL/persona/brand load)        → running
- *   3-12s:   strategist (if narrativeArc) running, pre done
- *   12-30s:  caption + brief running (parallel)
- *   30-40s:  extras (replies/time/followup) running
- *   40-50s:  qa running
- *   >50s:    all done (waiting for actual response)
+ * Tier-aware: 100s prepends a scout stage (real data fetch).
+ *
+ * Schedule:
+ *   30s tier: pre / caption / brief / gen (~20s total)
+ *   60s tier: pre / strategist / caption / brief / gen / extras / qa (~50s)
+ *   100s tier: + scout at front (~60-90s)
  */
-function synthesizeStages(elapsedMs: number, team: any[] | undefined): any[] {
+function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "100s"): any[] {
   const t = elapsedMs;
-  const stages = [
-    { key: "pre",        label: "URL / persona / brand", startedAt: 0,        completedAt: t > 3000 ? 3000 : undefined,  status: t > 3000 ? "done" : "running" },
-    { key: "strategist", label: "Strategist 規劃敘事弧",  startedAt: 3000,     completedAt: t > 12000 ? 12000 : undefined, status: t < 3000 ? "pending" : t > 12000 ? "done" : "running" },
-    { key: "caption",    label: "Caption Writer 寫變體", startedAt: 3000,     completedAt: t > 28000 ? 28000 : undefined, status: t < 3000 ? "pending" : t > 28000 ? "done" : "running" },
-    { key: "brief",      label: "Image Director 寫視覺 brief", startedAt: 3000,     completedAt: t > 28000 ? 28000 : undefined, status: t < 3000 ? "pending" : t > 28000 ? "done" : "running" },
-    { key: "gen",        label: "Flux 生圖", startedAt: 28000, completedAt: t > 38000 ? 38000 : undefined, status: t < 28000 ? "pending" : t > 38000 ? "done" : "running" },
-    { key: "extras",     label: "留言模板 / 發文時段 / 跟進", startedAt: 28000, completedAt: t > 42000 ? 42000 : undefined, status: t < 28000 ? "pending" : t > 42000 ? "done" : "running" },
-    { key: "qa",         label: "Jordan Hayes 審核", startedAt: 42000, completedAt: t > 50000 ? 50000 : undefined, status: t < 42000 ? "pending" : t > 50000 ? "done" : "running" },
-  ];
+  const isResearch = tier === "100s";
+  const isProd = tier === "60s" || tier === "100s";
+
+  // Scout offset: 100s adds 12s scout up-front; other tiers start at 0
+  const scoutEnd = isResearch ? 12000 : 0;
+  const preEnd = scoutEnd + 3000;
+  const stratEnd = preEnd + 9000;
+  const capStart = preEnd;
+  const capEnd = capStart + 25000;
+  const genEnd = capEnd + 10000;
+  const extrasEnd = capEnd + 14000;
+  const qaEnd = extrasEnd + 8000;
+
+  const mk = (key: string, label: string, start: number, end: number) => ({
+    key, label, startedAt: start,
+    completedAt: t > end ? end : undefined,
+    status: t < start ? "pending" : t > end ? "done" : "running",
+  });
+
+  const stages: any[] = [];
+  if (isResearch) {
+    stages.push(mk("scout", "🔬 Scout 爬取真實爆款數據", 0, scoutEnd));
+  }
+  stages.push(mk("pre", "URL / persona / brand load", scoutEnd, preEnd));
+  if (isProd) {
+    stages.push(mk("strategist", "Strategist 規劃敘事弧", preEnd, stratEnd));
+  }
+  stages.push(mk("caption", "Caption Writer 寫變體", capStart, capEnd));
+  stages.push(mk("brief", "Image Director 寫視覺 brief", capStart, capEnd));
+  stages.push(mk("gen", "Flux 生圖", capEnd, genEnd));
+  if (isProd) {
+    stages.push(mk("extras", "留言模板 / 發文時段 / 跟進", capEnd, extrasEnd));
+    stages.push(mk("qa", "Jordan Hayes 審核", extrasEnd, qaEnd));
+  }
   return stages;
 }
 
@@ -361,22 +385,74 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   const expectedSec = tier === "30s" ? 30 : tier === "60s" ? 60 : 100;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
+  // Tier-distinct hero metadata — user feels the difference immediately
+  const tierHero = tier === "30s"
+    ? {
+        emoji: "⚡",
+        kicker: "QUICK DRAFT",
+        headline: "30 秒搞定一篇貼文",
+        sub: "輕量產出 · 3 個 caption 變體 · 風格 brief（按需生圖）",
+        bullets: ["3 變體", "<20 秒", "URL/品牌語氣支援"],
+        accent: "#00b4bc",
+        gradientFrom: "rgba(0,180,188,0.10)",
+      }
+    : tier === "60s"
+    ? {
+        emoji: "🎼",
+        kicker: "PRODUCTION PACKAGE",
+        headline: "60 秒交付一份完整製作包",
+        sub: "多 Agent 協作 · 5 變體 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
+        bullets: ["5 變體", "7-9 位 agent 協作", "Flux 真生圖", "Jordan QA 審核"],
+        accent: "#7c3aed",
+        gradientFrom: "rgba(124,58,237,0.10)",
+      }
+    : {
+        emoji: "🔬",
+        kicker: "RESEARCH-VALIDATED",
+        headline: "100 秒做出有真實爆款數據根據的內容",
+        sub: "Scout 爬近 30 天通路爆款 → 多 Agent 製作包 → 影片（適用時）",
+        bullets: ["真實爆款數據", "5 變體 + 真生圖", "8-10 位 agent 協作", "影片生成（reel/shorts）"],
+        accent: "#f59e0b",
+        gradientFrom: "rgba(245,158,11,0.10)",
+      };
+
   return (
     <div>
-      {/* ─── HERO (mirrors MissionsHome layout) ─────────────────────────── */}
+      {/* ─── HERO (tier-distinct, immediately differentiable) ─────────────── */}
       <div
-        className="relative pt-16 pb-12 px-6 text-center"
-        style={{ background: "linear-gradient(180deg, rgba(124,58,237,0.04) 0%, transparent 100%)" }}
+        className="relative pt-14 pb-10 px-6 text-center"
+        style={{ background: `linear-gradient(180deg, ${tierHero.gradientFrom} 0%, transparent 100%)` }}
       >
-        <p className="text-tiny font-semibold tracking-[0.18em] text-default-500 uppercase mb-3">
-          SOWORK · MARKETING OS · {tierLabel.toUpperCase()}
-        </p>
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-          <span style={{ background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            {tierTagline}
+        <div className="inline-flex items-center gap-2 mb-3">
+          <span
+            className="text-[10px] font-bold tracking-[0.2em] uppercase px-3 py-1 rounded-full text-white shadow-sm"
+            style={{ background: `linear-gradient(135deg, ${tierHero.accent}, ${tierHero.accent}cc)` }}
+          >
+            {tierHero.kicker} · {tierLabel.toUpperCase()}
+          </span>
+        </div>
+        <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-3 leading-tight">
+          <span className="text-3xl md:text-4xl mr-2">{tierHero.emoji}</span>
+          <span style={{ background: `linear-gradient(135deg, ${tierHero.accent} 0%, ${tierHero.accent}aa 100%)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            {tierHero.headline}
           </span>
         </h1>
-        <p className="text-default-500 text-small">
+        <p className="text-default-600 text-medium md:text-large mb-4 max-w-3xl mx-auto leading-relaxed">
+          {tierHero.sub}
+        </p>
+        {/* Per-tier feature bullets */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
+          {tierHero.bullets.map((b) => (
+            <span
+              key={b}
+              className="text-tiny px-3 py-1 rounded-full font-medium"
+              style={{ background: `${tierHero.accent}15`, color: tierHero.accent, border: `1px solid ${tierHero.accent}30` }}
+            >
+              {b}
+            </span>
+          ))}
+        </div>
+        <p className="text-default-500 text-tiny">
           {tasksThisTier.length} 個 {tierLabel} 任務 ·{" "}
           {new Set(tasksThisTier.map((t) => t.agent_id).filter(Boolean)).size} 位專屬 Agent · 品牌腦：
           <span className="font-medium text-default-700">{brandName ?? "（未選）"}</span>
@@ -639,7 +715,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                           stages={
                             orchestraStages && orchestraStages.length > 0
                               ? orchestraStages
-                              : synthesizeStages(tickMs, (activeTask as any).team)
+                              : synthesizeStages(tickMs, tier)
                           }
                           captionAgent={agentMeta ?? activeTask.agent ?? null}
                           imageAgent={imageAgentMeta}
