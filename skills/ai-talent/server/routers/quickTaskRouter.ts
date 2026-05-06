@@ -671,6 +671,9 @@ import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
 import { FB_30S_TASKS, FB_60S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
 import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA, getFB60OrchestraConfig, getFB60Template } from "../_core/quickTaskFB60";
+import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../_core/quickTaskIG60";
+import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../_core/quickTaskYT60";
+import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../_core/quickTaskMulti60";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -873,13 +876,26 @@ export const quickTaskRouter = router({
       kind: "fast" as const,
       platform: "audience",
     }));
-    // FB 60s production-package tasks (2026-05-06) — multi-agent collab
-    const fb60Tasks = FB_60S_TASKS_V2.map((t) => ({
-      ...t,
-      kind: "fast" as const,
-      platform: "facebook",
-    }));
-    const tasks: any[] = [...fbTasks, ...fb60Tasks, ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks];
+    // 60s production-package tasks (2026-05-06) — multi-agent collab
+    const fb60Tasks = FB_60S_TASKS_V2.map((t) => ({ ...t, kind: "fast" as const, platform: "facebook" }));
+    const ig60Tasks = IG_60S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "instagram" }));
+    const yt60Tasks = YT_60S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "youtube" }));
+    const multi60Tasks = MULTI_60S_TASKS.map((t) => {
+      const id = t.id;
+      const platform =
+        id.startsWith("tt-") ? "tiktok"
+        : id.startsWith("li-") ? "linkedin"
+        : id.startsWith("em-") ? "email"
+        : id.startsWith("pr-") ? "pr"
+        : id.startsWith("br-") ? "brand"
+        : id.startsWith("rs-") ? "audience"
+        : "facebook";
+      return { ...t, kind: "fast" as const, platform };
+    });
+    const tasks: any[] = [
+      ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
+      ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks,
+    ];
     // Collect unique agent_ids that need lookup (covers both fb + ig)
     const agentIds: number[] = Array.from(new Set(
       tasks.flatMap((t: any) => (t.agent_id ? [Number(t.agent_id)] : []))
@@ -946,11 +962,15 @@ export const quickTaskRouter = router({
     .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
     .mutation(async ({ input }) => {
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
-      // FB 60s production-package tasks (2026-05-06) take priority
-      const fb60Template = getFB60Template(input.taskId);
-      const fb60Config = getFB60OrchestraConfig(input.taskId);
-      if (fb60Template && fb60Config) {
-        return runOrchestra({ template: fb60Template, config: fb60Config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
+      // 60s production-package tasks (FB / IG / YT / multi-channel) take priority
+      const tier60Template =
+        getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
+        getYT60Template(input.taskId) ?? getMulti60Template(input.taskId);
+      const tier60Config =
+        getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
+        getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
+      if (tier60Template && tier60Config) {
+        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
       }
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??
