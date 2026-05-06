@@ -20,13 +20,16 @@ jobs:
           set -e
           APP=/opt/marketing-os/app
           AI=$APP/skills/ai-talent
-          cd "$AI"
-          # Pull latest first so the script reflects what's on main
+          # Pull latest so the script reflects main
           cd "$APP" && git fetch origin main && git reset --hard origin/main
           cd "$AI"
+
+          # Load .env (provides LOCAL_DB_* + ANTHROPIC_API_KEY etc)
+          set -a
+          source "$AI/.env" 2>/dev/null
+          set +a
+
           npx tsx scripts/seed-brand-positioning-for-theater.ts 2>&1 | tee /tmp/seed-positioning.log
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Tail summary
         if: always()
