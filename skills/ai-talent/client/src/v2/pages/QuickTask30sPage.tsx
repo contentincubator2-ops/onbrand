@@ -1097,7 +1097,7 @@ function OutputCarousel({
   // Pass `lucide={Pencil}` for Lucide outline (Notion-style); `icon={faPenNib}` for legacy FA.
   const ToolBtn = ({ icon, lucide: LucideIcon, label, active, onPress, disabled }: {
     icon?: any;
-    lucide?: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+    lucide?: any;
     label: string;
     active?: boolean;
     onPress: () => void;
