@@ -48,6 +48,31 @@ const CARD_PALETTES = [
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
+/**
+ * Synthesize live stages while orchestra is running (no streaming yet).
+ * Maps elapsed ms → which stages should be "running" / "done".
+ * Schedule (matches orchestra.ts wall-clock pattern):
+ *   0-3s:    pre (URL/persona/brand load)        → running
+ *   3-12s:   strategist (if narrativeArc) running, pre done
+ *   12-30s:  caption + brief running (parallel)
+ *   30-40s:  extras (replies/time/followup) running
+ *   40-50s:  qa running
+ *   >50s:    all done (waiting for actual response)
+ */
+function synthesizeStages(elapsedMs: number, team: any[] | undefined): any[] {
+  const t = elapsedMs;
+  const stages = [
+    { key: "pre",        label: "URL / persona / brand", startedAt: 0,        completedAt: t > 3000 ? 3000 : undefined,  status: t > 3000 ? "done" : "running" },
+    { key: "strategist", label: "Strategist 規劃敘事弧",  startedAt: 3000,     completedAt: t > 12000 ? 12000 : undefined, status: t < 3000 ? "pending" : t > 12000 ? "done" : "running" },
+    { key: "caption",    label: "Caption Writer 寫變體", startedAt: 3000,     completedAt: t > 28000 ? 28000 : undefined, status: t < 3000 ? "pending" : t > 28000 ? "done" : "running" },
+    { key: "brief",      label: "Image Director 寫視覺 brief", startedAt: 3000,     completedAt: t > 28000 ? 28000 : undefined, status: t < 3000 ? "pending" : t > 28000 ? "done" : "running" },
+    { key: "gen",        label: "Flux 生圖", startedAt: 28000, completedAt: t > 38000 ? 38000 : undefined, status: t < 28000 ? "pending" : t > 38000 ? "done" : "running" },
+    { key: "extras",     label: "留言模板 / 發文時段 / 跟進", startedAt: 28000, completedAt: t > 42000 ? 42000 : undefined, status: t < 28000 ? "pending" : t > 42000 ? "done" : "running" },
+    { key: "qa",         label: "Jordan Hayes 審核", startedAt: 42000, completedAt: t > 50000 ? 50000 : undefined, status: t < 42000 ? "pending" : t > 50000 ? "done" : "running" },
+  ];
+  return stages;
+}
+
 interface FBTaskCard {
   id: string;
   tier: "30s" | "60s" | "90s";
@@ -567,24 +592,32 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                           color={tickMs < expectedSec * 1000 ? "primary" : "warning"}
                           value={progressPct}
                         />
-                        <div className="text-center pt-2">
-                          <Spinner size="sm" />
-                          <p className="text-tiny text-default-500 mt-1">
-                            {activeTask.agent?.name ?? "Agent"} 正在寫…
-                          </p>
-                        </div>
+                        {/* 30s tier: simple spinner. 60s/100s: live team grid. */}
+                        {tier === "30s" && (
+                          <div className="text-center pt-2">
+                            <Spinner size="sm" />
+                            <p className="text-tiny text-default-500 mt-1">
+                              {activeTask.agent?.name ?? "Agent"} 正在寫…
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* 60s/100s tier — show Stage Pipeline once stages start arriving.
-                        Currently stages only populate after orchestra finishes (no
-                        streaming yet). For now this shows after run; future work:
-                        tRPC subscription stream live updates. */}
-                    {(tier === "60s" || tier === "100s") && orchestraStages && orchestraStages.length > 0 && (
+                    {/* 60s/100s tier — Live multi-agent collaboration view.
+                        While running: synthesize stages from elapsed time so user
+                        sees the pipeline kick in immediately (real stage timestamps
+                        only arrive when orchestra completes — no streaming yet).
+                        After complete: swap to real orchestra stages. */}
+                    {(tier === "60s" || tier === "100s") && (running || (orchestraStages && orchestraStages.length > 0)) && (
                       <div className="mt-4">
                         <StagePipelineView
-                          stages={orchestraStages}
-                          captionAgent={agentMeta}
+                          stages={
+                            orchestraStages && orchestraStages.length > 0
+                              ? orchestraStages
+                              : synthesizeStages(tickMs, (activeTask as any).team)
+                          }
+                          captionAgent={agentMeta ?? activeTask.agent ?? null}
                           imageAgent={imageAgentMeta}
                           tier={tier}
                         />
