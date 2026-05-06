@@ -32,7 +32,7 @@ import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { StagePipelineView } from "../components/quickTask/StagePipelineView";
-import { faPalette } from "@fortawesome/free-solid-svg-icons";
+import { faPalette, faPenNib } from "@fortawesome/free-solid-svg-icons";
 
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
@@ -528,6 +528,11 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         size="4xl"
         scrollBehavior="inside"
         backdrop="blur"
+        classNames={{
+          base: "max-h-[92vh]",
+          body: "py-3",
+          footer: "border-t border-default-200 bg-white sticky bottom-0",
+        }}
       >
         <ModalContent>
           {activeTask && (
@@ -795,35 +800,53 @@ function OutputCarousel({
     : baseSlide;
   const isEdited = edits[idx] != null && edits[idx] !== baseSlide?.caption;
 
+  // Toggle: 60s/100s pipeline expanded or collapsed (default collapsed after run)
+  const [pipelineExpanded, setPipelineExpanded] = useState(false);
+  const stageCount = orchestraStages?.length ?? 0;
+  const doneStages = orchestraStages?.filter((s: any) => s.status === "done").length ?? 0;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-tiny text-default-500 flex-wrap">
-        <FontAwesomeIcon icon={faClock} />
-        <span>{latencyMs != null ? `${(latencyMs / 1000).toFixed(1)}s 完成` : ""}</span>
-        {agentMeta && (
-          <>
-            <span>·</span>
-            <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-4 h-4" />
-            <span>{agentMeta.name}</span>
-          </>
-        )}
-        {imageAgentMeta && (
-          <>
-            <span>+</span>
-            <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-4 h-4" />
-            <span>{imageAgentMeta.name}</span>
-          </>
+      {/* Compact status header — 1 line summary, agents inline */}
+      <div className="flex items-center justify-between gap-2 text-tiny text-default-500 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <FontAwesomeIcon icon={faClock} className="text-default-400" />
+          <span className="font-medium text-default-700">
+            {latencyMs != null ? `${(latencyMs / 1000).toFixed(1)}s 完成` : ""}
+          </span>
+          {agentMeta && (
+            <>
+              <span className="text-default-300">·</span>
+              <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-4 h-4" />
+              <span>{agentMeta.name}</span>
+            </>
+          )}
+          {imageAgentMeta && (
+            <>
+              <span className="text-default-300">+</span>
+              <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-4 h-4" />
+              <span>{imageAgentMeta.name}</span>
+            </>
+          )}
+        </div>
+        {/* Pipeline toggle (60s/100s only) */}
+        {orchestraStages && orchestraStages.length > 0 && activeTask.tier !== "30s" && (
+          <button
+            onClick={() => setPipelineExpanded((x) => !x)}
+            className="flex items-center gap-1.5 text-tiny text-default-500 hover:text-default-700 transition"
+          >
+            <span>🎼 {doneStages}/{stageCount} agents 協作</span>
+            <FontAwesomeIcon icon={pipelineExpanded ? faChevronLeft : faChevronRight} className="text-[10px] rotate-90" />
+            <span className="text-default-400">{pipelineExpanded ? "收合" : "展開"}</span>
+          </button>
         )}
       </div>
 
-      {/* Orchestra stage view.
-          - 30s tier: simple ribbon (Notion-style, single line)
-          - 60s/100s tier: full StagePipelineView with agent cards */}
+      {/* 30s tier ribbon (always visible, takes 1 line). 60s/100s collapsed by default. */}
       {orchestraStages && orchestraStages.length > 0 && (
         activeTask.tier === "30s" && !orchestraStages.find((s: any) => s.key === "extras" || s.key === "qa") ? (
-          <div className="border-t border-b border-default-100 py-2">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-tiny text-default-500">
-              <span className="text-[10px] uppercase tracking-wider text-default-400">Orchestra</span>
+          <div className="border-t border-b border-default-100 py-1.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-default-500">
               {orchestraStages.map((s: any, i: number) => (
                 <span key={s.key} className="flex items-center gap-1.5">
                   {i > 0 && <span className="text-default-300">·</span>}
@@ -837,14 +860,14 @@ function OutputCarousel({
               ))}
             </div>
           </div>
-        ) : (
+        ) : pipelineExpanded ? (
           <StagePipelineView
             stages={orchestraStages}
             captionAgent={agentMeta}
             imageAgent={imageAgentMeta}
             tier={(orchestraStages.find((s: any) => s.key === "scout") ? "100s" : "60s") as any}
           />
-        )
+        ) : null
       )}
 
       {/* URL provenance — 已讀的連結，灰階呈現 */}
@@ -866,54 +889,103 @@ function OutputCarousel({
         </Card>
       )}
 
-      {/* Carousel — Notion 風格：灰階單色，無漸層、無 primary chip */}
-      {total > 1 && (
-        <div className="flex items-center justify-between px-1 py-1">
-          <Button
-            isIconOnly
-            size="sm"
-            variant="light"
-            isDisabled={idx === 0}
-            onPress={() => setIdx(Math.max(0, idx - 1))}
+      {/* ─── MAIN: mockup centered, prominent side-flanking chevrons ─── */}
+      <div className="relative flex items-stretch gap-2 mt-2">
+        {/* Left chevron — only when more than 1 variant */}
+        {total > 1 && (
+          <button
+            onClick={() => setIdx(Math.max(0, idx - 1))}
+            disabled={idx === 0}
+            className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-medium transition ${
+              idx === 0
+                ? "opacity-20 cursor-not-allowed"
+                : "bg-default-100 hover:bg-default-200 active:bg-default-300 cursor-pointer"
+            }`}
+            aria-label="上一個版本"
           >
-            <FontAwesomeIcon icon={faChevronLeft} className="text-default-500" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <span className="text-small font-medium text-default-700">{slide.label}</span>
-            {slide.qa && (
-              <span
-                title={slide.qa.comment ?? ""}
-                className={`text-[10px] uppercase tracking-wider ${slide.qa.status === "pass" ? "text-success-600" : "text-warning-600"}`}
-              >
-                {slide.qa.status === "pass" ? "✓ QA pass" : "⚠ QA flag"}
-                {typeof slide.qa.score === "number" ? ` ${Math.round(slide.qa.score)}/100` : ""}
-              </span>
-            )}
-            <span className="text-tiny text-default-400 tabular-nums">
-              {idx + 1} / {total}
-            </span>
-            <div className="flex gap-1">
-              {slides.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setIdx(i)}
-                  className={`h-1 rounded-full transition ${
-                    i === idx ? "bg-default-700 w-4" : "bg-default-200 w-1"
-                  }`}
-                  aria-label={`切到版本 ${i + 1}`}
-                />
-              ))}
+            <FontAwesomeIcon icon={faChevronLeft} className="text-default-700 text-medium" />
+          </button>
+        )}
+
+        {/* Centered mockup */}
+        <div className="flex-1 min-w-0 flex justify-center">
+          {mockupVariant && (
+            <div className="w-full max-w-[480px]">
+              <PlatformMockup
+                variant={mockupVariant}
+                title={output.title ?? ""}
+                brief={output.description ?? ""}
+                brandName={brandName}
+                brandLogoUrl={brandLogoUrl}
+                liveCaption={slide.caption}
+                liveTitle={output.title}
+                liveDescription={output.description}
+                liveCta={output.cta}
+                liveHashtags={slide.hashtags}
+                liveImageStyle={slide.imageStyle}
+                liveImageUrl={slide.imageUrl ?? undefined}
+                liveImageStatus={slide.imageStatus}
+                liveVideoStyle={output.video_style_direction?.summary}
+                ogCard={fetchedUrl?.og ? {
+                  url: fetchedUrl.url,
+                  image: fetchedUrl.og.image,
+                  title: fetchedUrl.og.title,
+                  description: fetchedUrl.og.description,
+                  siteName: fetchedUrl.og.site_name,
+                  domain: fetchedUrl.og.domain,
+                } : undefined}
+              />
             </div>
-          </div>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="light"
-            isDisabled={idx === total - 1}
-            onPress={() => setIdx(Math.min(total - 1, idx + 1))}
+          )}
+        </div>
+
+        {/* Right chevron */}
+        {total > 1 && (
+          <button
+            onClick={() => setIdx(Math.min(total - 1, idx + 1))}
+            disabled={idx === total - 1}
+            className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-medium transition ${
+              idx === total - 1
+                ? "opacity-20 cursor-not-allowed"
+                : "bg-default-100 hover:bg-default-200 active:bg-default-300 cursor-pointer"
+            }`}
+            aria-label="下一個版本"
           >
-            <FontAwesomeIcon icon={faChevronRight} className="text-default-500" />
-          </Button>
+            <FontAwesomeIcon icon={faChevronRight} className="text-default-700 text-medium" />
+          </button>
+        )}
+      </div>
+
+      {/* Variant indicator strip — directly below mockup */}
+      {total > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-1">
+          <span className="text-small font-semibold text-default-800">{slide.label}</span>
+          {slide.qa && (
+            <span
+              title={slide.qa.comment ?? ""}
+              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                slide.qa.status === "pass" ? "text-success-700 bg-success-50" : "text-warning-700 bg-warning-50"
+              }`}
+            >
+              {slide.qa.status === "pass" ? "✓ QA pass" : "⚠ QA flag"}
+              {typeof slide.qa.score === "number" ? ` ${Math.round(slide.qa.score)}` : ""}
+            </span>
+          )}
+          <span className="text-tiny text-default-500 tabular-nums">
+            {idx + 1} / {total}
+          </span>
+          <div className="flex gap-1.5">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                className={`h-2 rounded-full transition ${
+                  i === idx ? "bg-default-800 w-6" : "bg-default-300 hover:bg-default-400 w-2"
+                }`}
+                aria-label={`切到版本 ${i + 1}`}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -931,36 +1003,31 @@ function OutputCarousel({
         </button>
       )}
 
-      {/* The mockup — caption swaps per variant, image style is shared (one
-          image style direction applies across all caption variants since
-          they're verbal alternatives of the same post) */}
-      {mockupVariant && (
-        <PlatformMockup
-          variant={mockupVariant}
-          // 不再 fallback 到 activeTask.label — 那會把任務名稱（"FB 純文字 hook 5 種"）
-          // 印在 mockup 內文上方。沒 title 就讓 mockup 自己 hide。
-          title={output.title ?? ""}
-          brief={output.description ?? ""}
-          brandName={brandName}
-          brandLogoUrl={brandLogoUrl}
-          liveCaption={slide.caption}
-          liveTitle={output.title}
-          liveDescription={output.description}
-          liveCta={output.cta}
-          liveHashtags={slide.hashtags}
-          liveImageStyle={slide.imageStyle}
-          liveImageUrl={slide.imageUrl ?? undefined}
-          liveImageStatus={slide.imageStatus}
-          liveVideoStyle={output.video_style_direction?.summary}
-          ogCard={fetchedUrl?.og ? {
-            url: fetchedUrl.url,
-            image: fetchedUrl.og.image,
-            title: fetchedUrl.og.title,
-            description: fetchedUrl.og.description,
-            siteName: fetchedUrl.og.site_name,
-            domain: fetchedUrl.og.domain,
-          } : undefined}
-        />
+      {/* Inline edit textarea — placed RIGHT BELOW the mockup so the link is obvious */}
+      {slide?.caption && (
+        <div className="space-y-2 border border-default-200 rounded-medium p-3 bg-default-50">
+          <div className="flex items-center justify-between">
+            <span className="text-tiny font-medium text-default-700">
+              <FontAwesomeIcon icon={faPenNib as any} className="mr-1 text-default-500" />
+              直接編輯這個版本（mockup 即時更新）
+            </span>
+            {isEdited && (
+              <button
+                onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
+                className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
+              >
+                還原 AI 原版
+              </button>
+            )}
+          </div>
+          <Textarea
+            value={slide.caption}
+            onValueChange={(v) => setEdits((e) => ({ ...e, [idx]: v }))}
+            minRows={4}
+            maxRows={10}
+            classNames={{ input: "text-small leading-relaxed font-sans" }}
+          />
+        </div>
       )}
 
       {/* QA reviewer block — 60s/100s tier shows Jordan Hayes' review per slide */}
@@ -1044,29 +1111,7 @@ function OutputCarousel({
         </div>
       )}
 
-      {/* Inline editor — change caption and see the mockup update in real time */}
-      {slide?.caption && (
-        <div className="space-y-2 border border-default-200 rounded-medium p-3 bg-default-50">
-          <div className="flex items-center justify-between">
-            <span className="text-tiny font-medium text-default-700">編輯這個版本</span>
-            {isEdited && (
-              <button
-                onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
-                className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
-              >
-                還原 AI 原版
-              </button>
-            )}
-          </div>
-          <Textarea
-            value={slide.caption}
-            onValueChange={(v) => setEdits((e) => ({ ...e, [idx]: v }))}
-            minRows={4}
-            classNames={{ input: "text-small leading-relaxed font-sans" }}
-          />
-          <p className="text-[10px] text-default-400">改完直接看上面 mockup，覺得 OK 按下方「複製全文」帶走</p>
-        </div>
-      )}
+      {/* (inline editor moved up — placed directly below mockup for clear visual link) */}
 
       {/* Actions row — next to mockup */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
