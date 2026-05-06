@@ -266,6 +266,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
             image_style_direction: v.image?.style ? { summary: v.image.style } : undefined,
             imageUrl: v.image?.url ?? null,
             imageStatus: v.image?.status ?? "skipped",
+            // 60s/100s tier: QA result attached by orchestra
+            qa: v.qa ?? null,
           })),
         };
         setOutput(transformedOutput);
@@ -640,6 +642,7 @@ function OutputCarousel({
   const slides: Array<{
     label: string; caption: string; hashtags?: string[]; imageStyle?: string;
     imageUrl?: string | null; imageStatus?: "ready" | "failed" | "skipped" | "timeout";
+    qa?: { status: "pass" | "flag"; comment?: string; score?: number; suggestions?: string[] } | null;
   }> = useMemo(() => {
     const topStyle = output.image_style_direction?.summary;
     const orchestraMode = (output.variants ?? []).some((v: any) => v.imageUrl !== undefined || v.imageStatus !== undefined);
@@ -651,6 +654,7 @@ function OutputCarousel({
         imageStyle: v.image_style_direction?.summary || topStyle,
         imageUrl: v.imageUrl ?? null,
         imageStatus: v.imageStatus ?? "skipped",
+        qa: v.qa ?? null,
       }));
     }
     // Legacy path
@@ -780,6 +784,15 @@ function OutputCarousel({
           </Button>
           <div className="flex items-center gap-3">
             <span className="text-small font-medium text-default-700">{slide.label}</span>
+            {slide.qa && (
+              <span
+                title={slide.qa.comment ?? ""}
+                className={`text-[10px] uppercase tracking-wider ${slide.qa.status === "pass" ? "text-success-600" : "text-warning-600"}`}
+              >
+                {slide.qa.status === "pass" ? "✓ QA pass" : "⚠ QA flag"}
+                {typeof slide.qa.score === "number" ? ` ${Math.round(slide.qa.score)}/100` : ""}
+              </span>
+            )}
             <span className="text-tiny text-default-400 tabular-nums">
               {idx + 1} / {total}
             </span>
@@ -852,6 +865,29 @@ function OutputCarousel({
             domain: fetchedUrl.og.domain,
           } : undefined}
         />
+      )}
+
+      {/* QA reviewer block — 60s/100s tier shows Jordan Hayes' review per slide */}
+      {slide?.qa && slide.qa.comment && (
+        <div className={`border rounded-medium px-3 py-2 text-tiny ${
+          slide.qa.status === "pass"
+            ? "border-success-200 bg-success-50 text-success-800"
+            : "border-warning-200 bg-warning-50 text-warning-800"
+        }`}>
+          <div className="flex items-center gap-2 mb-1 font-semibold">
+            <span>{slide.qa.status === "pass" ? "✓" : "⚠"}</span>
+            <span>Jordan Hayes（QA reviewer）</span>
+            {typeof slide.qa.score === "number" && (
+              <span className="text-default-400 tabular-nums">{Math.round(slide.qa.score)}/100</span>
+            )}
+          </div>
+          <p className="leading-relaxed">{slide.qa.comment}</p>
+          {slide.qa.suggestions && slide.qa.suggestions.length > 0 && (
+            <ul className="mt-1 space-y-0.5 list-disc list-inside text-[11px] opacity-90">
+              {slide.qa.suggestions.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* Inline editor — change caption and see the mockup update in real time */}

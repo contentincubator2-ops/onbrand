@@ -18,6 +18,7 @@ import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate } from "./mediaGen";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
+import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext } from "./brandContext";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
@@ -415,7 +416,20 @@ export async function runOrchestra(args: {
     const inputValues = Object.values(args.inputs).filter((v): v is string => typeof v === "string");
     const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
 
-    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix] = await Promise.all([
+    // 100s tier: also kick off scout (viral patterns research) in parallel
+    const isResearchTier = tier === "100s";
+    const taskTopic = inputValues[0]?.slice(0, 200) ?? "";
+    const taskChannel =
+      args.template.outputDefaults?.platform ??
+      (args.template.id?.startsWith("ig-") ? "instagram"
+        : args.template.id?.startsWith("yt-") ? "youtube"
+        : args.template.id?.startsWith("tt-") ? "tiktok"
+        : args.template.id?.startsWith("li-") ? "linkedin"
+        : args.template.id?.startsWith("em-") ? "email"
+        : args.template.id?.startsWith("pr-") ? "press"
+        : "facebook");
+
+    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns] = await Promise.all([
       loadAgent(args.template.agent_id),
       loadAgent(args.config.imageDirectorId),
       ytUrlInput
@@ -433,7 +447,27 @@ export async function runOrchestra(args: {
         return null;
       })(),
       buildBrandContext(args.brandId).catch(() => ""),
+      // Scout stage — only fires for 100s tier
+      isResearchTier
+        ? (async () => {
+            try {
+              return await fetchViralPatterns({ channel: taskChannel, topic: taskTopic, brandId: args.brandId });
+            } catch { return null; }
+          })()
+        : Promise.resolve(null),
     ]);
+
+    // Record scout stage for 100s
+    if (isResearchTier) {
+      const stScout = stage("scout", `爬取 ${taskChannel} 爆款 / 趨勢`);
+      if (viralPatterns && viralPatterns.patterns.length > 0) {
+        stScout.status = "done";
+      } else {
+        stScout.status = "failed";
+        errors.push("scout: 無 API key 或無結果（100s tier 將不含 real-data validation）");
+      }
+      stScout.completedAt = Date.now() - startedAt;
+    }
     stPre.status = "done";
     stPre.completedAt = Date.now() - startedAt;
 
@@ -455,11 +489,16 @@ export async function runOrchestra(args: {
       : urlSummary
         ? { url: urlSummary.url, title: urlSummary.title, chars: urlSummary.fetched_chars, og: urlSummary.og }
         : null;
-    const urlContext = ytContext
+    let urlContext = ytContext
       ? "\n\n" + formatYouTubeContextForPrompt(ytContext) + "\n\n"
       : urlSummary
         ? "\n\n" + formatUrlSummaryForPrompt(urlSummary) + "\n\n"
         : "";
+    // Append viral patterns research to urlContext (so it gets injected
+    // alongside URL content, downstream of brand)
+    if (viralPatterns && viralPatterns.patterns.length > 0) {
+      urlContext += "\n\n" + formatViralPatternsForPrompt(viralPatterns) + "\n\n";
+    }
 
     // ── Stage 2: caption + image briefs in parallel ───────────────────
     const stCap = stage("caption", `${captionLoad.meta?.name ?? "Caption agent"} 寫 ${args.config.variants} 個變體`);
