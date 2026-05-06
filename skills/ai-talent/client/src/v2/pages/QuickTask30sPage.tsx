@@ -173,11 +173,12 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     : { data: [] };
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
 
-  // 30s tier: filter by tier="30s". 60s tier: filter by tier="60s" (real
-  // production-package tasks shipped 2026-05-06). 100s tier: still reuses
-  // 30s pool (Phase 3 scout/video integration TBD); UI scales orchestra.
+  // 30s tier: filter by tier="30s" (simple/quick tasks).
+  // 60s tier: filter by tier="60s" (production-package multi-agent tasks).
+  // 100s tier: also use 60s pool — 100s = 60s + scout + video gen layered
+  // on top, so same task definitions apply (per architectural plan).
   const tasksThisTier = useMemo(
-    () => tier === "60s"
+    () => (tier === "60s" || tier === "100s")
       ? allTasks.filter((t) => t.tier === "60s")
       : allTasks.filter((t) => t.tier === "30s"),
     [allTasks, tier],
@@ -220,8 +221,8 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   const tierTagline = tier === "30s"
     ? "今天，要寫哪一篇 30 秒搞定的貼文？"
     : tier === "60s"
-    ? "今天，要做哪一個 60 秒搞定的內容？"
-    : "今天，要交付哪一個 90 秒級的策略產出？";
+    ? "今天，要做哪一個 60 秒製作包？"
+    : "今天，要做哪一個 100 秒研究驗證版？";
 
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
   // Plan B 20s parallel orchestra (caption_writer + image_director + Flux Schnell ×N)

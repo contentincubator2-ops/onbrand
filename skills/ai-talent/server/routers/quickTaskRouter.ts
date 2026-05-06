@@ -1018,12 +1018,24 @@ export const quickTaskRouter = router({
       return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
     }),
 
-  // 100s tier — research-validated + video-where-applicable. Same task pool.
-  // Currently just bumps tier flag; scout / video integration is Phase 3 build.
+  // 100s tier — research-validated (scout) + video-where-applicable.
+  // Uses same 60s production-package task pool; orchestra adds scout stage
+  // automatically when tier="100s". Falls through to 30s pool for legacy.
   runOrchestra100: protectedProcedure
     .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
     .mutation(async ({ input }) => {
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+      // Try 60s production-package pools first (FB60V2 / IG60 / YT60 / Multi60)
+      const tier60Template =
+        getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
+        getYT60Template(input.taskId) ?? getMulti60Template(input.taskId);
+      const tier60Config =
+        getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
+        getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
+      if (tier60Template && tier60Config) {
+        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, tier: "100s" });
+      }
+      // Legacy fallback to 30s pool
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??
         IG_30S_TASKS.find((t) => t.id === input.taskId) ??
