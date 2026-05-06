@@ -323,7 +323,37 @@ export interface OrchestraConfig {
     highlightCovers?: number;
     /** A/B test pairs (forces 2 of the variants to be A/B opposites) */
     abTestPairs?: boolean;
+    /**
+     * FB 60s production-package extras (2026-05-06).
+     * Multi-post + specialty-role tasks build on the universal extras above.
+     */
+    /** Multi-post fanout count — caption_writer × N parallel (e.g. 5-day = 5) */
+    postsCount?: number;
+    /** Strategist runs first; output piped into N parallel writers as anchor */
+    narrativeArc?: boolean;
+    /** Compare table: original viral post vs adapted brand version (#10) */
+    compareTable?: boolean;
+    /** Timing advisor: should we post now? (#11 current-events) */
+    timingAdvisor?: boolean;
+    /** Legal assistant: consent / anonymize check (#12 testimonial) */
+    legalAssistant?: boolean;
   };
+  /**
+   * 60s FB-only — strategist agent runs BEFORE caption_writer to set the
+   * narrative structure / theme arc for multi-post tasks. Output is piped
+   * into the per-variant caption fanout as an anchor section.
+   */
+  strategistAgentId?: number;
+  /**
+   * 60s FB-only — task-specific specialty role (Compare Editor / Timing
+   * Advisor / Legal Assistant). Runs in parallel with extras stage.
+   */
+  specialtyAgentId?: number;
+  /**
+   * Multi-post task post-type labels (e.g. ["預告 1","預告 2","當日","事後"]
+   * for launch-kit). Drives variant labels when extras.postsCount is set.
+   */
+  postLabels?: string[];
 }
 
 const MANDY_ID = 239184; // FB Visual Direction Lead

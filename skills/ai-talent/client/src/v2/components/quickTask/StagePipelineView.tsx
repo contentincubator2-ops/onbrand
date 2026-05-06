@@ -15,7 +15,7 @@
 import React from "react";
 import { Avatar } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPenNib, faPalette, faComments, faClock, faCalendarPlus, faShieldHalved, faMagnifyingGlassChart } from "@fortawesome/free-solid-svg-icons";
+import { faPenNib, faPalette, faComments, faClock, faCalendarPlus, faShieldHalved, faMagnifyingGlassChart, faSitemap, faGavel } from "@fortawesome/free-solid-svg-icons";
 
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
@@ -40,10 +40,12 @@ interface AgentSlot {
 }
 
 /** Agent allocation for 60s tier — universal across channels.
- *  Caption + image agents come from per-task config; the rest are global. */
-const PIPELINE_AGENTS: AgentSlot[] = [
+ *  Caption + image agents come from per-task config; the rest are global.
+ *  group: visual grouping (1 = Strategy/Drafting, 2 = Production package, 3 = Review) */
+const PIPELINE_AGENTS: Array<AgentSlot & { group: 1 | 2 | 3 }> = [
   {
     stageKey: "scout",
+    group: 1,
     role: "Scout",
     agentName: "Perplexity Scout",
     agentTitle: "real-data 爆款研究",
@@ -51,7 +53,17 @@ const PIPELINE_AGENTS: AgentSlot[] = [
     description: "（100s）爬近 30 天通路爆款、萃取 hook 結構",
   },
   {
+    stageKey: "strategist",
+    group: 1,
+    role: "Strategist",
+    agentName: "（依任務）",
+    agentTitle: "規劃整體敘事弧",
+    icon: faSitemap,
+    description: "多篇系列任務由 strategist 先排結構，寫手再依錨點寫",
+  },
+  {
     stageKey: "caption",
+    group: 1,
     role: "Caption Writer",
     agentName: "（依任務）",
     icon: faPenNib,
@@ -59,26 +71,39 @@ const PIPELINE_AGENTS: AgentSlot[] = [
   },
   {
     stageKey: "brief",
+    group: 1,
     role: "Image Director",
-    agentName: "（依任務）",
+    agentName: "Mandy Cheng",
+    agentTitle: "FB Visual Direction Lead",
     icon: faPalette,
     description: "5 條視覺方向 + 真生 Flux 圖（60s+）",
   },
   {
     stageKey: "extras",
-    role: "Reply / Schedule / Followup",
-    agentName: "Helen Sung × David Wang × Sophie Ho",
-    agentTitle: "60s production package 三人組",
+    group: 2,
+    role: "Production Package",
+    agentName: "Emma × Helen × David × Sophie",
+    agentTitle: "hashtag / reply / schedule / followup",
     icon: faComments,
-    description: "留言模板 ×5 / 最佳發文時段 / 24h 跟進貼文（並行）",
+    description: "並行：hashtag、留言模板、發文時段、24h 跟進",
+  },
+  {
+    stageKey: "specialty",
+    group: 2,
+    role: "Specialty Role",
+    agentName: "（依任務）",
+    agentTitle: "Compare / Timing / Legal",
+    icon: faGavel,
+    description: "爆款改寫對照表 / 時事時效檢核 / 客戶見證法務檢核",
   },
   {
     stageKey: "qa",
+    group: 3,
     role: "QA Reviewer",
     agentName: "Jordan Hayes",
     agentTitle: "AI 品牌故事 CMO",
     icon: faShieldHalved,
-    description: "審核 5 變體：caption / image / package coherence",
+    description: "審核所有變體：caption / image / package coherence",
   },
 ];
 

@@ -72,7 +72,20 @@ export interface OrchestraVariant {
     storyboard?: Array<{ frame: number; visual: string; voiceover?: string }>;
     /** IG profile highlight cover briefs (3-5) */
     highlightCovers?: Array<{ name: string; visual: string }>;
+    /** FB 60s #10 viral-rewrite — original vs adapted compare */
+    compareTable?: string;
+    /** FB 60s #11 trend-rewrite — timing advisor recommendation */
+    timingAdvice?: string;
+    /** FB 60s #12 testimonial-rewrite — legal / consent check */
+    legalCheck?: string;
   };
+}
+
+/** Strategist anchor (system-wide, shared across all variants of one task). */
+export interface OrchestraStrategist {
+  agentName: string;
+  agentTitle?: string;
+  anchor: string; // 4-8 line structure anchor for series tasks
 }
 
 export interface OrchestraResult {
@@ -90,6 +103,10 @@ export interface OrchestraResult {
   stages: OrchestraStage[];
   ok: boolean;
   errors: string[];
+  /** Strategist output (only present for narrativeArc tasks) */
+  strategist?: OrchestraStrategist | null;
+  /** Specialty role agent meta (FB 60s #10/11/12) */
+  specialtyAgent?: AgentMeta | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -149,8 +166,13 @@ async function callOneVariant(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  /** Strategist anchor (multi-post / narrativeArc tasks) — injected before user msg */
+  strategistAnchor?: string;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
-  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg } = args;
+  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, strategistAnchor } = args;
+  // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
+  // substitute the actual post slot before sending to LLM.
+  const filledSystemPrompt = template.systemPrompt.replace(/\{label\}/g, label);
 
   const lengthHint =
     config.captionMaxChars > 0
@@ -183,12 +205,19 @@ async function callOneVariant(args: {
       `若 URL 抓到的內容跟品牌領域不相關，那就照 URL 主題寫，不要硬扯品牌。\n`
     : "";
 
+  const strategistSection = strategistAnchor
+    ? `\n# 系列敘事框架（由 strategist 規劃 — 必須遵循）\n${strategistAnchor}\n` +
+      `↑ 上面是整個系列的結構錨點。你寫的這篇必須對應「${label}」這一段，` +
+      `且與其他段呼應、不重複內容。\n`
+    : "";
+
   const system =
     `# 你的角色 / 寫作風格參考\n` +
     captionPersona +
     `\n# 任務說明\n` +
-    template.systemPrompt +
-    `\n\n【本次任務】只寫 1 個變體：**${label}** 口吻。\n` +
+    filledSystemPrompt +
+    strategistSection +
+    `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
     `${lengthHint}\n\n` +
     `【角色 vs 主角 — 重要】\n` +
     `上面的「角色」只是給你**寫作口吻**參考。**主角永遠是用戶或用戶輸入的內容**（在 user message + URL context）。\n` +
@@ -258,6 +287,7 @@ async function callCaptionWriter(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  strategistAnchor?: string;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.
@@ -420,6 +450,116 @@ async function callFollowupPost(args: { caption: string; channel: string }): Pro
       timeoutPromise<never>(LLM_BUDGET_MS, "followup_post"),
     ]);
     return r.content.trim().slice(0, 800);
+  } catch { return ""; }
+}
+
+// ── Strategist stage (FB 60s narrativeArc tasks) ────────────────────────
+//
+// Runs BEFORE caption_writer fanout. Outputs a 4-8 line "structure anchor"
+// that gets piped into each per-variant call. This makes multi-post tasks
+// (5-day countdown, 3-serial, launch-kit, live-suite) cohere across slots
+// without each writer reinventing the arc.
+//
+// Cost: 1 LLM call ~6-8s. Adds to wall but reduces caption inconsistency.
+
+async function callStrategist(args: {
+  template: FBTaskTemplate;
+  strategistPersona: string;
+  brandPrefix: string;
+  urlContext: string;
+  userMsg: string;
+  postLabels: string[];
+}): Promise<string> {
+  const { strategistPersona, template, brandPrefix, urlContext, userMsg, postLabels } = args;
+  const system =
+    `# 你的角色\n` +
+    strategistPersona +
+    `\n# 任務\n` +
+    `用戶要產出 FB 系列貼文（${postLabels.length} 篇）。你不寫 caption — 你寫整體「結構錨點」給後續寫手用。\n\n` +
+    `產出 4-8 行繁體中文，涵蓋：\n` +
+    `1) 整體 narrative 主題 / 核心訊息\n` +
+    `2) 每篇的角色定位（${postLabels.map((l) => `「${l}」`).join(" / ")}）\n` +
+    `3) 篇與篇之間的勾連邏輯（每篇結尾如何帶到下一篇）\n` +
+    `4) 整體調性（情感 / 理性 / 緊湊 / 慢敘事 etc.）\n\n` +
+    `直接給結構錨點文字，不要前言。\n` +
+    (urlContext ? `\n# URL 內容\n${urlContext}` : "") +
+    `\n# 品牌語氣\n${brandPrefix}`;
+  try {
+    const r = await Promise.race([
+      callModel(
+        [{ role: "system", content: system }, { role: "user", content: userMsg }],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(LLM_BUDGET_MS, "strategist"),
+    ]);
+    return r.content.trim().slice(0, 1500);
+  } catch { return ""; }
+}
+
+// ── Specialty role outputs (FB 60s tasks #10/11/12) ─────────────────────
+
+async function callCompareTable(args: { caption: string; viralSource: string; persona: string }): Promise<string> {
+  const { caption, viralSource, persona } = args;
+  const system =
+    persona +
+    `任務：用戶提供了一篇爆款原文，以及我們改寫後的品牌版。你寫一份 4-6 行對照分析：\n` +
+    `- 原文 hook 機制 vs 改寫版 hook\n- 原文敘事結構 vs 改寫版結構\n- 情緒節奏對照\n- 品牌切入點是否自然\n` +
+    `輸出純文字，不要 JSON、不要 markdown table。`;
+  try {
+    const r = await Promise.race([
+      callModel(
+        [{ role: "system", content: system }, { role: "user", content: `# 爆款原文\n${viralSource.slice(0, 800)}\n\n# 改寫版\n${caption.slice(0, 800)}` }],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(LLM_BUDGET_MS, "compare_table"),
+    ]);
+    return r.content.trim().slice(0, 1000);
+  } catch { return ""; }
+}
+
+async function callTimingAdvisor(args: { caption: string; trendTopic: string; persona: string }): Promise<string> {
+  const { caption, trendTopic, persona } = args;
+  const system =
+    persona +
+    `任務：分析這個時事題材的時效性，給品牌「現在發 / 等等發 / 不要發」的建議。\n` +
+    `4-6 行繁中：① 時事熱度判斷 ② 發文時機建議（具體時間範圍）③ 風險點（敏感、過時、爭議）④ 加分點。\n` +
+    `輸出純文字。`;
+  try {
+    const r = await Promise.race([
+      callModel(
+        [{ role: "system", content: system }, { role: "user", content: `# 時事題材\n${trendTopic.slice(0, 400)}\n\n# 改寫版貼文\n${caption.slice(0, 600)}` }],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(LLM_BUDGET_MS, "timing_advisor"),
+    ]);
+    return r.content.trim().slice(0, 1000);
+  } catch { return ""; }
+}
+
+async function callLegalAssistant(args: { caption: string; testimonialSource: string; consentStatus: string; persona: string }): Promise<string> {
+  const { caption, testimonialSource, consentStatus, persona } = args;
+  const system =
+    persona +
+    `任務：客戶見證改寫文的法務 / 倫理檢核。輸出 4-6 行繁中：\n` +
+    `① 同意狀態判斷（已同意 / 需匿名 / 待確認）\n` +
+    `② 改寫版有無違反原意 / 編造事實\n` +
+    `③ 數字 / 成效宣稱是否有原文支持\n` +
+    `④ 個資 / 識別資訊是否需脫敏\n` +
+    `⑤ 風險評分（低 / 中 / 高）+ 1 句建議\n` +
+    `輸出純文字。`;
+  try {
+    const r = await Promise.race([
+      callModel(
+        [{ role: "system", content: system }, { role: "user", content: `# 同意狀態\n${consentStatus || "未標示"}\n\n# 客戶原話\n${testimonialSource.slice(0, 600)}\n\n# 改寫版\n${caption.slice(0, 600)}` }],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(LLM_BUDGET_MS, "legal_assistant"),
+    ]);
+    return r.content.trim().slice(0, 1000);
   } catch { return ""; }
 }
 
@@ -604,6 +744,40 @@ export async function runOrchestra(args: {
       urlContext += "\n\n" + formatViralPatternsForPrompt(viralPatterns) + "\n\n";
     }
 
+    // ── Stage 1.5: Strategist (FB 60s narrativeArc tasks) ─────────────
+    // Runs synchronously BEFORE caption_writer fanout; output piped as
+    // anchor into each per-variant call. Skip for non-narrativeArc.
+    let strategistAnchor = "";
+    let strategistMeta: AgentMeta | null = null;
+    const useStrategist =
+      (tier === "60s" || tier === "100s") &&
+      !!args.config.strategistAgentId &&
+      !!args.config.extras?.narrativeArc;
+    if (useStrategist) {
+      const stStrat = stage("strategist", "Strategist 規劃系列敘事弧");
+      try {
+        const stratLoad = await loadAgent(args.config.strategistAgentId);
+        strategistMeta = stratLoad.meta;
+        const labels = (args.config.postLabels && args.config.postLabels.length > 0)
+          ? args.config.postLabels
+          : args.config.variantLabels.slice(0, args.config.variants);
+        strategistAnchor = await callStrategist({
+          template: args.template,
+          strategistPersona: stratLoad.persona,
+          brandPrefix,
+          urlContext,
+          userMsg,
+          postLabels: labels,
+        });
+        stStrat.status = strategistAnchor ? "done" : "failed";
+        stStrat.completedAt = Date.now() - startedAt;
+      } catch (e: any) {
+        stStrat.status = "failed";
+        stStrat.completedAt = Date.now() - startedAt;
+        errors.push(`strategist: ${String(e?.message ?? e)}`);
+      }
+    }
+
     // ── Stage 2: caption + image briefs in parallel ───────────────────
     const stCap = stage("caption", `${captionLoad.meta?.name ?? "Caption agent"} 寫 ${args.config.variants} 個變體`);
     const stImg = args.config.imageDirectorId
@@ -618,6 +792,7 @@ export async function runOrchestra(args: {
         brandPrefix,
         urlContext,
         userMsg,
+        strategistAnchor: strategistAnchor || undefined,
       }).then((c) => { stCap.status = "done"; stCap.completedAt = Date.now() - startedAt; return c; }).catch((e) => {
         stCap.status = "failed";
         stCap.completedAt = Date.now() - startedAt;
@@ -701,27 +876,59 @@ export async function runOrchestra(args: {
     // Per-variant fanout. Each extras agent is a small LLM call (~5-10s).
     // Failures non-fatal; variant ships without that extra.
     const extrasCfg = args.config.extras;
+    // Pre-load specialty agent persona if needed (shared across all variants)
+    let specialtyMeta: AgentMeta | null = null;
+    let specialtyPersona = "";
+    const useSpecialty =
+      (tier === "60s" || tier === "100s") &&
+      !!args.config.specialtyAgentId &&
+      !!extrasCfg &&
+      (extrasCfg.compareTable || extrasCfg.timingAdvisor || extrasCfg.legalAssistant);
+    if (useSpecialty) {
+      const specLoad = await loadAgent(args.config.specialtyAgentId);
+      specialtyMeta = specLoad.meta;
+      specialtyPersona = specLoad.persona;
+    }
     if ((tier === "60s" || tier === "100s") && extrasCfg) {
-      const stExtras = stage("extras", "撰寫留言模板 / 發文時段 / 追蹤貼文");
+      const stExtras = stage("extras", "撰寫留言模板 / 發文時段 / 追蹤貼文" + (useSpecialty ? " / 專業檢核" : ""));
       try {
         await Promise.all(
           variants.map(async (v) => {
             if (!v.caption) return; // skip extras for empty variants
             const channel = taskChannel;
+            const viralSrc = (args.inputs["viral_source"] ?? "").toString();
+            const trendSrc = (args.inputs["trend_topic"] ?? "").toString();
+            const testSrc = (args.inputs["testimonial_source"] ?? "").toString();
+            const consent = (args.inputs["consent_status"] ?? "").toString();
             const subResults = await Promise.all([
               extrasCfg.replyTemplates && extrasCfg.replyTemplates > 0
                 ? callReplyTemplates({ caption: v.caption, channel, n: extrasCfg.replyTemplates })
                 : Promise.resolve([] as Array<{ userSays: string; yourReply: string }>),
               extrasCfg.postingTime ? callPostingTime({ caption: v.caption, channel }) : Promise.resolve(""),
               extrasCfg.followupPost ? callFollowupPost({ caption: v.caption, channel }) : Promise.resolve(""),
+              extrasCfg.compareTable && useSpecialty
+                ? callCompareTable({ caption: v.caption, viralSource: viralSrc, persona: specialtyPersona })
+                : Promise.resolve(""),
+              extrasCfg.timingAdvisor && useSpecialty
+                ? callTimingAdvisor({ caption: v.caption, trendTopic: trendSrc, persona: specialtyPersona })
+                : Promise.resolve(""),
+              extrasCfg.legalAssistant && useSpecialty
+                ? callLegalAssistant({ caption: v.caption, testimonialSource: testSrc, consentStatus: consent, persona: specialtyPersona })
+                : Promise.resolve(""),
             ]);
             const replies = subResults[0];
             const postingTime = subResults[1];
             const followupPost = subResults[2];
+            const compareTable = subResults[3];
+            const timingAdvice = subResults[4];
+            const legalCheck = subResults[5];
             v.extras = {
               ...(replies.length > 0 ? { replyTemplates: replies } : {}),
               ...(postingTime ? { postingTime } : {}),
               ...(followupPost ? { followupPost } : {}),
+              ...(compareTable ? { compareTable } : {}),
+              ...(timingAdvice ? { timingAdvice } : {}),
+              ...(legalCheck ? { legalCheck } : {}),
             };
           }),
         );
@@ -788,6 +995,10 @@ export async function runOrchestra(args: {
       stages,
       ok: variants.some((v) => v.caption.length > 0),
       errors,
+      strategist: strategistMeta && strategistAnchor
+        ? { agentName: strategistMeta.name, agentTitle: strategistMeta.title, anchor: strategistAnchor }
+        : null,
+      specialtyAgent: specialtyMeta,
     };
   })();
 

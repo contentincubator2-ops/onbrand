@@ -664,6 +664,9 @@ function OutputCarousel({
       postingTime?: string;
       replyTemplates?: Array<{ userSays: string; yourReply: string }>;
       followupPost?: string;
+      compareTable?: string;
+      timingAdvice?: string;
+      legalCheck?: string;
     } | null;
   }> = useMemo(() => {
     const topStyle = output.image_style_direction?.summary;
@@ -925,7 +928,7 @@ function OutputCarousel({
       )}
 
       {/* 60s/100s production extras package — posting time / reply templates / followup */}
-      {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost) && (
+      {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost || slide.extras.compareTable || slide.extras.timingAdvice || slide.extras.legalCheck) && (
         <div className="border border-default-200 rounded-medium bg-default-50 p-3 space-y-2.5">
           <div className="flex items-center gap-2">
             <span className="text-tiny font-semibold text-default-700">📦 Production package</span>
@@ -957,6 +960,26 @@ function OutputCarousel({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* FB 60s specialty role outputs — task #10/11/12 only */}
+          {slide.extras.compareTable && (
+            <div className="border-t border-default-200 pt-2.5">
+              <p className="text-tiny text-default-500 mb-1.5">🔁 爆款對照分析（Compare Editor）</p>
+              <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.compareTable}</p>
+            </div>
+          )}
+          {slide.extras.timingAdvice && (
+            <div className="border-t border-default-200 pt-2.5">
+              <p className="text-tiny text-default-500 mb-1.5">⏱ 時效性顧問（Timing Advisor）</p>
+              <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.timingAdvice}</p>
+            </div>
+          )}
+          {slide.extras.legalCheck && (
+            <div className="border-t border-default-200 pt-2.5">
+              <p className="text-tiny text-default-500 mb-1.5">⚖ 法務 / 倫理檢核（Legal Assistant）</p>
+              <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.legalCheck}</p>
             </div>
           )}
         </div>
