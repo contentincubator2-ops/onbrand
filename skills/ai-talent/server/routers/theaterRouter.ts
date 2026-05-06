@@ -261,10 +261,10 @@ ${importantHint}
           aspectRatio: aspect as any,
           brandId: input.brandId,
         });
-        if (r.status === "succeeded" && r.imageUrl) {
-          return { ok: true as const, imageUrl: r.imageUrl, brief };
+        if (r.status === "ready" && r.url) {
+          return { ok: true as const, imageUrl: r.url, brief };
         }
-        return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? "image gen failed" };
+        return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `image gen ${r.status}` };
       } catch (e: any) {
         return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
       }
