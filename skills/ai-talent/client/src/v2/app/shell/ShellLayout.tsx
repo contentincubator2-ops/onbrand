@@ -330,6 +330,26 @@ function IconBar({
 
 /* ── Icon nav link (collapsed icon+label) ── */
 
+/** Hash brand name → deterministic HSL color. Each brand gets a unique
+ *  signature color used as the pill background; first-letter stays white.
+ *  Uses HSL with controlled lightness/saturation so colors stay readable. */
+function brandColor(name: string): { bg: string; bgGradient: string; light: string } {
+  if (!name) return { bg: "#7c3aed", bgGradient: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)", light: "rgba(124,58,237,0.10)" };
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0x7fffffff;
+  const hue = hash % 360;
+  // Slight per-name variance to avoid all brands being same saturation
+  const sat = 55 + ((hash >> 8) % 20); // 55-75%
+  const light = 42 + ((hash >> 16) % 8); // 42-50% — readable on white text
+  const bg = `hsl(${hue}, ${sat}%, ${light}%)`;
+  const bgDark = `hsl(${hue}, ${sat}%, ${Math.max(28, light - 14)}%)`;
+  return {
+    bg,
+    bgGradient: `linear-gradient(135deg, ${bg} 0%, ${bgDark} 100%)`,
+    light: `hsla(${hue}, ${sat}%, ${light}%, 0.10)`,
+  };
+}
+
 /* ─────────────── Brand Hierarchy Pill (fixed top-left) ───────────────
    Always-expanded horizontal pill showing the active brand → product →
    event hierarchy. Click any segment to open a hierarchical dropdown
@@ -381,6 +401,7 @@ function BrandHierarchyPill({
   const displayName =
     activeEvent?.name ?? activeProduct?.name ?? activeBrand?.name ?? "選擇品牌";
   const displayInitial = (activeBrand?.name ?? "?").charAt(0);
+  const activeBrandColor = activeBrand ? brandColor(activeBrand.name) : brandColor("");
 
   return (
     <div
@@ -399,24 +420,25 @@ function BrandHierarchyPill({
           width: "100%",
           height: 44,
           borderRadius: 12,
-          border: open ? "1.5px solid #7c3aed" : "1px solid #e5e7eb",
-          background: "#fff",
+          border: open ? `1.5px solid ${activeBrandColor.bg}` : "1px solid #e5e7eb",
+          // Active brand: tint the entire pill background with brand color (10% opacity)
+          background: activeBrand ? activeBrandColor.light : "#fff",
           display: "flex",
           alignItems: "center",
           gap: 10,
           padding: "0 10px 0 6px",
           cursor: "pointer",
           boxShadow: open
-            ? "0 8px 24px rgba(124,58,237,0.18)"
+            ? `0 8px 24px ${activeBrandColor.bg}33`
             : "0 2px 8px rgba(0,0,0,0.06)",
-          transition: "border-color 0.12s, box-shadow 0.12s",
+          transition: "border-color 0.12s, box-shadow 0.12s, background 0.12s",
         }}
       >
-        {/* Logo / initial square */}
+        {/* Logo / initial square — uses brand-specific color */}
         <span style={{
           width: 30, height: 30, borderRadius: 8, flexShrink: 0,
           background: activeBrand
-            ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
+            ? activeBrandColor.bgGradient
             : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
           color: "#fff",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -478,6 +500,7 @@ function BrandHierarchyPill({
             <p style={{ fontSize: 12, color: "#9ca3af", padding: "6px 10px" }}>還沒建立品牌</p>
           ) : brands.map((b: any) => {
             const isActive = b.id === scope.brandId;
+            const bColor = brandColor(b.name);
             return (
               <button
                 key={b.id}
@@ -488,7 +511,7 @@ function BrandHierarchyPill({
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 8,
                   padding: "6px 10px", border: "none", borderRadius: 6,
-                  background: isActive ? "rgba(124,58,237,0.08)" : "transparent",
+                  background: isActive ? bColor.light : "transparent",
                   cursor: "pointer", textAlign: "left",
                 }}
                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f9fafb"; }}
@@ -496,7 +519,7 @@ function BrandHierarchyPill({
               >
                 <span style={{
                   width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                  background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                  background: bColor.bgGradient,
                   color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 11, fontWeight: 700, overflow: "hidden",
                 }}>
@@ -505,7 +528,7 @@ function BrandHierarchyPill({
                 <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: isActive ? 600 : 500, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {b.name}
                 </span>
-                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: "#7c3aed" }} />}
+                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: bColor.bg }} />}
               </button>
             );
           })}
