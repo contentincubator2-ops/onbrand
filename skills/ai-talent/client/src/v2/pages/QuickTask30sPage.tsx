@@ -673,29 +673,27 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         <ModalContent>
           {activeTask && (
             <>
-              <ModalHeader className="flex flex-col gap-1">
-                <div className="flex items-center gap-3">
-                  {activeTask.agent && (
-                    <Avatar
-                      src={activeTask.agent.avatarUrl || dicebear(activeTask.agent.name)}
-                      size="md"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{activeTask.label}</p>
-                    <p className="text-tiny text-default-500">
-                      {activeTask.agent ? `${activeTask.agent.name} · ${activeTask.agent.title}` : activeTask.description}
-                    </p>
-                  </div>
-                  <span
-                    className="text-[10px] font-bold tabular-nums px-2.5 py-1 rounded-full text-white shadow-sm"
-                    style={{
-                      background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)`,
-                    }}
-                  >
-                    {tier}
-                  </span>
+              {/* Canva-style modal header: title HIDDEN by default (only tooltip on hover);
+                  primary visual is the asset. Show only tiny task name + tier chip + ✕. */}
+              <ModalHeader className="flex items-center gap-2 py-1.5 px-3 border-b border-default-100">
+                {/* Tiny task name (almost-hidden) — only readable for orientation */}
+                <div
+                  className="min-w-0 flex-1 group cursor-default"
+                  title={activeTask.agent ? `${activeTask.label} · ${activeTask.agent.name}（${activeTask.agent.title}）` : activeTask.label}
+                >
+                  <p className="text-[11px] text-default-400 truncate group-hover:text-default-600 transition">
+                    {activeTask.label}
+                    {activeTask.agent && <span className="text-default-300 ml-2">· {activeTask.agent.name}</span>}
+                  </p>
                 </div>
+                <span
+                  className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)`,
+                  }}
+                >
+                  {tier}
+                </span>
               </ModalHeader>
               <ModalBody>
                 {!output ? (
@@ -1022,48 +1020,45 @@ function OutputCarousel({
         </Card>
       )}
 
-      {/* ═══ CANVA-STYLE: tool rail | mockup canvas | contextual right panel ═══ */}
-      <div className="flex gap-3 items-stretch">
-        {/* ── LEFT TOOL RAIL — icon-only, Canva-minimal ────────────────── */}
-        <div className="flex flex-col gap-2 pt-1 shrink-0">
-          {slide?.caption && (
-            <ToolBtn icon={faPenNib} label="編輯文案" active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
+      {/* ═══ CANVA TOP TOOLBAR — horizontal icon row above the asset ═══ */}
+      <div className="flex items-center gap-1 px-1 py-1 border-b border-default-100">
+        {slide?.caption && (
+          <ToolBtn icon={faPenNib} label="編輯文案" active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
+        )}
+        <ToolBtn icon={faImage} label="AI 生圖" active={activeTool === "style"}
+          disabled={!slide?.imageStyle} onPress={() => toggleTool("style")} />
+        <ToolBtn icon={faFilm} label="AI 生影片（即將推出）" active={activeTool === "video"}
+          disabled onPress={() => toggleTool("video")} />
+        <ToolBtn icon={faWandMagicSparkles} label="AI prompt / 視覺方向" active={activeTool === "prompt"}
+          disabled={!slide?.imageStyle} onPress={() => toggleTool("prompt")} />
+        <ToolBtn icon={faSliders} label="細節" active={activeTool === "details"}
+          disabled={!hasDetails} onPress={() => toggleTool("details")} />
+        <span className="w-px h-6 bg-default-200 mx-1" />
+        <ToolBtn icon={faFolderPlus} label="加到專案"
+          onPress={() => window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。")} />
+        <ToolBtn icon={faCompass} label="換個語氣"
+          onPress={() => { window.location.href = "/brands"; }} />
+        {/* Right side: latency + agents micro-info, very faint */}
+        <div className="ml-auto flex items-center gap-1.5 text-[10px] text-default-400 pr-1">
+          {latencyMs != null && <span className="tabular-nums">{(latencyMs / 1000).toFixed(1)}s</span>}
+          {agentMeta && (
+            <>
+              <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{agentMeta.name}</span>
+            </>
           )}
-          <ToolBtn
-            icon={faImage}
-            label="AI 生圖"
-            active={activeTool === "style"}
-            disabled={!slide?.imageStyle}
-            onPress={() => toggleTool("style")}
-          />
-          <ToolBtn
-            icon={faFilm}
-            label="AI 生影片（即將推出）"
-            active={activeTool === "video"}
-            disabled
-            onPress={() => toggleTool("video")}
-          />
-          <ToolBtn
-            icon={faWandMagicSparkles}
-            label="AI prompt / 視覺方向"
-            active={activeTool === "prompt"}
-            disabled={!slide?.imageStyle}
-            onPress={() => toggleTool("prompt")}
-          />
-          <ToolBtn
-            icon={faSliders}
-            label="細節（Agent 流程 / QA / 製作包）"
-            active={activeTool === "details"}
-            disabled={!hasDetails}
-            onPress={() => toggleTool("details")}
-          />
-          <ToolBtn icon={faFolderPlus} label="加到專案"
-            onPress={() => window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。")} />
-          <ToolBtn icon={faCompass} label="換個語氣（換品牌設定）"
-            onPress={() => { window.location.href = "/brands"; }} />
+          {imageAgentMeta && (
+            <>
+              <span>+</span>
+              <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-3.5 h-3.5" />
+            </>
+          )}
         </div>
+      </div>
 
-        {/* ── CENTER CANVAS: Mockup huge, side chevrons ────────────────── */}
+      {/* ═══ CANVA STAGE: huge mockup | optional right contextual panel ═══ */}
+      <div className="flex gap-3 items-stretch">
+        {/* ── CENTER STAGE: Mockup HUGE with side chevrons + floating pill ── */}
         <div className="flex-1 min-w-0 flex flex-col items-center">
           <div className="relative flex items-stretch gap-2">
             {total > 1 && (
@@ -1078,16 +1073,58 @@ function OutputCarousel({
                 <FontAwesomeIcon icon={faChevronLeft} className="text-default-700 text-medium" />
               </button>
             )}
-            {/* Centered mockup with Canva-style soft frame */}
+            {/* Centered mockup with Canva-style soft frame + floating pill above */}
             <div className="flex-1 min-w-0 flex justify-center">
               {mockupVariant && (
-                <div
-                  className="w-full max-w-[480px] rounded-2xl overflow-hidden shadow-md"
-                  style={{
-                    background: "white",
-                    boxShadow: `0 8px 32px -12px ${tierAccent(pageTier)}40, 0 0 0 1px ${tierAccent(pageTier)}20`,
-                  }}
-                >
+                <div className="relative w-full max-w-[640px]">
+                  {/* Floating action pill above mockup (Canva pattern) */}
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-white border border-default-200 rounded-full shadow-md px-1 py-0.5">
+                    <button
+                      onClick={() => toggleTool("edit")}
+                      title="編輯這個版本"
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
+                        activeTool === "edit" ? "text-white" : "text-default-600 hover:bg-default-100"
+                      }`}
+                      style={activeTool === "edit" ? { background: tierAccent(pageTier) } : undefined}
+                    >
+                      <FontAwesomeIcon icon={faPenNib} className="text-tiny" />
+                    </button>
+                    <button
+                      onClick={() => { if (slide?.caption) navigator.clipboard.writeText(slide.caption); }}
+                      title="複製這版"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-default-600 hover:bg-default-100 transition"
+                    >
+                      <FontAwesomeIcon icon={faClipboard} className="text-tiny" />
+                    </button>
+                    {slide?.imageStyle && !slide?.imageUrl && (
+                      <button
+                        onClick={() => setMediaGenOpen(true)}
+                        title="用此風格 AI 生圖"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-default-600 hover:bg-default-100 transition"
+                      >
+                        <FontAwesomeIcon icon={faPalette} className="text-tiny" />
+                      </button>
+                    )}
+                    <span className="w-px h-4 bg-default-200" />
+                    <button
+                      onClick={() => toggleTool("details")}
+                      title="細節"
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
+                        activeTool === "details" ? "text-white" : "text-default-500 hover:bg-default-100"
+                      }`}
+                      style={activeTool === "details" ? { background: tierAccent(pageTier) } : undefined}
+                      disabled={!hasDetails}
+                    >
+                      <FontAwesomeIcon icon={faSliders} className="text-tiny" />
+                    </button>
+                  </div>
+                  <div
+                    className="rounded-2xl overflow-hidden"
+                    style={{
+                      background: "white",
+                      boxShadow: `0 12px 40px -12px ${tierAccent(pageTier)}50, 0 0 0 1px ${tierAccent(pageTier)}25`,
+                    }}
+                  >
                   <PlatformMockup
                     variant={mockupVariant}
                     title={output.title ?? ""}
@@ -1112,6 +1149,7 @@ function OutputCarousel({
                       domain: fetchedUrl.og.domain,
                     } : undefined}
                   />
+                  </div>
                 </div>
               )}
             </div>
@@ -1361,34 +1399,40 @@ function OutputCarousel({
         )}
       </div>
 
-      {/* ═══ Canva-style bottom thumbnail strip (page nav) ═══════════════ */}
-      {total > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-3 pb-1 border-t border-default-100 overflow-x-auto">
-          {slides.map((s, i) => {
-            const active = i === idx;
-            return (
-              <button
-                key={i}
-                onClick={() => setIdx(i)}
-                title={s.label}
-                className={`flex-shrink-0 w-14 h-14 rounded-lg flex flex-col items-center justify-center font-bold transition relative ${
-                  active ? "shadow-md text-white scale-105" : "bg-default-100 text-default-600 hover:bg-default-200 hover:scale-105"
-                }`}
-                style={active ? {
-                  background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}cc)`,
-                } : undefined}
-              >
-                <span className="text-medium leading-none">{i + 1}</span>
-                {s.qa && (
-                  <span className="text-[8px] mt-0.5 opacity-90">
-                    {s.qa.status === "pass" ? "✓" : "⚠"}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* ═══ Canva-style bottom thumbnail strip (page nav) — always shown ═══ */}
+      <div className="flex items-center justify-center gap-2 pt-2 pb-1 border-t border-default-100 overflow-x-auto">
+        {slides.map((s, i) => {
+          const active = i === idx;
+          return (
+            <button
+              key={i}
+              onClick={() => setIdx(i)}
+              title={s.label}
+              className={`flex-shrink-0 w-14 h-14 rounded-lg flex flex-col items-center justify-center font-bold transition relative ${
+                active ? "shadow-md text-white scale-105" : "bg-default-100 text-default-600 hover:bg-default-200 hover:scale-105"
+              }`}
+              style={active ? {
+                background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}cc)`,
+              } : undefined}
+            >
+              <span className="text-medium leading-none">{i + 1}</span>
+              {s.qa && (
+                <span className="text-[8px] mt-0.5 opacity-90">
+                  {s.qa.status === "pass" ? "✓" : "⚠"}
+                </span>
+              )}
+            </button>
+          );
+        })}
+        {/* [+] regenerate more — Canva "add page" pattern */}
+        <button
+          onClick={() => window.alert("「再生成多版」會重跑這個任務 — 暫時請按底部的「重做」")}
+          title="再生成多版"
+          className="flex-shrink-0 w-14 h-14 rounded-lg border-2 border-dashed border-default-300 text-default-400 hover:border-default-500 hover:text-default-600 transition flex items-center justify-center"
+        >
+          <span className="text-2xl leading-none">+</span>
+        </button>
+      </div>
 
       <MediaGenFlow
         open={mediaGenOpen}
