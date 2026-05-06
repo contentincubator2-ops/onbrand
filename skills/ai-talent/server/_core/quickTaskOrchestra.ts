@@ -57,6 +57,22 @@ export interface OrchestraVariant {
     status: "ready" | "failed" | "skipped" | "timeout";
     errorMsg?: string;
   };
+  /**
+   * 60s tier production-package extras. Always optional — 30s tier leaves
+   * everything undefined; 60s+ populates per OrchestraConfig.extras flags.
+   */
+  extras?: {
+    /** Best posting time recommendation (e.g. "週四 19:00-21:00") */
+    postingTime?: string;
+    /** Reply templates: anticipated user comment → brand response */
+    replyTemplates?: Array<{ userSays: string; yourReply: string }>;
+    /** A 24-hour-later followup post that builds on this one */
+    followupPost?: string;
+    /** Storyboard frames for video / Reel / Shorts (each = scene description) */
+    storyboard?: Array<{ frame: number; visual: string; voiceover?: string }>;
+    /** IG profile highlight cover briefs (3-5) */
+    highlightCovers?: Array<{ name: string; visual: string }>;
+  };
 }
 
 export interface OrchestraResult {
@@ -339,6 +355,74 @@ async function callImageDirector(args: {
   );
 }
 
+// ── 60s tier extras: reply templates / posting time / followup post ─────
+//
+// Each extra is its own tiny LLM call (qwen, ~10s budget). Failures are
+// non-fatal — the variant ships without that extra and UI shows "—".
+
+async function callReplyTemplates(args: { caption: string; channel: string; n: number }): Promise<Array<{ userSays: string; yourReply: string }>> {
+  const { caption, channel, n } = args;
+  const system =
+    `你是社群留言策劃師。基於下面這篇即將發出的 ${channel} 貼文，預測 ${n} 種最可能的用戶留言（從正面到質疑都涵蓋），並寫出對應的品牌回覆。\n\n` +
+    `每一組：用戶可能會說的話（30 字內，自然口吻）+ 品牌怎麼回（30-60 字，有溫度不罐頭）。\n\n` +
+    `輸出嚴格 JSON 陣列：[{"userSays":"...","yourReply":"..."}, ...]\n` +
+    `第一個字元是 [。不要 markdown 圍籬。\n`;
+  try {
+    const r = await Promise.race([
+      callModel(
+        [{ role: "system", content: system }, { role: "user", content: `貼文：\n${caption}` }],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(LLM_BUDGET_MS, "reply_templates"),
+    ]);
+    const parsed = tryParseJson(r.content);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, n).map((p: any) => ({
+      userSays: String(p?.userSays ?? "").slice(0, 200),
+      yourReply: String(p?.yourReply ?? "").slice(0, 400),
+    })).filter((p) => p.userSays && p.yourReply);
+  } catch { return []; }
+}
+
+async function callPostingTime(args: { caption: string; channel: string }): Promise<string> {
+  const { caption, channel } = args;
+  const system =
+    `根據下面這篇 ${channel} 貼文的主題、語氣、對象，推薦 1 個最佳發文時段。\n` +
+    `回答格式：「週X HH:MM-HH:MM｜理由（30 字內）」。例：「週四 19:00-21:00｜下班通勤後滑社群高峰，貼文輕鬆題材剛好接住」\n` +
+    `不要列多個選項，只給最推薦的 1 個。`;
+  try {
+    const r = await Promise.race([
+      callModel(
+        [{ role: "system", content: system }, { role: "user", content: caption.slice(0, 800) }],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(8_000, "posting_time"),
+    ]);
+    return r.content.trim().slice(0, 200);
+  } catch { return ""; }
+}
+
+async function callFollowupPost(args: { caption: string; channel: string }): Promise<string> {
+  const { caption, channel } = args;
+  const system =
+    `這是即將發到 ${channel} 的主貼文。請寫一篇 24 小時後的追蹤貼文（80-150 字），延伸主貼文的對話：\n` +
+    `- 不要重複主貼文重點\n- 可以是補充細節、回答留言常見問題、或下集預告\n- 語氣連貫\n` +
+    `直接給追蹤貼文文字（不要加 prefix 像 "Day 2:"）。`;
+  try {
+    const r = await Promise.race([
+      callModel(
+        [{ role: "system", content: system }, { role: "user", content: caption.slice(0, 800) }],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(LLM_BUDGET_MS, "followup_post"),
+    ]);
+    return r.content.trim().slice(0, 800);
+  } catch { return ""; }
+}
+
 // ── Single image gen with per-image timeout ─────────────────────────────
 
 async function genOneImage(prompt: string, config: OrchestraConfig): Promise<OrchestraVariant["image"]> {
@@ -386,6 +470,16 @@ export async function runOrchestra(args: {
     const scaledLabels = baseLabels.length >= 5
       ? baseLabels.slice(0, 5)
       : [...baseLabels, ...extraLabels.slice(0, 5 - baseLabels.length)];
+
+    // 60s tier KEY differentiators vs 30s:
+    //   1. runImageGen=true (Flux really runs — real images, not just briefs)
+    //   2. extras enabled — production-package add-ons (replies, time, followup)
+    // 100s tier: same as 60s + scout already added at stage 1 + future video gen.
+    const defaultExtras = {
+      replyTemplates: 5,
+      postingTime: true,
+      followupPost: true,
+    };
     args = {
       ...args,
       config: {
@@ -393,6 +487,8 @@ export async function runOrchestra(args: {
         variants: 5,
         images: args.config.images > 0 ? 5 : 0,
         variantLabels: scaledLabels,
+        runImageGen: args.config.images > 0,  // 60s: yes if task has visual
+        extras: { ...defaultExtras, ...(args.config.extras ?? {}) },
       },
     };
   }
@@ -599,6 +695,43 @@ export async function runOrchestra(args: {
         hashtags: cap?.hashtags ?? [],
         image: images[i] ?? { style: briefs[i] ?? null, url: null, status: args.config.images > 0 ? "failed" : "skipped" },
       });
+    }
+
+    // ── Stage 3.5: 60s/100s production extras (replies / time / followup) ─
+    // Per-variant fanout. Each extras agent is a small LLM call (~5-10s).
+    // Failures non-fatal; variant ships without that extra.
+    const extrasCfg = args.config.extras;
+    if ((tier === "60s" || tier === "100s") && extrasCfg) {
+      const stExtras = stage("extras", "撰寫留言模板 / 發文時段 / 追蹤貼文");
+      try {
+        await Promise.all(
+          variants.map(async (v) => {
+            if (!v.caption) return; // skip extras for empty variants
+            const channel = taskChannel;
+            const subResults = await Promise.all([
+              extrasCfg.replyTemplates && extrasCfg.replyTemplates > 0
+                ? callReplyTemplates({ caption: v.caption, channel, n: extrasCfg.replyTemplates })
+                : Promise.resolve([] as Array<{ userSays: string; yourReply: string }>),
+              extrasCfg.postingTime ? callPostingTime({ caption: v.caption, channel }) : Promise.resolve(""),
+              extrasCfg.followupPost ? callFollowupPost({ caption: v.caption, channel }) : Promise.resolve(""),
+            ]);
+            const replies = subResults[0];
+            const postingTime = subResults[1];
+            const followupPost = subResults[2];
+            v.extras = {
+              ...(replies.length > 0 ? { replyTemplates: replies } : {}),
+              ...(postingTime ? { postingTime } : {}),
+              ...(followupPost ? { followupPost } : {}),
+            };
+          }),
+        );
+        stExtras.status = "done";
+        stExtras.completedAt = Date.now() - startedAt;
+      } catch (e: any) {
+        stExtras.status = "failed";
+        stExtras.completedAt = Date.now() - startedAt;
+        errors.push(`extras: ${String(e?.message ?? e)}`);
+      }
     }
 
     // ── Stage 4: QA review (60s/100s tier only, parallel per variant) ─────

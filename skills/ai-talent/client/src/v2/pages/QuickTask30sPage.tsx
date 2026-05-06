@@ -266,8 +266,9 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
             image_style_direction: v.image?.style ? { summary: v.image.style } : undefined,
             imageUrl: v.image?.url ?? null,
             imageStatus: v.image?.status ?? "skipped",
-            // 60s/100s tier: QA result attached by orchestra
+            // 60s/100s tier: QA result + production extras
             qa: v.qa ?? null,
+            extras: v.extras ?? null,
           })),
         };
         setOutput(transformedOutput);
@@ -643,6 +644,11 @@ function OutputCarousel({
     label: string; caption: string; hashtags?: string[]; imageStyle?: string;
     imageUrl?: string | null; imageStatus?: "ready" | "failed" | "skipped" | "timeout";
     qa?: { status: "pass" | "flag"; comment?: string; score?: number; suggestions?: string[] } | null;
+    extras?: {
+      postingTime?: string;
+      replyTemplates?: Array<{ userSays: string; yourReply: string }>;
+      followupPost?: string;
+    } | null;
   }> = useMemo(() => {
     const topStyle = output.image_style_direction?.summary;
     const orchestraMode = (output.variants ?? []).some((v: any) => v.imageUrl !== undefined || v.imageStatus !== undefined);
@@ -655,6 +661,7 @@ function OutputCarousel({
         imageUrl: v.imageUrl ?? null,
         imageStatus: v.imageStatus ?? "skipped",
         qa: v.qa ?? null,
+        extras: v.extras ?? null,
       }));
     }
     // Legacy path
@@ -886,6 +893,44 @@ function OutputCarousel({
             <ul className="mt-1 space-y-0.5 list-disc list-inside text-[11px] opacity-90">
               {slide.qa.suggestions.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
             </ul>
+          )}
+        </div>
+      )}
+
+      {/* 60s/100s production extras package — posting time / reply templates / followup */}
+      {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost) && (
+        <div className="border border-default-200 rounded-medium bg-default-50 p-3 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-tiny font-semibold text-default-700">📦 Production package</span>
+            <span className="text-[10px] text-default-400">(60s 完整包)</span>
+          </div>
+
+          {slide.extras.postingTime && (
+            <div className="flex items-start gap-2 text-tiny">
+              <span className="text-default-500 shrink-0 w-16">⏰ 發文時段</span>
+              <span className="text-default-800">{slide.extras.postingTime}</span>
+            </div>
+          )}
+
+          {slide.extras.followupPost && (
+            <div className="flex items-start gap-2 text-tiny">
+              <span className="text-default-500 shrink-0 w-16">📅 24h 跟進</span>
+              <span className="text-default-800 whitespace-pre-line leading-relaxed flex-1">{slide.extras.followupPost}</span>
+            </div>
+          )}
+
+          {slide.extras.replyTemplates && slide.extras.replyTemplates.length > 0 && (
+            <div>
+              <p className="text-tiny text-default-500 mb-1.5">💬 留言回覆模板（{slide.extras.replyTemplates.length} 組）</p>
+              <div className="space-y-1.5 pl-2 border-l-2 border-default-300">
+                {slide.extras.replyTemplates.slice(0, 5).map((rt, i) => (
+                  <div key={i} className="text-tiny">
+                    <p className="text-default-500">用戶：{rt.userSays}</p>
+                    <p className="text-default-800 mt-0.5">你回：{rt.yourReply}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

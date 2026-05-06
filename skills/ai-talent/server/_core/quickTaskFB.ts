@@ -290,6 +290,8 @@ export interface OrchestraConfig {
    * lets the user opt into MediaGenFlow when they actually want a render.
    * - false → image_director writes briefs, Flux is NOT called (default 30s)
    * - true  → image_director writes briefs + Flux Schnell renders them
+   *
+   * 60s tier auto-overrides this to true (real images = key differentiator).
    */
   runImageGen: boolean;
   imageDirectorId: number | null;
@@ -300,6 +302,28 @@ export interface OrchestraConfig {
   /** Caption length range hint (chars, lower bound) for prompt + UI badge */
   captionMinChars: number;
   captionMaxChars: number;
+  /**
+   * 60s tier extras — production-package add-ons that turn a "draft" into
+   * "ready-to-publish". Each task picks which extras it wants. Orchestra
+   * dispatches the extra agents in parallel after caption is done.
+   *
+   * Default: undefined → no extras (30s behavior).
+   * In 60s tier orchestra auto-fills sensible defaults if config doesn't set.
+   */
+  extras?: {
+    /** N reply templates per variant (e.g. 5 = 5 example user→brand exchanges) */
+    replyTemplates?: number;
+    /** Algorithmic recommendation of best posting time (uses brand_brain history) */
+    postingTime?: boolean;
+    /** A 24h-later followup post draft */
+    followupPost?: boolean;
+    /** Storyboard frames for video tasks (3-6) */
+    storyboard?: number;
+    /** Highlight cover briefs for IG profile tasks (3-5) */
+    highlightCovers?: number;
+    /** A/B test pairs (forces 2 of the variants to be A/B opposites) */
+    abTestPairs?: boolean;
+  };
 }
 
 const MANDY_ID = 239184; // FB Visual Direction Lead
