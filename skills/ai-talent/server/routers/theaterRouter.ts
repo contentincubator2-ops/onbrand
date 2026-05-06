@@ -66,41 +66,93 @@ export const theaterRouter = router({
         ? input.importantDates.map((d) => `${d.date}「${d.name}」`).join("、")
         : "無特別檔期";
 
-      // Chief opening — one LLM call, ~2-3s
+      // Chief opening + per-platform lead thoughts in ONE LLM call.
+      // Returns JSON: { chief: "...", leads: { facebook: "...", ig: "..." } }
+      // Single 3-4s round-trip beats 7 sequential calls.
+      const platformContext: Record<string, string> = {
+        facebook:  "FB lead — 規劃中長文節奏（90-180 字 / 篇）。",
+        instagram: "IG lead — Reel + Carousel + Static 混合節奏。",
+        youtube:   "YT lead — 主片 + Shorts 配比；一週導向同 1 個 USP。",
+        threads:   "Threads lead — 串文短打、即時感、口語。",
+        line:      "LINE lead — 1:1 廣播訊息、強 CTA、導購為主。",
+        blog:      "Blog lead — SEO 長文、結構分明、深度內容。",
+      };
+      const askedPlatforms = input.platforms;
+      const platformAsks = askedPlatforms
+        .map((p) => `${p}: ${platformContext[p]}`)
+        .join("\n");
+
       let chiefOpening = "";
+      let leadThoughts: Record<string, string> = {};
       try {
         const r = await invokeLLM({
           provider: "anthropic",
           model: "claude-haiku-4-5",
-          maxTokens: 220,
+          maxTokens: 800,
           messages: [
             {
               role: "system",
-              content: "你是 Joe Pulizzi 風格的內容策略總監 Claire Hsu。用第一人稱、口語、像在會議桌上指揮各組長，給出 2-3 句的開場白。中文。不要使用 markdown。",
+              content: `你是內容企劃台的劇本設計師。為以下 7 位 AI agent 各寫一段 1-2 句的「上場台詞」：
+1 位總策畫 Claire Hsu（Joe Pulizzi 風格）— 開場宣告本週主軸 + USP 分配原則。
+${askedPlatforms.length} 位平台 lead — 各自接棒、口語、第一人稱、明確說出他這個平台的節奏與本週重點。
+
+輸出嚴格 JSON：
+{
+  "chief": "Claire 的 2 句開場白",
+  "leads": {
+    ${askedPlatforms.map((p) => `"${p}": "該平台 lead 的 1-2 句台詞"`).join(",\n    ")}
+  }
+}
+不加 markdown / 解釋 / 額外文字。每段台詞不超過 60 字。中文。`,
             },
             {
               role: "user",
               content: `品牌：${pos?.tagline ?? "（無）"}
 TA：${pos?.targetAudience ?? "（無）"}
+品牌語氣：${pos?.brandVoice ?? "口語、專業"}
 USP 候選：${usps.join("、")}
-本週要顧的平台：${platformLabels}
-重要日子：${dateChips}
+本週重要日子：${dateChips}
 
-請說一段 2-3 句的開場，包含：
-1) 一句總策略（這週的主軸）
-2) USP 怎麼分到不同平台的原則（一篇貼文聚焦 1 個 USP）
-3) 點名各平台 lead 接手`,
+各平台規格：
+${platformAsks}
+
+請輸出 JSON。`,
             },
           ],
         });
-        chiefOpening = r.choices[0]?.message?.content?.toString().trim() ?? "";
-      } catch {
-        chiefOpening = `本週主軸：把 ${usps[0]} 放到最前面。一篇貼文聚焦 1 個 USP。${platformLabels} 各組 lead 等等接手。`;
+        const raw = r.choices[0]?.message?.content?.toString().trim() ?? "";
+        // Strip code fences if present
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        const parsed = JSON.parse(cleaned);
+        chiefOpening = String(parsed.chief ?? "").trim();
+        if (parsed.leads && typeof parsed.leads === "object") {
+          for (const p of askedPlatforms) {
+            const v = (parsed.leads as any)[p];
+            if (typeof v === "string" && v.trim()) leadThoughts[p] = v.trim();
+          }
+        }
+      } catch (e) {
+        // graceful fallback — formulaic but never crashes
+        chiefOpening = `本週主軸：把 ${usps[0]} 推到最前面。一篇貼文聚焦 1 個 USP，${platformLabels} 各組 lead 等等接手。`;
+      }
+
+      // Fill missing leads with formulaic fallback
+      const fallbackLine: Record<string, string> = {
+        facebook:  `FB 我來。中長文節奏，痛點 → 解方 → CTA。`,
+        instagram: `IG 換我講。視覺先行，Reel 配 Carousel，每篇 1 個 USP。`,
+        youtube:   `YT 一週 1 主片 + 2 Shorts，導向同 1 個 USP。`,
+        threads:   `Threads 走串文，每天 1-2 條短打、即時感。`,
+        line:      `LINE 一週 2 次廣播，週中預熱 + 週末導購。`,
+        blog:      `Blog 我規劃 1-2 篇長文，SEO + USP 對齊。`,
+      };
+      for (const p of askedPlatforms) {
+        if (!leadThoughts[p]) leadThoughts[p] = fallbackLine[p] ?? "我這條線接手。";
       }
 
       return {
         usps,
         chiefOpening,
+        leadThoughts,
         positioning: pos ? {
           tagline: pos.tagline,
           targetAudience: pos.targetAudience,

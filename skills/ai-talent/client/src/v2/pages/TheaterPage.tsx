@@ -29,6 +29,8 @@ import {
   Play,
   X,
   Check,
+  RefreshCw,
+  Copy,
 } from "lucide-react";
 import {
   THEATER_CAST,
@@ -181,12 +183,16 @@ function PlatformCell({
   caption,
   writerAvatar,
   imageDirAvatar,
+  onRedo,
+  onCopy,
 }: {
   platform: TheaterPlatform;
   state: CellState;
   caption: string;
   writerAvatar: string | null;
   imageDirAvatar: string | null;
+  onRedo?: () => void;
+  onCopy?: () => void;
 }) {
   const meta = PLATFORM_META[platform];
   const isIdle    = state.status === "idle" || state.status === "queued";
@@ -241,9 +247,9 @@ function PlatformCell({
       </div>
 
       {/* caption area */}
-      <div className="p-3 flex-1 min-h-[80px]">
+      <div className="p-3 flex-1 min-h-[80px] flex flex-col">
         {(isWriting || isImaging || isDone) && caption ? (
-          <p className="text-[12px] text-neutral-800 leading-relaxed whitespace-pre-wrap">
+          <p className="text-[12px] text-neutral-800 leading-relaxed whitespace-pre-wrap flex-1">
             {caption}
             {isWriting && (
               <span
@@ -253,11 +259,37 @@ function PlatformCell({
             )}
           </p>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
             <p className="text-[10px] text-neutral-400">
               {isIdle ? "等候 caption writer 接棒…" : "—"}
             </p>
+          </div>
+        )}
+
+        {/* Action row — only on done */}
+        {isDone && caption && (
+          <div className="mt-2 pt-2 border-t border-neutral-100 flex items-center gap-1.5">
+            {onCopy && (
+              <button
+                onClick={onCopy}
+                className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+                title="複製 caption"
+              >
+                <Copy size={11} strokeWidth={2} />
+                複製
+              </button>
+            )}
+            {onRedo && (
+              <button
+                onClick={onRedo}
+                className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+                title="重新生成這一格"
+              >
+                <RefreshCw size={11} strokeWidth={2} />
+                重做
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -324,6 +356,17 @@ export default function TheaterPage() {
   const cellsRef = useRef<Map<CellKey, CellState>>(new Map());
   useEffect(() => { cellsRef.current = cells; }, [cells]);
 
+  // Per-cell metadata captured at run time — needed for redo.
+  // Map<CellKey, { usp, importantDateName, brandTagline, brandVoice }>
+  const [cellMeta, setCellMeta] = useState<Map<CellKey, {
+    usp: string;
+    importantDateName: string | null;
+    brandTagline: string | null;
+    brandVoice: string | null;
+    weekday: string;
+    date: string;
+  }>>(new Map());
+
   // Brain bar state
   const [running, setRunning] = useState(false);
   const [station, setStation] = useState<BrainStation | null>(null);
@@ -349,8 +392,13 @@ export default function TheaterPage() {
     }
     setCells(fresh);
 
-    // 0) Fetch run plan from backend (positioning → USP pool + chief opening)
-    let runPlan: { usps: string[]; chiefOpening: string; positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null };
+    // 0) Fetch run plan from backend (positioning → USP pool + chief opening + lead thoughts)
+    let runPlan: {
+      usps: string[];
+      chiefOpening: string;
+      leadThoughts: Record<string, string>;
+      positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null;
+    };
     try {
       runPlan = await utils.theater.runStart.fetch({
         brandId,
@@ -364,7 +412,7 @@ export default function TheaterPage() {
       return;
     }
 
-    const { usps, chiefOpening, positioning } = runPlan;
+    const { usps, chiefOpening, leadThoughts, positioning } = runPlan;
     const brandTagline = positioning?.tagline ?? null;
     const brandVoice   = positioning?.brandVoice ?? null;
 
@@ -377,19 +425,11 @@ export default function TheaterPage() {
       },
     ];
 
-    // 2) Per-platform leads talk strategy
+    // 2) Per-platform leads talk strategy (real LLM output from runStart)
     for (const p of activePlatforms) {
       const lead = getPlatformLead(p);
-      const meta = PLATFORM_META[p];
-      const lines: Record<TheaterPlatform, string> = {
-        facebook:  `FB 我來。7 天主軸 = 痛點故事 + 解方落地。Day1 起頭、Day3 高峰、Day6 收成 CTA。`,
-        instagram: `IG 換我講。Reel × 3 + Carousel × 2 + Static × 2，視覺先行、文字後援，每篇配 1 個 USP。`,
-        youtube:   `YT 一週 1 主片 + 2 Shorts，主片走深度、Shorts 補節奏，全週導同 1 個 USP。`,
-        threads:   `Threads 走串文，每天 1-2 條短發、口語、即時感，跟 IG 完全分開節奏。`,
-        line:      `LINE 一週 2 次廣播，週三預熱 + 週五導購，圖文選單同步換檔。`,
-        blog:      `Blog 7 天我規劃 2 篇長文，SEO keyword + USP 對齊，每篇 1500 字以上。`,
-      };
-      stations.push({ member: lead, thought: lines[p], durationMs: 4500 });
+      const thought = leadThoughts[p] || `${PLATFORM_META[p].label} 我這條線接手。`;
+      stations.push({ member: lead, thought, durationMs: 4500 });
     }
 
     // 3) Writers + image dirs (one short station per platform)
@@ -487,6 +527,19 @@ export default function TheaterPage() {
         if (stopRef.current) return;
 
         updateCell(task.key, { status: "writing", caption: "" });
+        // Persist meta for future redo on this cell
+        setCellMeta((prev) => {
+          const next = new Map(prev);
+          next.set(task.key, {
+            usp: task.usp,
+            importantDateName: task.importantDateName,
+            brandTagline: plan.brandTagline,
+            brandVoice: plan.brandVoice,
+            weekday: task.weekday,
+            date: task.date,
+          });
+          return next;
+        });
         try {
           const r = await generateCellMut.mutateAsync({
             brandId,
@@ -561,6 +614,65 @@ export default function TheaterPage() {
       next.set(key, { ...cur, ...patch });
       return next;
     });
+  };
+
+  // ── Per-cell redo: re-runs caption + image with stored meta ───────────
+  const redoCell = async (key: CellKey, platform: TheaterPlatform) => {
+    if (!brandId) return;
+    const meta = cellMeta.get(key);
+    if (!meta) {
+      console.warn("[theater] redo: no meta for", key);
+      return;
+    }
+    updateCell(key, { status: "writing", caption: "" });
+    try {
+      const r = await generateCellMut.mutateAsync({
+        brandId,
+        platform,
+        date: meta.date,
+        weekday: meta.weekday,
+        usp: meta.usp,
+        importantDateName: meta.importantDateName,
+        brandTagline: meta.brandTagline,
+        brandVoice: meta.brandVoice,
+      });
+      if (!r.ok || !r.caption) {
+        updateCell(key, { status: "failed" });
+        return;
+      }
+      updateCell(key, { status: "imaging", caption: r.caption });
+      const img = await generateImageMut.mutateAsync({
+        brandId,
+        platform,
+        caption: r.caption,
+        brandTagline: meta.brandTagline,
+      });
+      updateCell(key, {
+        status: "done",
+        caption: r.caption,
+        imageUrl: img.ok ? img.imageUrl : null,
+        doneAt: Date.now(),
+      });
+    } catch (e) {
+      console.error("[theater] redo failed:", key, e);
+      updateCell(key, { status: "failed" });
+    }
+  };
+
+  const copyCaption = async (key: CellKey) => {
+    const cap = cells.get(key)?.caption;
+    if (!cap) return;
+    try {
+      await navigator.clipboard.writeText(cap);
+    } catch {
+      // fallback: select textarea trick
+      const ta = document.createElement("textarea");
+      ta.value = cap;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
   };
 
   // ── Important date add ────────────────────────────────────────────────
@@ -757,6 +869,8 @@ export default function TheaterPage() {
                           caption={state.caption ?? ""}
                           writerAvatar={avatarOf(getPlatformWriter(p))}
                           imageDirAvatar={avatarOf(getPlatformImage(p))}
+                          onCopy={() => copyCaption(key)}
+                          onRedo={() => redoCell(key, p)}
                         />
                       );
                     })}
