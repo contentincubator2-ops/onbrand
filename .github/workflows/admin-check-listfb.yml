@@ -13,9 +13,29 @@ jobs:
           command_timeout: 60s
           script: |
             cd /opt/marketing-os/app/skills/ai-talent
+            # Run listFB inline by simulating its task aggregation
             npx tsx -e "
-            import('./server/_core/quickTaskFB60.ts').then(m => {
-              console.log('FB60 tasks:', m.FB_60S_TASKS_V2.length);
-              console.log('First 3 ids:', m.FB_60S_TASKS_V2.slice(0,3).map((t:any)=>t.id+' tier='+t.tier));
-            }).catch(e => console.error('FB60 import error:', e.message));
+            (async () => {
+              const fb = await import('./server/_core/quickTaskFB.ts');
+              const fb60 = await import('./server/_core/quickTaskFB60.ts');
+              const ig = await import('./server/_core/quickTaskIG.ts');
+              const ig60 = await import('./server/_core/quickTaskIG60.ts');
+              const yt = await import('./server/_core/quickTaskYT.ts');
+              const yt60 = await import('./server/_core/quickTaskYT60.ts');
+              const m60 = await import('./server/_core/quickTaskMulti60.ts');
+
+              const all = [
+                ...fb.listAllFBTasks(),
+                ...fb60.FB_60S_TASKS_V2.map((t:any)=>({...t, kind:'fast', platform:'facebook'})),
+                ...ig60.IG_60S_TASKS.map((t:any)=>({...t, kind:'fast', platform:'instagram'})),
+                ...yt60.YT_60S_TASKS.map((t:any)=>({...t, kind:'fast', platform:'youtube'})),
+                ...m60.MULTI_60S_TASKS.map((t:any)=>({...t, kind:'fast'})),
+              ];
+              const fb60ByTier = all.filter((t:any)=>t.platform==='facebook' && t.tier==='60s');
+              console.log('Total tasks aggregated:', all.length);
+              console.log('Filter (platform=facebook, tier=60s) returns:', fb60ByTier.length, 'tasks');
+              for (const t of fb60ByTier.slice(0, 5)) console.log('  -', t.id, 'tier=', t.tier, 'label=', t.label);
+              const fb30 = all.filter((t:any)=>t.platform==='facebook' && t.tier==='30s');
+              console.log('FB 30s tasks:', fb30.length);
+            })().catch(e => console.error('error:', e.message, e.stack));
             " 2>&1
