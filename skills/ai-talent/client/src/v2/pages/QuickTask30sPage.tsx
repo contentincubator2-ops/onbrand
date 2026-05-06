@@ -32,7 +32,7 @@ import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { StagePipelineView } from "../components/quickTask/StagePipelineView";
-import { faPalette, faPenNib, faFilm, faWandMagicSparkles, faSliders, faTerminal, faImage } from "@fortawesome/free-solid-svg-icons";
+import { faPalette, faPenNib, faFilm, faWandMagicSparkles, faSliders, faTerminal, faImage, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
@@ -665,9 +665,9 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         backdrop="blur"
         classNames={{
           base: "max-h-[94vh]",
-          body: "py-2 px-3",
+          body: "py-2 px-3 bg-default-50",
           footer: "border-t border-default-200 bg-white sticky bottom-0 py-2",
-          header: "py-2",
+          header: "py-2 bg-white",
         }}
       >
         <ModalContent>
@@ -1065,59 +1065,21 @@ function OutputCarousel({
               <button
                 onClick={() => setIdx(Math.max(0, idx - 1))}
                 disabled={idx === 0}
-                className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-2xl transition ${
-                  idx === 0 ? "opacity-20 cursor-not-allowed" : "bg-default-100 hover:bg-default-200 active:bg-default-300"
+                className={`flex-shrink-0 w-8 self-stretch flex items-center justify-center rounded-full transition ${
+                  idx === 0 ? "opacity-0 cursor-not-allowed" : "text-default-400 hover:text-default-700 hover:bg-white/60"
                 }`}
                 aria-label="上一個版本"
               >
-                <FontAwesomeIcon icon={faChevronLeft} className="text-default-700 text-medium" />
+                <FontAwesomeIcon icon={faChevronLeft} className="text-medium" />
               </button>
             )}
-            {/* Centered mockup with Canva-style soft frame + floating pill above */}
+            {/* Canva-style canvas: grey breathing room + asset centered + soft shadow.
+                NO floating pill (removed — Canva detail view doesn't have it). */}
             <div className="flex-1 min-w-0 flex justify-center">
               {mockupVariant && (
-                <div className="relative w-full max-w-[640px]">
-                  {/* Floating action pill above mockup (Canva pattern) */}
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-white border border-default-200 rounded-full shadow-md px-1 py-0.5">
-                    <button
-                      onClick={() => toggleTool("edit")}
-                      title="編輯這個版本"
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
-                        activeTool === "edit" ? "text-white" : "text-default-600 hover:bg-default-100"
-                      }`}
-                      style={activeTool === "edit" ? { background: tierAccent(pageTier) } : undefined}
-                    >
-                      <FontAwesomeIcon icon={faPenNib} className="text-tiny" />
-                    </button>
-                    <button
-                      onClick={() => { if (slide?.caption) navigator.clipboard.writeText(slide.caption); }}
-                      title="複製這版"
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-default-600 hover:bg-default-100 transition"
-                    >
-                      <FontAwesomeIcon icon={faClipboard} className="text-tiny" />
-                    </button>
-                    {slide?.imageStyle && !slide?.imageUrl && (
-                      <button
-                        onClick={() => setMediaGenOpen(true)}
-                        title="用此風格 AI 生圖"
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-default-600 hover:bg-default-100 transition"
-                      >
-                        <FontAwesomeIcon icon={faPalette} className="text-tiny" />
-                      </button>
-                    )}
-                    <span className="w-px h-4 bg-default-200" />
-                    <button
-                      onClick={() => toggleTool("details")}
-                      title="細節"
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
-                        activeTool === "details" ? "text-white" : "text-default-500 hover:bg-default-100"
-                      }`}
-                      style={activeTool === "details" ? { background: tierAccent(pageTier) } : undefined}
-                      disabled={!hasDetails}
-                    >
-                      <FontAwesomeIcon icon={faSliders} className="text-tiny" />
-                    </button>
-                  </div>
+                <div
+                  className={`w-full ${activeTool ? "max-w-[640px]" : "max-w-[760px]"} transition-all`}
+                >
                   <div
                     className="rounded-2xl overflow-hidden"
                     style={{
@@ -1157,36 +1119,18 @@ function OutputCarousel({
               <button
                 onClick={() => setIdx(Math.min(total - 1, idx + 1))}
                 disabled={idx === total - 1}
-                className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-2xl transition ${
-                  idx === total - 1 ? "opacity-20 cursor-not-allowed" : "bg-default-100 hover:bg-default-200 active:bg-default-300"
+                className={`flex-shrink-0 w-8 self-stretch flex items-center justify-center rounded-full transition ${
+                  idx === total - 1 ? "opacity-0 cursor-not-allowed" : "text-default-400 hover:text-default-700 hover:bg-white/60"
                 }`}
                 aria-label="下一個版本"
               >
-                <FontAwesomeIcon icon={faChevronRight} className="text-default-700 text-medium" />
+                <FontAwesomeIcon icon={faChevronRight} className="text-medium" />
               </button>
             )}
           </div>
 
-          {/* Active variant label (small, centered) */}
-          {total > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <span className="text-tiny font-semibold text-default-700">{slide.label}</span>
-              {slide.qa && (
-                <span
-                  title={slide.qa.comment ?? ""}
-                  className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full ${
-                    slide.qa.status === "pass" ? "text-success-700 bg-success-50" : "text-warning-700 bg-warning-50"
-                  }`}
-                >
-                  {slide.qa.status === "pass" ? "✓" : "⚠"}
-                  {typeof slide.qa.score === "number" ? ` ${Math.round(slide.qa.score)}` : ""}
-                </span>
-              )}
-              <span className="text-[10px] text-default-400 tabular-nums">
-                {idx + 1} / {total}
-              </span>
-            </div>
-          )}
+          {/* Variant label removed per CJ — redundant with bottom thumbnail strip
+              showing active variant. Keep modal clean (Canva pattern). */}
 
           {/* Inline edit textarea — only shows when ✏️ tool active (Canva pattern) */}
           {activeTool === "edit" && slide?.caption && (
@@ -1221,17 +1165,16 @@ function OutputCarousel({
             </div>
           )}
 
-          {/* Brand logo hint (when missing) */}
+          {/* Brand logo hint moved to floating bottom-right when applicable —
+              keeps main canvas clean (Canva pattern: no nag banners). */}
           {brandId && !brandLogoUrl && (
             <button
               onClick={() => setFbLogoModalOpen(true)}
-              className="w-full flex items-center gap-2 text-tiny text-default-500 bg-default-50 hover:bg-default-100 transition border border-dashed border-default-300 rounded-2xl px-3 py-2"
+              className="fixed bottom-20 right-6 z-30 flex items-center gap-1.5 text-[10px] text-default-500 bg-white hover:bg-default-50 transition border border-default-200 rounded-full shadow-sm px-2.5 py-1"
+              title="這個品牌還沒粉專頭像 — 點此一鍵抓取"
             >
-              <FontAwesomeIcon icon={faFacebookF} className="text-default-400" />
-              <span className="flex-1 text-left">
-                這個品牌還沒粉專頭像 — <span className="text-default-700 font-medium">點此一鍵抓取</span>
-              </span>
-              <FontAwesomeIcon icon={faChevronRight} className="text-default-400 text-[10px]" />
+              <FontAwesomeIcon icon={faFacebookF} className="text-default-400 text-[9px]" />
+              <span>抓粉專頭像</span>
             </button>
           )}
         </div>
@@ -1432,6 +1375,16 @@ function OutputCarousel({
         >
           <span className="text-2xl leading-none">+</span>
         </button>
+        {/* ⌄ overflow / show all — Canva "view all pages" pattern */}
+        {total > 4 && (
+          <button
+            onClick={() => toggleTool("details")}
+            title="展開所有版本"
+            className="flex-shrink-0 w-10 h-14 rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition flex items-center justify-center"
+          >
+            <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />
+          </button>
+        )}
       </div>
 
       <MediaGenFlow
