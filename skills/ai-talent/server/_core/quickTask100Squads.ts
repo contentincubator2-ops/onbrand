@@ -38,14 +38,13 @@ export interface SquadIndexEntry {
   methodology?: string;
 }
 
-// ─── FB 100s squads (11 — all from existing FB_90S_TASK_INDEX) ─────────
-// These squads have full agent rosters seeded via seed-fb-additional-squads.ts
-// + seed-fb-calendar-variants.ts. They produce calendar-shaped / toolkit /
-// strategy outputs (NOT caption variants).
+// ─── FB 100s squads (11 — slugs verified to exist in DB 2026-05-06) ────
+// Each squad has been assigned a DISTINCT lead via admin-squad-leads-100s.yml
+// so the cards show 11 different real faces.
 export const FB_100S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-100-monthly-calendar",
-    squad_slug: "fb-monthly-calendar",
+    squad_slug: "fb-monthly-calendar-pulizzi",
     platform: "facebook", postType: "feed",
     label: "FB 完整月行事曆 30 天",
     description: "真實行事曆呈現：每天主題 + 產品 + 視覺方向 + 配文支柱配比",
@@ -61,7 +60,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
   },
   {
     id: "fb-100-event-launch",
-    squad_slug: "fb-event-launch-kit",
+    squad_slug: "fb-garyvee-jab-hook",
     platform: "facebook", postType: "event",
     label: "FB 活動上線套組",
     description: "GaryVee Jab-Jab-Right-Hook + 預告 + 當日 + 事後完整劇本",
@@ -100,40 +99,40 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Kaushik Web Analytics 2.0",
   },
   {
-    id: "fb-100-carousel-10frame",
-    squad_slug: "fb-carousel",
+    id: "fb-100-carousel-cvo",
+    squad_slug: "fb-deiss-cvo",
     platform: "facebook", postType: "carousel",
-    label: "FB Carousel 10 卡完整敘事",
-    description: "Hook-Build-Turn-Payoff 完整弧 + 10 卡視覺一致",
-    methodology: "Hook-Build-Turn-Payoff",
+    label: "FB Carousel 完整 CVO 漏斗敘事",
+    description: "Deiss CVO 8 步 + 10 卡輪播完整敘事",
+    methodology: "Ryan Deiss CVO",
   },
   {
-    id: "fb-100-reels-full",
-    squad_slug: "fb-reels-script",
-    platform: "facebook", postType: "reel",
-    label: "FB Reels 完整腳本",
-    description: "Hook-Hold-Payoff（含分鏡 + 配樂方向 + 字幕節奏）",
-    methodology: "Hook-Hold-Payoff",
+    id: "fb-100-offer-first",
+    squad_slug: "fb-hormozi-offer-first",
+    platform: "facebook", postType: "feed",
+    label: "FB Offer-First 主打貼文",
+    description: "Alex Hormozi Grand Slam Offer + 不可拒絕的提案結構",
+    methodology: "Hormozi Offer-First",
   },
   {
-    id: "fb-100-livestream-suite",
-    squad_slug: "fb-livestream-prep",
-    platform: "facebook", postType: "live",
-    label: "FB 直播完整套組",
-    description: "預告 + 摘要 + 轉錄重點剪（成對敘事）",
-    methodology: "Pre-Live + Post-Live 成對敘事",
+    id: "fb-100-magnetic-marketing",
+    squad_slug: "fb-kennedy-magnetic",
+    platform: "facebook", postType: "feed",
+    label: "FB 磁吸式行銷",
+    description: "Dan Kennedy Magnetic Marketing + 直效行銷文案",
+    methodology: "Kennedy Magnetic Marketing",
   },
   {
-    id: "fb-100-crisis-full",
-    squad_slug: "fb-crisis-comms",
-    platform: "facebook", postType: "comment",
-    label: "FB 完整危機公關",
-    description: "Lagadec 4 段 + 後續追蹤 + 媒體聲明 + 內部 SOP",
-    methodology: "Lagadec 4 段",
+    id: "fb-100-mass-control",
+    squad_slug: "fb-kern-mass-control",
+    platform: "facebook", postType: "feed",
+    label: "FB Mass Control 大型發表",
+    description: "Frank Kern Mass Control + 多階段預告 → launch → 收束",
+    methodology: "Kern Mass Control",
   },
 ];
 
-// ─── IG 100s squads (7 — from seed-ig-catalog.ts) ──────────────────────
+// ─── IG 100s squads (7 — slugs verified to exist in DB 2026-05-06) ─────
 export const IG_100S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-100-monthly-calendar",
@@ -144,52 +143,52 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Pulizzi 內容支柱型",
   },
   {
-    id: "ig-100-account-reposition",
-    squad_slug: "ig-account-reposition",
-    platform: "instagram", postType: "profile",
-    label: "IG 帳號重新定位",
-    description: "新 bio + 9 highlight 主題 + launch posts + visual direction",
-    methodology: "Trout & Ries Positioning",
-  },
-  {
-    id: "ig-100-quarterly-strategy",
-    squad_slug: "ig-quarterly-strategy",
+    id: "ig-100-youtility",
+    squad_slug: "ig-baer-youtility",
     platform: "instagram", postType: "feed",
-    label: "IG 季度策略",
-    description: "季度大主題 + 內容支柱配比 + 12 個 reel/post 規劃",
-    methodology: "Pulizzi Quarterly Cadence",
+    label: "IG Youtility 實用內容策略",
+    description: "Jay Baer Youtility 法 + 不推銷而是有用 + 30 天實用內容",
+    methodology: "Baer Youtility",
   },
   {
-    id: "ig-100-event-launch-kit",
-    squad_slug: "ig-event-launch-kit",
+    id: "ig-100-visual-story",
+    squad_slug: "ig-chrisdo-visual-story",
     platform: "instagram", postType: "feed",
-    label: "IG 活動上線套組",
-    description: "story + reel + post + collab 規劃 + 完整 launch narrative",
-    methodology: "GaryVee Jab-Jab-Right-Hook",
+    label: "IG 視覺敘事策略",
+    description: "Chris Do Visual Story + 完整視覺一致性 + brand 識別系統",
+    methodology: "Chris Do Visual Story",
   },
   {
-    id: "ig-100-countdown-series",
-    squad_slug: "ig-countdown-series",
-    platform: "instagram", postType: "feed",
-    label: "IG 倒數活動系列",
-    description: "倒數 N 天每天獨立 hook + story 配套互動 sticker",
-    methodology: "Cialdini Scarcity",
-  },
-  {
-    id: "ig-100-livestream-prep",
-    squad_slug: "ig-livestream-prep",
+    id: "ig-100-live-first",
+    squad_slug: "ig-fanzo-live-first",
     platform: "instagram", postType: "live",
-    label: "IG Live 完整套組",
-    description: "預告 + 直播配套 + 摘要回放 + reel 剪輯指南",
-    methodology: "Pre/Post-Live",
+    label: "IG Live-First 直播優先策略",
+    description: "Brian Fanzo Live-First + 完整直播配套 + 後續 reel 剪輯",
+    methodology: "Fanzo Live-First",
   },
   {
-    id: "ig-100-monthly-analytics",
-    squad_slug: "ig-monthly-analytics",
+    id: "ig-100-document",
+    squad_slug: "ig-garyvee-document",
     platform: "instagram", postType: "feed",
-    label: "IG 月度成效報告",
-    description: "Engagement / Reach / Saves 全方位 + 下月策略建議",
-    methodology: "Kaushik Web Analytics",
+    label: "IG Document-Don't-Create 紀錄式內容",
+    description: "GaryVee Document Don't Create + 真實感 + 高頻紀錄",
+    methodology: "GaryVee Document",
+  },
+  {
+    id: "ig-100-radical-transparency",
+    squad_slug: "ig-hollis-radical-transparency",
+    platform: "instagram", postType: "feed",
+    label: "IG 極致透明品牌敘事",
+    description: "Rachel Hollis Radical Transparency + 真實品牌故事",
+    methodology: "Hollis Radical Transparency",
+  },
+  {
+    id: "ig-100-save-worthy",
+    squad_slug: "ig-hormozi-save-worthy",
+    platform: "instagram", postType: "feed",
+    label: "IG Save-Worthy 收藏型內容",
+    description: "Hormozi Save-Worthy 5 條法則 + 高收藏 carousel + 教學貼文",
+    methodology: "Hormozi Save-Worthy",
   },
 ];
 
