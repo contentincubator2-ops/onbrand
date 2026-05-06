@@ -1,0 +1,56 @@
+name: Admin — Inspect 100s squad lead agents
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+
+            echo "=== 11 FB + 7 IG 100s squads — lead agent + team size ==="
+            $MYSQL -e "
+              SELECT s.slug AS squad_slug,
+                     a.id AS lead_id, a.name AS lead_name, a.title AS lead_title,
+                     JSON_LENGTH(s.agents) AS team_size,
+                     JSON_EXTRACT(s.agents, '$[*].name') AS member_names
+                FROM squads s
+                LEFT JOIN agents a ON a.id = s.lead_agent_id
+               WHERE s.slug IN (
+                 'fb-monthly-calendar','fb-monthly-calendar-product-promo',
+                 'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
+                 'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
+                 'fb-reels-script','fb-livestream-prep','fb-crisis-comms',
+                 'ig-monthly-calendar-pulizzi','ig-account-reposition','ig-quarterly-strategy',
+                 'ig-event-launch-kit','ig-countdown-series','ig-livestream-prep',
+                 'ig-monthly-analytics'
+               )
+               ORDER BY s.slug
+            " | sed 's/\t/  |  /g'
+
+            echo ""
+            echo "=== Lead distribution (count by lead) ==="
+            $MYSQL -e "
+              SELECT a.id, a.name, a.title, COUNT(*) AS led_squads
+                FROM squads s
+                JOIN agents a ON a.id = s.lead_agent_id
+               WHERE s.slug IN (
+                 'fb-monthly-calendar','fb-monthly-calendar-product-promo',
+                 'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
+                 'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
+                 'fb-reels-script','fb-livestream-prep','fb-crisis-comms',
+                 'ig-monthly-calendar-pulizzi','ig-account-reposition','ig-quarterly-strategy',
+                 'ig-event-launch-kit','ig-countdown-series','ig-livestream-prep',
+                 'ig-monthly-analytics'
+               )
+               GROUP BY a.id, a.name, a.title
+               ORDER BY led_squads DESC, a.id
+            "
