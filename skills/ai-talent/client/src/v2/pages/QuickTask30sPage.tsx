@@ -560,10 +560,10 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                           className="w-20 h-20 ring-2 ring-white/60"
                         />
                         <span
-                          className="absolute top-2 right-2 text-tiny font-semibold px-2 py-0.5 rounded-full"
-                          style={{ background: "rgba(255,255,255,0.85)", color: pal.text }}
+                          className="absolute top-2 right-2 text-tiny font-semibold px-2 py-0.5 rounded-full text-white shadow-sm"
+                          style={{ background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)` }}
                         >
-                          {t.tier}
+                          {tier}
                         </span>
                       </div>
                       {/* Card info */}
@@ -642,10 +642,10 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                   <span
                     className="text-[10px] font-bold tabular-nums px-2.5 py-1 rounded-full text-white shadow-sm"
                     style={{
-                      background: `linear-gradient(135deg, ${tierAccent(activeTask.tier)}, ${tierAccent(activeTask.tier)}cc)`,
+                      background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)`,
                     }}
                   >
-                    {activeTask.tier}
+                    {tier}
                   </span>
                 </div>
               </ModalHeader>
@@ -738,6 +738,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                   <OutputCarousel
                     output={output}
                     activeTask={activeTask}
+                    pageTier={tier}
                     brandName={brandName}
                     brandId={brandId}
                     brandLogoUrl={brandLogoUrl}
@@ -808,11 +809,16 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
  * If output has 0 variants (just top-level caption), shows a single mockup.
  */
 function OutputCarousel({
-  output, activeTask, brandName, brandId, brandLogoUrl, onBrandLogoUpdated,
+  output, activeTask, pageTier, brandName, brandId, brandLogoUrl, onBrandLogoUpdated,
   mockupVariant, latencyMs, agentMeta, imageAgentMeta, orchestraStages, fetchedUrl, errorMsg,
 }: {
   output: any;
   activeTask: FBTaskCard;
+  /** Page-level tier ("30s" / "60s" / "100s") — drives ALL visual tier identity
+   *  (chip color, gradient, accordion availability), independent of the
+   *  task's data tier (FB60V2 tasks always have tier="60s" but appear on
+   *  both /60s and /100s pages — visual tier follows page, not data). */
+  pageTier: "30s" | "60s" | "100s";
   brandName: string | null;
   brandId: number | null;
   brandLogoUrl: string | null;
@@ -938,7 +944,7 @@ function OutputCarousel({
           )}
         </div>
         {/* Pipeline toggle (60s/100s only) */}
-        {orchestraStages && orchestraStages.length > 0 && activeTask.tier !== "30s" && (
+        {orchestraStages && orchestraStages.length > 0 && pageTier !== "30s" && (
           <button
             onClick={() => setPipelineExpanded((x) => !x)}
             className="flex items-center gap-1.5 text-tiny text-default-500 hover:text-default-700 transition"
@@ -982,7 +988,7 @@ function OutputCarousel({
                   className="w-full max-w-[480px] rounded-2xl overflow-hidden shadow-md"
                   style={{
                     background: "white",
-                    boxShadow: `0 8px 32px -12px ${tierAccent(activeTask.tier)}40, 0 0 0 1px ${tierAccent(activeTask.tier)}20`,
+                    boxShadow: `0 8px 32px -12px ${tierAccent(pageTier)}40, 0 0 0 1px ${tierAccent(pageTier)}20`,
                   }}
                 >
                   <PlatformMockup
@@ -1052,7 +1058,7 @@ function OutputCarousel({
                     className={`h-2 rounded-full transition ${
                       i === idx ? "w-6" : "w-2 bg-default-300 hover:bg-default-400"
                     }`}
-                    style={i === idx ? { background: tierAccent(activeTask.tier) } : undefined}
+                    style={i === idx ? { background: tierAccent(pageTier) } : undefined}
                     aria-label={`切到版本 ${i + 1}`}
                   />
                 ))}
@@ -1121,14 +1127,14 @@ function OutputCarousel({
                       : "border-default-200 hover:border-default-300 hover:shadow-sm"
                   }`}
                   style={active ? {
-                    background: `${tierAccent(activeTask.tier)}10`,
-                    borderColor: tierAccent(activeTask.tier),
-                    boxShadow: `0 0 0 2px ${tierAccent(activeTask.tier)}40`,
+                    background: `${tierAccent(pageTier)}10`,
+                    borderColor: tierAccent(pageTier),
+                    boxShadow: `0 0 0 2px ${tierAccent(pageTier)}40`,
                   } : undefined}
                 >
                   <div
                     className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
-                    style={{ background: `linear-gradient(135deg, ${tierAccent(activeTask.tier)}, ${tierAccent(activeTask.tier)}aa)` }}
+                    style={{ background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}aa)` }}
                   >
                     {i + 1}
                   </div>
@@ -1251,7 +1257,7 @@ function OutputCarousel({
       {orchestraStages && orchestraStages.length > 0 && (
         <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group">
           <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
-            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: `${tierAccent(activeTask.tier)}20` }}>🎼</span>
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: `${tierAccent(pageTier)}20` }}>🎼</span>
             <span>Agent 協作流程</span>
             <span className="text-tiny font-normal text-default-500">
               {doneStages}/{stageCount} agents · {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : ""}
@@ -1259,7 +1265,7 @@ function OutputCarousel({
             <FontAwesomeIcon icon={faChevronRight} className="ml-auto text-tiny text-default-400 group-open:rotate-90 transition-transform" />
           </summary>
           <div className="p-3 border-t border-default-100">
-            {activeTask.tier === "30s" && !orchestraStages.find((s: any) => s.key === "extras" || s.key === "qa") ? (
+            {pageTier === "30s" && !orchestraStages.find((s: any) => s.key === "extras" || s.key === "qa") ? (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-default-500">
                 {orchestraStages.map((s: any, i: number) => (
                   <span key={s.key} className="flex items-center gap-1.5">
@@ -1274,7 +1280,7 @@ function OutputCarousel({
                 stages={orchestraStages}
                 captionAgent={agentMeta}
                 imageAgent={imageAgentMeta}
-                tier={(orchestraStages.find((s: any) => s.key === "scout") ? "100s" : "60s") as any}
+                tier={pageTier}
               />
             )}
           </div>
