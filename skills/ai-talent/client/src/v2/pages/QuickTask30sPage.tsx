@@ -32,7 +32,7 @@ import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { StagePipelineView } from "../components/quickTask/StagePipelineView";
-import { faPalette, faPenNib } from "@fortawesome/free-solid-svg-icons";
+import { faPalette, faPenNib, faFilm, faWandMagicSparkles, faSliders, faTerminal, faImage } from "@fortawesome/free-solid-svg-icons";
 
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
@@ -660,13 +660,14 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
       <Modal
         isOpen={!!activeTask}
         onClose={closeTask}
-        size="4xl"
+        size="5xl"
         scrollBehavior="inside"
         backdrop="blur"
         classNames={{
-          base: "max-h-[92vh]",
-          body: "py-3",
-          footer: "border-t border-default-200 bg-white sticky bottom-0",
+          base: "max-h-[94vh]",
+          body: "py-2 px-3",
+          footer: "border-t border-default-200 bg-white sticky bottom-0 py-2",
+          header: "py-2",
         }}
       >
         <ModalContent>
@@ -961,45 +962,55 @@ function OutputCarousel({
     : baseSlide;
   const isEdited = edits[idx] != null && edits[idx] !== baseSlide?.caption;
 
-  // Toggle: 60s/100s pipeline expanded or collapsed (default collapsed after run)
-  const [pipelineExpanded, setPipelineExpanded] = useState(false);
+  // Canva-style modal state. Single activeTool drives the right panel content.
+  // null = no panel (mockup max width); other values toggle a context-sensitive
+  // drawer to the right (edit / style / video / details / prompt).
+  type ToolKind = null | "edit" | "style" | "video" | "details" | "prompt";
+  const [activeTool, setActiveTool] = useState<ToolKind>(null);
   const stageCount = orchestraStages?.length ?? 0;
   const doneStages = orchestraStages?.filter((s: any) => s.status === "done").length ?? 0;
+  const hasDetails = !!(slide?.qa?.comment || slide?.extras || (orchestraStages && orchestraStages.length > 0) || fetchedUrl);
+  const toggleTool = (t: ToolKind) => setActiveTool((cur) => (cur === t ? null : t));
+
+  // Tool rail button — icon-only, Canva-style. Active = tier-color gradient.
+  const ToolBtn = ({ icon, label, active, onPress, disabled }: { icon: any; label: string; active?: boolean; onPress: () => void; disabled?: boolean }) => (
+    <button
+      onClick={onPress}
+      disabled={disabled}
+      title={label}
+      className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center transition relative ${
+        disabled ? "opacity-30 cursor-not-allowed"
+          : active ? "shadow-md text-white scale-105"
+          : "bg-default-50 text-default-600 hover:bg-default-100 hover:scale-105"
+      }`}
+      style={active && !disabled ? { background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}cc)` } : undefined}
+    >
+      <FontAwesomeIcon icon={icon} className="text-medium" />
+    </button>
+  );
 
   return (
-    <div className="space-y-3">
-      {/* Compact status header — 1 line summary, agents inline */}
-      <div className="flex items-center justify-between gap-2 text-tiny text-default-500 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <FontAwesomeIcon icon={faClock} className="text-default-400" />
-          <span className="font-medium text-default-700">
-            {latencyMs != null ? `${(latencyMs / 1000).toFixed(1)}s 完成` : ""}
-          </span>
-          {agentMeta && (
-            <>
-              <span className="text-default-300">·</span>
-              <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-4 h-4" />
-              <span>{agentMeta.name}</span>
-            </>
-          )}
-          {imageAgentMeta && (
-            <>
-              <span className="text-default-300">+</span>
-              <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-4 h-4" />
-              <span>{imageAgentMeta.name}</span>
-            </>
-          )}
-        </div>
-        {/* Pipeline toggle (60s/100s only) */}
+    <div className="space-y-2">
+      {/* Minimal info strip — single muted line, latency + agents only */}
+      <div className="flex items-center gap-2 text-[10px] text-default-400 px-1">
+        {latencyMs != null && (
+          <span className="tabular-nums">{(latencyMs / 1000).toFixed(1)}s</span>
+        )}
+        {agentMeta && (
+          <>
+            <Avatar src={agentMeta.avatarUrl || dicebear(agentMeta.name)} size="sm" className="w-3.5 h-3.5" />
+            <span>{agentMeta.name}</span>
+          </>
+        )}
+        {imageAgentMeta && (
+          <>
+            <span>+</span>
+            <Avatar src={imageAgentMeta.avatarUrl || dicebear(imageAgentMeta.name)} size="sm" className="w-3.5 h-3.5" />
+            <span>{imageAgentMeta.name}</span>
+          </>
+        )}
         {orchestraStages && orchestraStages.length > 0 && pageTier !== "30s" && (
-          <button
-            onClick={() => setPipelineExpanded((x) => !x)}
-            className="flex items-center gap-1.5 text-tiny text-default-500 hover:text-default-700 transition"
-          >
-            <span>🎼 {doneStages}/{stageCount} agents 協作</span>
-            <FontAwesomeIcon icon={pipelineExpanded ? faChevronLeft : faChevronRight} className="text-[10px] rotate-90" />
-            <span className="text-default-400">{pipelineExpanded ? "收合" : "展開"}</span>
-          </button>
+          <span className="ml-auto">{doneStages}/{stageCount} agents · 點 📊 看細節</span>
         )}
       </div>
 
@@ -1011,10 +1022,49 @@ function OutputCarousel({
         </Card>
       )}
 
-      {/* ═══ MAIN GRID: mockup center + variant strip right (Midjourney) ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr,180px] gap-4">
-        {/* ── COLUMN A: Mockup with prev/next chevrons + variant indicator ── */}
-        <div className="space-y-3">
+      {/* ═══ CANVA-STYLE: tool rail | mockup canvas | contextual right panel ═══ */}
+      <div className="flex gap-3 items-stretch">
+        {/* ── LEFT TOOL RAIL — icon-only, Canva-minimal ────────────────── */}
+        <div className="flex flex-col gap-2 pt-1 shrink-0">
+          {slide?.caption && (
+            <ToolBtn icon={faPenNib} label="編輯文案" active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
+          )}
+          <ToolBtn
+            icon={faImage}
+            label="AI 生圖"
+            active={activeTool === "style"}
+            disabled={!slide?.imageStyle}
+            onPress={() => toggleTool("style")}
+          />
+          <ToolBtn
+            icon={faFilm}
+            label="AI 生影片（即將推出）"
+            active={activeTool === "video"}
+            disabled
+            onPress={() => toggleTool("video")}
+          />
+          <ToolBtn
+            icon={faWandMagicSparkles}
+            label="AI prompt / 視覺方向"
+            active={activeTool === "prompt"}
+            disabled={!slide?.imageStyle}
+            onPress={() => toggleTool("prompt")}
+          />
+          <ToolBtn
+            icon={faSliders}
+            label="細節（Agent 流程 / QA / 製作包）"
+            active={activeTool === "details"}
+            disabled={!hasDetails}
+            onPress={() => toggleTool("details")}
+          />
+          <ToolBtn icon={faFolderPlus} label="加到專案"
+            onPress={() => window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。")} />
+          <ToolBtn icon={faCompass} label="換個語氣（換品牌設定）"
+            onPress={() => { window.location.href = "/brands"; }} />
+        </div>
+
+        {/* ── CENTER CANVAS: Mockup huge, side chevrons ────────────────── */}
+        <div className="flex-1 min-w-0 flex flex-col items-center">
           <div className="relative flex items-stretch gap-2">
             {total > 1 && (
               <button
@@ -1079,56 +1129,49 @@ function OutputCarousel({
             )}
           </div>
 
-          {/* Variant indicator: label + QA chip + 1/N + dot strip */}
+          {/* Active variant label (small, centered) */}
           {total > 1 && (
-            <div className="flex items-center justify-center gap-3">
-              <span className="text-small font-semibold text-default-800">{slide.label}</span>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <span className="text-tiny font-semibold text-default-700">{slide.label}</span>
               {slide.qa && (
                 <span
                   title={slide.qa.comment ?? ""}
-                  className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full ${
                     slide.qa.status === "pass" ? "text-success-700 bg-success-50" : "text-warning-700 bg-warning-50"
                   }`}
                 >
-                  {slide.qa.status === "pass" ? "✓ QA" : "⚠ QA"}
+                  {slide.qa.status === "pass" ? "✓" : "⚠"}
                   {typeof slide.qa.score === "number" ? ` ${Math.round(slide.qa.score)}` : ""}
                 </span>
               )}
-              <span className="text-tiny text-default-500 tabular-nums">
+              <span className="text-[10px] text-default-400 tabular-nums">
                 {idx + 1} / {total}
               </span>
-              <div className="flex gap-1.5">
-                {slides.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setIdx(i)}
-                    className={`h-2 rounded-full transition ${
-                      i === idx ? "w-6" : "w-2 bg-default-300 hover:bg-default-400"
-                    }`}
-                    style={i === idx ? { background: tierAccent(pageTier) } : undefined}
-                    aria-label={`切到版本 ${i + 1}`}
-                  />
-                ))}
-              </div>
             </div>
           )}
 
-          {/* Inline edit textarea — directly under mockup, Canva-soft frame */}
-          {slide?.caption && (
-            <div className="rounded-2xl border border-default-200 bg-white shadow-sm p-3 space-y-2">
+          {/* Inline edit textarea — only shows when ✏️ tool active (Canva pattern) */}
+          {activeTool === "edit" && slide?.caption && (
+            <div className="w-full max-w-[640px] mt-3 rounded-2xl border-2 bg-white shadow-md p-3 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                 style={{ borderColor: tierAccent(pageTier) }}>
               <div className="flex items-center justify-between">
                 <span className="text-tiny font-semibold text-default-700 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faPenNib} className="text-default-500" />
+                  <FontAwesomeIcon icon={faPenNib} style={{ color: tierAccent(pageTier) }} />
                   直接編輯（mockup 即時更新）
                 </span>
-                {isEdited && (
-                  <button
-                    onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
-                    className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
-                  >
-                    還原 AI 原版
+                <div className="flex items-center gap-2">
+                  {isEdited && (
+                    <button
+                      onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
+                      className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
+                    >
+                      還原 AI 原版
+                    </button>
+                  )}
+                  <button onClick={() => setActiveTool(null)} className="text-default-400 hover:text-default-600">
+                    <FontAwesomeIcon icon={faXmark} className="text-tiny" />
                   </button>
-                )}
+                </div>
               </div>
               <Textarea
                 value={slide.caption}
@@ -1155,243 +1198,197 @@ function OutputCarousel({
           )}
         </div>
 
-        {/* ── COLUMN B: Vertical variant thumbnail strip (Midjourney) ── */}
-        {total > 1 && (
-          <div className="lg:sticky lg:top-2 lg:self-start space-y-2 max-h-[calc(92vh-200px)] overflow-y-auto pr-1">
-            <p className="text-[10px] font-semibold tracking-widest text-default-500 uppercase pb-1 sticky top-0 bg-white">
-              {total} 個版本
-            </p>
-            {slides.map((s, i) => {
-              const active = i === idx;
-              const initials = (s.label || `${i + 1}`).slice(0, 2);
-              return (
-                <button
-                  key={i}
-                  onClick={() => setIdx(i)}
-                  className={`w-full text-left rounded-xl border transition flex items-start gap-2 p-2 ${
-                    active
-                      ? "shadow-md ring-2"
-                      : "border-default-200 hover:border-default-300 hover:shadow-sm"
-                  }`}
-                  style={active ? {
-                    background: `${tierAccent(pageTier)}10`,
-                    borderColor: tierAccent(pageTier),
-                    boxShadow: `0 0 0 2px ${tierAccent(pageTier)}40`,
-                  } : undefined}
-                >
-                  <div
-                    className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
-                    style={{ background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}aa)` }}
+        {/* ── RIGHT CONTEXTUAL PANEL — slides in only when a tool is active ── */}
+        {activeTool && activeTool !== "edit" && (
+          <div className="w-72 shrink-0 max-h-[calc(92vh-220px)] overflow-y-auto pr-1 space-y-2 animate-in slide-in-from-right-2 fade-in duration-200">
+            {/* Panel header with close button */}
+            <div className="sticky top-0 bg-white pb-2 flex items-center justify-between border-b border-default-100 z-10">
+              <span className="text-tiny font-bold tracking-wider uppercase" style={{ color: tierAccent(pageTier) }}>
+                {activeTool === "style" && "🎨 視覺方向 + AI 生圖"}
+                {activeTool === "video" && "🎬 AI 影片生成"}
+                {activeTool === "prompt" && "🪄 AI Prompt"}
+                {activeTool === "details" && "📊 細節資訊"}
+              </span>
+              <button onClick={() => setActiveTool(null)} className="text-default-400 hover:text-default-700">
+                <FontAwesomeIcon icon={faXmark} className="text-tiny" />
+              </button>
+            </div>
+
+            {/* STYLE panel — image style brief + 用此風格生圖 button */}
+            {activeTool === "style" && (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-default-200 bg-default-50 p-3">
+                  <p className="text-[10px] text-default-500 mb-1">當前 image style brief</p>
+                  <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line">
+                    {slide?.imageStyle ?? "（無視覺方向 brief）"}
+                  </p>
+                </div>
+                {slide?.imageStyle && !slide.imageUrl && (
+                  <Button
+                    color="primary"
+                    size="sm"
+                    className="w-full font-semibold"
+                    style={{ background: tierAccent(pageTier), color: "white" }}
+                    startContent={<FontAwesomeIcon icon={faImage} />}
+                    onPress={() => setMediaGenOpen(true)}
                   >
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-tiny font-semibold truncate text-default-800">{s.label}</p>
-                    <p className="text-[10px] text-default-500 line-clamp-2 leading-snug mt-0.5">
-                      {s.caption ? s.caption.slice(0, 50) + "…" : "（無內容）"}
+                    用此風格 AI 生圖（Flux）
+                  </Button>
+                )}
+                {slide?.imageUrl && (
+                  <p className="text-tiny text-success-600">✓ 此版本已有真生圖</p>
+                )}
+              </div>
+            )}
+
+            {/* VIDEO panel — phase 2 placeholder */}
+            {activeTool === "video" && (
+              <div className="rounded-xl border border-dashed border-default-300 bg-default-50 p-4 text-center">
+                <FontAwesomeIcon icon={faFilm} className="text-3xl text-default-300 mb-2" />
+                <p className="text-tiny text-default-500">AI 影片生成（Hailuo / Kling）</p>
+                <p className="text-[10px] text-default-400 mt-1">Phase 2 啟用中</p>
+              </div>
+            )}
+
+            {/* PROMPT panel — show what was sent to LLM */}
+            {activeTool === "prompt" && (
+              <div className="rounded-xl border border-default-200 bg-default-50 p-3 space-y-2">
+                <p className="text-[10px] text-default-500 mb-1">視覺方向（會送進 AI 生圖）</p>
+                <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line border-l-2 border-default-300 pl-2">
+                  {slide?.imageStyle ?? "（這個任務沒有 visual brief）"}
+                </p>
+                {slide?.hashtags && slide.hashtags.length > 0 && (
+                  <>
+                    <p className="text-[10px] text-default-500 mt-3 mb-1">推薦 hashtag</p>
+                    <p className="text-tiny text-primary-700">
+                      {slide.hashtags.map((h: string) => `#${h}`).join(" ")}
                     </p>
-                    {s.qa && (
-                      <span
-                        className={`inline-block mt-1 text-[9px] font-semibold uppercase ${
-                          s.qa.status === "pass" ? "text-success-600" : "text-warning-600"
-                        }`}
-                      >
-                        {s.qa.status === "pass" ? "✓" : "⚠"} {s.qa.status}
-                      </span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* DETAILS panel — QA + Production package + Agent collab */}
+            {activeTool === "details" && (
+              <div className="space-y-2">
+                {slide?.qa && slide.qa.comment && (
+                  <div className={`rounded-xl border p-3 ${
+                    slide.qa.status === "pass" ? "border-success-200 bg-success-50" : "border-warning-200 bg-warning-50"
+                  }`}>
+                    <div className="flex items-center gap-2 text-tiny font-semibold mb-1">
+                      <span>{slide.qa.status === "pass" ? "✓" : "⚠"}</span>
+                      <span>QA: Jordan Hayes</span>
+                      {typeof slide.qa.score === "number" && (
+                        <span className="ml-auto tabular-nums">{Math.round(slide.qa.score)}/100</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-default-700">{slide.qa.comment}</p>
+                    {slide.qa.suggestions && slide.qa.suggestions.length > 0 && (
+                      <ul className="mt-1.5 space-y-0.5 list-disc list-inside text-[10px] text-default-600">
+                        {slide.qa.suggestions.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
+                      </ul>
                     )}
                   </div>
-                </button>
-              );
-            })}
+                )}
+                {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost || slide.extras.compareTable || slide.extras.timingAdvice || slide.extras.legalCheck) && (
+                  <div className="rounded-xl border border-default-200 bg-white p-3 space-y-2 text-tiny">
+                    <p className="font-semibold flex items-center gap-1.5"><span>📦</span> Production package</p>
+                    {slide.extras.postingTime && (
+                      <p><span className="text-default-500">⏰ 發文時段：</span><span className="text-default-800">{slide.extras.postingTime}</span></p>
+                    )}
+                    {slide.extras.followupPost && (
+                      <div>
+                        <p className="text-default-500">📅 24h 跟進：</p>
+                        <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.followupPost}</p>
+                      </div>
+                    )}
+                    {slide.extras.replyTemplates && slide.extras.replyTemplates.length > 0 && (
+                      <div>
+                        <p className="text-default-500 mb-1">💬 留言模板（{slide.extras.replyTemplates.length} 組）</p>
+                        <div className="space-y-1 pl-2 border-l-2 border-default-200">
+                          {slide.extras.replyTemplates.slice(0, 5).map((rt, i) => (
+                            <div key={i}>
+                              <p className="text-default-500 text-[10px]">用戶：{rt.userSays}</p>
+                              <p className="text-default-800 text-[10px]">你回：{rt.yourReply}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {slide.extras.compareTable && (
+                      <div className="border-t border-default-100 pt-2">
+                        <p className="text-default-500 mb-1">🔁 爆款對照</p>
+                        <p className="text-default-800 whitespace-pre-line text-[10px]">{slide.extras.compareTable}</p>
+                      </div>
+                    )}
+                    {slide.extras.timingAdvice && (
+                      <div className="border-t border-default-100 pt-2">
+                        <p className="text-default-500 mb-1">⏱ 時效性</p>
+                        <p className="text-default-800 whitespace-pre-line text-[10px]">{slide.extras.timingAdvice}</p>
+                      </div>
+                    )}
+                    {slide.extras.legalCheck && (
+                      <div className="border-t border-default-100 pt-2">
+                        <p className="text-default-500 mb-1">⚖ 法務檢核</p>
+                        <p className="text-default-800 whitespace-pre-line text-[10px]">{slide.extras.legalCheck}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {orchestraStages && orchestraStages.length > 0 && (
+                  <div className="rounded-xl border border-default-200 bg-white p-3">
+                    <p className="text-tiny font-semibold mb-2">🎼 Agent 協作 ({doneStages}/{stageCount})</p>
+                    <StagePipelineView
+                      stages={orchestraStages}
+                      captionAgent={agentMeta}
+                      imageAgent={imageAgentMeta}
+                      tier={pageTier}
+                    />
+                  </div>
+                )}
+                {fetchedUrl && (
+                  <div className="rounded-xl border border-default-200 bg-white p-3 text-tiny">
+                    <p className="font-semibold mb-1">🔗 已讀連結</p>
+                    <a href={fetchedUrl.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline break-all text-[10px]">
+                      {fetchedUrl.title ?? fetchedUrl.url}
+                    </a>
+                    <p className="text-default-400 text-[10px] mt-1">{fetchedUrl.chars.toLocaleString()} 字</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ═══ ACCORDIONS — collapsible details (60s/100s only sections) ═══ */}
-      {/* Each accordion uses native <details> for zero-dep, with Canva-style colorful headers. */}
-
-      {/* QA reviewer (60s/100s) */}
-      {slide?.qa && slide.qa.comment && (
-        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group" open>
-          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
-            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: slide.qa.status === "pass" ? "#10b98120" : "#f59e0b20" }}>
-              {slide.qa.status === "pass" ? "✓" : "⚠"}
-            </span>
-            <span>Jordan Hayes 審核</span>
-            <span className={`text-tiny font-normal ${slide.qa.status === "pass" ? "text-success-600" : "text-warning-600"}`}>
-              {typeof slide.qa.score === "number" ? `${Math.round(slide.qa.score)}/100` : (slide.qa.status === "pass" ? "PASS" : "FLAG")}
-            </span>
-            <FontAwesomeIcon icon={faChevronRight} className="ml-auto text-tiny text-default-400 group-open:rotate-90 transition-transform" />
-          </summary>
-          <div className="px-4 pb-3 pt-1 text-tiny text-default-700 leading-relaxed border-t border-default-100">
-            <p>{slide.qa.comment}</p>
-            {slide.qa.suggestions && slide.qa.suggestions.length > 0 && (
-              <ul className="mt-1.5 space-y-0.5 list-disc list-inside text-[11px] opacity-80">
-                {slide.qa.suggestions.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
-              </ul>
-            )}
-          </div>
-        </details>
-      )}
-
-      {/* Production package (60s/100s) */}
-      {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost || slide.extras.compareTable || slide.extras.timingAdvice || slide.extras.legalCheck) && (
-        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group" open>
-          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
-            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: "#7c3aed20" }}>📦</span>
-            <span>Production package</span>
-            <span className="text-tiny font-normal text-default-500">
-              {[
-                slide.extras.replyTemplates?.length ? `${slide.extras.replyTemplates.length} 留言模板` : null,
-                slide.extras.postingTime ? "發文時段" : null,
-                slide.extras.followupPost ? "跟進貼文" : null,
-                slide.extras.compareTable ? "對照分析" : null,
-                slide.extras.timingAdvice ? "時效檢核" : null,
-                slide.extras.legalCheck ? "法務檢核" : null,
-              ].filter(Boolean).join(" · ")}
-            </span>
-            <FontAwesomeIcon icon={faChevronRight} className="ml-auto text-tiny text-default-400 group-open:rotate-90 transition-transform" />
-          </summary>
-          <div className="px-4 pb-3 pt-2 text-tiny space-y-2.5 border-t border-default-100">
-            {slide.extras.postingTime && (
-              <div className="flex items-start gap-2">
-                <span className="text-default-500 shrink-0 w-16">⏰ 發文時段</span>
-                <span className="text-default-800">{slide.extras.postingTime}</span>
-              </div>
-            )}
-            {slide.extras.followupPost && (
-              <div className="flex items-start gap-2">
-                <span className="text-default-500 shrink-0 w-16">📅 24h 跟進</span>
-                <span className="text-default-800 whitespace-pre-line leading-relaxed flex-1">{slide.extras.followupPost}</span>
-              </div>
-            )}
-            {slide.extras.replyTemplates && slide.extras.replyTemplates.length > 0 && (
-              <div>
-                <p className="text-default-500 mb-1.5">💬 留言回覆模板（{slide.extras.replyTemplates.length} 組）</p>
-                <div className="space-y-1.5 pl-2 border-l-2 border-default-200">
-                  {slide.extras.replyTemplates.slice(0, 5).map((rt, i) => (
-                    <div key={i}>
-                      <p className="text-default-500">用戶：{rt.userSays}</p>
-                      <p className="text-default-800 mt-0.5">你回：{rt.yourReply}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {slide.extras.compareTable && (
-              <div className="border-t border-default-100 pt-2">
-                <p className="text-default-500 mb-1">🔁 爆款對照分析</p>
-                <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.compareTable}</p>
-              </div>
-            )}
-            {slide.extras.timingAdvice && (
-              <div className="border-t border-default-100 pt-2">
-                <p className="text-default-500 mb-1">⏱ 時效性顧問</p>
-                <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.timingAdvice}</p>
-              </div>
-            )}
-            {slide.extras.legalCheck && (
-              <div className="border-t border-default-100 pt-2">
-                <p className="text-default-500 mb-1">⚖ 法務 / 倫理檢核</p>
-                <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.legalCheck}</p>
-              </div>
-            )}
-          </div>
-        </details>
-      )}
-
-      {/* Agent collab pipeline (all tiers) */}
-      {orchestraStages && orchestraStages.length > 0 && (
-        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group">
-          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
-            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: `${tierAccent(pageTier)}20` }}>🎼</span>
-            <span>Agent 協作流程</span>
-            <span className="text-tiny font-normal text-default-500">
-              {doneStages}/{stageCount} agents · {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : ""}
-            </span>
-            <FontAwesomeIcon icon={faChevronRight} className="ml-auto text-tiny text-default-400 group-open:rotate-90 transition-transform" />
-          </summary>
-          <div className="p-3 border-t border-default-100">
-            {pageTier === "30s" && !orchestraStages.find((s: any) => s.key === "extras" || s.key === "qa") ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-default-500">
-                {orchestraStages.map((s: any, i: number) => (
-                  <span key={s.key} className="flex items-center gap-1.5">
-                    {i > 0 && <span className="text-default-300">·</span>}
-                    <span className={s.status === "failed" ? "text-danger-600" : "text-default-600"}>{s.label}</span>
-                    {s.completedAt != null && <span className="text-default-400 tabular-nums">{(s.completedAt / 1000).toFixed(1)}s</span>}
+      {/* ═══ Canva-style bottom thumbnail strip (page nav) ═══════════════ */}
+      {total > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-3 pb-1 border-t border-default-100 overflow-x-auto">
+          {slides.map((s, i) => {
+            const active = i === idx;
+            return (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                title={s.label}
+                className={`flex-shrink-0 w-14 h-14 rounded-lg flex flex-col items-center justify-center font-bold transition relative ${
+                  active ? "shadow-md text-white scale-105" : "bg-default-100 text-default-600 hover:bg-default-200 hover:scale-105"
+                }`}
+                style={active ? {
+                  background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}cc)`,
+                } : undefined}
+              >
+                <span className="text-medium leading-none">{i + 1}</span>
+                {s.qa && (
+                  <span className="text-[8px] mt-0.5 opacity-90">
+                    {s.qa.status === "pass" ? "✓" : "⚠"}
                   </span>
-                ))}
-              </div>
-            ) : (
-              <StagePipelineView
-                stages={orchestraStages}
-                captionAgent={agentMeta}
-                imageAgent={imageAgentMeta}
-                tier={pageTier}
-              />
-            )}
-          </div>
-        </details>
+                )}
+              </button>
+            );
+          })}
+        </div>
       )}
-
-      {/* URL provenance (when present) */}
-      {fetchedUrl && (
-        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group">
-          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
-            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: "#06b6d420" }}>🔗</span>
-            <span>已讀連結</span>
-            <span className="text-tiny font-normal text-default-500 truncate min-w-0 flex-1">
-              {fetchedUrl.title ?? fetchedUrl.url}
-            </span>
-            <span className="text-tiny font-normal text-default-400 tabular-nums shrink-0">{fetchedUrl.chars.toLocaleString()} 字</span>
-            <FontAwesomeIcon icon={faChevronRight} className="text-tiny text-default-400 group-open:rotate-90 transition-transform" />
-          </summary>
-          <div className="px-4 pb-3 pt-1 text-tiny border-t border-default-100">
-            <a href={fetchedUrl.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline break-all">
-              {fetchedUrl.url}
-            </a>
-          </div>
-        </details>
-      )}
-
-      {/* ═══ Inline action row — secondary actions (primary in modal footer) ═══ */}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        <Button
-          variant="flat"
-          size="sm"
-          startContent={<FontAwesomeIcon icon={faClipboard} />}
-          onPress={() => { if (slide?.caption) navigator.clipboard.writeText(slide.caption); }}
-        >
-          複製這版{isEdited ? "（已編輯）" : ""}
-        </Button>
-        <Button
-          variant="flat"
-          size="sm"
-          startContent={<FontAwesomeIcon icon={faFolderPlus} />}
-          onPress={() => window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。\n目前可先「複製這版」貼到專案文件。")}
-        >
-          加到專案
-        </Button>
-        <Button
-          variant="flat"
-          size="sm"
-          startContent={<FontAwesomeIcon icon={faCompass} />}
-          onPress={() => { window.location.href = "/brands"; }}
-          title="會根據你的品牌設定重新調整口吻"
-        >
-          🔄 換個語氣
-        </Button>
-        {slide.imageStyle && !slide.imageUrl && (
-          <Button
-            variant="flat"
-            size="sm"
-            startContent={<FontAwesomeIcon icon={faPalette} />}
-            onPress={() => setMediaGenOpen(true)}
-          >
-            🎨 用此風格生圖
-          </Button>
-        )}
-      </div>
 
       <MediaGenFlow
         open={mediaGenOpen}
