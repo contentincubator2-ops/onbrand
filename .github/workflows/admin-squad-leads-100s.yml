@@ -1,4 +1,4 @@
-name: Admin — Reassign 100s squad leads for diversity
+name: Admin — Audit 100s squad existence + leads
 on:
   workflow_dispatch:
 
@@ -16,7 +16,25 @@ jobs:
             export MYSQL_PWD="mos_secure_2026"
             MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
 
-            echo "=== 11 FB + 7 IG 100s squads — lead agent + team size ==="
+            echo "=== Which of the 18 expected 100s squads actually exist? ==="
+            $MYSQL -e "
+              SELECT s.slug AS existing_slug, a.name AS lead, a.title
+                FROM squads s
+                LEFT JOIN agents a ON a.id = s.lead_agent_id
+               WHERE s.slug IN (
+                 'fb-monthly-calendar','fb-monthly-calendar-product-promo',
+                 'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
+                 'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
+                 'fb-reels-script','fb-livestream-prep','fb-crisis-comms',
+                 'ig-monthly-calendar-pulizzi','ig-account-reposition','ig-quarterly-strategy',
+                 'ig-event-launch-kit','ig-countdown-series','ig-livestream-prep',
+                 'ig-monthly-analytics'
+               )
+               ORDER BY s.slug
+            "
+            echo ""
+            echo "=== Lead diversity after update ==="
+            echo "(legacy from prev step)"
             $MYSQL -e "
               SELECT s.slug AS squad_slug,
                      a.id AS lead_id, a.name AS lead_name, a.title AS lead_title,
