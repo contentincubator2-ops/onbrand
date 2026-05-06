@@ -31,11 +31,27 @@ jobs:
                 ...yt60.YT_60S_TASKS.map((t:any)=>({...t, kind:'fast', platform:'youtube'})),
                 ...m60.MULTI_60S_TASKS.map((t:any)=>({...t, kind:'fast'})),
               ];
-              const fb60ByTier = all.filter((t:any)=>t.platform==='facebook' && t.tier==='60s');
-              console.log('Total tasks aggregated:', all.length);
-              console.log('Filter (platform=facebook, tier=60s) returns:', fb60ByTier.length, 'tasks');
-              for (const t of fb60ByTier.slice(0, 5)) console.log('  -', t.id, 'tier=', t.tier, 'label=', t.label);
-              const fb30 = all.filter((t:any)=>t.platform==='facebook' && t.tier==='30s');
-              console.log('FB 30s tasks:', fb30.length);
+              // Apply same platform inference as listFB router
+              const enriched = all.map((t:any) => {
+                const platform = t.platform ?? (
+                  t.id?.startsWith('ig-') ? 'instagram' :
+                  t.id?.startsWith('yt-') ? 'youtube' :
+                  t.id?.startsWith('tt-') ? 'tiktok' :
+                  t.id?.startsWith('li-') ? 'linkedin' :
+                  t.id?.startsWith('em-') ? 'email' :
+                  t.id?.startsWith('pr-') ? 'pr' :
+                  t.id?.startsWith('br-') ? 'brand' :
+                  t.id?.startsWith('rs-') ? 'audience' :
+                  t.id?.startsWith('fb-') ? 'facebook' : 'facebook'
+                );
+                return { ...t, platform };
+              });
+              console.log('Total enriched:', enriched.length);
+              const fb30 = enriched.filter((t:any)=>t.platform==='facebook' && t.tier==='30s');
+              const fb60 = enriched.filter((t:any)=>t.platform==='facebook' && t.tier==='60s');
+              console.log('FB 30s:', fb30.length, '(should be 10)');
+              console.log('FB 60s:', fb60.length, '(should be 12)');
+              if (fb60.length > 0) for (const t of fb60.slice(0,3)) console.log('  60s:', t.id, '|', t.label);
+              if (fb30.length > 0) for (const t of fb30.slice(0,3)) console.log('  30s:', t.id, '|', t.label);
             })().catch(e => console.error('error:', e.message, e.stack));
             " 2>&1

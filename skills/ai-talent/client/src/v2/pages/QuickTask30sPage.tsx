@@ -134,11 +134,13 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
     : { data: [] };
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
 
-  // 60s and 100s tier reuse the same 30s task pool; orchestra scales output
-  // (5 variants + QA for 60s; +scout/video for 100s). All "30s" tasks show
-  // on /60s and /100s pages with the tier-appropriate orchestra.
+  // 30s tier: filter by tier="30s". 60s tier: filter by tier="60s" (real
+  // production-package tasks shipped 2026-05-06). 100s tier: still reuses
+  // 30s pool (Phase 3 scout/video integration TBD); UI scales orchestra.
   const tasksThisTier = useMemo(
-    () => tier === "30s" ? allTasks.filter((t) => t.tier === "30s") : allTasks.filter((t) => t.tier === "30s"),
+    () => tier === "60s"
+      ? allTasks.filter((t) => t.tier === "60s")
+      : allTasks.filter((t) => t.tier === "30s"),
     [allTasks, tier],
   );
 
