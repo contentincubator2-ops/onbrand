@@ -1307,23 +1307,30 @@ function OutputCarousel({
 
       {/* ═══ CANVA STAGE: huge mockup | optional right contextual panel ═══ */}
       <div className="flex gap-3 items-stretch">
-        {/* ── CENTER STAGE: Mockup HUGE with side chevrons + floating pill ── */}
+        {/* ── CENTER STAGE: Mockup with side chevrons (each chevron shows variant name) ── */}
         <div className="flex-1 min-w-0 flex flex-col items-center">
           <div className="relative flex items-stretch gap-2">
             {total > 1 && (
               <button
                 onClick={() => setIdx(Math.max(0, idx - 1))}
                 disabled={idx === 0}
-                className={`flex-shrink-0 w-8 self-stretch flex items-center justify-center rounded-full transition ${
-                  idx === 0 ? "opacity-0 cursor-not-allowed" : "text-default-400 hover:text-default-700 hover:bg-white/60"
+                className={`flex-shrink-0 self-stretch flex flex-col items-center justify-center gap-1 rounded-xl transition px-2 ${
+                  idx === 0
+                    ? "opacity-0 cursor-not-allowed pointer-events-none"
+                    : "text-default-500 hover:text-default-800 hover:bg-white/60"
                 }`}
                 aria-label="上一個版本"
+                title={idx > 0 ? `上一版：${slides[idx - 1]?.label}` : ""}
               >
-                <FontAwesomeIcon icon={faChevronLeft} className="text-medium" />
+                <FontAwesomeIcon icon={faChevronLeft} className="text-large" />
+                {idx > 0 && (
+                  <span className="text-[10px] font-medium text-default-500 max-w-[60px] text-center leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
+                    {slides[idx - 1]?.label}
+                  </span>
+                )}
               </button>
             )}
-            {/* Canva-style canvas: grey breathing room + asset centered + soft shadow.
-                NO floating pill (removed — Canva detail view doesn't have it). */}
+            {/* Canva-style canvas: grey breathing room + asset centered + soft shadow */}
             <div className="flex-1 min-w-0 flex justify-center">
               {mockupVariant && (
                 <div
@@ -1333,12 +1340,13 @@ function OutputCarousel({
                     className="rounded-2xl overflow-hidden"
                     style={{
                       background: "white",
-                      // Beefier shadow per CJ: prominent depth, mockup floats above grey canvas
                       boxShadow: `0 24px 48px -16px ${tierAccent(pageTier)}55, 0 8px 24px -8px rgba(0,0,0,0.10), 0 0 0 1px ${tierAccent(pageTier)}25`,
                     }}
                   >
                   <PlatformMockup
-                    variant={mockupVariant}
+                    // Inject the active variant label into the mockup's variantLabel
+                    // so the FACEBOOK / FEED header reads e.g. "FACEBOOK / FEED · 情感版"
+                    variant={{ ...mockupVariant, label: `${mockupVariant.label} · ${slide.label ?? ""}` }}
                     title={output.title ?? ""}
                     brief={output.description ?? ""}
                     brandName={brandName}
@@ -1369,12 +1377,20 @@ function OutputCarousel({
               <button
                 onClick={() => setIdx(Math.min(total - 1, idx + 1))}
                 disabled={idx === total - 1}
-                className={`flex-shrink-0 w-8 self-stretch flex items-center justify-center rounded-full transition ${
-                  idx === total - 1 ? "opacity-0 cursor-not-allowed" : "text-default-400 hover:text-default-700 hover:bg-white/60"
+                className={`flex-shrink-0 self-stretch flex flex-col items-center justify-center gap-1 rounded-xl transition px-2 ${
+                  idx === total - 1
+                    ? "opacity-0 cursor-not-allowed pointer-events-none"
+                    : "text-default-500 hover:text-default-800 hover:bg-white/60"
                 }`}
                 aria-label="下一個版本"
+                title={idx < total - 1 ? `下一版：${slides[idx + 1]?.label}` : ""}
               >
-                <FontAwesomeIcon icon={faChevronRight} className="text-medium" />
+                <FontAwesomeIcon icon={faChevronRight} className="text-large" />
+                {idx < total - 1 && (
+                  <span className="text-[10px] font-medium text-default-500 max-w-[60px] text-center leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
+                    {slides[idx + 1]?.label}
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -1889,66 +1905,11 @@ function OutputCarousel({
         )}
       </div>
 
-      {/* ═══ Canva-style bottom thumbnail strip (page nav) — always shown ═══ */}
-      <div className="flex items-center justify-center gap-2 pt-2 pb-1 border-t border-default-100 overflow-x-auto">
-        {slides.map((s, i) => {
-          const active = i === idx;
-          return (
-            <button
-              key={i}
-              onClick={() => setIdx(i)}
-              title={s.label}
-              className={`flex-shrink-0 w-14 h-14 rounded-lg flex flex-col items-center justify-center font-bold transition relative ${
-                active ? "shadow-md text-white scale-105" : "bg-default-100 text-default-600 hover:bg-default-200 hover:scale-105"
-              }`}
-              style={active ? {
-                background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}cc)`,
-              } : undefined}
-            >
-              <span className="text-medium leading-none">{i + 1}</span>
-              {s.qa && (
-                <span className="text-[8px] mt-0.5 opacity-90">
-                  {s.qa.status === "pass" ? "✓" : "⚠"}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        {/* [+] regenerate more — Canva "add page" pattern */}
-        <button
-          onClick={() => window.alert("「再生成多版」會重跑這個任務 — 暫時請按底部的「重做」")}
-          title="再生成多版"
-          className="flex-shrink-0 w-14 h-14 rounded-lg border-2 border-dashed border-default-300 text-default-400 hover:border-default-500 hover:text-default-600 transition flex items-center justify-center"
-        >
-          <span className="text-2xl leading-none">+</span>
-        </button>
-        {/* ⌄ overflow / show all — Canva "view all pages" pattern */}
-        {total > 4 && (
-          <button
-            onClick={() => toggleTool("details")}
-            title="展開所有版本"
-            className="flex-shrink-0 w-10 h-14 rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition flex items-center justify-center"
-          >
-            <FontAwesomeIcon icon={faChevronDown} className="text-tiny" />
-          </button>
-        )}
-      </div>
+      {/* (Bottom thumbnail strip removed per CJ — variant switching now lives
+          on the chevrons themselves with the variant name displayed inline.) */}
 
-      <MediaGenFlow
-        open={mediaGenOpen}
-        onClose={() => setMediaGenOpen(false)}
-        kind="image"
-        initialBrief={slide.imageStyle ?? ""}
-        brandContext={brandName ?? undefined}
-        brandId={brandId ?? undefined}
-        onComplete={(r) => {
-          // Auto-attach generated image to the active slide's mockup
-          if (r?.url) {
-            setImageOverrides((o) => ({ ...o, [idx]: r.url }));
-            setMediaGenOpen(false); // close modal so user sees mockup updated
-          }
-        }}
-      />
+      {/* MediaGenFlow modal removed — image / video gen is now inline in the
+          right panel (Step 3 of 🖼/🎬 tool flow). No more popup. */}
 
       {/* FB avatar picker — minimal modal that triggers brand.fetchFacebookAvatar */}
       <Modal isOpen={fbLogoModalOpen} onClose={() => setFbLogoModalOpen(false)} size="md" backdrop="blur">

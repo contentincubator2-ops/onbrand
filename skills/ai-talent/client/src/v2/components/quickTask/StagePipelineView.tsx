@@ -270,7 +270,7 @@ export function StagePipelineView({
         </p>
       </div>
 
-      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+      <div className="p-3 flex flex-col gap-2">
         {visibleSlots.map((slot) => {
           const stage = byKey[slot.stageKey]!;
           const isCaption = slot.stageKey === "caption";
