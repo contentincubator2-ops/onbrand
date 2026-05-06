@@ -31,6 +31,7 @@ import {
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import MediaGenFlow from "../components/media/MediaGenFlow";
+import { StagePipelineView } from "../components/quickTask/StagePipelineView";
 import { faPalette } from "@fortawesome/free-solid-svg-icons";
 
 const CARD_PALETTES = [
@@ -549,6 +550,21 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                       </div>
                     )}
 
+                    {/* 60s/100s tier — show Stage Pipeline once stages start arriving.
+                        Currently stages only populate after orchestra finishes (no
+                        streaming yet). For now this shows after run; future work:
+                        tRPC subscription stream live updates. */}
+                    {(tier === "60s" || tier === "100s") && orchestraStages && orchestraStages.length > 0 && (
+                      <div className="mt-4">
+                        <StagePipelineView
+                          stages={orchestraStages}
+                          captionAgent={agentMeta}
+                          imageAgent={imageAgentMeta}
+                          tier={tier}
+                        />
+                      </div>
+                    )}
+
                     {errorMsg && (
                       <Card className="bg-warning-50 border border-warning-200 mt-4">
                         <CardBody className="text-warning-800 text-small">{errorMsg}</CardBody>
@@ -738,24 +754,35 @@ function OutputCarousel({
         )}
       </div>
 
-      {/* Orchestra stage ribbon — Notion 風格：灰階為主，顏色只在 failed 時出現 */}
+      {/* Orchestra stage view.
+          - 30s tier: simple ribbon (Notion-style, single line)
+          - 60s/100s tier: full StagePipelineView with agent cards */}
       {orchestraStages && orchestraStages.length > 0 && (
-        <div className="border-t border-b border-default-100 py-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-tiny text-default-500">
-            <span className="text-[10px] uppercase tracking-wider text-default-400">Orchestra</span>
-            {orchestraStages.map((s: any, i: number) => (
-              <span key={s.key} className="flex items-center gap-1.5">
-                {i > 0 && <span className="text-default-300">·</span>}
-                <span className={s.status === "failed" ? "text-danger-600" : "text-default-600"}>
-                  {s.label}
+        activeTask.tier === "30s" && !orchestraStages.find((s: any) => s.key === "extras" || s.key === "qa") ? (
+          <div className="border-t border-b border-default-100 py-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-tiny text-default-500">
+              <span className="text-[10px] uppercase tracking-wider text-default-400">Orchestra</span>
+              {orchestraStages.map((s: any, i: number) => (
+                <span key={s.key} className="flex items-center gap-1.5">
+                  {i > 0 && <span className="text-default-300">·</span>}
+                  <span className={s.status === "failed" ? "text-danger-600" : "text-default-600"}>
+                    {s.label}
+                  </span>
+                  {s.completedAt != null && (
+                    <span className="text-default-400 tabular-nums">{(s.completedAt / 1000).toFixed(1)}s</span>
+                  )}
                 </span>
-                {s.completedAt != null && (
-                  <span className="text-default-400 tabular-nums">{(s.completedAt / 1000).toFixed(1)}s</span>
-                )}
-              </span>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <StagePipelineView
+            stages={orchestraStages}
+            captionAgent={agentMeta}
+            imageAgent={imageAgentMeta}
+            tier={(orchestraStages.find((s: any) => s.key === "scout") ? "100s" : "60s") as any}
+          />
+        )
       )}
 
       {/* URL provenance — 已讀的連結，灰階呈現 */}
