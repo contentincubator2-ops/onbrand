@@ -375,17 +375,25 @@ export async function runOrchestra(args: {
   /** Tier override — 60s/100s scale variants + add QA stage. Default 30s. */
   tier?: OrchestraTier;
 }): Promise<OrchestraResult> {
-  // Tier-based config scaling (additive, doesn't mutate original config)
+  // Tier-based config scaling (additive, doesn't mutate original config).
+  // 60s/100s bumps variants 3 → 5 but task config typically only has 3
+  // variantLabels. Pad with extra labels so each new variant has a usable
+  //口吻 instead of "版本 4" fallback.
   const tier: OrchestraTier = args.tier ?? "30s";
-  if (tier === "60s") {
+  if (tier === "60s" || tier === "100s") {
+    const baseLabels = args.config.variantLabels;
+    const extraLabels = ["進階版", "替代版", "極簡版", "完整版"]; // generic fallbacks
+    const scaledLabels = baseLabels.length >= 5
+      ? baseLabels.slice(0, 5)
+      : [...baseLabels, ...extraLabels.slice(0, 5 - baseLabels.length)];
     args = {
       ...args,
-      config: { ...args.config, variants: 5, images: args.config.images > 0 ? 5 : 0 },
-    };
-  } else if (tier === "100s") {
-    args = {
-      ...args,
-      config: { ...args.config, variants: 5, images: args.config.images > 0 ? 5 : 0 },
+      config: {
+        ...args.config,
+        variants: 5,
+        images: args.config.images > 0 ? 5 : 0,
+        variantLabels: scaledLabels,
+      },
     };
   }
   const tierBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "100s" ? HARD_BUDGET_100S : HARD_BUDGET_MS;
