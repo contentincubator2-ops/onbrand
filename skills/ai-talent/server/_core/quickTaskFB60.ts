@@ -336,6 +336,33 @@ ${FB60_TONE}`,
     maxTokens: 1100,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
+
+  // 13. FB 廣告完整包 A/B/C — 3 個獨立廣告，每個含 caption + 3 張視覺
+  // 替代危機回覆任務，per CJ direction 2026-05-06
+  {
+    id: "fb-60-ad-pack-3",
+    tier: "60s", postType: "ad",
+    label: "FB 廣告完整包 A/B/C",
+    description: "3 個獨立廣告（情感 / 理性 / 反差切角），每個含完整 caption + 3 張配圖風格",
+    agent_id: 60021, // Tina Ji
+    skill_slug: "fb-ad-copy",
+    primary_question: "這檔廣告的主推產品 / 受眾 / 賣點？",
+    primary_input: { key: "campaign", placeholder: "例：母親節健力餐高蛋白組合，職業媽媽 35-50 歲", type: "textarea" },
+    inputs: [
+      { key: "campaign", label: "Campaign 主題", type: "textarea", required: true },
+    ],
+    systemPrompt: `產出 FB 廣告完整包其中 1 支廣告（150-300 字）。
+本次你寫的是「{label}」這個切角的完整廣告。
+結構：headline (25 字) + primary text (80-150 字) + CTA (10 字)。
+caption 欄位整合輸出格式：
+[Headline] xxx
+[Primary] xxxxx
+[CTA] xxx
+每個切角獨立完整，可直接複製到 Ads Manager。${FB60_TONE}`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "ad" },
+  },
 ];
 
 // ─── Orchestra configs (per task) ──────────────────────────────────────────
@@ -570,6 +597,25 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     specialtyAgentId: 180855,  // Jason Evans — Risk & Compliance
     extras: {
       legalAssistant: true,
+      replyTemplates: 5, postingTime: true, followupPost: true,
+    },
+  },
+
+  // 13. FB 廣告完整包 A/B/C — multi-post fanout for 3 ad angles
+  "fb-60-ad-pack-3": {
+    variants: 3,
+    images: 3,
+    runImageGen: true,
+    imageDirectorId: MANDY,
+    aspectRatio: "1:1",
+    fluxSize: "square_hd",
+    imageQualitySteps: 4,
+    variantLabels: ["情感切角", "理性切角", "反差切角"],
+    captionMinChars: 150,
+    captionMaxChars: 300,
+    postLabels: ["情感切角", "理性切角", "反差切角"],
+    extras: {
+      postsCount: 3,
       replyTemplates: 5, postingTime: true, followupPost: true,
     },
   },

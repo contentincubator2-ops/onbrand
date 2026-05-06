@@ -206,8 +206,8 @@ caption 直接列 hashtag（每個 # 前綴 + 空格分隔，可換行）。
     id: "ig-30-comment-reply",
     tier: "30s",
     postType: "feed",
-    label: "IG 留言回覆",
-    description: "5 種口吻回覆（粉絲 / 客訴 / 同行 / KOL / 沉默）",
+    label: "IG 留言回覆（一般）",
+    description: "5 種口吻回覆（粉絲互動 / 友善討論 / 同行交流 / KOL 互動 / 一般詢問）",
     agent_id: 180143, // Emily Wang — Community Manager
     skill_slug: "community-manager",
     primary_question: "貼上原始用戶留言（或留言情境）",
