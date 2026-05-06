@@ -2081,6 +2081,46 @@ ${agentCtx.systemPromptPrefix}`;
           );
         }
       }
+      // ── 100s tier: inject real-time scout data (festivals / trending / news) ─
+      // For squad slugs in our 100s pool, fetch real market data via Tavily/
+      // Gemini and inject as context. Cached 5 min per (slug, brandId) to
+      // avoid hitting the API on every step. Per CJ direction: 100s squads
+      // must have actual market data, not just LLM internal knowledge.
+      try {
+        const { ALL_100S_SQUADS } = await import("../_core/quickTask100Squads");
+        const matched = ALL_100S_SQUADS.find((s) => s.squad_slug === input.squadSlug);
+        if (matched) {
+          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../_core/socialListeningScout");
+          // Decide kind from squad slug pattern
+          const kind: "festivals" | "trending" | "news" | "viral" =
+            matched.squad_slug.includes("monthly-calendar") || matched.squad_slug.includes("countdown") ? "festivals"
+            : matched.squad_slug.includes("crisis") || matched.squad_slug.includes("kern-mass-control") ? "trending"
+            : matched.squad_slug.includes("quarterly") || matched.squad_slug.includes("analytics") || matched.squad_slug.includes("reposition") ? "news"
+            : "viral";
+          // Use mission-level cache key
+          const cacheKey = `__scout_${input.squadSlug}_${scopeBrandId ?? 0}`;
+          const cached = (globalThis as any)[cacheKey];
+          let viral = cached?.data;
+          const cacheAge = cached ? Date.now() - cached.ts : Infinity;
+          if (!viral || cacheAge > 5 * 60_000) {
+            const topic = `${matched.label} ${mission?.title ?? ""}`.slice(0, 120);
+            viral = await fetchViralPatterns({
+              channel: matched.platform,
+              topic,
+              brandId: scopeBrandId ?? undefined,
+              kind,
+            });
+            (globalThis as any)[cacheKey] = { data: viral, ts: Date.now() };
+          }
+          if (viral && viral.patterns.length > 0) {
+            contextParts.push(formatViralPatternsForPrompt(viral, kind));
+          }
+        }
+      } catch (e) {
+        // Scout failure non-fatal — squad still runs with brand context only
+        console.log(`[100s scout] non-fatal: ${(e as Error)?.message}`);
+      }
+
       const brandContext = contextParts.join("\n\n");
 
       const stepName = step.name ?? step.title ?? `Step ${input.stepOrder}`;
