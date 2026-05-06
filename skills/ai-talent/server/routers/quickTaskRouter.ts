@@ -1148,7 +1148,7 @@ export const quickTaskRouter = router({
         const text = (r.content ?? "").trim();
         // Split on triple newline to separate explanation from rewritten caption
         const parts = text.split(/\n\n\n+/);
-        const explanation = parts.length > 1 ? parts[0].trim() : "";
+        const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
         const rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
         return { explanation, rewritten, ok: true };
       } catch (e: any) {
