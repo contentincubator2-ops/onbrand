@@ -770,11 +770,13 @@ export const FB_90S_TASK_INDEX: Array<{
   { id: "fb-90-crisis-full",            squad_slug: "fb-crisis-comms",           postType: "comment",  label: "FB 完整危機公關",    description: "Lagadec 4 段 + 後續追蹤 + 媒體聲明" },
 ];
 
-/** Helper: get all FB tasks across tiers in a single list */
+/** Helper: get all FB tasks across tiers in a single list.
+ *  2026-05-06: legacy FB_60S_TASKS removed from this list — new
+ *  FB_60S_TASKS_V2 (in quickTaskFB60.ts) is the canonical 60s pool with
+ *  multi-agent collaboration. Router merges FB60V2 separately. */
 export function listAllFBTasks() {
   return [
     ...FB_30S_TASKS.map(t => ({ ...t, kind: "fast" as const })),
-    ...FB_60S_TASKS.map(t => ({ ...t, kind: "mid" as const })),
     ...FB_90S_TASK_INDEX.map(t => ({
       id: t.id,
       tier: "90s" as const,

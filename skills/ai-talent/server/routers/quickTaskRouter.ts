@@ -896,10 +896,31 @@ export const quickTaskRouter = router({
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks,
     ];
-    // Collect unique agent_ids that need lookup (covers both fb + ig)
-    const agentIds: number[] = Array.from(new Set(
-      tasks.flatMap((t: any) => (t.agent_id ? [Number(t.agent_id)] : []))
-    ));
+    // 60s production-package universal team agent IDs (used by orchestra)
+    // Emma Zhang / Helen Sung / David Wang / Sophie Ho / Jordan Hayes / Mandy / Nancy / Nina / Anna / Zeyu / Nathan
+    const UNIVERSAL_60S_IDS = [30005, 180163, 30003, 60012, 239184, 180170, 180157, 180165, 60071, 60062];
+    // Resolve 60s orchestra config for each task to get strategist + specialty + image director
+    const orchestraLookup = (id: string) =>
+      getFB60OrchestraConfig(id) ?? getIG60OrchestraConfig(id) ??
+      getYT60OrchestraConfig(id) ?? getMulti60OrchestraConfig(id);
+    // Collect unique agent_ids that need lookup (covers both fb + ig + collab team)
+    const teamIdsByTask: Record<string, number[]> = {};
+    for (const t of tasks) {
+      if (t.tier !== "60s") continue;
+      const cfg = orchestraLookup(t.id);
+      if (!cfg) continue;
+      const ids: number[] = [];
+      if (t.agent_id) ids.push(t.agent_id);
+      if (cfg.imageDirectorId) ids.push(cfg.imageDirectorId);
+      if (cfg.strategistAgentId) ids.push(cfg.strategistAgentId);
+      if (cfg.specialtyAgentId) ids.push(cfg.specialtyAgentId);
+      ids.push(...UNIVERSAL_60S_IDS.slice(0, 5)); // Emma/Helen/David/Sophie/Jordan core 5
+      teamIdsByTask[t.id] = Array.from(new Set(ids));
+    }
+    const agentIds: number[] = Array.from(new Set([
+      ...tasks.flatMap((t: any) => (t.agent_id ? [Number(t.agent_id)] : [])),
+      ...Object.values(teamIdsByTask).flat(),
+    ]));
     const agentMap: Record<number, { id: number; name: string; title: string; avatarUrl: string | null }> = {};
     if (agentIds.length > 0) {
       const placeholders = agentIds.map(() => "?").join(",");
@@ -935,6 +956,10 @@ export const quickTaskRouter = router({
       if (t.kind === "squad") {
         return { ...base, squad_slug: t.squad_slug, inputs: [], agent: null, skill_slug: null };
       }
+      // For 60s tasks, surface the full collab team so cards can show
+      // "8 位 agent 協作" badge + tooltip with team roster.
+      const teamIds = teamIdsByTask[t.id] ?? [];
+      const team = teamIds.map((id) => agentMap[id]).filter(Boolean);
       return {
         ...base,
         inputs: t.inputs ?? [],
@@ -945,6 +970,7 @@ export const quickTaskRouter = router({
         primary_question: t.primary_question ?? null,
         primary_input: t.primary_input ?? null,
         agent: t.agent_id ? (agentMap[t.agent_id] ?? null) : null,
+        team: team.length > 0 ? team : undefined,
       };
     });
   }),

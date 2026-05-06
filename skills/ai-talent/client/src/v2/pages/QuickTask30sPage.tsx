@@ -63,6 +63,9 @@ interface FBTaskCard {
   agent_id?: number | null;
   skill_slug?: string | null;
   agent?: { id: number; name: string; title: string; avatarUrl: string | null } | null;
+  /** 60s tier: full collab team (caption_writer + image_director + strategist
+   *  + specialty + universal helpers Emma/Helen/David/Sophie/Jordan). */
+  team?: Array<{ id: number; name: string; title: string; avatarUrl: string | null }>;
   squad_slug?: string;
 }
 
@@ -458,6 +461,27 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                           <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
                           <span className="text-tiny font-medium text-default-700 truncate">{agentName}</span>
                         </div>
+                        {/* 60s tier: show full collab team avatar stack + count */}
+                        {(t as any).team && (t as any).team.length > 1 && (
+                          <div className="flex items-center gap-1.5 -mt-1">
+                            <div className="flex -space-x-2">
+                              {((t as any).team as Array<{id:number;name:string;avatarUrl:string|null}>)
+                                .slice(0, 5)
+                                .map((m) => (
+                                  <Avatar
+                                    key={m.id}
+                                    src={m.avatarUrl || dicebear(m.name)}
+                                    size="sm"
+                                    className="w-5 h-5 ring-1 ring-white"
+                                    title={m.name}
+                                  />
+                                ))}
+                            </div>
+                            <span className="text-[10px] text-default-500">
+                              +{Math.max(0, (t as any).team.length - 5)} · {(t as any).team.length} 位協作
+                            </span>
+                          </div>
+                        )}
                         {t.skill_slug && (
                           <Chip size="sm" variant="flat" className="self-start text-[10px]">
                             {t.skill_slug}
