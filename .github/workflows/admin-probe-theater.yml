@@ -68,20 +68,31 @@ jobs:
           BID="${{ github.event.inputs.brand_id }}"
           BID="${BID:-2821}"
 
+          # Find the actual owner of the brand (positioningBridge filters by userId)
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          OWNER_ID=$(mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent -e "SELECT userId FROM brands WHERE id=$BID")
+          echo "Brand owner userId: $OWNER_ID"
+
           # Inline tsx probe — exercises the exact code path runStart uses
           npx tsx -e "
           import { getBrandPositioningById } from './server/positioningBridge';
           (async () => {
-            const pos = await getBrandPositioningById(${BID}, 0);
+            const pos = await getBrandPositioningById(${BID}, ${OWNER_ID});
             console.log('=== positioningBridge output ===');
+            if (!pos) { console.log('pos is NULL'); process.exit(2); }
             console.log(JSON.stringify({
-              tagline: pos?.tagline,
-              usp: pos?.usp,
-              differentiators_count: pos?.differentiators?.length ?? 0,
-              differentiators: pos?.differentiators?.slice(0, 3),
-              messagingPillars: pos?.messagingPillars?.slice(0, 3),
-              brandVoice: pos?.brandVoice,
+              tagline: pos.tagline,
+              usp: pos.usp,
+              differentiators_count: pos.differentiators?.length ?? 0,
+              differentiators: pos.differentiators?.slice(0, 3),
+              messagingPillars_count: pos.messagingPillars?.length ?? 0,
+              messagingPillars: pos.messagingPillars?.slice(0, 3),
+              brandVoice: pos.brandVoice,
+              source: pos.source,
             }, null, 2));
-            process.exit(0);
+            const ok = (pos.differentiators?.length ?? 0) >= 3;
+            console.log('');
+            console.log(ok ? '✓ HEALTHY — Theater will work' : '✗ FAIL — differentiators count < 3');
+            process.exit(ok ? 0 : 1);
           })();
           "
