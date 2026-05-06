@@ -43,6 +43,7 @@ import QuickTasksPage from "../pages/QuickTasksPage";
 import QuickTask30sPage from "../pages/QuickTask30sPage";
 import BoardroomPage from "../pages/BoardroomPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
+import TheaterPage from "../pages/TheaterPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
 import SquadLabPage from "../pages/admin/SquadLabPage";
 
@@ -154,6 +155,7 @@ export default function AppV2() {
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
+          <Route path="/theater"   element={<TheaterPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
           <Route path="/templates" element={<MethodologyCatalog />} />

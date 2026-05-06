@@ -45,10 +45,12 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/100s",      label: "100S",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
-  // 範本 / 比稿 hidden per CJ direction 2026-05-06 — focus narrows to
-  // tier tasks + projects + brands. Routes still exist for direct URL access.
+  // Content Generation Theater — replaces 案例 (CJ direction 2026-05-06).
+  // Live waterfall of AI-generated FB / IG / YT cards for the active brand.
+  { to: "/theater",   label: "劇場",     icon: <FontAwesomeIcon icon={faBookBookmark} /> },
   { to: "/brands",    label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
-  { to: "/playbooks", label: "案例",     icon: <FontAwesomeIcon icon={faBookBookmark} /> },
+  // 範本 / 比稿 / 案例 hidden — direct URL access still works (/templates,
+  // /boardroom, /playbooks).
 ];
 
 /* ─────────────────────────── Root layout ─────────────────────────── */
@@ -152,12 +154,15 @@ export default function ShellLayout() {
         </>
       )}
 
-      {/* Global scope bar removed 2026-05-06 per CJ — brand picker is now
-          top-left in the IconBar (BrandSwitcherButton with popover). The
-          right-top scope bar was redundant and visually competed with the
-          brand button. Product / event sub-scope still accessible via the
-          per-page ScopeBar component (e.g. PickerWorkspace). */}
-      {/* <GlobalScopeBar scope={scope} setScope={setScope} brands={brands} /> */}
+      {/* Brand hierarchy pill — fixed top-left, always-expanded horizontal bar
+          showing the active brand → product → event. Click for hierarchical
+          dropdown to switch or add. Replaces old vertical circle button. */}
+      <BrandHierarchyPill
+        brands={brands}
+        scope={scope}
+        setScope={setScope}
+        onNavigate={(to) => navigate(to)}
+      />
 
       {/* Main content */}
       <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
@@ -210,8 +215,11 @@ function IconBar({
         overflow: "hidden",   /* prevent any horizontal scrollbar from appearing */
       }}
     >
-      {/* Toggle — topmost, always at same position */}
-      <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      {/* Top spacer for floating BrandHierarchyPill (44px pill + 10px top + 10px gap) */}
+      <div style={{ height: 64, flexShrink: 0 }} />
+
+      {/* Toggle — moved down to leave room for the floating brand pill above */}
+      <div style={{ height: 48, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
           <button
             onClick={onToggle}
@@ -230,16 +238,8 @@ function IconBar({
         </Tooltip>
       </div>
 
-      {/* Brand switcher — top-left prominent. Shows brand logo (collapsed) or
-          logo + name (when sidebar expanded). Click opens brand-picker popover.
-          Removed orange '+' build-task button (was nav to '/' with no purpose). */}
-      <BrandSwitcherButton
-        brands={brands}
-        activeBrandId={scope.brandId}
-        sidebarCollapsed={collapsed}
-        onPickBrand={(id) => setScope({ brandId: id, productId: null, eventId: null })}
-        onAddBrand={() => onNavigate("/brands")}
-      />
+      {/* Brand pill moved out of IconBar — now floats top-left of viewport
+          as horizontal hierarchy bar (BrandHierarchyPill in main layout) */}
 
       {/* Nav icons */}
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px" }}>
@@ -330,12 +330,315 @@ function IconBar({
 
 /* ── Icon nav link (collapsed icon+label) ── */
 
-/* ─────────────────────── Brand Switcher Button ───────────────────────
-   Top-left prominent brand picker. Two states:
-   - sidebar collapsed: shows just the logo/initial in 44px circle
-   - sidebar expanded: shows logo + brand NAME in a horizontal pill
-   Click → popover with brand list + 「新增品牌」 entry.
+/* ─────────────── Brand Hierarchy Pill (fixed top-left) ───────────────
+   Always-expanded horizontal pill showing the active brand → product →
+   event hierarchy. Click any segment to open a hierarchical dropdown
+   for switching or adding. Replaces the old cramped circle button.
+
+   Layout: positioned absolute at top-left of viewport, width 280px,
+   height 44px. Pushes IconBar's first child down via top padding.
 */
+function BrandHierarchyPill({
+  brands, scope, setScope, onNavigate,
+}: {
+  brands: any[];
+  scope: ScopeState;
+  setScope: (s: ScopeState) => void;
+  onNavigate: (to: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Load product / event lists scoped to current brand
+  const productsQuery = (trpc as any).product?.listByBrand?.useQuery
+    ? (trpc as any).product.listByBrand.useQuery(
+        { brandId: scope.brandId ?? undefined },
+        { enabled: !!scope.brandId, refetchOnWindowFocus: false }
+      )
+    : { data: [] };
+  const eventsQuery = (trpc as any).event?.listByBrand?.useQuery
+    ? (trpc as any).event.listByBrand.useQuery(
+        { brandId: scope.brandId ?? undefined },
+        { enabled: !!scope.brandId, refetchOnWindowFocus: false }
+      )
+    : { data: [] };
+  const products = (productsQuery.data as any[]) ?? [];
+  const events = (eventsQuery.data as any[]) ?? [];
+
+  const activeBrand = brands.find((b: any) => b.id === scope.brandId) ?? null;
+  const activeProduct = products.find((p: any) => p.id === scope.productId) ?? null;
+  const activeEvent = events.find((e: any) => e.id === scope.eventId) ?? null;
+
+  // Display priority: event > product > brand (most specific scope wins as label)
+  const displayName =
+    activeEvent?.name ?? activeProduct?.name ?? activeBrand?.name ?? "選擇品牌";
+  const displayInitial = (activeBrand?.name ?? "?").charAt(0);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "fixed",
+        left: 12,
+        top: 10,
+        zIndex: 50,
+        width: 260,
+      }}
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          height: 44,
+          borderRadius: 12,
+          border: open ? "1.5px solid #7c3aed" : "1px solid #e5e7eb",
+          background: "#fff",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "0 10px 0 6px",
+          cursor: "pointer",
+          boxShadow: open
+            ? "0 8px 24px rgba(124,58,237,0.18)"
+            : "0 2px 8px rgba(0,0,0,0.06)",
+          transition: "border-color 0.12s, box-shadow 0.12s",
+        }}
+      >
+        {/* Logo / initial square */}
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+          background: activeBrand
+            ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
+            : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
+          color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 13, fontWeight: 700,
+          overflow: "hidden",
+        }}>
+          {activeBrand?.logoUrl ? (
+            <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : displayInitial}
+        </span>
+        {/* Hierarchy text — breadcrumbs Brand › Product › Event */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15 }}>
+          {(activeProduct || activeEvent) && (
+            <span style={{
+              fontSize: 9, color: "#9ca3af", letterSpacing: "0.3px",
+              maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {activeBrand?.name}{activeProduct ? ` › ${activeProduct.name}` : ""}
+            </span>
+          )}
+          <span style={{
+            fontSize: 13, color: "#1f2937", fontWeight: 700,
+            maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {displayName}
+          </span>
+        </div>
+        {/* Dropdown chevron */}
+        <FontAwesomeIcon
+          icon={faChevronDown}
+          style={{
+            fontSize: 11,
+            color: "#9ca3af",
+            transition: "transform 0.15s",
+            transform: open ? "rotate(180deg)" : "none",
+          }}
+        />
+      </button>
+
+      {/* Hierarchical popover: Brand → Product → Event */}
+      {open && (
+        <div
+          style={{
+            marginTop: 6,
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.14), 0 4px 8px rgba(0,0,0,0.04)",
+            padding: 6,
+            maxHeight: "70vh",
+            overflowY: "auto",
+          }}
+        >
+          {/* BRAND section */}
+          <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>
+            品牌
+          </p>
+          {brands.length === 0 ? (
+            <p style={{ fontSize: 12, color: "#9ca3af", padding: "6px 10px" }}>還沒建立品牌</p>
+          ) : brands.map((b: any) => {
+            const isActive = b.id === scope.brandId;
+            return (
+              <button
+                key={b.id}
+                onClick={() => {
+                  setScope({ brandId: b.id, productId: null, eventId: null });
+                  setOpen(false);
+                }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 8,
+                  padding: "6px 10px", border: "none", borderRadius: 6,
+                  background: isActive ? "rgba(124,58,237,0.08)" : "transparent",
+                  cursor: "pointer", textAlign: "left",
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f9fafb"; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{
+                  width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                  background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                  color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 700, overflow: "hidden",
+                }}>
+                  {b.logoUrl ? <img src={b.logoUrl} alt={b.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (b.name?.charAt(0) ?? "?")}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: isActive ? 600 : 500, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {b.name}
+                </span>
+                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: "#7c3aed" }} />}
+              </button>
+            );
+          })}
+
+          {/* PRODUCT section (only when brand selected) */}
+          {scope.brandId && products.length > 0 && (
+            <>
+              <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
+              <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
+                產品 / Product
+              </p>
+              {scope.productId && (
+                <button
+                  onClick={() => { setScope({ ...scope, productId: null, eventId: null }); setOpen(false); }}
+                  style={{
+                    width: "100%", padding: "4px 10px", border: "none", borderRadius: 6,
+                    background: "transparent", cursor: "pointer", textAlign: "left",
+                    fontSize: 11, color: "#9ca3af",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  ← 不限定產品
+                </button>
+              )}
+              {products.map((p: any) => {
+                const isActive = p.id === scope.productId;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => { setScope({ brandId: scope.brandId, productId: p.id, eventId: null }); setOpen(false); }}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 8,
+                      padding: "5px 10px", border: "none", borderRadius: 6,
+                      background: isActive ? "rgba(22,163,74,0.08)" : "transparent",
+                      cursor: "pointer", textAlign: "left",
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f9fafb"; }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: 3, background: isActive ? "#16a34a" : "#d1d5db", flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: isActive ? 600 : 500, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.name}
+                    </span>
+                    {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: "#16a34a" }} />}
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {/* EVENT section (only when brand selected) */}
+          {scope.brandId && events.length > 0 && (
+            <>
+              <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
+              <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
+                活動 / Event
+              </p>
+              {scope.eventId && (
+                <button
+                  onClick={() => { setScope({ ...scope, eventId: null }); setOpen(false); }}
+                  style={{
+                    width: "100%", padding: "4px 10px", border: "none", borderRadius: 6,
+                    background: "transparent", cursor: "pointer", textAlign: "left",
+                    fontSize: 11, color: "#9ca3af",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  ← 不限定活動
+                </button>
+              )}
+              {events.map((ev: any) => {
+                const isActive = ev.id === scope.eventId;
+                return (
+                  <button
+                    key={ev.id}
+                    onClick={() => {
+                      // Auto-bind brand from event row + product if single
+                      const evBrandId = ev.brandId ?? scope.brandId;
+                      const productIds: number[] = ev.productIds ?? [];
+                      const evProductId = productIds.length === 1 ? productIds[0] : (ev.productId ?? scope.productId);
+                      setScope({ brandId: evBrandId, productId: evProductId ?? null, eventId: ev.id });
+                      setOpen(false);
+                    }}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 8,
+                      padding: "5px 10px", border: "none", borderRadius: 6,
+                      background: isActive ? "rgba(37,99,235,0.08)" : "transparent",
+                      cursor: "pointer", textAlign: "left",
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f9fafb"; }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: 3, background: isActive ? "#2563eb" : "#d1d5db", flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: isActive ? 600 : 500, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {ev.name}
+                    </span>
+                    {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: "#2563eb" }} />}
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {/* Add new */}
+          <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
+          <button
+            onClick={() => { onNavigate("/brands"); setOpen(false); }}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 8,
+              padding: "6px 10px", border: "none", borderRadius: 6,
+              background: "transparent", cursor: "pointer", textAlign: "left",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          >
+            <span style={{
+              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+              background: "#f3f4f6", color: "#6b7280",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12,
+            }}>
+              <FontAwesomeIcon icon={faPlus} />
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: 500, color: "#374151" }}>新增品牌 / 產品 / 活動</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BrandSwitcherButton({
   brands, activeBrandId, sidebarCollapsed, onPickBrand, onAddBrand,
 }: {
