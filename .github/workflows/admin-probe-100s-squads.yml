@@ -75,9 +75,8 @@ jobs:
             . ./.env
             set +a
 
-            cat > /tmp/probe-squads.ts <<'TS'
-            // Probe 18 100s squads: load each, resolve all step agents, check
-            // tier=100s scout hook integration.
+            cat > /opt/marketing-os/app/skills/ai-talent/probe-squads-tmp.ts <<'TS'
+            // Probe scout for 桂冠 brand — does real market data come back?
             import localPool from "./server/localDb";
             import { ALL_100S_SQUADS } from "./server/_core/quickTask100Squads";
             import { fetchViralPatterns } from "./server/_core/socialListeningScout";
@@ -145,4 +144,6 @@ jobs:
               console.log("Phase 2 待辦：在 stepExecute step-0 自動跑 scout，把節慶/熱點注入後續 step 的 prompt。");
             })().catch((e) => { console.error("probe crashed:", e?.message ?? e); process.exit(1); });
             TS
-            npx tsx /tmp/probe-squads.ts 2>&1
+            cd /opt/marketing-os/app/skills/ai-talent
+            npx tsx ./probe-squads-tmp.ts 2>&1
+            rm -f ./probe-squads-tmp.ts
