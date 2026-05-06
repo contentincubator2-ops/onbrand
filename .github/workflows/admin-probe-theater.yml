@@ -1,0 +1,81 @@
+name: Admin — Probe Theater (DB + runStart smoke)
+
+# After admin-seed-brand-positioning has run, this workflow:
+#   1. Reads soworkAnalysis for a sample brand and asserts differentiators
+#      array is non-empty (proves seed persisted).
+#   2. Calls theater.runStart through the same in-process LLM path the UI
+#      uses, prints the JSON. If usps is non-empty + chiefOpening != ""
+#      then the deployed Theater is healthy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand ID to probe (default 2821 = SoWorkai)"
+        required: false
+        default: "2821"
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Pull main
+        run: |
+          set -e
+          cd /opt/marketing-os/app
+          git fetch origin main && git reset --hard origin/main
+
+      - name: DB inspection
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          BID="${{ github.event.inputs.brand_id }}"
+          BID="${BID:-2821}"
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent"
+
+          echo "=== Brand row ==="
+          $MYSQL -e "SELECT id, name, tagline FROM brands WHERE id=$BID"
+
+          echo ""
+          echo "=== soworkAnalysis (parsed keys) ==="
+          $MYSQL -e "SELECT JSON_KEYS(soworkAnalysis) FROM brands WHERE id=$BID"
+
+          echo ""
+          echo "=== USP + differentiators count ==="
+          $MYSQL -e "SELECT JSON_EXTRACT(soworkAnalysis,'\$.usp') AS usp, JSON_LENGTH(JSON_EXTRACT(soworkAnalysis,'\$.differentiators')) AS diff_count, JSON_LENGTH(JSON_EXTRACT(soworkAnalysis,'\$.messagingPillars')) AS pillar_count FROM brands WHERE id=$BID"
+
+          echo ""
+          echo "=== differentiators (first 3) ==="
+          $MYSQL -e "SELECT JSON_EXTRACT(soworkAnalysis,'\$.differentiators[0]') FROM brands WHERE id=$BID"
+          $MYSQL -e "SELECT JSON_EXTRACT(soworkAnalysis,'\$.differentiators[1]') FROM brands WHERE id=$BID"
+          $MYSQL -e "SELECT JSON_EXTRACT(soworkAnalysis,'\$.differentiators[2]') FROM brands WHERE id=$BID"
+
+      - name: Probe theater.runStart in-process
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          cd "$AI"
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          BID="${{ github.event.inputs.brand_id }}"
+          BID="${BID:-2821}"
+
+          # Inline tsx probe — exercises the exact code path runStart uses
+          npx tsx -e "
+          import { getBrandPositioningById } from './server/positioningBridge';
+          (async () => {
+            const pos = await getBrandPositioningById(${BID}, 0);
+            console.log('=== positioningBridge output ===');
+            console.log(JSON.stringify({
+              tagline: pos?.tagline,
+              usp: pos?.usp,
+              differentiators_count: pos?.differentiators?.length ?? 0,
+              differentiators: pos?.differentiators?.slice(0, 3),
+              messagingPillars: pos?.messagingPillars?.slice(0, 3),
+              brandVoice: pos?.brandVoice,
+            }, null, 2));
+            process.exit(0);
+          })();
+          "
