@@ -48,6 +48,17 @@ const CARD_PALETTES = [
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
+/** Tier accent color (Canva-style — vibrant, distinct per tier).
+ *  30s = teal (quick / fast), 60s = purple (production / depth),
+ *  100s = amber (premium / research-validated). Used for mockup frame
+ *  glow, variant active dot, accordion icon backgrounds. */
+function tierAccent(tier: "30s" | "60s" | "90s" | "100s" | undefined | null): string {
+  if (tier === "60s") return "#7c3aed";   // purple
+  if (tier === "100s") return "#f59e0b";  // amber
+  if (tier === "90s") return "#f59e0b";   // legacy → amber
+  return "#00b4bc";                        // 30s teal (default)
+}
+
 /**
  * Synthesize live stages while orchestra is running (no streaming yet).
  * Maps elapsed ms → which stages should be "running" / "done".
@@ -551,7 +562,14 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                       {activeTask.agent ? `${activeTask.agent.name} · ${activeTask.agent.title}` : activeTask.description}
                     </p>
                   </div>
-                  <span className="text-tiny text-default-400 tabular-nums">{activeTask.tier}</span>
+                  <span
+                    className="text-[10px] font-bold tabular-nums px-2.5 py-1 rounded-full text-white shadow-sm"
+                    style={{
+                      background: `linear-gradient(135deg, ${tierAccent(activeTask.tier)}, ${tierAccent(activeTask.tier)}cc)`,
+                    }}
+                  >
+                    {activeTask.tier}
+                  </span>
                 </div>
               </ModalHeader>
               <ModalBody>
@@ -676,10 +694,23 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                 ) : (
                   <>
                     <Button variant="light" onPress={closeTask}>關閉</Button>
-                    <Button variant="flat" onPress={() => { setOutput(null); setPrimaryAnswer(primaryAnswer); }} startContent={<FontAwesomeIcon icon={faRotateRight} />}>
+                    <Button
+                      variant="flat"
+                      onPress={() => { setOutput(null); setPrimaryAnswer(primaryAnswer); }}
+                      startContent={<FontAwesomeIcon icon={faRotateRight} />}
+                      className="hover:scale-[1.02] transition"
+                    >
                       重做
                     </Button>
-                    <Button color="primary" onPress={handleCopy} startContent={<FontAwesomeIcon icon={faClipboard} />}>
+                    <Button
+                      onPress={handleCopy}
+                      startContent={<FontAwesomeIcon icon={faClipboard} />}
+                      className="font-semibold hover:scale-[1.02] transition"
+                      style={{
+                        background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}dd)`,
+                        color: "white",
+                      }}
+                    >
                       複製全文
                     </Button>
                   </>
@@ -842,45 +873,6 @@ function OutputCarousel({
         )}
       </div>
 
-      {/* 30s tier ribbon (always visible, takes 1 line). 60s/100s collapsed by default. */}
-      {orchestraStages && orchestraStages.length > 0 && (
-        activeTask.tier === "30s" && !orchestraStages.find((s: any) => s.key === "extras" || s.key === "qa") ? (
-          <div className="border-t border-b border-default-100 py-1.5">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-default-500">
-              {orchestraStages.map((s: any, i: number) => (
-                <span key={s.key} className="flex items-center gap-1.5">
-                  {i > 0 && <span className="text-default-300">·</span>}
-                  <span className={s.status === "failed" ? "text-danger-600" : "text-default-600"}>
-                    {s.label}
-                  </span>
-                  {s.completedAt != null && (
-                    <span className="text-default-400 tabular-nums">{(s.completedAt / 1000).toFixed(1)}s</span>
-                  )}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : pipelineExpanded ? (
-          <StagePipelineView
-            stages={orchestraStages}
-            captionAgent={agentMeta}
-            imageAgent={imageAgentMeta}
-            tier={(orchestraStages.find((s: any) => s.key === "scout") ? "100s" : "60s") as any}
-          />
-        ) : null
-      )}
-
-      {/* URL provenance — 已讀的連結，灰階呈現 */}
-      {fetchedUrl && (
-        <div className="flex items-center gap-2 text-tiny text-default-500 border-b border-default-100 pb-2">
-          <span className="text-default-700">✓ 已讀過連結</span>
-          <span className="text-default-400 truncate flex-1">
-            {fetchedUrl.title ?? fetchedUrl.url}
-          </span>
-          <span className="text-default-400 tabular-nums">{fetchedUrl.chars.toLocaleString()} 字</span>
-        </div>
-      )}
-
       {!slide.caption && (
         <Card className="bg-warning-50 border border-warning-200">
           <CardBody className="text-warning-800 text-tiny py-2 px-3">
@@ -889,239 +881,356 @@ function OutputCarousel({
         </Card>
       )}
 
-      {/* ─── MAIN: mockup centered, prominent side-flanking chevrons ─── */}
-      <div className="relative flex items-stretch gap-2 mt-2">
-        {/* Left chevron — only when more than 1 variant */}
-        {total > 1 && (
-          <button
-            onClick={() => setIdx(Math.max(0, idx - 1))}
-            disabled={idx === 0}
-            className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-medium transition ${
-              idx === 0
-                ? "opacity-20 cursor-not-allowed"
-                : "bg-default-100 hover:bg-default-200 active:bg-default-300 cursor-pointer"
-            }`}
-            aria-label="上一個版本"
-          >
-            <FontAwesomeIcon icon={faChevronLeft} className="text-default-700 text-medium" />
-          </button>
-        )}
-
-        {/* Centered mockup */}
-        <div className="flex-1 min-w-0 flex justify-center">
-          {mockupVariant && (
-            <div className="w-full max-w-[480px]">
-              <PlatformMockup
-                variant={mockupVariant}
-                title={output.title ?? ""}
-                brief={output.description ?? ""}
-                brandName={brandName}
-                brandLogoUrl={brandLogoUrl}
-                liveCaption={slide.caption}
-                liveTitle={output.title}
-                liveDescription={output.description}
-                liveCta={output.cta}
-                liveHashtags={slide.hashtags}
-                liveImageStyle={slide.imageStyle}
-                liveImageUrl={slide.imageUrl ?? undefined}
-                liveImageStatus={slide.imageStatus}
-                liveVideoStyle={output.video_style_direction?.summary}
-                ogCard={fetchedUrl?.og ? {
-                  url: fetchedUrl.url,
-                  image: fetchedUrl.og.image,
-                  title: fetchedUrl.og.title,
-                  description: fetchedUrl.og.description,
-                  siteName: fetchedUrl.og.site_name,
-                  domain: fetchedUrl.og.domain,
-                } : undefined}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Right chevron */}
-        {total > 1 && (
-          <button
-            onClick={() => setIdx(Math.min(total - 1, idx + 1))}
-            disabled={idx === total - 1}
-            className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-medium transition ${
-              idx === total - 1
-                ? "opacity-20 cursor-not-allowed"
-                : "bg-default-100 hover:bg-default-200 active:bg-default-300 cursor-pointer"
-            }`}
-            aria-label="下一個版本"
-          >
-            <FontAwesomeIcon icon={faChevronRight} className="text-default-700 text-medium" />
-          </button>
-        )}
-      </div>
-
-      {/* Variant indicator strip — directly below mockup */}
-      {total > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-1">
-          <span className="text-small font-semibold text-default-800">{slide.label}</span>
-          {slide.qa && (
-            <span
-              title={slide.qa.comment ?? ""}
-              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                slide.qa.status === "pass" ? "text-success-700 bg-success-50" : "text-warning-700 bg-warning-50"
-              }`}
-            >
-              {slide.qa.status === "pass" ? "✓ QA pass" : "⚠ QA flag"}
-              {typeof slide.qa.score === "number" ? ` ${Math.round(slide.qa.score)}` : ""}
-            </span>
-          )}
-          <span className="text-tiny text-default-500 tabular-nums">
-            {idx + 1} / {total}
-          </span>
-          <div className="flex gap-1.5">
-            {slides.map((_, i) => (
+      {/* ═══ MAIN GRID: mockup center + variant strip right (Midjourney) ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr,180px] gap-4">
+        {/* ── COLUMN A: Mockup with prev/next chevrons + variant indicator ── */}
+        <div className="space-y-3">
+          <div className="relative flex items-stretch gap-2">
+            {total > 1 && (
               <button
-                key={i}
-                onClick={() => setIdx(i)}
-                className={`h-2 rounded-full transition ${
-                  i === idx ? "bg-default-800 w-6" : "bg-default-300 hover:bg-default-400 w-2"
+                onClick={() => setIdx(Math.max(0, idx - 1))}
+                disabled={idx === 0}
+                className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-2xl transition ${
+                  idx === 0 ? "opacity-20 cursor-not-allowed" : "bg-default-100 hover:bg-default-200 active:bg-default-300"
                 }`}
-                aria-label={`切到版本 ${i + 1}`}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Hint when brand has no logo — points to one-click FB fetch */}
-      {brandId && !brandLogoUrl && (
-        <button
-          onClick={() => setFbLogoModalOpen(true)}
-          className="w-full flex items-center gap-2 text-tiny text-default-500 bg-default-50 hover:bg-default-100 transition border border-dashed border-default-300 rounded-medium px-3 py-2"
-        >
-          <FontAwesomeIcon icon={faFacebookF} className="text-default-400" />
-          <span className="flex-1 text-left">
-            這個品牌還沒粉專頭像 — <span className="text-default-700 font-medium">點此一鍵抓取</span>
-          </span>
-          <FontAwesomeIcon icon={faChevronRight} className="text-default-400 text-[10px]" />
-        </button>
-      )}
-
-      {/* Inline edit textarea — placed RIGHT BELOW the mockup so the link is obvious */}
-      {slide?.caption && (
-        <div className="space-y-2 border border-default-200 rounded-medium p-3 bg-default-50">
-          <div className="flex items-center justify-between">
-            <span className="text-tiny font-medium text-default-700">
-              <FontAwesomeIcon icon={faPenNib as any} className="mr-1 text-default-500" />
-              直接編輯這個版本（mockup 即時更新）
-            </span>
-            {isEdited && (
-              <button
-                onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
-                className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
+                aria-label="上一個版本"
               >
-                還原 AI 原版
+                <FontAwesomeIcon icon={faChevronLeft} className="text-default-700 text-medium" />
+              </button>
+            )}
+            {/* Centered mockup with Canva-style soft frame */}
+            <div className="flex-1 min-w-0 flex justify-center">
+              {mockupVariant && (
+                <div
+                  className="w-full max-w-[480px] rounded-2xl overflow-hidden shadow-md"
+                  style={{
+                    background: "white",
+                    boxShadow: `0 8px 32px -12px ${tierAccent(activeTask.tier)}40, 0 0 0 1px ${tierAccent(activeTask.tier)}20`,
+                  }}
+                >
+                  <PlatformMockup
+                    variant={mockupVariant}
+                    title={output.title ?? ""}
+                    brief={output.description ?? ""}
+                    brandName={brandName}
+                    brandLogoUrl={brandLogoUrl}
+                    liveCaption={slide.caption}
+                    liveTitle={output.title}
+                    liveDescription={output.description}
+                    liveCta={output.cta}
+                    liveHashtags={slide.hashtags}
+                    liveImageStyle={slide.imageStyle}
+                    liveImageUrl={slide.imageUrl ?? undefined}
+                    liveImageStatus={slide.imageStatus}
+                    liveVideoStyle={output.video_style_direction?.summary}
+                    ogCard={fetchedUrl?.og ? {
+                      url: fetchedUrl.url,
+                      image: fetchedUrl.og.image,
+                      title: fetchedUrl.og.title,
+                      description: fetchedUrl.og.description,
+                      siteName: fetchedUrl.og.site_name,
+                      domain: fetchedUrl.og.domain,
+                    } : undefined}
+                  />
+                </div>
+              )}
+            </div>
+            {total > 1 && (
+              <button
+                onClick={() => setIdx(Math.min(total - 1, idx + 1))}
+                disabled={idx === total - 1}
+                className={`flex-shrink-0 w-10 sm:w-12 self-stretch flex items-center justify-center rounded-2xl transition ${
+                  idx === total - 1 ? "opacity-20 cursor-not-allowed" : "bg-default-100 hover:bg-default-200 active:bg-default-300"
+                }`}
+                aria-label="下一個版本"
+              >
+                <FontAwesomeIcon icon={faChevronRight} className="text-default-700 text-medium" />
               </button>
             )}
           </div>
-          <Textarea
-            value={slide.caption}
-            onValueChange={(v) => setEdits((e) => ({ ...e, [idx]: v }))}
-            minRows={4}
-            maxRows={10}
-            classNames={{ input: "text-small leading-relaxed font-sans" }}
-          />
-        </div>
-      )}
 
-      {/* QA reviewer block — 60s/100s tier shows Jordan Hayes' review per slide */}
-      {slide?.qa && slide.qa.comment && (
-        <div className={`border rounded-medium px-3 py-2 text-tiny ${
-          slide.qa.status === "pass"
-            ? "border-success-200 bg-success-50 text-success-800"
-            : "border-warning-200 bg-warning-50 text-warning-800"
-        }`}>
-          <div className="flex items-center gap-2 mb-1 font-semibold">
-            <span>{slide.qa.status === "pass" ? "✓" : "⚠"}</span>
-            <span>Jordan Hayes（QA reviewer）</span>
-            {typeof slide.qa.score === "number" && (
-              <span className="text-default-400 tabular-nums">{Math.round(slide.qa.score)}/100</span>
-            )}
-          </div>
-          <p className="leading-relaxed">{slide.qa.comment}</p>
-          {slide.qa.suggestions && slide.qa.suggestions.length > 0 && (
-            <ul className="mt-1 space-y-0.5 list-disc list-inside text-[11px] opacity-90">
-              {slide.qa.suggestions.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* 60s/100s production extras package — posting time / reply templates / followup */}
-      {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost || slide.extras.compareTable || slide.extras.timingAdvice || slide.extras.legalCheck) && (
-        <div className="border border-default-200 rounded-medium bg-default-50 p-3 space-y-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-tiny font-semibold text-default-700">📦 Production package</span>
-            <span className="text-[10px] text-default-400">(60s 完整包)</span>
-          </div>
-
-          {slide.extras.postingTime && (
-            <div className="flex items-start gap-2 text-tiny">
-              <span className="text-default-500 shrink-0 w-16">⏰ 發文時段</span>
-              <span className="text-default-800">{slide.extras.postingTime}</span>
-            </div>
-          )}
-
-          {slide.extras.followupPost && (
-            <div className="flex items-start gap-2 text-tiny">
-              <span className="text-default-500 shrink-0 w-16">📅 24h 跟進</span>
-              <span className="text-default-800 whitespace-pre-line leading-relaxed flex-1">{slide.extras.followupPost}</span>
-            </div>
-          )}
-
-          {slide.extras.replyTemplates && slide.extras.replyTemplates.length > 0 && (
-            <div>
-              <p className="text-tiny text-default-500 mb-1.5">💬 留言回覆模板（{slide.extras.replyTemplates.length} 組）</p>
-              <div className="space-y-1.5 pl-2 border-l-2 border-default-300">
-                {slide.extras.replyTemplates.slice(0, 5).map((rt, i) => (
-                  <div key={i} className="text-tiny">
-                    <p className="text-default-500">用戶：{rt.userSays}</p>
-                    <p className="text-default-800 mt-0.5">你回：{rt.yourReply}</p>
-                  </div>
+          {/* Variant indicator: label + QA chip + 1/N + dot strip */}
+          {total > 1 && (
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-small font-semibold text-default-800">{slide.label}</span>
+              {slide.qa && (
+                <span
+                  title={slide.qa.comment ?? ""}
+                  className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    slide.qa.status === "pass" ? "text-success-700 bg-success-50" : "text-warning-700 bg-warning-50"
+                  }`}
+                >
+                  {slide.qa.status === "pass" ? "✓ QA" : "⚠ QA"}
+                  {typeof slide.qa.score === "number" ? ` ${Math.round(slide.qa.score)}` : ""}
+                </span>
+              )}
+              <span className="text-tiny text-default-500 tabular-nums">
+                {idx + 1} / {total}
+              </span>
+              <div className="flex gap-1.5">
+                {slides.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setIdx(i)}
+                    className={`h-2 rounded-full transition ${
+                      i === idx ? "w-6" : "w-2 bg-default-300 hover:bg-default-400"
+                    }`}
+                    style={i === idx ? { background: tierAccent(activeTask.tier) } : undefined}
+                    aria-label={`切到版本 ${i + 1}`}
+                  />
                 ))}
               </div>
             </div>
           )}
 
-          {/* FB 60s specialty role outputs — task #10/11/12 only */}
-          {slide.extras.compareTable && (
-            <div className="border-t border-default-200 pt-2.5">
-              <p className="text-tiny text-default-500 mb-1.5">🔁 爆款對照分析（Compare Editor）</p>
-              <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.compareTable}</p>
+          {/* Inline edit textarea — directly under mockup, Canva-soft frame */}
+          {slide?.caption && (
+            <div className="rounded-2xl border border-default-200 bg-white shadow-sm p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-tiny font-semibold text-default-700 flex items-center gap-1.5">
+                  <FontAwesomeIcon icon={faPenNib} className="text-default-500" />
+                  直接編輯（mockup 即時更新）
+                </span>
+                {isEdited && (
+                  <button
+                    onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
+                    className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
+                  >
+                    還原 AI 原版
+                  </button>
+                )}
+              </div>
+              <Textarea
+                value={slide.caption}
+                onValueChange={(v) => setEdits((e) => ({ ...e, [idx]: v }))}
+                minRows={4}
+                maxRows={10}
+                classNames={{ input: "text-small leading-relaxed font-sans" }}
+              />
             </div>
           )}
-          {slide.extras.timingAdvice && (
-            <div className="border-t border-default-200 pt-2.5">
-              <p className="text-tiny text-default-500 mb-1.5">⏱ 時效性顧問（Timing Advisor）</p>
-              <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.timingAdvice}</p>
-            </div>
-          )}
-          {slide.extras.legalCheck && (
-            <div className="border-t border-default-200 pt-2.5">
-              <p className="text-tiny text-default-500 mb-1.5">⚖ 法務 / 倫理檢核（Legal Assistant）</p>
-              <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.legalCheck}</p>
-            </div>
+
+          {/* Brand logo hint (when missing) */}
+          {brandId && !brandLogoUrl && (
+            <button
+              onClick={() => setFbLogoModalOpen(true)}
+              className="w-full flex items-center gap-2 text-tiny text-default-500 bg-default-50 hover:bg-default-100 transition border border-dashed border-default-300 rounded-2xl px-3 py-2"
+            >
+              <FontAwesomeIcon icon={faFacebookF} className="text-default-400" />
+              <span className="flex-1 text-left">
+                這個品牌還沒粉專頭像 — <span className="text-default-700 font-medium">點此一鍵抓取</span>
+              </span>
+              <FontAwesomeIcon icon={faChevronRight} className="text-default-400 text-[10px]" />
+            </button>
           )}
         </div>
+
+        {/* ── COLUMN B: Vertical variant thumbnail strip (Midjourney) ── */}
+        {total > 1 && (
+          <div className="lg:sticky lg:top-2 lg:self-start space-y-2 max-h-[calc(92vh-200px)] overflow-y-auto pr-1">
+            <p className="text-[10px] font-semibold tracking-widest text-default-500 uppercase pb-1 sticky top-0 bg-white">
+              {total} 個版本
+            </p>
+            {slides.map((s, i) => {
+              const active = i === idx;
+              const initials = (s.label || `${i + 1}`).slice(0, 2);
+              return (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  className={`w-full text-left rounded-xl border transition flex items-start gap-2 p-2 ${
+                    active
+                      ? "shadow-md ring-2"
+                      : "border-default-200 hover:border-default-300 hover:shadow-sm"
+                  }`}
+                  style={active ? {
+                    background: `${tierAccent(activeTask.tier)}10`,
+                    borderColor: tierAccent(activeTask.tier),
+                    boxShadow: `0 0 0 2px ${tierAccent(activeTask.tier)}40`,
+                  } : undefined}
+                >
+                  <div
+                    className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${tierAccent(activeTask.tier)}, ${tierAccent(activeTask.tier)}aa)` }}
+                  >
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-tiny font-semibold truncate text-default-800">{s.label}</p>
+                    <p className="text-[10px] text-default-500 line-clamp-2 leading-snug mt-0.5">
+                      {s.caption ? s.caption.slice(0, 50) + "…" : "（無內容）"}
+                    </p>
+                    {s.qa && (
+                      <span
+                        className={`inline-block mt-1 text-[9px] font-semibold uppercase ${
+                          s.qa.status === "pass" ? "text-success-600" : "text-warning-600"
+                        }`}
+                      >
+                        {s.qa.status === "pass" ? "✓" : "⚠"} {s.qa.status}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ═══ ACCORDIONS — collapsible details (60s/100s only sections) ═══ */}
+      {/* Each accordion uses native <details> for zero-dep, with Canva-style colorful headers. */}
+
+      {/* QA reviewer (60s/100s) */}
+      {slide?.qa && slide.qa.comment && (
+        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group" open>
+          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: slide.qa.status === "pass" ? "#10b98120" : "#f59e0b20" }}>
+              {slide.qa.status === "pass" ? "✓" : "⚠"}
+            </span>
+            <span>Jordan Hayes 審核</span>
+            <span className={`text-tiny font-normal ${slide.qa.status === "pass" ? "text-success-600" : "text-warning-600"}`}>
+              {typeof slide.qa.score === "number" ? `${Math.round(slide.qa.score)}/100` : (slide.qa.status === "pass" ? "PASS" : "FLAG")}
+            </span>
+            <FontAwesomeIcon icon={faChevronRight} className="ml-auto text-tiny text-default-400 group-open:rotate-90 transition-transform" />
+          </summary>
+          <div className="px-4 pb-3 pt-1 text-tiny text-default-700 leading-relaxed border-t border-default-100">
+            <p>{slide.qa.comment}</p>
+            {slide.qa.suggestions && slide.qa.suggestions.length > 0 && (
+              <ul className="mt-1.5 space-y-0.5 list-disc list-inside text-[11px] opacity-80">
+                {slide.qa.suggestions.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
+              </ul>
+            )}
+          </div>
+        </details>
       )}
 
-      {/* (inline editor moved up — placed directly below mockup for clear visual link) */}
+      {/* Production package (60s/100s) */}
+      {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost || slide.extras.compareTable || slide.extras.timingAdvice || slide.extras.legalCheck) && (
+        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group" open>
+          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: "#7c3aed20" }}>📦</span>
+            <span>Production package</span>
+            <span className="text-tiny font-normal text-default-500">
+              {[
+                slide.extras.replyTemplates?.length ? `${slide.extras.replyTemplates.length} 留言模板` : null,
+                slide.extras.postingTime ? "發文時段" : null,
+                slide.extras.followupPost ? "跟進貼文" : null,
+                slide.extras.compareTable ? "對照分析" : null,
+                slide.extras.timingAdvice ? "時效檢核" : null,
+                slide.extras.legalCheck ? "法務檢核" : null,
+              ].filter(Boolean).join(" · ")}
+            </span>
+            <FontAwesomeIcon icon={faChevronRight} className="ml-auto text-tiny text-default-400 group-open:rotate-90 transition-transform" />
+          </summary>
+          <div className="px-4 pb-3 pt-2 text-tiny space-y-2.5 border-t border-default-100">
+            {slide.extras.postingTime && (
+              <div className="flex items-start gap-2">
+                <span className="text-default-500 shrink-0 w-16">⏰ 發文時段</span>
+                <span className="text-default-800">{slide.extras.postingTime}</span>
+              </div>
+            )}
+            {slide.extras.followupPost && (
+              <div className="flex items-start gap-2">
+                <span className="text-default-500 shrink-0 w-16">📅 24h 跟進</span>
+                <span className="text-default-800 whitespace-pre-line leading-relaxed flex-1">{slide.extras.followupPost}</span>
+              </div>
+            )}
+            {slide.extras.replyTemplates && slide.extras.replyTemplates.length > 0 && (
+              <div>
+                <p className="text-default-500 mb-1.5">💬 留言回覆模板（{slide.extras.replyTemplates.length} 組）</p>
+                <div className="space-y-1.5 pl-2 border-l-2 border-default-200">
+                  {slide.extras.replyTemplates.slice(0, 5).map((rt, i) => (
+                    <div key={i}>
+                      <p className="text-default-500">用戶：{rt.userSays}</p>
+                      <p className="text-default-800 mt-0.5">你回：{rt.yourReply}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {slide.extras.compareTable && (
+              <div className="border-t border-default-100 pt-2">
+                <p className="text-default-500 mb-1">🔁 爆款對照分析</p>
+                <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.compareTable}</p>
+              </div>
+            )}
+            {slide.extras.timingAdvice && (
+              <div className="border-t border-default-100 pt-2">
+                <p className="text-default-500 mb-1">⏱ 時效性顧問</p>
+                <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.timingAdvice}</p>
+              </div>
+            )}
+            {slide.extras.legalCheck && (
+              <div className="border-t border-default-100 pt-2">
+                <p className="text-default-500 mb-1">⚖ 法務 / 倫理檢核</p>
+                <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.legalCheck}</p>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
 
-      {/* Actions row — next to mockup */}
+      {/* Agent collab pipeline (all tiers) */}
+      {orchestraStages && orchestraStages.length > 0 && (
+        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group">
+          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: `${tierAccent(activeTask.tier)}20` }}>🎼</span>
+            <span>Agent 協作流程</span>
+            <span className="text-tiny font-normal text-default-500">
+              {doneStages}/{stageCount} agents · {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : ""}
+            </span>
+            <FontAwesomeIcon icon={faChevronRight} className="ml-auto text-tiny text-default-400 group-open:rotate-90 transition-transform" />
+          </summary>
+          <div className="p-3 border-t border-default-100">
+            {activeTask.tier === "30s" && !orchestraStages.find((s: any) => s.key === "extras" || s.key === "qa") ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-default-500">
+                {orchestraStages.map((s: any, i: number) => (
+                  <span key={s.key} className="flex items-center gap-1.5">
+                    {i > 0 && <span className="text-default-300">·</span>}
+                    <span className={s.status === "failed" ? "text-danger-600" : "text-default-600"}>{s.label}</span>
+                    {s.completedAt != null && <span className="text-default-400 tabular-nums">{(s.completedAt / 1000).toFixed(1)}s</span>}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <StagePipelineView
+                stages={orchestraStages}
+                captionAgent={agentMeta}
+                imageAgent={imageAgentMeta}
+                tier={(orchestraStages.find((s: any) => s.key === "scout") ? "100s" : "60s") as any}
+              />
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* URL provenance (when present) */}
+      {fetchedUrl && (
+        <details className="rounded-2xl border border-default-200 bg-white overflow-hidden group">
+          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center gap-2 text-small font-semibold hover:bg-default-50 transition select-none">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-tiny" style={{ background: "#06b6d420" }}>🔗</span>
+            <span>已讀連結</span>
+            <span className="text-tiny font-normal text-default-500 truncate min-w-0 flex-1">
+              {fetchedUrl.title ?? fetchedUrl.url}
+            </span>
+            <span className="text-tiny font-normal text-default-400 tabular-nums shrink-0">{fetchedUrl.chars.toLocaleString()} 字</span>
+            <FontAwesomeIcon icon={faChevronRight} className="text-tiny text-default-400 group-open:rotate-90 transition-transform" />
+          </summary>
+          <div className="px-4 pb-3 pt-1 text-tiny border-t border-default-100">
+            <a href={fetchedUrl.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline break-all">
+              {fetchedUrl.url}
+            </a>
+          </div>
+        </details>
+      )}
+
+      {/* ═══ Inline action row — secondary actions (primary in modal footer) ═══ */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button
           variant="flat"
           size="sm"
           startContent={<FontAwesomeIcon icon={faClipboard} />}
-          onPress={() => {
-            if (slide?.caption) navigator.clipboard.writeText(slide.caption);
-          }}
+          onPress={() => { if (slide?.caption) navigator.clipboard.writeText(slide.caption); }}
         >
           複製這版{isEdited ? "（已編輯）" : ""}
         </Button>
@@ -1129,10 +1238,7 @@ function OutputCarousel({
           variant="flat"
           size="sm"
           startContent={<FontAwesomeIcon icon={faFolderPlus} />}
-          onPress={() => {
-            // TODO Phase next: open project picker modal
-            window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。\n目前可先「複製這版」貼到專案文件。");
-          }}
+          onPress={() => window.alert("「加到專案」功能將串到 ProjectsPage — 之後接好。\n目前可先「複製這版」貼到專案文件。")}
         >
           加到專案
         </Button>
@@ -1141,16 +1247,10 @@ function OutputCarousel({
           size="sm"
           startContent={<FontAwesomeIcon icon={faCompass} />}
           onPress={() => { window.location.href = "/brands"; }}
-          title="會根據你的品牌設定重新調整口吻 — 不會重設帳號"
+          title="會根據你的品牌設定重新調整口吻"
         >
           🔄 換個語氣
         </Button>
-        {/* Show "用此風格生圖" whenever we have a style brief and no real
-            image yet. Previously hidden when fetchedUrl.og existed (FB link
-            posts use OG card → no image needed) but YT fetchedUrl also
-            populates og.image with the YT thumbnail, which incorrectly hid
-            this button for all YT tasks. New rule: hide only when slide has
-            an actual generated image already (slide.imageUrl). */}
         {slide.imageStyle && !slide.imageUrl && (
           <Button
             variant="flat"
@@ -1158,7 +1258,7 @@ function OutputCarousel({
             startContent={<FontAwesomeIcon icon={faPalette} />}
             onPress={() => setMediaGenOpen(true)}
           >
-            用此風格生圖
+            🎨 用此風格生圖
           </Button>
         )}
       </div>
