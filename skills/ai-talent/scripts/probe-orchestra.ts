@@ -51,7 +51,9 @@ import { RESEARCH_30S_TASKS, RESEARCH_30S_ORCHESTRA } from "../server/_core/quic
   console.log(`Input [${inputKey}]: ${(inputs[inputKey] ?? "").slice(0, 80)}…\n`);
 
   const startedAt = Date.now();
-  const result = await runOrchestra({ template, config, inputs });
+  const tierEnv = (process.env.TIER as "30s" | "60s" | "100s") || "30s";
+  const result = await runOrchestra({ template, config, inputs, tier: tierEnv });
+  console.log(`Tier: ${tierEnv}`);
   const elapsedMs = Date.now() - startedAt;
 
   console.log(`Result (${(elapsedMs / 1000).toFixed(1)}s):`);

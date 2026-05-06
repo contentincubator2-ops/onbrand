@@ -11,6 +11,11 @@ on:
         description: "primary input value (override)"
         required: false
         type: string
+      tier:
+        description: "tier override (30s | 60s | 100s)"
+        required: false
+        type: string
+        default: "30s"
 
 jobs:
   probe:
@@ -32,6 +37,7 @@ jobs:
             # Run the in-process probe (task_id passed via env)
             export TASK_ID="${{ github.event.inputs.task_id }}"
             export TASK_INPUT="${{ github.event.inputs.task_input }}"
+            export TIER="${{ github.event.inputs.tier }}"
             npx tsx scripts/probe-orchestra.ts 2>&1
             exit_code=$?
             echo ""
