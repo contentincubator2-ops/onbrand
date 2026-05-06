@@ -45,9 +45,10 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/100s",      label: "100S",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
-  // Content Generation Theater — replaces 案例 (CJ direction 2026-05-06).
-  // Live waterfall of AI-generated FB / IG / YT cards for the active brand.
-  { to: "/theater",   label: "劇場",     icon: <FontAwesomeIcon icon={faBookBookmark} /> },
+  // 內容企劃台 — replaces 案例 (CJ 2026-05-07). 20-agent cast plans
+  // 6-platform calendar; brain bar shows the active speaker streaming
+  // strategy thoughts. Route /theater kept for backward compat.
+  { to: "/theater",   label: "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
   { to: "/brands",    label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
   // 範本 / 比稿 / 案例 hidden — direct URL access still works (/templates,
   // /boardroom, /playbooks).

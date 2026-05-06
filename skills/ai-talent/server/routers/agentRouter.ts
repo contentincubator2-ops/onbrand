@@ -4,6 +4,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getSoworkDb } from "../db";
 import { sql, eq, and } from "drizzle-orm";
 import { matchAgents } from "../agentMatcher";
+import localPool from "../localDb";
 
 // ── Shared schema (single source of truth — no duplication) ───────────────
 import { soworkAgents } from "../_schemas/soworkAgents";
@@ -128,5 +129,34 @@ export const agentRouter = router({
           }));
 
       return { agents: effectiveAgents, plan, taskType };
+    }),
+
+  /**
+   * Fetch agent metadata for a fixed list of IDs. Used by Theater
+   * (內容企劃台) to preload the 20-person cast's name + title +
+   * avatarUrl in one round-trip.
+   */
+  byIds: protectedProcedure
+    .input(z.object({ ids: z.array(z.number().int().positive()).max(50) }))
+    .query(async ({ input }) => {
+      if (input.ids.length === 0) return [];
+      try {
+        const placeholders = input.ids.map(() => "?").join(",");
+        const [rows]: any = await localPool.execute(
+          `SELECT id, slug, name, title, avatarUrl, primarySkill
+             FROM agents WHERE id IN (${placeholders})`,
+          input.ids,
+        );
+        return (rows as any[]).map((r) => ({
+          id:        Number(r.id),
+          slug:      r.slug ?? null,
+          name:      r.name,
+          title:     r.title,
+          avatarUrl: r.avatarUrl ?? null,
+          primarySkill: r.primarySkill ?? null,
+        }));
+      } catch {
+        return [];
+      }
     }),
 });
