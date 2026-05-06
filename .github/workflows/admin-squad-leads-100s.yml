@@ -1,4 +1,4 @@
-name: Admin — Audit 100s squad existence + leads
+name: Admin — Audit + reassign 100s squad leads
 on:
   workflow_dispatch:
 
@@ -14,109 +14,44 @@ jobs:
           command_timeout: 60s
           script: |
             export MYSQL_PWD="mos_secure_2026"
-            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+            cat > /tmp/audit_squads.sql <<'SQL'
+            SELECT '=== Existing fb-* and ig-* squads ===' AS step;
+            SELECT s.slug, s.is_active, a.id AS lead_id, a.name AS lead_name
+              FROM squads s
+              LEFT JOIN agents a ON a.id = s.lead_agent_id
+             WHERE s.slug LIKE 'fb-%' OR s.slug LIKE 'ig-%'
+             ORDER BY s.slug;
 
-            echo "=== ALL fb-* and ig-* squads in DB ==="
-            $MYSQL -e "
-              SELECT s.slug, s.is_active, a.name AS lead
-                FROM squads s
-                LEFT JOIN agents a ON a.id = s.lead_agent_id
-               WHERE s.slug LIKE 'fb-%' OR s.slug LIKE 'ig-%'
-               ORDER BY s.slug
-            "
-            echo ""
-            echo "=== Which of the 18 expected 100s squads actually exist? ==="
-            $MYSQL -e "
-              SELECT s.slug AS existing_slug, a.name AS lead, a.title
-                FROM squads s
-                LEFT JOIN agents a ON a.id = s.lead_agent_id
-               WHERE s.slug IN (
-                 'fb-monthly-calendar','fb-monthly-calendar-product-promo',
-                 'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
-                 'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
-                 'fb-reels-script','fb-livestream-prep','fb-crisis-comms',
-                 'ig-monthly-calendar-pulizzi','ig-account-reposition','ig-quarterly-strategy',
-                 'ig-event-launch-kit','ig-countdown-series','ig-livestream-prep',
-                 'ig-monthly-analytics'
-               )
-               ORDER BY s.slug
-            "
-            echo ""
-            echo "=== Lead diversity after update ==="
-            echo "(legacy from prev step)"
-            $MYSQL -e "
-              SELECT s.slug AS squad_slug,
-                     a.id AS lead_id, a.name AS lead_name, a.title AS lead_title,
-                     JSON_LENGTH(s.agents) AS team_size,
-                     JSON_EXTRACT(s.agents, '$[*].name') AS member_names
-                FROM squads s
-                LEFT JOIN agents a ON a.id = s.lead_agent_id
-               WHERE s.slug IN (
-                 'fb-monthly-calendar','fb-monthly-calendar-product-promo',
-                 'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
-                 'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
-                 'fb-reels-script','fb-livestream-prep','fb-crisis-comms',
-                 'ig-monthly-calendar-pulizzi','ig-account-reposition','ig-quarterly-strategy',
-                 'ig-event-launch-kit','ig-countdown-series','ig-livestream-prep',
-                 'ig-monthly-analytics'
-               )
-               ORDER BY s.slug
-            " | sed 's/\t/  |  /g'
+            SELECT '=== Updating leads (only WHERE squad exists) ===' AS step;
+            UPDATE squads SET lead_agent_id = 180159 WHERE slug = 'fb-monthly-calendar';
+            UPDATE squads SET lead_agent_id = 60068  WHERE slug = 'fb-monthly-calendar-product-promo';
+            UPDATE squads SET lead_agent_id = 31     WHERE slug = 'fb-event-launch-kit';
+            UPDATE squads SET lead_agent_id = 60007  WHERE slug = 'fb-countdown-series';
+            UPDATE squads SET lead_agent_id = 180030 WHERE slug = 'fb-account-reposition';
+            UPDATE squads SET lead_agent_id = 180186 WHERE slug = 'fb-quarterly-strategy';
+            UPDATE squads SET lead_agent_id = 60030  WHERE slug = 'fb-monthly-analytics';
+            UPDATE squads SET lead_agent_id = 224294 WHERE slug = 'fb-carousel';
+            UPDATE squads SET lead_agent_id = 60029  WHERE slug = 'fb-reels-script';
+            UPDATE squads SET lead_agent_id = 40     WHERE slug = 'fb-livestream-prep';
+            UPDATE squads SET lead_agent_id = 239185 WHERE slug = 'fb-crisis-comms';
+            UPDATE squads SET lead_agent_id = 180166 WHERE slug = 'ig-monthly-calendar-pulizzi';
+            UPDATE squads SET lead_agent_id = 30005  WHERE slug = 'ig-account-reposition';
+            UPDATE squads SET lead_agent_id = 220751 WHERE slug = 'ig-quarterly-strategy';
+            UPDATE squads SET lead_agent_id = 180168 WHERE slug = 'ig-event-launch-kit';
+            UPDATE squads SET lead_agent_id = 60072  WHERE slug = 'ig-countdown-series';
+            UPDATE squads SET lead_agent_id = 180170 WHERE slug = 'ig-livestream-prep';
+            UPDATE squads SET lead_agent_id = 60056  WHERE slug = 'ig-monthly-analytics';
 
-            echo ""
-            echo "=== Reassigning leads (18 squads → 18 distinct domain-matched agents) ==="
-            # Picks domain-matched agents, all distinct. IDs verified to exist in agents table.
-            $MYSQL -e "
-              UPDATE squads SET lead_agent_id = 180159 WHERE slug = 'fb-monthly-calendar';
-              UPDATE squads SET lead_agent_id = 60068  WHERE slug = 'fb-monthly-calendar-product-promo';
-              UPDATE squads SET lead_agent_id = 31     WHERE slug = 'fb-event-launch-kit';
-              UPDATE squads SET lead_agent_id = 60007  WHERE slug = 'fb-countdown-series';
-              UPDATE squads SET lead_agent_id = 180030 WHERE slug = 'fb-account-reposition';
-              UPDATE squads SET lead_agent_id = 180186 WHERE slug = 'fb-quarterly-strategy';
-              UPDATE squads SET lead_agent_id = 60030  WHERE slug = 'fb-monthly-analytics';
-              UPDATE squads SET lead_agent_id = 224294 WHERE slug = 'fb-carousel';
-              UPDATE squads SET lead_agent_id = 60029  WHERE slug = 'fb-reels-script';
-              UPDATE squads SET lead_agent_id = 40     WHERE slug = 'fb-livestream-prep';
-              UPDATE squads SET lead_agent_id = 239185 WHERE slug = 'fb-crisis-comms';
-              UPDATE squads SET lead_agent_id = 180166 WHERE slug = 'ig-monthly-calendar-pulizzi';
-              UPDATE squads SET lead_agent_id = 30005  WHERE slug = 'ig-account-reposition';
-              UPDATE squads SET lead_agent_id = 220751 WHERE slug = 'ig-quarterly-strategy';
-              UPDATE squads SET lead_agent_id = 180168 WHERE slug = 'ig-event-launch-kit';
-              UPDATE squads SET lead_agent_id = 60072  WHERE slug = 'ig-countdown-series';
-              UPDATE squads SET lead_agent_id = 180170 WHERE slug = 'ig-livestream-prep';
-              UPDATE squads SET lead_agent_id = 60056  WHERE slug = 'ig-monthly-analytics';
-            "
+            SELECT '=== After update ===' AS step;
+            SELECT s.slug, a.id AS lead_id, a.name AS lead_name, a.title
+              FROM squads s
+              LEFT JOIN agents a ON a.id = s.lead_agent_id
+             WHERE s.slug LIKE 'fb-%' OR s.slug LIKE 'ig-%'
+             ORDER BY s.slug;
 
-            echo ""
-            echo "=== After update — lead per squad ==="
-            $MYSQL -e "
-              SELECT s.slug AS squad, a.id AS lead_id, a.name AS lead, a.title
-                FROM squads s
-                LEFT JOIN agents a ON a.id = s.lead_agent_id
-               WHERE s.slug IN (
-                 'fb-monthly-calendar','fb-monthly-calendar-product-promo',
-                 'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
-                 'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
-                 'fb-reels-script','fb-livestream-prep','fb-crisis-comms',
-                 'ig-monthly-calendar-pulizzi','ig-account-reposition','ig-quarterly-strategy',
-                 'ig-event-launch-kit','ig-countdown-series','ig-livestream-prep',
-                 'ig-monthly-analytics'
-               )
-               ORDER BY s.slug
-            "
-
-            echo ""
-            echo "=== Lead diversity check (should be 18 distinct) ==="
-            $MYSQL -e "
-              SELECT COUNT(DISTINCT lead_agent_id) AS distinct_leads, COUNT(*) AS total_squads
-                FROM squads
-               WHERE slug IN (
-                 'fb-monthly-calendar','fb-monthly-calendar-product-promo',
-                 'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
-                 'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
-                 'fb-reels-script','fb-livestream-prep','fb-crisis-comms',
-                 'ig-monthly-calendar-pulizzi','ig-account-reposition','ig-quarterly-strategy',
-                 'ig-event-launch-kit','ig-countdown-series','ig-livestream-prep',
-                 'ig-monthly-analytics'
-               )
-            "
+            SELECT '=== Diversity ===' AS step;
+            SELECT COUNT(DISTINCT lead_agent_id) AS distinct_leads, COUNT(*) AS total
+              FROM squads
+             WHERE (slug LIKE 'fb-%' OR slug LIKE 'ig-%') AND lead_agent_id IS NOT NULL;
+            SQL
+            mysql -h localhost -u mos_user mos_db < /tmp/audit_squads.sql 2>&1
