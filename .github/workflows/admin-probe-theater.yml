@@ -21,10 +21,16 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Pull main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          cd /opt/marketing-os/app
-          git fetch origin main && git reset --hard origin/main
+          APP=/opt/marketing-os/app
+          cd "$APP"
+          REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+          git remote set-url origin "$REPO"
+          git fetch origin main
+          git reset --hard origin/main
 
       - name: DB inspection
         run: |
