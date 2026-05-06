@@ -1,0 +1,65 @@
+name: Admin — Find Theater cast (6-platform diverse calendar leads + writers)
+
+# Goal: stage a 內容企劃台 cast where every role is a DIFFERENT person.
+# Already used (must EXCLUDE):
+#   180159 Claire Hsu (chief strategist — fixed)
+#   239180 Stacy Lin, 239181 Vincent Shen, 239182 Phoebe Yang
+#   239183 Aiden Hsu, 239184 Mandy Cheng, 239185 Brian Chou
+#   24 Janet Chang (YT lead — keep)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+            EXCLUDE="id NOT IN (180159,239180,239181,239182,239183,239184,239185,24)"
+
+            echo "=== 1. IG calendar / editorial lead (NOT Phoebe) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(title) LIKE '%instagram%' OR LOWER(title) LIKE '%ig %' OR LOWER(slug) LIKE 'ig-%' OR LOWER(primarySkill) LIKE '%instagram%') AND (LOWER(title) LIKE '%strateg%' OR LOWER(title) LIKE '%calendar%' OR LOWER(title) LIKE '%editorial%' OR LOWER(title) LIKE '%planner%' OR LOWER(primarySkill) LIKE '%calendar%' OR LOWER(primarySkill) LIKE '%editorial%' OR LOWER(primarySkill) LIKE '%plan%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== 2. Threads / 短文 / 串文 lead ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(slug) LIKE '%thread%' OR LOWER(title) LIKE '%thread%' OR LOWER(primarySkill) LIKE '%thread%' OR LOWER(primarySkill) LIKE '%micro-content%' OR LOWER(primarySkill) LIKE '%short-text%' OR LOWER(title) LIKE '%短文%' OR LOWER(primarySkill) LIKE '%conversational%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== 3. LINE OA / messaging / broadcast lead ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(slug) LIKE '%line%' OR LOWER(title) LIKE '%line oa%' OR LOWER(title) LIKE '%line@%' OR LOWER(primarySkill) LIKE '%line-oa%' OR LOWER(primarySkill) LIKE '%messaging%' OR LOWER(primarySkill) LIKE '%broadcast%' OR LOWER(title) LIKE '%通訊軟體%' OR LOWER(title) LIKE '%官方帳號%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== 4. Blog / long-form / SEO writer lead ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(slug) LIKE '%blog%' OR LOWER(slug) LIKE '%long%' OR LOWER(title) LIKE '%blog%' OR LOWER(title) LIKE '%long-form%' OR LOWER(title) LIKE '%longform%' OR LOWER(title) LIKE '%seo%' OR LOWER(primarySkill) LIKE '%longform%' OR LOWER(primarySkill) LIKE '%long-form%' OR LOWER(primarySkill) LIKE '%seo%' OR LOWER(primarySkill) LIKE '%blog%' OR LOWER(title) LIKE '%部落%' OR LOWER(title) LIKE '%專欄%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== 5. Caption writers — IG-flavored (NOT Aiden) ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(primarySkill) LIKE '%caption%' OR LOWER(primarySkill) LIKE '%copy%' OR LOWER(title) LIKE '%copywriter%' OR LOWER(title) LIKE '%文案%') AND (LOWER(title) LIKE '%instagram%' OR LOWER(slug) LIKE 'ig-%') ORDER BY id LIMIT 10"
+
+            echo ""
+            echo "=== 6. Caption writers — Threads-flavored ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(primarySkill) LIKE '%hook%' OR LOWER(primarySkill) LIKE '%conversational%' OR LOWER(primarySkill) LIKE '%punchy%' OR LOWER(title) LIKE '%短文%' OR LOWER(title) LIKE '%即時%') ORDER BY id LIMIT 10"
+
+            echo ""
+            echo "=== 7. Caption writers — LINE / direct messaging ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(primarySkill) LIKE '%direct-response%' OR LOWER(primarySkill) LIKE '%push%' OR LOWER(title) LIKE '%edm%' OR LOWER(title) LIKE '%電子報%' OR LOWER(title) LIKE '%direct%' OR LOWER(primarySkill) LIKE '%conversion-copy%') ORDER BY id LIMIT 10"
+
+            echo ""
+            echo "=== 8. Caption writers — Blog long-form ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(primarySkill) LIKE '%longform%' OR LOWER(primarySkill) LIKE '%long-form%' OR LOWER(primarySkill) LIKE '%seo-writing%' OR LOWER(primarySkill) LIKE '%storytelling%' OR LOWER(title) LIKE '%專欄%' OR LOWER(title) LIKE '%feature writer%' OR LOWER(title) LIKE '%深度%' OR LOWER(primarySkill) LIKE '%narrative%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== 9. Image directors — NOT Mandy, prefer platform diversity ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(title) LIKE '%visual%' OR LOWER(title) LIKE '%art direct%' OR LOWER(title) LIKE '%design%' OR LOWER(title) LIKE '%視覺%' OR LOWER(primarySkill) LIKE '%visual-direct%' OR LOWER(primarySkill) LIKE '%art-direct%' OR LOWER(primarySkill) LIKE '%creative-direct%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== 10. QA reviewer — content / brand safety / fact-check ==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND $EXCLUDE AND (LOWER(title) LIKE '%qa%' OR LOWER(title) LIKE '%review%' OR LOWER(title) LIKE '%editor%' OR LOWER(title) LIKE '%fact%' OR LOWER(title) LIKE '%總編%' OR LOWER(primarySkill) LIKE '%fact-check%' OR LOWER(primarySkill) LIKE '%qa%' OR LOWER(primarySkill) LIKE '%review%' OR LOWER(primarySkill) LIKE '%proofread%') ORDER BY id LIMIT 15"
