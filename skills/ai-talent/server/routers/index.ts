@@ -47,6 +47,7 @@ import { positioningRouter } from "./positioningRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
 import { feedbackRouter } from "./feedbackRouter";
 import { squadLeadRouter } from "./squadLeadRouter";
+import { theaterRouter } from "./theaterRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -99,6 +100,7 @@ export const appRouter = router({
   platformConnect: platformConnectRouter,
   feedback:        feedbackRouter,
   squadLead:       squadLeadRouter,
+  theater:         theaterRouter,
 });
 
 export type AppRouter = typeof appRouter;

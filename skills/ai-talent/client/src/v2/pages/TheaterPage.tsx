@@ -307,6 +307,10 @@ export default function TheaterPage() {
   const castQuery = trpc.agent.byIds.useQuery({ ids: castIds() }, {
     staleTime: 60 * 60_000,
   });
+  // Theater backend
+  const utils = trpc.useUtils();
+  const generateCellMut  = trpc.theater.generateCell.useMutation();
+  const generateImageMut = trpc.theater.generateImage.useMutation();
   const avatarById = useMemo(() => {
     const m = new Map<number, string | null>();
     (castQuery.data ?? []).forEach((a) => m.set(a.id, a.avatarUrl));
@@ -314,16 +318,23 @@ export default function TheaterPage() {
   }, [castQuery.data]);
   const avatarOf = (m: CastMember) => avatarById.get(m.id) ?? null;
 
-  // Cell state map
+  // Cell state map (+ ref mirror so async workers can read latest captions
+  // without re-running the closure on every state change)
   const [cells, setCells] = useState<Map<CellKey, CellState>>(new Map());
+  const cellsRef = useRef<Map<CellKey, CellState>>(new Map());
+  useEffect(() => { cellsRef.current = cells; }, [cells]);
 
   // Brain bar state
   const [running, setRunning] = useState(false);
   const [station, setStation] = useState<BrainStation | null>(null);
 
   // Build the station script when run starts
-  const startRun = () => {
+  const startRun = async () => {
     if (running) return;
+    if (!brandId) {
+      alert("請先選擇品牌");
+      return;
+    }
     if (activePlatforms.length === 0) {
       alert("請至少選擇一個社群平台");
       return;
@@ -338,12 +349,31 @@ export default function TheaterPage() {
     }
     setCells(fresh);
 
-    // 1) Chief opening monologue
+    // 0) Fetch run plan from backend (positioning → USP pool + chief opening)
+    let runPlan: { usps: string[]; chiefOpening: string; positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null };
+    try {
+      runPlan = await utils.theater.runStart.fetch({
+        brandId,
+        platforms: activePlatforms,
+        importantDates: importantDates.map((d) => ({ date: d.date, name: d.name })),
+      });
+    } catch (e) {
+      console.error("[theater] runStart failed:", e);
+      setRunning(false);
+      alert("無法載入品牌定位 — 請先完成品牌定位再試");
+      return;
+    }
+
+    const { usps, chiefOpening, positioning } = runPlan;
+    const brandTagline = positioning?.tagline ?? null;
+    const brandVoice   = positioning?.brandVoice ?? null;
+
+    // 1) Chief opening monologue (real LLM-generated)
     const stations: BrainStation[] = [
       {
         member: getChief(),
-        thought: `本月有 ${importantDates.length || "些"} 個重要日子要顧，先把 USP 拆給每個平台。一篇貼文 = 一個 USP，這是底線。${activePlatforms.map((p) => PLATFORM_META[p].short).join("、")} 我都點到位了，等等各組接手。`,
-        durationMs: 5500,
+        thought: chiefOpening || `本週 USP 候選：${usps.join("、")}。一篇貼文 = 一個 USP。${activePlatforms.map((p) => PLATFORM_META[p].short).join("、")} 各組準備接手。`,
+        durationMs: 6500,
       },
     ];
 
@@ -387,8 +417,8 @@ export default function TheaterPage() {
       durationMs: 5000,
     });
 
-    // Drive the station carousel + cell progression
-    runStations(stations);
+    // Drive the station carousel + cell progression (real backend)
+    runStations(stations, { usps, brandTagline, brandVoice });
   };
 
   const stopRun = () => {
@@ -396,16 +426,45 @@ export default function TheaterPage() {
     setStation(null);
   };
 
-  // ── Station playback + cell mock progression ──────────────────────────
+  // ── Station playback + real backend cell pump ─────────────────────────
   const stopRef = useRef(false);
-  const runStations = async (stations: BrainStation[]) => {
+  const runStations = async (
+    stations: BrainStation[],
+    plan: { usps: string[]; brandTagline: string | null; brandVoice: string | null },
+  ) => {
+    if (!brandId) return;
     stopRef.current = false;
-    // Caption queue (concurrency 2) + image queue (concurrency 1)
-    const captionTasks: CellKey[] = [];
-    for (const d of days) for (const p of activePlatforms) captionTasks.push(cellKey(p, d.date));
+
+    // Build queue: by date order, all platforms per date.
+    // Each task carries the USP assigned (round-robin from the pool).
+    type Task = {
+      key: CellKey;
+      platform: TheaterPlatform;
+      date: string;
+      weekday: string;
+      usp: string;
+      importantDateName: string | null;
+    };
+    const captionTasks: Task[] = [];
+    let uspCursor = 0;
+    for (const d of days) {
+      const matching = importantDates.find((x) => x.date === d.date);
+      for (const p of activePlatforms) {
+        const usp = plan.usps[uspCursor % plan.usps.length] ?? plan.usps[0]!;
+        uspCursor++;
+        captionTasks.push({
+          key: cellKey(p, d.date),
+          platform: p,
+          date: d.date,
+          weekday: d.weekday,
+          usp,
+          importantDateName: matching ? matching.name : null,
+        });
+      }
+    }
     let captionIdx = 0;
 
-    // Kick off station carousel
+    // Kick off station carousel (frontend-paced, decoupled from generation)
     (async () => {
       for (const s of stations) {
         if (stopRef.current) break;
@@ -414,49 +473,83 @@ export default function TheaterPage() {
       }
     })();
 
-    // Once stations enter the writers step, start the cell pump
-    // (we keep it simple — start pump 6s after run begins so chief +
-    // first lead get airtime)
+    // Wait ~6s so chief + first lead get airtime before cells start filling.
     await sleep(6000);
     if (stopRef.current) return;
 
-    // 2-concurrent caption pump
+    // Caption pump — concurrency 2
+    const imageQueue: Task[] = [];
     const captionWorker = async () => {
       while (captionIdx < captionTasks.length) {
         const myIdx = captionIdx++;
-        const key = captionTasks[myIdx];
-        if (!key) continue;
+        const task = captionTasks[myIdx];
+        if (!task) continue;
         if (stopRef.current) return;
 
-        // Begin writing
-        updateCell(key, { status: "writing", caption: "" });
-        const caption = await mockWriteCaption(key, importantDates);
-        if (stopRef.current) return;
-        updateCell(key, { status: "writing", caption });
-        // hand off to image queue
-        imageQueue.push(key);
-        await sleep(400);
+        updateCell(task.key, { status: "writing", caption: "" });
+        try {
+          const r = await generateCellMut.mutateAsync({
+            brandId,
+            platform: task.platform,
+            date: task.date,
+            weekday: task.weekday,
+            usp: task.usp,
+            importantDateName: task.importantDateName,
+            brandTagline: plan.brandTagline,
+            brandVoice: plan.brandVoice,
+          });
+          if (stopRef.current) return;
+          if (r.ok && r.caption) {
+            updateCell(task.key, { status: "writing", caption: r.caption });
+            imageQueue.push({ ...task });
+          } else {
+            updateCell(task.key, { status: "failed" });
+          }
+        } catch (e) {
+          console.error("[theater] caption failed:", task.key, e);
+          updateCell(task.key, { status: "failed" });
+        }
       }
     };
-    const imageQueue: CellKey[] = [];
+
+    // Image pump — concurrency 1 (one at a time, by date order)
     const imageWorker = async () => {
       while (true) {
         if (stopRef.current) return;
-        const key = imageQueue.shift();
-        if (!key) {
-          // done?
+        const task = imageQueue.shift();
+        if (!task) {
           if (captionIdx >= captionTasks.length && imageQueue.length === 0) return;
-          await sleep(300);
+          await sleep(400);
           continue;
         }
-        updateCell(key, { status: "imaging" });
-        const url = await mockGenImage(key);
-        if (stopRef.current) return;
-        updateCell(key, { status: "done", imageUrl: url, doneAt: Date.now() });
+        updateCell(task.key, { status: "imaging" });
+        // Pull caption from cell state (set by caption worker)
+        const captionFromState = (cellsRef.current.get(task.key)?.caption) ?? "";
+        if (!captionFromState) {
+          updateCell(task.key, { status: "failed" });
+          continue;
+        }
+        try {
+          const r = await generateImageMut.mutateAsync({
+            brandId,
+            platform: task.platform,
+            caption: captionFromState,
+            brandTagline: plan.brandTagline,
+          });
+          if (stopRef.current) return;
+          if (r.ok && r.imageUrl) {
+            updateCell(task.key, { status: "done", imageUrl: r.imageUrl, doneAt: Date.now() });
+          } else {
+            // image failed → keep caption, mark as done with no image rather than failing the whole cell
+            updateCell(task.key, { status: "done", imageUrl: null, doneAt: Date.now() });
+          }
+        } catch (e) {
+          console.error("[theater] image failed:", task.key, e);
+          updateCell(task.key, { status: "done", imageUrl: null, doneAt: Date.now() });
+        }
       }
     };
 
-    // 2 caption workers + 1 image worker
     await Promise.all([captionWorker(), captionWorker(), imageWorker()]);
     setRunning(false);
   };
@@ -706,25 +799,3 @@ export default function TheaterPage() {
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-/**
- * Phase-1 mock caption — typewrites a sample USP-aligned caption per cell.
- * Replaced by real `runCalendar` mutation in next commit.
- */
-async function mockWriteCaption(
-  key: CellKey,
-  importantDates: ImportantDate[],
-): Promise<string> {
-  const [platform, date] = key.split("::");
-  const matching = importantDates.find((d) => d.date === date);
-  await sleep(800 + Math.random() * 1200);
-  const base = `[${platform.toUpperCase()} · ${date}] 今天的主角是「USP·1」— 把核心價值講白話，讓讀者一秒接住。${matching ? `\n搭 ${matching.name}：把活動引子接進來。` : ""}\n\nCTA：點下方連結，查更多。`;
-  return base;
-}
-
-async function mockGenImage(key: CellKey): Promise<string> {
-  await sleep(1500 + Math.random() * 800);
-  // placeholder gradient based on cell key
-  const seed = encodeURIComponent(key);
-  return `https://api.dicebear.com/7.x/shapes/svg?seed=${seed}&backgroundColor=fef3c7,fed7aa,fde68a`;
-}
