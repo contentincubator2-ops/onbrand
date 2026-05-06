@@ -127,6 +127,7 @@ interface FBTaskCard {
    *  + specialty + universal helpers Emma/Helen/David/Sophie/Jordan). */
   team?: Array<{ id: number; name: string; title: string; avatarUrl: string | null }>;
   squad_slug?: string;
+  methodology?: string;
 }
 
 type Tier = "30s" | "60s" | "100s";
@@ -256,6 +257,14 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
 
   const openTask = (t: FBTaskCard) => {
+    // 100s squad tasks (FB + IG) launch the full squad pipeline in /picker
+    // workspace — multi-step deliverable (calendar / toolkit / strategy)
+    // produced by real squad agents, not orchestra variants.
+    if (t.kind === "squad" && (t as any).squad_slug) {
+      const slug = (t as any).squad_slug;
+      window.location.href = `/picker?workspace=ai-talent&slug=${encodeURIComponent(slug)}`;
+      return;
+    }
     setActiveTask(t);
     setPrimaryAnswer("");
     setOutput(null);
@@ -406,11 +415,11 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         gradientFrom: "rgba(124,58,237,0.10)",
       }
     : {
-        emoji: "🔬",
-        kicker: "CAMPAIGN-LEVEL · REAL-TIME DATA",
-        headline: "100 秒交付 campaign 級別內容",
-        sub: "整月月曆 / 14 天倒數 / 完整 launch toolkit — Scout 即時抓節慶 / 時事 / 趨勢，貼回真實時間軸",
-        bullets: ["即時抓節慶 / 時事", "campaign 級別產出（7-30 篇）", "8-10 位 agent 協作", "對應既有 squad 配置"],
+        emoji: "🎯",
+        kicker: "REAL SQUAD · CAMPAIGN PIPELINE",
+        headline: "100 秒任務 = 真實 Squad 多步驟工作流",
+        sub: "點擊任務後進入 Squad 工作區（/picker）— 多位 agent 接力、按方法論交付完整月曆 / launch toolkit / 危機劇本",
+        bullets: ["真實 Squad pipeline", "完整方法論（Pulizzi / Cialdini / Lagadec）", "calendar / toolkit shape 輸出", "FB 11 + IG 7 squad 已就位"],
         accent: "#f59e0b",
         gradientFrom: "rgba(245,158,11,0.10)",
       };
@@ -564,14 +573,25 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                         >
                           {tier}
                         </span>
+                        {/* 100s squad tasks: show "真實 Squad" badge so user knows it's a multi-step pipeline */}
+                        {(t as any).kind === "squad" && (
+                          <span className="absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/90 text-default-700 shadow-sm">
+                            🎯 真實 Squad
+                          </span>
+                        )}
                       </div>
                       {/* Card info */}
                       <div className="p-3 flex flex-col gap-1 flex-1">
                         <p className="text-small font-semibold leading-tight line-clamp-2">{t.label}</p>
                         <p className="text-tiny text-default-500 line-clamp-2">{t.description}</p>
+                        {(t as any).methodology && (
+                          <span className="text-[10px] text-default-400 italic">📚 {(t as any).methodology}</span>
+                        )}
                         <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                           <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
-                          <span className="text-tiny font-medium text-default-700 truncate">{agentName}</span>
+                          <span className="text-tiny font-medium text-default-700 truncate">
+                            {(t as any).kind === "squad" ? "多步驟 squad pipeline" : agentName}
+                          </span>
                         </div>
                         {/* 60s tier: show full collab team avatar stack + count */}
                         {(t as any).team && (t as any).team.length > 1 && (

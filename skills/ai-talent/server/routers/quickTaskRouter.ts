@@ -675,6 +675,7 @@ import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../_core/
 import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../_core/quickTaskYT60";
 import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../_core/quickTaskMulti60";
 import { ALL_100S_TASKS, get100Template, get100OrchestraConfig } from "../_core/quickTask100";
+import { ALL_100S_SQUADS } from "../_core/quickTask100Squads";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -881,12 +882,27 @@ export const quickTaskRouter = router({
     const fb60Tasks = FB_60S_TASKS_V2.map((t) => ({ ...t, kind: "fast" as const, platform: "facebook" }));
     const ig60Tasks = IG_60S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "instagram" }));
     const yt60Tasks = YT_60S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "youtube" }));
-    // 100s tasks (campaign-level, real-time data)
-    const tasks100 = ALL_100S_TASKS.map((t) => {
+    // 100s tasks split into:
+    //  - SQUAD-based (FB + IG with full multi-step squad infrastructure):
+    //    runs via squad.stepExecute → /picker workspace UI
+    //  - Orchestra-based fallback (other channels — Phase 2: build squads)
+    const tasks100Squads = ALL_100S_SQUADS.map((s) => ({
+      id: s.id,
+      tier: "100s" as const,
+      postType: s.postType,
+      platform: s.platform,
+      label: s.label,
+      description: s.description,
+      kind: "squad" as const,
+      squad_slug: s.squad_slug,
+      methodology: s.methodology,
+    }));
+    // Orchestra-based 100s tasks for channels without squads yet (filtered to
+    // exclude FB + IG since those now have proper squads above)
+    const tasks100Orchestra = ALL_100S_TASKS.filter((t) => !t.id.startsWith("fb-") && !t.id.startsWith("ig-")).map((t) => {
       const id = t.id;
       const platform =
-        id.startsWith("ig-") ? "instagram"
-        : id.startsWith("yt-") ? "youtube"
+        id.startsWith("yt-") ? "youtube"
         : id.startsWith("tt-") ? "tiktok"
         : id.startsWith("li-") ? "linkedin"
         : id.startsWith("em-") ? "email"
@@ -896,6 +912,7 @@ export const quickTaskRouter = router({
         : "facebook";
       return { ...t, kind: "fast" as const, platform };
     });
+    const tasks100 = [...tasks100Squads, ...tasks100Orchestra];
     const multi60Tasks = MULTI_60S_TASKS.map((t) => {
       const id = t.id;
       const platform =
@@ -971,7 +988,7 @@ export const quickTaskRouter = router({
         label: t.label, description: t.description, kind: t.kind,
       };
       if (t.kind === "squad") {
-        return { ...base, squad_slug: t.squad_slug, inputs: [], agent: null, skill_slug: null };
+        return { ...base, squad_slug: t.squad_slug, methodology: t.methodology ?? null, inputs: [], agent: null, skill_slug: null };
       }
       // For 60s tasks, surface the full collab team so cards can show
       // "8 位 agent 協作" badge + tooltip with team roster.
