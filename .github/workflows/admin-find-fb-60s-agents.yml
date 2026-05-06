@@ -1,0 +1,54 @@
+name: Admin — Find FB 60s task specialists (multi-post / crisis / live / narrative)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
+
+            # All previously used (FB+IG+YT+TT+LI+Email+PR+Brand+Research + 60s extras: Helen Sung 180163, David Wang 30003, Sophie Ho 60012)
+            EXCLUDED="(239183, 60021, 239185, 30002, 40, 180159, 239184, 180166, 229985, 60029, 35, 60068, 224294, 180168, 30005, 180143, 60056, 60072, 220751, 60022, 180170, 24, 36, 30013, 180268, 60030, 30014, 30004, 180157, 210252, 180186, 210220, 30011, 180167, 60033, 220949, 222392, 60055, 60031, 210310, 180158, 60073, 180165, 30018, 229905, 180172, 180173, 180176, 180197, 180203, 180199, 180009, 220862, 60071, 30017, 60012, 60060, 60061, 60062, 180039, 180054, 180062, 180068, 221080, 60063, 29, 30008, 60035, 60036, 60037, 60038, 180175, 180182, 210266, 180193, 60011, 220869, 238853, 60002, 180797, 210173, 220915, 220870, 60066, 220871, 220001, 220872, 210303, 30003, 90004, 220927, 90031, 90005, 90032, 90006, 220528, 220529, 220530, 180163)"
+
+            echo "=== A. Multi-post / calendar planner（任務 6, 7, 10 — 7 天系列 / launch / 5 篇連載）==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%calendar%' OR LOWER(primarySkill) LIKE '%content-calendar%' OR LOWER(primarySkill) LIKE '%multi-post%' OR LOWER(primarySkill) LIKE '%series%' OR LOWER(title) LIKE '%calendar%' OR LOWER(title) LIKE '%campaign manager%' OR LOWER(primarySkill) LIKE '%campaign-orchestrator%' OR LOWER(slug) LIKE '%countdown%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== B. 危機 / Crisis comms / escalation specialist (任務 5)==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%crisis%' OR LOWER(primarySkill) LIKE '%escalation%' OR LOWER(primarySkill) LIKE '%incident-response%' OR LOWER(title) LIKE '%crisis%' OR LOWER(title) LIKE '%escalation%' OR LOWER(slug) LIKE '%crisis%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== C. Album / Carousel / Multi-frame storyteller (任務 3, 4)==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%album%' OR LOWER(primarySkill) LIKE '%carousel%' OR LOWER(primarySkill) LIKE '%multi-frame%' OR LOWER(primarySkill) LIKE '%storytelling%' OR LOWER(primarySkill) LIKE '%narrative%' OR LOWER(title) LIKE '%storyteller%' OR LOWER(title) LIKE '%narrative%') ORDER BY id LIMIT 25"
+
+            echo ""
+            echo "=== D. Event launch / kit producer (任務 7)==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%event-launch%' OR LOWER(primarySkill) LIKE '%launch-kit%' OR LOWER(slug) LIKE '%event-launch%' OR LOWER(title) LIKE '%event marketing%' OR LOWER(primarySkill) LIKE '%product-launch%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== E. Live show / FB Live producer (任務 8)==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(slug) LIKE '%fb-live%' OR LOWER(slug) LIKE '%live-prep%' OR LOWER(slug) LIKE '%live-show%' OR LOWER(primarySkill) LIKE '%livestream-prod%' OR LOWER(primarySkill) LIKE '%live-show-producer%' OR LOWER(title) LIKE '%live producer%' OR LOWER(title) LIKE '%show producer%') ORDER BY id LIMIT 20"
+
+            echo ""
+            echo "=== F. Pinned post / strategy (任務 9)==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%pinned%' OR LOWER(primarySkill) LIKE '%highlight-strategy%' OR LOWER(primarySkill) LIKE '%page-strategy%' OR LOWER(slug) LIKE '%pinned%') ORDER BY id LIMIT 15"
+
+            echo ""
+            echo "=== G. Existing fb-* squads — squad lead might fit 60s ==="
+            $MYSQL -e "SELECT s.slug AS squad_slug, a.id, a.name, a.title, a.primarySkill FROM squads s JOIN agents a ON a.id=s.lead_agent_id WHERE s.is_active=1 AND s.is_approved=1 AND s.slug LIKE 'fb-%' AND a.id NOT IN $EXCLUDED ORDER BY s.slug LIMIT 25"
+
+            echo ""
+            echo "=== H. Engagement / link-post specialist (任務 2)==="
+            $MYSQL -e "SELECT id, slug, name, title, primarySkill FROM agents WHERE isAvailable=1 AND id NOT IN $EXCLUDED AND (LOWER(primarySkill) LIKE '%link-post%' OR LOWER(primarySkill) LIKE '%click-through%' OR LOWER(primarySkill) LIKE '%engagement%' OR LOWER(title) LIKE '%engagement%') ORDER BY id LIMIT 15"
+
+            echo "=== Done ==="
