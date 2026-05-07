@@ -56,6 +56,10 @@ interface ImportantDate {
 
 interface CellState {
   status: "idle" | "queued" | "writing" | "qa" | "imaging" | "done" | "failed";
+  /** Phase 2: per-platform structured fields (IG hashtags, YT chapters,
+   *  LINE subject, Threads thread chain, Blog h2 list, etc). Mockup pulls
+   *  what it knows; missing keys render with default skeleton. */
+  structured?: Record<string, any>;
   caption?: string;
   imageUrl?: string | null;
   startedAt?: number;
@@ -236,14 +240,40 @@ function PlatformCell({
         <div className="relative bg-white">
           <PlatformMockup
             variant={meta.mockup as any}
-            title={caption.split("\n")[0]?.slice(0, 40) ?? ""}
+            title={(state.structured as any)?.headline ?? caption.split("\n")[0]?.slice(0, 40) ?? ""}
             brief={caption}
             brandName={brandName}
             brandLogoUrl={brandLogoUrl ?? null}
             liveCaption={caption}
+            // Phase 2: pass platform-specific structured fields
+            liveHashtags={(state.structured as any)?.hashtags}
+            liveDescription={
+              (state.structured as any)?.subject ??
+              (state.structured as any)?.h2?.join(" · ") ??
+              undefined
+            }
             liveImageUrl={state.imageUrl ?? undefined}
             liveImageStatus={state.imageUrl ? "ready" : (isImaging ? undefined : "skipped")}
           />
+          {/* Per-platform structured tail (chapters / thread / h2)
+              shown beneath the mockup since not all PlatformMockup
+              variants support these slots natively. */}
+          {(state.structured as any)?.chapters?.length > 0 && (
+            <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[10px] leading-relaxed">
+              <p className="text-neutral-500 mb-0.5">章節時間軸</p>
+              {((state.structured as any).chapters as string[]).slice(0, 5).map((c, i) => (
+                <p key={i} className="text-neutral-700">{c}</p>
+              ))}
+            </div>
+          )}
+          {(state.structured as any)?.thread?.length > 1 && (
+            <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[10px] leading-relaxed">
+              <p className="text-neutral-500 mb-0.5">續發 ({(state.structured as any).thread.length} 則)</p>
+              {((state.structured as any).thread as string[]).slice(1, 4).map((t, i) => (
+                <p key={i} className="text-neutral-700">{`${i + 2}. ${t.slice(0, 80)}`}</p>
+              ))}
+            </div>
+          )}
           {isImaging && !state.imageUrl && (
             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
               <Avatar src={imageDirAvatar ?? undefined} size="sm" className="w-8 h-8" />
@@ -684,13 +714,13 @@ export default function TheaterPage() {
           });
           if (stopRef.current) return;
           if (r.ok && r.caption) {
-            // Show writer's raw draft (rewrites and all — visible on
-            // purpose so user can see the work happen)
-            updateCell(task.key, { status: "writing", caption: r.caption });
+            // Show writer's raw draft + structured fields (rewrites and all — visible on purpose)
+            const structured = (r as any).structured ?? {};
+            updateCell(task.key, { status: "writing", caption: r.caption, structured });
             // Brief beat so user perceives the draft, then QA passes
             await sleep(450);
             if (stopRef.current) return;
-            updateCell(task.key, { status: "qa", caption: r.caption });
+            updateCell(task.key, { status: "qa", caption: r.caption, structured });
             try {
               const qa = await qaReviewMut.mutateAsync({
                 draft: r.caption,
@@ -701,7 +731,7 @@ export default function TheaterPage() {
               });
               if (stopRef.current) return;
               if (qa.ok && qa.caption) {
-                updateCell(task.key, { status: "qa", caption: qa.caption });
+                updateCell(task.key, { status: "qa", caption: qa.caption, structured });
               }
             } catch (e) {
               console.warn("[theater] QA review failed, keeping draft:", task.key, e);
@@ -756,7 +786,17 @@ export default function TheaterPage() {
       }
     };
 
-    await Promise.all([captionWorker(), captionWorker(), imageWorker()]);
+    // Phase 2: bumped image worker pool 1 → 3. Captions still 2-wide so
+    // we don't slam the LLM provider, but Flux can comfortably handle 3
+    // parallel renders and cell completion velocity matters more than
+    // image-by-image waterfall (CJ flagged '圖等很久' as a P1).
+    await Promise.all([
+      captionWorker(),
+      captionWorker(),
+      imageWorker(),
+      imageWorker(),
+      imageWorker(),
+    ]);
     setRunning(false);
   };
 
@@ -798,7 +838,8 @@ export default function TheaterPage() {
         updateCell(key, { status: "failed" });
         return;
       }
-      updateCell(key, { status: "imaging", caption: r.caption });
+      const newStructured = (r as any).structured ?? {};
+      updateCell(key, { status: "imaging", caption: r.caption, structured: newStructured });
       const img = await generateImageMut.mutateAsync({
         brandId,
         platform,
@@ -808,6 +849,7 @@ export default function TheaterPage() {
       updateCell(key, {
         status: "done",
         caption: r.caption,
+        structured: newStructured,
         imageUrl: img.ok ? img.imageUrl : null,
         doneAt: Date.now(),
       });

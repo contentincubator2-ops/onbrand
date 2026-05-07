@@ -476,35 +476,67 @@ ${hookInstruction}${ctaInstruction}${scoutInstruction}
 
 備註：你寫到一半發現要改沒關係，可以重新寫。後面有資深編輯（QA agent）會掃過你的草稿、清掉重複開頭與斷句、把節奏調順。專心把訊息寫好就行。`;
 
+      // Phase 2: structured per-platform output. The shape varies by
+      // platform so the cell mockup can render IG hashtags, YT chapters,
+      // LINE subject etc. — without these the cells looked identical
+      // across platforms (CJ feedback #2 '各平台沒真正差異化').
+      const structuredFieldHint = ({
+        facebook:  `"hashtags": []   // FB hashtags ≤ 3 個（FB 觀眾不愛 hashtag）`,
+        instagram: `"hashtags": []   // IG 精準 hashtag 3-5 個（不要 #love 灌水）`,
+        youtube:   `"chapters": []   // YT 章節 2-4 個 ["00:00 開場", "01:30 重點 1", ...]`,
+        threads:   `"thread": []     // Threads 串文 1-3 則（單則 50-100 字，可選；單則就用 ["..."]）`,
+        line:      `"subject": ""    // LINE 推播主旨（≤ 20 字，給用戶通知列看的）`,
+        blog:      `"headline": "", "h2": []  // Blog 主標 + 2-4 個 H2 小標暗示`,
+      } as Record<string, string>)[input.platform] ?? `"extra": null`;
+
       const user = `日期：${input.date}（${input.weekday}）
 本篇要溝通的 USP：「${input.usp}」
 ${importantHint}
 
-請依照平台原生結構 + 指定 Hook 類型 + 指定 CTA 意圖，直接寫出這則貼文。`;
+請依照平台原生結構 + 指定 Hook 類型 + 指定 CTA 意圖寫這則貼文。
+
+【輸出格式（嚴格 JSON）】
+{
+  "caption": "完整貼文純文字（含換行）",
+  ${structuredFieldHint}
+}
+不要在 JSON 外加任何文字 / markdown 圍籬 / 解釋。`;
 
       try {
         const r = await invokeLLM({
           provider: "anthropic",
           model: "claude-haiku-4-5",
-          maxTokens: 600,
+          maxTokens: 800,
           messages: [
             { role: "system", content: sys },
             { role: "user", content: user },
           ],
         });
-        let caption = r.choices[0]?.message?.content?.toString().trim() ?? "";
-        // Strip common preamble leaks ("這是一則 FB 貼文：") — these are
-        // formatting noise, not substantive rewrite. The QA pass cleans
-        // up restart artefacts (duplicate openings, broken sentences) so
-        // we leave those visible here on purpose.
-        caption = caption.replace(/^(以下是|這是)?[一個]?[則篇]?\s*[FBIYTGtbreadlinkBlog一-鿿]+貼文[：:]\s*/i, "").trim();
-        if ((caption.startsWith("「") && caption.endsWith("」")) ||
-            (caption.startsWith("\"") && caption.endsWith("\""))) {
-          caption = caption.slice(1, -1).trim();
+        const raw = r.choices[0]?.message?.content?.toString().trim() ?? "";
+        // Strip code fences if present
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        let caption = "";
+        let structured: Record<string, any> = {};
+        try {
+          const parsed = JSON.parse(cleaned);
+          caption = String(parsed.caption ?? "").trim();
+          // Pull all non-caption keys as structured extras
+          for (const [k, v] of Object.entries(parsed)) {
+            if (k !== "caption") structured[k] = v;
+          }
+        } catch {
+          // Plaintext fallback — model didn't honour JSON. Treat as caption.
+          caption = cleaned
+            .replace(/^(以下是|這是)?[一個]?[則篇]?\s*[FBIYTGtbreadlinkBlog一-鿿]+貼文[：:]\s*/i, "")
+            .trim();
+          if ((caption.startsWith("「") && caption.endsWith("」")) ||
+              (caption.startsWith("\"") && caption.endsWith("\""))) {
+            caption = caption.slice(1, -1).trim();
+          }
         }
-        return { ok: true as const, caption };
+        return { ok: true as const, caption, structured };
       } catch (e: any) {
-        return { ok: false as const, caption: "", error: String(e?.message ?? e) };
+        return { ok: false as const, caption: "", structured: {}, error: String(e?.message ?? e) };
       }
     }),
 
