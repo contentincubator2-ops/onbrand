@@ -193,6 +193,8 @@ function PlatformCell({
   brandLogoUrl,
   onRedo,
   onCopy,
+  onEdit,
+  onMarkRule,
 }: {
   platform: TheaterPlatform;
   state: CellState;
@@ -204,7 +206,13 @@ function PlatformCell({
   brandLogoUrl: string | null;
   onRedo?: () => void;
   onCopy?: () => void;
+  onEdit?: (newCaption: string) => void;
+  onMarkRule?: () => void;
 }) {
+  // Phase 3a — inline edit state
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(caption);
+  useEffect(() => { if (!editing) setDraft(caption); }, [caption, editing]);
   const meta = PLATFORM_META[platform];
   const isIdle    = state.status === "idle" || state.status === "queued";
   const isWriting = state.status === "writing";
@@ -307,9 +315,56 @@ function PlatformCell({
         </div>
       )}
 
+      {/* Inline edit overlay (Phase 3a) — opens on dblclick of done cell */}
+      {editing && (
+        <div className="absolute inset-0 z-30 bg-white/95 backdrop-blur-sm rounded-lg p-3 flex flex-col gap-2 shadow-lg" style={{ border: "2px solid #6366f1" }}>
+          <p className="text-[10px] text-indigo-700 font-semibold flex items-center gap-1">
+            ✏️ 編輯 caption — Enter 儲存 / Esc 取消
+          </p>
+          <textarea
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { setEditing(false); setDraft(caption); }
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                onEdit?.(draft);
+                setEditing(false);
+              }
+            }}
+            className="flex-1 w-full text-[12px] leading-relaxed px-2 py-1.5 border border-indigo-200 rounded resize-none focus:outline-none focus:border-indigo-500"
+            style={{ minHeight: 140 }}
+          />
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => { setEditing(false); setDraft(caption); }}
+              className="text-[10px] px-2 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+            >
+              取消
+            </button>
+            <button
+              onClick={() => { onEdit?.(draft); setEditing(false); }}
+              className="text-[10px] px-2 py-1 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium"
+            >
+              儲存
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Double-click area on the mockup body opens inline edit */}
+      {isDone && caption && !editing && onEdit && (
+        <div
+          className="absolute inset-0 cursor-text"
+          style={{ background: "transparent" }}
+          onDoubleClick={() => setEditing(true)}
+          title="雙擊編輯文字"
+        />
+      )}
+
       {/* Action row (only on done) */}
-      {isDone && caption && (
-        <div className="mt-1 px-1 py-1.5 flex items-center gap-1.5">
+      {isDone && caption && !editing && (
+        <div className="mt-1 px-1 py-1.5 flex items-center gap-1.5 flex-wrap">
           {onCopy && (
             <button
               onClick={onCopy}
@@ -318,6 +373,24 @@ function PlatformCell({
             >
               <Copy size={11} strokeWidth={2} />
               複製
+            </button>
+          )}
+          {onEdit && (
+            <button
+              onClick={() => setEditing(true)}
+              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+              title="雙擊或按這顆鈕編輯"
+            >
+              ✏️ 編輯
+            </button>
+          )}
+          {onMarkRule && (
+            <button
+              onClick={onMarkRule}
+              className="text-[10px] px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-900 flex items-center gap-1 transition"
+              title="標記這篇要改的地方 — 可選擇套用到單篇 / 全品牌"
+            >
+              ⚠ 標記要改
             </button>
           )}
           {onRedo && (
@@ -432,6 +505,7 @@ export default function TheaterPage() {
   const generateCellMut  = trpc.theater.generateCell.useMutation();
   const generateImageMut = trpc.theater.generateImage.useMutation();
   const qaReviewMut      = trpc.theater.qaReviewCell.useMutation();
+  const addBrandRuleMut  = trpc.theater.addBrandRule.useMutation();
   const avatarById = useMemo(() => {
     const m = new Map<number, string | null>();
     (castQuery.data ?? []).forEach((a) => m.set(a.id, a.avatarUrl));
@@ -711,6 +785,9 @@ export default function TheaterPage() {
             cta:  task.cta  as any,
             // Phase 1.5: real scouted viral patterns for this platform
             scoutPatterns: task.scoutPatterns,
+            // Phase 3a: run-scope ad-hoc rules (brand-scope rules are
+            // loaded server-side from DB)
+            adhocRules: runRules,
           });
           if (stopRef.current) return;
           if (r.ok && r.caption) {
@@ -872,6 +949,94 @@ export default function TheaterPage() {
       ta.select();
       document.execCommand("copy");
       ta.remove();
+    }
+  };
+
+  // ── Phase 3a: inline edit + 修改規則 modal ──────────────────────
+  /** Inline edit handler — user committed new caption text directly */
+  const editCellCaption = (key: CellKey, newCaption: string) => {
+    if (!newCaption.trim()) return;
+    updateCell(key, { caption: newCaption.trim() });
+  };
+
+  /** Run-scope rules: applied to all future cells in this run only.
+   *  Persistent across cells in the run; cleared on stop / new run. */
+  const [runRules, setRunRules] = useState<string[]>([]);
+
+  /** Modal for marking a cell as needing a fix */
+  const [ruleModal, setRuleModal] = useState<{ key: CellKey; platform: TheaterPlatform } | null>(null);
+  const [ruleText, setRuleText] = useState("");
+  const [ruleScope, setRuleScope] = useState<"post" | "run" | "brand">("post");
+
+  const openRuleModal = (key: CellKey) => {
+    const platform = key.split("::")[0] as TheaterPlatform;
+    setRuleModal({ key, platform });
+    setRuleText("");
+    setRuleScope("post");
+  };
+  const closeRuleModal = () => { setRuleModal(null); setRuleText(""); };
+  const submitRule = async () => {
+    if (!ruleModal || !ruleText.trim()) return;
+    const rule = ruleText.trim();
+    const { key, platform } = ruleModal;
+    if (ruleScope === "brand" && brandId) {
+      // Persist to DB → all future runs for this brand will get this rule
+      try {
+        await addBrandRuleMut.mutateAsync({ brandId, rule, scope: "brand" });
+      } catch (e) {
+        console.error("[theater] addBrandRule failed:", e);
+      }
+    } else if (ruleScope === "run") {
+      // Stash in client state for the rest of this run
+      setRunRules((prev) => [...prev, rule]);
+    }
+    closeRuleModal();
+    // Re-run this cell with the rule applied (single-post + run-scope both
+    // benefit from immediate redo; brand-scope also redoes since the
+    // user wants to see the fix now)
+    const meta = cellMeta.get(key);
+    if (!meta || !brandId) return;
+    updateCell(key, { status: "writing", caption: "" });
+    try {
+      const adhoc = ruleScope === "post"
+        ? [rule]
+        : ruleScope === "run"
+          ? [...runRules, rule]
+          : []; // brand-scope is loaded server-side from DB, no adhoc needed
+      const r = await generateCellMut.mutateAsync({
+        brandId,
+        platform,
+        date: meta.date,
+        weekday: meta.weekday,
+        usp: meta.usp,
+        importantDateName: meta.importantDateName,
+        brandTagline: meta.brandTagline,
+        brandVoice: meta.brandVoice,
+        hook: meta.hook as any,
+        cta:  meta.cta  as any,
+        scoutPatterns: meta.scoutPatterns,
+        adhocRules: adhoc,
+      });
+      if (!r.ok || !r.caption) {
+        updateCell(key, { status: "failed" });
+        return;
+      }
+      const structured = (r as any).structured ?? {};
+      // Skip QA on rule-driven redo (user gave explicit edit; trust LLM)
+      updateCell(key, { status: "imaging", caption: r.caption, structured });
+      const img = await generateImageMut.mutateAsync({
+        brandId, platform, caption: r.caption, brandTagline: meta.brandTagline,
+      });
+      updateCell(key, {
+        status: "done",
+        caption: r.caption,
+        structured,
+        imageUrl: img.ok ? img.imageUrl : null,
+        doneAt: Date.now(),
+      });
+    } catch (e) {
+      console.error("[theater] rule redo failed:", e);
+      updateCell(key, { status: "failed" });
     }
   };
 
@@ -1102,11 +1267,81 @@ export default function TheaterPage() {
                       brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
                       onCopy={() => copyCaption(key)}
                       onRedo={() => redoCell(key, p)}
+                      onEdit={(newCaption) => editCellCaption(key, newCaption)}
+                      onMarkRule={() => openRuleModal(key)}
                     />
                   </div>
                 );
               });
             })}
+          </div>
+        )}
+
+        {/* Phase 3a — 標記要改 modal */}
+        {ruleModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6" onClick={closeRuleModal}>
+            <div
+              className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold text-neutral-900 mb-1">
+                ⚠️ 標記要改的地方
+              </h3>
+              <p className="text-xs text-neutral-500 mb-4">
+                寫下這篇要改的地方（例：「不能說玩家使用經驗」、「不能有負面陳述」、「結尾不要寫『歡迎洽詢』」），等等會自動套用 + 重新生成。
+              </p>
+              <textarea
+                autoFocus
+                value={ruleText}
+                onChange={(e) => setRuleText(e.target.value)}
+                placeholder="例：不能說玩家使用經驗"
+                className="w-full text-sm px-3 py-2 border border-neutral-300 rounded resize-none focus:outline-none focus:border-indigo-500"
+                style={{ minHeight: 80 }}
+              />
+              <p className="text-xs font-medium text-neutral-700 mt-4 mb-2">套用範圍</p>
+              <div className="space-y-2">
+                {([
+                  { v: "post" as const,  label: "只改這一篇", hint: "重新生成這格 caption，套規則一次。" },
+                  { v: "run"  as const,  label: "套用到本次 7 天全部",  hint: "這次企劃剩下還沒重做的格子都會吃這條規則。" },
+                  { v: "brand" as const, label: "套用到本品牌所有未來企劃 ✨", hint: "存進品牌規則庫，下次按開始企劃會自動帶。" },
+                ]).map((opt) => (
+                  <label
+                    key={opt.v}
+                    className={`block p-2.5 rounded-lg border cursor-pointer transition ${
+                      ruleScope === opt.v ? "border-indigo-500 bg-indigo-50" : "border-neutral-200 hover:bg-neutral-50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="radio"
+                        checked={ruleScope === opt.v}
+                        onChange={() => setRuleScope(opt.v)}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">{opt.hint}</p>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center justify-end gap-2 mt-5">
+                <button
+                  onClick={closeRuleModal}
+                  className="text-sm px-4 py-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={submitRule}
+                  disabled={!ruleText.trim()}
+                  className="text-sm px-4 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  套用 + 重新生成
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

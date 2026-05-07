@@ -17,6 +17,7 @@ import { getBrandPositioningById } from "../positioningBridge";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
+import localPool from "../localDb";
 
 // Per-(brand, platform, day) scout cache. The cache key encloses the
 // YYYY-MM-DD so it auto-expires daily. Viral patterns don't shift in
@@ -214,6 +215,23 @@ const PLATFORM_GUIDE: Record<z.infer<typeof PlatformZ>, string> = {
 SEO 友善：自然帶入 1-2 個關鍵字，不要硬塞。`,
 };
 
+/** Load active brand-level caption rules. Each rule is a 1-line
+ *  constraint (e.g. "不能說玩家使用經驗", "結尾不要寫『歡迎洽詢』")
+ *  the user added via the 修改規則 modal with scope='brand'. */
+async function loadBrandRules(brandId: number, userId: number): Promise<string[]> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT rule FROM brand_caption_rules
+        WHERE brandId = ? AND userId = ? AND active = 1 AND scope = 'brand'
+        ORDER BY id ASC`,
+      [brandId, userId],
+    );
+    return (rows as any[]).map((r) => String(r.rule || "").trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export const theaterRouter = router({
   /**
    * Load brand positioning, derive 5-7 USPs, ask LLM for the chief's
@@ -231,7 +249,10 @@ export const theaterRouter = router({
       dates: z.array(z.string()).optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const pos = await getBrandPositioningById(input.brandId, ctx.user.id);
+      const [pos, brandRules] = await Promise.all([
+        getBrandPositioningById(input.brandId, ctx.user.id),
+        loadBrandRules(input.brandId, ctx.user.id),
+      ]);
 
       // USP pool — prefer differentiators, fall back to messagingPillars,
       // last resort: synthesize from positioningSummary.
@@ -401,6 +422,10 @@ ${platformAsks}
         // Phase 1.5 — real per-platform viral patterns from Perplexity
         scoutByPlatform,
         scoutIndustry: industry,
+        // Phase 3a — user-defined brand rules (will also be injected
+        // server-side per cell, but we surface them so the UI can show
+        // the rule chips on the brain bar)
+        brandRules,
         positioning: pos ? {
           tagline: pos.tagline,
           targetAudience: pos.targetAudience,
@@ -428,8 +453,17 @@ ${platformAsks}
       // Phase 1.5 — real viral patterns scouted from Perplexity for this
       // platform + brand industry. Frontend passes the platform's array.
       scoutPatterns: z.array(z.string()).max(8).optional(),
+      // Phase 3a — user-defined caption rules. Server fetches brand-scoped
+      // rules from DB; client passes run-scoped + post-scoped rules here.
+      adhocRules: z.array(z.string()).max(20).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const brandRules = await loadBrandRules(input.brandId, ctx.user.id);
+      const allRules = [...brandRules, ...(input.adhocRules ?? [])].filter(Boolean);
+      const rulesInstruction = allRules.length > 0
+        ? `\n【品牌規則 — 強制遵守，違反等於失敗】
+${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
+        : "";
       const guide = PLATFORM_GUIDE[input.platform];
       const importantHint = input.importantDateName
         ? `當天有「${input.importantDateName}」檔期，請從 USP 與這個檔期的「真實連結」切入（例如母親節 = 媽媽的具體場景，不是「祝媽媽快樂」這種空話）。`
@@ -462,7 +496,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}${scoutInstruction}
+${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。
@@ -687,5 +721,73 @@ ${cleaned}
       } catch (e: any) {
         return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
       }
+    }),
+
+  // ─── Brand caption rules CRUD (Phase 3a) ────────────────────────────
+  // User adds rules via the 修改規則 modal. Only brand-scope rules are
+  // persisted; run/post-scope are handled transiently in client memory.
+
+  listBrandRules: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT id, rule, scope, active, createdAt
+             FROM brand_caption_rules
+            WHERE brandId = ? AND userId = ?
+            ORDER BY id DESC`,
+          [input.brandId, ctx.user.id],
+        );
+        return (rows as any[]).map((r) => ({
+          id: Number(r.id),
+          rule: String(r.rule),
+          scope: String(r.scope),
+          active: Number(r.active) === 1,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+        }));
+      } catch (e: any) {
+        console.error("[theater.listBrandRules]", e?.message ?? e);
+        return [];
+      }
+    }),
+
+  addBrandRule: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      rule:    z.string().min(2).max(300),
+      scope:   z.enum(["brand"]).default("brand"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [r]: any = await localPool.execute(
+        `INSERT INTO brand_caption_rules (brandId, userId, rule, scope, active)
+              VALUES (?, ?, ?, ?, 1)`,
+        [input.brandId, ctx.user.id, input.rule.trim(), input.scope],
+      );
+      return { ok: true as const, id: Number(r?.insertId ?? 0) };
+    }),
+
+  removeBrandRule: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await localPool.execute(
+        `DELETE FROM brand_caption_rules WHERE id = ? AND userId = ?`,
+        [input.id, ctx.user.id],
+      );
+      return { ok: true as const };
+    }),
+
+  // Phase 3a: inline edit save — frontend dblclicks a cell, edits text,
+  // commits. We don't persist captions to a table (they're transient
+  // run state) — this is just the simple shape for client to call.
+  // Currently no-op on server; left as a tRPC procedure so future
+  // versions can audit/log edits or sync to a saved-runs store.
+  saveCellEdit: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      cellKey: z.string(),
+      caption: z.string().min(1).max(8000),
+    }))
+    .mutation(async () => {
+      return { ok: true as const };
     }),
 });

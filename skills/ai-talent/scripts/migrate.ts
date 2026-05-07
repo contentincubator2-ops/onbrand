@@ -1113,6 +1113,29 @@ async function main() {
       console.log("[migrate] squads.mockup_images: already exists, skipped");
     }
 
+    // ── Theater brand_caption_rules (Phase 3a) ──────────────────────────
+    // User-defined caption rules per brand. Injected into Theater
+    // generateCell prompt as additional rules. Scope determines lifetime:
+    //   "brand"  — apply to all future runs for this brand (persistent)
+    //   "run"    — apply to current run only (frontend handles transient)
+    //   "post"   — apply to a single cell (frontend handles per-cell redo)
+    // Only "brand" scope is persisted in this table; the others live in
+    // memory on the client.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_caption_rules (
+        id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId     INT          NOT NULL,
+        userId      INT          NOT NULL,
+        rule        TEXT         NOT NULL,
+        scope       VARCHAR(16)  NOT NULL DEFAULT 'brand',
+        active      TINYINT(1)   NOT NULL DEFAULT 1,
+        createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_brand_rules_brandId (brandId),
+        INDEX idx_brand_rules_active (brandId, active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_caption_rules: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
