@@ -30,6 +30,7 @@ import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
+import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
 // Notion-style line icons
@@ -641,21 +642,9 @@ export default function BrandsPage() {
             <EntityStats variant="inline" />
           </div>
 
-          {/* Search bar */}
-          <div className="w-full" style={{ maxWidth: 800 }}>
-            <Input
-              size="lg"
-              radius="lg"
-              variant="flat"
-              placeholder={`搜尋 ${scopeName} 的資產 / 規範 / 規則…`}
-              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 18 }} />}
-              classNames={{
-                base: "overflow-hidden rounded-[20px]",
-                inputWrapper: "h-14 bg-white shadow-md border border-default-100 rounded-[20px] data-[focus=true]:shadow-lg",
-                input: "text-medium",
-              }}
-            />
-          </div>
+          {/* Brand-message bar (replaces search): shows current USP /
+              tagline (interim or full) + 測試 / 定案 buttons. */}
+          <BrandMessageBar brandId={activeBrandIdForLocks} />
 
           {/* Tab tiles — /30s circular colored style (4 tiles incl. 知識) */}
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
