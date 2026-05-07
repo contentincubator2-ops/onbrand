@@ -916,25 +916,12 @@ export default function BrandsPage() {
             <>
               {/* ── 定位 card grid (pos:home) ── */}
               {section === "pos:home" ? (
-                <div>
-                  <TabActionBar
-                    tab="positioning"
-                    label="定位"
+                <div style={{ padding: "16px 28px 0" }}>
+                  <PositioningTopRow
+                    brandId={(scope?.brandId ?? brandId) as number | null}
+                    scopeMode={scopeMode}
                     locked={!!tabLocks.positioning}
-                    hasContent={tabHasContent.positioning}
-                    statusText={
-                      pipeline.status === "running" ? "正在分析中…"
-                        : pipeline.status === "done" ? "定位分析已完成"
-                        : tabHasContent.positioning ? "已有部分內容 — 可重新分析或繼續編輯個別段落"
-                        : "尚未開始 — 按下開始，agent 會逐步幫你完成全套定位分析"
-                    }
-                    subText={pipelineSteps.length > 0 ? `${pipelineSteps.length} 個步驟 · 從 ${pipelineSteps[0]?.title} 到 ${pipelineSteps[pipelineSteps.length - 1]?.title}` : undefined}
-                    pipelineStatus={pipeline.status}
-                    onPause={pausePipeline}
-                    onResume={resumePipeline}
-                    onSkip={skipPipeline}
-                    onStop={stopPipeline}
-                    onAction={() => handleTabAction("positioning")}
+                    onLockToggle={() => handleLockToggle("positioning")}
                   />
                   <PositioningGrid
                     scopeMode={scopeMode}
@@ -2366,6 +2353,105 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
           {err && <span className="text-tiny text-danger-600">{err}</span>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── PositioningTopRow ───────────────────────
+   Compact action row for the 定位 tab — replaces wide TabActionBar.
+   Shows: ✨ 自動定位 button + live job progress + 🔓 lock chip.
+   The 自動定位 button fires positioningJobs.start (new background
+   runner with retry × 5 + parallel waves + cost tracking).
+   ───────────────────────────────────────────────────────────────────── */
+function PositioningTopRow({
+  brandId, scopeMode, locked, onLockToggle,
+}: {
+  brandId: number | null;
+  scopeMode: "brand"|"product"|"event"|"none";
+  locked: boolean;
+  onLockToggle: () => void;
+}) {
+  const entityKind = scopeMode === "brand" ? "brand" : scopeMode === "product" ? "product" : scopeMode === "event" ? "event" : null;
+  const job = (entityKind && brandId) ? (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+    { entityKind, entityId: brandId },
+    { enabled: !!brandId, refetchInterval: 4_000 },
+  ) : null;
+  const jobData = (job?.data as any) ?? null;
+  const isRunning = jobData?.status === "running";
+  const isDone = jobData?.status === "done";
+  const isFailed = jobData?.status === "failed";
+  const cur = Number(jobData?.currentStep ?? 0);
+  const total = Number(jobData?.totalSteps ?? 0);
+
+  const startMut = (trpc as any).positioningJobs?.start?.useMutation?.();
+
+  const handleAuto = () => {
+    if (!brandId || !entityKind || locked) return;
+    if (isRunning) return;
+    startMut?.mutate?.({ entityKind, entityId: brandId, lang: "zh-TW" });
+  };
+
+  const buttonLabel =
+    isRunning ? `自動定位中 (${cur}/${total || "?"})…`
+  : isDone     ? "重新自動定位"
+  : isFailed   ? "重試自動定位"
+  : "✨ 自動定位";
+
+  return (
+    <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleAuto}
+          disabled={!brandId || !entityKind || locked || isRunning}
+          className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition ${
+            isRunning ? "bg-violet-100 text-violet-700 cursor-wait"
+            : locked ? "bg-default-100 text-default-400 cursor-not-allowed"
+            : "bg-violet-600 text-white hover:bg-violet-700 cursor-pointer shadow-sm"
+          }`}
+          title={
+            locked ? "已鎖定" :
+            isRunning ? `背景產生中 (step ${cur}/${total})` :
+            "用 14-step pipeline 自動填寫所有定位欄位（背景執行，retry × 5）"
+          }
+        >
+          <Sparkles size={14} className={isRunning ? "animate-pulse" : ""} />
+          {buttonLabel}
+        </button>
+
+        {isRunning && total > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-32 h-1.5 bg-default-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-violet-500 transition-all"
+                style={{ width: `${Math.min(100, (cur / total) * 100)}%` }}
+              />
+            </div>
+            <span className="text-xs text-default-500 tabular-nums">{cur}/{total}</span>
+          </div>
+        )}
+
+        {isFailed && jobData?.lastError && (
+          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}>
+            ⚠ {String(jobData.lastError).slice(0, 80)}
+          </span>
+        )}
+
+        {isDone && (
+          <span className="text-xs text-emerald-700">✓ 已完成 14 個段落</span>
+        )}
+      </div>
+
+      <button
+        onClick={onLockToggle}
+        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition ${
+          locked ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                 : "bg-default-100 text-default-600 hover:bg-default-200"
+        }`}
+        title={locked ? "點擊解鎖定位" : "點擊鎖定定位"}
+      >
+        <FontAwesomeIcon icon={locked ? faLock : faLockOpen} className="text-[11px]" />
+        {locked ? "已鎖定 · 點此解鎖" : "鎖定定位"}
+      </button>
     </div>
   );
 }
