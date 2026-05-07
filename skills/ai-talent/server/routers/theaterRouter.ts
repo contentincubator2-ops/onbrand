@@ -74,41 +74,77 @@ const CTA_PLAYBOOK: Record<CtaKey, string> = {
 };
 
 /**
- * Detect & strip the "LLM restart-rewrite" pattern.
+ * Detect & strip "LLM restart-rewrite" patterns.
  *
- * Some captions come back like:
- *   "超過 300 萬筆台灣捕獲紀錄分析後，我們發現了一件反直覺的事：多數玩家堅信的「
+ * Two flavors observed in production:
  *
- *    超過 300 萬筆台灣捕獲紀錄分析後，我們發現了一件反直覺的事：多數玩家堅信的「黃金出沒時段」，..."
+ *  A) Inline restart (no paragraph break):
+ *     "...堅信的「\n超過 300 萬筆...堅信的「黃金出沒時段」..."
  *
- * The model writes a partial first sentence, line-breaks, then rewrites
- * the full caption. We detect this by finding the first 20+ chars of the
- * caption appearing again *later* in the text (likely after a blank line)
- * and dropping everything before that second occurrence.
+ *  B) Paragraph-level restart (the common case):
+ *     "Pokemon GO 只要加個 Discord 群就夠了，但其實光靠一個群，你很
  *
- * Conservative thresholds:
- *   - prefix length ≥ 18 chars (avoids matching short stock phrases)
- *   - second occurrence must start within first 320 chars (real restart
- *     happens early; later matches are legitimate refrain/repetition)
- *   - prefix must NOT contain a 句點/換行 (a complete first sentence
- *     that legitimately starts the caption is fine — only abandoned
- *     mid-sentence stubs count)
+ *      Pokemon GO 只要加個 Discord 群就夠了，但其實光靠一個群，你很可能..."
+ *     → first paragraph is a stub, second is the full version,
+ *       second STARTS WITH the same chars as the stub.
+ *
+ * dedupeRestart handles both. Always runs on every QA output — the LLM
+ * polish can't be trusted to dedupe even when explicitly told to.
  */
-function stripRestartPrefix(caption: string): string {
-  if (!caption) return caption;
+function dedupeRestart(text: string): string {
+  if (!text) return text;
+  let out = text.trim();
+
+  // Pattern B — paragraph-level. Walk paragraphs front-to-back; if any
+  // paragraph N is a strict prefix of paragraph N+1 (or shares a long
+  // prefix with it), drop N. Repeat until stable.
+  for (let pass = 0; pass < 3; pass++) {
+    const paras = out.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    if (paras.length < 2) break;
+    let mutated = false;
+    const kept: string[] = [];
+    for (let i = 0; i < paras.length; i++) {
+      const cur = paras[i] ?? "";
+      const next = paras[i + 1] ?? "";
+      // Stub must be shorter, ≥ 8 chars, and lack an end-of-sentence finish
+      const stubLooksIncomplete =
+        cur.length >= 8 &&
+        cur.length < next.length &&
+        !/[。！？]$/.test(cur);
+      if (stubLooksIncomplete) {
+        // Compare prefix — if next starts with cur (or first 12+ chars of cur)
+        const head = cur.length > 30 ? cur.slice(0, 30) : cur;
+        if (next.startsWith(head) || next.startsWith(cur.slice(0, 15))) {
+          // Skip cur — it's the abandoned stub
+          mutated = true;
+          continue;
+        }
+      }
+      kept.push(cur);
+    }
+    if (!mutated) break;
+    out = kept.join("\n\n").trim();
+  }
+
+  // Pattern A — inline (within first 320 chars), the original heuristic
   for (const len of [40, 32, 24, 18]) {
-    if (caption.length <= len * 2) continue;
-    const head = caption.slice(0, len).trim();
+    if (out.length <= len * 2) continue;
+    const head = out.slice(0, len).trim();
     if (!head) continue;
-    // Skip if head contains end-of-sentence punctuation (legit start)
-    if (/[。！？\n]/.test(head)) continue;
-    const second = caption.indexOf(head, len);
+    if (/[。！？]/.test(head)) continue; // legit complete first sentence
+    const second = out.indexOf(head, len + 1);
     if (second > 0 && second <= 320) {
-      return caption.slice(second).trim();
+      out = out.slice(second).trim();
+      break;
     }
   }
-  return caption;
+  return out;
 }
+
+// Backwards-compat alias for any old callers (none currently — kept for
+// future surgery without thrashing imports)
+const stripRestartPrefix = dedupeRestart;
+void stripRestartPrefix;
 
 /** Round-robin allocate hooks ensuring no two consecutive days on the
  *  same platform repeat. Stable per-brand seed so re-runs reproduce. */
@@ -496,7 +532,7 @@ ${importantHint}
     }))
     .mutation(async ({ input }) => {
       // 1) Cheap programmatic dedupe (the restart-pattern we already know)
-      let cleaned = stripRestartPrefix(input.draft);
+      let cleaned = dedupeRestart(input.draft);
 
       // 2) LLM polish for soft issues. Keep model output tightly scoped:
       //    plain-text caption only, no commentary, no markdown.
@@ -549,6 +585,10 @@ ${cleaned}
             (polished.startsWith("\"") && polished.endsWith("\""))) {
           polished = polished.slice(1, -1).trim();
         }
+        // BELT-AND-SUSPENDERS: run dedupe again on LLM output. The polish
+        // model frequently echoes the input verbatim or re-introduces the
+        // restart pattern even when explicitly told to remove it.
+        polished = dedupeRestart(polished);
         // Safety: if QA returned empty or radically shorter, prefer the
         // dedup'd cleaned version
         if (!polished || polished.length < cleaned.length * 0.4) {
@@ -557,7 +597,7 @@ ${cleaned}
         return { ok: true as const, caption: polished, polished: true as const };
       } catch (e: any) {
         // QA fail → return programmatic-clean version (still better than draft)
-        return { ok: true as const, caption: cleaned, polished: false as const, error: String(e?.message ?? e) };
+        return { ok: true as const, caption: dedupeRestart(cleaned), polished: false as const, error: String(e?.message ?? e) };
       }
     }),
 
