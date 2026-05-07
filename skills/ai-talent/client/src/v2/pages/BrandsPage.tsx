@@ -33,6 +33,7 @@ import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import ConnectorEditor from "../components/positioning/ConnectorEditor";
+import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
 // Notion-style line icons
@@ -97,6 +98,8 @@ export default function BrandsPage() {
 
   // Add entity modal (新增品牌 / 產品 / 活動)
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
+  // Inline test panel (試寫 expand below kicker row)
+  const [testPanelOpen, setTestPanelOpen] = useState(false);
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
@@ -614,26 +617,30 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Header (compact 2-line, centered) ──────────────────────
-          Line 1: emblem + brand name (centered).
-          Line 2: stats · BRAND WORKSPACE pill (small grey).
-          Then tiles row, then message bar. */}
-      <div className="relative pt-5 pb-4 px-6">
+      {/* ─── Hero — /30s-style centered axis (CJ feedback 2026-05-07) ───
+          eyebrow → title → stats → message bar → tiles → kicker.
+          測試 / 定案 chips live in the kicker row, NOT in the bar. */}
+      <div className="relative pt-10 pb-6 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
-          {/* Line 1 — emblem + name */}
-          <div className="flex items-center gap-2.5 mb-1.5">
+          {/* Eyebrow */}
+          <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
+            SoWork · BRAND
+          </p>
+
+          {/* Emblem + gradient title (one centered line) */}
+          <div className="flex items-center gap-3 mb-3">
             <div style={{
-              width: 34, height: 34, borderRadius: 10,
+              width: 44, height: 44, borderRadius: 12,
               background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 3px 10px rgba(124,58,237,0.24)",
+              boxShadow: "0 4px 14px rgba(124,58,237,0.25)",
             }}>
-              <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 15 }} />
+              <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 18 }} />
             </div>
             <h1
               className="font-semibold tracking-tight leading-none"
               style={{
-                fontSize: "clamp(1.35rem, 2.2vw, 1.85rem)",
+                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
                 background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -644,22 +651,17 @@ export default function BrandsPage() {
             </h1>
           </div>
 
-          {/* Line 2 — stats · BRAND WORKSPACE pill */}
-          <div className="flex items-center gap-2 mb-3 text-tiny text-default-500">
+          {/* Stats */}
+          <div className="text-small text-default-500 mb-5">
             <EntityStats variant="inline" />
-            <span className="text-default-300">·</span>
-            <span
-              className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
-              style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
-            >
-              BRAND WORKSPACE
-            </span>
           </div>
 
-          {/* Tab tiles — kept BEFORE the message bar so they stay
-              visible even when 測試 panel expands the bar inline. */}
-          <div className="w-full overflow-x-auto mb-4" style={{ scrollbarWidth: "none" }}>
-            <div className="flex items-start gap-3 w-max mx-auto px-2 pb-1">
+          {/* Message bar — display-only; matches /30s search bar visually */}
+          <BrandMessageBar brandId={activeBrandIdForLocks} />
+
+          {/* Tab tiles — /30s circular colored style (5 tiles incl. 連結) */}
+          <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
                 { v: "positioning" as const, label: "定位", Icon: LucideTarget,   bg: "#7C3AED" },
                 { v: "copy"        as const, label: "文字", Icon: LucideType,     bg: "#0EA5E9" },
@@ -703,11 +705,23 @@ export default function BrandsPage() {
             </div>
           </div>
 
-          {/* Brand-message bar — moved BELOW tiles so 測試 expansion
-              pushes the tab content area, not the navigation tiles. */}
-          <BrandMessageBar brandId={activeBrandIdForLocks} />
+          {/* Kicker row — BRAND WORKSPACE pill + action chips (試寫 / 定案) */}
+          <KickerRow
+            brandId={activeBrandIdForLocks}
+            scopeName={scopeName}
+            testOpen={testPanelOpen}
+            onToggleTest={() => setTestPanelOpen((v) => !v)}
+          />
         </div>
       </div>
+
+      {/* Inline test panel — slides below the hero, pushes tab content
+          down. Stays open until user closes via × or 收起試寫. */}
+      <BrandTestPanel
+        brandId={activeBrandIdForLocks}
+        open={testPanelOpen}
+        onClose={() => setTestPanelOpen(false)}
+      />
 
       {/* Brain bar — appears WHILE positioning pipeline runs.
           Shows current step's agent + thinking text in the same line-art
@@ -2344,6 +2358,41 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
           {err && <span className="text-tiny text-danger-600">{err}</span>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── KickerRow ───────────────────────────────
+   Tiny grey row sitting under the tiles, matches /30s "tier signature".
+   BRAND WORKSPACE pill + brand name + 試寫 chip + 定案 chip.
+   ───────────────────────────────────────────────────────────────────── */
+function KickerRow({
+  brandId, scopeName, testOpen, onToggleTest,
+}: {
+  brandId: number | null;
+  scopeName: string;
+  testOpen: boolean;
+  onToggleTest: () => void;
+}) {
+  const { status, isRunning } = usePositioningStatus(brandId);
+  return (
+    <div className="mt-4 flex items-center gap-2 text-tiny text-default-400 flex-wrap justify-center">
+      <span
+        className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
+        style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
+      >
+        BRAND WORKSPACE
+      </span>
+      <span>·</span>
+      <span className="text-default-600">{scopeName}</span>
+      <span className="text-default-300 mx-1">|</span>
+      <BrandActionChipsRow
+        brandId={brandId}
+        expanded={testOpen}
+        onToggle={onToggleTest}
+        status={status}
+        isRunning={isRunning}
+      />
     </div>
   );
 }
