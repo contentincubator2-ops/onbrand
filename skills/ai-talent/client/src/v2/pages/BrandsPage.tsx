@@ -98,6 +98,21 @@ export default function BrandsPage() {
   const tabLocks = (tabLocksQuery.data as { positioning: any; copy: any; visual: any } | null) ?? { positioning: null, copy: null, visual: null };
   const lockTabMut   = (trpc as any).theater?.lockTab?.useMutation();
   const unlockTabMut = (trpc as any).theater?.unlockTab?.useMutation();
+  // Load brand's full positioning JSON so cards can show preview content
+  // without re-fetching per-tile (single round trip via scope.active).
+  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery
+    ? (trpc as any).scope.active.useQuery(
+        { brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: null },
+        { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false, staleTime: 30_000 }
+      )
+    : { data: null };
+  const fullPositioning = (scopeActiveQuery.data as any)?.brand?.positioning ?? {};
+  const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
+  // Positioning segments live as top-level keys in `positioning` (e.g.
+  // positioning.goldenCircle, positioning.tagline...) — written by the
+  // pipeline runner. We pass the whole bag to PositioningGrid for preview.
+  const positioningSegmentData: Record<string, any> = fullPositioning ?? {};
+
   const handleLockToggle = async (tab: "positioning" | "copy" | "visual") => {
     if (!activeBrandIdForLocks) return;
     try {
@@ -871,6 +886,7 @@ export default function BrandsPage() {
                     scopeMode={scopeMode}
                     segments={segments}
                     onSelect={setSection}
+                    segmentData={positioningSegmentData}
                   />
                 </div>
               ) : (
@@ -1041,15 +1057,22 @@ export default function BrandsPage() {
                           gap: 14,
                           marginBottom: 4,
                         }}>
-                          {group.items.map(item => (
-                            <AssetCard
-                              key={item.id}
-                              label={item.label}
-                              icon={item.icon}
-                              bg={item.bg}
-                              onClick={() => setSection(item.id)}
-                            />
-                          ))}
+                          {group.items.map(item => {
+                            const k = item.id.startsWith("asset:") ? item.id.slice("asset:".length) : item.id;
+                            const v = brandAssets[k];
+                            const preview = previewForAsset(k, v);
+                            return (
+                              <AssetCard
+                                key={item.id}
+                                label={item.label}
+                                icon={item.icon}
+                                bg={item.bg}
+                                onClick={() => setSection(item.id)}
+                                preview={preview}
+                                hasContent={!!preview}
+                              />
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
@@ -1166,15 +1189,22 @@ export default function BrandsPage() {
                           gap: 14,
                           marginBottom: 4,
                         }}>
-                          {group.items.map(item => (
-                            <AssetCard
-                              key={item.id}
-                              label={item.label}
-                              icon={item.icon}
-                              bg={item.bg}
-                              onClick={() => setSection(item.id)}
-                            />
-                          ))}
+                          {group.items.map(item => {
+                            const k = item.id.startsWith("asset:") ? item.id.slice("asset:".length) : item.id;
+                            const v = brandAssets[k];
+                            const preview = previewForAsset(k, v);
+                            return (
+                              <AssetCard
+                                key={item.id}
+                                label={item.label}
+                                icon={item.icon}
+                                bg={item.bg}
+                                onClick={() => setSection(item.id)}
+                                preview={preview}
+                                hasContent={!!preview}
+                              />
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
@@ -1316,11 +1346,13 @@ function PositioningBrainBar({ thinking }: {
 /* ─────────────────────────── PositioningGrid ───────────────────────── */
 // 品牌定位的 card grid — 速查卡/指令庫 + segments 分組顯示
 function PositioningGrid({
-  scopeMode, segments, onSelect,
+  scopeMode, segments, onSelect, segmentData,
 }: {
   scopeMode: "brand" | "product" | "event" | "none";
   segments: import("../lib/positioningSchema").SegmentSpec[];
   onSelect: (section: string) => void;
+  /** Map of segment id → its current content (top-level positioning keys). */
+  segmentData?: Record<string, any>;
 }) {
   // Derive groups from segment num prefix
   const groupedSegs = React.useMemo(() => {
@@ -1386,15 +1418,59 @@ function PositioningGrid({
             )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
-            {group.segs.map((s, si) => (
-              <AssetCard
-                key={s.id}
-                label={`${s.num} ${s.title}`}
-                icon={ICONS[s.id] ?? faBookOpen}
-                bg={BG_CYCLE[(gi * 4 + si) % BG_CYCLE.length]!}
-                onClick={() => onSelect(`seg:${s.id}`)}
-              />
-            ))}
+            {group.segs.map((s, si) => {
+              // Try to derive a preview from segment data:
+              // positioning[segId] could be a string, object {summary,...},
+              // or array. Stringify carefully + truncate.
+              const segVal = segmentData?.[s.id];
+              let preview: React.ReactNode | null = null;
+              let hasContent = false;
+              if (segVal != null) {
+                if (typeof segVal === "string") {
+                  const t = segVal.trim();
+                  if (t) { preview = <span>{t.length > 140 ? t.slice(0, 140) + "…" : t}</span>; hasContent = true; }
+                } else if (typeof segVal === "object") {
+                  // Pull the most likely "main text" field
+                  const candidates = [
+                    segVal.summary, segVal.statement, segVal.value, segVal.text,
+                    segVal.tagline, segVal.story, segVal.why, segVal.usp,
+                  ].filter((x: any) => typeof x === "string" && x.trim());
+                  if (candidates.length > 0) {
+                    const t = String(candidates[0]).trim();
+                    preview = <span>{t.length > 140 ? t.slice(0, 140) + "…" : t}</span>;
+                    hasContent = true;
+                  } else if (Array.isArray(segVal)) {
+                    const items = segVal.filter((x: any) => typeof x === "string");
+                    if (items.length > 0) {
+                      preview = (
+                        <span>
+                          {items.slice(0, 3).map((x: string, i: number) => (
+                            <span key={i} style={{
+                              display: "inline-block", margin: "1px 3px 1px 0",
+                              padding: "1px 6px", borderRadius: 999,
+                              background: "rgba(255,255,255,0.7)", fontSize: 10,
+                            }}>{x}</span>
+                          ))}
+                          {items.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{items.length - 3}</span>}
+                        </span>
+                      );
+                      hasContent = true;
+                    }
+                  }
+                }
+              }
+              return (
+                <AssetCard
+                  key={s.id}
+                  label={`${s.num} ${s.title}`}
+                  icon={ICONS[s.id] ?? faBookOpen}
+                  bg={BG_CYCLE[(gi * 4 + si) % BG_CYCLE.length]!}
+                  onClick={() => onSelect(`seg:${s.id}`)}
+                  preview={preview}
+                  hasContent={hasContent}
+                />
+              );
+            })}
           </div>
         </div>
       ))}
@@ -1420,11 +1496,66 @@ function PositioningGrid({
 }
 
 /* ─────────────────────────── AssetCard ─────────────────────────── */
-// ③ 4-col 資產卡片：hover scale(1.02) + shadow 加深
-function AssetCard({ label, icon, bg, onClick }: {
+// ③ 4-col 資產卡片：hover scale(1.02) + shadow 加深。
+// 支援可選的 preview — 已填內容直接顯示在卡片上，省去點進去才看到。
+function AssetCard({ label, icon, bg, onClick, preview, hasContent }: {
   label: string; icon: any; bg: string; onClick: () => void;
+  preview?: React.ReactNode;
+  hasContent?: boolean;
 }) {
   const [hovered, setHovered] = React.useState(false);
+  // Two layouts:
+  //   compact (no preview)  → centered icon + label, 28px padding
+  //   detailed (preview)    → top-left icon + label, preview content area, 14px padding
+  if (preview) {
+    return (
+      <button
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          display: "flex", flexDirection: "column", alignItems: "stretch", textAlign: "left",
+          gap: 8, padding: "14px 14px 12px", borderRadius: 12,
+          background: bg, border: "1px solid rgba(0,0,0,0.06)",
+          cursor: "pointer", width: "100%",
+          minHeight: 132,
+          transform: hovered ? "scale(1.015)" : "scale(1)",
+          boxShadow: hovered ? "0 8px 24px rgba(0,0,0,0.13)" : "0 1px 4px rgba(0,0,0,0.06)",
+          transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: "rgba(255,255,255,0.65)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <FontAwesomeIcon icon={icon} style={{ fontSize: 14, color: "#6B7280" }} />
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", flex: 1, minWidth: 0 }}>
+            {label}
+          </span>
+          {hasContent && (
+            <span style={{
+              fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4,
+              background: "rgba(16,185,129,0.18)", color: "#047857",
+            }}>已填</span>
+          )}
+        </div>
+        <div style={{
+          flex: 1,
+          fontSize: 11, lineHeight: 1.55, color: "#4B5563",
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 5,
+          WebkitBoxOrient: "vertical",
+        }}>
+          {preview}
+        </div>
+      </button>
+    );
+  }
   return (
     <button
       onClick={onClick}
@@ -1444,8 +1575,104 @@ function AssetCard({ label, icon, bg, onClick }: {
     >
       <FontAwesomeIcon icon={icon} style={{ fontSize: 28, color: "#6B7280", opacity: 0.85 }} />
       <span style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{label}</span>
+      <span style={{ fontSize: 10, color: "#9CA3AF" }}>尚未填寫 — 點進去開始</span>
     </button>
   );
+}
+
+/** Derive a preview ReactNode from an asset value. Returns null if no
+ *  meaningful content yet (caller falls back to compact card). */
+function previewForAsset(assetKey: string, value: any): React.ReactNode | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value;
+  // text-like: GenericTextarea uses { text } or { links }
+  const textBlob = (v.text ?? v.links ?? "").toString().trim();
+
+  // ListEditor: { items: string[] }
+  if (Array.isArray(v.items) && v.items.length > 0) {
+    const cleaned = v.items.map((x: any) => String(x).trim()).filter(Boolean);
+    if (cleaned.length === 0) return null;
+    return (
+      <span>
+        {cleaned.slice(0, 4).map((x: string, i: number) => (
+          <span key={i} style={{
+            display: "inline-block", margin: "1px 3px 1px 0",
+            padding: "1px 6px", borderRadius: 999,
+            background: "rgba(255,255,255,0.7)", color: "#374151",
+            fontSize: 10, fontWeight: 500,
+          }}>{x.length > 14 ? x.slice(0, 14) + "…" : x}</span>
+        ))}
+        {cleaned.length > 4 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{cleaned.length - 4}</span>}
+      </span>
+    );
+  }
+  // PairListEditor: { pairs: [{from, to}] }
+  if (Array.isArray(v.pairs) && v.pairs.length > 0) {
+    const ps = v.pairs.filter((p: any) => p?.from && p?.to);
+    if (ps.length === 0) return null;
+    return (
+      <span>
+        {ps.slice(0, 3).map((p: any, i: number) => (
+          <span key={i} style={{ display: "block", marginBottom: 2 }}>
+            <span style={{ color: "#9CA3AF" }}>{p.from}</span>
+            <span style={{ color: "#9CA3AF", margin: "0 4px" }}>→</span>
+            <span style={{ color: "#374151", fontWeight: 500 }}>{p.to}</span>
+          </span>
+        ))}
+        {ps.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{ps.length - 3} 條</span>}
+      </span>
+    );
+  }
+  // ColorFields: { list: [{name, hex}] }
+  if (assetKey === "colors" && Array.isArray(v.list) && v.list.length > 0) {
+    const colors = v.list.filter((c: any) => c?.hex);
+    if (colors.length === 0) return null;
+    return (
+      <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        {colors.slice(0, 6).map((c: any, i: number) => (
+          <span key={i} style={{
+            display: "inline-flex", alignItems: "center", gap: 4,
+            fontSize: 10, color: "#374151",
+          }}>
+            <span style={{
+              width: 14, height: 14, borderRadius: 4,
+              background: c.hex,
+              border: "1px solid rgba(0,0,0,0.08)",
+            }} />
+            {c.name ?? c.hex}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  // LogoFields: { primaryUrl, ... }
+  if (assetKey === "logo" && (v.primaryUrl || v.iconUrl || v.darkUrl)) {
+    return (
+      <span style={{ fontSize: 10 }}>
+        {v.primaryUrl && <span style={{ display: "block", color: "#374151" }}>主 logo: {String(v.primaryUrl).slice(0, 40)}…</span>}
+        {v.guidelines && <span style={{ display: "block", color: "#6B7280", marginTop: 2 }}>{String(v.guidelines).slice(0, 60)}</span>}
+      </span>
+    );
+  }
+  // FontFields: { primary, secondary, ... }
+  if (assetKey === "fonts") {
+    const lines: string[] = [];
+    if (v.primary) lines.push(`主：${v.primary}`);
+    if (v.secondary) lines.push(`副：${v.secondary}`);
+    if (lines.length === 0) return null;
+    return <span>{lines.join(" · ")}</span>;
+  }
+  // PhotoFields: { urls: [...] } or { list: [...] }
+  if (assetKey === "photos") {
+    const urls: string[] = Array.isArray(v.urls) ? v.urls : Array.isArray(v.list) ? v.list : [];
+    if (urls.length === 0) return null;
+    return <span>{urls.length} 張照片</span>;
+  }
+  // Generic textarea
+  if (textBlob) {
+    return <span>{textBlob.length > 140 ? textBlob.slice(0, 140) + "…" : textBlob}</span>;
+  }
+  return null;
 }
 
 /* ─────────────────────────── VisualNavItem ─────────────────────────── */
