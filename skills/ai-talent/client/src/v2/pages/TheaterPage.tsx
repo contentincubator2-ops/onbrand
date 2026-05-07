@@ -54,6 +54,21 @@ interface ImportantDate {
   name: string;
 }
 
+// Phase 3b — 素材 (產品 / 照片)
+interface ProductMaterial {
+  id: string;
+  name: string;
+  usp: string;
+  launchDate?: string; // YYYY-MM-DD
+  photoUrl?: string;
+}
+interface PhotoMaterial {
+  id: string;
+  url: string;
+  tag: "product" | "scene" | "person" | "lifestyle";
+  note?: string;
+}
+
 interface CellState {
   status: "idle" | "queued" | "writing" | "qa" | "imaging" | "done" | "failed";
   /** Phase 2: per-platform structured fields (IG hashtags, YT chapters,
@@ -418,6 +433,8 @@ const persistKey = (brandId: number | null) =>
 interface PersistedRun {
   activePlatforms: TheaterPlatform[];
   importantDates: ImportantDate[];
+  products?: ProductMaterial[];
+  photos?: PhotoMaterial[];
   cells: Array<[CellKey, CellState]>;
   cellMeta: Array<[CellKey, {
     usp: string;
@@ -475,6 +492,27 @@ export default function TheaterPage() {
   const [importantDates, setImportantDates] = useState<ImportantDate[]>(
     persisted?.importantDates ?? [],
   );
+  const [products, setProducts] = useState<ProductMaterial[]>(
+    persisted?.products ?? [],
+  );
+  const [photos, setPhotos] = useState<PhotoMaterial[]>(
+    persisted?.photos ?? [],
+  );
+
+  // Phase 3b: 加入素材 modal state
+  const [materialModalOpen, setMaterialModalOpen] = useState(false);
+  const [materialTab, setMaterialTab] = useState<"event" | "product" | "photo">("event");
+  // event tab fields (reuses newDate / newDateName below)
+  // product tab fields
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductUsp, setNewProductUsp] = useState("");
+  const [newProductLaunch, setNewProductLaunch] = useState("");
+  // photo tab fields
+  const [newPhotoUrl, setNewPhotoUrl] = useState("");
+  const [newPhotoTag, setNewPhotoTag] = useState<"product" | "scene" | "person" | "lifestyle">("product");
+  const [newPhotoNote, setNewPhotoNote] = useState("");
+
+  const totalMaterials = importantDates.length + products.length + photos.length;
   const [showAddDate, setShowAddDate] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [newDateName, setNewDateName] = useState("");
@@ -539,15 +577,17 @@ export default function TheaterPage() {
   useEffect(() => {
     if (!brandId) return;
     // Skip empty initial state to avoid writing junk before first run
-    if (cells.size === 0 && cellMeta.size === 0) return;
+    if (cells.size === 0 && cellMeta.size === 0 && products.length === 0 && photos.length === 0) return;
     savePersisted(brandId, {
       activePlatforms,
       importantDates,
+      products,
+      photos,
       cells: Array.from(cells.entries()),
       cellMeta: Array.from(cellMeta.entries()),
       savedAt: Date.now(),
     });
-  }, [brandId, activePlatforms, importantDates, cells, cellMeta]);
+  }, [brandId, activePlatforms, importantDates, products, photos, cells, cellMeta]);
 
   // When brand switches, hydrate from that brand's persistence (or reset).
   const lastBrandRef = useRef<number | null>(brandId);
@@ -559,6 +599,8 @@ export default function TheaterPage() {
     setCellMeta(new Map(p?.cellMeta ?? []));
     setActivePlatforms(p?.activePlatforms ?? ["facebook", "instagram", "youtube"]);
     setImportantDates(p?.importantDates ?? []);
+    setProducts(p?.products ?? []);
+    setPhotos(p?.photos ?? []);
   }, [brandId]);
 
   // Brain bar state
@@ -605,6 +647,9 @@ export default function TheaterPage() {
         importantDates: importantDates.map((d) => ({ date: d.date, name: d.name })),
         // Phase 1: pass dates so server can pre-allocate hook + CTA per cell
         dates: days.map((d) => d.date),
+        // Phase 3b: 素材 (products + photos) so chief brief can mention them
+        products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
+        photos: photos.map((ph) => ({ url: ph.url, tag: ph.tag, note: ph.note })),
       });
     } catch (e) {
       console.error("[theater] runStart failed:", e);
@@ -788,6 +833,9 @@ export default function TheaterPage() {
             // Phase 3a: run-scope ad-hoc rules (brand-scope rules are
             // loaded server-side from DB)
             adhocRules: runRules,
+            // Phase 3b: 素材 context
+            products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
+            photoTags: photos.map((ph) => ph.tag),
           });
           if (stopRef.current) return;
           if (r.ok && r.caption) {
@@ -1156,59 +1204,49 @@ export default function TheaterPage() {
           })}
         </div>
 
-        {/* Important dates */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-neutral-500 mr-2">重要日子：</span>
+        {/* Phase 3b: 加入素材 toolbar — prominent button + summary chips */}
+        <div className="flex items-center gap-2 flex-wrap mt-3">
+          <button
+            onClick={() => { setMaterialModalOpen(true); setMaterialTab("event"); }}
+            className="px-4 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 border-2 border-indigo-200 hover:border-indigo-400 flex items-center gap-2 text-sm font-medium transition shadow-sm"
+            disabled={running}
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            <span>📦 加入素材</span>
+            {totalMaterials > 0 && (
+              <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
+                {totalMaterials}
+              </span>
+            )}
+          </button>
+
+          {/* Inline summary chips */}
           {importantDates.map((d) => (
-            <span
-              key={d.id}
-              className="px-2.5 py-1 text-xs rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5"
-            >
+            <span key={d.id} className="px-2.5 py-1 text-xs rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5">
               <CalendarIcon size={11} strokeWidth={2} />
               <span className="font-semibold">{d.date.slice(5)}</span>
               <span>{d.name}</span>
-              <button
-                onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))}
-                className="text-amber-600 hover:text-amber-900"
-              >
+              <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-600 hover:text-amber-900">
                 <X size={11} />
               </button>
             </span>
           ))}
-          {showAddDate ? (
-            <span className="flex items-center gap-1.5 px-2 py-1 bg-white border border-neutral-300 rounded-lg">
-              <input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="text-xs outline-none"
-              />
-              <input
-                type="text"
-                placeholder="名稱（例：母親節）"
-                value={newDateName}
-                onChange={(e) => setNewDateName(e.target.value)}
-                className="text-xs outline-none w-32"
-              />
-              <button onClick={handleAddDate} className="text-emerald-600 hover:text-emerald-800">
-                <Check size={14} strokeWidth={2.5} />
-              </button>
-              <button
-                onClick={() => { setShowAddDate(false); setNewDate(""); setNewDateName(""); }}
-                className="text-neutral-400 hover:text-neutral-700"
-              >
-                <X size={14} />
+          {products.map((p) => (
+            <span key={p.id} className="px-2.5 py-1 text-xs rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
+              📦 <span className="font-semibold">{p.name}</span>
+              <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900">
+                <X size={11} />
               </button>
             </span>
-          ) : (
-            <button
-              onClick={() => setShowAddDate(true)}
-              className="text-xs text-neutral-600 hover:text-neutral-900 flex items-center gap-1 px-2.5 py-1 rounded-lg border border-dashed border-neutral-300 hover:border-neutral-500"
-            >
-              <Plus size={12} strokeWidth={2} />
-              加入重要日子
-            </button>
-          )}
+          ))}
+          {photos.map((ph) => (
+            <span key={ph.id} className="px-2.5 py-1 text-xs rounded-lg bg-pink-50 text-pink-800 border border-pink-200 flex items-center gap-1.5">
+              📸 <span>{ph.tag}</span>
+              <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="text-pink-600 hover:text-pink-900">
+                <X size={11} />
+              </button>
+            </span>
+          ))}
         </div>
       </div>
 
@@ -1274,6 +1312,168 @@ export default function TheaterPage() {
                 );
               });
             })}
+          </div>
+        )}
+
+        {/* Phase 3b — 加入素材 modal (3 tabs: 活動 / 產品 / 照片) */}
+        {materialModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6" onClick={() => setMaterialModalOpen(false)}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-base font-semibold text-neutral-900 mb-1">📦 加入素材</h3>
+              <p className="text-xs text-neutral-500 mb-4">活動 / 產品 / 照片，等等開始企劃時 agents 會把這些 context 都吃進去。</p>
+
+              {/* Tab switcher */}
+              <div className="flex items-center gap-1 mb-5 border-b border-neutral-200">
+                {([
+                  { v: "event"   as const, label: "🗓 活動",  count: importantDates.length },
+                  { v: "product" as const, label: "📦 產品",  count: products.length },
+                  { v: "photo"   as const, label: "📸 照片",  count: photos.length },
+                ]).map((t) => (
+                  <button
+                    key={t.v}
+                    onClick={() => setMaterialTab(t.v)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
+                      materialTab === t.v
+                        ? "border-indigo-500 text-indigo-700"
+                        : "border-transparent text-neutral-500 hover:text-neutral-800"
+                    }`}
+                  >
+                    {t.label} {t.count > 0 && <span className="text-xs text-neutral-400">({t.count})</span>}
+                  </button>
+                ))}
+              </div>
+
+              {/* Event tab */}
+              {materialTab === "event" && (
+                <div className="space-y-3">
+                  {importantDates.length > 0 && (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {importantDates.map((d) => (
+                        <div key={d.id} className="flex items-center justify-between bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                          <span className="text-sm">🗓 <b>{d.date}</b> {d.name}</span>
+                          <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-600 hover:text-amber-900">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
+                    <input type="text" placeholder="活動 / 檔期名稱（例：母親節限時優惠）" value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <button
+                      onClick={() => { handleAddDate(); }}
+                      disabled={!newDate || !newDateName}
+                      className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                    >
+                      新增
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Product tab */}
+              {materialTab === "product" && (
+                <div className="space-y-3">
+                  {products.length > 0 && (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {products.map((p) => (
+                        <div key={p.id} className="flex items-start justify-between bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+                          <div className="text-sm">
+                            <p>📦 <b>{p.name}</b> {p.launchDate && <span className="text-emerald-600 text-xs">· {p.launchDate} 上市</span>}</p>
+                            <p className="text-xs text-neutral-600 mt-0.5">{p.usp}</p>
+                          </div>
+                          <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-1">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <input type="text" placeholder="產品 / 服務名稱（例：健力餐 5g）" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder="這個產品的 USP（一句話）" value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <div className="flex items-center gap-2">
+                      <input type="date" placeholder="上市日（可選）" value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
+                      <button
+                        onClick={() => {
+                          if (!newProductName || !newProductUsp) return;
+                          setProducts((prev) => [...prev, {
+                            id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                            name: newProductName.trim(),
+                            usp: newProductUsp.trim(),
+                            launchDate: newProductLaunch || undefined,
+                          }]);
+                          setNewProductName(""); setNewProductUsp(""); setNewProductLaunch("");
+                        }}
+                        disabled={!newProductName || !newProductUsp}
+                        className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                      >
+                        新增
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Photo tab */}
+              {materialTab === "photo" && (
+                <div className="space-y-3">
+                  {photos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                      {photos.map((ph) => (
+                        <div key={ph.id} className="relative group">
+                          <img src={ph.url} alt={ph.note ?? ph.tag} className="w-full aspect-square object-cover rounded-lg border border-pink-200" />
+                          <span className="absolute top-1 left-1 text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/90 text-white font-medium">
+                            {ph.tag}
+                          </span>
+                          <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <input type="url" placeholder="照片 URL（直接貼網址 / 將來支援上傳）" value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <div className="flex items-center gap-2">
+                      <select value={newPhotoTag} onChange={(e) => setNewPhotoTag(e.target.value as any)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded">
+                        <option value="product">產品實拍</option>
+                        <option value="scene">場景</option>
+                        <option value="person">人物</option>
+                        <option value="lifestyle">情境</option>
+                      </select>
+                      <input type="text" placeholder="備註（可選）" value={newPhotoNote} onChange={(e) => setNewPhotoNote(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <button
+                        onClick={() => {
+                          if (!newPhotoUrl) return;
+                          setPhotos((prev) => [...prev, {
+                            id: `ph-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                            url: newPhotoUrl.trim(),
+                            tag: newPhotoTag,
+                            note: newPhotoNote.trim() || undefined,
+                          }]);
+                          setNewPhotoUrl(""); setNewPhotoNote("");
+                        }}
+                        disabled={!newPhotoUrl}
+                        className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                      >
+                        新增
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end mt-5 pt-4 border-t border-neutral-100">
+                <button
+                  onClick={() => setMaterialModalOpen(false)}
+                  className="text-sm px-4 py-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+                >
+                  完成
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

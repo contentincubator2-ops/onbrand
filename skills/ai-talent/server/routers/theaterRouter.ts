@@ -247,6 +247,18 @@ export const theaterRouter = router({
       })).default([]),
       // Phase 1: dates list so we can pre-allocate hook/CTA plans server-side
       dates: z.array(z.string()).optional(),
+      // Phase 3b: 素材 (products + photos) — surfaces in chief opening
+      // and injected into per-cell prompts as additional context.
+      products: z.array(z.object({
+        name: z.string(),
+        usp: z.string(),
+        launchDate: z.string().optional(),
+      })).max(20).optional(),
+      photos: z.array(z.object({
+        url: z.string(),
+        tag: z.string(),
+        note: z.string().optional(),
+      })).max(20).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const [pos, brandRules] = await Promise.all([
@@ -319,6 +331,8 @@ TA：${pos?.targetAudience ?? "（無）"}
 品牌語氣：${pos?.brandVoice ?? "口語、專業"}
 USP 候選：${usps.join("、")}
 本週重要日子：${dateChips}
+${(input.products?.length ?? 0) > 0 ? `\n本次強調的產品：\n${input.products!.map((p) => `  · ${p.name}（USP: ${p.usp}${p.launchDate ? `; ${p.launchDate} 上市` : ""}）`).join("\n")}` : ""}
+${(input.photos?.length ?? 0) > 0 ? `\n可運用素材：${input.photos!.length} 張用戶上傳照片（tag: ${input.photos!.map((ph) => ph.tag).join("/")}）` : ""}
 
 各平台規格：
 ${platformAsks}
@@ -456,6 +470,11 @@ ${platformAsks}
       // Phase 3a — user-defined caption rules. Server fetches brand-scoped
       // rules from DB; client passes run-scoped + post-scoped rules here.
       adhocRules: z.array(z.string()).max(20).optional(),
+      // Phase 3b — 素材 (產品 / 照片) for caption context
+      products: z.array(z.object({
+        name: z.string(), usp: z.string(), launchDate: z.string().optional(),
+      })).max(10).optional(),
+      photoTags: z.array(z.string()).max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const brandRules = await loadBrandRules(input.brandId, ctx.user.id);
@@ -463,6 +482,21 @@ ${platformAsks}
       const rulesInstruction = allRules.length > 0
         ? `\n【品牌規則 — 強制遵守，違反等於失敗】
 ${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
+        : "";
+
+      // Phase 3b: products + photo tags injected as soft context.
+      // Writer can naturally weave product names / use available photo
+      // types in visual descriptions; not strictly enforced.
+      const materialsInstruction = (input.products?.length ?? 0) > 0 || (input.photoTags?.length ?? 0) > 0
+        ? `\n【可運用素材】${
+            (input.products?.length ?? 0) > 0
+              ? `\n產品：${input.products!.map((p) => `${p.name}（${p.usp}${p.launchDate ? `; ${p.launchDate} 上市` : ""}）`).join("、")}`
+              : ""
+          }${
+            (input.photoTags?.length ?? 0) > 0
+              ? `\n可用照片類型：${input.photoTags!.join("、")}（如 USP 帶到視覺，自然提及這些畫面類型）`
+              : ""
+          }`
         : "";
       const guide = PLATFORM_GUIDE[input.platform];
       const importantHint = input.importantDateName
@@ -496,7 +530,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}
+${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。
