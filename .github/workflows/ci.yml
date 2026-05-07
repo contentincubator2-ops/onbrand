@@ -79,13 +79,12 @@ jobs:
               echo "⚠️  migrations had issues — deploy continues, fix via admin-run-migrations workflow"
             }
 
-            echo "===== Install frontend ====="
+            echo "===== Install frontend (force clean) ====="
             cd "$AI/client"
-            # Clear any TS incremental cache that may be out of sync with
-            # current source tree (was causing JSX.IntrinsicElements
-            # resolution failures on SquadLabPage despite local tsc passing).
-            rm -rf node_modules/.cache .tsbuildinfo tsconfig.tsbuildinfo 2>/dev/null || true
-            npm install --legacy-peer-deps 2>&1 | tail -3
+            # Force clean install — VM's stale node_modules has been
+            # producing JSX.IntrinsicElements resolution failures.
+            rm -rf node_modules .tsbuildinfo tsconfig.tsbuildinfo 2>/dev/null || true
+            npm install --legacy-peer-deps 2>&1 | tail -5
 
             echo "===== Build frontend (atomic) ====="
             # Build into a temp dir. The live public/ is never touched until
