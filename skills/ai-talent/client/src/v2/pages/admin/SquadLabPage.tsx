@@ -1,10 +1,3 @@
-// @ts-nocheck — VM build (Linux + Node 20 + clean npm install) hits
-// recurring TS7026 'JSX.IntrinsicElements not found' on this file, while
-// local tsc passes clean (same source, same lockfile, same tsconfig).
-// Suspect: peer-dep resolution drift on @types/react between dev WSL
-// Node + VM node. SquadLabPage is admin-only; runtime is fine.
-// Removing band-aid: dig into VM `npm ls @types/react` to see which
-// version installed, then pin in package.json.
 /**
  * SquadLabPage — admin backend for managing + approving + simulating squads.
  *

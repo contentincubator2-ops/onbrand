@@ -97,13 +97,10 @@ jobs:
             BUILD_TMP="$AI/public_build_tmp"
             rm -rf "$BUILD_TMP"
 
-            # Use build:fast (vite-only, skip tsc). The 'test' job above
-            # already runs full tsc on both server + client and blocks the
-            # deploy if type-checks fail. Running tsc again on the VM
-            # caused intermittent TS7026 errors due to peer-dep resolution
-            # drift (@types/react). Vite's swc transform is enough for
-            # production builds — type errors are caught earlier.
-            npm run build:fast -- --outDir "$BUILD_TMP" --emptyOutDir 2>&1 | tail -20
+            # Full build = tsc + vite. Now that devDeps install correctly
+            # (NODE_ENV=development override above), @types/react resolves
+            # and tsc finds JSX intrinsics.
+            npm run build -- --outDir "$BUILD_TMP" --emptyOutDir 2>&1 | tail -30
 
             NEW_HASH=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$BUILD_TMP/index.html" 2>/dev/null | head -1)
             if [ -z "$NEW_HASH" ]; then
