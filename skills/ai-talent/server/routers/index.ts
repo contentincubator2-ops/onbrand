@@ -49,6 +49,7 @@ import { feedbackRouter } from "./feedbackRouter";
 import { squadLeadRouter } from "./squadLeadRouter";
 import { theaterRouter } from "./theaterRouter";
 import { positioningJobsRouter } from "./positioningJobsRouter";
+import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -103,6 +104,7 @@ export const appRouter = router({
   squadLead:       squadLeadRouter,
   theater:         theaterRouter,
   positioningJobs: positioningJobsRouter,
+  brandKnowledge:  brandKnowledgeRouter,
 });
 
 export type AppRouter = typeof appRouter;

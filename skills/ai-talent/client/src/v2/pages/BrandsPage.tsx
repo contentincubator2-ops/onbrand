@@ -29,13 +29,14 @@ import PipelineRunner, { type PipelineState } from "../components/positioning/Pi
 import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
+import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
 // Notion-style line icons
 import {
   Target as LucideTarget, Type as LucideType, Palette as LucidePalette,
   Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
-  RotateCcw as LucideRotate,
+  RotateCcw as LucideRotate, BookOpen as LucideBook,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -198,12 +199,13 @@ export default function BrandsPage() {
   // tab strip above it.
   const [searchParams, setSearchParams] = useSearchParams();
   const urlCat = searchParams.get("cat") ?? "positioning";
-  const category: "positioning" | "copy" | "visual" | "settings" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "settings" =
     urlCat === "visual" ? "visual"
     : urlCat === "copy" ? "copy"
+    : urlCat === "knowledge" ? "knowledge"
     : urlCat === "settings" ? "settings"
     : "positioning";
-  const setCategory = (next: "positioning" | "copy" | "visual") => {
+  const setCategory = (next: "positioning" | "copy" | "visual" | "knowledge") => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
@@ -224,6 +226,7 @@ export default function BrandsPage() {
       prevCatRef.current = category;
       if (category === "visual" || category === "copy") setSection("asset:all");
       else if (category === "settings") setSection("settings");
+      else if (category === "knowledge") setSection("settings"); // any default — content branch handles it
       else                              setSection("pos:home");
     }
   }, [category]);
@@ -654,53 +657,42 @@ export default function BrandsPage() {
             />
           </div>
 
-          {/* Tab tiles — Notion-style monochrome line icons (no colored bg) */}
+          {/* Tab tiles — /30s circular colored style (4 tiles incl. 知識) */}
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
-                { v: "positioning" as const, label: "定位", Icon: LucideTarget },
-                { v: "copy"        as const, label: "文字", Icon: LucideType },
-                { v: "visual"      as const, label: "視覺", Icon: LucidePalette },
+                { v: "positioning" as const, label: "定位", Icon: LucideTarget,   bg: "#7C3AED" },
+                { v: "copy"        as const, label: "文字", Icon: LucideType,     bg: "#0EA5E9" },
+                { v: "visual"      as const, label: "視覺", Icon: LucidePalette,  bg: "#F97316" },
+                { v: "knowledge"   as const, label: "知識", Icon: LucideBook,     bg: "#10B981" },
               ]).map((t) => {
                 const active = category === t.v;
-                const locked = !!tabLocks[t.v];
+                const locked = t.v !== "knowledge" && !!tabLocks[t.v as "positioning"|"copy"|"visual"];
                 const Icon = t.Icon;
                 return (
                   <button
                     key={t.v}
                     onClick={() => setCategory(t.v)}
-                    className="flex flex-col items-center gap-2 shrink-0 transition hover:opacity-100 cursor-pointer relative"
-                    style={{
-                      padding: "10px 18px 8px",
-                      borderRadius: 12,
-                      background: active ? "#F4F4F5" : "transparent",
-                      opacity: active ? 1 : 0.65,
-                      border: active ? "1px solid #E4E4E7" : "1px solid transparent",
-                    }}
+                    className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer relative"
                   >
-                    <div className="relative flex items-center justify-center" style={{ width: 38, height: 38 }}>
-                      <Icon
-                        size={26}
-                        strokeWidth={1.5}
-                        color={active ? "#18181B" : "#52525B"}
-                      />
+                    <div
+                      className={`w-14 h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
+                      style={{ background: t.bg }}
+                    >
+                      <Icon size={24} strokeWidth={2} color="#fff" />
                       {locked && (
                         <span
-                          className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center"
+                          className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white flex items-center justify-center"
                           style={{ border: "1px solid #18181B" }}
                           title="已鎖定"
                         >
-                          <LucideLock size={9} strokeWidth={2} color="#18181B" />
+                          <LucideLock size={10} strokeWidth={2.5} color="#18181B" />
                         </span>
                       )}
                     </div>
-                    <span style={{
-                      fontSize: 13, fontWeight: active ? 600 : 500,
-                      color: active ? "#18181B" : "#52525B",
-                      letterSpacing: "0.02em",
-                    }}>
+                    <span className={`text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
                       {t.label}
-                      {locked && <span className="ml-1 text-[10px] font-normal" style={{ color: "#71717A" }}>· 已鎖定</span>}
+                      {locked && <span className="ml-1 text-[10px] font-normal" style={{ color: "#71717A" }}>·已鎖定</span>}
                     </span>
                   </button>
                 );
@@ -892,6 +884,11 @@ export default function BrandsPage() {
 
         {/* Right: scope-aware content pane — driven by `section` (sidebar handles all nav) */}
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
+          {/* ── 知識庫 ── */}
+          {derivedCategory === "knowledge" && (
+            <KnowledgeEditor brandId={activeBrandIdForLocks} />
+          )}
+
           {/* ── 品牌 / 產品 / 活動定位 ── */}
           {derivedCategory === "positioning" && (
             <>

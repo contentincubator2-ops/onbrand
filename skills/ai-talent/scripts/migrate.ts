@@ -1161,6 +1161,27 @@ async function main() {
     `);
     console.log("[migrate] usage_log: OK");
 
+    // ── brand_knowledge_items (NotebookLM-style knowledge tile) ─────────
+    // CJ direction (2026-05-07): user uploads their own successful posts /
+    // reference texts; injected into Theater + 30s/60s/100s as additional
+    // context. Cap: 50 items × 8K chars = ~400K chars total per brand.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_knowledge_items (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        userId     INT NOT NULL,
+        brandId    INT NOT NULL,
+        kind       VARCHAR(32) NOT NULL DEFAULT 'reference',
+        title      VARCHAR(255) NOT NULL,
+        body       MEDIUMTEXT NULL,
+        sourceUrl  VARCHAR(1024) NULL,
+        tags       JSON NULL,
+        createdAt  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_brand (brandId, userId, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_knowledge_items: OK");
+
     // ── Brand tab locks (定位 / 文字 / 視覺 lock state) ─────────────────
     // Stores per-brand lock state for the 3 brand workspace tabs. When a
     // tab is locked, the editor is read-only and the platform treats that
