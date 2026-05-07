@@ -98,14 +98,17 @@ async function suggestOne(args: {
   knowledgeBlock: string;
 }): Promise<{ ok: true; value: any; shape: string } | { ok: false; error: string }> {
   const spec = ASSET_SPEC[args.assetKey];
-  const sys = `你是品牌文案顧問，繁體中文。任務：根據品牌定位 + 知識庫 + **品牌真實公開內容**，幫填寫文字資產欄位。
+  const hasReal = (args.realContent ?? "").length > 0;
+  const sys = `你是品牌文案顧問，繁體中文。任務：根據可得資訊填寫文字資產欄位。
 ${spec.ask}
 ${formatHintFor(spec.shape, spec.n)}
 直接輸出 JSON 物件，**第一個字元就是 {**。不要前綴「以下是…」、不要 markdown code fence、不要解釋。
 
-【最重要的規則】
-- 如果下方有「品牌真實公開內容」，**必須**以該內容為準推斷產業 / 受眾 / 語氣。不要用品牌名字猜產業。
-- 如果真實內容跟你的訓練印象不符，以真實內容為準。
+【產出原則】
+${hasReal
+  ? "- 下方提供了品牌的官網 / 社群實際內容，**必須**以該內容為準推斷產業 / 受眾 / 語氣，不要用品牌名字猜產業。\n- 如果真實內容跟訓練印象不符，以真實內容為準。"
+  : "- 目前沒抓到品牌的官網 / 社群實際內容。請根據品牌名 + 描述 + 產業常識，產出合理草案 — 寧可寫一份用戶可以審閱修改的版本，也不要回拒或留空。"
+}
 ${args.brandPrefix}${args.realContent}${args.knowledgeBlock}`;
 
   try {
@@ -282,9 +285,13 @@ export const brandKnowledgeRouter = router({
         tiktok: "TikTok", linkedin: "LinkedIn", email: "EDM 電子報", press: "新聞稿",
       };
       const label = labelMap[input.platform] ?? input.platform;
+      const hasReal = real.hasContent;
       const sys = `你是品牌文案顧問，繁體中文。
 任務：為這個品牌產出在 ${label} 平台寫貼文 / 配圖時可以直接 inject 給 LLM 的 system prompt。
-必須以下方「品牌真實公開內容」推斷產業 / 受眾 / 語氣，不要用品牌名瞎猜。
+${hasReal
+  ? "下方有品牌官網 / 社群實際內容 — 以該內容推斷產業 / 受眾 / 語氣。"
+  : "目前沒抓到品牌的官網 / 社群實際內容，請根據品牌名 + 描述 + 產業常識合理推斷，直接寫指令草稿，不要回拒或留空。"
+}
 
 輸出 JSON：
 {

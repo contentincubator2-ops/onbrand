@@ -21,6 +21,58 @@ import localPool from "../localDb";
 import { invokeLLM } from "./llm";
 import { fetchViralPatterns } from "./socialListeningScout";
 
+/**
+ * Read whatever interim or full positioning is stored for an entity, and
+ * format the "consumer wants X / competitor lacks Y / brand fills Z"
+ * triad as a prompt-injectable block. Used as a fallback when real
+ * public content (FB / website) isn't reachable — gives the LLM a
+ * coherent positioning frame instead of letting it refuse.
+ */
+export async function loadInterimPositioningBlock(
+  entityKind: "brand" | "product" | "event",
+  entityId: number,
+): Promise<string> {
+  const table = entityKind === "brand" ? "brands" : entityKind === "product" ? "products" : "events";
+  const col = entityKind === "brand" ? "soworkAnalysis" : "positioning";
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT \`${col}\` AS payload, name FROM \`${table}\` WHERE id = ? LIMIT 1`,
+      [entityId],
+    );
+    const row = (rows as any[])[0];
+    if (!row) return "";
+    let cur: any = row.payload;
+    if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
+    cur = cur ?? {};
+    const interim = cur._interim ?? null;
+
+    // Prefer top-level full pipeline output, fall back to interim
+    const wants  = interim?.consumerWants;
+    const lacks  = interim?.competitorLacks;
+    const fills  = interim?.brandFills;
+    const usp    = cur.usp ?? interim?.usp;
+    const audience = cur.targetAudience ?? interim?.targetAudience;
+    const positioning = cur.positioning ?? interim?.positioning;
+    const tagline = cur.tagline ?? interim?.tagline;
+
+    const lines: string[] = [];
+    if (wants || lacks || fills) {
+      lines.push("【臨時定位 — wants / lacks / fills】");
+      if (wants) lines.push(`消費者想要：${wants}`);
+      if (lacks) lines.push(`競品給不了：${lacks}`);
+      if (fills) lines.push(`品牌可補上：${fills}`);
+    }
+    if (positioning) lines.push(`一句話定位：${positioning}`);
+    if (tagline)     lines.push(`標語：${tagline}`);
+    if (usp)         lines.push(`核心 USP：${usp}`);
+    if (audience)    lines.push(`目標受眾：${audience}`);
+    if (lines.length === 0) return "";
+    return `\n\n【品牌定位（用於 ground 產出）】\n${lines.join("\n")}`;
+  } catch {
+    return "";
+  }
+}
+
 export interface InterimPulse {
   _interim: true;
   generatedAt: string;

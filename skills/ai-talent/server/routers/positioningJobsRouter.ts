@@ -21,6 +21,7 @@ import {
   buildEventPositioningSteps,
 } from "../_core/positioningSteps";
 import { generateInterimPulse } from "../_core/interimQuickPulse";
+import { loadBrandFullContext } from "../_core/brandFullContext";
 import { invokeLLM } from "../_core/llm";
 import { buildBrandPrefix } from "../_core/brandContext";
 import { getBrandRealContent } from "../_core/brandRealContent";
@@ -216,26 +217,47 @@ ${brandPrefix || ""}${knowledgeBlock || ""}`;
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const [brandPrefix, real, knowledgeBlock] = await Promise.all([
-        buildBrandPrefix(input.brandId).catch(() => ""),
+      // CJ 2026-05-07: scan EVERYTHING under this brandId — positioning,
+      // 文字 assets, 視覺 assets, knowledge, interim, AI 指令 (FB only
+      // for this test). Plus real public content (官網/FB) when reachable.
+      const [fullCtx, real, knowledgeBlock] = await Promise.all([
+        loadBrandFullContext(input.brandId, { platformFilter: "facebook" }).catch(() => ({ block: "", hasFullPositioning: false, hasInterim: false, hasTextAssets: false, hasVisualAssets: false, hasAIPrompts: {} as Record<string, boolean> })),
         getBrandRealContent(input.brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
         loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
       ]);
 
+      // CJ 2026-05-07: simplified to 3 FB scenarios — covers most of the
+      // common copy work without the noise of 6 different formats. User
+      // can re-test with new positioning and immediately see whether
+      // tone/industry inference is on.
       const SCENARIOS = [
-        { id: "fb_intro",    icon: "📱", label: "FB 短貼文（介紹主商品）",    ask: "請寫 80-120 字的 Facebook 短貼文，介紹品牌主力商品/服務。口語、有故事感。" },
-        { id: "ig_lifestyle",icon: "📷", label: "IG 標題（生活感）",         ask: "請寫一則 30-60 字的 Instagram 標題，生活感、不要硬推銷，可加 1-2 個 emoji。" },
-        { id: "service_reply",icon:"💬", label: "客服 / Threads 回覆",       ask: "情境：用戶留言『請問你們地址在哪？平日有開嗎？』。請用 60-100 字回覆，要符合品牌語氣，不要客套到僵化。" },
-        { id: "live_open",   icon: "🎬", label: "直播開場 30 秒",            ask: "請寫一段 80-150 字的直播開場稿（30 秒口播），直接開門見山說今天主題 + 為什麼觀眾要留下來看。" },
-        { id: "crisis",      icon: "⚠️", label: "危機公關回應",              ask: "情境：有客戶在 FB 公開抱怨服務不好。請寫 80-120 字公開回應，要誠懇、不卸責、說明改善動作。" },
-        { id: "edm",         icon: "📧", label: "EDM 主旨 + 第一句",         ask: "請寫 EDM：主旨 1 行（≤ 25 字）+ 開信第一句（≤ 50 字）。要讓人有開信動機，不要寫『親愛的客戶』這種制式套話。" },
+        { id: "fb_intro",    icon: "📱", label: "FB 短貼文（介紹主商品）",    ask: "請寫 80-120 字的 Facebook 短貼文，介紹品牌主力商品/服務。口語、有故事感、不要套話。" },
+        { id: "fb_event",    icon: "🎉", label: "FB 活動 / 優惠 貼文",        ask: "情境：品牌正在做一檔限定活動（自行設定一個合理的活動主題）。請寫 100-150 字的 FB 貼文，有具體優惠內容、清楚 CTA、不要寫『歡迎大家來』這種空話。" },
+        { id: "fb_story",    icon: "💬", label: "FB 品牌故事 / 心情文",      ask: "請寫 120-180 字的 Facebook 品牌故事貼文，從一個小場景切入（用戶 / 同事 / 創辦人視角），自然帶出品牌主張，不要寫得像新聞稿。" },
       ] as const;
 
-      const sysCommon = `你是品牌文案顧問。繁體中文。
-產出規則：
-- 必須以下方「品牌真實公開內容」推斷產業 / 受眾，不要用品牌名瞎猜。
-- 直接輸出純文字（不要 markdown、不要前綴「貼文：」）。
-${brandPrefix}${real.context}${knowledgeBlock}`;
+      // 2026-05-07: grounding chain (in priority order):
+      //   real public content → full positioning → interim positioning
+      //   → text/visual/AI assets → brand description → industry knowledge.
+      // Always produce a draft, never refuse with "please provide content".
+      const groundingHint =
+        real.hasContent
+          ? "下方有品牌的官網 / 社群實際內容 — 以該內容為準推斷產業 / 受眾 / 語氣。"
+        : fullCtx.hasFullPositioning
+          ? "下方有品牌的完整定位 — 以該定位為準（USP / 差異化 / 訊息支柱）撰寫。"
+        : fullCtx.hasInterim
+          ? "下方有臨時定位（消費者想要 X / 競品給不了 Y / 品牌補上 Z）— **以這份臨時定位撰寫**，把『品牌補上的價值』講成具體的產品 / 服務體驗。"
+          : "下方資料有限，請根據品牌名 + 描述 + 產業常識合理推斷直接寫，不要回拒『請提供更多資料』。";
+
+      const sysCommon = `你是資深品牌文案。繁體中文。
+
+【產出原則】
+1. ${groundingHint}
+2. 必須遵守下方「文字資產」中的禁用詞 / 推薦用詞 / 替換對照（如有）。
+3. 必須採用下方「AI 指令庫 · facebook · 文字指令」中的口吻規則（如有）。
+4. 直接輸出純文字貼文（不要 markdown、不要前綴「貼文：」、不要解釋為什麼這樣寫）。
+5. 不要寫「祝大家 X 快樂」「親愛的客戶」這種僵化套話。
+${fullCtx.block}${real.context}${knowledgeBlock}`;
 
       const results = await Promise.all(SCENARIOS.map(async (s) => {
         try {
