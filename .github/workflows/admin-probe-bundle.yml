@@ -1,0 +1,52 @@
+name: Admin — Probe deployed JS bundle for runtime issues
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect deployed JS bundle
+        run: |
+          set +e
+          DIST=/opt/marketing-os/app/skills/ai-talent/public
+          MAIN=$(ls -t "$DIST/assets"/index-*.js 2>/dev/null | head -1)
+          echo "MAIN = $MAIN"
+          [ -z "$MAIN" ] && { echo "no main bundle"; exit 1; }
+          echo "Size: $(stat -c '%s' "$MAIN")"
+          echo "Mtime: $(stat -c '%y' "$MAIN")"
+
+          echo ""
+          echo "════ /60s route presence ════"
+          echo "  /60s string count: $(grep -c '/60s' "$MAIN")"
+          echo "  /30s string count: $(grep -c '/30s' "$MAIN")"
+          echo "  /100s string count: $(grep -c '/100s' "$MAIN")"
+
+          echo ""
+          echo "════ tier='60s' rendering identifiers ════"
+          echo "  PRODUCTION PACKAGE: $(grep -c 'PRODUCTION PACKAGE' "$MAIN")"
+          echo "  60 秒交付: $(grep -c '60 秒交付' "$MAIN")"
+          echo "  StagePipelineView: $(grep -c 'StagePipelineView' "$MAIN")"
+          echo "  runOrchestra60: $(grep -c 'runOrchestra60' "$MAIN")"
+
+          echo ""
+          echo "════ Theater identifiers ════"
+          echo "  theater.runStart: $(grep -c 'theater\.runStart\|theater_runStart' "$MAIN")"
+          echo "  THEATER_CAST: $(grep -c 'THEATER_CAST\|theaterCast' "$MAIN")"
+          echo "  內容企劃台: $(grep -c '內容企劃台' "$MAIN")"
+
+          echo ""
+          echo "════ Recent feature work — confirms latest code is bundled ════"
+          echo "  PLATFORM_GUIDE (just shipped): $(grep -c 'PLATFORM_GUIDE' "$MAIN")"
+          echo "  theater-masonry: $(grep -c 'theater-masonry' "$MAIN")"
+          echo "  企劃台 sidebar label: $(grep -c '企劃台' "$MAIN")"
+
+          echo ""
+          echo "════ Test extracting 100 chars before/after first /60s match ════"
+          grep -oE '.{50}/60s.{50}' "$MAIN" | head -3
+
+          echo ""
+          echo "════ Look for AppV2 route registration ════"
+          grep -oE '.{30}path:"/60s".{60}' "$MAIN" | head -2
