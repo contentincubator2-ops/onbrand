@@ -215,10 +215,22 @@ const PLATFORM_GUIDE: Record<z.infer<typeof PlatformZ>, string> = {
 SEO 友善：自然帶入 1-2 個關鍵字，不要硬塞。`,
 };
 
-/** Load active brand-level caption rules. Each rule is a 1-line
- *  constraint (e.g. "不能說玩家使用經驗", "結尾不要寫『歡迎洽詢』")
- *  the user added via the 修改規則 modal with scope='brand'. */
+/** Load active brand-level caption rules from BOTH sources:
+ *
+ *  1. brand_caption_rules table — explicit rules added via the
+ *     Theater 修改規則 modal (one rule per row, scope='brand').
+ *
+ *  2. brands.positioning._assets — text-discipline assets from the
+ *     /brands page 文字 tab (用詞 / 替換對照 / 品牌準則 / 禁用詞 etc.)
+ *     These get auto-translated into rule strings here so the user
+ *     never needs to re-type them as Theater rules.
+ *
+ *  Both sources merged into a single string[] returned to the writer.
+ */
 async function loadBrandRules(brandId: number, userId: number): Promise<string[]> {
+  const out: string[] = [];
+
+  // 1. Explicit rules from brand_caption_rules table
   try {
     const [rows]: any = await localPool.execute(
       `SELECT rule FROM brand_caption_rules
@@ -226,10 +238,70 @@ async function loadBrandRules(brandId: number, userId: number): Promise<string[]
         ORDER BY id ASC`,
       [brandId, userId],
     );
-    return (rows as any[]).map((r) => String(r.rule || "").trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
+    for (const r of (rows as any[])) {
+      const t = String(r.rule || "").trim();
+      if (t) out.push(t);
+    }
+  } catch { /* non-fatal */ }
+
+  // 2. Derive rules from /brands 文字 tab assets
+  try {
+    const [posRows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+      [brandId, userId],
+    );
+    const row = (posRows as any[])[0];
+    if (!row) return out;
+    let pos: any = row.positioning;
+    if (typeof pos === "string") {
+      try { pos = JSON.parse(pos); } catch { pos = null; }
+    }
+    const assets = pos?._assets ?? {};
+
+    // banned_words.items[] → "不要使用「X」"
+    const banned: string[] = Array.isArray(assets.banned_words?.items) ? assets.banned_words.items : [];
+    for (const w of banned) {
+      const t = String(w || "").trim();
+      if (t) out.push(`不要使用「${t}」這個詞或變體。`);
+    }
+
+    // preferred_terms.items[] → soft hint
+    const preferred: string[] = Array.isArray(assets.preferred_terms?.items) ? assets.preferred_terms.items : [];
+    if (preferred.length > 0) {
+      out.push(`遇到合適情境，優先使用品牌愛用詞：${preferred.slice(0, 12).map((x) => String(x).trim()).filter(Boolean).join("、")}。`);
+    }
+
+    // term_substitutions.pairs[{from, to}] → "不要說 X，改說 Y"
+    const subs: Array<{ from: string; to: string }> = Array.isArray(assets.term_substitutions?.pairs) ? assets.term_substitutions.pairs : [];
+    for (const p of subs) {
+      const f = String(p?.from || "").trim();
+      const tt = String(p?.to || "").trim();
+      if (f && tt) out.push(`不要說「${f}」，改說「${tt}」。`);
+    }
+
+    // voice_principles.items[] → 1 rule each
+    const vps: string[] = Array.isArray(assets.voice_principles?.items) ? assets.voice_principles.items : [];
+    for (const v of vps) {
+      const t = String(v || "").trim();
+      if (t) out.push(t);
+    }
+
+    // branded_terms.items[] → preserve as-is
+    const branded: string[] = Array.isArray(assets.branded_terms?.items) ? assets.branded_terms.items : [];
+    if (branded.length > 0) {
+      out.push(`提到以下品牌術語時，保留原文不翻譯不改寫：${branded.slice(0, 10).map((x) => String(x).trim()).filter(Boolean).join("、")}。`);
+    }
+
+    // abbreviations.pairs[{from, to}] → 縮寫展開規則 (only if user supplied)
+    const abbs: Array<{ from: string; to: string }> = Array.isArray(assets.abbreviations?.pairs) ? assets.abbreviations.pairs : [];
+    for (const p of abbs.slice(0, 6)) {
+      const f = String(p?.from || "").trim();
+      const tt = String(p?.to || "").trim();
+      if (f && tt) out.push(`縮寫「${f}」第一次出現時，建議補上全稱「${tt}」。`);
+    }
+  } catch { /* non-fatal — writer still gets explicit rules */ }
+
+  return out;
 }
 
 export const theaterRouter = router({

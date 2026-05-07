@@ -638,6 +638,8 @@ export default function TheaterPage() {
       // Phase 1.5: real scouted viral patterns per platform
       scoutByPlatform: Record<string, string[]>;
       scoutIndustry: string | null;
+      // Brand-level rules merged from brand_caption_rules + positioning._assets
+      brandRules?: string[];
       positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null;
     };
     try {
@@ -658,15 +660,23 @@ export default function TheaterPage() {
       return;
     }
 
-    const { usps, chiefOpening, leadThoughts, hookPlan, ctaPlan, scoutByPlatform, scoutIndustry, positioning } = runPlan;
+    const { usps, chiefOpening, leadThoughts, hookPlan, ctaPlan, scoutByPlatform, scoutIndustry, brandRules, positioning } = runPlan;
+    // Surface brand rule count in chief station so user sees rules are active
+    const brandRulesCount = brandRules?.length ?? 0;
     const brandTagline = positioning?.tagline ?? null;
     const brandVoice   = positioning?.brandVoice ?? null;
 
     // 1) Chief opening monologue (real LLM-generated)
+    //    Append brand-rule count chip if any are active so user sees the
+    //    /brands 文字 tab assets are flowing through.
+    const baseChief = chiefOpening || `本週 USP 候選：${usps.join("、")}。一篇貼文 = 一個 USP。${activePlatforms.map((p) => PLATFORM_META[p].short).join("、")} 各組準備接手。`;
+    const rulesLine = brandRulesCount > 0
+      ? `\n（已載入 ${brandRulesCount} 條品牌文字規則 — 來自 /brands 文字 tab，所有 caption 自動套用。）`
+      : "";
     const stations: BrainStation[] = [
       {
         member: getChief(),
-        thought: chiefOpening || `本週 USP 候選：${usps.join("、")}。一篇貼文 = 一個 USP。${activePlatforms.map((p) => PLATFORM_META[p].short).join("、")} 各組準備接手。`,
+        thought: `${baseChief}${rulesLine}`,
         durationMs: 6500,
       },
     ];
