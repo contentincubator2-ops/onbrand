@@ -18,112 +18,172 @@ import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./share
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-/* ─────────────── Press Release ─────────────── */
+/* ─────────────── Press Release ───────────────
+ *
+ * 2026-05-07 redesign — modeled on the "minimalist standard press release"
+ * reference (cream paper, black serif-feeling sans, single rule lines).
+ *
+ * Field map (1:1 with MockupFields):
+ *   brandName            → COMPANY NAME eyebrow
+ *   (fixed)              → "PRESS RELEASE" headline bar
+ *   today                → date stamp under top rule
+ *   liveTitle ?? title   → bold body headline
+ *   liveDescription OR
+ *     first line of body → subhead (one line, lighter weight)
+ *   liveCaption (paras)  → body paragraphs (split on \n\n)
+ *   brandName            → COMPANY contact column (left)
+ *   (derived from brand) → MEDIA CONTACT column (right)
+ */
+
+/** Split caption into [subhead, ...bodyParagraphs]. If liveDescription is
+ *  provided we use it as the subhead and treat all caption paragraphs as body. */
+function splitCaption(caption: string, hasExplicitSubhead: boolean): {
+  subhead: string | null;
+  paragraphs: string[];
+} {
+  const blocks = caption.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  if (blocks.length === 0) return { subhead: null, paragraphs: [] };
+  if (hasExplicitSubhead) return { subhead: null, paragraphs: blocks };
+  // No explicit subhead → first block becomes subhead, rest become body
+  return { subhead: blocks[0] ?? null, paragraphs: blocks.slice(1) };
+}
 
 export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCaption, liveDescription }: MockupFields) {
   const brand = brandName ?? "Your Brand";
-  const today = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
+  const dateStr = (() => {
+    const d = new Date();
+    return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
+  })();
+  const headline = liveTitle ?? title;
+  const { subhead, paragraphs } = liveCaption
+    ? splitCaption(liveCaption, !!liveDescription)
+    : { subhead: null as string | null, paragraphs: [] as string[] };
+  const finalSubhead = liveDescription ?? subhead;
+
+  // Minimal contact derivation — uses brand slug for an obvious example.
+  // Real teams replace this block in the published draft.
+  const slug = brand.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const contactEmail = `press@${slug || "brand"}.com`;
 
   return (
-    <div className="w-full max-w-[680px] mx-auto">
+    <div className="w-full max-w-[720px] mx-auto">
       <MockupHeader icon={faNewspaper} label="新聞稿" variantLabel={variantLabel} />
 
-      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-xl">
-        {/* PR header band */}
-        <div className="bg-foreground px-8 py-4 flex items-center justify-between">
-          <p className="text-background font-bold text-[15px] tracking-tight">{brand}</p>
-          <Chip size="sm" variant="flat" className="bg-background/20 text-background border-background/30">
-            新聞稿 · 即時發佈
-          </Chip>
-        </div>
+      {/* Cream paper sheet with soft drop shadow */}
+      <div
+        className="rounded-sm overflow-hidden"
+        style={{
+          background: "#EBE7D7",
+          boxShadow: "0 24px 48px -16px rgba(0,0,0,0.18), 0 8px 16px -8px rgba(0,0,0,0.10)",
+          fontFamily: "'Inter', 'Noto Sans TC', system-ui, sans-serif",
+          color: "#111",
+        }}
+      >
+        <div className="px-10 md:px-14 py-10 md:py-14">
+          {/* COMPANY NAME eyebrow */}
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.18em] mb-2"
+            style={{ color: "#111" }}
+          >
+            {brand.toUpperCase()}
+          </p>
 
-        {/* Document body */}
-        <div className="px-10 py-8">
-          {/* FOR IMMEDIATE RELEASE */}
-          <p className="text-tiny font-bold text-default-500 uppercase tracking-widest mb-4">
-            FOR IMMEDIATE RELEASE / 即時新聞
+          {/* PRESS RELEASE — the fixed bold title bar */}
+          <h1
+            className="font-black leading-none mb-5"
+            style={{
+              fontSize: "clamp(28px, 5vw, 44px)",
+              letterSpacing: "0.01em",
+              color: "#111",
+            }}
+          >
+            PRESS RELEASE
+          </h1>
+
+          {/* Top rule */}
+          <div className="border-t border-black/80 mb-7" />
+
+          {/* Date stamp */}
+          <p className="text-[11px] tabular-nums mb-7" style={{ color: "#111" }}>
+            {dateStr}
           </p>
 
           {/* Headline */}
-          <h1 className="text-[26px] font-bold leading-snug tracking-tight mb-2">
-            {liveTitle ?? title}
-          </h1>
-
-          {/* Subheadline / lede */}
-          {liveDescription ? (
-            <MarkdownText content={liveDescription} className="text-[15px] text-default-600 leading-relaxed italic mb-4" />
+          {headline ? (
+            <h2
+              className="font-bold leading-snug mb-2"
+              style={{ fontSize: "clamp(17px, 2.2vw, 22px)", color: "#111" }}
+            >
+              {headline}
+            </h2>
           ) : (
-            <div className="space-y-1.5 mb-4">
-              <Skeleton className="h-4 w-full rounded" />
-              <Skeleton className="h-4 w-[88%] rounded" />
-            </div>
+            <Skeleton className="h-5 w-[80%] rounded mb-2" />
           )}
 
-          {/* Dateline */}
-          <div className="flex items-center gap-2 text-tiny text-default-500 mb-6">
-            <FontAwesomeIcon icon={faCalendarDays} />
-            <span>{today}</span>
-            <span>–</span>
-            <FontAwesomeIcon icon={faBuilding} />
-            <span>台北</span>
-          </div>
-
-          <Divider className="mb-6" />
-
-          {/* Body */}
-          {liveCaption ? (
-            <article className="prose prose-sm max-w-none text-foreground prose-p:leading-relaxed prose-p:text-foreground prose-headings:font-semibold">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{liveCaption}</ReactMarkdown>
-            </article>
+          {/* Subheadline (lighter weight, slightly smaller) */}
+          {finalSubhead ? (
+            <p
+              className="leading-snug mb-7"
+              style={{ fontSize: "15px", color: "#111", fontWeight: 500 }}
+            >
+              {finalSubhead}
+            </p>
           ) : (
-            <div className="space-y-6">
-              {[1, 2, 3].map((p) => (
-                <div key={p} className="space-y-2">
-                  <Skeleton className="h-3 w-full rounded" />
-                  <Skeleton className="h-3 w-[97%] rounded" />
-                  <Skeleton className="h-3 w-[92%] rounded" />
-                  {p === 1 && <Skeleton className="h-3 w-[78%] rounded" />}
+            <Skeleton className="h-4 w-[60%] rounded mb-7" />
+          )}
+
+          {/* Body paragraphs */}
+          {paragraphs.length > 0 ? (
+            <div className="space-y-4">
+              {paragraphs.map((p, i) => (
+                <p
+                  key={i}
+                  className="leading-relaxed"
+                  style={{ fontSize: "12.5px", color: "#222" }}
+                >
+                  {p}
+                </p>
+              ))}
+            </div>
+          ) : !liveCaption ? (
+            <div className="space-y-5">
+              {[1, 2, 3, 4].map((p) => (
+                <div key={p} className="space-y-1.5">
+                  <Skeleton className="h-2.5 w-full rounded" />
+                  <Skeleton className="h-2.5 w-[97%] rounded" />
+                  <Skeleton className="h-2.5 w-[88%] rounded" />
+                  {p === 1 && <Skeleton className="h-2.5 w-[72%] rounded" />}
                 </div>
               ))}
-              {/* Quote block skeleton */}
-              <div className="border-l-4 border-primary pl-4 space-y-2">
-                <Skeleton className="h-3 w-full rounded" />
-                <Skeleton className="h-3 w-[85%] rounded" />
-                <Skeleton className="h-3 w-[45%] rounded opacity-50" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-3 w-full rounded" />
-                <Skeleton className="h-3 w-[88%] rounded" />
-              </div>
             </div>
-          )}
+          ) : null}
 
-          <Divider className="my-6" />
+          {/* Bottom rule */}
+          <div className="border-t border-black/80 mt-10 mb-6" />
 
-          {/* Boilerplate */}
-          <div className="space-y-2">
-            <p className="text-tiny font-bold text-default-500 uppercase tracking-widest">關於 {brand}</p>
-            <p className="text-small text-default-600 leading-relaxed">
-              {brand} 是一家專注於數位行銷與品牌成長的專業機構，協助品牌在多元平台上建立強大的市場影響力。
-            </p>
-          </div>
-
-          <Divider className="my-6" />
-
-          {/* Contact */}
-          <div className="space-y-2">
-            <p className="text-tiny font-bold text-default-500 uppercase tracking-widest">媒體聯絡</p>
-            <div className="flex items-center gap-2 text-small text-default-600">
-              <FontAwesomeIcon icon={faEnvelope} className="text-default-400" />
-              <span>press@{brand.toLowerCase().replace(/\s+/g, "")}.com</span>
+          {/* Two-column contacts (COMPANY · MEDIA CONTACT) */}
+          <div className="grid grid-cols-2 gap-8">
+            <div>
+              <p className="text-[11px] font-bold tracking-[0.12em] mb-2" style={{ color: "#111" }}>
+                COMPANY
+              </p>
+              <p className="text-[11px] leading-relaxed" style={{ color: "#333" }}>
+                {brand}<br />
+                {contactEmail}<br />
+                +886 2 0000 0000
+              </p>
             </div>
-            <div className="flex items-center gap-2 text-small text-default-600">
-              <FontAwesomeIcon icon={faPhone} className="text-default-400" />
-              <span>+886-2-XXXX-XXXX</span>
+            <div>
+              <p className="text-[11px] font-bold tracking-[0.12em] mb-2" style={{ color: "#111" }}>
+                MEDIA CONTACT
+              </p>
+              <p className="text-[11px] leading-relaxed" style={{ color: "#333" }}>
+                公關聯絡人<br />
+                {contactEmail}<br />
+                +886 2 0000 0000
+              </p>
             </div>
           </div>
-
-          <p className="text-center text-tiny text-default-400 mt-8">###</p>
         </div>
       </div>
     </div>
