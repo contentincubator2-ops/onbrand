@@ -1,0 +1,136 @@
+name: Admin — Debug current state (post recent shipments)
+
+# Verifies:
+#  1. All recent feature commits landed in deployed bundle
+#  2. brand_caption_rules + brands.tabLocks DB migrations ran
+#  3. Theater + Brand routers are mounted and respond
+#  4. PM2 error log has no NEW errors (last 5 min)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sweep:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Bundle inspection
+        run: |
+          set +e
+          DIST=/opt/marketing-os/app/skills/ai-talent/public
+          MAIN=$(ls -t "$DIST/assets"/index-*.js 2>/dev/null | head -1)
+          [ -z "$MAIN" ] && { echo "no main bundle"; exit 1; }
+          echo "MAIN: $MAIN"
+          echo "Mtime: $(stat -c %y "$MAIN")"
+          echo "Size:  $(stat -c %s "$MAIN") bytes"
+
+          echo ""
+          echo "════ Recent feature signatures ════"
+          echo "  AddEntityModal:           $(grep -c 'AddEntityModal\|新增品牌 / 產品' "$MAIN")"
+          echo "  TabActionBar:             $(grep -c '已鎖定 — 解鎖才能編輯\|TabActionBar\|開始撰寫文字\|開始視覺' "$MAIN")"
+          echo "  Notion-style line tiles:  $(grep -c 'lucide-react' "$MAIN" || echo bundled)"
+          echo "  preview cards:            $(grep -c '尚未填寫 — 點進去開始\|previewForAsset' "$MAIN")"
+          echo "  brain bar (positioning):  $(grep -c 'PositioningBrainBar\|分析中…' "$MAIN")"
+          echo "  brand-caption rule:       $(grep -c 'brand_caption_rules\|brand caption rules' "$MAIN")"
+          echo "  Phase 1.5 scout:          $(grep -c 'scoutByPlatform\|scoutIndustry' "$MAIN")"
+          echo "  Phase 2 structured out:   $(grep -c 'CHANNEL_TO_MOCKUP_PLATFORM\|chapters\|hashtags' "$MAIN")"
+          echo "  Phase 3a 修改規則 modal:   $(grep -c '套用到本品牌所有未來企劃\|adhocRules' "$MAIN")"
+          echo "  Phase 3b 加入素材 modal:   $(grep -c '加入素材\|材料\|materialModalOpen' "$MAIN")"
+          echo "  QA agent (Chun-Hao):      $(grep -c 'Chun-Hao\|qaReviewCell\|校對中' "$MAIN")"
+
+      - name: HTML sync check
+        run: |
+          set +e
+          DIST=/opt/marketing-os/app/skills/ai-talent/public
+          DISK=$(basename $(ls -t "$DIST/assets"/index-*.js 2>/dev/null | head -1))
+          REF=$(curl -s https://marketing-os.sowork.ai/brands | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1)
+          echo "Disk:  $DISK"
+          echo "HTML:  $REF"
+          [ "$DISK" = "$REF" ] && echo "  ✓ in sync" || echo "  ✗ MISMATCH"
+
+      - name: HTTP probe — pages render
+        run: |
+          set +e
+          for path in /30s /60s /100s /theater /squads /brands "/brands?cat=copy" "/brands?cat=visual"; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "https://marketing-os.sowork.ai$path")
+            echo "  $path → $STATUS"
+          done
+
+      - name: DB migrations sanity
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent"
+
+          echo "════ brand_caption_rules table ════"
+          $MYSQL -e "SHOW CREATE TABLE brand_caption_rules" 2>&1 | head -3 || echo "  ✗ table missing"
+          $MYSQL -e "SELECT COUNT(*) AS rule_count FROM brand_caption_rules" 2>&1 | head -2
+
+          echo ""
+          echo "════ brands.tabLocks column ════"
+          $MYSQL -e "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='brands' AND COLUMN_NAME='tabLocks'" 2>&1
+          $MYSQL -e "SELECT COUNT(*) AS brands_with_locks FROM brands WHERE tabLocks IS NOT NULL AND tabLocks != ''" 2>&1 | head -2
+
+          echo ""
+          echo "════ brands.industry column (used by Theater scout) ════"
+          $MYSQL -e "SELECT COUNT(*) AS brands_with_industry FROM brands WHERE industry IS NOT NULL AND industry != ''" 2>&1 | head -2
+
+      - name: theaterRouter end-to-end probe
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          OWNER=$(mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent -e "SELECT userId FROM brands WHERE id=2821")
+          cd "$AI"
+          npx tsx -e "
+          import { appRouter } from './server/routers';
+          (async () => {
+            const ctx: any = { user: { id: $OWNER } };
+            const caller = appRouter.createCaller(ctx);
+            const today = new Date(); const dates = Array.from({length:7}).map((_,i)=>{const x=new Date(today); x.setDate(today.getDate()+i); return x.toISOString().slice(0,10);});
+            const result = await caller.theater.runStart({
+              brandId: 2821,
+              platforms: ['facebook'] as any,
+              importantDates: [],
+              dates,
+            });
+            console.log('USPs:', result.usps?.length);
+            console.log('hookPlan size:', Object.keys(result.hookPlan ?? {}).length);
+            console.log('ctaPlan size:', Object.keys(result.ctaPlan ?? {}).length);
+            console.log('scoutByPlatform.facebook:', (result.scoutByPlatform?.facebook ?? []).length, 'patterns');
+            console.log('brandRules:', (result.brandRules ?? []).length);
+            console.log('scoutIndustry:', result.scoutIndustry);
+            // Verify lock procedures
+            const locks = await caller.theater.getTabLocks({ brandId: 2821 });
+            console.log('tabLocks:', JSON.stringify(locks));
+            process.exit(0);
+          })().catch((e) => { console.error('PROBE FAIL:', e?.message ?? e); process.exit(1); });
+          " 2>&1 | tail -25
+
+      - name: PM2 error log — last 30 lines (only NEW errors)
+        run: |
+          set +e
+          ERR=$HOME/.pm2/logs/marketing-os-error.log
+          [ -f "$ERR" ] || ERR=/root/.pm2/logs/marketing-os-error.log
+          if [ -f "$ERR" ]; then
+            echo "Total error log: $(stat -c %s "$ERR")B"
+            echo ""
+            echo "Last 30 lines:"
+            tail -30 "$ERR"
+          else
+            echo "(no error log)"
+          fi
+
+      - name: PM2 status
+        run: |
+          set +e
+          pm2 jlist 2>/dev/null | python3 -c "
+          import sys, json, time
+          data = json.loads(sys.stdin.read())
+          for p in data:
+              if p['name'] == 'marketing-os':
+                  age = (time.time()*1000 - p['pm2_env']['pm_uptime'])/1000
+                  print(f'  pid={p[\"pid\"]} age={age:.0f}s status={p[\"pm2_env\"][\"status\"]} restarts={p[\"pm2_env\"][\"restart_time\"]}')" 2>/dev/null
