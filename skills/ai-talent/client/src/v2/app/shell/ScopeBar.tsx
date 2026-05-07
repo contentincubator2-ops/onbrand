@@ -112,10 +112,33 @@ export function useScopeState(): [ScopeState, (s: ScopeState) => void] {
   }, []);
 
   // External URL changes (deep link, manual edit) → sync into state.
+  // CRITICAL: don't clobber state when URL has NO b/p/e at all — that
+  // happens on every tab navigation (e.g. /30s → /60s drops query
+  // params). Treat "empty URL" as "no opinion, keep current state and
+  // re-mirror to URL". Only override state if URL has at least one
+  // explicit param value.
   React.useEffect(() => {
-    const b = Number(searchParams.get("b")) || null;
-    const p = Number(searchParams.get("p")) || null;
-    const e = Number(searchParams.get("e")) || null;
+    const bRaw = searchParams.get("b");
+    const pRaw = searchParams.get("p");
+    const eRaw = searchParams.get("e");
+    const urlHasAny = !!(bRaw || pRaw || eRaw);
+    if (!urlHasAny) {
+      // Tab navigation case — restore URL from current scope so
+      // refresh / share-link still works.
+      if (scope.brandId || scope.productId || scope.eventId) {
+        setSearchParams((prev) => {
+          const sp = new URLSearchParams(prev);
+          if (scope.brandId)   sp.set("b", String(scope.brandId));
+          if (scope.productId) sp.set("p", String(scope.productId));
+          if (scope.eventId)   sp.set("e", String(scope.eventId));
+          return sp;
+        }, { replace: true });
+      }
+      return;
+    }
+    const b = Number(bRaw) || null;
+    const p = Number(pRaw) || null;
+    const e = Number(eRaw) || null;
     if (b !== scope.brandId || p !== scope.productId || e !== scope.eventId) {
       setScopeState({ brandId: b, productId: p, eventId: e });
       writeScopeToStorage({ brandId: b, productId: p, eventId: e });
