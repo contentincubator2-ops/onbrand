@@ -201,6 +201,75 @@ export const brandRouter = router({
     }),
 
   /**
+   * Update brand's external connections — website + per-platform URLs.
+   * Called from the 連結 tile on Brand workspace.
+   *
+   * CJ direction (2026-05-07):
+   *   "我不知道我要去哪裡輸入官網和各種社群平台的連結，應該也是在
+   *    品牌區嗎? 有一個連結器的 tile?"
+   *
+   * Invalidates the brandRealContent cache so the next 自動填寫 / 測試
+   * uses the freshly-saved URLs instead of stale ones.
+   */
+  updateConnections: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      website: z.string().max(2048).optional().nullable(),
+      socialLinks: z.record(z.string(), z.string()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { brands } = await import("../../drizzle/schema");
+      // Verify ownership
+      const rows = await db.select().from(brands)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const cleanLinks: Record<string, string> = {};
+      if (input.socialLinks) {
+        for (const [k, v] of Object.entries(input.socialLinks)) {
+          if (typeof v === "string" && v.trim()) cleanLinks[k] = v.trim();
+        }
+      }
+
+      await db.update(brands).set({
+        website: input.website?.trim() || null,
+        socialLinks: Object.keys(cleanLinks).length > 0 ? cleanLinks : null,
+      } as any).where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
+
+      // Invalidate the real-content cache so AI 自動填寫 / 測試 picks up
+      // the new URLs immediately.
+      try {
+        const { invalidateBrandRealContent } = await import("../_core/brandRealContent");
+        invalidateBrandRealContent(input.brandId);
+      } catch {/* non-fatal */}
+
+      return { ok: true as const };
+    }),
+
+  /** Read connections (website + socialLinks) for the connector tile UI. */
+  getConnections: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const { brands } = await import("../../drizzle/schema");
+      const rows = await db.select().from(brands)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
+        .limit(1);
+      const r = rows[0];
+      if (!r) return null;
+      let links: any = (r as any).socialLinks ?? {};
+      if (typeof links === "string") { try { links = JSON.parse(links); } catch { links = {}; } }
+      return {
+        website: (r as any).website ?? "",
+        socialLinks: (links && typeof links === "object" ? links : {}) as Record<string, string>,
+      };
+    }),
+
+  /**
    * Fetch a brand's Facebook page profile picture and save it as the brand
    * logo. Uses Facebook's public Graph picture endpoint — no token needed
    * for public pages: graph.facebook.com/{handle}/picture?width=400&redirect=true

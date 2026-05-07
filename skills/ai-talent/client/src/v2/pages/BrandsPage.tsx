@@ -32,6 +32,7 @@ import BrandAssetEditor, { type AssetKey } from "../components/positioning/Brand
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
+import ConnectorEditor from "../components/positioning/ConnectorEditor";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
 // Notion-style line icons
@@ -39,7 +40,7 @@ import {
   Target as LucideTarget, Type as LucideType, Palette as LucidePalette,
   Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
   RotateCcw as LucideRotate, BookOpen as LucideBook,
-  Sparkles,
+  Sparkles, Link2 as LucideLink,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -202,13 +203,14 @@ export default function BrandsPage() {
   // tab strip above it.
   const [searchParams, setSearchParams] = useSearchParams();
   const urlCat = searchParams.get("cat") ?? "positioning";
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "settings" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "connector" | "settings" =
     urlCat === "visual" ? "visual"
     : urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
+    : urlCat === "connector" ? "connector"
     : urlCat === "settings" ? "settings"
     : "positioning";
-  const setCategory = (next: "positioning" | "copy" | "visual" | "knowledge") => {
+  const setCategory = (next: "positioning" | "copy" | "visual" | "knowledge" | "connector") => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
@@ -612,26 +614,26 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Header (compact — single fold) ─────────────────────────
-          Layout reordered 2026-05-07 (CJ feedback: tile 切到上緣):
-          identity row (emblem + name + stats) compact, then tiles row,
-          then message bar. Tiles always visible without scrolling. */}
+      {/* ─── Header (compact 2-line, centered) ──────────────────────
+          Line 1: emblem + brand name (centered).
+          Line 2: stats · BRAND WORKSPACE pill (small grey).
+          Then tiles row, then message bar. */}
       <div className="relative pt-5 pb-4 px-6">
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
-          {/* Compact identity row: emblem · name · stats inline */}
-          <div className="flex items-center gap-3 mb-3">
+          {/* Line 1 — emblem + name */}
+          <div className="flex items-center gap-2.5 mb-1.5">
             <div style={{
-              width: 32, height: 32, borderRadius: 9,
+              width: 34, height: 34, borderRadius: 10,
               background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(124,58,237,0.22)",
+              boxShadow: "0 3px 10px rgba(124,58,237,0.24)",
             }}>
-              <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 14 }} />
+              <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 15 }} />
             </div>
             <h1
               className="font-semibold tracking-tight leading-none"
               style={{
-                fontSize: "clamp(1.15rem, 2vw, 1.6rem)",
+                fontSize: "clamp(1.35rem, 2.2vw, 1.85rem)",
                 background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -640,12 +642,14 @@ export default function BrandsPage() {
             >
               {scopeName}
             </h1>
-            <span className="text-tiny text-default-400">·</span>
-            <div className="text-tiny text-default-500">
-              <EntityStats variant="inline" />
-            </div>
+          </div>
+
+          {/* Line 2 — stats · BRAND WORKSPACE pill */}
+          <div className="flex items-center gap-2 mb-3 text-tiny text-default-500">
+            <EntityStats variant="inline" />
+            <span className="text-default-300">·</span>
             <span
-              className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest ml-1"
+              className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
               style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
             >
               BRAND WORKSPACE
@@ -661,9 +665,12 @@ export default function BrandsPage() {
                 { v: "copy"        as const, label: "文字", Icon: LucideType,     bg: "#0EA5E9" },
                 { v: "visual"      as const, label: "視覺", Icon: LucidePalette,  bg: "#F97316" },
                 { v: "knowledge"   as const, label: "知識", Icon: LucideBook,     bg: "#10B981" },
+                { v: "connector"   as const, label: "連結", Icon: LucideLink,     bg: "#64748B" },
               ]).map((t) => {
                 const active = category === t.v;
-                const locked = t.v !== "knowledge" && !!tabLocks[t.v as "positioning"|"copy"|"visual"];
+                const locked = t.v === "positioning" || t.v === "copy" || t.v === "visual"
+                  ? !!tabLocks[t.v as "positioning"|"copy"|"visual"]
+                  : false;
                 const Icon = t.Icon;
                 return (
                   <button
@@ -875,6 +882,11 @@ export default function BrandsPage() {
           {/* ── 知識庫 ── */}
           {derivedCategory === "knowledge" && (
             <KnowledgeEditor key={`knowledge-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
+          )}
+
+          {/* ── 連結器（外部 URL 來源） ── */}
+          {derivedCategory === "connector" && (
+            <ConnectorEditor key={`connector-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
           )}
 
           {/* ── 品牌 / 產品 / 活動定位 ── */}
