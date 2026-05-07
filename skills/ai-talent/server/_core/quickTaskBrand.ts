@@ -22,7 +22,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 tagline 候選。每變體 1 種角度（功能 / 情感 / 反差）。
 規則：5-10 字、有節奏、不抽象、避免"領先"/"極致"等空話。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 350,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-value-prop",
@@ -36,7 +36,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 value proposition 句。每變體 1 種結構（We help X do Y by Z / X 不再 Y / 唯一 X 做 Y）。
 規則：80 字內、有具體動詞、不要"提供解決方案"這種模糊。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 400,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-brand-voice",
@@ -50,7 +50,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 brand voice 描述。每變體 1 種人格傾向（專業 / 親民 / 玩味）。
 結構：5 個形容詞 → 「我們會這樣寫」(3 個 do 範例) → 「我們不會這樣寫」(3 個 don't 範例)。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 600,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-archetype",
@@ -67,7 +67,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
 - 你的競品偏哪個 archetype，你怎麼跟他們不同
 每變體用 1 個不同 archetype。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-positioning",
@@ -82,7 +82,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
 結構：For [target] / who [need] / our [brand] is the [category] that [differentiator] / because [reason to believe]。
 要 specific（不要"行銷人"，要"50 人以下 SaaS 行銷主管"）。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 500,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-elevator-pitch",
@@ -96,7 +96,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 30 秒電梯簡報（150-250 字，講出來剛好 30 秒）。每變體 1 種角度（問題切入 / 故事切入 / 數據切入）。
 結構：Hook → 我們解決什麼 → 不同在哪 → 想做什麼下一步。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 600,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-manifesto",
@@ -111,7 +111,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
 結構：開場 1 句強烈立場 → 我們相信 X / 我們不相信 Y → 因此我們做 Z。
 要有節奏感、適合念出來、避免管理顧問語言。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 600,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-forbidden-words",
@@ -126,7 +126,7 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
 格式：❌ 「禁用詞」 → ✅ 「替代用法」（1 句範例）
 ${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 700,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-naming",
@@ -140,7 +140,7 @@ ${BRAND_TONE}`,
     systemPrompt: `產出品牌命名候選（10 個）。每變體 1 種策略（描述型 / 暗喻型 / 創造詞 / 人名地名）。
 每個候選後加 1 句說明（為何這名字，可能的好 / 壞處）。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-30-competitor-map",
@@ -154,7 +154,7 @@ ${BRAND_TONE}`,
     systemPrompt: `產出競品定位地圖。每變體 1 組軸（價格 vs 功能 / 大眾 vs 利基 / 工具 vs 文化）。
 格式：軸定義 → 每家競品落點（含 1 句說明） → 你的最佳定位象限 + 為什麼。${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 900,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
 ];
 

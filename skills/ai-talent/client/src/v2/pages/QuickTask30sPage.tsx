@@ -352,7 +352,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           });
           // Same channel→mockup-platform normalization as the orchestra path
           const SQUAD_CHANNEL_MAP: Record<string, string> = {
-            pr: "press", brand: "press", audience: "press",
+            pr: "press", brand: "generic", audience: "generic",
           };
           const rawPlat = (activeTask as any).platform ?? "facebook";
           const platform = SQUAD_CHANNEL_MAP[rawPlat] ?? rawPlat;
@@ -411,9 +411,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         //   keys on the *mockup* platform (press). Without this map,
         //   pr/press-release falls through to UnsupportedVariantPlaceholder.
         const CHANNEL_TO_MOCKUP_PLATFORM: Record<string, string> = {
-          pr:       "press",   // 新聞稿 → press-release mockup
-          brand:    "press",   // 品牌定位 — document-style, reuse press until brand mockup ships
-          audience: "press",   // 用戶研究 — same
+          pr:       "press",    // 新聞稿 → minimalist press-release mockup
+          brand:    "generic",  // 品牌定位 → generic doc mockup (taglines / value prop)
+          audience: "generic",  // 用戶研究 → generic doc mockup (interviews / personas)
         };
         const rawTaskPlatform =
           (activeTask as any).platform ??

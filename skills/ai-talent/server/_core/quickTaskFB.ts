@@ -36,7 +36,7 @@ export interface FBTaskTemplate {
    * Widened 2026-05-05 to support IG / Threads / etc. as channel rollout
    * progresses (see project_30s_task_sop.md). */
   outputDefaults: {
-    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press";
+    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "generic";
     post_type: string;
   };
 }

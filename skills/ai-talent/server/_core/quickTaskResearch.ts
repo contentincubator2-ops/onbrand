@@ -23,7 +23,7 @@ export const RESEARCH_30S_TASKS: FBTaskTemplate[] = [
 規則：開放式問題（"請告訴我..."）、不要誘導性、含 1 個破冰題 + 8 個核心 + 1 個 wrap-up。
 ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 1000,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-persona-draft",
@@ -38,7 +38,7 @@ ${RES_TONE}`,
 結構：姓名 + 年齡 + 職業 → 1 句生活情境 → 主要 goals (3) → pain points (3) → 一週中的典型一天 → 用什麼 tool / 媒體 / KOL → 對你品牌的關鍵問題。
 ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-survey",
@@ -53,7 +53,7 @@ ${RES_TONE}`,
 規則：含 demographics 2 題 + 核心 6 題 + open-ended 2 題。每題給：問題 + 題型（單選 / 多選 / Likert / 數字 / 開放）+ 選項。
 ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 1200,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-journey-map",
@@ -73,7 +73,7 @@ ${RES_TONE}`,
 
 每變體 1 種 customer segment 視角。${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 1200,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-competitive-interview",
@@ -88,7 +88,7 @@ ${RES_TONE}`,
 結構：背景 (2) → 評估過程（看了哪些選項、依據是？）(3) → 最終決定（為何選 X？）(2) → 反思 (2) → wrap-up。
 規則：避免問「為什麼不選我們」，要問「你最後選 X 的關鍵時刻」。${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-jtbd-guide",
@@ -103,7 +103,7 @@ ${RES_TONE}`,
 結構：第一次想到要解決這問題（when / where）→ 之前用什麼 → 切換的觸發點 → 評估了什麼 → 用了之後（what changed）。
 每變體 1 種 framing（functional / emotional / social job）。${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-synthesis-template",
@@ -118,7 +118,7 @@ ${RES_TONE}`,
 結構：主題分類 → 每主題下：證據 quote、出現頻率、影響嚴重度 → implications + recommendations。
 ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 1000,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-consent-form",
@@ -133,7 +133,7 @@ ${RES_TONE}`,
 必含：研究目的、訪談形式（時長 / 錄音 / 場地）、資料用途、保密措施、退出權、聯絡人、補償（如有）、簽名欄。
 ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-usability-script",
@@ -148,7 +148,7 @@ ${RES_TONE}`,
 結構：開場（介紹 / 暖身 / think-aloud 引導）→ 任務 1-7（每任務含 scenario + 完成標準 + 觀察重點）→ wrap-up（SUS 量表 + 開放回饋）。
 ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 1200,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-30-screener",
@@ -163,7 +163,7 @@ ${RES_TONE}`,
 規則：每題標明「合格條件」（passes if X）；包含 disqualify 題（避開行銷 / 競品從業）。
 ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 700,
-    outputDefaults: { platform: "press", post_type: "generic" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
 ];
 

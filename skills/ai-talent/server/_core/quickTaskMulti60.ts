@@ -246,7 +246,7 @@ const PR_IMG = 60035;
 export const PR_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "pr-60-news-release-full",
-    tier: "60s", postType: "press",
+    tier: "60s", postType: "press-release",
     label: "新聞稿完整版",
     description: "標題 + 副標 + 5W1H 導語 + 3 段內文 + 公司簡介 + 媒體聯絡",
     agent_id: 60036, skill_slug: "pr-writing",
@@ -257,7 +257,7 @@ export const PR_60S_TASKS: FBTaskTemplate[] = [
 結構：標題 → 副標 → 導語（5W1H）→ 3 段內文 → 引言 → 公司簡介 → 聯絡資訊。
 語氣中性、第三人稱、不要行銷感。${TONE("Press")}`,
     preferredModel: "qwen", maxTokens: 1800,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "press", post_type: "press-release" },
   },
   // pr-60-crisis-statement removed per CJ direction 2026-05-06.
 ];
@@ -278,7 +278,7 @@ const BR_IMG = 60030; // Boyu Hsu (repurposed)
 export const BRAND_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "br-60-tagline-suite",
-    tier: "60s", postType: "press",
+    tier: "60s", postType: "generic",
     label: "品牌 Tagline 5 種版本",
     description: "Strategist 定原型 + 5 個 tagline 候選 + 應用情境",
     agent_id: 60037, skill_slug: "brand-strategy",
@@ -287,11 +287,11 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     inputs: [{ key: "spirit", label: "品牌精神", type: "textarea", required: true }],
     systemPrompt: `產出品牌 tagline（每變體 1 個 12 字內 tagline + 50 字應用情境）。${TONE("Brand")}`,
     preferredModel: "qwen", maxTokens: 700,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-60-value-prop",
-    tier: "60s", postType: "press",
+    tier: "60s", postType: "generic",
     label: "Value Proposition 完整改寫",
     description: "Strategist 找競品差異 + 5 種 value prop 版本",
     agent_id: 60037, skill_slug: "brand-strategy",
@@ -301,11 +301,11 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 value proposition（每變體 100-200 字）。
 結構：For [target] who [problem], we are [category] that [benefit].${TONE("Brand")}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "br-60-brand-voice",
-    tier: "60s", postType: "press",
+    tier: "60s", postType: "generic",
     label: "Brand Voice Guideline",
     description: "5 種品牌語氣樣本 + Do / Don't 對照",
     agent_id: 60037, skill_slug: "brand-strategy",
@@ -314,7 +314,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     inputs: [{ key: "voice_direction", label: "語氣方向", type: "textarea", required: true }],
     systemPrompt: `產出品牌 voice 樣本（每變體 100-200 字 sample + 50 字 Do/Don't）。${TONE("Brand")}`,
     preferredModel: "qwen", maxTokens: 800,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
 ];
 
@@ -349,7 +349,7 @@ const RS_IMG = 24; // Janet Chang (repurposed)
 export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "rs-60-interview-guide",
-    tier: "60s", postType: "press",
+    tier: "60s", postType: "generic",
     label: "用戶訪談大綱完整版",
     description: "Strategist 設計研究問題 + 開放式問題 + 探查 prompt",
     agent_id: 60038, skill_slug: "user-research",
@@ -360,11 +360,11 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
 結構：暖身（5 分鐘）→ 背景（10 分鐘）→ 主題探查（30 分鐘）→ 收尾。
 每個問題後標時間 + 後續 prompt。${TONE("Research")}`,
     preferredModel: "qwen", maxTokens: 1300,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-60-persona-suite",
-    tier: "60s", postType: "press",
+    tier: "60s", postType: "generic",
     label: "用戶 Persona 5 張組",
     description: "5 種主要 persona 名片（demo + psycho + 痛點 + 渠道）",
     agent_id: 60038, skill_slug: "user-research",
@@ -374,11 +374,11 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 1 張 persona 名片（300-500 字）。
 結構：姓名 + 一句話 + demo (年齡/職業/收入) + 價值觀×3 + 痛點×3 + 媒體渠道×3 + hook line。${TONE("Research")}`,
     preferredModel: "qwen", maxTokens: 1100,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
     id: "rs-60-jtbd-suite",
-    tier: "60s", postType: "press",
+    tier: "60s", postType: "generic",
     label: "Jobs-to-be-Done 5 種",
     description: "5 個 JTBD 陳述 + 觸發情境 + 競爭對手",
     agent_id: 60038, skill_slug: "user-research",
@@ -388,7 +388,7 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
     systemPrompt: `產出 JTBD 陳述（每變體 80-150 字）。
 格式：When [situation], I want to [motivation], so I can [expected outcome]。${TONE("Research")}`,
     preferredModel: "qwen", maxTokens: 700,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "generic", post_type: "generic" },
   },
 ];
 
