@@ -887,6 +887,83 @@ ${cleaned}
   // run state) — this is just the simple shape for client to call.
   // Currently no-op on server; left as a tRPC procedure so future
   // versions can audit/log edits or sync to a saved-runs store.
+  // ─── Brand tab locks (定位 / 文字 / 視覺) ───────────────────────────
+  // Locking a tab marks its content as canonical. Theater / 30s / 60s /
+  // 100s all read positioning regardless, but the LOCK is a user
+  // commitment that reads "this is approved" — UI shows it, editors go
+  // read-only, and downstream agents are told this is final-form.
+
+  getTabLocks: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT tabLocks FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+          [input.brandId, ctx.user.id],
+        );
+        const row = (rows as any[])[0];
+        if (!row) return { positioning: null, copy: null, visual: null };
+        let parsed: any = row.tabLocks;
+        if (typeof parsed === "string") {
+          try { parsed = JSON.parse(parsed); } catch { parsed = null; }
+        }
+        const out = parsed ?? {};
+        return {
+          positioning: out.positioning ?? null,
+          copy:        out.copy        ?? null,
+          visual:      out.visual      ?? null,
+        };
+      } catch {
+        return { positioning: null, copy: null, visual: null };
+      }
+    }),
+
+  lockTab: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      tab: z.enum(["positioning", "copy", "visual"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [rows]: any = await localPool.execute(
+        `SELECT tabLocks FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new Error("brand not found");
+      let cur: any = row.tabLocks;
+      if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
+      cur = cur ?? {};
+      cur[input.tab] = { at: new Date().toISOString(), by: ctx.user.id };
+      await localPool.execute(
+        `UPDATE brands SET tabLocks = ? WHERE id = ? AND userId = ?`,
+        [JSON.stringify(cur), input.brandId, ctx.user.id],
+      );
+      return { ok: true as const, lock: cur[input.tab] };
+    }),
+
+  unlockTab: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      tab: z.enum(["positioning", "copy", "visual"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [rows]: any = await localPool.execute(
+        `SELECT tabLocks FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new Error("brand not found");
+      let cur: any = row.tabLocks;
+      if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
+      cur = cur ?? {};
+      cur[input.tab] = null;
+      await localPool.execute(
+        `UPDATE brands SET tabLocks = ? WHERE id = ? AND userId = ?`,
+        [JSON.stringify(cur), input.brandId, ctx.user.id],
+      );
+      return { ok: true as const };
+    }),
+
   saveCellEdit: protectedProcedure
     .input(z.object({
       brandId: z.number().int().positive(),

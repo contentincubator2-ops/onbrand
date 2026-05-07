@@ -38,7 +38,7 @@ import {
   faChevronDown, faPlus, faCloudArrowUp, faShapes,
   faPalette, faFont, faQuoteLeft, faBullseye, faUsers,
   faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
-  faFolderOpen, faUserPlus, faCrown, faPlay,
+  faFolderOpen, faUserPlus, faCrown, faPlay, faLock, faLockOpen,
   faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
   faRocket, faBullhorn,
   faWandSparkles, faEllipsis, faCircleInfo,
@@ -86,6 +86,33 @@ export default function BrandsPage() {
 
   // Add entity modal (新增品牌 / 產品 / 活動)
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
+
+  // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
+  const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
+  const tabLocksQuery = (trpc as any).theater?.getTabLocks?.useQuery
+    ? (trpc as any).theater.getTabLocks.useQuery(
+        { brandId: activeBrandIdForLocks ?? 0 },
+        { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false }
+      )
+    : { data: null, refetch: () => {} };
+  const tabLocks = (tabLocksQuery.data as { positioning: any; copy: any; visual: any } | null) ?? { positioning: null, copy: null, visual: null };
+  const lockTabMut   = (trpc as any).theater?.lockTab?.useMutation();
+  const unlockTabMut = (trpc as any).theater?.unlockTab?.useMutation();
+  const handleLockToggle = async (tab: "positioning" | "copy" | "visual") => {
+    if (!activeBrandIdForLocks) return;
+    try {
+      if (tabLocks[tab]) {
+        if (!confirm(`確定要解鎖「${tab === "positioning" ? "定位" : tab === "copy" ? "文字" : "視覺"}」？解鎖後可以繼續編輯，全平台會用最新版本。`)) return;
+        await unlockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
+      } else {
+        if (!confirm(`要鎖定「${tab === "positioning" ? "定位" : tab === "copy" ? "文字" : "視覺"}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有 30s/60s/100s/Theater 任務都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`)) return;
+        await lockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
+      }
+      tabLocksQuery.refetch?.();
+    } catch (e) {
+      console.error("[brands] lock toggle failed:", e);
+    }
+  };
 
   // Resolve scope mode — choose-one rule from ScopeBar.
   const scopeMode: "brand" | "product" | "event" | "none" =
@@ -575,20 +602,31 @@ export default function BrandsPage() {
                 { v: "visual"      as const, label: "視覺",   icon: faPalette,    bg: "#F59E0B" },
               ]).map((t) => {
                 const active = category === t.v;
+                const locked = !!tabLocks[t.v];
                 return (
                   <button
                     key={t.v}
                     onClick={() => setCategory(t.v)}
-                    className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer"
+                    className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer relative"
                   >
                     <div
-                      className={`w-16 h-16 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
+                      className={`w-16 h-16 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"} relative`}
                       style={{ background: t.bg }}
                     >
                       <FontAwesomeIcon icon={t.icon} className="text-2xl" />
+                      {locked && (
+                        <div
+                          className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white"
+                          style={{ border: "2px solid white", boxShadow: "0 2px 6px rgba(16,185,129,0.45)" }}
+                          title="已鎖定"
+                        >
+                          <FontAwesomeIcon icon={faLock} style={{ fontSize: 10 }} />
+                        </div>
+                      )}
                     </div>
                     <span className={`text-small ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
                       {t.label}
+                      {locked && <span className="ml-1 text-emerald-600 text-[10px]">·已鎖定</span>}
                     </span>
                   </button>
                 );
@@ -616,6 +654,67 @@ export default function BrandsPage() {
       {pipelineThinking && (
         <PositioningBrainBar thinking={pipelineThinking} />
       )}
+
+      {/* Lock controls bar — sits above each tab's content. State-aware:
+          locked → green check banner with 解鎖 button
+          unlocked → soft hint with 🔒 鎖定 button to commit current state */}
+      {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
+        const tabLabel = category === "positioning" ? "定位" : category === "copy" ? "文字" : "視覺";
+        const lock = tabLocks[category];
+        const isLocked = !!lock;
+        return (
+          <div style={{
+            background: isLocked ? "#ECFDF5" : "#F9FAFB",
+            borderBottom: "1px solid #E5E7EB",
+            padding: "10px 28px",
+          }}>
+            <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{
+                    background: isLocked ? "#10B981" : "#E5E7EB",
+                    color: isLocked ? "white" : "#6B7280",
+                  }}
+                >
+                  <FontAwesomeIcon icon={isLocked ? faLock : faLockOpen} style={{ fontSize: 13 }} />
+                </div>
+                <div>
+                  {isLocked ? (
+                    <>
+                      <p className="text-small font-semibold text-emerald-800 m-0">
+                        ✅ {tabLabel}已鎖定 — 全平台採用此版本為單一真相
+                      </p>
+                      <p className="text-tiny text-emerald-600 m-0">
+                        鎖定於 {new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-small font-semibold text-default-800 m-0">
+                        {tabLabel} 尚未鎖定
+                      </p>
+                      <p className="text-tiny text-default-500 m-0">
+                        鎖定後：編輯欄變唯讀 · 全平台 (30s/60s/100s/Theater) 用這份為單一真相
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                color={isLocked ? "default" : "success"}
+                variant={isLocked ? "flat" : "solid"}
+                onPress={() => handleLockToggle(category as "positioning" | "copy" | "visual")}
+                startContent={<FontAwesomeIcon icon={isLocked ? faLockOpen : faLock} />}
+                isLoading={lockTabMut?.isPending || unlockTabMut?.isPending}
+              >
+                {isLocked ? "解鎖" : `🔒 鎖定${tabLabel}`}
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ─── Body: full-bleed (left rail removed 2026-05-07) ─────────────────── */}
       <div className="flex-1 flex">

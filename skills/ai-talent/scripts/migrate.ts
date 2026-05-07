@@ -1113,6 +1113,23 @@ async function main() {
       console.log("[migrate] squads.mockup_images: already exists, skipped");
     }
 
+    // ── Brand tab locks (定位 / 文字 / 視覺 lock state) ─────────────────
+    // Stores per-brand lock state for the 3 brand workspace tabs. When a
+    // tab is locked, the editor is read-only and the platform treats that
+    // tab's content as the single source of truth. Format:
+    //   { positioning: {at: ISO, by: userId} | null, copy: ..., visual: ... }
+    const [tlCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands'
+         AND COLUMN_NAME = 'tabLocks'
+    `) as any;
+    if ((tlCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE brands ADD COLUMN tabLocks TEXT NULL COMMENT 'JSON: per-tab lock state'`);
+      console.log("[migrate] brands.tabLocks: added");
+    } else {
+      console.log("[migrate] brands.tabLocks: already exists, skipped");
+    }
+
     // ── Theater brand_caption_rules (Phase 3a) ──────────────────────────
     // User-defined caption rules per brand. Injected into Theater
     // generateCell prompt as additional rules. Scope determines lifetime:
