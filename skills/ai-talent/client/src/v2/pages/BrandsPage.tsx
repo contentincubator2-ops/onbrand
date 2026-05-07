@@ -612,45 +612,50 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Header (matches /30s squads-style) ────────────────────── */}
-      <div className="relative pt-12 pb-6 px-6 text-center">
+      {/* ─── Header (compact — single fold) ─────────────────────────
+          Layout reordered 2026-05-07 (CJ feedback: tile 切到上緣):
+          identity row (emblem + name + stats) compact, then tiles row,
+          then message bar. Tiles always visible without scrolling. */}
+      <div className="relative pt-5 pb-4 px-6">
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
-          <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-            SoWork · BRAND
-          </p>
-          {/* Brand icon (small, above title) */}
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 12,
-            boxShadow: "0 4px 14px rgba(124,58,237,0.25)",
-          }}>
-            <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 18 }} />
-          </div>
-          <h1
-            className="font-semibold tracking-tight leading-tight text-center mb-3"
-            style={{
-              fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+          {/* Compact identity row: emblem · name · stats inline */}
+          <div className="flex items-center gap-3 mb-3">
+            <div style={{
+              width: 32, height: 32, borderRadius: 9,
               background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            {scopeName}
-          </h1>
-          <div className="text-small text-default-500 mb-5">
-            <EntityStats variant="inline" />
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(124,58,237,0.22)",
+            }}>
+              <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 14 }} />
+            </div>
+            <h1
+              className="font-semibold tracking-tight leading-none"
+              style={{
+                fontSize: "clamp(1.15rem, 2vw, 1.6rem)",
+                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              {scopeName}
+            </h1>
+            <span className="text-tiny text-default-400">·</span>
+            <div className="text-tiny text-default-500">
+              <EntityStats variant="inline" />
+            </div>
+            <span
+              className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest ml-1"
+              style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
+            >
+              BRAND WORKSPACE
+            </span>
           </div>
 
-          {/* Brand-message bar (replaces search): shows current USP /
-              tagline (interim or full) + 測試 / 定案 buttons. */}
-          <BrandMessageBar brandId={activeBrandIdForLocks} />
-
-          {/* Tab tiles — /30s circular colored style (4 tiles incl. 知識) */}
-          <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            <div className="flex items-start gap-3 w-max mx-auto px-2">
+          {/* Tab tiles — kept BEFORE the message bar so they stay
+              visible even when 測試 panel expands the bar inline. */}
+          <div className="w-full overflow-x-auto mb-4" style={{ scrollbarWidth: "none" }}>
+            <div className="flex items-start gap-3 w-max mx-auto px-2 pb-1">
               {([
                 { v: "positioning" as const, label: "定位", Icon: LucideTarget,   bg: "#7C3AED" },
                 { v: "copy"        as const, label: "文字", Icon: LucideType,     bg: "#0EA5E9" },
@@ -691,17 +696,9 @@ export default function BrandsPage() {
             </div>
           </div>
 
-          {/* Tier signature mini-chip */}
-          <div className="mt-3 flex items-center gap-2 text-tiny text-default-400">
-            <span
-              className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
-              style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
-            >
-              BRAND WORKSPACE
-            </span>
-            <span>·</span>
-            <span>{scopeEyebrow}</span>
-          </div>
+          {/* Brand-message bar — moved BELOW tiles so 測試 expansion
+              pushes the tab content area, not the navigation tiles. */}
+          <BrandMessageBar brandId={activeBrandIdForLocks} />
         </div>
       </div>
 
@@ -2376,8 +2373,13 @@ const COPY_TILE_GROUPS: Array<{
     items: [
       { key: "cta_library",     label: "CTA 庫",     icon: faQuoteLeft,  bg: "#F0F9FF", shape: "items" },
       { key: "hook_library",    label: "Hook 庫",    icon: faQuoteLeft,  bg: "#FFF0F6", shape: "items" },
-      { key: "ai_prompts",      label: "AI 指令庫",  icon: faRobot,      bg: "#F5F3FF", shape: "items" },
       { key: "templates_copy",  label: "文案範本",   icon: faFolderOpen, bg: "#FFFBEB", shape: "items" },
+    ],
+  },
+  {
+    label: "AI 設定",
+    items: [
+      { key: "ai_prompts",      label: "AI 指令庫",  icon: faRobot,      bg: "#F5F3FF", shape: "items" },
     ],
   },
 ];
@@ -2460,11 +2462,13 @@ function CopyTabInline({
     setBulkFillingKeys(new Set(emptyKeys));
     try {
       const r = await bulkMut?.mutateAsync?.({ brandId, emptyKeys });
-      if (!r?.ok) { setBulkErr("自動填寫失敗"); return; }
+      if (!r?.ok) { setBulkErr("自動填寫失敗（伺服器無回應）"); return; }
       // Merge all results into drafts and persist in ONE save.
       const updates: Record<string, any> = {};
       for (const [k, payload] of Object.entries(r.results ?? {})) {
         updates[k] = (payload as any).value;
+        // Mark filled keys dirty so server-state refresh doesn't clobber them.
+        dirtyRef.current.add(k);
       }
       const nextDrafts = { ...drafts, ...updates };
       setDrafts(nextDrafts);
@@ -2473,12 +2477,27 @@ function CopyTabInline({
           ...fullPositioning,
           _assets: { ...(fullPositioning._assets ?? {}), ...updates },
         };
-        saveMut.mutate({ kind: "brand", id: brandId, positioning: merged });
+        saveMut.mutate({ kind: "brand", id: brandId, positioning: merged }, {
+          onSuccess: () => {
+            // Now safe to clear dirty flag — server has the values.
+            for (const k of Object.keys(updates)) dirtyRef.current.delete(k);
+          },
+        });
       }
       setBulkResult({ filled: Object.keys(updates).length, sources: r.sources ?? [] });
+
+      // Surface per-field failures (the silent-fail bug from 2026-05-07)
+      const errCount = Object.keys(r.errors ?? {}).length;
+      const warnings: string[] = [];
       if (!r.hasRealContent) {
-        setBulkErr("⚠️ 找不到品牌的官網 / FB 內容 — 結果可能不準。建議先到「設定」補上 website 或 socialLinks");
+        warnings.push("⚠️ 找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
       }
+      if (errCount > 0) {
+        const firstFew = Object.entries(r.errors ?? {}).slice(0, 3)
+          .map(([k, msg]) => `${k}: ${msg}`).join(" | ");
+        warnings.push(`${errCount} 個欄位失敗（${firstFew}${errCount > 3 ? " …" : ""}）`);
+      }
+      if (warnings.length > 0) setBulkErr(warnings.join("\n"));
     } catch (e: any) {
       setBulkErr(String(e?.message ?? e));
     } finally {
@@ -2539,11 +2558,13 @@ function CopyTabInline({
       </div>
 
       {(bulkErr || bulkResult) && (
-        <div className={`text-xs px-3 py-2 rounded-lg ${
-          bulkErr && !bulkResult ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"
+        <div className={`text-xs px-3 py-2 rounded-lg whitespace-pre-line ${
+          bulkErr && !bulkResult ? "bg-amber-50 text-amber-800" :
+          bulkErr ? "bg-amber-50 text-amber-800" :
+          "bg-emerald-50 text-emerald-800"
         }`}>
-          {bulkResult && <span>✓ 已填入 {bulkResult.filled} 個欄位{bulkResult.sources.length > 0 && `（來源：${bulkResult.sources.join(" + ")}）`}</span>}
-          {bulkErr && <span>{bulkResult ? "・" : ""}{bulkErr}</span>}
+          {bulkResult && <div>✓ 已填入 {bulkResult.filled} 個欄位{bulkResult.sources.length > 0 && `（來源：${bulkResult.sources.join(" + ")}）`}</div>}
+          {bulkErr && <div>{bulkErr}</div>}
         </div>
       )}
 

@@ -54,6 +54,41 @@ function coerceShape(parsed: any, shape: "text" | "items" | "pairs"): any {
   };
 }
 
+/** Tolerant JSON extraction. Tries fenced block first, then first
+ *  balanced {…} object in the text. Handles LLMs that prepend chatty
+ *  text like "Sure, here's the JSON:" before the actual object. */
+function extractJSON(text: string): any | null {
+  // 1. Fenced ```json {...} ``` block
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) {
+    try { return JSON.parse(fence[1]!.trim()); } catch { /* fall through */ }
+  }
+  // 2. First top-level balanced JSON object
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (esc) { esc = false; continue; }
+    if (ch === "\\") { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        const candidate = text.slice(start, i + 1);
+        try { return JSON.parse(candidate); } catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
+const SUGGEST_TIMEOUT_MS = 30_000;
+
 async function suggestOne(args: {
   brandId: number;
   userId: number;
@@ -66,7 +101,7 @@ async function suggestOne(args: {
   const sys = `你是品牌文案顧問，繁體中文。任務：根據品牌定位 + 知識庫 + **品牌真實公開內容**，幫填寫文字資產欄位。
 ${spec.ask}
 ${formatHintFor(spec.shape, spec.n)}
-直接輸出 JSON，不要前綴、不要 markdown code fence。
+直接輸出 JSON 物件，**第一個字元就是 {**。不要前綴「以下是…」、不要 markdown code fence、不要解釋。
 
 【最重要的規則】
 - 如果下方有「品牌真實公開內容」，**必須**以該內容為準推斷產業 / 受眾 / 語氣。不要用品牌名字猜產業。
@@ -74,13 +109,16 @@ ${formatHintFor(spec.shape, spec.n)}
 ${args.brandPrefix}${args.realContent}${args.knowledgeBlock}`;
 
   try {
-    const r = await invokeLLM({
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: `品牌資產欄位：${args.assetKey}` },
-      ],
-      maxTokens: 1500,
-    });
+    const r = await Promise.race([
+      invokeLLM({
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: `品牌資產欄位：${args.assetKey}` },
+        ],
+        maxTokens: 1500,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("LLM timeout (30s)")), SUGGEST_TIMEOUT_MS)),
+    ]);
     const raw = r.choices[0]?.message?.content;
     const text = typeof raw === "string" ? raw : "";
     const inTok  = r.usage?.prompt_tokens ?? 0;
@@ -93,14 +131,16 @@ ${args.brandPrefix}${args.realContent}${args.knowledgeBlock}`;
          (inTok * 1.0 + outTok * 5.0) / 1_000_000],
       );
     } catch {/* non-fatal */}
-    const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    const jsonText = m ? m[1]!.trim() : text.trim();
-    let parsed: any = null;
-    try { parsed = JSON.parse(jsonText); } catch { /* fallthrough */ }
-    if (!parsed) return { ok: false, error: "LLM did not return parseable JSON" };
+    const parsed = extractJSON(text);
+    if (!parsed) {
+      console.warn(`[suggestOne:${args.assetKey}] JSON parse failed. Raw text:`, text.slice(0, 500));
+      return { ok: false, error: `JSON parse failed (got ${text.length} chars)` };
+    }
     return { ok: true, value: coerceShape(parsed, spec.shape), shape: spec.shape };
   } catch (e: any) {
-    return { ok: false, error: String(e?.message ?? e) };
+    const msg = String(e?.message ?? e);
+    console.warn(`[suggestOne:${args.assetKey}] failed:`, msg);
+    return { ok: false, error: msg };
   }
 }
 
