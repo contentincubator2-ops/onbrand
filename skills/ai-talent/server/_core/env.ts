@@ -95,28 +95,23 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-// 2026-05-08 (P0-A): production startup assertion — refuse to boot if
-// no email provider is configured. Without this, registration / forgot-
-// password silently fail and trial users get stuck.
+// 2026-05-08 (P0-A): production warnings — log loudly if email config
+// missing, but DON'T crash. The runtime registration/forgot-password
+// paths now hard-fail their own request when email send errors, which
+// gives the actual user a clear message. Crashing startup just means
+// the whole site is down (502) until ops fills in keys.
 if (parsed.data.NODE_ENV === "production") {
   const hasEmailKey = !!(parsed.data.SENDGRID_API_KEY || parsed.data.RESEND_API_KEY);
   if (!hasEmailKey) {
-    console.error(
-      "[env] FATAL: production requires SENDGRID_API_KEY or RESEND_API_KEY for auth emails. Refusing to start."
+    console.warn(
+      "[env] WARN: production missing SENDGRID_API_KEY / RESEND_API_KEY — email auth (register / forgot password) will hard-fail at runtime."
     );
-    process.exit(1);
   }
   if (!parsed.data.EMAIL_FROM) {
-    console.error(
-      "[env] FATAL: production requires EMAIL_FROM (sender address). Refusing to start."
-    );
-    process.exit(1);
+    console.warn("[env] WARN: production missing EMAIL_FROM — using default noreply@sowork.ai.");
   }
   if (!parsed.data.APP_URL) {
-    console.error(
-      "[env] FATAL: production requires APP_URL for verification / reset links. Refusing to start."
-    );
-    process.exit(1);
+    console.warn("[env] WARN: production missing APP_URL — verification / reset links will use http://localhost:3001.");
   }
 }
 
