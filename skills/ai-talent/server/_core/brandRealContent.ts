@@ -12,6 +12,62 @@
  */
 import localPool from "../localDb";
 import { fetchUrlSummary, formatUrlSummaryForPrompt } from "./urlContext";
+import { perplexityScout } from "./scouts/perplexityScout";
+
+const PERPLEXITY_TIMEOUT_MS = 12_000;
+
+/** Map a social URL host → friendly platform label + search hint. */
+function classifySocialUrl(url: string): { platform: string; label: string } | null {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    if (host.includes("facebook.com") || host === "fb.com" || host === "m.facebook.com") return { platform: "facebook", label: "Facebook 粉專" };
+    if (host.includes("instagram.com"))                      return { platform: "instagram", label: "Instagram" };
+    if (host.includes("youtube.com") || host === "youtu.be") return { platform: "youtube", label: "YouTube" };
+    if (host.includes("threads.net"))                        return { platform: "threads", label: "Threads" };
+    if (host.includes("tiktok.com"))                         return { platform: "tiktok", label: "TikTok" };
+    if (host.includes("linkedin.com"))                       return { platform: "linkedin", label: "LinkedIn" };
+    if (host.includes("line.me") || host.includes("lin.ee")) return { platform: "line", label: "LINE OA" };
+    return null;
+  } catch { return null; }
+}
+
+/** Use Perplexity to fetch real brand content from a social platform.
+ *  Direct fetchUrlSummary on FB / IG returns mostly empty (auth wall); this
+ *  goes around by asking Perplexity for actual indexed posts / mentions. */
+async function fetchSocialViaPerplexity(args: {
+  brandName: string;
+  platform: string;
+  label: string;
+  url: string;
+}): Promise<string | null> {
+  try {
+    const items = await Promise.race([
+      perplexityScout.fetch({
+        brandId: 0,
+        brandName: args.brandName,
+        industry: undefined,
+        keywords: [
+          `${args.brandName} ${args.label} 最近貼文`,
+          `${args.brandName} ${args.platform} 內容語氣 風格`,
+          args.url,
+        ],
+        competitors: [],
+        industryTags: [],
+        days: 60,
+        limit: 5,
+        loadCred: async () => null,
+      } as any),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), PERPLEXITY_TIMEOUT_MS)),
+    ]);
+    if (!items || !Array.isArray(items) || items.length === 0) return null;
+    const lines = items.slice(0, 4).map((it: any, i: number) => {
+      const title = String(it.title ?? "").slice(0, 120);
+      const excerpt = String(it.content ?? "").slice(0, 320).replace(/\s+/g, " ");
+      return `${i + 1}. ${title}\n   ${excerpt}`;
+    });
+    return `【${args.label}】${args.url}\n（透過 Perplexity 搜尋實際內容）\n${lines.join("\n")}`;
+  } catch { return null; }
+}
 
 interface CachedSnapshot {
   brandId: number;
@@ -82,22 +138,38 @@ export async function getBrandRealContent(
     } catch { /* skip */ }
   }
 
-  // 2. Social links (FB / IG / YT) — best-effort URL fetch.
-  // For FB: their public page HTML is mostly empty without auth; we still
-  // try fetchUrlSummary which falls back to OG tags / meta description.
-  // If that's all we get it's still useful (品牌 self-description).
+  // 2. Social links — direct fetchUrlSummary on FB / IG returns mostly
+  //    empty body (auth wall + JS-rendered). Use Perplexity to query
+  //    actual indexed brand content instead. Run in parallel so multiple
+  //    socials don't serialise.
   if (brand.socialLinks) {
-    for (const [platform, url] of Object.entries(brand.socialLinks)) {
-      if (typeof url !== "string" || !url.startsWith("http")) continue;
+    const socialEntries = Object.entries(brand.socialLinks)
+      .filter(([, url]) => typeof url === "string" && url.startsWith("http")) as [string, string][];
+
+    const socialResults = await Promise.all(socialEntries.map(async ([key, url]) => {
+      const cls = classifySocialUrl(url) ?? { platform: key, label: key.toUpperCase() };
+      // Strategy A: Perplexity first (real post content from web index)
+      const viaPerplexity = await fetchSocialViaPerplexity({
+        brandName: brand.name, platform: cls.platform, label: cls.label, url,
+      });
+      if (viaPerplexity) {
+        return { label: cls.label, block: viaPerplexity.slice(0, MAX_CHARS_PER_SOURCE) };
+      }
+      // Strategy B fallback: direct OG fetch (returns at least page name)
       try {
         const summary = await fetchUrlSummary(url);
         if (summary) {
           const formatted = formatUrlSummaryForPrompt(summary).slice(0, MAX_CHARS_PER_SOURCE);
-          const label = platform.toUpperCase();
-          blocks.push(`【${label}】${url}\n${formatted}`);
-          sources.push(label);
+          return { label: cls.label, block: `【${cls.label}】${url}\n${formatted}` };
         }
       } catch { /* skip */ }
+      return null;
+    }));
+
+    for (const r of socialResults) {
+      if (!r) continue;
+      blocks.push(r.block);
+      sources.push(r.label);
     }
   }
 
@@ -105,6 +177,7 @@ export async function getBrandRealContent(
     ? `\n\n【品牌真實公開內容（用於 ground 產出，不要捏造跟這份不符的產業）】\n${blocks.join("\n\n")}`
     : "";
 
+  const dedupedSources = Array.from(new Set(sources));
   const snap: CachedSnapshot = {
     brandId,
     fetchedAt: Date.now(),
@@ -112,7 +185,7 @@ export async function getBrandRealContent(
     hasContent: blocks.length > 0,
   };
   CACHE.set(brandId, snap);
-  return { context, hasContent: snap.hasContent, sources };
+  return { context, hasContent: snap.hasContent, sources: dedupedSources };
 }
 
 /** Clear cache for a brand (e.g. after user edits website / socialLinks). */
