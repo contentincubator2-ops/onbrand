@@ -1,0 +1,38 @@
+name: Admin — Probe dist directory + index.html content
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Find all dist locations
+        run: |
+          set +e
+          echo "════ Find every index.html under /opt/marketing-os ════"
+          find /opt/marketing-os -maxdepth 6 -name index.html 2>/dev/null | head -20
+
+          echo ""
+          echo "════ Each index.html: size + content ════"
+          for f in $(find /opt/marketing-os -maxdepth 6 -name index.html 2>/dev/null); do
+            echo ""
+            echo "──── $f ────"
+            stat -c 'size=%s mtime=%y' "$f"
+            echo "--- content ---"
+            cat "$f"
+            echo ""
+            echo "--- /assets dir ---"
+            ls -la "$(dirname "$f")/assets" 2>/dev/null | head -10
+          done
+
+          echo ""
+          echo "════ nginx root for marketing-os ════"
+          for s in /etc/nginx/sites-enabled/*; do
+            grep -lE "marketing-os|sowork" "$s" 2>/dev/null
+          done | while read sf; do
+            echo ""
+            echo "── $sf ──"
+            sudo cat "$sf" 2>/dev/null | grep -E "root|try_files|location" | head -20
+          done
