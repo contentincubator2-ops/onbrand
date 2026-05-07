@@ -333,9 +333,28 @@ export const theaterRouter = router({
       })).max(20).optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const [pos, brandRules] = await Promise.all([
+      const [pos, brandRules, lockState] = await Promise.all([
         getBrandPositioningById(input.brandId, ctx.user.id),
         loadBrandRules(input.brandId, ctx.user.id),
+        // Pull tabLocks so the chief station can ack the lock state
+        (async () => {
+          try {
+            const [rows]: any = await localPool.execute(
+              `SELECT tabLocks FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+              [input.brandId, ctx.user.id],
+            );
+            const row = (rows as any[])[0];
+            let parsed: any = row?.tabLocks;
+            if (typeof parsed === "string") { try { parsed = JSON.parse(parsed); } catch { parsed = null; } }
+            return {
+              positioning: !!parsed?.positioning,
+              copy:        !!parsed?.copy,
+              visual:      !!parsed?.visual,
+            };
+          } catch {
+            return { positioning: false, copy: false, visual: false };
+          }
+        })(),
       ]);
 
       // USP pool — prefer differentiators, fall back to messagingPillars,
@@ -512,6 +531,9 @@ ${platformAsks}
         // server-side per cell, but we surface them so the UI can show
         // the rule chips on the brain bar)
         brandRules,
+        // Brand workspace lock states — frontend uses these to show
+        // '採用已鎖定的品牌定位' acknowledgment in the chief opening.
+        lockState,
         positioning: pos ? {
           tagline: pos.tagline,
           targetAudience: pos.targetAudience,

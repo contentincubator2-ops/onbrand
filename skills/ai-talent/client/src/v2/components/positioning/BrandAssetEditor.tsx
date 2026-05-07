@@ -28,6 +28,9 @@ interface AssetEditorProps {
   assetKey: AssetKey;
   value: any;
   onChange: (next: any) => void;
+  /** When true, all fields render read-only and a lock banner appears.
+   *  Driven by the parent tab's lock state from /brands page. */
+  readOnly?: boolean;
 }
 
 const META: Record<AssetKey, { icon: any; title: string; sub: string }> = {
@@ -57,49 +60,62 @@ const META: Record<AssetKey, { icon: any; title: string; sub: string }> = {
   templates_copy:      { icon: faPenNib, title: "文案範本",   sub: "活動文 / 公告 / EDM 範本" },
 };
 
-export default function BrandAssetEditor({ assetKey, value, onChange }: AssetEditorProps) {
+export default function BrandAssetEditor({ assetKey, value, onChange, readOnly = false }: AssetEditorProps) {
   const meta = META[assetKey];
   const v = value ?? {};
+  // No-op the change handler when locked — defense-in-depth in case any
+  // field bypasses the visual disabled state.
+  const safeOnChange = readOnly ? () => {} : onChange;
 
   return (
     <Card shadow="none" className="border border-divider">
       <CardHeader className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
         <div className="flex items-center gap-3 min-w-0">
-          <Chip size="sm" variant="flat" color="default" className="shrink-0">
+          <Chip
+            size="sm"
+            variant="flat"
+            color={readOnly ? "warning" : "default"}
+            className="shrink-0"
+          >
             <FontAwesomeIcon icon={meta.icon} className="text-tiny mr-1" />
-            ASSET
+            {readOnly ? "已鎖定 · 唯讀" : "ASSET"}
           </Chip>
           <div className="min-w-0">
             <h3 className="text-medium font-semibold truncate">{meta.title}</h3>
-            <p className="text-tiny text-default-500 truncate">{meta.sub}</p>
+            <p className="text-tiny text-default-500 truncate">
+              {readOnly ? "此分區已鎖定 — 回 /brands 解鎖該 tab 才能編輯。" : meta.sub}
+            </p>
           </div>
         </div>
       </CardHeader>
-      <CardBody className="px-5 pb-5 pt-2 gap-4">
-        {assetKey === "logo"     && <LogoFields     v={v} onChange={onChange} />}
-        {assetKey === "colors"   && <ColorFields    v={v} onChange={onChange} />}
-        {assetKey === "fonts"    && <FontFields     v={v} onChange={onChange} />}
-        {assetKey === "photos"   && <PhotoFields    v={v} onChange={onChange} />}
-        {assetKey === "guidelines"  && <GenericTextarea v={v} onChange={onChange} keyName="text" label="準則內容" />}
-        {assetKey === "templates"   && <GenericTextarea v={v} onChange={onChange} keyName="links" label="範本連結列表（每行一筆）" />}
+      <CardBody
+        className="px-5 pb-5 pt-2 gap-4"
+        style={readOnly ? { opacity: 0.65, pointerEvents: "none", userSelect: "text" } : undefined}
+      >
+        {assetKey === "logo"     && <LogoFields     v={v} onChange={safeOnChange} />}
+        {assetKey === "colors"   && <ColorFields    v={v} onChange={safeOnChange} />}
+        {assetKey === "fonts"    && <FontFields     v={v} onChange={safeOnChange} />}
+        {assetKey === "photos"   && <PhotoFields    v={v} onChange={safeOnChange} />}
+        {assetKey === "guidelines"  && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label="準則內容" />}
+        {assetKey === "templates"   && <GenericTextarea v={v} onChange={safeOnChange} keyName="links" label="範本連結列表（每行一筆）" />}
         {/* 視覺 — additional */}
-        {assetKey === "imagery_style" && <GenericTextarea v={v} onChange={onChange} keyName="text" label="圖像風格規範（攝影調性 / 構圖 / 色溫）" />}
-        {assetKey === "icon_style"    && <GenericTextarea v={v} onChange={onChange} keyName="text" label="圖示風格（Line / Solid / Duotone / 線粗）" />}
-        {assetKey === "chart_style"   && <GenericTextarea v={v} onChange={onChange} keyName="text" label="圖表風格（資料視覺化色票、字型、樣式）" />}
-        {assetKey === "layout_rules"  && <GenericTextarea v={v} onChange={onChange} keyName="text" label="排版規範（留白 / 對齊 / 標題層級）" />}
+        {assetKey === "imagery_style" && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label="圖像風格規範（攝影調性 / 構圖 / 色溫）" />}
+        {assetKey === "icon_style"    && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label="圖示風格（Line / Solid / Duotone / 線粗）" />}
+        {assetKey === "chart_style"   && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label="圖表風格（資料視覺化色票、字型、樣式）" />}
+        {assetKey === "layout_rules"  && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label="排版規範（留白 / 對齊 / 標題層級）" />}
         {/* 文字 — bullet list editors（每行一條，Phase 2 接到 brand_caption_rules）*/}
-        {assetKey === "voice"               && <GenericTextarea v={v} onChange={onChange} keyName="text" label="品牌整體語氣方向（一段話描述）" />}
-        {assetKey === "voice_principles"    && <ListEditor v={v} onChange={onChange} keyName="items" label="Do / Don't 規則（每行一條）" placeholder="例：寫『家人都笑了』而不是『顧客好評如潮』" />}
-        {assetKey === "preferred_terms"     && <ListEditor v={v} onChange={onChange} keyName="items" label="推薦用詞（每行一個）" placeholder="例：守護" />}
-        {assetKey === "banned_words"        && <ListEditor v={v} onChange={onChange} keyName="items" label="禁用詞（每行一個）" placeholder="例：玩家使用經驗" />}
-        {assetKey === "term_substitutions"  && <PairListEditor v={v} onChange={onChange} keyName="pairs" label="替換對照（不要說 → 改說）" placeholderL="原本說的（X）" placeholderR="改成說（Y）" />}
-        {assetKey === "branded_terms"       && <ListEditor v={v} onChange={onChange} keyName="items" label="品牌術語（每行一個）" placeholder="例：SoWork 工作流" />}
-        {assetKey === "product_naming"      && <GenericTextarea v={v} onChange={onChange} keyName="text" label="產品命名規範" />}
-        {assetKey === "abbreviations"       && <PairListEditor v={v} onChange={onChange} keyName="pairs" label="縮寫對照（縮寫 → 全稱）" placeholderL="例：CMO" placeholderR="例：Chief Marketing Officer" />}
-        {assetKey === "cta_library"         && <ListEditor v={v} onChange={onChange} keyName="items" label="CTA 句子（每行一條）" placeholder="例：點下方連結看詳情" />}
-        {assetKey === "hook_library"        && <ListEditor v={v} onChange={onChange} keyName="items" label="開場 Hook（每行一條）" placeholder="例：上週遇到一個媽媽，她說..." />}
-        {assetKey === "ai_prompts"          && <ListEditor v={v} onChange={onChange} keyName="items" label="常用 AI Prompt（每行一條）" placeholder="例：用桂冠口吻寫一段..." />}
-        {assetKey === "templates_copy"      && <ListEditor v={v} onChange={onChange} keyName="items" label="文案範本（每行一個範本標題 / URL）" placeholder="例：母親節 EDM 範本 https://..." />}
+        {assetKey === "voice"               && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label="品牌整體語氣方向（一段話描述）" />}
+        {assetKey === "voice_principles"    && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="Do / Don't 規則（每行一條）" placeholder="例：寫『家人都笑了』而不是『顧客好評如潮』" />}
+        {assetKey === "preferred_terms"     && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="推薦用詞（每行一個）" placeholder="例：守護" />}
+        {assetKey === "banned_words"        && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="禁用詞（每行一個）" placeholder="例：玩家使用經驗" />}
+        {assetKey === "term_substitutions"  && <PairListEditor v={v} onChange={safeOnChange} keyName="pairs" label="替換對照（不要說 → 改說）" placeholderL="原本說的（X）" placeholderR="改成說（Y）" />}
+        {assetKey === "branded_terms"       && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="品牌術語（每行一個）" placeholder="例：SoWork 工作流" />}
+        {assetKey === "product_naming"      && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label="產品命名規範" />}
+        {assetKey === "abbreviations"       && <PairListEditor v={v} onChange={safeOnChange} keyName="pairs" label="縮寫對照（縮寫 → 全稱）" placeholderL="例：CMO" placeholderR="例：Chief Marketing Officer" />}
+        {assetKey === "cta_library"         && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="CTA 句子（每行一條）" placeholder="例：點下方連結看詳情" />}
+        {assetKey === "hook_library"        && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="開場 Hook（每行一條）" placeholder="例：上週遇到一個媽媽，她說..." />}
+        {assetKey === "ai_prompts"          && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="常用 AI Prompt（每行一條）" placeholder="例：用桂冠口吻寫一段..." />}
+        {assetKey === "templates_copy"      && <ListEditor v={v} onChange={safeOnChange} keyName="items" label="文案範本（每行一個範本標題 / URL）" placeholder="例：母親節 EDM 範本 https://..." />}
       </CardBody>
     </Card>
   );

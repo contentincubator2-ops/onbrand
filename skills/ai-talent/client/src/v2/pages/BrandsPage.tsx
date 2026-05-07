@@ -987,6 +987,7 @@ export default function BrandsPage() {
                   scopeEventId={scope?.eventId ?? null}
                   pipelineThinking={pipelineThinking && pipelineThinking.segmentTarget === section ? pipelineThinking : null}
                   onAutoFill={runSegmentAutoFill}
+                  locked={!!tabLocks.positioning}
                 />
               </div>
               )}  {/* end section !== pos:home */}
@@ -1038,7 +1039,7 @@ export default function BrandsPage() {
                       }}>
                         ← 所有資產
                       </button>
-                      <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} />
+                      <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} locked={!!tabLocks.visual} />
                     </div>
                   );
                 }
@@ -1196,7 +1197,7 @@ export default function BrandsPage() {
                         fontSize: 12, color: "#78716C", background: "none", border: "none",
                         cursor: "pointer", marginBottom: 16, padding: 0,
                       }}>← 文字總覽</button>
-                      <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} />
+                      <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} locked={!!tabLocks.copy} />
                     </div>
                   );
                 }
@@ -1901,7 +1902,7 @@ interface PipelineThinking {
 function PositioningPanel({
   section, scopeMode, scopeName,
   scopeBrandId, scopeProductId, scopeEventId,
-  pipelineThinking, onAutoFill,
+  pipelineThinking, onAutoFill, locked,
 }: {
   section: string;
   scopeMode: "brand" | "product" | "event" | "none";
@@ -1911,6 +1912,7 @@ function PositioningPanel({
   scopeEventId: number | null;
   pipelineThinking?: PipelineThinking | null;
   onAutoFill?: (segmentId: string) => void;
+  locked?: boolean;
 }) {
   if (scopeMode === "none") {
     return (
@@ -1927,16 +1929,32 @@ function PositioningPanel({
   }
 
   return (
-    <PositioningEditor
-      section={section}
-      scopeMode={scopeMode}
-      scopeName={scopeName}
-      brandId={scopeBrandId}
-      productId={scopeProductId}
-      eventId={scopeEventId}
-      pipelineThinking={pipelineThinking ?? null}
-      onAutoFill={onAutoFill}
-    />
+    <div style={locked ? { position: "relative" } : undefined}>
+      {locked && (
+        <div style={{
+          position: "sticky", top: 0, zIndex: 5,
+          background: "#FEF3C7", border: "1px solid #FCD34D",
+          padding: "8px 14px", borderRadius: 8, marginBottom: 12,
+          fontSize: 12, color: "#92400E",
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span>🔒</span>
+          <span>定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。</span>
+        </div>
+      )}
+      <div style={locked ? { opacity: 0.65, pointerEvents: "none" } : undefined}>
+        <PositioningEditor
+          section={section}
+          scopeMode={scopeMode}
+          scopeName={scopeName}
+          brandId={scopeBrandId}
+          productId={scopeProductId}
+          eventId={scopeEventId}
+          pipelineThinking={pipelineThinking ?? null}
+          onAutoFill={onAutoFill}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -2066,7 +2084,7 @@ function PositioningEditor({
 // Manual-fill panel for non-positioning brand assets (logo/colors/fonts/...).
 // Reads scope.active.brand.positioning._assets[assetKey], writes via
 // scope.savePositioning with debounced (800ms) auto-save.
-function BrandAssetPanel({ assetKey, brandId }: { assetKey: AssetKey; brandId: number }) {
+function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; brandId: number; locked?: boolean }) {
   const utils = (trpc as any).useUtils?.() ?? null;
   const scopeActive = (trpc as any).scope?.active?.useQuery
     ? (trpc as any).scope.active.useQuery(
@@ -2111,7 +2129,7 @@ function BrandAssetPanel({ assetKey, brandId }: { assetKey: AssetKey; brandId: n
           <SaveIndicator state={saveState} hasTarget={true} />
         </CardBody>
       </Card>
-      <BrandAssetEditor assetKey={assetKey} value={draft} onChange={onChange} />
+      <BrandAssetEditor assetKey={assetKey} value={draft} onChange={onChange} readOnly={!!locked} />
     </div>
   );
 }

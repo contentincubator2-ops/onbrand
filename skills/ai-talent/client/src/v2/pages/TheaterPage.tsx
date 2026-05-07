@@ -640,6 +640,8 @@ export default function TheaterPage() {
       scoutIndustry: string | null;
       // Brand-level rules merged from brand_caption_rules + positioning._assets
       brandRules?: string[];
+      // Per-tab lock state from /brands page
+      lockState?: { positioning: boolean; copy: boolean; visual: boolean };
       positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null;
     };
     try {
@@ -660,9 +662,13 @@ export default function TheaterPage() {
       return;
     }
 
-    const { usps, chiefOpening, leadThoughts, hookPlan, ctaPlan, scoutByPlatform, scoutIndustry, brandRules, positioning } = runPlan;
-    // Surface brand rule count in chief station so user sees rules are active
+    const { usps, chiefOpening, leadThoughts, hookPlan, ctaPlan, scoutByPlatform, scoutIndustry, brandRules, lockState, positioning } = runPlan;
+    // Surface brand rule count + lock acknowledgment in chief station
     const brandRulesCount = brandRules?.length ?? 0;
+    const lockedTabs: string[] = [];
+    if (lockState?.positioning) lockedTabs.push("定位");
+    if (lockState?.copy)        lockedTabs.push("文字");
+    if (lockState?.visual)      lockedTabs.push("視覺");
     const brandTagline = positioning?.tagline ?? null;
     const brandVoice   = positioning?.brandVoice ?? null;
 
@@ -673,10 +679,13 @@ export default function TheaterPage() {
     const rulesLine = brandRulesCount > 0
       ? `\n（已載入 ${brandRulesCount} 條品牌文字規則 — 來自 /brands 文字 tab，所有 caption 自動套用。）`
       : "";
+    const lockLine = lockedTabs.length > 0
+      ? `\n📌 採用已鎖定的品牌${lockedTabs.join(" · ")} — 全平台單一真相。`
+      : "";
     const stations: BrainStation[] = [
       {
         member: getChief(),
-        thought: `${baseChief}${rulesLine}`,
+        thought: `${baseChief}${rulesLine}${lockLine}`,
         durationMs: 6500,
       },
     ];
