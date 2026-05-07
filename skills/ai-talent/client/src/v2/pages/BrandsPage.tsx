@@ -30,6 +30,7 @@ import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
+import { EntityStats } from "../components/EntityStats";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -37,7 +38,7 @@ import {
   faChevronDown, faPlus, faCloudArrowUp, faShapes,
   faPalette, faFont, faQuoteLeft, faBullseye, faUsers,
   faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
-  faFolderOpen, faUserPlus, faCrown,
+  faFolderOpen, faUserPlus, faCrown, faPlay,
   faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
   faRocket, faBullhorn,
   faWandSparkles, faEllipsis, faCircleInfo,
@@ -517,86 +518,104 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* ─── Hero header — 首頁同款三層漸層 ── */}
-      <section
-        className="relative px-8 pt-10 pb-8 overflow-hidden"
-        style={{
-          boxShadow: "0 6px 24px rgba(0,0,0,0.07)",
-          backgroundImage: [
-            "linear-gradient(to bottom, transparent 65%, rgb(252,251,254) 100%)",
-            "linear-gradient(rgba(255,255,255,0.96), rgba(255,255,255,0.96))",
-            "linear-gradient(135deg, #00b4bc 0%, #8b5cf6 60%, #4c1d95 100%)",
-          ].join(", "),
-        }}
-      >
-        <div className="relative z-10 flex flex-col items-center text-center">
-          {/* Eyebrow */}
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "rgba(99,102,241,0.7)" }}>
-            SoWork · {scopeEyebrow}
+      {/* ─── Header (matches /30s squads-style) ────────────────────── */}
+      <div className="relative pt-12 pb-6 px-6 text-center">
+        <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
+          <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
+            SoWork · BRAND
           </p>
-
-          {/* Brand icon */}
+          {/* Brand icon (small, above title) */}
           <div style={{
-            width: 48, height: 48, borderRadius: 14,
+            width: 44, height: 44, borderRadius: 12,
             background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             marginBottom: 12,
-            boxShadow: "0 4px 16px rgba(124,58,237,0.30)",
+            boxShadow: "0 4px 14px rgba(124,58,237,0.25)",
           }}>
-            <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 20 }} />
+            <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 18 }} />
           </div>
-
-          {/* Main title — gradient text, 首頁同款 */}
           <h1
-            className="font-semibold tracking-tight leading-tight"
+            className="font-semibold tracking-tight leading-tight text-center mb-3"
             style={{
               fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
               background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
-              margin: 0,
             }}
           >
             {scopeName}
           </h1>
-        </div>
-      </section>
+          <div className="text-small text-default-500 mb-5">
+            <EntityStats variant="inline" />
+          </div>
 
-      {/* ─── Top tab strip (replaces the old left sub-nav) ─────────── */}
-      <div style={{
-        borderBottom: "1px solid #E4E3E1",
-        background: "white",
-        padding: "0 28px",
-      }}>
-        <div className="flex items-center gap-1" style={{ maxWidth: 1400, margin: "0 auto" }}>
-          {([
-            { v: "positioning" as const, label: "🎯 定位",  desc: "策略 / TA / 差異化" },
-            { v: "copy"        as const, label: "📝 文字",  desc: "口吻 / 用詞 / 範本" },
-            { v: "visual"      as const, label: "🎨 視覺",  desc: "標誌 / 顏色 / 圖像" },
-          ]).map((t) => (
-            <button
-              key={t.v}
-              onClick={() => setCategory(t.v)}
-              style={{
-                padding: "14px 20px", border: "none",
-                borderBottom: category === t.v ? "3px solid #7C3AED" : "3px solid transparent",
-                marginBottom: -1,
-                background: "transparent", cursor: "pointer",
-                fontSize: 15, fontWeight: category === t.v ? 700 : 500,
-                color: category === t.v ? "#7C3AED" : "#6B7280",
-                display: "flex", alignItems: "baseline", gap: 8,
-                transition: "color 0.12s, border-color 0.12s",
+          {/* Search bar */}
+          <div className="w-full" style={{ maxWidth: 800 }}>
+            <Input
+              size="lg"
+              radius="lg"
+              variant="flat"
+              placeholder={`搜尋 ${scopeName} 的資產 / 規範 / 規則…`}
+              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 18 }} />}
+              classNames={{
+                base: "overflow-hidden rounded-[20px]",
+                inputWrapper: "h-14 bg-white shadow-md border border-default-100 rounded-[20px] data-[focus=true]:shadow-lg",
+                input: "text-medium",
               }}
-              onMouseEnter={(e) => { if (category !== t.v) e.currentTarget.style.color = "#374151"; }}
-              onMouseLeave={(e) => { if (category !== t.v) e.currentTarget.style.color = "#6B7280"; }}
+            />
+          </div>
+
+          {/* Circle tiles — 定位 / 文字 / 視覺 (mirrors /30s channel row) */}
+          <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <div className="flex items-start gap-5 w-max mx-auto px-2">
+              {([
+                { v: "positioning" as const, label: "定位",   icon: faBullseye,   bg: "#7C3AED" },
+                { v: "copy"        as const, label: "文字",   icon: faQuoteLeft,  bg: "#0EA5E9" },
+                { v: "visual"      as const, label: "視覺",   icon: faPalette,    bg: "#F59E0B" },
+              ]).map((t) => {
+                const active = category === t.v;
+                return (
+                  <button
+                    key={t.v}
+                    onClick={() => setCategory(t.v)}
+                    className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer"
+                  >
+                    <div
+                      className={`w-16 h-16 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
+                      style={{ background: t.bg }}
+                    >
+                      <FontAwesomeIcon icon={t.icon} className="text-2xl" />
+                    </div>
+                    <span className={`text-small ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
+                      {t.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tier signature mini-chip */}
+          <div className="mt-3 flex items-center gap-2 text-tiny text-default-400">
+            <span
+              className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
+              style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
             >
-              <span>{t.label}</span>
-              <span style={{ fontSize: 11, fontWeight: 400, color: "#9CA3AF" }}>{t.desc}</span>
-            </button>
-          ))}
+              BRAND WORKSPACE
+            </span>
+            <span>·</span>
+            <span>{scopeEyebrow}</span>
+          </div>
         </div>
       </div>
+
+      {/* Brain bar — appears WHILE positioning pipeline runs.
+          Shows current step's agent + thinking text in the same line-art
+          portrait + speech bubble style as /theater. */}
+      {pipelineThinking && (
+        <PositioningBrainBar thinking={pipelineThinking} />
+      )}
 
       {/* ─── Body: full-bleed (left rail removed 2026-05-07) ─────────────────── */}
       <div className="flex-1 flex">
@@ -705,11 +724,56 @@ export default function BrandsPage() {
             <>
               {/* ── 定位 card grid (pos:home) ── */}
               {section === "pos:home" ? (
-                <PositioningGrid
-                  scopeMode={scopeMode}
-                  segments={segments}
-                  onSelect={setSection}
-                />
+                <div>
+                  {/* Primary 「開始定位」 button — runs the full pipeline.
+                      Visible at top of positioning grid. Re-runs if already done. */}
+                  {scopeMode !== "none" && pipelineSteps.length > 0 && (
+                    <div style={{ padding: "20px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", margin: 0 }}>
+                          {pipeline.status === "running" ? "🧠 正在分析中…"
+                            : pipeline.status === "done" ? "✅ 定位分析已完成"
+                            : "尚未開始 — 按下開始，agent 會逐步幫你完成全套定位分析"}
+                        </p>
+                        <p style={{ fontSize: 12, color: "#6B7280", margin: "2px 0 0" }}>
+                          {pipelineSteps.length} 個步驟 · {pipelineSteps.length > 0 && `從 ${pipelineSteps[0]?.title} 到 ${pipelineSteps[pipelineSteps.length - 1]?.title}`}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {pipeline.status === "running" && (
+                          <>
+                            <Button size="sm" variant="flat" onPress={pausePipeline}>暫停</Button>
+                            <Button size="sm" variant="flat" color="default" onPress={skipPipeline}>跳過此步</Button>
+                            <Button size="sm" variant="flat" color="danger" onPress={stopPipeline}>停止</Button>
+                          </>
+                        )}
+                        {pipeline.status === "paused" && (
+                          <Button size="sm" color="primary" onPress={resumePipeline} startContent={<FontAwesomeIcon icon={faPlay} />}>繼續</Button>
+                        )}
+                        {(pipeline.status === "idle" || pipeline.status === "done") && (
+                          <Button
+                            size="lg"
+                            color="primary"
+                            onPress={startPipeline}
+                            startContent={<FontAwesomeIcon icon={faPlay} />}
+                            style={{
+                              background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                              fontSize: 14, fontWeight: 600,
+                              boxShadow: "0 6px 18px rgba(99,102,241,0.35)",
+                            }}
+                          >
+                            {pipeline.status === "done" ? "重新分析" : "開始定位"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <PositioningGrid
+                    scopeMode={scopeMode}
+                    segments={segments}
+                    onSelect={setSection}
+                  />
+                </div>
               ) : (
               /* ── 選了具體 section → 原本的內容 ── */
               <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1075,6 +1139,78 @@ export default function BrandsPage() {
         }}
       />
     </main>
+  );
+}
+
+/* ─────────────────────────── PositioningBrainBar ─────────────────────
+ *
+ * Mirrors the /theater BrainBar visual language: a strategist agent's
+ * portrait inside a line-art frame + a speech bubble showing live
+ * thinking text from the positioning pipeline.
+ *
+ * Always renders with the same agent (Claire Hsu — same chief strategist
+ * as Theater). Future: swap per pipeline step's assigned agent.
+ */
+function PositioningBrainBar({ thinking }: {
+  thinking: {
+    segmentTarget: string;
+    text: string;
+    phase: string | null;
+    startedAt: number | null;
+    stepNum: number;
+    stepTotal: number;
+    stepTitle: string;
+  };
+}) {
+  // Typewriter-feel: just render text plain (server already streams it).
+  return (
+    <div
+      className="sticky top-0 z-30 w-full border-b border-neutral-200 backdrop-blur-md"
+      style={{ background: "#7C3AED08" }}
+    >
+      <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center gap-4">
+        <div
+          className="flex-shrink-0 w-14 h-14 rounded-2xl bg-white flex items-center justify-center"
+          style={{ border: "2px solid #111", boxShadow: "3px 3px 0 #7C3AED66" }}
+        >
+          <span style={{ fontSize: 22 }}>🧠</span>
+        </div>
+        <div
+          className="relative flex-1 bg-white px-4 py-2.5 rounded-2xl"
+          style={{ border: "2px solid #111", boxShadow: "3px 3px 0 #7C3AED33" }}
+        >
+          <div
+            className="absolute left-[-8px] top-5 w-4 h-4 bg-white"
+            style={{
+              borderLeft: "2px solid #111",
+              borderBottom: "2px solid #111",
+              transform: "rotate(45deg)",
+            }}
+          />
+          <div className="text-tiny text-neutral-500 mb-0.5 flex items-center gap-2">
+            <span className="font-semibold text-neutral-800">
+              Step {thinking.stepNum} / {thinking.stepTotal}
+            </span>
+            <span>·</span>
+            <span>{thinking.stepTitle}</span>
+            {thinking.phase && (
+              <>
+                <span>·</span>
+                <span className="text-purple-600">{thinking.phase}</span>
+              </>
+            )}
+          </div>
+          <p className="text-small text-neutral-900 leading-snug">
+            {thinking.text || "正在分析…"}
+            <span
+              className="inline-block w-[2px] h-[14px] ml-0.5 align-middle bg-neutral-900"
+              style={{ animation: "blink 1s steps(2) infinite" }}
+            />
+          </p>
+        </div>
+      </div>
+      <style>{`@keyframes blink { 50% { opacity: 0 } }`}</style>
+    </div>
   );
 }
 
