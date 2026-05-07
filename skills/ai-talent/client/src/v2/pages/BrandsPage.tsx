@@ -29,6 +29,7 @@ import PipelineRunner, { type PipelineState } from "../components/positioning/Pi
 import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
+import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -80,7 +81,10 @@ interface Tile {
 }
 
 export default function BrandsPage() {
-  const { brandId, setBrandId, brands, scope } = useOutletContext<ShellOutletCtx>();
+  const { brandId, setBrandId, brands, scope, setScope } = useOutletContext<ShellOutletCtx>();
+
+  // Add entity modal (新增品牌 / 產品 / 活動)
+  const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
 
   // Resolve scope mode — choose-one rule from ScopeBar.
   const scopeMode: "brand" | "product" | "event" | "none" =
@@ -821,9 +825,10 @@ export default function BrandsPage() {
                       </div>
                     ))}
 
-                    {/* ⑥ 紫色浮動 + 按鈕 */}
+                    {/* ⑥ 紫色浮動 + 按鈕 → 開啟新增 entity modal（品牌 / 產品 / 活動） */}
                     <button
-                      title="新增資產"
+                      title="新增品牌 / 產品 / 活動"
+                      onClick={() => setAddModal({ open: true, tab: scopeMode === "brand" ? "product" : scopeMode === "product" ? "event" : "brand" })}
                       style={{
                         position: "fixed", bottom: 32, right: 32, zIndex: 50,
                         width: 52, height: 52, borderRadius: "50%",
@@ -869,6 +874,41 @@ export default function BrandsPage() {
           )}
         </div>
       </div>
+
+      {/* Page-level always-visible 「+ 新增」FAB — clicks open the unified
+          modal with a sensible default tab based on current scope. */}
+      <button
+        onClick={() => setAddModal({ open: true, tab: scopeMode === "brand" ? "product" : scopeMode === "product" ? "event" : "brand" })}
+        title="新增 品牌 / 產品 / 活動"
+        style={{
+          position: "fixed", bottom: 32, right: 32, zIndex: 60,
+          padding: "12px 20px", borderRadius: 999,
+          background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+          border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 8,
+          color: "white", fontSize: 14, fontWeight: 600,
+          boxShadow: "0 6px 20px rgba(99,102,241,0.45)",
+          transition: "transform 0.15s, box-shadow 0.15s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 10px 28px rgba(99,102,241,0.55)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(99,102,241,0.45)"; }}
+      >
+        <FontAwesomeIcon icon={faPlus} />
+        <span>新增</span>
+      </button>
+
+      {/* AddEntityModal — shared dialog for 品牌 / 產品 / 活動 */}
+      <AddEntityModal
+        isOpen={addModal.open}
+        initialTab={addModal.tab}
+        defaultBrandId={(scope?.brandId ?? brandId) ?? null}
+        onClose={() => setAddModal({ open: false, tab: addModal.tab })}
+        onCreated={(kind, id) => {
+          if (kind === "brand") { setBrandId(id); setScope({ brandId: id, productId: null, eventId: null }); }
+          else if (kind === "product") setScope({ brandId: scope?.brandId ?? brandId ?? null, productId: id, eventId: null });
+          else if (kind === "event") setScope({ brandId: scope?.brandId ?? brandId ?? null, productId: scope?.productId ?? null, eventId: id });
+        }}
+      />
     </main>
   );
 }

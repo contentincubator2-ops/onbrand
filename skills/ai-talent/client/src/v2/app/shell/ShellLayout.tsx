@@ -11,6 +11,7 @@ import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
+import AddEntityModal, { type AddEntityTab } from "../../components/AddEntityModal";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -368,6 +369,7 @@ function BrandHierarchyPill({
   onNavigate: (to: string) => void;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [addModal, setAddModal] = React.useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!open) return;
@@ -636,30 +638,49 @@ function BrandHierarchyPill({
             </>
           )}
 
-          {/* Add new */}
+          {/* Add new — opens unified modal instead of navigating */}
           <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
-          <button
-            onClick={() => { onNavigate("/brands"); setOpen(false); }}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 8,
-              padding: "6px 10px", border: "none", borderRadius: 6,
-              background: "transparent", cursor: "pointer", textAlign: "left",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-          >
-            <span style={{
-              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-              background: "#f3f4f6", color: "#6b7280",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12,
-            }}>
-              <FontAwesomeIcon icon={faPlus} />
-            </span>
-            <span style={{ fontSize: 12.5, fontWeight: 500, color: "#374151" }}>新增品牌 / 產品 / 活動</span>
-          </button>
+          {([
+            { tab: "brand"   as const, label: "新增品牌",  icon: faRocket,        accent: "#7C3AED" },
+            { tab: "product" as const, label: "新增產品",  icon: faBoxOpen,       accent: "#059669" },
+            { tab: "event"   as const, label: "新增活動",  icon: faCalendarDays,  accent: "#F97316" },
+          ]).map((opt) => (
+            <button
+              key={opt.tab}
+              onClick={() => { setAddModal({ open: true, tab: opt.tab }); setOpen(false); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                padding: "6px 10px", border: "none", borderRadius: 6,
+                background: "transparent", cursor: "pointer", textAlign: "left",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <span style={{
+                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                background: `${opt.accent}15`, color: opt.accent,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11,
+              }}>
+                <FontAwesomeIcon icon={opt.icon} />
+              </span>
+              <span style={{ fontSize: 12.5, fontWeight: 500, color: "#374151" }}>{opt.label}</span>
+            </button>
+          ))}
         </div>
       )}
+      {/* AddEntityModal — fires on bottom button click; defaults brand for product/event */}
+      <AddEntityModal
+        isOpen={addModal.open}
+        initialTab={addModal.tab}
+        defaultBrandId={scope.brandId ?? null}
+        onClose={() => setAddModal({ open: false, tab: addModal.tab })}
+        onCreated={(kind, id) => {
+          if (kind === "brand") setScope({ brandId: id, productId: null, eventId: null });
+          else if (kind === "product") setScope({ brandId: scope.brandId ?? null, productId: id, eventId: null });
+          else if (kind === "event") setScope({ brandId: scope.brandId ?? null, productId: scope.productId ?? null, eventId: id });
+        }}
+      />
     </div>
   );
 }
