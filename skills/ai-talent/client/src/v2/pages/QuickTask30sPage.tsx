@@ -30,6 +30,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
+import { EntityStats } from "../components/EntityStats";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { StagePipelineView } from "../components/quickTask/StagePipelineView";
 import { faPalette, faPenNib, faFilm, faWandMagicSparkles, faSliders, faTerminal, faImage, faChevronDown } from "@fortawesome/free-solid-svg-icons";
@@ -510,88 +511,105 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         gradientFrom: "rgba(245,158,11,0.10)",
       };
 
+  // Hero copy adapts to tier but the visual structure is identical to /squads
+  // (eyebrow → gradient title → EntityStats → search → channel icons).
+  const heroTitle = tier === "30s"
+    ? "今天，要寫哪一篇 30 秒搞定的貼文？"
+    : tier === "60s"
+    ? "今天，要做哪一個 60 秒製作包？"
+    : "今天，要做哪一個 100 秒研究驗證版？";
+
   return (
     <div>
-      {/* ─── HERO (tier-distinct, immediately differentiable) ─────────────── */}
-      <div
-        className="relative pt-14 pb-10 px-6 text-center"
-        style={{ background: `linear-gradient(180deg, ${tierHero.gradientFrom} 0%, transparent 100%)` }}
-      >
-        <div className="inline-flex items-center gap-2 mb-3">
-          <span
-            className="text-[10px] font-bold tracking-[0.2em] uppercase px-3 py-1 rounded-full text-white shadow-sm"
-            style={{ background: `linear-gradient(135deg, ${tierHero.accent}, ${tierHero.accent}cc)` }}
-          >
-            {tierHero.kicker} · {tierLabel.toUpperCase()}
-          </span>
-        </div>
-        <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-3 leading-tight">
-          <span className="text-3xl md:text-4xl mr-2">{tierHero.emoji}</span>
-          <span style={{ background: `linear-gradient(135deg, ${tierHero.accent} 0%, ${tierHero.accent}aa 100%)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            {tierHero.headline}
-          </span>
-        </h1>
-        <p className="text-default-600 text-medium md:text-large mb-4 max-w-3xl mx-auto leading-relaxed">
-          {tierHero.sub}
-        </p>
-        {/* Per-tier feature bullets */}
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
-          {tierHero.bullets.map((b) => (
-            <span
-              key={b}
-              className="text-tiny px-3 py-1 rounded-full font-medium"
-              style={{ background: `${tierHero.accent}15`, color: tierHero.accent, border: `1px solid ${tierHero.accent}30` }}
+      {/* ─── HERO (matches /squads layout) ────────────────────────────── */}
+      <div className="relative pt-14 pb-10 px-6 text-center">
+        <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
+          {/* Three lines above search: eyebrow / gradient title / stats */}
+          <div className="mb-6 w-full">
+            <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
+              SoWork · Marketing OS
+            </p>
+            <h1
+              className="font-semibold tracking-tight leading-tight text-center"
+              style={{
+                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
             >
-              {b}
+              {heroTitle}
+            </h1>
+            <div className="mt-3 text-small text-default-500">
+              <EntityStats variant="inline" />
+            </div>
+          </div>
+
+          {/* Search bar — matches /squads sizing */}
+          <div className="w-full" style={{ maxWidth: 800 }}>
+            <Input
+              size="lg"
+              radius="lg"
+              variant="flat"
+              placeholder={`搜尋 ${tierLabel} 任務、Agent 或 skill…`}
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              isClearable
+              onClear={() => setSearchQuery("")}
+              startContent={
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 18 }} />
+              }
+              classNames={{
+                base: "overflow-hidden rounded-[20px]",
+                inputWrapper: "h-16 bg-white shadow-md border border-default-100 rounded-[20px] data-[focus=true]:shadow-lg",
+                input: "text-medium",
+              }}
+            />
+          </div>
+
+          {/* Channel icon row — circle tiles, /squads style */}
+          <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <div className="flex items-start gap-3 w-max mx-auto px-2">
+              {CHANNEL_TILES.map((c) => {
+                const active = channel === c.id;
+                const disabled = !c.enabled;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => c.enabled && setChannel(c.id)}
+                    disabled={disabled}
+                    className={`flex flex-col items-center gap-1.5 shrink-0 transition ${disabled ? "opacity-30 cursor-not-allowed" : "hover:scale-105 cursor-pointer"}`}
+                  >
+                    <div
+                      className={`w-14 h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
+                      style={{ background: c.bg }}
+                    >
+                      <FontAwesomeIcon icon={c.icon} className="text-xl" />
+                    </div>
+                    <span className={`text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
+                      {c.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tiny tier signature — kept so the page identifies itself, but
+              tucked under the channel row so it doesn't dominate. */}
+          <div className="mt-4 flex items-center gap-2 text-tiny text-default-400">
+            <span
+              className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
+              style={{ background: tierHero.accent, fontSize: 9, letterSpacing: "0.15em" }}
+            >
+              {tierHero.kicker}
             </span>
-          ))}
-        </div>
-        <p className="text-default-500 text-tiny">
-          {tasksThisTier.length} 個 {tierLabel} 任務 ·{" "}
-          {new Set(tasksThisTier.map((t) => t.agent_id).filter(Boolean)).size} 位專屬 Agent · 品牌腦：
-          <span className="font-medium text-default-700">{brandName ?? "（未選）"}</span>
-        </p>
-
-        {/* Search bar */}
-        <div className="max-w-[640px] mx-auto mt-8">
-          <Input
-            size="lg"
-            radius="full"
-            placeholder={`搜尋 ${tierLabel} 任務、Agent 或 skill...`}
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400" />}
-            classNames={{
-              inputWrapper: "bg-white shadow-md border border-default-100 h-14",
-              input: "text-medium",
-            }}
-          />
-        </div>
-
-        {/* Channel icon row (mirrors MissionsHome QUICK_TILES) */}
-        <div className="max-w-[800px] mx-auto mt-8 grid grid-cols-5 md:grid-cols-10 gap-3">
-          {CHANNEL_TILES.map((c) => {
-            const active = channel === c.id;
-            const disabled = !c.enabled;
-            return (
-              <button
-                key={c.id}
-                onClick={() => c.enabled && setChannel(c.id)}
-                disabled={disabled}
-                className={`flex flex-col items-center gap-1.5 transition ${disabled ? "opacity-30 cursor-not-allowed" : "hover:scale-105 cursor-pointer"}`}
-              >
-                <div
-                  className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white shadow-sm ${active ? "ring-4 ring-primary-200" : ""}`}
-                  style={{ background: c.bg }}
-                >
-                  <FontAwesomeIcon icon={c.icon} className="text-lg md:text-xl" />
-                </div>
-                <span className={`text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
-                  {c.label}
-                </span>
-              </button>
-            );
-          })}
+            <span>·</span>
+            <span>{tasksThisTier.length} 個 {tierLabel} 任務</span>
+            <span>·</span>
+            <span>品牌腦：<span className="font-medium text-default-700">{brandName ?? "（未選）"}</span></span>
+          </div>
         </div>
       </div>
 
