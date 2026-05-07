@@ -81,10 +81,14 @@ jobs:
 
             echo "===== Install frontend (force clean) ====="
             cd "$AI/client"
-            # Force clean install — VM's stale node_modules has been
-            # producing JSX.IntrinsicElements resolution failures.
             rm -rf node_modules .tsbuildinfo tsconfig.tsbuildinfo 2>/dev/null || true
-            npm install --legacy-peer-deps 2>&1 | tail -5
+            # Show full install output (was being truncated to last 5 lines)
+            npm install --legacy-peer-deps 2>&1 | tail -50
+
+            echo "===== Verify critical deps ====="
+            ls node_modules/@vitejs/plugin-react/package.json 2>&1 || echo "✗ @vitejs/plugin-react MISSING"
+            ls node_modules/vite/package.json 2>&1 || echo "✗ vite MISSING"
+            ls node_modules/react/package.json 2>&1 || echo "✗ react MISSING"
 
             echo "===== Build frontend (atomic) ====="
             # Build into a temp dir. The live public/ is never touched until
