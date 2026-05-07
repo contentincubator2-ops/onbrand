@@ -437,7 +437,8 @@ ${hookInstruction}${ctaInstruction}${scoutInstruction}
 6. 字數要落在平台規則的範圍內，不要過長或過短。
 7. 直接輸出貼文純文字，**不要寫「這是一則 ___ 貼文：」這種前綴**。
 8. **嚴格遵守上方指定的 Hook 類型與 CTA 意圖** — 如果今天分配的是「數字驚奇」，就不能用「你有沒有遇過...」開場；如果今天 CTA 是「分享給朋友」，就不能寫「留言告訴我」。
-9. **一次寫到底，不要寫到一半重啟、不要把同一個開頭寫兩次**。如果你想換句話，直接在心裡重寫，但給我的 output 只能有一份完整的貼文。輸出之前在腦中校對：第一句不能跟貼文中段任何一句重複。`;
+
+備註：你寫到一半發現要改沒關係，可以重新寫。後面有資深編輯（QA agent）會掃過你的草稿、清掉重複開頭與斷句、把節奏調順。專心把訊息寫好就行。`;
 
       const user = `日期：${input.date}（${input.weekday}）
 本篇要溝通的 USP：「${input.usp}」
@@ -456,21 +457,107 @@ ${importantHint}
           ],
         });
         let caption = r.choices[0]?.message?.content?.toString().trim() ?? "";
-        // Strip common preamble leaks ("這是一則 FB 貼文：")
+        // Strip common preamble leaks ("這是一則 FB 貼文：") — these are
+        // formatting noise, not substantive rewrite. The QA pass cleans
+        // up restart artefacts (duplicate openings, broken sentences) so
+        // we leave those visible here on purpose.
         caption = caption.replace(/^(以下是|這是)?[一個]?[則篇]?\s*[FBIYTGtbreadlinkBlog一-鿿]+貼文[：:]\s*/i, "").trim();
-        // Strip surrounding quotes if model wrapped output
         if ((caption.startsWith("「") && caption.endsWith("」")) ||
             (caption.startsWith("\"") && caption.endsWith("\""))) {
           caption = caption.slice(1, -1).trim();
         }
-        // Dedupe restart-pattern: LLM occasionally writes a partial first
-        // sentence, breaks line, and rewrites the full caption from
-        // scratch. Detect this by finding the first 25-30 chars verbatim
-        // appearing again later — drop the preamble.
-        caption = stripRestartPrefix(caption);
         return { ok: true as const, caption };
       } catch (e: any) {
         return { ok: false as const, caption: "", error: String(e?.message ?? e) };
+      }
+    }),
+
+  /**
+   * QA pass — Chun-Hao Chen (資深社群編輯) reviews the writer's draft.
+   * Cleans:
+   *   · 重複開頭 / 寫到一半重啟的副本
+   *   · 被切斷的句子（缺尾標點、開頭引號沒收尾）
+   *   · 亂入的 markdown / preamble
+   *   · 違反指定 hook / CTA 但內容值得保留 → 微調首尾
+   *   · 跟其他 cell 的相似度太高（暫不檢查跨 cell — 留 v2）
+   *
+   * Programmatic stripRestartPrefix() runs first as cheap shortcut, then
+   * Haiku polish for the soft issues.
+   *
+   * Wall: ~1-2s per call. Frontend runs concurrency 2 to compress total.
+   */
+  qaReviewCell: protectedProcedure
+    .input(z.object({
+      draft:    z.string().min(1).max(5000),
+      platform: PlatformZ,
+      hook:     z.enum(HOOK_KEYS).optional(),
+      cta:      z.enum(CTA_KEYS).optional(),
+      usp:      z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      // 1) Cheap programmatic dedupe (the restart-pattern we already know)
+      let cleaned = stripRestartPrefix(input.draft);
+
+      // 2) LLM polish for soft issues. Keep model output tightly scoped:
+      //    plain-text caption only, no commentary, no markdown.
+      const expectedHookHint = input.hook
+        ? `這篇預期的 hook 類型是「${input.hook}」`
+        : "";
+      const expectedCtaHint = input.cta
+        ? `這篇預期的 CTA 是「${input.cta}」`
+        : "";
+
+      try {
+        const r = await invokeLLM({
+          provider: "anthropic",
+          model: "claude-haiku-4-5",
+          maxTokens: 800,
+          messages: [
+            {
+              role: "system",
+              content: `你是 Chun-Hao Chen，資深社群編輯。任務：把寫手的草稿掃過一遍，做「最小幅度的修補」：
+1. 如果草稿裡有「寫到一半重啟、第一句出現兩次、開頭斷句」的情況 → 保留比較完整的那一份，刪掉殘稿。
+2. 如果有「被切斷的句子（缺結尾標點、開引號沒收尾）」→ 補完。
+3. 如果有「markdown / heading / bullet / 前綴自介」混入 → 拿掉。
+4. 如果語氣明顯偏離預期 hook / CTA → 微調首尾，**不要重寫整篇**。
+5. 如果草稿本來就乾淨 → **直接原樣回傳**，不要為改而改。
+6. **絕對不要重新編造內容、不要替換 USP、不要加你自己的觀點**。
+
+輸出規則：
+- 只回傳清理後的純文字 caption（保留原本的換行 / emoji / hashtag）
+- 不加「這是修改後的版本：」這種前綴
+- 不加任何 markdown 圍籬`,
+            },
+            {
+              role: "user",
+              content: `平台：${input.platform}
+本篇 USP：「${input.usp}」
+${expectedHookHint}
+${expectedCtaHint}
+
+【寫手草稿】
+${cleaned}
+
+請輸出清理後的乾淨版。`,
+            },
+          ],
+        });
+        let polished = r.choices[0]?.message?.content?.toString().trim() ?? cleaned;
+        // Same noise stripping as writer output
+        polished = polished.replace(/^(以下是|這是|清理後)?[一個]?[則篇]?[版本的]?\s*[一-鿿\w]*[：:\s]+/u, "").trim();
+        if ((polished.startsWith("「") && polished.endsWith("」")) ||
+            (polished.startsWith("\"") && polished.endsWith("\""))) {
+          polished = polished.slice(1, -1).trim();
+        }
+        // Safety: if QA returned empty or radically shorter, prefer the
+        // dedup'd cleaned version
+        if (!polished || polished.length < cleaned.length * 0.4) {
+          return { ok: true as const, caption: cleaned, polished: false as const };
+        }
+        return { ok: true as const, caption: polished, polished: true as const };
+      } catch (e: any) {
+        // QA fail → return programmatic-clean version (still better than draft)
+        return { ok: true as const, caption: cleaned, polished: false as const, error: String(e?.message ?? e) };
       }
     }),
 

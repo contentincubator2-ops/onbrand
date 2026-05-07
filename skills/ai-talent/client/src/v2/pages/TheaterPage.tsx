@@ -55,7 +55,7 @@ interface ImportantDate {
 }
 
 interface CellState {
-  status: "idle" | "queued" | "writing" | "imaging" | "done" | "failed";
+  status: "idle" | "queued" | "writing" | "qa" | "imaging" | "done" | "failed";
   caption?: string;
   imageUrl?: string | null;
   startedAt?: number;
@@ -184,6 +184,7 @@ function PlatformCell({
   caption,
   writerAvatar,
   imageDirAvatar,
+  qaAvatar,
   brandName,
   brandLogoUrl,
   onRedo,
@@ -194,6 +195,7 @@ function PlatformCell({
   caption: string;
   writerAvatar: string | null;
   imageDirAvatar: string | null;
+  qaAvatar: string | null;
   brandName: string | null;
   brandLogoUrl: string | null;
   onRedo?: () => void;
@@ -202,15 +204,17 @@ function PlatformCell({
   const meta = PLATFORM_META[platform];
   const isIdle    = state.status === "idle" || state.status === "queued";
   const isWriting = state.status === "writing";
+  const isQA      = state.status === "qa";
   const isImaging = state.status === "imaging";
   const isDone    = state.status === "done";
-  const hasContent = isWriting || isImaging || isDone;
+  const hasContent = isWriting || isQA || isImaging || isDone;
 
   // Tiny status pill (replaces the heavy colored header strip — mockup
   // already shows the platform identity, we just need a state indicator).
   const statusLabel =
     state.status === "queued"  ? "排隊中" :
     state.status === "writing" ? "撰寫中" :
+    state.status === "qa"      ? "QA 校對中" :
     state.status === "imaging" ? "生圖中" :
     state.status === "done"    ? "完成"   :
     state.status === "failed"  ? "失敗"   : "等待";
@@ -251,6 +255,13 @@ function PlatformCell({
             <div className="absolute inset-0 bg-white/80 flex items-center gap-2 justify-center">
               <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
               <p className="text-[11px] text-neutral-600">caption writer 撰寫中…</p>
+            </div>
+          )}
+          {isQA && (
+            <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full shadow-sm">
+              <Avatar src={qaAvatar ?? undefined} size="sm" className="w-5 h-5" />
+              <Spinner size="sm" classNames={{ wrapper: "w-3 h-3", circle1: "border-b-amber-500", circle2: "border-b-amber-500" }} />
+              <span className="text-[10px] text-amber-700 font-medium pr-1">Chun-Hao 校對中</span>
             </div>
           )}
         </div>
@@ -390,6 +401,7 @@ export default function TheaterPage() {
   const utils = trpc.useUtils();
   const generateCellMut  = trpc.theater.generateCell.useMutation();
   const generateImageMut = trpc.theater.generateImage.useMutation();
+  const qaReviewMut      = trpc.theater.qaReviewCell.useMutation();
   const avatarById = useMemo(() => {
     const m = new Map<number, string | null>();
     (castQuery.data ?? []).forEach((a) => m.set(a.id, a.avatarUrl));
@@ -672,7 +684,29 @@ export default function TheaterPage() {
           });
           if (stopRef.current) return;
           if (r.ok && r.caption) {
+            // Show writer's raw draft (rewrites and all — visible on
+            // purpose so user can see the work happen)
             updateCell(task.key, { status: "writing", caption: r.caption });
+            // Brief beat so user perceives the draft, then QA passes
+            await sleep(450);
+            if (stopRef.current) return;
+            updateCell(task.key, { status: "qa", caption: r.caption });
+            try {
+              const qa = await qaReviewMut.mutateAsync({
+                draft: r.caption,
+                platform: task.platform,
+                hook: task.hook as any,
+                cta:  task.cta  as any,
+                usp:  task.usp,
+              });
+              if (stopRef.current) return;
+              if (qa.ok && qa.caption) {
+                updateCell(task.key, { status: "qa", caption: qa.caption });
+              }
+            } catch (e) {
+              console.warn("[theater] QA review failed, keeping draft:", task.key, e);
+            }
+            // Hand off to image queue with the (possibly QA-cleaned) caption
             imageQueue.push({ ...task });
           } else {
             updateCell(task.key, { status: "failed" });
@@ -1021,6 +1055,7 @@ export default function TheaterPage() {
                       caption={state.caption ?? ""}
                       writerAvatar={avatarOf(getPlatformWriter(p))}
                       imageDirAvatar={avatarOf(getPlatformImage(p))}
+                      qaAvatar={avatarOf(getQA())}
                       brandName={brandName}
                       brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
                       onCopy={() => copyCaption(key)}
