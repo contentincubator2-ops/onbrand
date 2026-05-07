@@ -31,6 +31,12 @@ import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
+// Notion-style line icons
+import {
+  Target as LucideTarget, Type as LucideType, Palette as LucidePalette,
+  Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
+  RotateCcw as LucideRotate,
+} from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -558,6 +564,46 @@ export default function BrandsPage() {
         }
       : null;
 
+  // Per-tab completion state — drives the action button label
+  // ("開始___" vs "重新___") and the empty-state hint.
+  const COPY_KEYS_FOR_COMPLETION: AssetKey[] = [
+    "voice", "voice_principles",
+    "preferred_terms", "banned_words", "term_substitutions",
+    "branded_terms", "product_naming", "abbreviations",
+    "cta_library", "hook_library", "ai_prompts", "templates_copy",
+  ];
+  const VISUAL_KEYS_FOR_COMPLETION: AssetKey[] = [
+    "logo", "colors", "fonts", "photos", "guidelines", "templates",
+    "imagery_style", "icon_style", "chart_style", "layout_rules",
+  ];
+  const hasAnyAsset = (keys: AssetKey[]) => keys.some((k) => {
+    const v = brandAssets[k];
+    if (!v || typeof v !== "object") return false;
+    if (typeof v.text === "string" && v.text.trim()) return true;
+    if (typeof v.links === "string" && v.links.trim()) return true;
+    if (Array.isArray(v.items) && v.items.some((x: any) => String(x).trim())) return true;
+    if (Array.isArray(v.pairs) && v.pairs.some((p: any) => p?.from && p?.to)) return true;
+    if (Array.isArray(v.list) && v.list.length > 0) return true;
+    if (Array.isArray(v.urls) && v.urls.length > 0) return true;
+    if (typeof v.primaryUrl === "string" && v.primaryUrl.trim()) return true;
+    if (typeof v.primary === "string" && v.primary.trim()) return true;
+    return false;
+  });
+  const tabHasContent = {
+    positioning: pipeline.status === "done" || pipeline.status === "running" || pipeline.status === "paused"
+      || Object.keys(fullPositioning ?? {}).some((k) => k !== "_assets" && fullPositioning?.[k]),
+    copy:   hasAnyAsset(COPY_KEYS_FOR_COMPLETION),
+    visual: hasAnyAsset(VISUAL_KEYS_FOR_COMPLETION),
+  };
+  // Action handler for the primary button — 文字/視覺 just navigate to
+  // the first asset card; 定位 fires the real pipeline.
+  const handleTabAction = (tab: "positioning" | "copy" | "visual") => {
+    if (tabLocks[tab]) return; // locked guard (safety; button also disabled)
+    if (tab === "positioning") { startPipeline(); return; }
+    if (tab === "copy")        { setSection("asset:voice"); return; }
+    if (tab === "visual")      { setSection("asset:logo");  return; }
+  };
+
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* ─── Header (matches /30s squads-style) ────────────────────── */}
@@ -608,40 +654,53 @@ export default function BrandsPage() {
             />
           </div>
 
-          {/* Circle tiles — 定位 / 文字 / 視覺 (mirrors /30s channel row) */}
+          {/* Tab tiles — Notion-style monochrome line icons (no colored bg) */}
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            <div className="flex items-start gap-5 w-max mx-auto px-2">
+            <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
-                { v: "positioning" as const, label: "定位",   icon: faBullseye,   bg: "#7C3AED" },
-                { v: "copy"        as const, label: "文字",   icon: faQuoteLeft,  bg: "#0EA5E9" },
-                { v: "visual"      as const, label: "視覺",   icon: faPalette,    bg: "#F59E0B" },
+                { v: "positioning" as const, label: "定位", Icon: LucideTarget },
+                { v: "copy"        as const, label: "文字", Icon: LucideType },
+                { v: "visual"      as const, label: "視覺", Icon: LucidePalette },
               ]).map((t) => {
                 const active = category === t.v;
                 const locked = !!tabLocks[t.v];
+                const Icon = t.Icon;
                 return (
                   <button
                     key={t.v}
                     onClick={() => setCategory(t.v)}
-                    className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer relative"
+                    className="flex flex-col items-center gap-2 shrink-0 transition hover:opacity-100 cursor-pointer relative"
+                    style={{
+                      padding: "10px 18px 8px",
+                      borderRadius: 12,
+                      background: active ? "#F4F4F5" : "transparent",
+                      opacity: active ? 1 : 0.65,
+                      border: active ? "1px solid #E4E4E7" : "1px solid transparent",
+                    }}
                   >
-                    <div
-                      className={`w-16 h-16 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"} relative`}
-                      style={{ background: t.bg }}
-                    >
-                      <FontAwesomeIcon icon={t.icon} className="text-2xl" />
+                    <div className="relative flex items-center justify-center" style={{ width: 38, height: 38 }}>
+                      <Icon
+                        size={26}
+                        strokeWidth={1.5}
+                        color={active ? "#18181B" : "#52525B"}
+                      />
                       {locked && (
-                        <div
-                          className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white"
-                          style={{ border: "2px solid white", boxShadow: "0 2px 6px rgba(16,185,129,0.45)" }}
+                        <span
+                          className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center"
+                          style={{ border: "1px solid #18181B" }}
                           title="已鎖定"
                         >
-                          <FontAwesomeIcon icon={faLock} style={{ fontSize: 10 }} />
-                        </div>
+                          <LucideLock size={9} strokeWidth={2} color="#18181B" />
+                        </span>
                       )}
                     </div>
-                    <span className={`text-small ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
+                    <span style={{
+                      fontSize: 13, fontWeight: active ? 600 : 500,
+                      color: active ? "#18181B" : "#52525B",
+                      letterSpacing: "0.02em",
+                    }}>
                       {t.label}
-                      {locked && <span className="ml-1 text-emerald-600 text-[10px]">·已鎖定</span>}
+                      {locked && <span className="ml-1 text-[10px] font-normal" style={{ color: "#71717A" }}>· 已鎖定</span>}
                     </span>
                   </button>
                 );
@@ -839,49 +898,25 @@ export default function BrandsPage() {
               {/* ── 定位 card grid (pos:home) ── */}
               {section === "pos:home" ? (
                 <div>
-                  {/* Primary 「開始定位」 button — runs the full pipeline.
-                      Visible at top of positioning grid. Re-runs if already done. */}
-                  {scopeMode !== "none" && pipelineSteps.length > 0 && (
-                    <div style={{ padding: "20px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                      <div>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", margin: 0 }}>
-                          {pipeline.status === "running" ? "🧠 正在分析中…"
-                            : pipeline.status === "done" ? "✅ 定位分析已完成"
-                            : "尚未開始 — 按下開始，agent 會逐步幫你完成全套定位分析"}
-                        </p>
-                        <p style={{ fontSize: 12, color: "#6B7280", margin: "2px 0 0" }}>
-                          {pipelineSteps.length} 個步驟 · {pipelineSteps.length > 0 && `從 ${pipelineSteps[0]?.title} 到 ${pipelineSteps[pipelineSteps.length - 1]?.title}`}
-                        </p>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {pipeline.status === "running" && (
-                          <>
-                            <Button size="sm" variant="flat" onPress={pausePipeline}>暫停</Button>
-                            <Button size="sm" variant="flat" color="default" onPress={skipPipeline}>跳過此步</Button>
-                            <Button size="sm" variant="flat" color="danger" onPress={stopPipeline}>停止</Button>
-                          </>
-                        )}
-                        {pipeline.status === "paused" && (
-                          <Button size="sm" color="primary" onPress={resumePipeline} startContent={<FontAwesomeIcon icon={faPlay} />}>繼續</Button>
-                        )}
-                        {(pipeline.status === "idle" || pipeline.status === "done") && (
-                          <Button
-                            size="lg"
-                            color="primary"
-                            onPress={startPipeline}
-                            startContent={<FontAwesomeIcon icon={faPlay} />}
-                            style={{
-                              background: "linear-gradient(135deg, #7C3AED, #6366F1)",
-                              fontSize: 14, fontWeight: 600,
-                              boxShadow: "0 6px 18px rgba(99,102,241,0.35)",
-                            }}
-                          >
-                            {pipeline.status === "done" ? "重新分析" : "開始定位"}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <TabActionBar
+                    tab="positioning"
+                    label="定位"
+                    locked={!!tabLocks.positioning}
+                    hasContent={tabHasContent.positioning}
+                    statusText={
+                      pipeline.status === "running" ? "正在分析中…"
+                        : pipeline.status === "done" ? "定位分析已完成"
+                        : tabHasContent.positioning ? "已有部分內容 — 可重新分析或繼續編輯個別段落"
+                        : "尚未開始 — 按下開始，agent 會逐步幫你完成全套定位分析"
+                    }
+                    subText={pipelineSteps.length > 0 ? `${pipelineSteps.length} 個步驟 · 從 ${pipelineSteps[0]?.title} 到 ${pipelineSteps[pipelineSteps.length - 1]?.title}` : undefined}
+                    pipelineStatus={pipeline.status}
+                    onPause={pausePipeline}
+                    onResume={resumePipeline}
+                    onSkip={skipPipeline}
+                    onStop={stopPipeline}
+                    onAction={() => handleTabAction("positioning")}
+                  />
                   <PositioningGrid
                     scopeMode={scopeMode}
                     segments={segments}
@@ -960,8 +995,24 @@ export default function BrandsPage() {
 
           {/* ── 視覺資產 ── */}
           {derivedCategory === "visual" && scopeMode === "brand" && (
-            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32, position: "relative" }}>
-
+            <div style={{ padding: "0 0 32px", display: "flex", flexDirection: "column", gap: 0, position: "relative" }}>
+              {/* Action bar — only on grid view (not while editing a single asset) */}
+              {section === "asset:all" && (
+                <TabActionBar
+                  tab="visual"
+                  label="視覺"
+                  locked={!!tabLocks.visual}
+                  hasContent={tabHasContent.visual}
+                  statusText={
+                    tabHasContent.visual
+                      ? "已有部分視覺資產 — 可繼續補完，或重新從第一張開始"
+                      : "尚未填寫 — 按下開始，從標誌設定起逐步完成"
+                  }
+                  subText="標誌 / 顏色 / 字型 / 圖像風格 / 視覺規範 / 素材庫"
+                  onAction={() => handleTabAction("visual")}
+                />
+              )}
+              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32 }}>
               {/* ── 若選了具體資產類別，顯示其編輯器 ── */}
               {(() => {
                 const VALID_ASSET_KEYS: AssetKey[] = [
@@ -1105,12 +1156,29 @@ export default function BrandsPage() {
                   </>
                 );
               })()}
+              </div>
             </div>
           )}
 
           {/* ── 文字（Restructure 2026-05-07）── */}
           {derivedCategory === "copy" && scopeMode === "brand" && (
-            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32, position: "relative" }}>
+            <div style={{ padding: "0 0 32px", display: "flex", flexDirection: "column", gap: 0, position: "relative" }}>
+              {section === "asset:all" && (
+                <TabActionBar
+                  tab="copy"
+                  label="撰寫文字"
+                  locked={!!tabLocks.copy}
+                  hasContent={tabHasContent.copy}
+                  statusText={
+                    tabHasContent.copy
+                      ? "已有部分文字資產 — 可繼續補完，或重新從口吻開始"
+                      : "尚未填寫 — 按下開始，從品牌口吻 / 用詞 / 範本逐步完成"
+                  }
+                  subText="口吻 / 用詞規範 / 專用詞彙 / 常用文案"
+                  onAction={() => handleTabAction("copy")}
+                />
+              )}
+              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32 }}>
               {(() => {
                 const VALID_COPY_KEYS: AssetKey[] = [
                   "voice", "voice_principles",
@@ -1211,6 +1279,7 @@ export default function BrandsPage() {
                   </>
                 );
               })()}
+              </div>
             </div>
           )}
 
@@ -1268,6 +1337,103 @@ export default function BrandsPage() {
         }}
       />
     </main>
+  );
+}
+
+/* ─────────────────────────── TabActionBar ───────────────────────────
+ *
+ * Shared action bar for 定位 / 文字 / 視覺 tabs. State-aware label:
+ *   locked        → button disabled "已鎖定 — 解鎖才能編輯"
+ *   running (定位) → 暫停 / 跳過此步 / 停止
+ *   paused  (定位) → 繼續
+ *   has content   → 重新___ (rotate icon)
+ *   empty         → 開始___ (play icon)
+ *
+ * Uses Notion-style line icons (Lucide) instead of FontAwesome.
+ */
+function TabActionBar({
+  tab, label, locked, hasContent, statusText, subText,
+  pipelineStatus, onPause, onResume, onSkip, onStop, onAction,
+}: {
+  tab: "positioning" | "copy" | "visual";
+  label: string;
+  locked: boolean;
+  hasContent: boolean;
+  statusText: string;
+  subText?: string;
+  pipelineStatus?: string;
+  onPause?: () => void;
+  onResume?: () => void;
+  onSkip?: () => void;
+  onStop?: () => void;
+  onAction: () => void;
+}) {
+  const isRunning = pipelineStatus === "running";
+  const isPaused  = pipelineStatus === "paused";
+  return (
+    <div style={{
+      borderBottom: "1px solid #E5E7EB",
+      background: "#FAFAFA",
+      padding: "16px 28px",
+    }}>
+      <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "#18181B", margin: 0 }}>
+            {locked ? `${label}已鎖定 — 解鎖才能編輯` :
+              isRunning ? "正在分析中…" :
+              statusText}
+          </p>
+          {subText && (
+            <p style={{ fontSize: 12, color: "#71717A", margin: "2px 0 0" }}>
+              {subText}
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {tab === "positioning" && isRunning && (
+            <>
+              <Button size="sm" variant="bordered" onPress={onPause}>暫停</Button>
+              <Button size="sm" variant="bordered" onPress={onSkip}>跳過此步</Button>
+              <Button size="sm" variant="bordered" color="danger" onPress={onStop}>停止</Button>
+            </>
+          )}
+          {tab === "positioning" && isPaused && (
+            <Button
+              size="sm"
+              onPress={onResume}
+              startContent={<LucidePlay size={14} strokeWidth={2} />}
+              style={{ background: "#18181B", color: "white" }}
+            >
+              繼續
+            </Button>
+          )}
+          {(!isRunning && !isPaused) && (
+            <Button
+              size="lg"
+              isDisabled={locked}
+              onPress={onAction}
+              startContent={
+                locked ? <LucideLock size={15} strokeWidth={2} /> :
+                hasContent ? <LucideRotate size={15} strokeWidth={2} /> :
+                <LucidePlay size={15} strokeWidth={2} />
+              }
+              style={{
+                background: locked ? "#E4E4E7" : "#18181B",
+                color: locked ? "#A1A1AA" : "white",
+                fontSize: 14, fontWeight: 600,
+                cursor: locked ? "not-allowed" : "pointer",
+              }}
+            >
+              {locked
+                ? `已鎖定`
+                : hasContent
+                  ? `重新${label}`
+                  : `開始${label}`}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
