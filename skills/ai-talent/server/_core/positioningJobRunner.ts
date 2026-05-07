@@ -132,21 +132,24 @@ async function recordUsageRow(args: {
 }
 
 /** Read current entity row's positioning JSON, merge `patch` into it,
- *  and write back. Used by step runners to persist their output. */
+ *  and write back. Used by step runners to persist their output.
+ *  Brand uses `soworkAnalysis` (read by positioningBridge / Theater);
+ *  Product/Event use `positioning` (added by entity migration). */
 async function mergePositioning(kind: EntityKind, id: number, userId: number, patch: Record<string, any>): Promise<void> {
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
+  const col = kind === "brand" ? "soworkAnalysis" : "positioning";
   const [rows]: any = await localPool.execute(
-    `SELECT positioning FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
+    `SELECT \`${col}\` AS payload FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
     [id, userId],
   );
   const row = (rows as any[])[0];
   if (!row) throw new Error(`${kind} ${id} not found`);
-  let cur: any = row.positioning;
+  let cur: any = row.payload;
   if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
   cur = cur ?? {};
   const next = { ...cur, ...patch };
   await localPool.execute(
-    `UPDATE \`${table}\` SET positioning = ? WHERE id = ? AND userId = ?`,
+    `UPDATE \`${table}\` SET \`${col}\` = ? WHERE id = ? AND userId = ?`,
     [JSON.stringify(next), id, userId],
   );
 }

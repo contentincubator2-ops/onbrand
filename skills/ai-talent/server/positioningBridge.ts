@@ -134,21 +134,25 @@ export async function getBrandPositioningById(
     if (!brand) return null;
 
     const analysis = (brand.soworkAnalysis ?? {}) as Record<string, unknown>;
+    // Fallback chain: full pipeline output → interim quick-pulse → brand row → empty.
+    // Interim is stored under analysis._interim by interimQuickPulse.
+    const interim = (analysis._interim ?? {}) as Record<string, any>;
+    const fb = <T>(...vals: T[]): T | undefined => vals.find((v) => v != null && v !== "" && !(Array.isArray(v) && v.length === 0));
 
     return {
-      tagline: (analysis.tagline as string) ?? brand.tagline ?? brand.name,
-      targetAudience: brand.targetAudience ?? (analysis.targetAudience as string) ?? "",
-      usp: (analysis.usp as string) ?? (analysis.differentiators as string[])?.[0] ?? "",
-      positioningSummary: (analysis.positioning as string) ?? brand.tagline ?? brand.name,
+      tagline: fb<string>(analysis.tagline as string, brand.tagline ?? "", interim.tagline) ?? brand.name,
+      targetAudience: fb<string>(brand.targetAudience ?? "", analysis.targetAudience as string, interim.targetAudience) ?? "",
+      usp: fb<string>(analysis.usp as string, ((analysis.differentiators as string[])?.[0] ?? ""), interim.usp) ?? "",
+      positioningSummary: fb<string>(analysis.positioning as string, brand.tagline ?? "", interim.positioning) ?? brand.name,
       goldenCircle: (analysis.goldenCircle as PositioningResult["goldenCircle"]) ?? {
-        why: (analysis.valueProposition as string) ?? "",
+        why: (analysis.valueProposition as string) ?? interim.brandFills ?? "",
         how: brand.brandVoice ?? "",
         what: brand.name,
       },
-      valueProposition: (analysis.valueProposition as string) ?? "",
-      brandVoice: brand.brandVoice ?? "",
-      differentiators: (analysis.differentiators as string[]) ?? [],
-      messagingPillars: (analysis.messagingPillars as string[]) ?? [],
+      valueProposition: fb<string>(analysis.valueProposition as string, interim.brandFills) ?? "",
+      brandVoice: fb<string>(brand.brandVoice ?? "", interim.brandVoice) ?? "",
+      differentiators: ((analysis.differentiators as string[]) ?? interim.differentiators ?? []) as string[],
+      messagingPillars: ((analysis.messagingPillars as string[]) ?? interim.messagingPillars ?? []) as string[],
       // Industry is read from brands.industry column (used by Theater scout
       // to bound 'this industry's viral patterns' queries).
       industry: (brand as any).industry ?? (analysis.industry as string) ?? undefined,

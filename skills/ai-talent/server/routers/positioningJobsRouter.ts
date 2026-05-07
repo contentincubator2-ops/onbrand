@@ -20,6 +20,7 @@ import {
   buildProductPositioningSteps,
   buildEventPositioningSteps,
 } from "../_core/positioningSteps";
+import { generateInterimPulse } from "../_core/interimQuickPulse";
 import localPool from "../localDb";
 
 const entityKindSchema = z.enum(["brand", "product", "event"]);
@@ -71,6 +72,77 @@ export const positioningJobsRouter = router({
         steps,
       });
       return { ok: true as const, totalSteps: steps.length };
+    }),
+
+  /**
+   * Run interim quick-pulse synchronously (≤ 12s wall). Returns
+   * "consumer wants X / competitor lacks Y / brand fills Z" + tagline /
+   * USP / differentiators. Used as fallback for Theater + 30s/60s/100s
+   * before the full background pipeline finishes. Stays as fallback
+   * even after full pipeline completes.
+   */
+  runInterim: protectedProcedure
+    .input(z.object({
+      entityKind: entityKindSchema,
+      entityId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const ent = await loadEntity(input.entityKind, input.entityId, userId);
+      if (!ent) return { ok: false as const, error: `${input.entityKind} not found` };
+      const pulse = await generateInterimPulse({
+        userId,
+        entityKind: input.entityKind,
+        entityId: input.entityId,
+        brandName: ent.name,
+        industry: ent.industry,
+        description: ent.description,
+      });
+      return { ok: true as const, pulse };
+    }),
+
+  /** Read whatever's currently persisted (full or interim) for header
+   *  display + Theater fallback. Returns shape compatible with
+   *  PositioningResult subset. */
+  getCurrent: protectedProcedure
+    .input(z.object({
+      entityKind: entityKindSchema,
+      entityId: z.number().int().positive(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const table = input.entityKind === "brand" ? "brands"
+                  : input.entityKind === "product" ? "products" : "events";
+      const col = input.entityKind === "brand" ? "soworkAnalysis" : "positioning";
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT \`${col}\` AS payload FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
+          [input.entityId, userId],
+        );
+        const row = (rows as any[])[0];
+        if (!row) return null;
+        let cur: any = row.payload;
+        if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
+        if (!cur) return null;
+        const interim = cur._interim ?? null;
+        const isFull = !!(cur.executiveSummary || cur.brandActivation || cur.messagingStrategy);
+        // Prefer full data; fallback to interim shape
+        return {
+          source: isFull ? "full" : (interim ? "interim" : "empty"),
+          tagline: cur.tagline ?? interim?.tagline ?? "",
+          positioning: cur.positioning ?? cur.differentiation?.positioningStatement ?? interim?.positioning ?? "",
+          usp: cur.usp ?? cur.differentiation?.uniqueSellingProposition ?? interim?.usp ?? "",
+          targetAudience: cur.targetAudience ?? interim?.targetAudience ?? "",
+          differentiators: cur.differentiators ?? cur.differentiation?.keyDifferentiators ?? interim?.differentiators ?? [],
+          messagingPillars: cur.messagingPillars ?? cur.messagingStrategy?.messagingPillars ?? interim?.messagingPillars ?? [],
+          consumerWants: interim?.consumerWants ?? "",
+          competitorLacks: interim?.competitorLacks ?? "",
+          brandFills: interim?.brandFills ?? "",
+          interim,
+        };
+      } catch {
+        return null;
+      }
     }),
 
   /** Poll for live status. */
