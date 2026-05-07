@@ -206,55 +206,40 @@ function PlatformCell({
   const isDone    = state.status === "done";
   const hasContent = isWriting || isImaging || isDone;
 
-  return (
-    <div
-      className="rounded-xl bg-white overflow-hidden flex flex-col"
-      style={{
-        border: "1.5px solid #111",
-        boxShadow: isDone ? `3px 3px 0 ${meta.accent}33` : "none",
-      }}
-    >
-      {/* header strip */}
-      <div
-        className="px-3 py-2 flex items-center justify-between border-b-2 border-black"
-        style={{ background: meta.accent }}
-      >
-        <span className="text-white text-xs font-bold tracking-wide flex items-center gap-1.5">
-          <span>{meta.emoji}</span>
-          <span>{meta.short}</span>
-        </span>
-        <span className="text-white/90 text-[10px] uppercase tracking-wider">
-          {state.status === "idle"    && "等待"}
-          {state.status === "queued"  && "排隊中"}
-          {state.status === "writing" && "撰寫中"}
-          {state.status === "imaging" && "生圖中"}
-          {state.status === "done"    && "完成"}
-          {state.status === "failed"  && "失敗"}
-        </span>
-      </div>
+  // Tiny status pill (replaces the heavy colored header strip — mockup
+  // already shows the platform identity, we just need a state indicator).
+  const statusLabel =
+    state.status === "queued"  ? "排隊中" :
+    state.status === "writing" ? "撰寫中" :
+    state.status === "imaging" ? "生圖中" :
+    state.status === "done"    ? "完成"   :
+    state.status === "failed"  ? "失敗"   : "等待";
 
-      {/* Real platform mockup — scaled to fit calendar grid */}
+  return (
+    <div className="relative flex flex-col">
+      {/* status chip — floats top-right of mockup */}
+      {(hasContent || state.status === "queued") && (
+        <span
+          className="absolute top-2 right-2 z-10 px-2 py-0.5 text-[10px] font-medium rounded-full text-white shadow-sm"
+          style={{ background: meta.accent }}
+        >
+          {statusLabel}
+        </span>
+      )}
+
+      {/* Real platform mockup — full-width, no outer frame */}
       {hasContent ? (
-        <div className="relative bg-neutral-50 overflow-hidden" style={{ minHeight: 240 }}>
-          <div
-            style={{
-              transform: "scale(0.55)",
-              transformOrigin: "top left",
-              width: "182%",
-              pointerEvents: "none",
-            }}
-          >
-            <PlatformMockup
-              variant={meta.mockup as any}
-              title={caption.split("\n")[0]?.slice(0, 40) ?? ""}
-              brief={caption}
-              brandName={brandName}
-              brandLogoUrl={brandLogoUrl ?? null}
-              liveCaption={caption}
-              liveImageUrl={state.imageUrl ?? undefined}
-              liveImageStatus={state.imageUrl ? "ready" : (isImaging ? undefined : "skipped")}
-            />
-          </div>
+        <div className="relative bg-white">
+          <PlatformMockup
+            variant={meta.mockup as any}
+            title={caption.split("\n")[0]?.slice(0, 40) ?? ""}
+            brief={caption}
+            brandName={brandName}
+            brandLogoUrl={brandLogoUrl ?? null}
+            liveCaption={caption}
+            liveImageUrl={state.imageUrl ?? undefined}
+            liveImageStatus={state.imageUrl ? "ready" : (isImaging ? undefined : "skipped")}
+          />
           {isImaging && !state.imageUrl && (
             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
               <Avatar src={imageDirAvatar ?? undefined} size="sm" className="w-8 h-8" />
@@ -270,17 +255,20 @@ function PlatformCell({
           )}
         </div>
       ) : (
-        <div className="bg-neutral-50 flex items-center gap-2 justify-center" style={{ minHeight: 240 }}>
-          <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
+        <div
+          className="bg-neutral-50 rounded-lg flex flex-col items-center gap-2 justify-center text-center px-3"
+          style={{ minHeight: 200, border: "1px dashed #d4d4d4" }}
+        >
+          <span className="text-2xl opacity-30">{meta.emoji}</span>
           <p className="text-[10px] text-neutral-400">
-            {isIdle ? "等候接棒…" : "—"}
+            {isIdle ? `${meta.short} · 等候接棒…` : "—"}
           </p>
         </div>
       )}
 
       {/* Action row (only on done) */}
       {isDone && caption && (
-        <div className="px-2 py-2 border-t border-neutral-100 flex items-center gap-1.5">
+        <div className="mt-1 px-1 py-1.5 flex items-center gap-1.5">
           {onCopy && (
             <button
               onClick={onCopy}
@@ -309,6 +297,50 @@ function PlatformCell({
 
 // ─── Page ─────────────────────────────────────────────────────────────────
 
+/** localStorage key for persisting run state per brand. */
+const persistKey = (brandId: number | null) =>
+  brandId ? `theater:run:brand-${brandId}` : null;
+
+interface PersistedRun {
+  activePlatforms: TheaterPlatform[];
+  importantDates: ImportantDate[];
+  cells: Array<[CellKey, CellState]>;
+  cellMeta: Array<[CellKey, {
+    usp: string;
+    importantDateName: string | null;
+    brandTagline: string | null;
+    brandVoice: string | null;
+    weekday: string;
+    date: string;
+  }]>;
+  savedAt: number;
+}
+
+function loadPersisted(brandId: number | null): PersistedRun | null {
+  const k = persistKey(brandId);
+  if (!k) return null;
+  try {
+    const raw = localStorage.getItem(k);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // sanity check shape
+    if (!parsed.cells || !Array.isArray(parsed.cells)) return null;
+    return parsed as PersistedRun;
+  } catch {
+    return null;
+  }
+}
+
+function savePersisted(brandId: number | null, data: PersistedRun) {
+  const k = persistKey(brandId);
+  if (!k) return;
+  try {
+    localStorage.setItem(k, JSON.stringify(data));
+  } catch {
+    // quota exceeded etc — silently drop
+  }
+}
+
 export default function TheaterPage() {
   const ctx = useOutletContext<ShellOutletCtx>();
   const brandId = ctx?.brandId ?? null;
@@ -317,13 +349,18 @@ export default function TheaterPage() {
     [ctx?.brands, brandId],
   );
 
-  // selected platforms (default: FB + IG + YT)
-  const [activePlatforms, setActivePlatforms] = useState<TheaterPlatform[]>([
-    "facebook", "instagram", "youtube",
-  ]);
+  // Hydrate from localStorage on first mount (if there's a persisted run for this brand).
+  const persisted = useMemo(() => loadPersisted(brandId), [brandId]);
+
+  // selected platforms (default: FB + IG + YT, or restored from persistence)
+  const [activePlatforms, setActivePlatforms] = useState<TheaterPlatform[]>(
+    persisted?.activePlatforms ?? ["facebook", "instagram", "youtube"],
+  );
 
   // important dates user adds
-  const [importantDates, setImportantDates] = useState<ImportantDate[]>([]);
+  const [importantDates, setImportantDates] = useState<ImportantDate[]>(
+    persisted?.importantDates ?? [],
+  );
   const [showAddDate, setShowAddDate] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [newDateName, setNewDateName] = useState("");
@@ -362,8 +399,10 @@ export default function TheaterPage() {
 
   // Cell state map (+ ref mirror so async workers can read latest captions
   // without re-running the closure on every state change)
-  const [cells, setCells] = useState<Map<CellKey, CellState>>(new Map());
-  const cellsRef = useRef<Map<CellKey, CellState>>(new Map());
+  const [cells, setCells] = useState<Map<CellKey, CellState>>(
+    () => new Map(persisted?.cells ?? []),
+  );
+  const cellsRef = useRef<Map<CellKey, CellState>>(new Map(persisted?.cells ?? []));
   useEffect(() => { cellsRef.current = cells; }, [cells]);
 
   // Per-cell metadata captured at run time — needed for redo.
@@ -375,7 +414,33 @@ export default function TheaterPage() {
     brandVoice: string | null;
     weekday: string;
     date: string;
-  }>>(new Map());
+  }>>(() => new Map(persisted?.cellMeta ?? []));
+
+  // Persist on any state change (debounced via single effect)
+  useEffect(() => {
+    if (!brandId) return;
+    // Skip empty initial state to avoid writing junk before first run
+    if (cells.size === 0 && cellMeta.size === 0) return;
+    savePersisted(brandId, {
+      activePlatforms,
+      importantDates,
+      cells: Array.from(cells.entries()),
+      cellMeta: Array.from(cellMeta.entries()),
+      savedAt: Date.now(),
+    });
+  }, [brandId, activePlatforms, importantDates, cells, cellMeta]);
+
+  // When brand switches, hydrate from that brand's persistence (or reset).
+  const lastBrandRef = useRef<number | null>(brandId);
+  useEffect(() => {
+    if (lastBrandRef.current === brandId) return;
+    lastBrandRef.current = brandId;
+    const p = loadPersisted(brandId);
+    setCells(new Map(p?.cells ?? []));
+    setCellMeta(new Map(p?.cellMeta ?? []));
+    setActivePlatforms(p?.activePlatforms ?? ["facebook", "instagram", "youtube"]);
+    setImportantDates(p?.importantDates ?? []);
+  }, [brandId]);
 
   // Brain bar state
   const [running, setRunning] = useState(false);
@@ -730,6 +795,23 @@ export default function TheaterPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {!running && cells.size > 0 && (
+              <Button
+                size="sm"
+                variant="light"
+                onPress={() => {
+                  if (!confirm("確認清空目前這個品牌的企劃結果？此動作不可還原。")) return;
+                  setCells(new Map());
+                  setCellMeta(new Map());
+                  setStation(null);
+                  const k = persistKey(brandId);
+                  if (k) localStorage.removeItem(k);
+                }}
+                startContent={<RefreshCw size={13} strokeWidth={2} />}
+              >
+                清空結果
+              </Button>
+            )}
             {!running ? (
               <Button
                 color="primary"
@@ -737,7 +819,7 @@ export default function TheaterPage() {
                 startContent={<Play size={14} strokeWidth={2} />}
                 isDisabled={!brandId}
               >
-                開始企劃
+                {cells.size > 0 ? "重新企劃" : "開始企劃"}
               </Button>
             ) : (
               <Button
