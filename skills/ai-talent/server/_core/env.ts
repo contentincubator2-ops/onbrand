@@ -67,8 +67,10 @@ const envSchema = z.object({
   SHOPIFY_CLIENT_SECRET: z.string().optional(),
 
   // External services — optional
-  RESEND_API_KEY: z.string().optional(),
-  TAVILY_API_KEY: z.string().optional(),
+  RESEND_API_KEY:    z.string().optional(),
+  SENDGRID_API_KEY:  z.string().optional(),
+  EMAIL_FROM:        z.string().optional(),
+  TAVILY_API_KEY:    z.string().optional(),
 
   // AI Video Generation
   // FAL_API_KEY removed 2026-05-05 — fal.ai disabled site-wide.
@@ -91,6 +93,31 @@ if (!parsed.success) {
     parsed.error.flatten().fieldErrors
   );
   process.exit(1);
+}
+
+// 2026-05-08 (P0-A): production startup assertion — refuse to boot if
+// no email provider is configured. Without this, registration / forgot-
+// password silently fail and trial users get stuck.
+if (parsed.data.NODE_ENV === "production") {
+  const hasEmailKey = !!(parsed.data.SENDGRID_API_KEY || parsed.data.RESEND_API_KEY);
+  if (!hasEmailKey) {
+    console.error(
+      "[env] FATAL: production requires SENDGRID_API_KEY or RESEND_API_KEY for auth emails. Refusing to start."
+    );
+    process.exit(1);
+  }
+  if (!parsed.data.EMAIL_FROM) {
+    console.error(
+      "[env] FATAL: production requires EMAIL_FROM (sender address). Refusing to start."
+    );
+    process.exit(1);
+  }
+  if (!parsed.data.APP_URL) {
+    console.error(
+      "[env] FATAL: production requires APP_URL for verification / reset links. Refusing to start."
+    );
+    process.exit(1);
+  }
 }
 
 // SEC-7: JWT_SECRET is intentionally excluded from the ENV spread to prevent

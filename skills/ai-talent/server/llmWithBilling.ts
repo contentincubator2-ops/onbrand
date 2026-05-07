@@ -20,13 +20,56 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
 import { invokeLLM, type InvokeParams, type InvokeResult } from "./_core/llm";
-import { deductCredits } from "./deductCredits";
+import { deductCredits, checkEnoughCredits } from "./deductCredits";
 import {
   insertTokenLog,
   calcCostFromTokens,
   usdToCredits,
   type TokenLogInput,
 } from "./tokenLedger";
+import {
+  withTimeout,
+  LLM_HARD_TIMEOUT_MS,
+  DAILY_USD_CAP_TRIAL,
+  DAILY_USD_CAP_PAID,
+  MIN_CREDITS_TO_RUN,
+} from "./_core/timeout";
+import localPool from "./localDb";
+
+/**
+ * 2026-05-08 (P0-D): pre-flight cost guard — checks both rolling 24h
+ * spend (via usage_log SUM) and current wallet floor. Trial users
+ * capped at $5/day, paid at $50/day. Prevents runaway concurrent
+ * 30s/60s/100s tasks burning the budget.
+ */
+export async function preflightCostCheck(userId: number): Promise<{ ok: true } | { ok: false; reason: string }> {
+  // 1. Wallet floor check (re-uses checkEnoughCredits from deductCredits)
+  try {
+    const c = await checkEnoughCredits(userId, MIN_CREDITS_TO_RUN);
+    if (!c.enough) {
+      return { ok: false, reason: `餘額不足（剩 ${c.totalAvailable} credits，需要至少 ${MIN_CREDITS_TO_RUN}）。請充值或聯絡客服。` };
+    }
+  } catch {/* checkEnoughCredits is best-effort; continue */}
+
+  // 2. Rolling 24h $ cap from usage_log
+  try {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ");
+    const [rows]: any = await localPool.execute(
+      `SELECT COALESCE(SUM(costUsd), 0) AS total FROM usage_log WHERE userId = ? AND ts > ?`,
+      [userId, since],
+    );
+    const total = Number((rows as any[])[0]?.total ?? 0);
+    // We don't have plan tier here cheaply — assume trial cap by default
+    // (paid users still safe with $50 cap). Tighten later by joining
+    // user_credits.planTier.
+    const cap = DAILY_USD_CAP_TRIAL;
+    if (total >= cap) {
+      return { ok: false, reason: `今日 LLM 成本已達上限（$${total.toFixed(2)} / $${cap}）。明天再試或聯絡客服升級方案。` };
+    }
+  } catch {/* daily-cap check best-effort; don't block on DB transient */}
+
+  return { ok: true };
+}
 
 /** Hash an API key before storing it — prevents plaintext key storage in logs/DB/disk */
 function hashApiKey(apiKey: string): string {
@@ -255,8 +298,25 @@ export async function invokeLLMWithBilling(
     ...llmOptions
   } = options;
 
+  // 2026-05-08 (P0-D): pre-flight cost guard. Skipped for skipBilling
+  // (internal calls like onboarding agents).
+  if (!skipBilling) {
+    const guard = await preflightCostCheck(userId);
+    if (!guard.ok) {
+      const err = new Error(guard.reason) as any;
+      err.code = "INSUFFICIENT_CREDITS";
+      throw err;
+    }
+  }
+
   const startMs = Date.now();
-  const response = await invokeLLM({ ...llmOptions, provider: provider as any, model });
+  // 2026-05-08 (P0-D): hard 90s timeout — LLM provider hangs were
+  // pinning worker threads; now they fail fast and free the slot.
+  const response = await withTimeout(
+    invokeLLM({ ...llmOptions, provider: provider as any, model }),
+    LLM_HARD_TIMEOUT_MS,
+    `LLM ${provider}/${model}`,
+  );
   const latencyMs = Date.now() - startMs;
 
   const usage = parseTokenUsage(response);

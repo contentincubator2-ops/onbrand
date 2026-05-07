@@ -31,6 +31,7 @@ import {
   updateLastLoginIp,
   verifyEmailPassword,
   upsertGoogleUser,
+  deleteUserById,
   EMAIL_VERIFICATION_EXPIRY_MS,
 } from "./usersDb";
 import { sendEmailVerification, sendPasswordReset } from "./emailService";
@@ -140,7 +141,19 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       });
     } catch (emailError) {
       console.error("[auth] Failed to send verification email:", emailError);
-      // Don't fail registration if email fails
+      // 2026-05-08 (P0-A): hard-fail registration if email can't send.
+      // Previously this was swallowed → user thought 註冊成功 but couldn't
+      // verify. Now we delete the half-created user so they can re-try
+      // (without "此 email 已註冊" blocking them).
+      try {
+        await deleteUserById(db, user.id);
+      } catch (cleanupErr) {
+        console.error("[auth] Failed to clean up user after email failure:", cleanupErr);
+      }
+      res.status(503).json({
+        error: "驗證信寄送失敗，請稍後再試或聯絡客服。",
+      });
+      return;
     }
 
     res.json({
@@ -175,6 +188,17 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     const user = await verifyEmailPassword(db, email, password);
     if (!user) {
       res.status(401).json({ error: "電子郵件或密碼錯誤" });
+      return;
+    }
+
+    // 2026-05-08 (P0-B): block unverified users. Frontend uses
+    // `needsVerification: true` to show a "重發驗證信" CTA.
+    if (!user.isActive) {
+      res.status(403).json({
+        error: "請先驗證您的電子郵件後再登入",
+        needsVerification: true,
+        email,
+      });
       return;
     }
 
@@ -325,6 +349,17 @@ authRouter.post("/forgotPassword", async (req: Request, res: Response) => {
     }
 
     const { email } = result.data;
+
+    // 2026-05-08 (P0-C): rate limit per email (3 / hour). Prevents
+    // attacker flooding victim's inbox with reset emails.
+    const rl = checkForgotRateLimit(email);
+    if (!rl.ok) {
+      res.status(429).json({
+        error: `重設密碼請求過於頻繁，請於 ${Math.ceil(rl.retryInMs / 60000)} 分鐘後再試`,
+      });
+      return;
+    }
+
     const db = await getDb();
 
     const user = await getUserByEmail(db, email);
@@ -356,6 +391,13 @@ authRouter.post("/forgotPassword", async (req: Request, res: Response) => {
       });
     } catch (emailError) {
       console.error("[auth] Failed to send reset email:", emailError);
+      // 2026-05-08 (P0-A): hard-fail so user knows the request didn't go
+      // through. Previously silent → user thinks they'll get email but
+      // never does.
+      res.status(503).json({
+        error: "重設密碼信件寄送失敗，請稍後再試。",
+      });
+      return;
     }
 
     res.json({
@@ -399,8 +441,17 @@ authRouter.post("/resetPassword", async (req: Request, res: Response) => {
       return;
     }
 
-    // Update password
-    await updateUserPassword(db, user.id, password);
+    // 2026-05-08 (P0-C): CAS update — passes token so DB only writes
+    // when the token still matches. If two requests race, only one wins.
+    try {
+      await updateUserPassword(db, user.id, password, token);
+    } catch (err: any) {
+      if (String(err?.message) === "PASSWORD_RESET_TOKEN_ALREADY_USED") {
+        res.status(400).json({ error: "重設連結已使用過或已失效，請重新申請" });
+        return;
+      }
+      throw err;
+    }
 
     res.json({
       success: true,
@@ -408,6 +459,88 @@ authRouter.post("/resetPassword", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[auth] resetPassword error:", err);
+    res.status(500).json({ error: "伺服器錯誤" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 2026-05-08 (P0-B + P0-C): in-memory rate limiters
+// Per-email cooldowns. trial scale; revisit to Redis when scaling out.
+// ─────────────────────────────────────────────────────────────────────
+const RESEND_COOLDOWN_MS = 5 * 60 * 1000;       // resend verification: 5 min
+const FORGOT_COOLDOWN_MS = 60 * 60 * 1000;      // forgot password: 1 hour window
+const FORGOT_MAX_PER_WINDOW = 3;
+const lastResendByEmail = new Map<string, number>();
+const forgotByEmail = new Map<string, number[]>();
+
+function checkResendCooldown(email: string): { ok: true } | { ok: false; retryInMs: number } {
+  const last = lastResendByEmail.get(email) ?? 0;
+  const elapsed = Date.now() - last;
+  if (elapsed < RESEND_COOLDOWN_MS) {
+    return { ok: false, retryInMs: RESEND_COOLDOWN_MS - elapsed };
+  }
+  return { ok: true };
+}
+function markResend(email: string) { lastResendByEmail.set(email, Date.now()); }
+
+export function checkForgotRateLimit(email: string): { ok: true } | { ok: false; retryInMs: number } {
+  const now = Date.now();
+  const arr = (forgotByEmail.get(email) ?? []).filter((t) => now - t < FORGOT_COOLDOWN_MS);
+  if (arr.length >= FORGOT_MAX_PER_WINDOW) {
+    const oldest = arr[0]!;
+    return { ok: false, retryInMs: FORGOT_COOLDOWN_MS - (now - oldest) };
+  }
+  arr.push(now);
+  forgotByEmail.set(email, arr);
+  return { ok: true };
+}
+
+/**
+ * POST /api/auth/resend-verification — re-send verification email
+ * for users who registered but didn't get / lost the link.
+ *
+ * 2026-05-08 (P0-B): added so login's 403 needsVerification flow has
+ * a recovery path. Per-email 5-min cooldown.
+ */
+authRouter.post("/resend-verification", async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({ email: z.string().email("請輸入有效的電子郵件") });
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({ error: result.error.flatten().fieldErrors });
+      return;
+    }
+    const { email } = result.data;
+
+    const cd = checkResendCooldown(email);
+    if (!cd.ok) {
+      res.status(429).json({
+        error: `請等候 ${Math.ceil(cd.retryInMs / 60000)} 分鐘後再試`,
+      });
+      return;
+    }
+
+    const db = await getDb();
+    const user = await getUserByEmail(db, email);
+    // Don't reveal whether email exists — but only send if it does + still inactive
+    if (user && !(user as any).isActive) {
+      const verificationToken = nanoid(64);
+      const verificationExpires = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_MS);
+      await setEmailVerificationToken(db, email, verificationToken, verificationExpires);
+      const appUrl = process.env.APP_URL || "http://localhost:3001";
+      const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
+      try {
+        await sendEmailVerification({ to: email, name: user.name ?? "User", verifyUrl });
+      } catch (e) {
+        console.error("[auth] resend-verification email failed:", e);
+        res.status(503).json({ error: "驗證信寄送失敗，請稍後再試" });
+        return;
+      }
+    }
+    markResend(email);
+    res.json({ success: true, message: "如果此 email 還沒驗證，新的驗證信已寄出" });
+  } catch (err) {
+    console.error("[auth] resend-verification error:", err);
     res.status(500).json({ error: "伺服器錯誤" });
   }
 });

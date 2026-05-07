@@ -788,7 +788,7 @@ export default function PickerWorkspace() {
             <Button
               size="sm" variant="flat" radius="full" isIconOnly
               className="text-default-400 hover:text-foreground h-7 w-7 min-w-7"
-              onPress={() => window.location.href = "/settings/brands"}
+              onPress={() => { window.location.href = "/brands"; /* P0-E 2026-05-08: was /settings/brands which doesn't exist */ }}
               aria-label="新增品牌"
             >
               <span className="text-sm font-bold">＋</span>

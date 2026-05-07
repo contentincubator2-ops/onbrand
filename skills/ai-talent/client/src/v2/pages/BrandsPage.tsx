@@ -733,7 +733,7 @@ export default function BrandsPage() {
                     className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer relative"
                   >
                     <div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
+                      className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
                       style={{ background: t.bg }}
                     >
                       <Icon size={24} strokeWidth={2} color="#fff" />

@@ -50,7 +50,9 @@ import {
 
 interface MissionRow {
   id: number;
-  title: string;
+  // P0-E 2026-05-08: title can be null in DB (legacy rows from
+  // squad-spawn missions). Was crashing search filter on `.length`.
+  title: string | null;
   description?: string | null;
   workspace?: string | null;
   methodology?: string | null;

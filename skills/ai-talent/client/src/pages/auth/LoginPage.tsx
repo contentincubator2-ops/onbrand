@@ -12,7 +12,31 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // 2026-05-08 (P0-B): when login returns 403 needsVerification, show
+  // a "重發驗證信" CTA so user can recover without re-registering.
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMsg, setResendMsg] = useState("");
   const navigate = useNavigate();
+
+  const handleResendVerification = async () => {
+    if (!email) return;
+    setResendBusy(true); setResendMsg("");
+    try {
+      const r = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const d = await r.json();
+      if (!r.ok) setResendMsg(d.error || "重發失敗，請稍後再試");
+      else       setResendMsg(d.message || "驗證信已寄出，請檢查信箱");
+    } catch {
+      setResendMsg("網路錯誤，請稍後再試");
+    } finally {
+      setResendBusy(false);
+    }
+  };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,6 +44,8 @@ export default function LoginPage() {
 
     setLoading(true);
     setError("");
+    setNeedsVerification(false);
+    setResendMsg("");
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -33,6 +59,9 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.error || "登入失敗，請檢查您的電子郵件和密碼");
+        if (res.status === 403 && data.needsVerification) {
+          setNeedsVerification(true);
+        }
         return;
       }
 
@@ -169,8 +198,25 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                <span>⚠</span> {error}
+              <div className="flex flex-col gap-2 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 text-red-600">
+                  <span>⚠</span> {error}
+                </div>
+                {needsVerification && (
+                  <div className="flex flex-col gap-1.5 pl-6">
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={resendBusy || !email}
+                      className="self-start text-xs font-medium px-3 py-1 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      {resendBusy ? "寄送中…" : "重新寄送驗證信"}
+                    </button>
+                    {resendMsg && (
+                      <span className="text-xs text-default-600">{resendMsg}</span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

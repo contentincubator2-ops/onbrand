@@ -16,6 +16,14 @@ export const EMAIL_VERIFICATION_EXPIRY_MS = 24 * 60 * 60 * 1000;
 export const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
 
 /**
+ * Delete user by id — used by registration cleanup when verification
+ * email send fails (so the user can re-register without "已註冊" block).
+ */
+export async function deleteUserById(db: DB, id: number): Promise<void> {
+  await db.delete(users).where(eq(users.id, id));
+}
+
+/**
  * Get user by email
  */
 export async function getUserByEmail(db: DB, email: string) {
@@ -154,13 +162,41 @@ export async function setPasswordResetToken(
 /**
  * Update user password
  */
+/**
+ * Update password via reset-token compare-and-swap.
+ *
+ * 2026-05-08 (P0-C): The previous version did `WHERE id = ?` only —
+ * if two requests arrived with the same token (browser back-button,
+ * refresh, race), both could succeed and overwrite each other. Now
+ * the WHERE clause matches the EXACT token; affectedRows must be 1
+ * or we throw. Caller treats the error as "token already used".
+ *
+ * If `currentToken` is null, falls back to the legacy id-only update
+ * (used by Google OAuth flows that don't have a reset token).
+ */
 export async function updateUserPassword(
   db: DB,
   userId: number,
-  newPassword: string
-) {
+  newPassword: string,
+  currentToken?: string,
+): Promise<void> {
   const passwordHash = await hashPassword(newPassword);
 
+  if (currentToken) {
+    const result: any = await db
+      .update(users)
+      .set({ passwordHash, passwordResetToken: null, passwordResetExpires: null })
+      .where(and(eq(users.id, userId), eq(users.passwordResetToken, currentToken)));
+    // Drizzle MySQL returns [{affectedRows, ...}] — handle both shapes
+    const affected =
+      (result?.[0]?.affectedRows ?? result?.affectedRows ?? 0) as number;
+    if (affected !== 1) {
+      throw new Error("PASSWORD_RESET_TOKEN_ALREADY_USED");
+    }
+    return;
+  }
+
+  // Legacy path: no token CAS (Google flow)
   await db
     .update(users)
     .set({
@@ -192,7 +228,7 @@ export async function verifyEmailPassword(
   db: DB,
   email: string,
   password: string
-): Promise<{ userId: number; openId: string; name: string | null; email: string | null } | null> {
+): Promise<{ userId: number; openId: string; name: string | null; email: string | null; isActive: number } | null> {
   const user = await getUserByEmail(db, email);
   if (!user || !user.passwordHash) {
     return null;
@@ -208,6 +244,9 @@ export async function verifyEmailPassword(
     openId: user.openId,
     name: user.name,
     email: user.email,
+    // 2026-05-08 (P0-B): expose isActive so login handler can require
+    // email verification before issuing a session.
+    isActive: (user as any).isActive ?? 0,
   };
 }
 

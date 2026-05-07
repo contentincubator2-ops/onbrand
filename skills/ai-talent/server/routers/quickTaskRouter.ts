@@ -17,6 +17,7 @@
  * Provider 容錯：preferred 失敗 → forge fallback（同 v2）
  */
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callModel, type ModelProvider } from "../_core/multiModelRouter";
 import { getDb } from "../db";
@@ -1077,6 +1078,10 @@ export const quickTaskRouter = router({
     .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
+      // P0-D pre-flight cost guard
+      const { preflightCostCheck } = await import("../llmWithBilling");
+      const guard60 = await preflightCostCheck(userId);
+      if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       // 60s production-package tasks (FB / IG / YT / multi-channel) take priority
       const tier60Template =
@@ -1322,6 +1327,10 @@ export const quickTaskRouter = router({
     .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
+      // P0-D pre-flight cost guard (100s tier is the most expensive)
+      const { preflightCostCheck } = await import("../llmWithBilling");
+      const guard100 = await preflightCostCheck(userId);
+      if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       // Priority 1: 100s campaign-level tasks (FB100/IG100/YT100/Multi100)
       const tier100Template = get100Template(input.taskId);
@@ -1370,6 +1379,13 @@ export const quickTaskRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
+      // 2026-05-08 (P0-D): pre-flight cost guard. Trial users hitting
+      // wallet floor or daily $5 cap are stopped before LLM fan-out.
+      const { preflightCostCheck } = await import("../llmWithBilling");
+      const guard = await preflightCostCheck(userId);
+      if (!guard.ok) {
+        throw new TRPCError({ code: "FORBIDDEN", message: guard.reason });
+      }
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const { getOrchestraConfig } = await import("../_core/quickTaskFB");
       // Look up template + config in both FB and IG catalogs
