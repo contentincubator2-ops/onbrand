@@ -922,55 +922,64 @@ export default function TheaterPage() {
         </div>
       </div>
 
-      {/* Day-by-day waterfall */}
-      <div className="max-w-[1400px] mx-auto px-6 pb-16">
+      {/* Pinterest-style masonry — all cells flow into a single multi-column
+          stream, sorted by date then platform. Cells have varying heights
+          (each platform mockup has its own natural shape) so CSS columns
+          give the proper masonry packing. */}
+      <div className="max-w-[1600px] mx-auto px-6 pb-16">
         {!brandId ? (
           <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
             <p className="text-neutral-500 text-sm">請先在左上角選擇品牌</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {days.map((d) => {
+          <div
+            className="theater-masonry"
+            style={{ columnGap: "1rem" }}
+          >
+            <style>{`
+              .theater-masonry {
+                column-count: 2;
+              }
+              @media (min-width: 768px)  { .theater-masonry { column-count: 3; } }
+              @media (min-width: 1100px) { .theater-masonry { column-count: 4; } }
+              @media (min-width: 1500px) { .theater-masonry { column-count: 5; } }
+            `}</style>
+            {days.flatMap((d) => {
               const matchingDate = importantDates.find((x) => x.date === d.date);
-              return (
-                <div key={d.date} className="flex gap-4">
-                  {/* Date column */}
-                  <div className="w-32 flex-shrink-0 pt-2">
-                    <p className="text-sm font-bold text-neutral-900">{d.label}</p>
-                    {matchingDate && (
-                      <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded mt-1 inline-block">
-                        🎀 {matchingDate.name}
-                      </p>
-                    )}
-                  </div>
-                  {/* Cells */}
+              return activePlatforms.map((p) => {
+                const key = cellKey(p, d.date);
+                const state = cells.get(key) ?? { status: "idle" as const };
+                return (
                   <div
-                    className="flex-1 grid gap-3"
-                    style={{
-                      gridTemplateColumns: `repeat(${activePlatforms.length}, minmax(0, 1fr))`,
-                    }}
+                    key={key}
+                    className="mb-4 break-inside-avoid"
+                    style={{ breakInside: "avoid" }}
                   >
-                    {activePlatforms.map((p) => {
-                      const key = cellKey(p, d.date);
-                      const state = cells.get(key) ?? { status: "idle" as const };
-                      return (
-                        <PlatformCell
-                          key={key}
-                          platform={p}
-                          state={state}
-                          caption={state.caption ?? ""}
-                          writerAvatar={avatarOf(getPlatformWriter(p))}
-                          imageDirAvatar={avatarOf(getPlatformImage(p))}
-                          brandName={brandName}
-                          brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
-                          onCopy={() => copyCaption(key)}
-                          onRedo={() => redoCell(key, p)}
-                        />
-                      );
-                    })}
+                    {/* Date + platform chip — replaces the Day row */}
+                    <div className="flex items-center gap-2 mb-1.5 px-1">
+                      <span className="text-[11px] font-semibold text-neutral-700">
+                        {d.label}
+                      </span>
+                      {matchingDate && (
+                        <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                          🎀 {matchingDate.name}
+                        </span>
+                      )}
+                    </div>
+                    <PlatformCell
+                      platform={p}
+                      state={state}
+                      caption={state.caption ?? ""}
+                      writerAvatar={avatarOf(getPlatformWriter(p))}
+                      imageDirAvatar={avatarOf(getPlatformImage(p))}
+                      brandName={brandName}
+                      brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
+                      onCopy={() => copyCaption(key)}
+                      onRedo={() => redoCell(key, p)}
+                    />
                   </div>
-                </div>
-              );
+                );
+              });
             })}
           </div>
         )}
