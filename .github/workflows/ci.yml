@@ -81,6 +81,10 @@ jobs:
 
             echo "===== Install frontend ====="
             cd "$AI/client"
+            # Clear any TS incremental cache that may be out of sync with
+            # current source tree (was causing JSX.IntrinsicElements
+            # resolution failures on SquadLabPage despite local tsc passing).
+            rm -rf node_modules/.cache .tsbuildinfo tsconfig.tsbuildinfo 2>/dev/null || true
             npm install --legacy-peer-deps 2>&1 | tail -3
 
             echo "===== Build frontend (atomic) ====="
