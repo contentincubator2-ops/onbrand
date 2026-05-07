@@ -1207,18 +1207,29 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── 文字（Inline edit refactor 2026-05-07）──
-              key={brandId} forces full remount on brand switch so local
-              draft state + dirtyRef are reset (fix for 切換品牌文字沒切換). */}
-          {derivedCategory === "copy" && scopeMode === "brand" && (
-            <CopyTabInline
-              key={`copy-${(scope?.brandId ?? brandId) ?? 0}`}
-              brandId={(scope?.brandId ?? brandId) as number | null}
-              brandAssets={brandAssets}
-              fullPositioning={fullPositioning}
-              locked={!!tabLocks.copy}
-              onLockToggle={() => handleLockToggle("copy")}
-            />
+          {/* ── 文字 ──
+              2026-05-08: also visible for product/event scopes — copy
+              assets live at brand level, so product/event share the
+              parent brand's voice/words/templates. CopyTabInline
+              receives the resolved brandId regardless of active scope. */}
+          {derivedCategory === "copy" && activeBrandIdForLocks && (
+            <>
+              {scopeMode !== "brand" && (
+                <div className="max-w-[1100px] mx-auto px-6 pt-4">
+                  <div className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-xs text-sky-900">
+                    💡 文字資產屬於品牌共用 — 在這裡編輯會影響此品牌下所有產品 / 活動。
+                  </div>
+                </div>
+              )}
+              <CopyTabInline
+                key={`copy-${activeBrandIdForLocks}`}
+                brandId={activeBrandIdForLocks}
+                brandAssets={brandAssets}
+                fullPositioning={fullPositioning}
+                locked={!!tabLocks.copy}
+                onLockToggle={() => handleLockToggle("copy")}
+              />
+            </>
           )}
 
           {/* ── 設定（活動限定）── */}
@@ -2411,11 +2422,21 @@ function PositioningTopRow({
   locked: boolean;
   onLockToggle: () => void;
 }) {
-  const entityKind = scopeMode === "brand" ? "brand" : scopeMode === "product" ? "product" : scopeMode === "event" ? "event" : null;
-  const job = (entityKind && brandId) ? (trpc as any).positioningJobs?.getStatus?.useQuery?.(
-    { entityKind, entityId: brandId },
-    { enabled: !!brandId, refetchInterval: 4_000 },
-  ) : null;
+  // 2026-05-08: hooks must be called unconditionally (Rules of Hooks).
+  // Previous version did `(entityKind && brandId) ? useQuery(...) : null`
+  // which made hook count vary across renders → React broke silently
+  // and the auto-定位 button stopped working.
+  const entityKind: "brand"|"product"|"event"|null =
+    scopeMode === "brand" ? "brand" :
+    scopeMode === "product" ? "product" :
+    scopeMode === "event" ? "event" : null;
+
+  const [startError, setStartError] = useState<string | null>(null);
+
+  const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+    { entityKind: entityKind ?? "brand", entityId: brandId ?? 0 },
+    { enabled: !!brandId && !!entityKind, refetchInterval: 4_000 },
+  );
   const jobData = (job?.data as any) ?? null;
   const isRunning = jobData?.status === "running";
   const isDone = jobData?.status === "done";
@@ -2423,35 +2444,43 @@ function PositioningTopRow({
   const cur = Number(jobData?.currentStep ?? 0);
   const total = Number(jobData?.totalSteps ?? 0);
 
-  const startMut = (trpc as any).positioningJobs?.start?.useMutation?.();
+  const startMut = (trpc as any).positioningJobs?.start?.useMutation?.({
+    onSuccess: (data: any) => {
+      if (!data?.ok) setStartError(data?.error || "啟動失敗");
+      else setStartError(null);
+    },
+    onError: (e: any) => setStartError(String(e?.message ?? e ?? "啟動失敗")),
+  });
 
   const handleAuto = () => {
-    if (!brandId || !entityKind || locked) return;
-    if (isRunning) return;
+    if (!brandId || !entityKind || locked || isRunning) return;
+    setStartError(null);
     startMut?.mutate?.({ entityKind, entityId: brandId, lang: "zh-TW" });
   };
 
+  const totalSteps = entityKind === "brand" ? 14 : entityKind === "product" ? 6 : 4;
   const buttonLabel =
-    isRunning ? `自動定位中 (${cur}/${total || "?"})…`
+    isRunning ? `自動定位中 (${cur}/${total || totalSteps})…`
   : isDone     ? "重新自動定位"
   : isFailed   ? "重試自動定位"
   : "✨ 自動定位";
 
   return (
-    <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-      <div className="flex items-center gap-3">
+    <>
+      {/* Auto-定位 + status row */}
+      <div className="flex items-center gap-3 flex-wrap mb-3">
         <button
           onClick={handleAuto}
-          disabled={!brandId || !entityKind || locked || isRunning}
+          disabled={!brandId || !entityKind || locked || isRunning || startMut?.isPending}
           className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition ${
             isRunning ? "bg-violet-100 text-violet-700 cursor-wait"
             : locked ? "bg-default-100 text-default-400 cursor-not-allowed"
             : "bg-violet-600 text-white hover:bg-violet-700 cursor-pointer shadow-sm"
           }`}
           title={
-            locked ? "已鎖定" :
+            locked ? "已鎖定 — 解鎖後才能重跑" :
             isRunning ? `背景產生中 (step ${cur}/${total})` :
-            "用 14-step pipeline 自動填寫所有定位欄位（背景執行，retry × 5）"
+            `用 ${totalSteps}-step pipeline 自動填寫所有定位欄位（背景執行，retry × 5）`
           }
         >
           <Sparkles size={14} className={isRunning ? "animate-pulse" : ""} />
@@ -2461,38 +2490,59 @@ function PositioningTopRow({
         {isRunning && total > 0 && (
           <div className="flex items-center gap-2">
             <div className="w-32 h-1.5 bg-default-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-violet-500 transition-all"
-                style={{ width: `${Math.min(100, (cur / total) * 100)}%` }}
-              />
+              <div className="h-full bg-violet-500 transition-all" style={{ width: `${Math.min(100, (cur / total) * 100)}%` }} />
             </div>
             <span className="text-xs text-default-500 tabular-nums">{cur}/{total}</span>
           </div>
         )}
-
         {isFailed && jobData?.lastError && (
-          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}>
-            ⚠ {String(jobData.lastError).slice(0, 80)}
-          </span>
+          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}>⚠ {String(jobData.lastError).slice(0, 80)}</span>
         )}
-
-        {isDone && (
-          <span className="text-xs text-emerald-700">✓ 已完成 14 個段落</span>
+        {isDone && <span className="text-xs text-emerald-700">✓ 已完成 {total} 個段落</span>}
+        {startError && (
+          <span className="text-xs text-danger truncate max-w-md" title={startError}>⚠ {startError}</span>
         )}
       </div>
 
-      <button
-        onClick={onLockToggle}
-        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition ${
-          locked ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                 : "bg-default-100 text-default-600 hover:bg-default-200"
-        }`}
-        title={locked ? "點擊解鎖定位" : "點擊鎖定定位"}
+      {/* Wide lock bar (CJ 2026-05-08: 右側的鎖定定位，留下長橫 bar) */}
+      <div
+        className="rounded-xl border px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap"
+        style={{
+          background: locked ? "#ECFDF5" : "#F9FAFB",
+          borderColor: locked ? "#A7F3D0" : "#E5E7EB",
+        }}
       >
-        <FontAwesomeIcon icon={locked ? faLock : faLockOpen} className="text-[11px]" />
-        {locked ? "已鎖定 · 點此解鎖" : "鎖定定位"}
-      </button>
-    </div>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: locked ? "#10B981" : "#E5E7EB" }}
+          >
+            <FontAwesomeIcon icon={locked ? faLock : faLockOpen} style={{ color: locked ? "#fff" : "#6B7280", fontSize: 12 }} />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-default-900">
+              定位 {locked ? "已鎖定" : "尚未鎖定"}
+            </div>
+            <div className="text-xs text-default-500">
+              {locked
+                ? "全平台 (30s/60s/100s/Theater) 都用這份做為單一真相"
+                : "鎖定後：編輯欄變唯讀，全平台用這份為單一真相"}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onLockToggle}
+          className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full transition shrink-0 ${
+            locked
+              ? "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm"
+          }`}
+        >
+          <FontAwesomeIcon icon={locked ? faLockOpen : faLock} className="text-[11px]" />
+          {locked ? "解鎖定位" : "鎖定定位"}
+        </button>
+      </div>
+    </>
   );
 }
 
