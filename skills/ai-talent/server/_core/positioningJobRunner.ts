@@ -1,0 +1,350 @@
+/**
+ * positioningJobRunner — fire-and-forget background pipeline runner.
+ *
+ * CJ direction (2026-05-07):
+ *   "用戶建立好我們就背景執行，retry 直到成功，定位流程不用集（可
+ *   平行）但要穩定順暢。 完成時左下通知。 計算成本也收費。"
+ *
+ * Architecture:
+ *   - Caller fires startPositioningJob(...) and returns immediately.
+ *   - We spawn a detached async loop (setImmediate) that:
+ *       1. Marks status=running in positioning_jobs.
+ *       2. Runs each step with retry (5 attempts, exponential backoff).
+ *       3. Records every LLM call to usage_log for cost tracking.
+ *       4. Where steps are independent (no semantic dependency on prior
+ *          step output), runs them in parallel batches.
+ *       5. On final success → status=done, finishedAt=now.
+ *       6. On final fail (5 retries x all 5 backoffs exhausted on a
+ *          non-recoverable error) → status=failed, lastError=msg.
+ *   - Steps write directly to brands.positioning JSON via the same
+ *     scope.savePositioning path used by manual edits.
+ *
+ * Retry schedule (per step, per attempt index):
+ *   1: 5s    2: 15s    3: 45s    4: 2min    5: 5min
+ *   max wall budget per step ≈ 7-8 minutes
+ *
+ * Step parallelism:
+ *   Brand pipeline (14 steps) — partitioned into waves:
+ *     wave 1 (parallel): 1 market-insight, 2 audience, 3 competition
+ *     wave 2 (parallel, depends on wave 1): 4 differentiation, 5 USP, 6 positioning
+ *     wave 3 (sequential): 7 messaging, 8 voice (depend on wave 2 output)
+ *     wave 4 (parallel): 9 SMP, 10 trends
+ *     wave 5 (parallel): 11 origin, 12 values, 13 golden circle, 14 tagline
+ *
+ * Product pipeline (6 steps) — short version, mostly parallel.
+ * Event   pipeline (4 steps) — even shorter, all parallel after step 1.
+ */
+import localPool from "../localDb";
+
+export type EntityKind = "brand" | "product" | "event";
+export type JobStatus = "pending" | "running" | "done" | "failed";
+
+const RETRY_SCHEDULE_MS = [5_000, 15_000, 45_000, 120_000, 300_000];
+
+// In-process registry to prevent double-firing the same entity job.
+const activeJobs = new Set<string>();
+const jobKey = (kind: EntityKind, id: number) => `${kind}:${id}`;
+
+/** Step definition. Each pipeline step has an id, a label, deps (other
+ *  step ids), and a runner returning the step's output (will be merged
+ *  into positioning JSON). */
+export interface PositioningStep {
+  id: string;
+  label: string;
+  deps: string[]; // step ids that must complete before this one
+  run: (ctx: StepContext) => Promise<Record<string, any>>;
+}
+
+export interface StepContext {
+  userId: number;
+  entityKind: EntityKind;
+  entityId: number;
+  brandName: string;
+  industry?: string;
+  description?: string;
+  // outputs from already-completed steps in this run, keyed by step id
+  prevOutputs: Record<string, any>;
+  /** Helper to record cost — runner calls this after each LLM call. */
+  recordUsage: (kind: string, model: string, inputTokens: number, outputTokens: number, costUsd: number) => Promise<void>;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// DB helpers
+// ─────────────────────────────────────────────────────────────────────
+
+async function upsertJob(userId: number, kind: EntityKind, entityId: number, totalSteps: number): Promise<number> {
+  const [r]: any = await localPool.execute(
+    `INSERT INTO positioning_jobs (userId, entityKind, entityId, status, currentStep, totalSteps, startedAt)
+          VALUES (?, ?, ?, 'pending', 0, ?, NOW(3))
+       ON DUPLICATE KEY UPDATE
+           status = 'pending',
+           currentStep = 0,
+           retryCount = 0,
+           lastError = NULL,
+           startedAt = NOW(3),
+           finishedAt = NULL,
+           totalSteps = VALUES(totalSteps)`,
+    [userId, kind, entityId, totalSteps],
+  );
+  // ON DUP UPDATE returns insertId of original row; fetch via SELECT
+  const [rows]: any = await localPool.execute(
+    `SELECT id FROM positioning_jobs WHERE entityKind = ? AND entityId = ? LIMIT 1`,
+    [kind, entityId],
+  );
+  return Number((rows as any[])[0]?.id ?? r?.insertId ?? 0);
+}
+
+async function setJobStatus(jobId: number, status: JobStatus, fields: Partial<{
+  currentStep: number;
+  retryCount: number;
+  lastError: string | null;
+  finishedAt: boolean; // true → set NOW()
+}> = {}): Promise<void> {
+  const sets: string[] = ["status = ?"];
+  const params: any[] = [status];
+  if (fields.currentStep !== undefined) { sets.push("currentStep = ?"); params.push(fields.currentStep); }
+  if (fields.retryCount !== undefined)  { sets.push("retryCount = ?");  params.push(fields.retryCount); }
+  if (fields.lastError !== undefined)   { sets.push("lastError = ?");   params.push(fields.lastError); }
+  if (fields.finishedAt) sets.push("finishedAt = NOW(3)");
+  params.push(jobId);
+  await localPool.execute(
+    `UPDATE positioning_jobs SET ${sets.join(", ")} WHERE id = ?`,
+    params,
+  );
+}
+
+async function recordUsageRow(args: {
+  userId: number; entityKind?: EntityKind; entityId?: number;
+  kind: string; model: string;
+  inputTokens: number; outputTokens: number; costUsd: number;
+}): Promise<void> {
+  try {
+    await localPool.execute(
+      `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [args.userId, args.entityKind ?? null, args.entityId ?? null,
+       args.kind, args.model, args.inputTokens, args.outputTokens, args.costUsd],
+    );
+  } catch (e) {
+    // Non-fatal: usage logging shouldn't block the pipeline
+    console.warn("[positioningJobRunner] usage_log write failed:", (e as Error).message);
+  }
+}
+
+/** Read current entity row's positioning JSON, merge `patch` into it,
+ *  and write back. Used by step runners to persist their output. */
+async function mergePositioning(kind: EntityKind, id: number, userId: number, patch: Record<string, any>): Promise<void> {
+  const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
+  const [rows]: any = await localPool.execute(
+    `SELECT positioning FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
+    [id, userId],
+  );
+  const row = (rows as any[])[0];
+  if (!row) throw new Error(`${kind} ${id} not found`);
+  let cur: any = row.positioning;
+  if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
+  cur = cur ?? {};
+  const next = { ...cur, ...patch };
+  await localPool.execute(
+    `UPDATE \`${table}\` SET positioning = ? WHERE id = ? AND userId = ?`,
+    [JSON.stringify(next), id, userId],
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Public API
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget. Returns immediately; pipeline runs in background.
+ * Caller never awaits; status is queryable via getPositioningJob.
+ */
+export function startPositioningJob(args: {
+  userId: number;
+  entityKind: EntityKind;
+  entityId: number;
+  brandName: string;
+  industry?: string;
+  description?: string;
+  steps: PositioningStep[];
+}): void {
+  const k = jobKey(args.entityKind, args.entityId);
+  if (activeJobs.has(k)) {
+    console.log(`[positioningJobRunner] already running for ${k}, skip`);
+    return;
+  }
+  activeJobs.add(k);
+  // Detached execution — does NOT block caller
+  setImmediate(() => runPipelineDetached(args).finally(() => activeJobs.delete(k)));
+}
+
+export async function getPositioningJob(entityKind: EntityKind, entityId: number, userId: number): Promise<{
+  status: JobStatus;
+  currentStep: number;
+  totalSteps: number;
+  retryCount: number;
+  lastError: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+} | null> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT status, currentStep, totalSteps, retryCount, lastError, startedAt, finishedAt
+         FROM positioning_jobs
+        WHERE userId = ? AND entityKind = ? AND entityId = ?
+        ORDER BY id DESC LIMIT 1`,
+      [userId, entityKind, entityId],
+    );
+    const row = (rows as any[])[0];
+    if (!row) return null;
+    return {
+      status:      String(row.status) as JobStatus,
+      currentStep: Number(row.currentStep),
+      totalSteps:  Number(row.totalSteps),
+      retryCount:  Number(row.retryCount),
+      lastError:   row.lastError ?? null,
+      startedAt:   row.startedAt ? new Date(row.startedAt).toISOString() : null,
+      finishedAt:  row.finishedAt ? new Date(row.finishedAt).toISOString() : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Pull recent jobs that just transitioned to done/failed since `since`.
+ *  Used by the notification center to surface "X 完整定位完成" toasts. */
+export async function getRecentJobCompletions(userId: number, since: string): Promise<Array<{
+  id: number;
+  entityKind: EntityKind;
+  entityId: number;
+  status: JobStatus;
+  finishedAt: string;
+}>> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT id, entityKind, entityId, status, finishedAt
+         FROM positioning_jobs
+        WHERE userId = ? AND status IN ('done','failed') AND finishedAt > ?
+        ORDER BY finishedAt DESC LIMIT 20`,
+      [userId, since],
+    );
+    return (rows as any[]).map((r) => ({
+      id:         Number(r.id),
+      entityKind: String(r.entityKind) as EntityKind,
+      entityId:   Number(r.entityId),
+      status:     String(r.status) as JobStatus,
+      finishedAt: r.finishedAt ? new Date(r.finishedAt).toISOString() : "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Internal pipeline runner
+// ─────────────────────────────────────────────────────────────────────
+
+async function runPipelineDetached(args: {
+  userId: number;
+  entityKind: EntityKind;
+  entityId: number;
+  brandName: string;
+  industry?: string;
+  description?: string;
+  steps: PositioningStep[];
+}): Promise<void> {
+  const jobId = await upsertJob(args.userId, args.entityKind, args.entityId, args.steps.length);
+  await setJobStatus(jobId, "running");
+
+  // Build adjacency: id → step
+  const stepMap = new Map(args.steps.map((s) => [s.id, s]));
+  const completed = new Set<string>();
+  const outputs: Record<string, any> = {};
+  let currentStepNum = 0;
+
+  // Topo-execute in waves — each wave = all steps whose deps are satisfied
+  while (completed.size < args.steps.length) {
+    const ready = args.steps.filter((s) =>
+      !completed.has(s.id) && s.deps.every((d) => completed.has(d)),
+    );
+    if (ready.length === 0) {
+      // Should not happen if deps are well-formed
+      const err = `[positioningJobRunner] no ready steps but ${completed.size}/${args.steps.length} done — graph cycle?`;
+      console.error(err);
+      await setJobStatus(jobId, "failed", { lastError: err, finishedAt: true });
+      return;
+    }
+
+    // Run this wave in parallel
+    const recordUsage = async (kind: string, model: string, inputTokens: number, outputTokens: number, costUsd: number) => {
+      await recordUsageRow({
+        userId: args.userId, entityKind: args.entityKind, entityId: args.entityId,
+        kind, model, inputTokens, outputTokens, costUsd,
+      });
+    };
+
+    const results = await Promise.all(ready.map(async (step) => {
+      // Per-step retry loop
+      for (let attempt = 0; attempt < RETRY_SCHEDULE_MS.length; attempt++) {
+        try {
+          const ctx: StepContext = {
+            userId: args.userId,
+            entityKind: args.entityKind,
+            entityId: args.entityId,
+            brandName: args.brandName,
+            industry: args.industry,
+            description: args.description,
+            prevOutputs: outputs,
+            recordUsage,
+          };
+          const result = await step.run(ctx);
+          // Persist this step's output into positioning JSON
+          await mergePositioning(args.entityKind, args.entityId, args.userId, result);
+          return { step, result, ok: true as const };
+        } catch (e: any) {
+          const msg = String(e?.message ?? e);
+          console.warn(`[positioningJobRunner] step ${step.id} attempt ${attempt+1}/${RETRY_SCHEDULE_MS.length} failed: ${msg}`);
+          await setJobStatus(jobId, "running", {
+            currentStep: currentStepNum,
+            retryCount: attempt + 1,
+            lastError: msg,
+          });
+          if (attempt < RETRY_SCHEDULE_MS.length - 1) {
+            await new Promise((r) => setTimeout(r, RETRY_SCHEDULE_MS[attempt]));
+          } else {
+            return { step, result: null, ok: false as const, error: msg };
+          }
+        }
+      }
+      return { step, result: null, ok: false as const, error: "exhausted" };
+    }));
+
+    // Mark successes; if any failed after all retries → mark job failed but keep going for other steps
+    let anyFailedFinal = false;
+    for (const r of results) {
+      if (r.ok) {
+        completed.add(r.step.id);
+        outputs[r.step.id] = r.result;
+        currentStepNum++;
+        await setJobStatus(jobId, "running", { currentStep: currentStepNum });
+      } else {
+        anyFailedFinal = true;
+        // Still mark as completed in graph sense so dependent steps can attempt
+        // (they may or may not work — pragmatic: try them)
+        completed.add(r.step.id);
+        outputs[r.step.id] = null;
+      }
+    }
+
+    if (anyFailedFinal && completed.size === args.steps.length) {
+      await setJobStatus(jobId, "failed", {
+        currentStep: currentStepNum,
+        lastError: "one or more steps exhausted retries",
+        finishedAt: true,
+      });
+      return;
+    }
+  }
+
+  await setJobStatus(jobId, "done", { currentStep: args.steps.length, finishedAt: true });
+}

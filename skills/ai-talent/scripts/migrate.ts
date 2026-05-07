@@ -1113,6 +1113,54 @@ async function main() {
       console.log("[migrate] squads.mockup_images: already exists, skipped");
     }
 
+    // ── Positioning jobs (Batch 1: background pipeline runner) ──────────
+    // Tracks the state of long-running positioning analysis jobs that run
+    // in the background after entity creation. Each job is per (entityKind,
+    // entityId). Status transitions: pending → running → done | failed.
+    // 'currentStep' / 'totalSteps' drive the in-app progress UI.
+    // 'retryCount' caps at 5 (exponential backoff: 5s/15s/45s/2m/5m).
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS positioning_jobs (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId       INT          NOT NULL,
+        entityKind   VARCHAR(16)  NOT NULL COMMENT 'brand | product | event',
+        entityId     INT          NOT NULL,
+        status       VARCHAR(16)  NOT NULL DEFAULT 'pending' COMMENT 'pending | running | done | failed',
+        currentStep  INT          NOT NULL DEFAULT 0,
+        totalSteps   INT          NOT NULL DEFAULT 0,
+        retryCount   INT          NOT NULL DEFAULT 0,
+        lastError    TEXT         NULL,
+        startedAt    DATETIME(3)  NULL,
+        finishedAt   DATETIME(3)  NULL,
+        createdAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uniq_entity (entityKind, entityId),
+        KEY idx_user_status (userId, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] positioning_jobs: OK");
+
+    // ── Usage log (cost tracking per LLM call) ──────────────────────────
+    // Every LLM/scout call records token + cost so we can bill or audit.
+    // Keyed loosely by entityKind/entityId so we can roll up cost per
+    // brand later. NULL entityId = global (e.g. theater scout cache miss).
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS usage_log (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId       INT          NOT NULL,
+        entityKind   VARCHAR(16)  NULL,
+        entityId     INT          NULL,
+        kind         VARCHAR(32)  NOT NULL COMMENT 'positioning_step | interim_pulse | theater_caption | scout | ...',
+        model        VARCHAR(64)  NOT NULL,
+        inputTokens  INT          NOT NULL DEFAULT 0,
+        outputTokens INT          NOT NULL DEFAULT 0,
+        costUsd      DECIMAL(10,6) NOT NULL DEFAULT 0.000000,
+        ts           DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        KEY idx_user_ts (userId, ts),
+        KEY idx_entity (entityKind, entityId, ts)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] usage_log: OK");
+
     // ── Brand tab locks (定位 / 文字 / 視覺 lock state) ─────────────────
     // Stores per-brand lock state for the 3 brand workspace tabs. When a
     // tab is locked, the editor is read-only and the platform treats that
