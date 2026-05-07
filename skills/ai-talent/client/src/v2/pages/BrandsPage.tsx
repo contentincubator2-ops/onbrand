@@ -143,14 +143,28 @@ export default function BrandsPage() {
   }, [scopeMode, segments]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  // `cat` URL param (set by ShellLayout sidebar) drives the large category.
-  // `section` (page-level aside) drives the sub-item within that category.
-  const [searchParams] = useSearchParams();
+  // `cat` URL param drives the large category. After 2026-05-07 restructure,
+  // we have 3 top-level tabs: positioning / copy / visual. The 200px left
+  // sub-nav was removed — content area now full-bleed with a horizontal
+  // tab strip above it.
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlCat = searchParams.get("cat") ?? "positioning";
-  const category: "positioning" | "visual" | "settings" =
-    urlCat === "visual" ? "visual" : urlCat === "settings" ? "settings" : "positioning";
+  const category: "positioning" | "copy" | "visual" | "settings" =
+    urlCat === "visual" ? "visual"
+    : urlCat === "copy" ? "copy"
+    : urlCat === "settings" ? "settings"
+    : "positioning";
+  const setCategory = (next: "positioning" | "copy" | "visual") => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("cat", next);
+    setSearchParams(nextParams, { replace: true });
+  };
 
-  const defaultSection: SectionId = category === "visual" ? "asset:all" : category === "settings" ? "settings" : "pos:home";
+  const defaultSection: SectionId =
+    category === "visual" ? "asset:all"
+    : category === "copy" ? "asset:all"
+    : category === "settings" ? "settings"
+    : "pos:home";
   const [section, setSection] = useState<SectionId>(defaultSection);
   const derivedCategory = category; // alias for content-area conditions
 
@@ -159,7 +173,7 @@ export default function BrandsPage() {
   React.useEffect(() => {
     if (prevCatRef.current !== category) {
       prevCatRef.current = category;
-      if (category === "visual")        setSection("asset:all");
+      if (category === "visual" || category === "copy") setSection("asset:all");
       else if (category === "settings") setSection("settings");
       else                              setSection("pos:home");
     }
@@ -549,9 +563,46 @@ export default function BrandsPage() {
         </div>
       </section>
 
-      {/* ─── Body: full-bleed left rail + grid ─────────────────── */}
+      {/* ─── Top tab strip (replaces the old left sub-nav) ─────────── */}
+      <div style={{
+        borderBottom: "1px solid #E4E3E1",
+        background: "white",
+        padding: "0 28px",
+      }}>
+        <div className="flex items-center gap-1" style={{ maxWidth: 1400, margin: "0 auto" }}>
+          {([
+            { v: "positioning" as const, label: "🎯 定位",  desc: "策略 / TA / 差異化" },
+            { v: "copy"        as const, label: "📝 文字",  desc: "口吻 / 用詞 / 範本" },
+            { v: "visual"      as const, label: "🎨 視覺",  desc: "標誌 / 顏色 / 圖像" },
+          ]).map((t) => (
+            <button
+              key={t.v}
+              onClick={() => setCategory(t.v)}
+              style={{
+                padding: "14px 20px", border: "none",
+                borderBottom: category === t.v ? "3px solid #7C3AED" : "3px solid transparent",
+                marginBottom: -1,
+                background: "transparent", cursor: "pointer",
+                fontSize: 15, fontWeight: category === t.v ? 700 : 500,
+                color: category === t.v ? "#7C3AED" : "#6B7280",
+                display: "flex", alignItems: "baseline", gap: 8,
+                transition: "color 0.12s, border-color 0.12s",
+              }}
+              onMouseEnter={(e) => { if (category !== t.v) e.currentTarget.style.color = "#374151"; }}
+              onMouseLeave={(e) => { if (category !== t.v) e.currentTarget.style.color = "#6B7280"; }}
+            >
+              <span>{t.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 400, color: "#9CA3AF" }}>{t.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Body: full-bleed (left rail removed 2026-05-07) ─────────────────── */}
       <div className="flex-1 flex">
-        {/* ── Brand left rail — sub-nav only (你的方案/品牌選擇器 已移至收放側邊欄) ── */}
+        {/* Sub-nav aside (kept ONLY for settings; positioning/copy/visual now
+            use full-width grid). Hide entirely for the 3 main tabs. */}
+        {false && (
         <aside style={{
           width: 200, flexShrink: 0,
           borderRight: "1px solid #E4E3E1",
@@ -645,6 +696,7 @@ export default function BrandsPage() {
             })()}
           </nav>
         </aside>
+        )}
 
         {/* Right: scope-aware content pane — driven by `section` (sidebar handles all nav) */}
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
@@ -733,7 +785,16 @@ export default function BrandsPage() {
 
               {/* ── 若選了具體資產類別，顯示其編輯器 ── */}
               {(() => {
-                const VALID_ASSET_KEYS: AssetKey[] = ["logo", "colors", "fonts", "photos", "guidelines", "templates"];
+                const VALID_ASSET_KEYS: AssetKey[] = [
+                  // 視覺
+                  "logo", "colors", "fonts", "photos", "guidelines", "templates",
+                  "imagery_style", "icon_style", "chart_style", "layout_rules",
+                  // 文字
+                  "voice", "voice_principles",
+                  "preferred_terms", "banned_words", "term_substitutions",
+                  "branded_terms", "product_naming", "abbreviations",
+                  "cta_library", "hook_library", "ai_prompts", "templates_copy",
+                ];
                 const assetKey = section.slice("asset:".length) as AssetKey;
                 const activeBrandId = scope?.brandId ?? brandId;
                 if (VALID_ASSET_KEYS.includes(assetKey) && activeBrandId) {
@@ -758,28 +819,33 @@ export default function BrandsPage() {
                   items: Array<{ id: string; label: string; icon: any; bg: string; }>;
                 }> = [
                   {
-                    label: "基礎資產",
+                    label: "基礎元素",
                     items: [
                       { id: "asset:logo",       label: "標誌",   icon: faPenNib,    bg: "#FFF7ED" },
                       { id: "asset:colors",     label: "顏色",   icon: faPalette,   bg: "#F5F3FF" },
                       { id: "asset:fonts",      label: "字型",   icon: faFont,      bg: "#EFF6FF" },
-                      { id: "asset:guidelines", label: "準則",   icon: faShieldHalved, bg: "#F0FDF4" },
                     ],
                   },
                   {
-                    label: "品牌個性",
+                    label: "視覺風格",
                     items: [
-                      { id: "asset:voice",      label: "品牌口吻", icon: faQuoteLeft, bg: "#FFF0F6" },
-                      { id: "asset:templates",  label: "品牌範本", icon: faFolderOpen, bg: "#FFFBEB" },
+                      { id: "asset:imagery_style", label: "圖像風格", icon: faImage,    bg: "#FFF7ED" },
+                      { id: "asset:icon_style",    label: "圖示風格", icon: faIcons,    bg: "#F5F3FF" },
+                      { id: "asset:chart_style",   label: "圖表風格", icon: faChartPie, bg: "#ECFDF5" },
+                    ],
+                  },
+                  {
+                    label: "視覺規範",
+                    items: [
+                      { id: "asset:guidelines",   label: "視覺準則", icon: faShieldHalved, bg: "#F0FDF4" },
+                      { id: "asset:layout_rules", label: "排版規範", icon: faPenNib,       bg: "#FFFBEB" },
+                    ],
+                  },
+                  {
+                    label: "素材庫",
+                    items: [
                       { id: "asset:photos",     label: "照片",     icon: faImages,    bg: "#F0F9FF" },
-                    ],
-                  },
-                  {
-                    label: "視覺素材",
-                    items: [
-                      { id: "asset:images",  label: "圖像", icon: faImage,    bg: "#FFF7ED" },
-                      { id: "asset:icons",   label: "圖示", icon: faIcons,    bg: "#F5F3FF" },
-                      { id: "asset:charts",  label: "圖表", icon: faChartPie, bg: "#ECFDF5" },
+                      { id: "asset:templates",  label: "品牌範本", icon: faFolderOpen, bg: "#FFFBEB" },
                     ],
                   },
                 ];
@@ -850,6 +916,105 @@ export default function BrandsPage() {
                     >
                       <FontAwesomeIcon icon={faPlus} />
                     </button>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ── 文字（Restructure 2026-05-07）── */}
+          {derivedCategory === "copy" && scopeMode === "brand" && (
+            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32, position: "relative" }}>
+              {(() => {
+                const VALID_COPY_KEYS: AssetKey[] = [
+                  "voice", "voice_principles",
+                  "preferred_terms", "banned_words", "term_substitutions",
+                  "branded_terms", "product_naming", "abbreviations",
+                  "cta_library", "hook_library", "ai_prompts", "templates_copy",
+                ];
+                const assetKey = section.slice("asset:".length) as AssetKey;
+                const activeBrandId = scope?.brandId ?? brandId;
+                if (VALID_COPY_KEYS.includes(assetKey) && activeBrandId) {
+                  return (
+                    <div>
+                      <button onClick={() => setSection("asset:all")} style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        fontSize: 12, color: "#78716C", background: "none", border: "none",
+                        cursor: "pointer", marginBottom: 16, padding: 0,
+                      }}>← 文字總覽</button>
+                      <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} />
+                    </div>
+                  );
+                }
+
+                const COPY_GROUPS: Array<{
+                  label: string;
+                  items: Array<{ id: string; label: string; icon: any; bg: string; }>;
+                }> = [
+                  {
+                    label: "口吻風格",
+                    items: [
+                      { id: "asset:voice",            label: "品牌口吻", icon: faQuoteLeft, bg: "#FFF0F6" },
+                      { id: "asset:voice_principles", label: "品牌準則", icon: faShieldHalved, bg: "#F0FDF4" },
+                    ],
+                  },
+                  {
+                    label: "用詞規範",
+                    items: [
+                      { id: "asset:preferred_terms",     label: "推薦用詞", icon: faFont, bg: "#ECFDF5" },
+                      { id: "asset:banned_words",        label: "禁用詞",   icon: faShieldHalved, bg: "#FEE2E2" },
+                      { id: "asset:term_substitutions",  label: "替換對照", icon: faPenNib, bg: "#FFFBEB" },
+                    ],
+                  },
+                  {
+                    label: "專用詞彙",
+                    items: [
+                      { id: "asset:branded_terms",   label: "品牌術語",     icon: faTrademark, bg: "#F5F3FF" },
+                      { id: "asset:product_naming",  label: "產品名稱規範", icon: faBox,       bg: "#EFF6FF" },
+                      { id: "asset:abbreviations",   label: "縮寫對照",     icon: faFont,      bg: "#FFF7ED" },
+                    ],
+                  },
+                  {
+                    label: "常用文案",
+                    items: [
+                      { id: "asset:cta_library",     label: "CTA 庫",     icon: faQuoteLeft, bg: "#F0F9FF" },
+                      { id: "asset:hook_library",    label: "Hook 庫",    icon: faQuoteLeft, bg: "#FFF0F6" },
+                      { id: "asset:ai_prompts",      label: "AI 指令庫",  icon: faRobot,     bg: "#F5F3FF" },
+                      { id: "asset:templates_copy",  label: "文案範本",   icon: faFolderOpen, bg: "#FFFBEB" },
+                    ],
+                  },
+                ];
+
+                return (
+                  <>
+                    {COPY_GROUPS.map((group, gi) => (
+                      <div key={gi}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 600, color: "#A8A29E",
+                            letterSpacing: "0.10em", textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                          }}>{group.label}</span>
+                          <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
+                        </div>
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(4, 1fr)",
+                          gap: 14,
+                          marginBottom: 4,
+                        }}>
+                          {group.items.map(item => (
+                            <AssetCard
+                              key={item.id}
+                              label={item.label}
+                              icon={item.icon}
+                              bg={item.bg}
+                              onClick={() => setSection(item.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </>
                 );
               })()}

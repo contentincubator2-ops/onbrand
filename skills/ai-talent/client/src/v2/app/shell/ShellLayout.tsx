@@ -1284,8 +1284,9 @@ function SlidePanel({
               padding: "4px 6px 6px", margin: 0,
             }}>分類</p>
             {([
-              { cat: "positioning", label: "品牌定位", icon: faBookBookmark },
-              { cat: "visual",      label: "視覺資產", icon: faPaintBrush   },
+              { cat: "positioning", label: "定位", icon: faBookBookmark },
+              { cat: "copy",        label: "文字", icon: faFont         },
+              { cat: "visual",      label: "視覺", icon: faPaintBrush   },
             ] as Array<{ cat: string; label: string; icon: any }>).map(n => {
               const active = (searchParams.get("cat") ?? "positioning") === n.cat;
               return (
