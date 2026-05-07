@@ -31,6 +31,7 @@ import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
+import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
 // Notion-style line icons
@@ -1147,127 +1148,15 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── 文字（Restructure 2026-05-07）── */}
+          {/* ── 文字（Inline edit refactor 2026-05-07）── */}
           {derivedCategory === "copy" && scopeMode === "brand" && (
-            <div style={{ padding: "0 0 32px", display: "flex", flexDirection: "column", gap: 0, position: "relative" }}>
-              {section === "asset:all" && (
-                <TabActionBar
-                  tab="copy"
-                  label="撰寫文字"
-                  locked={!!tabLocks.copy}
-                  hasContent={tabHasContent.copy}
-                  statusText={
-                    tabHasContent.copy
-                      ? "已有部分文字資產 — 可繼續補完，或重新從口吻開始"
-                      : "尚未填寫 — 按下開始，從品牌口吻 / 用詞 / 範本逐步完成"
-                  }
-                  subText="口吻 / 用詞規範 / 專用詞彙 / 常用文案"
-                  onAction={() => handleTabAction("copy")}
-                />
-              )}
-              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32 }}>
-              {(() => {
-                const VALID_COPY_KEYS: AssetKey[] = [
-                  "voice", "voice_principles",
-                  "preferred_terms", "banned_words", "term_substitutions",
-                  "branded_terms", "product_naming", "abbreviations",
-                  "cta_library", "hook_library", "ai_prompts", "templates_copy",
-                ];
-                const assetKey = section.slice("asset:".length) as AssetKey;
-                const activeBrandId = scope?.brandId ?? brandId;
-                if (VALID_COPY_KEYS.includes(assetKey) && activeBrandId) {
-                  return (
-                    <div>
-                      <button onClick={() => setSection("asset:all")} style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        fontSize: 12, color: "#78716C", background: "none", border: "none",
-                        cursor: "pointer", marginBottom: 16, padding: 0,
-                      }}>← 文字總覽</button>
-                      <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} locked={!!tabLocks.copy} />
-                    </div>
-                  );
-                }
-
-                const COPY_GROUPS: Array<{
-                  label: string;
-                  items: Array<{ id: string; label: string; icon: any; bg: string; }>;
-                }> = [
-                  {
-                    label: "口吻風格",
-                    items: [
-                      { id: "asset:voice",            label: "品牌口吻", icon: faQuoteLeft, bg: "#FFF0F6" },
-                      { id: "asset:voice_principles", label: "品牌準則", icon: faShieldHalved, bg: "#F0FDF4" },
-                    ],
-                  },
-                  {
-                    label: "用詞規範",
-                    items: [
-                      { id: "asset:preferred_terms",     label: "推薦用詞", icon: faFont, bg: "#ECFDF5" },
-                      { id: "asset:banned_words",        label: "禁用詞",   icon: faShieldHalved, bg: "#FEE2E2" },
-                      { id: "asset:term_substitutions",  label: "替換對照", icon: faPenNib, bg: "#FFFBEB" },
-                    ],
-                  },
-                  {
-                    label: "專用詞彙",
-                    items: [
-                      { id: "asset:branded_terms",   label: "品牌術語",     icon: faTrademark, bg: "#F5F3FF" },
-                      { id: "asset:product_naming",  label: "產品名稱規範", icon: faBox,       bg: "#EFF6FF" },
-                      { id: "asset:abbreviations",   label: "縮寫對照",     icon: faFont,      bg: "#FFF7ED" },
-                    ],
-                  },
-                  {
-                    label: "常用文案",
-                    items: [
-                      { id: "asset:cta_library",     label: "CTA 庫",     icon: faQuoteLeft, bg: "#F0F9FF" },
-                      { id: "asset:hook_library",    label: "Hook 庫",    icon: faQuoteLeft, bg: "#FFF0F6" },
-                      { id: "asset:ai_prompts",      label: "AI 指令庫",  icon: faRobot,     bg: "#F5F3FF" },
-                      { id: "asset:templates_copy",  label: "文案範本",   icon: faFolderOpen, bg: "#FFFBEB" },
-                    ],
-                  },
-                ];
-
-                return (
-                  <>
-                    {COPY_GROUPS.map((group, gi) => (
-                      <div key={gi}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                          <span style={{
-                            fontSize: 11, fontWeight: 600, color: "#A8A29E",
-                            letterSpacing: "0.10em", textTransform: "uppercase",
-                            whiteSpace: "nowrap",
-                          }}>{group.label}</span>
-                          <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
-                        </div>
-                        <div style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(4, 1fr)",
-                          gap: 14,
-                          marginBottom: 4,
-                        }}>
-                          {group.items.map(item => {
-                            const k = item.id.startsWith("asset:") ? item.id.slice("asset:".length) : item.id;
-                            const v = brandAssets[k];
-                            const preview = previewForAsset(k, v);
-                            return (
-                              <AssetCard
-                                key={item.id}
-                                label={item.label}
-                                icon={item.icon}
-                                bg={item.bg}
-                                onClick={() => setSection(item.id)}
-                                preview={preview}
-                                hasContent={!!preview}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                );
-              })()}
-              </div>
-            </div>
+            <CopyTabInline
+              brandId={(scope?.brandId ?? brandId) as number | null}
+              brandAssets={brandAssets}
+              fullPositioning={fullPositioning}
+              locked={!!tabLocks.copy}
+              onLockToggle={() => handleLockToggle("copy")}
+            />
           )}
 
           {/* ── 設定（活動限定）── */}
@@ -2442,6 +2331,175 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
           {err && <span className="text-tiny text-danger-600">{err}</span>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── CopyTabInline ───────────────────────────
+   Inline-editable card grid for the 文字 tab. Each card contains the
+   actual editor (no click-to-navigate). Debounced auto-save (800ms)
+   patches positioning._assets[<key>] via scope.savePositioning. AI 協助填
+   per-card lives inside InlineAssetCard and writes through onChange.
+   Compact lock chip sits top-right (replaces the old wide TabActionBar).
+   ───────────────────────────────────────────────────────────────────── */
+type CopyShape = "text" | "items" | "pairs";
+const COPY_TILE_GROUPS: Array<{
+  label: string;
+  items: Array<{ key: string; label: string; icon: any; bg: string; shape: CopyShape }>;
+}> = [
+  {
+    label: "口吻風格",
+    items: [
+      { key: "voice",            label: "品牌口吻", icon: faQuoteLeft,    bg: "#FFF0F6", shape: "text" },
+      { key: "voice_principles", label: "品牌準則", icon: faShieldHalved, bg: "#F0FDF4", shape: "items" },
+    ],
+  },
+  {
+    label: "用詞規範",
+    items: [
+      { key: "preferred_terms",     label: "推薦用詞", icon: faFont,         bg: "#ECFDF5", shape: "items" },
+      { key: "banned_words",        label: "禁用詞",   icon: faShieldHalved, bg: "#FEE2E2", shape: "items" },
+      { key: "term_substitutions",  label: "替換對照", icon: faPenNib,       bg: "#FFFBEB", shape: "pairs" },
+    ],
+  },
+  {
+    label: "專用詞彙",
+    items: [
+      { key: "branded_terms",   label: "品牌術語",     icon: faTrademark, bg: "#F5F3FF", shape: "items" },
+      { key: "product_naming",  label: "產品名稱規範", icon: faBox,       bg: "#EFF6FF", shape: "text" },
+      { key: "abbreviations",   label: "縮寫對照",     icon: faFont,      bg: "#FFF7ED", shape: "pairs" },
+    ],
+  },
+  {
+    label: "常用文案",
+    items: [
+      { key: "cta_library",     label: "CTA 庫",     icon: faQuoteLeft,  bg: "#F0F9FF", shape: "items" },
+      { key: "hook_library",    label: "Hook 庫",    icon: faQuoteLeft,  bg: "#FFF0F6", shape: "items" },
+      { key: "ai_prompts",      label: "AI 指令庫",  icon: faRobot,      bg: "#F5F3FF", shape: "items" },
+      { key: "templates_copy",  label: "文案範本",   icon: faFolderOpen, bg: "#FFFBEB", shape: "items" },
+    ],
+  },
+];
+
+function CopyTabInline({
+  brandId, brandAssets, fullPositioning, locked, onLockToggle,
+}: {
+  brandId: number | null;
+  brandAssets: Record<string, any>;
+  fullPositioning: Record<string, any>;
+  locked: boolean;
+  onLockToggle: () => void;
+}) {
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const saveMut = (trpc as any).scope?.savePositioning?.useMutation
+    ? (trpc as any).scope.savePositioning.useMutation({
+        onSuccess: () => utils?.scope?.active?.invalidate?.(),
+      })
+    : null;
+
+  // Local working draft per asset key — keeps inputs responsive while a
+  // 800ms debounce flushes to the server.
+  const [drafts, setDrafts] = useState<Record<string, any>>(brandAssets);
+  React.useEffect(() => { setDrafts((d) => ({ ...brandAssets, ...d })); /* server > local on first load only */ }, [brandId]); // eslint-disable-line
+  // Whenever server data changes (fresh fetch), merge in only keys we
+  // haven't locally edited yet (avoid clobbering user typing).
+  const dirtyRef = React.useRef<Set<string>>(new Set());
+  React.useEffect(() => {
+    setDrafts((d) => {
+      const next = { ...d };
+      for (const k of Object.keys(brandAssets)) {
+        if (!dirtyRef.current.has(k)) next[k] = brandAssets[k];
+      }
+      return next;
+    });
+  }, [brandAssets]);
+
+  const timersRef = React.useRef<Record<string, any>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const updateAsset = (key: string, next: any) => {
+    if (locked || !brandId) return;
+    dirtyRef.current.add(key);
+    setDrafts((d) => ({ ...d, [key]: next }));
+    // Debounced flush
+    if (timersRef.current[key]) clearTimeout(timersRef.current[key]);
+    setSavingKey(key);
+    timersRef.current[key] = setTimeout(() => {
+      const merged = {
+        ...fullPositioning,
+        _assets: { ...(fullPositioning._assets ?? {}), [key]: next },
+      };
+      saveMut?.mutate?.({ kind: "brand", id: brandId, positioning: merged }, {
+        onSuccess: () => { setSavingKey(null); dirtyRef.current.delete(key); },
+        onError:   () => setSavingKey(null),
+      });
+    }, 800);
+  };
+
+  if (!brandId) {
+    return <div className="p-8 text-center text-default-500">請先選擇品牌</div>;
+  }
+
+  return (
+    <div style={{ padding: "16px 28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Compact lock chip (replaces wide TabActionBar) */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs text-default-500">
+          {savingKey ? (
+            <span className="flex items-center gap-1 text-default-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> 自動儲存中…
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-default-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 自動儲存
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onLockToggle}
+          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition ${
+            locked ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                   : "bg-default-100 text-default-600 hover:bg-default-200"
+          }`}
+          title={locked ? "點擊解鎖文字" : "點擊鎖定文字（全平台用這份做為單一真相）"}
+        >
+          <FontAwesomeIcon icon={locked ? faLock : faLockOpen} className="text-[11px]" />
+          {locked ? "已鎖定 · 點此解鎖" : "鎖定文字"}
+        </button>
+      </div>
+
+      {COPY_TILE_GROUPS.map((group, gi) => (
+        <div key={gi}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: "#A8A29E",
+              letterSpacing: "0.10em", textTransform: "uppercase",
+              whiteSpace: "nowrap",
+            }}>{group.label}</span>
+            <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
+          </div>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 14,
+          }}>
+            {group.items.map((item) => (
+              <InlineAssetCard
+                key={item.key}
+                assetKey={item.key}
+                label={item.label}
+                icon={item.icon}
+                bg={item.bg}
+                shape={item.shape}
+                value={drafts[item.key]}
+                onChange={(next) => updateAsset(item.key, next)}
+                brandId={brandId}
+                readOnly={locked}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

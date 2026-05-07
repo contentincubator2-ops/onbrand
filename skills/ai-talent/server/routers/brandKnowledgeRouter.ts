@@ -8,6 +8,8 @@
  */
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
+import { invokeLLM } from "../_core/llm";
+import { buildBrandPrefix } from "../_core/brandContext";
 import localPool from "../localDb";
 
 const MAX_ITEMS_PER_BRAND = 50;
@@ -101,6 +103,109 @@ export const brandKnowledgeRouter = router({
         [input.id, userId],
       );
       return { ok: true };
+    }),
+
+  /**
+   * AI 協助填寫 — given a brandId + assetKey, draft a sensible default
+   * value for that asset using the brand's positioning + knowledge base.
+   * Returns the SHAPE the editor expects (text / items[] / pairs[]) so
+   * the client can drop it straight into the editor.
+   */
+  suggestForAsset: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      assetKey: z.enum([
+        "voice", "voice_principles",
+        "preferred_terms", "banned_words", "term_substitutions",
+        "branded_terms", "product_naming", "abbreviations",
+        "cta_library", "hook_library", "ai_prompts", "templates_copy",
+      ]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [brandPrefix, knowledgeBlock] = await Promise.all([
+        buildBrandPrefix(input.brandId).catch(() => ""),
+        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+      ]);
+
+      // Per-asset prompt + expected output shape.
+      const SPEC: Record<string, { ask: string; shape: "text" | "items" | "pairs"; n?: number; format?: string }> = {
+        voice:              { ask: "請用 80-150 字描述這個品牌的整體語氣方向（正式/口語/幽默/溫暖等綜合判斷），讓寫文案的人能掌握『品牌講話的感覺』。", shape: "text" },
+        voice_principles:   { ask: "請列 6-10 條 Do/Don't 規則（每條一行）。具體可操作，例如『寫【家人都笑了】而不是【顧客好評如潮】』。", shape: "items", n: 8 },
+        preferred_terms:    { ask: "請列 8-15 個這個品牌應該『鼓勵使用』的詞。要符合品牌語氣 + 在地語感（繁體中文）。", shape: "items", n: 12 },
+        banned_words:       { ask: "請列 8-15 個應該『避免使用』的詞 — 包含空話、誇大用語、產業常見的爛詞。", shape: "items", n: 12 },
+        term_substitutions: { ask: "請列 6-10 對『不要說 X，改說 Y』的對照組（X=爛說法、Y=品牌建議說法）。", shape: "pairs", n: 8 },
+        branded_terms:      { ask: "依據品牌定位，列 5-8 個值得『品牌化』的專用詞彙（自家用語 / 註冊概念）。", shape: "items", n: 6 },
+        product_naming:     { ask: "請寫 100-200 字的產品命名規範（中英對照規則、格式統一、是否帶版本號等）。", shape: "text" },
+        abbreviations:      { ask: "請列 6-10 對縮寫對照（縮寫 → 全稱），跟產業 + 品牌相關。", shape: "pairs", n: 8 },
+        cta_library:        { ask: "請列 8 個符合品牌語氣的 CTA（行動句），不要套話。涵蓋導購/留言/分享/收藏/詢問等不同意圖。", shape: "items", n: 8 },
+        hook_library:       { ask: "請列 8 個符合品牌語氣的開場 Hook 句型（不要寫具體案例，是可重用的模板）。", shape: "items", n: 8 },
+        ai_prompts:         { ask: "請列 5 個常用的 AI prompt（每條完整可貼上的 system prompt 或 instruction），符合品牌口吻 + 產業情境。", shape: "items", n: 5 },
+        templates_copy:     { ask: "請列 5 個文案範本標題（標題 + 一句說明），常用情境（活動文 / 公告 / EDM / 道歉 / 感謝）。", shape: "items", n: 5 },
+      };
+      const spec = SPEC[input.assetKey];
+      if (!spec) return { ok: false as const, error: "unknown assetKey" };
+
+      const formatHint =
+        spec.shape === "text"  ? `輸出 JSON：{"text":"<完整內容>"}`
+      : spec.shape === "items" ? `輸出 JSON：{"items":["...","...",...]}（${spec.n ?? 8} 個左右）`
+      :                          `輸出 JSON：{"pairs":[{"from":"原本說的","to":"改成說的"},...]}`;
+
+      const sys = `你是品牌文案顧問，繁體中文。任務：根據品牌定位 + 知識庫，幫填寫文字資產欄位。
+${spec.ask}
+${formatHint}
+直接輸出 JSON，不要前綴、不要 markdown code fence。
+${brandPrefix || ""}${knowledgeBlock || ""}`;
+
+      try {
+        const r = await invokeLLM({
+          messages: [
+            { role: "system", content: sys },
+            { role: "user", content: `品牌資產欄位：${input.assetKey}` },
+          ],
+          maxTokens: 1500,
+        });
+        const raw = r.choices[0]?.message?.content;
+        const text = typeof raw === "string" ? raw : "";
+        const inTok  = r.usage?.prompt_tokens ?? 0;
+        const outTok = r.usage?.completion_tokens ?? 0;
+        try {
+          await localPool.execute(
+            `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+                  VALUES (?, 'brand', ?, ?, ?, ?, ?, ?)`,
+            [userId, input.brandId, `asset_suggest:${input.assetKey}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+             (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+          );
+        } catch {/* non-fatal */}
+
+        // Parse — strip code fence if present
+        const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        const jsonText = m ? m[1]!.trim() : text.trim();
+        let parsed: any = null;
+        try { parsed = JSON.parse(jsonText); } catch { /* fallthrough */ }
+        if (!parsed) return { ok: false as const, error: "LLM did not return parseable JSON" };
+
+        // Coerce to the shape the editor expects
+        if (spec.shape === "text") {
+          return { ok: true as const, shape: "text" as const, value: { text: String(parsed.text ?? "") } };
+        }
+        if (spec.shape === "items") {
+          return { ok: true as const, shape: "items" as const, value: { items: Array.isArray(parsed.items) ? parsed.items.filter((x: any) => typeof x === "string") : [] } };
+        }
+        return {
+          ok: true as const,
+          shape: "pairs" as const,
+          value: {
+            pairs: Array.isArray(parsed.pairs)
+              ? parsed.pairs
+                  .filter((p: any) => p && typeof p.from === "string" && typeof p.to === "string")
+                  .map((p: any) => ({ from: p.from, to: p.to }))
+              : [],
+          },
+        };
+      } catch (e: any) {
+        return { ok: false as const, error: String(e?.message ?? e) };
+      }
     }),
 });
 
