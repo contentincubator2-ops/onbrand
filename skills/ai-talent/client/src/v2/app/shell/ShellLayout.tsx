@@ -13,6 +13,7 @@ import { trpc } from "../../../lib/trpc";
 import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
 import AddEntityModal, { type AddEntityTab } from "../../components/AddEntityModal";
 import PositioningNotificationCenter from "../../components/PositioningNotificationCenter";
+import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -175,6 +176,16 @@ export default function ShellLayout() {
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}
       <PositioningNotificationCenter />
+
+      {/* Centred overlay shown when user switches brand / product / event */}
+      <ScopeSwitchOverlay
+        scopeKey={`${scope.brandId ?? 0}-${scope.productId ?? 0}-${scope.eventId ?? 0}`}
+        scopeName={
+          scope.eventId   ? null
+          : scope.productId ? null
+          : (brands.find((b: any) => b.id === scope.brandId)?.name ?? null)
+        }
+      />
     </div>
   );
 }

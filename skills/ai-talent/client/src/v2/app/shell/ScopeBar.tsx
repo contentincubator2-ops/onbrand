@@ -40,8 +40,24 @@ interface ScopeBarProps {
   setScope: (s: ScopeState) => void;
 }
 
+/** Read scope from URL first (deep-link friendly), fall back to
+ *  localStorage. URL params: ?b=<brandId>&p=<productId>&e=<eventId> */
+function readScopeFromUrl(): Partial<ScopeState> {
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const b = Number(sp.get("b")) || null;
+    const p = Number(sp.get("p")) || null;
+    const e = Number(sp.get("e")) || null;
+    return { brandId: b, productId: p, eventId: e };
+  } catch { return {}; }
+}
+
 function readScopeFromStorage(): ScopeState {
   try {
+    const url = readScopeFromUrl();
+    if (url.brandId || url.productId || url.eventId) {
+      return { brandId: url.brandId ?? null, productId: url.productId ?? null, eventId: url.eventId ?? null };
+    }
     const b = Number(localStorage.getItem("sowork.scope.brandId")) || null;
     const p = Number(localStorage.getItem("sowork.scope.productId")) || null;
     const e = Number(localStorage.getItem("sowork.scope.eventId")) || null;
@@ -57,12 +73,29 @@ function writeScopeToStorage(s: ScopeState) {
   } catch {}
 }
 
+/** Mirror scope to URL params so refresh / share-link preserves it. */
+function writeScopeToUrl(s: ScopeState) {
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    if (s.brandId)   sp.set("b", String(s.brandId));   else sp.delete("b");
+    if (s.productId) sp.set("p", String(s.productId)); else sp.delete("p");
+    if (s.eventId)   sp.set("e", String(s.eventId));   else sp.delete("e");
+    const qs = sp.toString();
+    const url = window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
+    window.history.replaceState(null, "", url);
+  } catch {}
+}
+
 export function useScopeState(): [ScopeState, (s: ScopeState) => void] {
   const [scope, setScopeState] = React.useState<ScopeState>(readScopeFromStorage);
   const setScope = React.useCallback((s: ScopeState) => {
     writeScopeToStorage(s);
+    writeScopeToUrl(s);
     setScopeState(s);
   }, []);
+  // Mirror initial scope to URL on mount (so refresh preserves it even if
+  // it was loaded from localStorage).
+  React.useEffect(() => { writeScopeToUrl(scope); /* eslint-disable-next-line */ }, []);
   return [scope, setScope];
 }
 

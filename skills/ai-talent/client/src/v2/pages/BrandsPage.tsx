@@ -874,7 +874,7 @@ export default function BrandsPage() {
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
           {/* ── 知識庫 ── */}
           {derivedCategory === "knowledge" && (
-            <KnowledgeEditor brandId={activeBrandIdForLocks} />
+            <KnowledgeEditor key={`knowledge-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
           )}
 
           {/* ── 品牌 / 產品 / 活動定位 ── */}
@@ -1146,9 +1146,12 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── 文字（Inline edit refactor 2026-05-07）── */}
+          {/* ── 文字（Inline edit refactor 2026-05-07）──
+              key={brandId} forces full remount on brand switch so local
+              draft state + dirtyRef are reset (fix for 切換品牌文字沒切換). */}
           {derivedCategory === "copy" && scopeMode === "brand" && (
             <CopyTabInline
+              key={`copy-${(scope?.brandId ?? brandId) ?? 0}`}
               brandId={(scope?.brandId ?? brandId) as number | null}
               brandAssets={brandAssets}
               fullPositioning={fullPositioning}
