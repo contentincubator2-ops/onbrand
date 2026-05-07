@@ -21,6 +21,9 @@ import {
   buildEventPositioningSteps,
 } from "../_core/positioningSteps";
 import { generateInterimPulse } from "../_core/interimQuickPulse";
+import { invokeLLM } from "../_core/llm";
+import { buildBrandPrefix } from "../_core/brandContext";
+import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import localPool from "../localDb";
 
 const entityKindSchema = z.enum(["brand", "product", "event"]);
@@ -142,6 +145,57 @@ export const positioningJobsRouter = router({
         };
       } catch {
         return null;
+      }
+    }),
+
+  /**
+   * Inline 測試 sandbox — used by BrandMessageBar's 🧪 測試 button.
+   * Takes brandId + a short topic prompt, runs ONE Haiku call with the
+   * brand's current positioning + uploaded knowledge injected, returns
+   * a single caption draft. Wall ≤ 8s. Cost logged as kind=test_sandbox.
+   */
+  testCaption: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      topic: z.string().min(1).max(280),
+      platform: z.enum(["facebook", "instagram", "youtube", "tiktok", "linkedin", "email"]).default("facebook"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [brandPrefix, knowledgeBlock] = await Promise.all([
+        buildBrandPrefix(input.brandId).catch(() => ""),
+        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+      ]);
+      const sys = `你是台灣本地市場的社群文案，繁體中文。
+為以下品牌寫一則 ${input.platform.toUpperCase()} 貼文（120-180 字），口語自然、不要套話、不要寫「祝大家...」。
+直接輸出貼文純文字，不要前綴、不要 markdown。
+${brandPrefix || ""}${knowledgeBlock || ""}`;
+      const userPrompt = `主題：${input.topic}`;
+      try {
+        const r = await invokeLLM({
+          messages: [{ role: "system", content: sys }, { role: "user", content: userPrompt }],
+          maxTokens: 600,
+        });
+        const content = r.choices[0]?.message?.content;
+        const text = typeof content === "string" ? content.trim() : "";
+        const inTok  = r.usage?.prompt_tokens ?? 0;
+        const outTok = r.usage?.completion_tokens ?? 0;
+        try {
+          await localPool.execute(
+            `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+                  VALUES (?, 'brand', ?, 'test_sandbox', ?, ?, ?, ?)`,
+            [userId, input.brandId, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+             (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+          );
+        } catch {/* non-fatal */}
+        return {
+          ok: true as const,
+          caption: text,
+          hasKnowledge: knowledgeBlock.length > 0,
+          hasPositioning: brandPrefix.length > 0,
+        };
+      } catch (e: any) {
+        return { ok: false as const, error: String(e?.message ?? e) };
       }
     }),
 

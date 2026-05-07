@@ -14,6 +14,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getBrandPositioningById } from "../positioningBridge";
+import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -571,7 +572,10 @@ ${platformAsks}
       photoTags: z.array(z.string()).max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const brandRules = await loadBrandRules(input.brandId, ctx.user.id);
+      const [brandRules, knowledgeBlock] = await Promise.all([
+        loadBrandRules(input.brandId, ctx.user.id),
+        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+      ]);
       const allRules = [...brandRules, ...(input.adhocRules ?? [])].filter(Boolean);
       const rulesInstruction = allRules.length > 0
         ? `\n【品牌規則 — 強制遵守，違反等於失敗】
@@ -624,7 +628,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}
+${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。

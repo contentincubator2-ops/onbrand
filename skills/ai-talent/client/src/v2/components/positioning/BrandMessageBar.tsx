@@ -12,16 +12,17 @@
  *   · full    — green chip "完整定位 ✓"
  *   · empty   — gray chip "等待產生"
  */
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { trpc } from "../../../lib/trpc";
 import { FlaskConical, CheckCircle2, RefreshCw } from "lucide-react";
+import TestSandboxModal from "./TestSandboxModal";
 
 interface Props {
   brandId: number | null;
 }
 
 export default function BrandMessageBar({ brandId }: Props) {
-  const navigate = useNavigate();
+  const [testOpen, setTestOpen] = useState(false);
 
   const cur = (trpc as any).positioningJobs?.getCurrent?.useQuery?.(
     { entityKind: "brand", entityId: brandId ?? 0 },
@@ -58,9 +59,7 @@ export default function BrandMessageBar({ brandId }: Props) {
 
   const handleTest = () => {
     if (!brandId) return;
-    // Lite sandbox not yet built — for now jump to /theater for the brand
-    // (full sandbox playground deferred to a follow-up wave)
-    navigate(`/theater?brandId=${brandId}`);
+    setTestOpen(true);
   };
 
   const handleLock = async () => {
@@ -87,6 +86,8 @@ export default function BrandMessageBar({ brandId }: Props) {
   };
 
   return (
+    <>
+    <TestSandboxModal isOpen={testOpen} onClose={() => setTestOpen(false)} brandId={brandId} />
     <div className="w-full" style={{ maxWidth: 800 }}>
       <div
         className="flex items-center gap-3 px-4 bg-white rounded-[20px] border border-default-100 shadow-md"
@@ -128,5 +129,6 @@ export default function BrandMessageBar({ brandId }: Props) {
         </button>
       </div>
     </div>
+    </>
   );
 }

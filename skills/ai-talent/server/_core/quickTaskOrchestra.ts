@@ -20,6 +20,7 @@ import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSumma
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext } from "./brandContext";
+import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
@@ -690,7 +691,11 @@ export async function runOrchestra(args: {
         }
         return null;
       })(),
-      buildBrandContext(args.brandId).catch(() => ""),
+      // Brand context + knowledge base merged (knowledge appended after).
+      Promise.all([
+        buildBrandContext(args.brandId).catch(() => ""),
+        args.brandId ? loadBrandKnowledgeForPrompt(args.brandId).catch(() => "") : Promise.resolve(""),
+      ]).then(([prefix, knowledge]) => prefix + (knowledge || "")),
       // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
       // viral (default) / festivals (calendar tasks) / trending (時事改寫) / news.
       isResearchTier

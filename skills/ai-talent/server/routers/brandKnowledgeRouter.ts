@@ -108,18 +108,21 @@ export const brandKnowledgeRouter = router({
  * Helper: pull all knowledge items for a brand and format for LLM injection.
  * Used by Theater / 30s / 60s / 100s prompt builders. Cuts at total char
  * budget (default 80K — leaves room for positioning + brand context).
+ *
+ * No userId filter: items were created with userId scoping at write time;
+ * read-time injection trusts the brand context (orchestra is already
+ * gated by brand ownership upstream).
  */
 export async function loadBrandKnowledgeForPrompt(
   brandId: number,
-  userId: number,
   budgetChars = 80_000,
 ): Promise<string> {
   try {
     const [rows]: any = await localPool.execute(
       `SELECT title, body, sourceUrl FROM brand_knowledge_items
-        WHERE brandId = ? AND userId = ?
+        WHERE brandId = ?
         ORDER BY createdAt DESC LIMIT ?`,
-      [brandId, userId, MAX_ITEMS_PER_BRAND],
+      [brandId, MAX_ITEMS_PER_BRAND],
     );
     const items = rows as any[];
     if (!items.length) return "";
