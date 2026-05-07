@@ -1,0 +1,54 @@
+name: Admin — Run DB migrations (one-shot)
+
+# Manual trigger to run scripts/migrate.ts on the VM.
+# Use this when you push a schema change but ci.yml's auto-migrate step
+# fails or you need to re-run on demand.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Pull main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          APP=/opt/marketing-os/app
+          cd "$APP"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+          git fetch origin main
+          git reset --hard origin/main
+          echo "At $(git log --oneline -1)"
+
+      - name: Run migrations
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          cd "$AI"
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          npx tsx scripts/migrate.ts 2>&1 | tail -50
+
+      - name: Verify schema
+        run: |
+          set +e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent"
+
+          echo "════ Tables ════"
+          $MYSQL -e "SHOW TABLES LIKE 'brand_caption_rules'"
+          $MYSQL -e "SHOW TABLES LIKE 'mission_resources'"
+
+          echo ""
+          echo "════ brands.tabLocks column ════"
+          $MYSQL -e "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='brands' AND COLUMN_NAME='tabLocks'"
+
+          echo ""
+          echo "════ Counts ════"
+          $MYSQL -e "SELECT COUNT(*) AS rules FROM brand_caption_rules"
+          $MYSQL -e "SELECT COUNT(*) AS branded_with_locks FROM brands WHERE tabLocks IS NOT NULL"

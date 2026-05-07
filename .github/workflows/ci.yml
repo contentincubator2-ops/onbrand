@@ -70,6 +70,15 @@ jobs:
             cd "$AI"
             npm install --legacy-peer-deps 2>&1 | tail -3
 
+            echo "===== Run DB migrations ====="
+            # Idempotent: each ALTER/CREATE checks information_schema first.
+            # Failure does NOT abort deploy — schema fixes can be retried via
+            # admin-run-migrations workflow if something goes wrong.
+            set -a; source "$AI/.env" 2>/dev/null; set +a
+            (cd "$AI" && npx tsx scripts/migrate.ts 2>&1 | tail -30) || {
+              echo "⚠️  migrations had issues — deploy continues, fix via admin-run-migrations workflow"
+            }
+
             echo "===== Install frontend ====="
             cd "$AI/client"
             npm install --legacy-peer-deps 2>&1 | tail -3
