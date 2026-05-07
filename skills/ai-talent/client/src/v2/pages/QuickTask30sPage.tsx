@@ -350,7 +350,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             topic: primaryAnswer || activeTask.label,
             brandId: brandId ?? undefined,
           });
-          const platform = (activeTask as any).platform ?? "facebook";
+          // Same channel→mockup-platform normalization as the orchestra path
+          const SQUAD_CHANNEL_MAP: Record<string, string> = {
+            pr: "press", brand: "press", audience: "press",
+          };
+          const rawPlat = (activeTask as any).platform ?? "facebook";
+          const platform = SQUAD_CHANNEL_MAP[rawPlat] ?? rawPlat;
           const transformedOutput = {
             platform,
             post_type: activeTask.postType ?? "feed",
@@ -399,7 +404,18 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         // Platform comes from the task itself (FB / IG / Threads). The
         // mockup variant inferer keys on platform:postType; hardcoding
         // "facebook" would route all IG tasks to FBFeed (regression).
-        const taskPlatform =
+        //
+        // Channel name → mockup platform key normalization:
+        //   listFB tags `task.platform` with the *channel* key for the
+        //   filter row (pr / brand / audience). PlatformMockup's switch
+        //   keys on the *mockup* platform (press). Without this map,
+        //   pr/press-release falls through to UnsupportedVariantPlaceholder.
+        const CHANNEL_TO_MOCKUP_PLATFORM: Record<string, string> = {
+          pr:       "press",   // 新聞稿 → press-release mockup
+          brand:    "press",   // 品牌定位 — document-style, reuse press until brand mockup ships
+          audience: "press",   // 用戶研究 — same
+        };
+        const rawTaskPlatform =
           (activeTask as any).platform ??
           (activeTask.id?.startsWith("ig-") ? "instagram"
             : activeTask.id?.startsWith("yt-") ? "youtube"
@@ -411,6 +427,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             : activeTask.id?.startsWith("rs-") ? "press"
             : activeTask.id?.startsWith("fb-") ? "facebook"
             : "facebook");
+        const taskPlatform = CHANNEL_TO_MOCKUP_PLATFORM[rawTaskPlatform] ?? rawTaskPlatform;
         // Threads task uses platform="threads" + post_type="post" — preserve.
         const platformOverride =
           activeTask.id === "ig-30-threads-cross-post" ? "threads" : taskPlatform;
