@@ -13,7 +13,7 @@
  *   · empty   — gray chip "等待產生"
  */
 import { useNavigate } from "react-router-dom";
-import { trpc } from "../../lib/trpc";
+import { trpc } from "../../../lib/trpc";
 import { FlaskConical, CheckCircle2, RefreshCw } from "lucide-react";
 
 interface Props {

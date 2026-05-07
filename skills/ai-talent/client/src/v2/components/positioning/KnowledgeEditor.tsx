@@ -6,7 +6,7 @@
  * 30s/60s/100s prompts as additional context.
  */
 import { useState } from "react";
-import { trpc } from "../../lib/trpc";
+import { trpc } from "../../../lib/trpc";
 import { Input, Textarea, Button, Card, CardBody } from "@heroui/react";
 import { Plus, Trash2, BookOpen, ExternalLink } from "lucide-react";
 
