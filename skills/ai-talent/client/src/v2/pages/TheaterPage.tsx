@@ -414,6 +414,8 @@ export default function TheaterPage() {
     brandVoice: string | null;
     weekday: string;
     date: string;
+    hook?: string | null;
+    cta?: string | null;
   }>>(() => new Map(persisted?.cellMeta ?? []));
 
   // Persist on any state change (debounced via single effect)
@@ -467,11 +469,13 @@ export default function TheaterPage() {
     }
     setCells(fresh);
 
-    // 0) Fetch run plan from backend (positioning → USP pool + chief opening + lead thoughts)
+    // 0) Fetch run plan from backend (positioning → USP pool + chief opening + lead thoughts + hook/cta plans)
     let runPlan: {
       usps: string[];
       chiefOpening: string;
       leadThoughts: Record<string, string>;
+      hookPlan: Record<string, string>;
+      ctaPlan: Record<string, string>;
       positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null;
     };
     try {
@@ -479,6 +483,8 @@ export default function TheaterPage() {
         brandId,
         platforms: activePlatforms,
         importantDates: importantDates.map((d) => ({ date: d.date, name: d.name })),
+        // Phase 1: pass dates so server can pre-allocate hook + CTA per cell
+        dates: days.map((d) => d.date),
       });
     } catch (e) {
       console.error("[theater] runStart failed:", e);
@@ -487,7 +493,7 @@ export default function TheaterPage() {
       return;
     }
 
-    const { usps, chiefOpening, leadThoughts, positioning } = runPlan;
+    const { usps, chiefOpening, leadThoughts, hookPlan, ctaPlan, positioning } = runPlan;
     const brandTagline = positioning?.tagline ?? null;
     const brandVoice   = positioning?.brandVoice ?? null;
 
@@ -533,7 +539,7 @@ export default function TheaterPage() {
     });
 
     // Drive the station carousel + cell progression (real backend)
-    runStations(stations, { usps, brandTagline, brandVoice });
+    runStations(stations, { usps, brandTagline, brandVoice, hookPlan, ctaPlan });
   };
 
   const stopRun = () => {
@@ -545,19 +551,27 @@ export default function TheaterPage() {
   const stopRef = useRef(false);
   const runStations = async (
     stations: BrainStation[],
-    plan: { usps: string[]; brandTagline: string | null; brandVoice: string | null },
+    plan: {
+      usps: string[];
+      brandTagline: string | null;
+      brandVoice: string | null;
+      hookPlan: Record<string, string>;
+      ctaPlan: Record<string, string>;
+    },
   ) => {
     if (!brandId) return;
     stopRef.current = false;
 
     // Build queue: by date order, all platforms per date.
-    // Each task carries the USP assigned (round-robin from the pool).
+    // Each task carries the USP + hook + CTA assigned (Phase 1 diversity).
     type Task = {
       key: CellKey;
       platform: TheaterPlatform;
       date: string;
       weekday: string;
       usp: string;
+      hook: string | null;
+      cta: string | null;
       importantDateName: string | null;
     };
     const captionTasks: Task[] = [];
@@ -567,12 +581,15 @@ export default function TheaterPage() {
       for (const p of activePlatforms) {
         const usp = plan.usps[uspCursor % plan.usps.length] ?? plan.usps[0]!;
         uspCursor++;
+        const planKey = `${d.date}::${p}`;
         captionTasks.push({
           key: cellKey(p, d.date),
           platform: p,
           date: d.date,
           weekday: d.weekday,
           usp,
+          hook: plan.hookPlan[planKey] ?? null,
+          cta:  plan.ctaPlan[planKey]  ?? null,
           importantDateName: matching ? matching.name : null,
         });
       }
@@ -602,7 +619,8 @@ export default function TheaterPage() {
         if (stopRef.current) return;
 
         updateCell(task.key, { status: "writing", caption: "" });
-        // Persist meta for future redo on this cell
+        // Persist meta for future redo on this cell (including hook + cta
+        // so redo reproduces the same diversity assignment)
         setCellMeta((prev) => {
           const next = new Map(prev);
           next.set(task.key, {
@@ -612,6 +630,8 @@ export default function TheaterPage() {
             brandVoice: plan.brandVoice,
             weekday: task.weekday,
             date: task.date,
+            hook: task.hook,
+            cta:  task.cta,
           });
           return next;
         });
@@ -625,6 +645,9 @@ export default function TheaterPage() {
             importantDateName: task.importantDateName,
             brandTagline: plan.brandTagline,
             brandVoice: plan.brandVoice,
+            // Phase 1: enforce hook + CTA diversity
+            hook: task.hook as any,
+            cta:  task.cta  as any,
           });
           if (stopRef.current) return;
           if (r.ok && r.caption) {
@@ -710,6 +733,9 @@ export default function TheaterPage() {
         importantDateName: meta.importantDateName,
         brandTagline: meta.brandTagline,
         brandVoice: meta.brandVoice,
+        // Phase 1: redo reuses the original hook + cta assignment
+        hook: meta.hook as any,
+        cta:  meta.cta  as any,
       });
       if (!r.ok || !r.caption) {
         updateCell(key, { status: "failed" });

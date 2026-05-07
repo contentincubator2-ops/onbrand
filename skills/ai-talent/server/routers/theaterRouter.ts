@@ -21,6 +21,75 @@ const PlatformZ = z.enum([
   "facebook", "instagram", "youtube", "threads", "line", "blog",
 ]);
 
+// ─── Hook + CTA pools (Phase 1: caption diversity) ──────────────────────
+//
+// Pre-allocated so two consecutive days never share the same hook on the
+// same platform. Solves CJ's #1 + #7 feedback ("每篇都是『你有沒有遇過』
+// 開頭" + "CTA 都是『留言告訴我』").
+
+const HOOK_KEYS = [
+  "story", "number", "contrast", "question",
+  "observation", "self_deprecate", "scenario", "myth_break",
+] as const;
+type HookKey = (typeof HOOK_KEYS)[number];
+
+const HOOK_PLAYBOOK: Record<HookKey, string> = {
+  story:           "故事開場 — 第一句以「上週遇到 / 前幾天 / 有個客人...」這種具體事件切入，禁止用問句或統計。",
+  number:          "數字驚奇 — 第一句必須含一個具體數字 / 比例 / 倍數（87% 的人 / 3 個月內 / 4 倍）。禁止用「你有沒有...」這種模糊問句開頭。",
+  contrast:        "對比反差 — 第一句結構必須是「以前 X，後來才 Y」或「大家都以為 X，但其實 Y」。",
+  question:        "問句啟動 — 第一句是真的問題（不是修辭），用「你 / 妳 / 你們」當主詞，問一個讓讀者立刻想回答的事。",
+  observation:     "短觀察 — 第一句以「最近發現 / 最近這陣子...」帶出觀察，不要立刻跳結論。",
+  self_deprecate:  "自嘲 — 第一句用「身為 ___ 我居然...」或「我以為自己 X，結果...」這種自我挖苦的語氣。",
+  scenario:        "具象場景 — 第一句直接寫一個畫面（晚上 8 點 / 打開冰箱 / 滑著手機...），讓讀者像看電影一樣進入。",
+  myth_break:      "破除迷思 — 第一句先點出常見誤解（「很多人以為 X」），第二句翻轉。",
+};
+
+const CTA_KEYS = [
+  "comment_engage", "click_link", "share_friend", "tag_friend",
+  "save", "purchase", "follow_up", "subscribe",
+] as const;
+type CtaKey = (typeof CTA_KEYS)[number];
+
+const CTA_PLAYBOOK: Record<CtaKey, string> = {
+  comment_engage:  "結尾請讀者「留言告訴我 / 你的看法是？/ 你也是嗎？」— 引發互動。",
+  click_link:      "結尾引導「點下方連結 / 看詳情 / 立即預訂」— 純導流。",
+  share_friend:    "結尾引導「分享給也在煩惱的朋友 / 把這篇 tag 給...」— 推薦擴散。",
+  tag_friend:      "結尾「標記一個你覺得需要看到的朋友」— 標記擴散，不是分享。",
+  save:            "結尾「收藏這篇 / 之後翻出來用 / 存起來備用」— 不要求互動，要求保留。",
+  purchase:        "結尾直接導購「現在就點 / 立即下單 / 加入購物車」— 不要含蓄。",
+  follow_up:       "結尾預告下一篇「明天我們會講 ___ / 下篇繼續 / 鎖定明天」— 養觀眾回訪習慣。",
+  subscribe:       "結尾「加 LINE 第一手收到 / 訂閱頻道 / 追蹤帳號」— 收割長期關係。",
+};
+
+/** Round-robin allocate hooks ensuring no two consecutive days on the
+ *  same platform repeat. Stable per-brand seed so re-runs reproduce. */
+function allocatePlan<K extends string>(
+  pool: readonly K[],
+  days: string[],
+  platforms: string[],
+  seed: number,
+): Record<string, K> {
+  const out: Record<string, K> = {};
+  const prevByPlatform: Record<string, K | null> = {};
+  let cursor = seed % pool.length;
+  for (const date of days) {
+    for (const platform of platforms) {
+      let pick = pool[cursor % pool.length] as K;
+      // If same as last on this platform, advance once
+      let safety = 0;
+      while (pick === prevByPlatform[platform] && safety < pool.length) {
+        cursor++;
+        pick = pool[cursor % pool.length] as K;
+        safety++;
+      }
+      out[`${date}::${platform}`] = pick;
+      prevByPlatform[platform] = pick;
+      cursor++;
+    }
+  }
+  return out;
+}
+
 /**
  * Platform-specific writing guidance — captures the structures actually
  * used in viral Taiwan posts on each platform. NOT generic "FB 中長文 +
@@ -82,6 +151,8 @@ export const theaterRouter = router({
         date: z.string(),
         name: z.string(),
       })).default([]),
+      // Phase 1: dates list so we can pre-allocate hook/CTA plans server-side
+      dates: z.array(z.string()).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const pos = await getBrandPositioningById(input.brandId, ctx.user.id);
@@ -188,10 +259,21 @@ ${platformAsks}
         if (!leadThoughts[p]) leadThoughts[p] = fallbackLine[p] ?? "我這條線接手。";
       }
 
+      // Phase 1: pre-allocate hook + CTA plans across (date × platform).
+      // Seed from brandId so re-runs are stable (idempotent for redo).
+      const planDays = input.dates && input.dates.length > 0
+        ? input.dates
+        : []; // frontend always passes dates now; empty = no plan needed
+      const hookPlan = allocatePlan(HOOK_KEYS, planDays, input.platforms, input.brandId);
+      const ctaPlan  = allocatePlan(CTA_KEYS,  planDays, input.platforms, input.brandId * 7);
+
       return {
         usps,
         chiefOpening,
         leadThoughts,
+        // Phase 1 — caption diversity
+        hookPlan,
+        ctaPlan,
         positioning: pos ? {
           tagline: pos.tagline,
           targetAudience: pos.targetAudience,
@@ -213,11 +295,23 @@ ${platformAsks}
       importantDateName: z.string().nullable().optional(),
       brandTagline: z.string().nullable().optional(),
       brandVoice: z.string().nullable().optional(),
+      // Phase 1 — diversity controls (frontend pulls from runStart's plans)
+      hook: z.enum(HOOK_KEYS).optional(),
+      cta:  z.enum(CTA_KEYS).optional(),
     }))
     .mutation(async ({ input }) => {
       const guide = PLATFORM_GUIDE[input.platform];
       const importantHint = input.importantDateName
         ? `當天有「${input.importantDateName}」檔期，請從 USP 與這個檔期的「真實連結」切入（例如母親節 = 媽媽的具體場景，不是「祝媽媽快樂」這種空話）。`
+        : "";
+
+      // Phase 1: hook + cta enforcement. Pre-allocated by runStart so two
+      // consecutive cells on the same platform never share the same hook.
+      const hookInstruction = input.hook
+        ? `\n【今日 Hook 類型 — 強制執行】\n${HOOK_PLAYBOOK[input.hook]}\n禁止用其他 hook 類型開場。`
+        : "";
+      const ctaInstruction = input.cta
+        ? `\n【今日 CTA 意圖 — 強制執行】\n${CTA_PLAYBOOK[input.cta]}\n禁止用其他 CTA 結尾。`
         : "";
 
       const sys = `你是台灣本地市場的社群文案，熟悉繁體中文使用者的閱讀習慣。
@@ -228,21 +322,23 @@ ${platformAsks}
 
 【平台原生結構（必讀）】
 ${guide}
+${hookInstruction}${ctaInstruction}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。
 2. 不要把 USP 原文照搬到貼文裡 — 用故事 / 場景 / 具體例子包裝，讓讀者自己感覺到。
-3. **絕對不要把貼文標題或主題重複講兩次**。第一句和第二句不能在意思上重複（例如：「上週遇到一個媽媽客人，她說…」後面就不要再寫「上週一個媽媽跟我說…」）。
+3. **絕對不要把貼文標題或主題重複講兩次**。第一句和第二句不能在意思上重複。
 4. 不要寫「祝大家 X 快樂」「希望大家 X」這種制式套話。
 5. 不要使用 markdown / heading / bullet（除非平台規則明確要求）。
 6. 字數要落在平台規則的範圍內，不要過長或過短。
-7. 直接輸出貼文純文字，**不要寫「這是一則 ___ 貼文：」這種前綴**。`;
+7. 直接輸出貼文純文字，**不要寫「這是一則 ___ 貼文：」這種前綴**。
+8. **嚴格遵守上方指定的 Hook 類型與 CTA 意圖** — 如果今天分配的是「數字驚奇」，就不能用「你有沒有遇過...」開場；如果今天 CTA 是「分享給朋友」，就不能寫「留言告訴我」。`;
 
       const user = `日期：${input.date}（${input.weekday}）
 本篇要溝通的 USP：「${input.usp}」
 ${importantHint}
 
-請依照平台原生結構直接寫出這則貼文。`;
+請依照平台原生結構 + 指定 Hook 類型 + 指定 CTA 意圖，直接寫出這則貼文。`;
 
       try {
         const r = await invokeLLM({
