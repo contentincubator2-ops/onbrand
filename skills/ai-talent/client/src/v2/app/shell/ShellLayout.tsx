@@ -12,6 +12,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
 import AddEntityModal, { type AddEntityTab } from "../../components/AddEntityModal";
+import PositioningNotificationCenter from "../../components/PositioningNotificationCenter";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -171,6 +172,9 @@ export default function ShellLayout() {
       <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
         <Outlet context={{ brandId, setBrandId, brands, scope, setScope }} />
       </div>
+
+      {/* Bottom-left toast feed for background positioning pipeline completions */}
+      <PositioningNotificationCenter />
     </div>
   );
 }

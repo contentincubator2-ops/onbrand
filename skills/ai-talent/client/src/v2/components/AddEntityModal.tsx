@@ -58,6 +58,17 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   const createBrandMut   = (trpc as any).brand?.create?.useMutation();
   const upsertProductMut = (trpc as any).product?.upsert?.useMutation();
   const upsertEventMut   = (trpc as any).event?.upsert?.useMutation();
+  // Background positioning pipeline + interim quick-pulse triggers.
+  // Fire-and-forget: caller doesn't await, UI returns immediately.
+  const startPositioningMut = (trpc as any).positioningJobs?.start?.useMutation();
+  const runInterimMut       = (trpc as any).positioningJobs?.runInterim?.useMutation();
+  const triggerPositioning = (kind: "brand" | "product" | "event", id: number) => {
+    if (!id) return;
+    // Interim is fast (<12s) — fire it; user sees a tagline appear shortly.
+    runInterimMut?.mutate?.({ entityKind: kind, entityId: id });
+    // Full pipeline runs in background; status polled via positioningJobs.getStatus.
+    startPositioningMut?.mutate?.({ entityKind: kind, entityId: id, lang: "zh-TW" });
+  };
 
   // ── Per-tab form state (kept independent so user can switch without losing input) ──
   // Brand
@@ -107,6 +118,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
       });
       const newId = Number(r?.id ?? r?.brandId ?? 0);
       await refreshLists();
+      triggerPositioning("brand", newId);
       onCreated?.("brand", newId);
       onClose();
     } catch (e: any) {
@@ -128,6 +140,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
       });
       const newId = Number(r?.id ?? 0);
       await refreshLists();
+      triggerPositioning("product", newId);
       onCreated?.("product", newId);
       onClose();
     } catch (e: any) {
@@ -151,6 +164,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
       });
       const newId = Number(r?.id ?? 0);
       await refreshLists();
+      triggerPositioning("event", newId);
       onCreated?.("event", newId);
       onClose();
     } catch (e: any) {
