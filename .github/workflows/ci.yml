@@ -79,16 +79,17 @@ jobs:
               echo "⚠️  migrations had issues — deploy continues, fix via admin-run-migrations workflow"
             }
 
-            echo "===== Install frontend (force clean) ====="
+            echo "===== Install frontend (force clean + include devDeps) ====="
             cd "$AI/client"
             rm -rf node_modules .tsbuildinfo tsconfig.tsbuildinfo 2>/dev/null || true
-            # Show full install output (was being truncated to last 5 lines)
-            npm install --legacy-peer-deps 2>&1 | tail -50
+            # VM exports NODE_ENV=production globally → npm skips
+            # devDependencies (vite, @vitejs/plugin-react etc). Override
+            # with --include=dev so the build toolchain installs.
+            NODE_ENV=development npm install --legacy-peer-deps --include=dev 2>&1 | tail -10
 
             echo "===== Verify critical deps ====="
             ls node_modules/@vitejs/plugin-react/package.json 2>&1 || echo "✗ @vitejs/plugin-react MISSING"
             ls node_modules/vite/package.json 2>&1 || echo "✗ vite MISSING"
-            ls node_modules/react/package.json 2>&1 || echo "✗ react MISSING"
 
             echo "===== Build frontend (atomic) ====="
             # Build into a temp dir. The live public/ is never touched until
