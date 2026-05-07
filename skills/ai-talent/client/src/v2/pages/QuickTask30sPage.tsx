@@ -160,7 +160,53 @@ const CHANNEL_TILES: ChannelTile[] = [
   { id: "audience",   label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: true  },
 ];
 
-export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
+/**
+ * Inner ErrorBoundary so a runtime crash in tier-specific code (60s/100s)
+ * shows a visible error panel instead of a white screen. The global
+ * AppErrorBoundary (in AppV2) catches outermost errors but a crash inside
+ * a deeply-nested branch (e.g. visibleTasks.map row, modal subtree)
+ * sometimes blanks just this page if state corruption isolates the
+ * unmount path. Inline boundary keeps the rest of the shell intact.
+ */
+class TierPageErrorBoundary extends React.Component<
+  { children: React.ReactNode; tier: string },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: any) {
+    // eslint-disable-next-line no-console
+    console.error(`[QuickTask${this.props.tier}] render error:`, error, info);
+  }
+  render() {
+    if (this.state.error) {
+      const e = this.state.error;
+      return (
+        <div style={{ padding: 32, maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ padding: 20, border: "1px solid #fca5a5", background: "#fef2f2", borderRadius: 12 }}>
+            <p style={{ fontSize: 11, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1 }}>
+              /{this.props.tier} render error
+            </p>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>頁面載入失敗</h2>
+            <p style={{ marginTop: 8, color: "#374151" }}>{e.message}</p>
+            <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
+              {e.stack}
+            </pre>
+            <button
+              style={{ marginTop: 12, padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+              onClick={() => this.setState({ error: null })}
+            >
+              重試渲染
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children as any;
+  }
+}
+
+function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const ctx = useOutletContext<ShellOutletCtx>();
   const brandId = (ctx?.brandId as number | null) ?? null;
   const brandName = useMemo(() => {
@@ -815,7 +861,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
                       color="primary"
                       onPress={handleRun}
                       isLoading={running}
-                      isDisabled={running || (activeTask.kind === "squad")}
+                      isDisabled={running}
                       startContent={!running && <FontAwesomeIcon icon={faPaperPlane} />}
                     >
                       {running ? "生成中…" : "立即產出"}
@@ -851,6 +897,16 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
         </ModalContent>
       </Modal>
     </div>
+  );
+}
+
+/** Default export wraps the page in a tier-aware error boundary so a
+ *  runtime crash shows a visible error panel (not a white screen). */
+export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
+  return (
+    <TierPageErrorBoundary tier={tier}>
+      <QuickTask30sPageInner tier={tier} />
+    </TierPageErrorBoundary>
   );
 }
 

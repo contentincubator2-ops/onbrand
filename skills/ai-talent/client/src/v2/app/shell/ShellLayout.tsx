@@ -378,15 +378,16 @@ function BrandHierarchyPill({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  // Load product / event lists scoped to current brand
-  const productsQuery = (trpc as any).product?.listByBrand?.useQuery
-    ? (trpc as any).product.listByBrand.useQuery(
+  // Load product / event lists scoped to current brand.
+  // NOTE: server exposes `list` (not `listByBrand`) — both accept {brandId}.
+  const productsQuery = (trpc as any).product?.list?.useQuery
+    ? (trpc as any).product.list.useQuery(
         { brandId: scope.brandId ?? undefined },
         { enabled: !!scope.brandId, refetchOnWindowFocus: false }
       )
     : { data: [] };
-  const eventsQuery = (trpc as any).event?.listByBrand?.useQuery
-    ? (trpc as any).event.listByBrand.useQuery(
+  const eventsQuery = (trpc as any).event?.list?.useQuery
+    ? (trpc as any).event.list.useQuery(
         { brandId: scope.brandId ?? undefined },
         { enabled: !!scope.brandId, refetchOnWindowFocus: false }
       )
