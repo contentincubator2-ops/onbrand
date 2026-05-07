@@ -1,0 +1,30 @@
+name: Admin — Probe nginx timeout for /trpc
+
+# CJ saw 'Unexpected token <, "<html>" is not valid JSON' on FB 30天
+# 內容行事曆. Most likely nginx returning HTML 504 because backend
+# (squad pipeline) takes longer than nginx's proxy_read_timeout.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Show nginx site for marketing-os
+        run: |
+          set +e
+          for f in /etc/nginx/sites-enabled/* /etc/nginx/sites-available/*; do
+            if grep -lE "marketing-os|sowork" "$f" 2>/dev/null > /dev/null; then
+              echo "──── $f ────"
+              sudo cat "$f" 2>/dev/null
+              echo ""
+            fi
+          done
+
+      - name: Show nginx default timeouts
+        run: |
+          set +e
+          echo "════ proxy / fastcgi default timeouts ════"
+          sudo nginx -T 2>/dev/null | grep -iE "proxy_read_timeout|proxy_connect_timeout|proxy_send_timeout|client_body_timeout|send_timeout|keepalive_timeout" | sort -u
