@@ -416,6 +416,7 @@ export default function TheaterPage() {
     date: string;
     hook?: string | null;
     cta?: string | null;
+    scoutPatterns?: string[];
   }>>(() => new Map(persisted?.cellMeta ?? []));
 
   // Persist on any state change (debounced via single effect)
@@ -469,13 +470,16 @@ export default function TheaterPage() {
     }
     setCells(fresh);
 
-    // 0) Fetch run plan from backend (positioning → USP pool + chief opening + lead thoughts + hook/cta plans)
+    // 0) Fetch run plan from backend (positioning → USP pool + chief opening + lead thoughts + hook/cta plans + scout)
     let runPlan: {
       usps: string[];
       chiefOpening: string;
       leadThoughts: Record<string, string>;
       hookPlan: Record<string, string>;
       ctaPlan: Record<string, string>;
+      // Phase 1.5: real scouted viral patterns per platform
+      scoutByPlatform: Record<string, string[]>;
+      scoutIndustry: string | null;
       positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null;
     };
     try {
@@ -493,7 +497,7 @@ export default function TheaterPage() {
       return;
     }
 
-    const { usps, chiefOpening, leadThoughts, hookPlan, ctaPlan, positioning } = runPlan;
+    const { usps, chiefOpening, leadThoughts, hookPlan, ctaPlan, scoutByPlatform, scoutIndustry, positioning } = runPlan;
     const brandTagline = positioning?.tagline ?? null;
     const brandVoice   = positioning?.brandVoice ?? null;
 
@@ -507,10 +511,20 @@ export default function TheaterPage() {
     ];
 
     // 2) Per-platform leads talk strategy (real LLM output from runStart)
+    //    Phase 1.5: append a one-line scout summary so the user can SEE
+    //    that real research happened on each platform.
     for (const p of activePlatforms) {
       const lead = getPlatformLead(p);
-      const thought = leadThoughts[p] || `${PLATFORM_META[p].label} 我這條線接手。`;
-      stations.push({ member: lead, thought, durationMs: 4500 });
+      const baseThought = leadThoughts[p] || `${PLATFORM_META[p].label} 我這條線接手。`;
+      const scoutCount = scoutByPlatform[p]?.length ?? 0;
+      const scoutLine = scoutCount > 0
+        ? `（剛掃了 ${scoutCount} 篇本週 ${PLATFORM_META[p].label} ${scoutIndustry ?? "同產業"}高互動貼文，結構參考已注入。）`
+        : "";
+      stations.push({
+        member: lead,
+        thought: `${baseThought}${scoutLine ? "\n" + scoutLine : ""}`,
+        durationMs: 4500,
+      });
     }
 
     // 3) Writers + image dirs (one short station per platform)
@@ -539,7 +553,7 @@ export default function TheaterPage() {
     });
 
     // Drive the station carousel + cell progression (real backend)
-    runStations(stations, { usps, brandTagline, brandVoice, hookPlan, ctaPlan });
+    runStations(stations, { usps, brandTagline, brandVoice, hookPlan, ctaPlan, scoutByPlatform });
   };
 
   const stopRun = () => {
@@ -557,13 +571,15 @@ export default function TheaterPage() {
       brandVoice: string | null;
       hookPlan: Record<string, string>;
       ctaPlan: Record<string, string>;
+      // Phase 1.5: real scout patterns per platform
+      scoutByPlatform: Record<string, string[]>;
     },
   ) => {
     if (!brandId) return;
     stopRef.current = false;
 
     // Build queue: by date order, all platforms per date.
-    // Each task carries the USP + hook + CTA assigned (Phase 1 diversity).
+    // Each task carries the USP + hook + CTA + scout assigned (Phase 1+1.5).
     type Task = {
       key: CellKey;
       platform: TheaterPlatform;
@@ -572,6 +588,7 @@ export default function TheaterPage() {
       usp: string;
       hook: string | null;
       cta: string | null;
+      scoutPatterns: string[];
       importantDateName: string | null;
     };
     const captionTasks: Task[] = [];
@@ -590,6 +607,7 @@ export default function TheaterPage() {
           usp,
           hook: plan.hookPlan[planKey] ?? null,
           cta:  plan.ctaPlan[planKey]  ?? null,
+          scoutPatterns: plan.scoutByPlatform[p] ?? [],
           importantDateName: matching ? matching.name : null,
         });
       }
@@ -620,7 +638,7 @@ export default function TheaterPage() {
 
         updateCell(task.key, { status: "writing", caption: "" });
         // Persist meta for future redo on this cell (including hook + cta
-        // so redo reproduces the same diversity assignment)
+        // + scout patterns so redo reproduces full context)
         setCellMeta((prev) => {
           const next = new Map(prev);
           next.set(task.key, {
@@ -632,6 +650,7 @@ export default function TheaterPage() {
             date: task.date,
             hook: task.hook,
             cta:  task.cta,
+            scoutPatterns: task.scoutPatterns,
           });
           return next;
         });
@@ -648,6 +667,8 @@ export default function TheaterPage() {
             // Phase 1: enforce hook + CTA diversity
             hook: task.hook as any,
             cta:  task.cta  as any,
+            // Phase 1.5: real scouted viral patterns for this platform
+            scoutPatterns: task.scoutPatterns,
           });
           if (stopRef.current) return;
           if (r.ok && r.caption) {
@@ -736,6 +757,8 @@ export default function TheaterPage() {
         // Phase 1: redo reuses the original hook + cta assignment
         hook: meta.hook as any,
         cta:  meta.cta  as any,
+        // Phase 1.5: redo reuses the same scout patterns
+        scoutPatterns: meta.scoutPatterns,
       });
       if (!r.ok || !r.caption) {
         updateCell(key, { status: "failed" });

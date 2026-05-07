@@ -38,6 +38,7 @@ export interface PositioningResult {
   brandVoice: string;
   differentiators: string[];
   messagingPillars: string[];
+  industry?: string;                 // 產業類別（給 scout / 競品分析 用）
   source: "db" | "ai-generated";    // 來源標記
   brandId?: number;                  // 若有寫入 DB，回傳 brandId
 }
@@ -148,6 +149,9 @@ export async function getBrandPositioningById(
       brandVoice: brand.brandVoice ?? "",
       differentiators: (analysis.differentiators as string[]) ?? [],
       messagingPillars: (analysis.messagingPillars as string[]) ?? [],
+      // Industry is read from brands.industry column (used by Theater scout
+      // to bound 'this industry's viral patterns' queries).
+      industry: (brand as any).industry ?? (analysis.industry as string) ?? undefined,
       source: "db",
       brandId: brand.id,
     };

@@ -16,6 +16,18 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getBrandPositioningById } from "../positioningBridge";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
+import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
+
+// Per-(brand, platform, day) scout cache. The cache key encloses the
+// YYYY-MM-DD so it auto-expires daily. Viral patterns don't shift in
+// minutes — caching avoids 6 perplexity calls every time the user
+// presses 重新企劃 within the same day.
+const scoutCache = new Map<string, { patterns: ViralPatterns | null; cachedAt: number }>();
+const SCOUT_TTL_MS = 24 * 60 * 60 * 1000;
+function scoutCacheKey(brandId: number, platform: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `b${brandId}::${platform}::${today}`;
+}
 
 const PlatformZ = z.enum([
   "facebook", "instagram", "youtube", "threads", "line", "blog",
@@ -258,6 +270,54 @@ ${platformAsks}
       const hookPlan = allocatePlan(HOOK_KEYS, planDays, input.platforms, input.brandId);
       const ctaPlan  = allocatePlan(CTA_KEYS,  planDays, input.platforms, input.brandId * 7);
 
+      // Phase 1.5 — Real per-platform viral pattern scout (Perplexity).
+      // Fires 6 (or N) parallel queries, one per selected platform, each
+      // bounded to the brand's industry. Cached per (brand, platform, day)
+      // so reruns within the same day skip the API call.
+      // Total wall-time impact: ~5-8s (parallel), capped at 12s by the
+      // scout's internal timeout. Failures degrade gracefully to null.
+      const industry = pos?.industry ?? null;
+      const brandTaglineForScout = pos?.tagline ?? `品牌 ${input.brandId}`;
+      const platformScoutResults = await Promise.all(
+        input.platforms.map(async (p) => {
+          const cacheKey = scoutCacheKey(input.brandId, p);
+          const hit = scoutCache.get(cacheKey);
+          if (hit && Date.now() - hit.cachedAt < SCOUT_TTL_MS) {
+            return [p, hit.patterns] as const;
+          }
+          const platformLabel = ({
+            facebook:  "Facebook",
+            instagram: "Instagram",
+            youtube:   "YouTube",
+            threads:   "Threads",
+            line:      "LINE OA",
+            blog:      "部落格 / 長文",
+          } as Record<string, string>)[p] ?? p;
+          const patterns = await fetchViralPatterns({
+            channel: p === "blog" ? "press" : p,  // scout knows: instagram/facebook/youtube/threads/line/press
+            topic: `${brandTaglineForScout} ${platformLabel} 高互動爆款結構`,
+            industry: industry ?? undefined,
+            brandId: input.brandId,
+            kind: "viral",
+          }).catch(() => null);
+          scoutCache.set(cacheKey, { patterns, cachedAt: Date.now() });
+          return [p, patterns] as const;
+        }),
+      );
+      const scoutByPlatform: Record<string, string[]> = {};
+      for (const [p, patterns] of platformScoutResults) {
+        if (!patterns || patterns.patterns.length === 0) {
+          scoutByPlatform[p] = [];
+          continue;
+        }
+        // Compress each pattern down to a 1-line takeaway for prompt injection
+        scoutByPlatform[p] = patterns.patterns.slice(0, 5).map((it) => {
+          const head = (it.title || "").slice(0, 60);
+          const body = (it.excerpt || "").slice(0, 180).replace(/\s+/g, " ");
+          return `《${head}》${body}`.trim();
+        });
+      }
+
       return {
         usps,
         chiefOpening,
@@ -265,6 +325,9 @@ ${platformAsks}
         // Phase 1 — caption diversity
         hookPlan,
         ctaPlan,
+        // Phase 1.5 — real per-platform viral patterns from Perplexity
+        scoutByPlatform,
+        scoutIndustry: industry,
         positioning: pos ? {
           tagline: pos.tagline,
           targetAudience: pos.targetAudience,
@@ -289,6 +352,9 @@ ${platformAsks}
       // Phase 1 — diversity controls (frontend pulls from runStart's plans)
       hook: z.enum(HOOK_KEYS).optional(),
       cta:  z.enum(CTA_KEYS).optional(),
+      // Phase 1.5 — real viral patterns scouted from Perplexity for this
+      // platform + brand industry. Frontend passes the platform's array.
+      scoutPatterns: z.array(z.string()).max(8).optional(),
     }))
     .mutation(async ({ input }) => {
       const guide = PLATFORM_GUIDE[input.platform];
@@ -305,6 +371,16 @@ ${platformAsks}
         ? `\n【今日 CTA 意圖 — 強制執行】\n${CTA_PLAYBOOK[input.cta]}\n禁止用其他 CTA 結尾。`
         : "";
 
+      // Phase 1.5: real Perplexity scout patterns for this platform.
+      // Anchor the writer to actual high-engagement structures from the
+      // brand's industry, not LLM-trained boilerplate. We DO NOT ask the
+      // LLM to mimic exact wording — only to absorb the structural cues.
+      const scoutInstruction = (input.scoutPatterns && input.scoutPatterns.length > 0)
+        ? `\n【本週 ${input.platform.toUpperCase()} 真實爆款參考（來自 Perplexity scout 抓取）】
+以下是本週同產業 ${input.platform} 高互動貼文的真實結構摘要 — 學它的「結構與節奏」（段落長度、開場語氣、結尾收法），但**不要照抄字句、不要直接套品牌**：
+${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
+        : "";
+
       const sys = `你是台灣本地市場的社群文案，熟悉繁體中文使用者的閱讀習慣。
 為以下品牌寫一則 ${input.platform} 貼文。
 
@@ -313,7 +389,7 @@ ${platformAsks}
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}
+${hookInstruction}${ctaInstruction}${scoutInstruction}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。
