@@ -747,14 +747,20 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
       <Modal
         isOpen={!!activeTask}
         onClose={closeTask}
-        size="5xl"
+        // 2026-05-08 (CJ): mockup 放到最大、白底全部拿掉。
+        // size full + transparent body lets the mockup fill the viewport;
+        // header / footer kept as compact strips with translucent bg so
+        // they don't visually dominate the asset.
+        size="full"
         scrollBehavior="inside"
         backdrop="blur"
         classNames={{
-          base: "max-h-[94vh]",
-          body: "py-2 px-3 bg-default-50",
-          footer: "border-t border-default-200 bg-white sticky bottom-0 py-2",
-          header: "py-2 bg-white",
+          base: "max-h-screen bg-transparent shadow-none",
+          wrapper: "p-0",
+          body: "py-0 px-0 bg-transparent",
+          footer: "border-t border-white/20 bg-black/20 backdrop-blur sticky bottom-0 py-2 px-4",
+          header: "py-2 px-3 bg-black/20 backdrop-blur border-b border-white/20",
+          closeButton: "text-white hover:bg-white/10",
         }}
       >
         <ModalContent>
@@ -1421,17 +1427,19 @@ function OutputCarousel({
                 )}
               </button>
             )}
-            {/* Canva-style canvas: grey breathing room + asset centered + soft shadow */}
+            {/* 2026-05-08 (CJ): mockup 放到最大、白底拿掉。
+                Canvas now stretches to ~95% of viewport width when tool
+                pane is closed, transparent background so the mockup
+                phone-frame is the visual anchor (not a white card). */}
             <div className="flex-1 min-w-0 flex justify-center">
               {mockupVariant && (
                 <div
-                  className={`w-full ${activeTool ? "max-w-[640px]" : "max-w-[760px]"} transition-all`}
+                  className={`w-full ${activeTool ? "max-w-[900px]" : "max-w-[1280px]"} transition-all`}
                 >
                   <div
                     className="rounded-2xl overflow-hidden"
                     style={{
-                      background: "white",
-                      boxShadow: `0 24px 48px -16px ${tierAccent(pageTier)}55, 0 8px 24px -8px rgba(0,0,0,0.10), 0 0 0 1px ${tierAccent(pageTier)}25`,
+                      background: "transparent",
                     }}
                   >
                   <PlatformMockup
