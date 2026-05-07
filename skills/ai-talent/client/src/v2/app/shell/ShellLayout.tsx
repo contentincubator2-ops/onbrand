@@ -44,7 +44,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/30s",       label: "30S",      icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/60s",       label: "60S",      icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
   { to: "/100s",      label: "100S",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
-  { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
+  // 進階 hidden — direct URL /squads still works.
+  // { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
   // 內容企劃台 — replaces 案例 (CJ 2026-05-07). 20-agent cast plans
   // 6-platform calendar; brain bar shows the active speaker streaming
