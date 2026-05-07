@@ -73,6 +73,43 @@ const CTA_PLAYBOOK: Record<CtaKey, string> = {
   subscribe:       "結尾「加 LINE 第一手收到 / 訂閱頻道 / 追蹤帳號」— 收割長期關係。",
 };
 
+/**
+ * Detect & strip the "LLM restart-rewrite" pattern.
+ *
+ * Some captions come back like:
+ *   "超過 300 萬筆台灣捕獲紀錄分析後，我們發現了一件反直覺的事：多數玩家堅信的「
+ *
+ *    超過 300 萬筆台灣捕獲紀錄分析後，我們發現了一件反直覺的事：多數玩家堅信的「黃金出沒時段」，..."
+ *
+ * The model writes a partial first sentence, line-breaks, then rewrites
+ * the full caption. We detect this by finding the first 20+ chars of the
+ * caption appearing again *later* in the text (likely after a blank line)
+ * and dropping everything before that second occurrence.
+ *
+ * Conservative thresholds:
+ *   - prefix length ≥ 18 chars (avoids matching short stock phrases)
+ *   - second occurrence must start within first 320 chars (real restart
+ *     happens early; later matches are legitimate refrain/repetition)
+ *   - prefix must NOT contain a 句點/換行 (a complete first sentence
+ *     that legitimately starts the caption is fine — only abandoned
+ *     mid-sentence stubs count)
+ */
+function stripRestartPrefix(caption: string): string {
+  if (!caption) return caption;
+  for (const len of [40, 32, 24, 18]) {
+    if (caption.length <= len * 2) continue;
+    const head = caption.slice(0, len).trim();
+    if (!head) continue;
+    // Skip if head contains end-of-sentence punctuation (legit start)
+    if (/[。！？\n]/.test(head)) continue;
+    const second = caption.indexOf(head, len);
+    if (second > 0 && second <= 320) {
+      return caption.slice(second).trim();
+    }
+  }
+  return caption;
+}
+
 /** Round-robin allocate hooks ensuring no two consecutive days on the
  *  same platform repeat. Stable per-brand seed so re-runs reproduce. */
 function allocatePlan<K extends string>(
@@ -399,7 +436,8 @@ ${hookInstruction}${ctaInstruction}${scoutInstruction}
 5. 不要使用 markdown / heading / bullet（除非平台規則明確要求）。
 6. 字數要落在平台規則的範圍內，不要過長或過短。
 7. 直接輸出貼文純文字，**不要寫「這是一則 ___ 貼文：」這種前綴**。
-8. **嚴格遵守上方指定的 Hook 類型與 CTA 意圖** — 如果今天分配的是「數字驚奇」，就不能用「你有沒有遇過...」開場；如果今天 CTA 是「分享給朋友」，就不能寫「留言告訴我」。`;
+8. **嚴格遵守上方指定的 Hook 類型與 CTA 意圖** — 如果今天分配的是「數字驚奇」，就不能用「你有沒有遇過...」開場；如果今天 CTA 是「分享給朋友」，就不能寫「留言告訴我」。
+9. **一次寫到底，不要寫到一半重啟、不要把同一個開頭寫兩次**。如果你想換句話，直接在心裡重寫，但給我的 output 只能有一份完整的貼文。輸出之前在腦中校對：第一句不能跟貼文中段任何一句重複。`;
 
       const user = `日期：${input.date}（${input.weekday}）
 本篇要溝通的 USP：「${input.usp}」
@@ -425,6 +463,11 @@ ${importantHint}
             (caption.startsWith("\"") && caption.endsWith("\""))) {
           caption = caption.slice(1, -1).trim();
         }
+        // Dedupe restart-pattern: LLM occasionally writes a partial first
+        // sentence, breaks line, and rewrites the full caption from
+        // scratch. Detect this by finding the first 25-30 chars verbatim
+        // appearing again later — drop the preamble.
+        caption = stripRestartPrefix(caption);
         return { ok: true as const, caption };
       } catch (e: any) {
         return { ok: false as const, caption: "", error: String(e?.message ?? e) };
