@@ -39,6 +39,7 @@ import {
   Target as LucideTarget, Type as LucideType, Palette as LucidePalette,
   Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
   RotateCcw as LucideRotate, BookOpen as LucideBook,
+  Sparkles,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -2396,6 +2397,11 @@ function CopyTabInline({
         onSuccess: () => utils?.scope?.active?.invalidate?.(),
       })
     : null;
+  const bulkMut = (trpc as any).brandKnowledge?.bulkSuggestEmptyAssets?.useMutation?.();
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkFillingKeys, setBulkFillingKeys] = useState<Set<string>>(new Set());
+  const [bulkResult, setBulkResult] = useState<{ filled: number; sources: string[] } | null>(null);
+  const [bulkErr, setBulkErr] = useState<string | null>(null);
 
   // Local working draft per asset key — keeps inputs responsive while a
   // 800ms debounce flushes to the server.
@@ -2436,21 +2442,85 @@ function CopyTabInline({
     }, 800);
   };
 
+  // Detect empty asset keys (for the global "自動填寫所有空欄" button).
+  const isEmpty = (k: string): boolean => {
+    const v = drafts[k];
+    if (!v) return true;
+    if (typeof v.text === "string" && v.text.trim().length > 0) return false;
+    if (Array.isArray(v.items) && v.items.filter((x: any) => typeof x === "string" && x.trim()).length > 0) return false;
+    if (Array.isArray(v.pairs) && v.pairs.filter((p: any) => p?.from?.trim() && p?.to?.trim()).length > 0) return false;
+    return true;
+  };
+  const allCopyKeys = COPY_TILE_GROUPS.flatMap((g) => g.items.map((it) => it.key));
+  const emptyKeys = allCopyKeys.filter(isEmpty);
+
+  const handleBulkAutoFill = async () => {
+    if (!brandId || locked || bulkBusy || emptyKeys.length === 0) return;
+    setBulkErr(null); setBulkResult(null); setBulkBusy(true);
+    setBulkFillingKeys(new Set(emptyKeys));
+    try {
+      const r = await bulkMut?.mutateAsync?.({ brandId, emptyKeys });
+      if (!r?.ok) { setBulkErr("自動填寫失敗"); return; }
+      // Merge all results into drafts and persist in ONE save.
+      const updates: Record<string, any> = {};
+      for (const [k, payload] of Object.entries(r.results ?? {})) {
+        updates[k] = (payload as any).value;
+      }
+      const nextDrafts = { ...drafts, ...updates };
+      setDrafts(nextDrafts);
+      if (saveMut && Object.keys(updates).length > 0) {
+        const merged = {
+          ...fullPositioning,
+          _assets: { ...(fullPositioning._assets ?? {}), ...updates },
+        };
+        saveMut.mutate({ kind: "brand", id: brandId, positioning: merged });
+      }
+      setBulkResult({ filled: Object.keys(updates).length, sources: r.sources ?? [] });
+      if (!r.hasRealContent) {
+        setBulkErr("⚠️ 找不到品牌的官網 / FB 內容 — 結果可能不準。建議先到「設定」補上 website 或 socialLinks");
+      }
+    } catch (e: any) {
+      setBulkErr(String(e?.message ?? e));
+    } finally {
+      setBulkBusy(false);
+      setBulkFillingKeys(new Set());
+    }
+  };
+
   if (!brandId) {
     return <div className="p-8 text-center text-default-500">請先選擇品牌</div>;
   }
 
   return (
     <div style={{ padding: "16px 28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Compact lock chip (replaces wide TabActionBar) */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs text-default-500">
+      {/* Top action row: bulk auto-fill + save indicator + lock chip */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBulkAutoFill}
+            disabled={!brandId || locked || bulkBusy || emptyKeys.length === 0}
+            className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition ${
+              bulkBusy ? "bg-violet-100 text-violet-700 cursor-wait"
+              : locked || emptyKeys.length === 0 ? "bg-default-100 text-default-400 cursor-not-allowed"
+              : "bg-violet-600 text-white hover:bg-violet-700 cursor-pointer shadow-sm"
+            }`}
+            title={
+              locked ? "已鎖定" :
+              emptyKeys.length === 0 ? "所有欄位都已填寫" :
+              `根據官網 / FB 自動填寫剩下 ${emptyKeys.length} 個空欄`
+            }
+          >
+            <Sparkles size={14} className={bulkBusy ? "animate-pulse" : ""} />
+            {bulkBusy ? `自動填寫中 (${bulkFillingKeys.size} 個欄位)…`
+              : emptyKeys.length === 0 ? "全部已填寫"
+              : `自動填寫 ${emptyKeys.length} 個空欄`}
+          </button>
           {savingKey ? (
-            <span className="flex items-center gap-1 text-default-500">
+            <span className="flex items-center gap-1 text-xs text-default-500">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> 自動儲存中…
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-default-400">
+            <span className="flex items-center gap-1 text-xs text-default-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 自動儲存
             </span>
           )}
@@ -2467,6 +2537,15 @@ function CopyTabInline({
           {locked ? "已鎖定 · 點此解鎖" : "鎖定文字"}
         </button>
       </div>
+
+      {(bulkErr || bulkResult) && (
+        <div className={`text-xs px-3 py-2 rounded-lg ${
+          bulkErr && !bulkResult ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"
+        }`}>
+          {bulkResult && <span>✓ 已填入 {bulkResult.filled} 個欄位{bulkResult.sources.length > 0 && `（來源：${bulkResult.sources.join(" + ")}）`}</span>}
+          {bulkErr && <span>{bulkResult ? "・" : ""}{bulkErr}</span>}
+        </div>
+      )}
 
       {COPY_TILE_GROUPS.map((group, gi) => (
         <div key={gi}>
@@ -2495,6 +2574,7 @@ function CopyTabInline({
                 onChange={(next) => updateAsset(item.key, next)}
                 brandId={brandId}
                 readOnly={locked}
+                filling={bulkFillingKeys.has(item.key)}
               />
             ))}
           </div>

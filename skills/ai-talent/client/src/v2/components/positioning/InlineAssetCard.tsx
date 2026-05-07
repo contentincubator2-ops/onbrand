@@ -4,14 +4,12 @@
  * Replaces the old click-to-navigate AssetCard behaviour. User edits in
  * place; values auto-save (debounced 800ms) via parent's onChange.
  *
- * AI 一鍵協助填 button calls trpc.brandKnowledge.suggestForAsset, fills
- * the editor with the suggestion (user can still edit after).
+ * Per-card AI button removed (CJ 2026-05-07: 全局只要一個按鈕). Bulk
+ * auto-fill is handled by parent CopyTabInline.
  */
-import { useState } from "react";
-import { trpc } from "../../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Sparkles, Plus, X } from "lucide-react";
-import { Textarea, Input, Button, Tooltip } from "@heroui/react";
+import { Plus, X, Sparkles } from "lucide-react";
+import { Textarea, Input } from "@heroui/react";
 
 type Shape = "text" | "items" | "pairs";
 
@@ -25,35 +23,18 @@ interface Props {
   onChange: (next: any) => void;
   brandId: number | null;
   readOnly?: boolean;
+  /** True while the bulk-suggest run is filling this specific card. */
+  filling?: boolean;
 }
 
 export default function InlineAssetCard({
-  assetKey, label, icon, bg, shape, value, onChange, brandId, readOnly,
+  assetKey, label, icon, bg, shape, value, onChange, readOnly, filling,
 }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const suggestMut = (trpc as any).brandKnowledge?.suggestForAsset?.useMutation?.();
-
-  const handleAI = async () => {
-    if (!brandId || readOnly) return;
-    setErr(null); setBusy(true);
-    try {
-      const r = await suggestMut?.mutateAsync?.({ brandId, assetKey: assetKey as any });
-      if (!r?.ok) { setErr(r?.error || "AI 協助填寫失敗"); return; }
-      onChange(r.value);
-    } catch (e: any) {
-      setErr(String(e?.message ?? e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const v = value ?? {};
 
   return (
     <div
-      className="rounded-xl border border-default-200 transition hover:shadow-sm"
+      className="rounded-xl border border-default-200 transition hover:shadow-sm relative"
       style={{ background: bg, padding: 14, minHeight: 200, display: "flex", flexDirection: "column" }}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -61,23 +42,12 @@ export default function InlineAssetCard({
           <FontAwesomeIcon icon={icon} className="text-default-600 shrink-0" />
           <span className="text-sm font-semibold text-default-800 truncate">{label}</span>
         </div>
-        <Tooltip content={readOnly ? "已鎖定" : "AI 根據品牌定位 + 知識庫協助填寫"} placement="top">
-          <button
-            onClick={handleAI}
-            disabled={!brandId || busy || readOnly}
-            className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full transition shrink-0 ${
-              busy ? "bg-violet-100 text-violet-700 cursor-wait"
-              : readOnly ? "bg-default-100 text-default-400 cursor-not-allowed"
-              : "bg-violet-50 text-violet-700 hover:bg-violet-100 cursor-pointer"
-            }`}
-          >
-            <Sparkles size={11} className={busy ? "animate-pulse" : ""} />
-            {busy ? "產生中…" : "AI 協助填"}
-          </button>
-        </Tooltip>
+        {filling && (
+          <span className="flex items-center gap-1 text-[10px] font-medium text-violet-700 px-2 py-1 rounded-full bg-violet-100 shrink-0">
+            <Sparkles size={11} className="animate-pulse" /> 自動填寫中…
+          </span>
+        )}
       </div>
-
-      {err && <div className="text-[11px] text-danger mb-1.5 px-1">{err}</div>}
 
       <div className="flex-1" style={readOnly ? { opacity: 0.55, pointerEvents: "none" } : undefined}>
         {shape === "text" && <TextField v={v} onChange={onChange} />}

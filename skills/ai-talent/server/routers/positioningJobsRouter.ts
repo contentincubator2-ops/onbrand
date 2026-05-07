@@ -23,6 +23,7 @@ import {
 import { generateInterimPulse } from "../_core/interimQuickPulse";
 import { invokeLLM } from "../_core/llm";
 import { buildBrandPrefix } from "../_core/brandContext";
+import { getBrandRealContent } from "../_core/brandRealContent";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import localPool from "../localDb";
 
@@ -197,6 +198,78 @@ ${brandPrefix || ""}${knowledgeBlock || ""}`;
       } catch (e: any) {
         return { ok: false as const, error: String(e?.message ?? e) };
       }
+    }),
+
+  /**
+   * 測試 battery — 6 scenarios in parallel, ~10-15s wall.
+   *
+   * CJ direction (2026-05-07):
+   *   "我覺得你的建議很棒，一次寫六個情境。"
+   *
+   * Returns six short captions to give the user a quick "is the brand
+   * voice on yet?" sanity check before locking. Each scenario uses
+   * positioning + knowledge + real FB / website content.
+   */
+  runTestBattery: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [brandPrefix, real, knowledgeBlock] = await Promise.all([
+        buildBrandPrefix(input.brandId).catch(() => ""),
+        getBrandRealContent(input.brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
+        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+      ]);
+
+      const SCENARIOS = [
+        { id: "fb_intro",    icon: "📱", label: "FB 短貼文（介紹主商品）",    ask: "請寫 80-120 字的 Facebook 短貼文，介紹品牌主力商品/服務。口語、有故事感。" },
+        { id: "ig_lifestyle",icon: "📷", label: "IG 標題（生活感）",         ask: "請寫一則 30-60 字的 Instagram 標題，生活感、不要硬推銷，可加 1-2 個 emoji。" },
+        { id: "service_reply",icon:"💬", label: "客服 / Threads 回覆",       ask: "情境：用戶留言『請問你們地址在哪？平日有開嗎？』。請用 60-100 字回覆，要符合品牌語氣，不要客套到僵化。" },
+        { id: "live_open",   icon: "🎬", label: "直播開場 30 秒",            ask: "請寫一段 80-150 字的直播開場稿（30 秒口播），直接開門見山說今天主題 + 為什麼觀眾要留下來看。" },
+        { id: "crisis",      icon: "⚠️", label: "危機公關回應",              ask: "情境：有客戶在 FB 公開抱怨服務不好。請寫 80-120 字公開回應，要誠懇、不卸責、說明改善動作。" },
+        { id: "edm",         icon: "📧", label: "EDM 主旨 + 第一句",         ask: "請寫 EDM：主旨 1 行（≤ 25 字）+ 開信第一句（≤ 50 字）。要讓人有開信動機，不要寫『親愛的客戶』這種制式套話。" },
+      ] as const;
+
+      const sysCommon = `你是品牌文案顧問。繁體中文。
+產出規則：
+- 必須以下方「品牌真實公開內容」推斷產業 / 受眾，不要用品牌名瞎猜。
+- 直接輸出純文字（不要 markdown、不要前綴「貼文：」）。
+${brandPrefix}${real.context}${knowledgeBlock}`;
+
+      const results = await Promise.all(SCENARIOS.map(async (s) => {
+        try {
+          const r = await invokeLLM({
+            messages: [
+              { role: "system", content: sysCommon },
+              { role: "user", content: s.ask },
+            ],
+            maxTokens: 600,
+          });
+          const content = r.choices[0]?.message?.content;
+          const text = typeof content === "string" ? content.trim() : "";
+          const inTok = r.usage?.prompt_tokens ?? 0;
+          const outTok = r.usage?.completion_tokens ?? 0;
+          try {
+            await localPool.execute(
+              `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+                    VALUES (?, 'brand', ?, ?, ?, ?, ?, ?)`,
+              [userId, input.brandId, `test_battery:${s.id}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+               (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+            );
+          } catch {/* non-fatal */}
+          return { id: s.id, icon: s.icon, label: s.label, caption: text, ok: true as const };
+        } catch (e: any) {
+          return { id: s.id, icon: s.icon, label: s.label, caption: "", ok: false as const, error: String(e?.message ?? e) };
+        }
+      }));
+
+      return {
+        ok: true as const,
+        scenarios: results,
+        hasRealContent: real.hasContent,
+        sources: real.sources,
+      };
     }),
 
   /** Poll for live status. */
