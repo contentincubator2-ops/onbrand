@@ -21,6 +21,7 @@
  * deep links / refresh keep the scope.
  */
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import {
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button, Chip,
@@ -40,24 +41,8 @@ interface ScopeBarProps {
   setScope: (s: ScopeState) => void;
 }
 
-/** Read scope from URL first (deep-link friendly), fall back to
- *  localStorage. URL params: ?b=<brandId>&p=<productId>&e=<eventId> */
-function readScopeFromUrl(): Partial<ScopeState> {
+function readScopeFromStorageOnly(): ScopeState {
   try {
-    const sp = new URLSearchParams(window.location.search);
-    const b = Number(sp.get("b")) || null;
-    const p = Number(sp.get("p")) || null;
-    const e = Number(sp.get("e")) || null;
-    return { brandId: b, productId: p, eventId: e };
-  } catch { return {}; }
-}
-
-function readScopeFromStorage(): ScopeState {
-  try {
-    const url = readScopeFromUrl();
-    if (url.brandId || url.productId || url.eventId) {
-      return { brandId: url.brandId ?? null, productId: url.productId ?? null, eventId: url.eventId ?? null };
-    }
     const b = Number(localStorage.getItem("sowork.scope.brandId")) || null;
     const p = Number(localStorage.getItem("sowork.scope.productId")) || null;
     const e = Number(localStorage.getItem("sowork.scope.eventId")) || null;
@@ -73,29 +58,71 @@ function writeScopeToStorage(s: ScopeState) {
   } catch {}
 }
 
-/** Mirror scope to URL params so refresh / share-link preserves it. */
-function writeScopeToUrl(s: ScopeState) {
-  try {
-    const sp = new URLSearchParams(window.location.search);
-    if (s.brandId)   sp.set("b", String(s.brandId));   else sp.delete("b");
-    if (s.productId) sp.set("p", String(s.productId)); else sp.delete("p");
-    if (s.eventId)   sp.set("e", String(s.eventId));   else sp.delete("e");
-    const qs = sp.toString();
-    const url = window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
-    window.history.replaceState(null, "", url);
-  } catch {}
-}
-
+/**
+ * useScopeState — single source of truth for brand/product/event scope.
+ *
+ * URL is owned by react-router via useSearchParams (NOT raw
+ * window.history.replaceState — that bypasses the router and causes
+ * stale state when other code calls setSearchParams).
+ *
+ * Order of truth on mount: URL (?b=&p=&e=) → localStorage → empty.
+ * Every setScope: writes localStorage + setSearchParams (replace) so
+ * router stays in sync and back-button doesn't accumulate scope changes.
+ */
 export function useScopeState(): [ScopeState, (s: ScopeState) => void] {
-  const [scope, setScopeState] = React.useState<ScopeState>(readScopeFromStorage);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [scope, setScopeState] = React.useState<ScopeState>(() => {
+    const b = Number(searchParams.get("b")) || null;
+    const p = Number(searchParams.get("p")) || null;
+    const e = Number(searchParams.get("e")) || null;
+    if (b || p || e) return { brandId: b, productId: p, eventId: e };
+    return readScopeFromStorageOnly();
+  });
+
   const setScope = React.useCallback((s: ScopeState) => {
     writeScopeToStorage(s);
-    writeScopeToUrl(s);
     setScopeState(s);
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      if (s.brandId)   sp.set("b", String(s.brandId));   else sp.delete("b");
+      if (s.productId) sp.set("p", String(s.productId)); else sp.delete("p");
+      if (s.eventId)   sp.set("e", String(s.eventId));   else sp.delete("e");
+      return sp;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // On mount, mirror initial scope (loaded from localStorage) into URL
+  // if the URL didn't already have it.
+  const didInitRef = React.useRef(false);
+  React.useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    const hasUrl = searchParams.get("b") || searchParams.get("p") || searchParams.get("e");
+    if (!hasUrl && (scope.brandId || scope.productId || scope.eventId)) {
+      setSearchParams((prev) => {
+        const sp = new URLSearchParams(prev);
+        if (scope.brandId)   sp.set("b", String(scope.brandId));
+        if (scope.productId) sp.set("p", String(scope.productId));
+        if (scope.eventId)   sp.set("e", String(scope.eventId));
+        return sp;
+      }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Mirror initial scope to URL on mount (so refresh preserves it even if
-  // it was loaded from localStorage).
-  React.useEffect(() => { writeScopeToUrl(scope); /* eslint-disable-next-line */ }, []);
+
+  // External URL changes (deep link, manual edit) → sync into state.
+  React.useEffect(() => {
+    const b = Number(searchParams.get("b")) || null;
+    const p = Number(searchParams.get("p")) || null;
+    const e = Number(searchParams.get("e")) || null;
+    if (b !== scope.brandId || p !== scope.productId || e !== scope.eventId) {
+      setScopeState({ brandId: b, productId: p, eventId: e });
+      writeScopeToStorage({ brandId: b, productId: p, eventId: e });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   return [scope, setScope];
 }
 

@@ -33,6 +33,7 @@ import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import ConnectorEditor from "../components/positioning/ConnectorEditor";
+import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
@@ -41,7 +42,7 @@ import {
   Target as LucideTarget, Type as LucideType, Palette as LucidePalette,
   Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
   RotateCcw as LucideRotate, BookOpen as LucideBook,
-  Sparkles, Link2 as LucideLink,
+  Sparkles, Link2 as LucideLink, Bot as LucideRobotIcon,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -206,14 +207,15 @@ export default function BrandsPage() {
   // tab strip above it.
   const [searchParams, setSearchParams] = useSearchParams();
   const urlCat = searchParams.get("cat") ?? "positioning";
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "connector" | "settings" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "ai_prompts" | "connector" | "settings" =
     urlCat === "visual" ? "visual"
     : urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
+    : urlCat === "ai_prompts" ? "ai_prompts"
     : urlCat === "connector" ? "connector"
     : urlCat === "settings" ? "settings"
     : "positioning";
-  const setCategory = (next: "positioning" | "copy" | "visual" | "knowledge" | "connector") => {
+  const setCategory = (next: "positioning" | "copy" | "visual" | "knowledge" | "ai_prompts" | "connector") => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
@@ -663,11 +665,12 @@ export default function BrandsPage() {
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
-                { v: "positioning" as const, label: "定位", Icon: LucideTarget,   bg: "#7C3AED" },
-                { v: "copy"        as const, label: "文字", Icon: LucideType,     bg: "#0EA5E9" },
-                { v: "visual"      as const, label: "視覺", Icon: LucidePalette,  bg: "#F97316" },
-                { v: "knowledge"   as const, label: "知識", Icon: LucideBook,     bg: "#10B981" },
-                { v: "connector"   as const, label: "連結", Icon: LucideLink,     bg: "#64748B" },
+                { v: "positioning" as const, label: "定位",   Icon: LucideTarget,   bg: "#7C3AED" },
+                { v: "copy"        as const, label: "文字",   Icon: LucideType,     bg: "#0EA5E9" },
+                { v: "visual"      as const, label: "視覺",   Icon: LucidePalette,  bg: "#F97316" },
+                { v: "knowledge"   as const, label: "知識",   Icon: LucideBook,     bg: "#10B981" },
+                { v: "ai_prompts"  as const, label: "AI 指令",Icon: LucideRobotIcon,bg: "#A855F7" },
+                { v: "connector"   as const, label: "連結",   Icon: LucideLink,     bg: "#64748B" },
               ]).map((t) => {
                 const active = category === t.v;
                 const locked = t.v === "positioning" || t.v === "copy" || t.v === "visual"
@@ -901,6 +904,11 @@ export default function BrandsPage() {
           {/* ── 連結器（外部 URL 來源） ── */}
           {derivedCategory === "connector" && (
             <ConnectorEditor key={`connector-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
+          )}
+
+          {/* ── AI 指令庫（per-platform text + image prompts） ── */}
+          {derivedCategory === "ai_prompts" && (
+            <AIPromptsEditor key={`ai-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
           )}
 
           {/* ── 品牌 / 產品 / 活動定位 ── */}
@@ -2438,12 +2446,6 @@ const COPY_TILE_GROUPS: Array<{
       { key: "cta_library",     label: "CTA 庫",     icon: faQuoteLeft,  bg: "#F0F9FF", shape: "items" },
       { key: "hook_library",    label: "Hook 庫",    icon: faQuoteLeft,  bg: "#FFF0F6", shape: "items" },
       { key: "templates_copy",  label: "文案範本",   icon: faFolderOpen, bg: "#FFFBEB", shape: "items" },
-    ],
-  },
-  {
-    label: "AI 設定",
-    items: [
-      { key: "ai_prompts",      label: "AI 指令庫",  icon: faRobot,      bg: "#F5F3FF", shape: "items" },
     ],
   },
 ];

@@ -262,6 +262,85 @@ export const brandKnowledgeRouter = router({
     }),
 
   /**
+   * AI 指令庫 — generate platform-specific text + image prompts using
+   * brand positioning + knowledge + real public content.
+   */
+  suggestAIPrompts: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      platform: z.enum(["facebook", "instagram", "youtube", "threads", "tiktok", "linkedin", "email", "press"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [brandPrefix, real, knowledgeBlock] = await Promise.all([
+        buildBrandPrefix(input.brandId).catch(() => ""),
+        getBrandRealContent(input.brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
+        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+      ]);
+      const labelMap: Record<string, string> = {
+        facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", threads: "Threads",
+        tiktok: "TikTok", linkedin: "LinkedIn", email: "EDM 電子報", press: "新聞稿",
+      };
+      const label = labelMap[input.platform] ?? input.platform;
+      const sys = `你是品牌文案顧問，繁體中文。
+任務：為這個品牌產出在 ${label} 平台寫貼文 / 配圖時可以直接 inject 給 LLM 的 system prompt。
+必須以下方「品牌真實公開內容」推斷產業 / 受眾 / 語氣，不要用品牌名瞎猜。
+
+輸出 JSON：
+{
+  "text": "<完整可貼上的文字指令；80-200 字；說明 ${label} 該怎麼寫貼文：口吻、結構、長度、要避免的、要強調的>",
+  "image": "<完整可貼上的圖片指令；80-200 字；說明 ${label} 配圖風格：構圖、色調、字幅、品牌元素、可用 / 不可用素材類型>"
+}
+直接輸出 JSON，第一字元就是 {。
+${brandPrefix}${real.context}${knowledgeBlock}`;
+      try {
+        const r = await Promise.race([
+          invokeLLM({
+            messages: [
+              { role: "system", content: sys },
+              { role: "user", content: `平台：${label}` },
+            ],
+            maxTokens: 1500,
+          }),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 30_000)),
+        ]);
+        const raw = r.choices[0]?.message?.content;
+        const text = typeof raw === "string" ? raw : "";
+        const inTok = r.usage?.prompt_tokens ?? 0;
+        const outTok = r.usage?.completion_tokens ?? 0;
+        try {
+          await localPool.execute(
+            `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+                  VALUES (?, 'brand', ?, ?, ?, ?, ?, ?)`,
+            [userId, input.brandId, `ai_prompt:${input.platform}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+             (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+          );
+        } catch {/* non-fatal */}
+        // Reuse extractJSON from suggestOne path — inline lite version here
+        const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        const jsonText = m ? m[1]!.trim() : text.trim();
+        let parsed: any = null;
+        try { parsed = JSON.parse(jsonText); } catch {
+          const start = jsonText.indexOf("{");
+          if (start >= 0) {
+            try { parsed = JSON.parse(jsonText.slice(start)); } catch {}
+          }
+        }
+        if (!parsed) return { ok: false as const, error: "JSON parse failed" };
+        return {
+          ok: true as const,
+          value: {
+            text:  String(parsed.text  ?? "").slice(0, 4000),
+            image: String(parsed.image ?? "").slice(0, 4000),
+          },
+          hasRealContent: real.hasContent,
+        };
+      } catch (e: any) {
+        return { ok: false as const, error: String(e?.message ?? e) };
+      }
+    }),
+
+  /**
    * 一鍵自動填寫 — fills ALL empty asset fields in one call.
    *
    * CJ direction (2026-05-07):
