@@ -96,40 +96,31 @@ function allocatePlan<K extends string>(
  * CTA" boilerplate. Real local patterns (痛點開場 / 對比反差 / 數字
  * 鉤子 / 串文式提問 / 直購式廣播 / SEO 長文標題 H2 結構).
  */
+// IMPORTANT: PLATFORM_GUIDE describes *format* (字數 / 段落 / hashtag /
+// emoji / CTA-position) only. Hook openings + CTA copy are NOT specified
+// here — those are owned by HOOK_PLAYBOOK + CTA_PLAYBOOK and injected per
+// cell by runStart's allocation. Letting the guide also list hooks
+// re-introduces the "你有沒有遇過" overlap CJ flagged in QA.
 const PLATFORM_GUIDE: Record<z.infer<typeof PlatformZ>, string> = {
-  facebook: `FB 台灣熱門貼文結構（120-200 字，繁體中文）。
-從以下「鉤子型開場」隨機挑一個切角寫：
-- 故事型：「上週遇到一個媽媽客人，她說…」
-- 對比型：「以前我以為 X，後來才發現 Y…」
-- 數字型：「3 個月內，我們發現 87% 的人都…」
-- 問句型：「你有沒有遇過這種情況？__」
-中段：用 1-2 個生活化具體場景帶出 USP（不是條列式）。
-結尾：行動引導（「留言告訴我…」「點下方連結…」「分享給也在煩惱的朋友」）。`,
+  facebook: `FB 貼文格式（120-200 字，繁體中文）。
+段落結構：開場 hook（1-2 句，依今日指定 hook 類型）→ 中段 1-2 個生活化具體場景帶出 USP（不寫條列）→ 結尾 CTA（依今日指定 CTA 意圖）。
+不寫 markdown，不寫 emoji 灌水，hashtag ≤ 3 個。`,
 
-  instagram: `IG 台灣熱門貼文結構（60-120 字，繁體中文，斷行多）。
-第一行 = 視覺鉤子（「這 3 個動作毀了你的腰」/「拍下這 5 個畫面，回家照片瞬間升級」）。
-中段：4-6 行短句，每行斷開，不寫長段落。
-適度 emoji（2-4 個，不灌水），結尾 1 行 CTA + 3-5 個精準 hashtag（不要 #love #photooftheday 灌水）。`,
+  instagram: `IG 貼文格式（60-120 字，繁體中文，斷行多）。
+段落結構：第一行 = 視覺鉤子（依今日指定 hook 類型寫成短句）→ 4-6 行短句斷開（不寫長段落）→ 結尾 CTA（依今日指定 CTA 意圖）。
+適度 emoji（2-4 個，不灌水），結尾配 3-5 個精準 hashtag（不要 #love #photooftheday 灌水）。`,
 
   youtube: `YT 影片描述（120-200 字，繁體中文）。
-第一句 = 主題 hook，吸引點開。
-中段：條列式 3 點影片亮點（用「✓」或「→」），每點一行。
-最後：訂閱引導 + 章節時間戳暗示（不需真的給時間）。
-不要把標題照抄到第一句。`,
+段落結構：第一句 hook（依今日指定 hook 類型）→ 條列 3 點影片亮點（用「✓」或「→」每點一行）→ 結尾 CTA（依今日指定 CTA 意圖）。
+不要把標題照抄到第一句。可暗示章節時間戳但不必給實際時間。`,
 
-  threads: `Threads 台灣熱門結構（單則 50-100 字，繁體中文）。
-口語、像朋友聊天的語氣。
-熱門切角：
-- 反思型：「我發現一件事…」
-- 提問型：「大家覺得 X 還是 Y？」
-- 短觀察：「最近 ___，你們也是嗎？」
-- 自嘲型：「身為 ___，我居然 ___」
+  threads: `Threads 格式（單則 50-100 字，繁體中文）。
+口語、像朋友聊天的語氣。單則完整：第一句 hook（依今日指定 hook 類型）→ 1-2 句展開 → 結尾 CTA（依今日指定 CTA 意圖）。
 不寫條列，不灌 hashtag（最多 1-2 個），可以用「…」「→」收尾留白。`,
 
   line: `LINE OA 廣播訊息（80-120 字，繁體中文）。
-單刀直入：第一句是 offer 或活動主題，不是品牌名。
-中段：1 個關鍵 benefit + 時效（例：「這週五前」/「限量 100 組」）。
-結尾：明確 CTA（「點下方連結」「回覆 1 索取」），語氣親切但有力。`,
+單刀直入：第一句 hook（依今日指定 hook 類型，但偏向 offer 導向）→ 中段 1 個關鍵 benefit + 時效（例：「這週五前」/「限量 100 組」）→ 結尾 CTA（依今日指定 CTA 意圖）。
+語氣親切但有力，不寫 emoji 海。`,
 
   blog: `Blog SEO 長文摘要（150-250 字，繁體中文）。
 第一段：用問題切入，帶出讀者搜尋意圖。
