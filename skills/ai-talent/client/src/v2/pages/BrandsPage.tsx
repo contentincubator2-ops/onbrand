@@ -32,8 +32,7 @@ import BrandAssetEditor, { type AssetKey } from "../components/positioning/Brand
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
-import ConnectorEditor from "../components/positioning/ConnectorEditor";
-import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
+import BrandSettingsSheet from "../components/positioning/BrandSettingsSheet";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
@@ -43,6 +42,7 @@ import {
   Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
   RotateCcw as LucideRotate, BookOpen as LucideBook,
   Sparkles, Link2 as LucideLink, Bot as LucideRobotIcon,
+  Settings as LucideSettings,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -101,6 +101,8 @@ export default function BrandsPage() {
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
   // Inline test panel (試寫 expand below kicker row)
   const [testPanelOpen, setTestPanelOpen] = useState(false);
+  // Settings sheet (right-drawer with 連結 / 視覺 / AI 指令 / 危險區)
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
@@ -207,15 +209,16 @@ export default function BrandsPage() {
   // tab strip above it.
   const [searchParams, setSearchParams] = useSearchParams();
   const urlCat = searchParams.get("cat") ?? "positioning";
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "ai_prompts" | "connector" | "settings" =
-    urlCat === "visual" ? "visual"
-    : urlCat === "copy" ? "copy"
+  // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
+  // "visual" is kept in the type for legacy lock-state code paths, but
+  // is no longer exposed as a tile — its contents live in Settings.
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "settings" =
+    urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
-    : urlCat === "ai_prompts" ? "ai_prompts"
-    : urlCat === "connector" ? "connector"
+    : urlCat === "visual" ? "visual"
     : urlCat === "settings" ? "settings"
     : "positioning";
-  const setCategory = (next: "positioning" | "copy" | "visual" | "knowledge" | "ai_prompts" | "connector") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge") => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
@@ -619,10 +622,29 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
+      {/* Settings sheet — opened by the gear icon in the header */}
+      <BrandSettingsSheet
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        brandId={activeBrandIdForLocks}
+        brandName={scopeName}
+      />
+
       {/* ─── Hero — /30s-style centered axis (CJ feedback 2026-05-07) ───
           eyebrow → title → stats → message bar → tiles → kicker.
           測試 / 定案 chips live in the kicker row, NOT in the bar. */}
       <div className="relative pt-10 pb-6 px-6 text-center">
+        {/* Gear icon top-right — opens Settings sheet (連結 / 視覺 / AI 指令 / 危險區) */}
+        {activeBrandIdForLocks && (
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="absolute top-5 right-5 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-default-200 hover:border-default-400 shadow-sm transition text-default-600 hover:text-default-900 z-10"
+            title="設定（連結 / 視覺 / AI 指令 / 刪除）"
+          >
+            <LucideSettings size={14} strokeWidth={1.8} />
+            <span className="text-xs font-medium">設定</span>
+          </button>
+        )}
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
           {/* Eyebrow */}
           <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
@@ -665,16 +687,13 @@ export default function BrandsPage() {
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
-                { v: "positioning" as const, label: "定位",   Icon: LucideTarget,   bg: "#7C3AED" },
-                { v: "copy"        as const, label: "文字",   Icon: LucideType,     bg: "#0EA5E9" },
-                { v: "visual"      as const, label: "視覺",   Icon: LucidePalette,  bg: "#F97316" },
-                { v: "knowledge"   as const, label: "知識",   Icon: LucideBook,     bg: "#10B981" },
-                { v: "ai_prompts"  as const, label: "AI 指令",Icon: LucideRobotIcon,bg: "#A855F7" },
-                { v: "connector"   as const, label: "連結",   Icon: LucideLink,     bg: "#64748B" },
+                { v: "positioning" as const, label: "定位", Icon: LucideTarget,  bg: "#7C3AED" },
+                { v: "copy"        as const, label: "文字", Icon: LucideType,    bg: "#0EA5E9" },
+                { v: "knowledge"   as const, label: "知識", Icon: LucideBook,    bg: "#10B981" },
               ]).map((t) => {
                 const active = category === t.v;
-                const locked = t.v === "positioning" || t.v === "copy" || t.v === "visual"
-                  ? !!tabLocks[t.v as "positioning"|"copy"|"visual"]
+                const locked = t.v === "positioning" || t.v === "copy"
+                  ? !!tabLocks[t.v as "positioning"|"copy"]
                   : false;
                 const Icon = t.Icon;
                 return (
@@ -901,15 +920,6 @@ export default function BrandsPage() {
             <KnowledgeEditor key={`knowledge-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
           )}
 
-          {/* ── 連結器（外部 URL 來源） ── */}
-          {derivedCategory === "connector" && (
-            <ConnectorEditor key={`connector-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
-          )}
-
-          {/* ── AI 指令庫（per-platform text + image prompts） ── */}
-          {derivedCategory === "ai_prompts" && (
-            <AIPromptsEditor key={`ai-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
-          )}
 
           {/* ── 品牌 / 產品 / 活動定位 ── */}
           {derivedCategory === "positioning" && (
