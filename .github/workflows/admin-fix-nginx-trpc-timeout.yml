@@ -1,0 +1,49 @@
+name: Admin — Fix nginx /trpc proxy_read_timeout (300s)
+
+# Squad pipelines (100s tier) take up to ~3 min for 7-step LLM chains.
+# Default nginx proxy_read_timeout is 60s → returns HTML 504 → frontend
+# JSON.parse error 'Unexpected token <'.
+# This workflow adds proxy_read_timeout 600s + proxy_send_timeout 300s
+# to the /trpc/ block in /etc/nginx/sites-enabled/marketing-os.
+# Idempotent: skips if already set.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Patch nginx site config
+        run: |
+          set -e
+          SITE=/etc/nginx/sites-enabled/marketing-os
+          [ ! -f "$SITE" ] && SITE=/etc/nginx/sites-available/marketing-os
+          [ ! -f "$SITE" ] && { echo "✗ marketing-os nginx site not found"; exit 1; }
+          echo "Patching: $SITE"
+
+          # Backup
+          sudo cp "$SITE" "${SITE}.bak.$(date +%s)"
+
+          # Check if already patched
+          if sudo grep -q "proxy_read_timeout 600s" "$SITE"; then
+            echo "✓ Already patched, no-op."
+            exit 0
+          fi
+
+          # Insert timeout directives inside the /trpc/ location block.
+          # Pattern: after 'location /trpc/ {' add timeout lines before any existing proxy_pass.
+          # Approach: use sed to inject 4 lines right after 'location /trpc/ {' line.
+          sudo sed -i.tmp '/location \/trpc\/ {/a\        proxy_read_timeout 600s;\n        proxy_send_timeout 300s;\n        proxy_connect_timeout 60s;\n        client_max_body_size 50m;' "$SITE"
+
+          echo ""
+          echo "──── /trpc/ block after patch ────"
+          sudo awk '/location \/trpc\/ \{/,/\}/' "$SITE"
+
+      - name: Reload nginx
+        run: |
+          set -e
+          sudo nginx -t 2>&1
+          sudo systemctl reload nginx
+          echo "✓ nginx reloaded"
