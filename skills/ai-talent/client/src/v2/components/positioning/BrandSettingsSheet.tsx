@@ -14,10 +14,11 @@
  *
  * Opens via the gear icon top-right of Brand workspace header.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, ModalContent, Button } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faPalette, faRobot, faTrash, faIdCard, faXmark } from "@fortawesome/free-solid-svg-icons";
+import {
+  IdCard, Link2, Palette, Bot, Trash2, X,
+} from "lucide-react";
 import ConnectorEditor from "./ConnectorEditor";
 import AIPromptsEditor from "./AIPromptsEditor";
 
@@ -28,18 +29,26 @@ interface Props {
   onClose: () => void;
   brandId: number | null;
   brandName: string | null;
+  /** Tab to land on when sheet opens. Defaults to "connector" (most common entry). */
+  initialTab?: SettingsTab;
+  /** Optional onboarding banner shown above active tab content. */
+  onboardingHint?: string;
 }
 
-const TABS: Array<{ id: SettingsTab; label: string; icon: any }> = [
-  { id: "info",      label: "基本資料",  icon: faIdCard  },
-  { id: "connector", label: "連結",      icon: faLink    },
-  { id: "visual",    label: "視覺",      icon: faPalette },
-  { id: "ai",        label: "AI 指令",   icon: faRobot   },
-  { id: "danger",    label: "危險區",    icon: faTrash   },
+const TABS: Array<{ id: SettingsTab; label: string; Icon: any }> = [
+  { id: "info",      label: "基本資料",  Icon: IdCard  },
+  { id: "connector", label: "連結",      Icon: Link2   },
+  { id: "visual",    label: "視覺",      Icon: Palette },
+  { id: "ai",        label: "AI 指令",   Icon: Bot     },
+  { id: "danger",    label: "危險區",    Icon: Trash2  },
 ];
 
-export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName }: Props) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("connector");
+export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName, initialTab, onboardingHint }: Props) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "connector");
+  // When a fresh initialTab arrives (e.g., onboarding triggers connector), reflect it.
+  useEffect(() => {
+    if (isOpen && initialTab) setActiveTab(initialTab);
+  }, [isOpen, initialTab]);
 
   return (
     <Modal
@@ -73,17 +82,13 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
                       : "text-default-700 hover:bg-default-100"
                   }`}
                 >
-                  <FontAwesomeIcon
-                    icon={t.icon}
-                    className="text-tiny shrink-0"
-                    style={{ width: 14 }}
-                  />
+                  <t.Icon size={14} strokeWidth={1.8} className="shrink-0" />
                   <span>{t.label}</span>
                 </button>
               ))}
             </nav>
             <div className="px-2 py-3 border-t border-default-100">
-              <Button variant="light" size="sm" onPress={onClose} startContent={<FontAwesomeIcon icon={faXmark} className="text-tiny" />} className="w-full justify-start">
+              <Button variant="light" size="sm" onPress={onClose} startContent={<X size={13} />} className="w-full justify-start">
                 關閉
               </Button>
             </div>
@@ -91,6 +96,12 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
 
           {/* Right pane — active tab */}
           <div className="flex-1 min-w-0 overflow-y-auto">
+            {onboardingHint && (
+              <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 text-sm text-amber-900 flex items-start gap-2">
+                <span className="text-base">👋</span>
+                <span className="leading-relaxed">{onboardingHint}</span>
+              </div>
+            )}
             {activeTab === "info" && <InfoTab brandId={brandId} brandName={brandName} />}
             {activeTab === "connector" && (
               <ConnectorEditor brandId={brandId} />

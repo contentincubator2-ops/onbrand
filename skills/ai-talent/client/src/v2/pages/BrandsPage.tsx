@@ -43,6 +43,10 @@ import {
   RotateCcw as LucideRotate, BookOpen as LucideBook,
   Sparkles, Link2 as LucideLink, Bot as LucideRobotIcon,
   Settings as LucideSettings,
+  Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon,
+  Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage,
+  Hash as LucideHash, MessageCircle as LucideMessage,
+  FileText as LucideFileText,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -103,6 +107,8 @@ export default function BrandsPage() {
   const [testPanelOpen, setTestPanelOpen] = useState(false);
   // Settings sheet (right-drawer with 連結 / 視覺 / AI 指令 / 危險區)
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"connector"|"visual"|"ai"|"danger">("connector");
+  const [onboardingHint, setOnboardingHint] = useState<string | undefined>(undefined);
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
@@ -125,6 +131,28 @@ export default function BrandsPage() {
     : { data: null };
   const fullPositioning = (scopeActiveQuery.data as any)?.brand?.positioning ?? {};
   const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
+
+  // Onboarding nudge: if this brand has no website / socialLinks yet,
+  // auto-open Settings → 連結 once. localStorage tracks dismissal so
+  // the prompt doesn't bug returning users.
+  const connQuery = (trpc as any).brand?.getConnections?.useQuery?.(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false, staleTime: 60_000 },
+  );
+  const connData = connQuery?.data as { website: string; socialLinks: Record<string,string> } | null | undefined;
+  React.useEffect(() => {
+    if (!activeBrandIdForLocks || !connData) return;
+    const dismissedKey = `sowork.connector.dismissed.${activeBrandIdForLocks}`;
+    if (localStorage.getItem(dismissedKey)) return;
+    const hasAny =
+      (connData.website ?? "").trim().length > 0 ||
+      Object.values(connData.socialLinks ?? {}).some((v) => typeof v === "string" && v.trim().length > 0);
+    if (hasAny) return;
+    setSettingsInitialTab("connector");
+    setOnboardingHint(`先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/100s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。填完關掉就不會再跳。`);
+    setSettingsOpen(true);
+    try { localStorage.setItem(dismissedKey, "1"); } catch {}
+  }, [activeBrandIdForLocks, connData]);
   // Positioning segments live as top-level keys in `positioning` (e.g.
   // positioning.goldenCircle, positioning.tagline...) — written by the
   // pipeline runner. We pass the whole bag to PositioningGrid for preview.
@@ -625,9 +653,11 @@ export default function BrandsPage() {
       {/* Settings sheet — opened by the gear icon in the header */}
       <BrandSettingsSheet
         isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+        onClose={() => { setSettingsOpen(false); setOnboardingHint(undefined); }}
         brandId={activeBrandIdForLocks}
         brandName={scopeName}
+        initialTab={settingsInitialTab}
+        onboardingHint={onboardingHint}
       />
 
       {/* ─── Hero — /30s-style centered axis (CJ feedback 2026-05-07) ───
@@ -2511,37 +2541,37 @@ function KickerRow({
 type CopyShape = "text" | "items" | "pairs";
 const COPY_TILE_GROUPS: Array<{
   label: string;
-  items: Array<{ key: string; label: string; icon: any; bg: string; shape: CopyShape }>;
+  items: Array<{ key: string; label: string; Icon: any; bg: string; shape: CopyShape }>;
 }> = [
   {
     label: "口吻風格",
     items: [
-      { key: "voice",            label: "品牌口吻", icon: faQuoteLeft,    bg: "#FFF0F6", shape: "text" },
-      { key: "voice_principles", label: "品牌準則", icon: faShieldHalved, bg: "#F0FDF4", shape: "items" },
+      { key: "voice",            label: "品牌口吻", Icon: LucideQuote,       bg: "#FFF0F6", shape: "text" },
+      { key: "voice_principles", label: "品牌準則", Icon: LucideShield,      bg: "#F0FDF4", shape: "items" },
     ],
   },
   {
     label: "用詞規範",
     items: [
-      { key: "preferred_terms",     label: "推薦用詞", icon: faFont,         bg: "#ECFDF5", shape: "items" },
-      { key: "banned_words",        label: "禁用詞",   icon: faShieldHalved, bg: "#FEE2E2", shape: "items" },
-      { key: "term_substitutions",  label: "替換對照", icon: faPenNib,       bg: "#FFFBEB", shape: "pairs" },
+      { key: "preferred_terms",     label: "推薦用詞", Icon: LucideTypeIcon, bg: "#ECFDF5", shape: "items" },
+      { key: "banned_words",        label: "禁用詞",   Icon: LucideShield,   bg: "#FEE2E2", shape: "items" },
+      { key: "term_substitutions",  label: "替換對照", Icon: LucidePencil,   bg: "#FFFBEB", shape: "pairs" },
     ],
   },
   {
     label: "專用詞彙",
     items: [
-      { key: "branded_terms",   label: "品牌術語",     icon: faTrademark, bg: "#F5F3FF", shape: "items" },
-      { key: "product_naming",  label: "產品名稱規範", icon: faBox,       bg: "#EFF6FF", shape: "text" },
-      { key: "abbreviations",   label: "縮寫對照",     icon: faFont,      bg: "#FFF7ED", shape: "pairs" },
+      { key: "branded_terms",   label: "品牌術語",     Icon: LucideAward,    bg: "#F5F3FF", shape: "items" },
+      { key: "product_naming",  label: "產品名稱規範", Icon: LucidePackage,  bg: "#EFF6FF", shape: "text" },
+      { key: "abbreviations",   label: "縮寫對照",     Icon: LucideHash,     bg: "#FFF7ED", shape: "pairs" },
     ],
   },
   {
     label: "常用文案",
     items: [
-      { key: "cta_library",     label: "CTA 庫",     icon: faQuoteLeft,  bg: "#F0F9FF", shape: "items" },
-      { key: "hook_library",    label: "Hook 庫",    icon: faQuoteLeft,  bg: "#FFF0F6", shape: "items" },
-      { key: "templates_copy",  label: "文案範本",   icon: faFolderOpen, bg: "#FFFBEB", shape: "items" },
+      { key: "cta_library",     label: "CTA 庫",     Icon: LucideMessage,    bg: "#F0F9FF", shape: "items" },
+      { key: "hook_library",    label: "Hook 庫",    Icon: LucideQuote,      bg: "#FFF0F6", shape: "items" },
+      { key: "templates_copy",  label: "文案範本",   Icon: LucideFileText,   bg: "#FFFBEB", shape: "items" },
     ],
   },
 ];
@@ -2750,7 +2780,7 @@ function CopyTabInline({
                 key={item.key}
                 assetKey={item.key}
                 label={item.label}
-                icon={item.icon}
+                Icon={item.Icon}
                 bg={item.bg}
                 shape={item.shape}
                 value={drafts[item.key]}

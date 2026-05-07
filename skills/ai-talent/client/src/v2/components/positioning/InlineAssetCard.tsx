@@ -7,7 +7,6 @@
  * Per-card AI button removed (CJ 2026-05-07: 全局只要一個按鈕). Bulk
  * auto-fill is handled by parent CopyTabInline.
  */
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Plus, X, Sparkles } from "lucide-react";
 import { Textarea, Input } from "@heroui/react";
 
@@ -16,7 +15,7 @@ type Shape = "text" | "items" | "pairs";
 interface Props {
   assetKey: string;
   label: string;
-  icon: any;       // FontAwesome icon
+  Icon: any;       // Lucide line-icon component (Notion-style)
   bg: string;      // tile color
   shape: Shape;
   value: any;
@@ -28,7 +27,7 @@ interface Props {
 }
 
 export default function InlineAssetCard({
-  assetKey, label, icon, bg, shape, value, onChange, readOnly, filling,
+  assetKey, label, Icon, bg, shape, value, onChange, readOnly, filling,
 }: Props) {
   const v = value ?? {};
 
@@ -39,7 +38,7 @@ export default function InlineAssetCard({
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <FontAwesomeIcon icon={icon} className="text-default-600 shrink-0" />
+          <Icon size={15} strokeWidth={1.7} className="text-default-600 shrink-0" />
           <span className="text-sm font-semibold text-default-800 truncate">{label}</span>
         </div>
         {filling && (

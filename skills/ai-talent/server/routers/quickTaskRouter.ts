@@ -1075,7 +1075,8 @@ export const quickTaskRouter = router({
   // QA reviewer (Jordan Hayes) + 50s budget. User sees richer output.
   runOrchestra60: protectedProcedure
     .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       // 60s production-package tasks (FB / IG / YT / multi-channel) take priority
       const tier60Template =
@@ -1085,7 +1086,7 @@ export const quickTaskRouter = router({
         getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
         getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
       if (tier60Template && tier60Config) {
-        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
+        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, userId, tier: "60s" });
       }
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??
@@ -1104,7 +1105,7 @@ export const quickTaskRouter = router({
         getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
         getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId);
       if (!config) throw new Error(`No config for: ${input.taskId}`);
-      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, tier: "60s" });
+      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, userId, tier: "60s" });
     }),
 
   // refineCaption — AI chat-style refinement. User sees the current caption +
@@ -1319,13 +1320,14 @@ export const quickTaskRouter = router({
   // automatically when tier="100s". Falls through to 30s pool for legacy.
   runOrchestra100: protectedProcedure
     .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       // Priority 1: 100s campaign-level tasks (FB100/IG100/YT100/Multi100)
       const tier100Template = get100Template(input.taskId);
       const tier100Config = get100OrchestraConfig(input.taskId);
       if (tier100Template && tier100Config) {
-        return runOrchestra({ template: tier100Template, config: tier100Config, inputs: input.inputs, brandId: input.brandId, tier: "100s" });
+        return runOrchestra({ template: tier100Template, config: tier100Config, inputs: input.inputs, brandId: input.brandId, userId, tier: "100s" });
       }
       // Priority 2: 60s production-package pools (legacy fallback)
       const tier60Template =
@@ -1335,7 +1337,7 @@ export const quickTaskRouter = router({
         getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
         getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
       if (tier60Template && tier60Config) {
-        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, tier: "100s" });
+        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, userId, tier: "100s" });
       }
       // Legacy fallback to 30s pool
       const template =
@@ -1355,7 +1357,7 @@ export const quickTaskRouter = router({
         getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
         getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId);
       if (!config) throw new Error(`No config for: ${input.taskId}`);
-      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, tier: "100s" });
+      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, userId, tier: "100s" });
     }),
 
   runOrchestra: protectedProcedure
@@ -1366,7 +1368,8 @@ export const quickTaskRouter = router({
         brandId: z.number().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const { getOrchestraConfig } = await import("../_core/quickTaskFB");
       // Look up template + config in both FB and IG catalogs
@@ -1407,6 +1410,7 @@ export const quickTaskRouter = router({
         config,
         inputs: input.inputs,
         brandId: input.brandId,
+        userId,
       });
     }),
 

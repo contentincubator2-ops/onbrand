@@ -700,6 +700,35 @@ ${importantHint}
             caption = caption.slice(1, -1).trim();
           }
         }
+        // Auto-record into mission_outputs so /projects shows this cell.
+        // Non-fatal: failure here doesn't break the user-facing response.
+        if (caption) {
+          try {
+            const { recordTaskRun } = await import("../_core/recordTaskRun");
+            const dateLabel = input.date ? `${input.date}（${input.weekday}）` : "Theater";
+            await recordTaskRun({
+              userId: ctx.user.id,
+              brandId: input.brandId,
+              workspace: input.platform,
+              taskId: `theater-${input.platform}-${input.date}`,
+              taskLabel: `Theater · ${input.platform.toUpperCase()} · ${dateLabel}`,
+              tier: "theater",
+              title: caption.slice(0, 80) || `Theater · ${dateLabel}`,
+              content: JSON.stringify({ caption, structured }, null, 2),
+              metadata: {
+                date: input.date,
+                weekday: input.weekday,
+                usp: input.usp,
+                hook: input.hook,
+                cta: input.cta,
+                importantDateName: input.importantDateName,
+              },
+            });
+          } catch (e) {
+            console.warn("[theater.generateCell] recordTaskRun failed:", (e as Error).message);
+          }
+        }
+
         return { ok: true as const, caption, structured };
       } catch (e: any) {
         return { ok: false as const, caption: "", structured: {}, error: String(e?.message ?? e) };

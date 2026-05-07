@@ -597,6 +597,9 @@ export async function runOrchestra(args: {
   config: OrchestraConfig;
   inputs: Record<string, string>;
   brandId?: number;
+  /** Caller's userId — used by recordTaskRun to write the output into
+   *  mission_outputs so /projects can find it. Optional for back-compat. */
+  userId?: number;
   /** Tier override — 60s/100s scale variants + add QA stage. Default 30s. */
   tier?: OrchestraTier;
 }): Promise<OrchestraResult> {
@@ -1015,7 +1018,7 @@ export async function runOrchestra(args: {
 
   // Hard 20s budget — whatever's done by then is what we ship
   try {
-    return await Promise.race([
+    const result = await Promise.race([
       orchestra,
       new Promise<OrchestraResult>((resolve) =>
         setTimeout(() => {
@@ -1038,6 +1041,38 @@ export async function runOrchestra(args: {
         }, tierBudget),
       ),
     ]);
+
+    // Auto-record to mission_outputs so /projects shows this run.
+    // Non-fatal: failure here doesn't break the user-facing response.
+    if (args.userId && result.ok && result.variants.length > 0) {
+      try {
+        const { recordTaskRun } = await import("./recordTaskRun");
+        const firstImage = result.variants.find((v) => v.image?.url)?.image?.url ?? null;
+        const channel = String((args.template as any).channel ?? "other");
+        const tierStr = (tier as "30s" | "60s" | "100s");
+        await recordTaskRun({
+          userId: args.userId,
+          brandId: args.brandId ?? null,
+          workspace: channel,
+          taskId: args.template.id,
+          taskLabel: args.template.label ?? args.template.id,
+          tier: tierStr,
+          title: result.variants[0]?.caption?.slice(0, 80) || args.template.label,
+          content: JSON.stringify(result.variants, null, 2),
+          metadata: {
+            latencyMs: result.totalLatencyMs,
+            captionAgent: result.captionAgent?.name,
+            imageAgent: result.imageAgent?.name,
+            variantCount: result.variants.length,
+          },
+          thumbnailUrl: firstImage,
+        });
+      } catch (e) {
+        console.warn("[runOrchestra] recordTaskRun failed:", (e as Error).message);
+      }
+    }
+
+    return result;
   } catch (e: any) {
     return {
       taskId: args.template.id,
