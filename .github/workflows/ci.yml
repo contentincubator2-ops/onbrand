@@ -93,10 +93,13 @@ jobs:
             BUILD_TMP="$AI/public_build_tmp"
             rm -rf "$BUILD_TMP"
 
-            # npm run build = "tsc && vite build"
-            # Pass --outDir via CLI so vite outputs to BUILD_TMP, not ../public.
-            # tsc still runs first and will catch type errors.
-            npm run build -- --outDir "$BUILD_TMP" --emptyOutDir 2>&1 | tail -20
+            # Use build:fast (vite-only, skip tsc). The 'test' job above
+            # already runs full tsc on both server + client and blocks the
+            # deploy if type-checks fail. Running tsc again on the VM
+            # caused intermittent TS7026 errors due to peer-dep resolution
+            # drift (@types/react). Vite's swc transform is enough for
+            # production builds — type errors are caught earlier.
+            npm run build:fast -- --outDir "$BUILD_TMP" --emptyOutDir 2>&1 | tail -20
 
             NEW_HASH=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$BUILD_TMP/index.html" 2>/dev/null | head -1)
             if [ -z "$NEW_HASH" ]; then
