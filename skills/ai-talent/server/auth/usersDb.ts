@@ -88,20 +88,35 @@ export async function createUser(db: DB, data: {
   const openId = nanoid(16); // generate unique openId
   const passwordHash = await hashPassword(data.password);
 
-  const rows = await db
-    .insert(users)
-    .values({
-      openId,
-      name: data.name,
-      email: data.email,
-      passwordHash,
-      authMethod: "password",
-      isActive: 0, // requires email verification
-      credits: 1000, // signup bonus
-      registrationIp: data.registrationIp,
-      role: "user",
-    })
-    .$dynamic();
+  // 2026-05-08 (P1-3): race-safe insert. With the UNIQUE index added on
+  // users.email (migrate.ts), concurrent register requests with the
+  // same address now fail with ER_DUP_ENTRY at the DB layer. Catch it
+  // and surface a clean DUPLICATE_EMAIL signal to the caller.
+  try {
+    await db
+      .insert(users)
+      .values({
+        openId,
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        authMethod: "password",
+        isActive: 0, // requires email verification
+        credits: 1000, // signup bonus
+        registrationIp: data.registrationIp,
+        role: "user",
+      })
+      .$dynamic();
+  } catch (err: any) {
+    const code = err?.code ?? err?.errno;
+    const msg = String(err?.message ?? "");
+    if (code === "ER_DUP_ENTRY" || code === 1062 || /Duplicate entry/i.test(msg)) {
+      const dup = new Error("DUPLICATE_EMAIL");
+      (dup as any).code = "DUPLICATE_EMAIL";
+      throw dup;
+    }
+    throw err;
+  }
 
   // Get the inserted user
   const newUser = await getUserByEmail(db, data.email);

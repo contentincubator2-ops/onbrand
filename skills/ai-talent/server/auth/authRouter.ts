@@ -115,9 +115,19 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       return;
     }
 
-    // Create user
+    // Create user (P1-3: race-safe — UNIQUE index catches concurrent
+    // duplicate registers, createUser throws DUPLICATE_EMAIL)
     const registrationIp = getClientIp(req);
-    const user = await createUser(db, { name, email, password, registrationIp });
+    let user;
+    try {
+      user = await createUser(db, { name, email, password, registrationIp });
+    } catch (e: any) {
+      if (e?.code === "DUPLICATE_EMAIL") {
+        res.status(400).json({ error: "此電子郵件已註冊" });
+        return;
+      }
+      throw e;
+    }
 
     if (!user) {
       res.status(500).json({ error: "註冊失敗，請稍後再試" });

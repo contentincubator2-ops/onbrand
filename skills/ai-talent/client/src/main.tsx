@@ -1,9 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, MutationCache, QueryCache } from "@tanstack/react-query";
 import { trpc, trpcClient } from "./lib/trpc";
-import { ToastProvider } from "./components/ui/Toast";
+import { ToastProvider, showToastGlobal } from "./components/ui/Toast";
 import { HeroUIProvider } from "@heroui/react";
 // v2 frontend rebuild — Sprint 1 (2026-04-25). The legacy App is kept on
 // disk for one cycle then removed. Flip USE_V2 to false to fall back.
@@ -13,7 +13,42 @@ const USE_V2 = true;
 const RootApp = USE_V2 ? AppV2 : App;
 import "./index.css";
 
-const queryClient = new QueryClient();
+// 2026-05-08 (P1-2): global mutation / query error toast.
+// Caught the silent-fail bug where many components used
+// `someMut?.mutateAsync?.()` without onError — failures got swallowed.
+// Now every unhandled mutation/query error surfaces a red toast bottom-
+// right; per-component onError still wins (default fires only when
+// caller doesn't handle).
+function shouldSilentSkip(err: any): boolean {
+  // Auth redirects are handled by authAwareFetch — don't double-toast
+  const code = err?.data?.code ?? err?.code;
+  if (code === "UNAUTHORIZED") return true;
+  return false;
+}
+function formatErr(err: any): string {
+  return String(err?.message ?? err?.shape?.message ?? err ?? "未知錯誤").slice(0, 240);
+}
+const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onError: (err: any, _vars, _ctx, mutation) => {
+      if (shouldSilentSkip(err)) return;
+      // If caller defined its own onError, skip — they're handling it
+      if ((mutation as any)?.options?.onError) return;
+      showToastGlobal(`操作失敗：${formatErr(err)}`, "error");
+    },
+  }),
+  queryCache: new QueryCache({
+    onError: (err: any, query) => {
+      if (shouldSilentSkip(err)) return;
+      // Don't toast every background poll failure (positioningJobs.getStatus
+      // every 4s, etc.) — only show when user-initiated and no custom onError.
+      if ((query as any)?.options?.onError) return;
+      // Skip background refetches (only toast initial load)
+      if ((query as any)?.state?.dataUpdateCount > 0) return;
+      showToastGlobal(`載入失敗：${formatErr(err)}`, "error");
+    },
+  }),
+});
 
 // ─── Global Error Boundary ────────────────────────────────────────────────────
 class AppErrorBoundary extends React.Component<

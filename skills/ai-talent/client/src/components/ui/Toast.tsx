@@ -21,16 +21,33 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
+/**
+ * Module-level emitter so non-React code (e.g. trpc onError handlers,
+ * fetch interceptors) can surface a toast without a hook.
+ *
+ * Set by ToastProvider on mount; safe-no-op until provider is mounted.
+ */
+let _globalShowToast: ToastContextValue["showToast"] = () => {};
+export function showToastGlobal(message: string, type: ToastType = "error") {
+  try { _globalShowToast(message, type); } catch {/* no-op */}
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: ToastType = "success") => {
-    const id = `toast-${Date.now()}`;
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
+    }, 4500);
   }, []);
+
+  // Wire module-level emitter so non-React code can call showToastGlobal()
+  React.useEffect(() => {
+    _globalShowToast = showToast;
+    return () => { _globalShowToast = () => {}; };
+  }, [showToast]);
 
   const COLORS: Record<ToastType, { bg: string; border: string; icon: string }> = {
     success: { bg: "#F0FDF4", border: "#86EFAC", icon: "✓" },

@@ -660,9 +660,42 @@ export default function BrandsPage() {
         onboardingHint={onboardingHint}
       />
 
+      {/* 2026-05-08 (P1-1): empty state — user has zero brands.
+          Show a friendly CTA instead of broken hero with no scope. */}
+      {scopeBrands.length === 0 && (
+        <div className="min-h-[60vh] flex items-center justify-center px-6">
+          <div className="max-w-[480px] text-center">
+            <div
+              className="mx-auto mb-5 flex items-center justify-center"
+              style={{
+                width: 72, height: 72, borderRadius: 18,
+                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                boxShadow: "0 10px 30px rgba(124,58,237,0.32)",
+              }}
+            >
+              <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 28 }} />
+            </div>
+            <h1 className="text-2xl font-semibold text-default-900 mb-2">建立你的第一個品牌</h1>
+            <p className="text-sm text-default-500 mb-6 leading-relaxed">
+              品牌是 Marketing OS 的根 — 定位 / 文字 / 視覺 / 知識 / AI 指令庫都掛在品牌底下。
+              建立後系統會自動執行 14 步定位分析，幾分鐘內就能開始產內容。
+            </p>
+            <button
+              onClick={() => setAddModal({ open: true, tab: "brand" })}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm shadow-md hover:shadow-lg transition"
+              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366F1 100%)" }}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              建立第一個品牌
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── Hero — /30s-style centered axis (CJ feedback 2026-05-07) ───
           eyebrow → title → stats → message bar → tiles → kicker.
           測試 / 定案 chips live in the kicker row, NOT in the bar. */}
+      {scopeBrands.length > 0 && (
       <div className="relative pt-10 pb-6 px-6 text-center">
         {/* Gear icon top-right — opens Settings sheet (連結 / 視覺 / AI 指令 / 危險區) */}
         {activeBrandIdForLocks && (
@@ -766,6 +799,7 @@ export default function BrandsPage() {
           />
         </div>
       </div>
+      )}{/* end scopeBrands.length > 0 hero */}
 
       {/* Inline test panel — slides below the hero, pushes tab content
           down. Stays open until user closes via × or 收起試寫. */}

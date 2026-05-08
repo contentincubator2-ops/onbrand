@@ -1182,6 +1182,47 @@ async function main() {
     `);
     console.log("[migrate] brand_knowledge_items: OK");
 
+    // ── 2026-05-08 (P1-3): UNIQUE index on users.email ──────────────────
+    // Race-safe register — concurrent POST /api/auth/register with the
+    // same email should produce ONE user, not two. The check-then-insert
+    // pattern in authRouter is racy without a DB-level uniqueness guard.
+    // We also add `lastVerificationSentAt` for resend-verification rate
+    // limiting (was P0-B promised but never migrated).
+    try {
+      const [hasUniqIdx]: any = await conn.execute(`
+        SELECT INDEX_NAME FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+           AND INDEX_NAME = 'uniq_users_email'
+      `);
+      if ((hasUniqIdx as any[]).length === 0) {
+        // Some legacy rows may have NULL email (oauth without email scope) —
+        // MySQL UNIQUE allows multiple NULLs so this is safe.
+        try {
+          await conn.execute(`ALTER TABLE users ADD UNIQUE INDEX uniq_users_email (email)`);
+          console.log("[migrate] users.email UNIQUE: added");
+        } catch (err: any) {
+          // Likely duplicate emails exist — log and skip (don't fail boot)
+          console.warn("[migrate] users.email UNIQUE: skipped — duplicates exist; clean before re-running.", err?.message);
+        }
+      } else {
+        console.log("[migrate] users.email UNIQUE: already exists, skipped");
+      }
+    } catch (e: any) {
+      console.warn("[migrate] users.email UNIQUE: skipped:", e?.message);
+    }
+
+    const [vsCol]: any = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+         AND COLUMN_NAME = 'lastVerificationSentAt'
+    `);
+    if ((vsCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE users ADD COLUMN lastVerificationSentAt DATETIME(3) NULL`);
+      console.log("[migrate] users.lastVerificationSentAt: added");
+    } else {
+      console.log("[migrate] users.lastVerificationSentAt: already exists, skipped");
+    }
+
     // ── Brand tab locks (定位 / 文字 / 視覺 lock state) ─────────────────
     // Stores per-brand lock state for the 3 brand workspace tabs. When a
     // tab is locked, the editor is read-only and the platform treats that

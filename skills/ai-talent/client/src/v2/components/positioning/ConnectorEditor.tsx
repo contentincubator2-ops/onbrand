@@ -12,6 +12,7 @@
  */
 import { useEffect, useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import { useSafeMutation } from "../../../lib/assertMutation";
 import { Card, CardBody, Input, Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faLine, faThreads, faTiktok, faLinkedin } from "@fortawesome/free-brands-svg-icons";
@@ -50,7 +51,7 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
     setLinks(data.socialLinks ?? {});
   }, [data]);
 
-  const updateMut = (trpc as any).brand?.updateConnections?.useMutation?.({
+  const updateMutRaw = (trpc as any).brand?.updateConnections?.useMutation?.({
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 1800);
@@ -58,11 +59,15 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
     },
     onError: (e: any) => setErr(String(e?.message ?? e)),
   });
+  // 2026-05-08: useSafeMutation surfaces a toast if the endpoint isn't
+  // deployed (was a silent-fail vector — user clicked save, nothing
+  // happened, no error shown).
+  const updateMut = useSafeMutation(updateMutRaw, "brand.updateConnections");
 
   const handleSave = async () => {
     setErr(null);
     try {
-      await updateMut?.mutateAsync?.({ brandId, website: website.trim() || null, socialLinks: links });
+      await updateMut.mutateAsync({ brandId, website: website.trim() || null, socialLinks: links });
     } catch (e: any) { setErr(String(e?.message ?? e)); }
   };
 

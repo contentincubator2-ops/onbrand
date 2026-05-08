@@ -113,6 +113,24 @@ if (parsed.data.NODE_ENV === "production") {
   if (!parsed.data.APP_URL) {
     console.warn("[env] WARN: production missing APP_URL — verification / reset links will use http://localhost:3001.");
   }
+
+  // 2026-05-08 (P1-6): JWT secret entropy check. Schema enforces ≥ 32
+  // chars but doesn't catch low-entropy strings like "aaaaa..." or the
+  // dev default. We measure unique-character count — a real random 32+
+  // char base64 secret has ~30+ unique characters; padding/repetition
+  // brings that down fast.
+  const secret = parsed.data.JWT_SECRET ?? "";
+  const uniqueChars = new Set(secret).size;
+  if (uniqueChars < 16) {
+    console.warn(
+      `[env] WARN: production JWT_SECRET has only ${uniqueChars} unique chars — likely weak. Generate via: openssl rand -base64 64`,
+    );
+  }
+  if (secret.includes("local-dev") || secret.includes("changeme") || secret.includes("example")) {
+    console.warn(
+      `[env] WARN: production JWT_SECRET looks like a dev placeholder. Rotate immediately.`,
+    );
+  }
 }
 
 // SEC-7: JWT_SECRET is intentionally excluded from the ENV spread to prevent
