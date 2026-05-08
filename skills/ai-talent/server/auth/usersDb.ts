@@ -92,6 +92,13 @@ export async function createUser(db: DB, data: {
   // users.email (migrate.ts), concurrent register requests with the
   // same address now fail with ER_DUP_ENTRY at the DB layer. Catch it
   // and surface a clean DUPLICATE_EMAIL signal to the caller.
+  //
+  // 2026-05-08 (CJ): trial bypass — auto-activate. Email verification is
+  // best-effort; if Resend / SendGrid is down or unconfigured users still
+  // need to be able to register and use the platform. We can flip back
+  // to isActive=0 once email infra is reliable. Set
+  // `REQUIRE_EMAIL_VERIFICATION=1` env to opt back in.
+  const requireVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "1";
   try {
     await db
       .insert(users)
@@ -101,7 +108,7 @@ export async function createUser(db: DB, data: {
         email: data.email,
         passwordHash,
         authMethod: "password",
-        isActive: 0, // requires email verification
+        isActive: requireVerification ? 0 : 1,
         credits: 1000, // signup bonus
         registrationIp: data.registrationIp,
         role: "user",

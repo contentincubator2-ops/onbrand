@@ -3,13 +3,13 @@
  * product / event in ScopeBar. Visualises "20 agents loading the new
  * scope's positioning + assets" so the switch feels intentional.
  *
- * CJ direction (2026-05-07):
- *   "切換品牌時讓用戶感受到有更換了，例如一個動畫，顯示讀取 xx 定位
- *    書、規範當中。或是 20 個 agent 作為背景，20 個人都滿的時候表示
- *    都讀取完了。"
+ * CJ direction:
+ *   - 2026-05-07: "20 個 agent 作為背景，都滿時表示讀取完成"
+ *   - 2026-05-08: "我想要用成 20 個不同 agent 的頭像" (was generic dots)
  *
- * UX: 1.4s reveal, agent dots fill in waves matching the 4 readers
- * (定位 / 文字 / 視覺 / 知識). Auto-dismisses.
+ * Avatars: 20 deterministic dicebear seeds (notionists style) so the
+ * faces are stable across reloads and feel like a fixed team rather
+ * than random noise.
  */
 import { useEffect, useRef, useState } from "react";
 
@@ -20,6 +20,35 @@ interface Props {
 
 const TOTAL_AGENTS = 20;
 const DURATION_MS = 1400;
+
+// 20 deterministic agent seeds — names span fictional team roles so the
+// composition feels like a real squad. Notionists style avatars match
+// the rest of the product (RunningAgentCarousel etc.).
+const AGENT_SEEDS: Array<{ name: string; role: string }> = [
+  { name: "Aiden Hsu",      role: "Caption Writer" },
+  { name: "Mandy Cheng",    role: "Image Director" },
+  { name: "Jordan Hayes",   role: "QA Reviewer" },
+  { name: "Tina Ji",         role: "Brand Strategist" },
+  { name: "Sarah Liu",       role: "CMO" },
+  { name: "Vicky Feng",      role: "Live Host" },
+  { name: "Iris Liang",      role: "IG Specialist" },
+  { name: "Janet Chang",     role: "YT Specialist" },
+  { name: "Nina Yeh",        role: "Shorts Editor" },
+  { name: "Eric Chen",       role: "Trend Researcher" },
+  { name: "Kevin Lin",       role: "Content Strategy" },
+  { name: "Yizhen Lai",      role: "Brand Story" },
+  { name: "Ryan Yu",         role: "Growth" },
+  { name: "Reed Lee",        role: "Insights Storyteller" },
+  { name: "Grace Wu",        role: "Brand Storyteller" },
+  { name: "Tyler Brooks",    role: "Short-Form" },
+  { name: "Emma Zhang",      role: "Hashtag Strategist" },
+  { name: "Helen Sung",      role: "Reply Writer" },
+  { name: "David Wang",      role: "Scheduler" },
+  { name: "Sophie Ho",       role: "Followup Writer" },
+];
+
+const dicebear = (seed: string) =>
+  `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=ede9fe,fce7f3,dbeafe,d1fae5,fef3c7,e0e7ff,fee2e2,e0f2fe&backgroundType=solid`;
 
 export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
   const [visible, setVisible] = useState(false);
@@ -51,7 +80,7 @@ export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
         rafRef.current = requestAnimationFrame(step);
       } else {
         // Hold full state for a beat, then fade out
-        setTimeout(() => setVisible(false), 220);
+        setTimeout(() => setVisible(false), 320);
       }
     };
     rafRef.current = requestAnimationFrame(step);
@@ -72,12 +101,17 @@ export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
     >
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes pulse-dot {
-          0%, 100% { transform: scale(1); opacity: 1 }
-          50% { transform: scale(1.18); opacity: 0.85 }
+        @keyframes avatarPop {
+          0%   { transform: scale(0.4); opacity: 0 }
+          60%  { transform: scale(1.12); opacity: 1 }
+          100% { transform: scale(1); opacity: 1 }
+        }
+        @keyframes avatarBreathe {
+          0%, 100% { transform: scale(1) }
+          50% { transform: scale(1.04) }
         }
       `}</style>
-      <div className="bg-white rounded-2xl shadow-2xl px-7 py-6 max-w-md mx-4">
+      <div className="bg-white rounded-2xl shadow-2xl px-7 py-6 max-w-lg mx-4">
         <div className="text-center">
           <div className="text-tiny font-semibold uppercase tracking-widest text-violet-500 mb-1">
             BRAND WORKSPACE
@@ -89,23 +123,42 @@ export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
             20 位 agent 正在載入定位 / 文字 / 視覺 / 知識
           </p>
 
-          {/* 20 agent dots in a 5×4 grid */}
-          <div className="grid grid-cols-10 gap-1.5 mb-2 mx-auto" style={{ maxWidth: 240 }}>
-            {Array.from({ length: TOTAL_AGENTS }).map((_, i) => {
+          {/* 20 agent avatars in a 10×2 grid */}
+          <div className="grid grid-cols-10 gap-1.5 mb-3 mx-auto" style={{ maxWidth: 360 }}>
+            {AGENT_SEEDS.map((agent, i) => {
               const isFilled = i < filled;
               return (
                 <div
-                  key={i}
-                  className="rounded-full transition-all"
-                  style={{
-                    width: 18, height: 18,
-                    background: isFilled
-                      ? `linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)`
-                      : "#E4E4E7",
-                    boxShadow: isFilled ? "0 1px 6px rgba(124,58,237,0.32)" : "none",
-                    animation: isFilled ? `pulse-dot 1.2s ease-in-out infinite ${i * 30}ms` : undefined,
-                  }}
-                />
+                  key={agent.name}
+                  className="relative"
+                  style={{ width: 30, height: 30 }}
+                  title={`${agent.name} · ${agent.role}`}
+                >
+                  {/* Placeholder background while not yet "loaded" */}
+                  {!isFilled && (
+                    <div
+                      className="absolute inset-0 rounded-full"
+                      style={{ background: "#E4E4E7" }}
+                    />
+                  )}
+                  {/* Avatar — pops in when reached */}
+                  {isFilled && (
+                    <div
+                      className="absolute inset-0 rounded-full overflow-hidden"
+                      style={{
+                        animation: `avatarPop 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards, avatarBreathe 1.6s ease-in-out infinite ${i * 50}ms`,
+                        boxShadow: "0 0 0 1.5px #fff, 0 1px 3px rgba(124,58,237,0.18)",
+                      }}
+                    >
+                      <img
+                        src={dicebear(agent.name)}
+                        alt={agent.name}
+                        loading="eager"
+                        style={{ width: "100%", height: "100%", display: "block" }}
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

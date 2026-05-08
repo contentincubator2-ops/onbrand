@@ -15,6 +15,8 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getBrandPositioningById } from "../positioningBridge";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
+import { getBrandRealContent } from "../_core/brandRealContent";
+import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywritingMaster";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -572,9 +574,12 @@ ${platformAsks}
       photoTags: z.array(z.string()).max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const [brandRules, knowledgeBlock] = await Promise.all([
+      const [brandRules, knowledgeBlock, realContent] = await Promise.all([
         loadBrandRules(input.brandId, ctx.user.id),
         loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+        // Real public content (website + social via Perplexity) — strongest
+        // grounding signal; prevents AI from hallucinating industry from name.
+        getBrandRealContent(input.brandId).then(r => r.context).catch(() => ""),
       ]);
       const allRules = [...brandRules, ...(input.adhocRules ?? [])].filter(Boolean);
       const rulesInstruction = allRules.length > 0
@@ -620,7 +625,17 @@ ${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
 ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
         : "";
 
-      const sys = `你是台灣本地市場的社群文案，熟悉繁體中文使用者的閱讀習慣。
+      // 2026-05-08: prepend master persona (sowork-ai-v2 inspired) so the
+      // LLM grounds in cultural context BEFORE task-specific rules.
+      const masterBlock = getCopywritingMasterPrompt({
+        market: "zh-TW",
+        platform: input.platform as PlatformCode,
+      });
+
+      const sys = `${masterBlock}
+
+# 本次貼文寫作
+
 為以下品牌寫一則 ${input.platform} 貼文。
 
 品牌：${input.brandTagline ?? "（請從 USP 反推主張）"}
@@ -628,7 +643,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}
+${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。

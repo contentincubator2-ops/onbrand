@@ -33,6 +33,7 @@ import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import BrandSettingsSheet from "../components/positioning/BrandSettingsSheet";
+import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
@@ -107,6 +108,12 @@ export default function BrandsPage() {
   const [testPanelOpen, setTestPanelOpen] = useState(false);
   // Settings sheet (right-drawer with 連結 / 視覺 / AI 指令 / 危險區)
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 2026-05-08: onboarding wizard for first-time users (no brands yet).
+  // Auto-opens once when the user lands here with zero brands; flag
+  // is per-session in localStorage so they don't get re-prompted on
+  // every refresh after dismissing.
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // (effect to auto-open is declared further down once scopeBrands is defined)
   const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"connector"|"visual"|"ai"|"danger">("connector");
   const [onboardingHint, setOnboardingHint] = useState<string | undefined>(undefined);
 
@@ -201,6 +208,17 @@ export default function BrandsPage() {
     ? (trpc as any).scope.options.useQuery(undefined, { refetchOnWindowFocus: false })
     : { data: null };
   const scopeBrands = ((scopeOptionsQuery.data as any)?.brands as any[]) ?? brands;
+
+  // 2026-05-08: auto-open onboarding wizard for first-time users (0
+  // brands), unless they previously dismissed it.
+  React.useEffect(() => {
+    if (scopeOptionsQuery?.isLoading) return;
+    const dismissedKey = "sowork.onboarding.dismissed";
+    if (scopeBrands.length === 0 && !localStorage.getItem(dismissedKey)) {
+      setOnboardingOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeBrands.length, scopeOptionsQuery?.isLoading]);
 
   // Build sub-nav from positioning schema + brand-only asset list.
   // Each segment becomes its own sub-nav entry (id = "seg:<segmentId>"),
@@ -660,36 +678,52 @@ export default function BrandsPage() {
         onboardingHint={onboardingHint}
       />
 
-      {/* 2026-05-08 (P1-1): empty state — user has zero brands.
-          Show a friendly CTA instead of broken hero with no scope. */}
+      {/* 2026-05-08: empty state — first-time user has zero brands.
+          Auto-opens the BrandOnboardingWizard (4-step guided flow).
+          Behind the wizard we keep a soft welcome screen so the page
+          doesn't look broken if user dismisses the wizard mid-way. */}
       {scopeBrands.length === 0 && (
-        <div className="min-h-[60vh] flex items-center justify-center px-6">
-          <div className="max-w-[480px] text-center">
-            <div
-              className="mx-auto mb-5 flex items-center justify-center"
-              style={{
-                width: 72, height: 72, borderRadius: 18,
-                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-                boxShadow: "0 10px 30px rgba(124,58,237,0.32)",
-              }}
-            >
-              <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 28 }} />
+        <>
+          <BrandOnboardingWizard
+            isOpen={onboardingOpen}
+            onClose={() => {
+              setOnboardingOpen(false);
+              try { localStorage.setItem("sowork.onboarding.dismissed", "1"); } catch {}
+            }}
+            onComplete={() => {
+              setOnboardingOpen(false);
+              try { localStorage.setItem("sowork.onboarding.dismissed", "1"); } catch {}
+              utils.scope?.options?.invalidate?.();
+              utils.brand?.listByMember?.invalidate?.();
+            }}
+          />
+          <div className="min-h-[60vh] flex items-center justify-center px-6">
+            <div className="max-w-[480px] text-center">
+              <div
+                className="mx-auto mb-5 flex items-center justify-center"
+                style={{
+                  width: 72, height: 72, borderRadius: 18,
+                  background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                  boxShadow: "0 10px 30px rgba(124,58,237,0.32)",
+                }}
+              >
+                <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 28 }} />
+              </div>
+              <h1 className="text-2xl font-semibold text-default-900 mb-2">歡迎使用 Marketing OS</h1>
+              <p className="text-sm text-default-500 mb-6 leading-relaxed">
+                先建立你的第一個品牌就能開始 — 系統會自動分析定位、設定文字 / 視覺 / AI 指令。
+              </p>
+              <button
+                onClick={() => setOnboardingOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm shadow-md hover:shadow-lg transition"
+                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366F1 100%)" }}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+                開始引導
+              </button>
             </div>
-            <h1 className="text-2xl font-semibold text-default-900 mb-2">建立你的第一個品牌</h1>
-            <p className="text-sm text-default-500 mb-6 leading-relaxed">
-              品牌是 Marketing OS 的根 — 定位 / 文字 / 視覺 / 知識 / AI 指令庫都掛在品牌底下。
-              建立後系統會自動執行 14 步定位分析，幾分鐘內就能開始產內容。
-            </p>
-            <button
-              onClick={() => setAddModal({ open: true, tab: "brand" })}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm shadow-md hover:shadow-lg transition"
-              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366F1 100%)" }}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              建立第一個品牌
-            </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* ─── Hero — /30s-style centered axis (CJ feedback 2026-05-07) ───
@@ -762,11 +796,17 @@ export default function BrandsPage() {
                 return (
                   <button
                     key={t.v}
+                    type="button"
                     onClick={() => setCategory(t.v)}
-                    className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer relative"
+                    /* 2026-05-08 (CJ feedback #4): label was unreliable as a
+                       click target because hover-scale on the parent shifted
+                       hit-box mid-click. pointer-events-none on the inner
+                       children + explicit type="button" + hover handled by
+                       a sibling style prevents the issue. */
+                    className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer relative px-1 py-1 hover:scale-105 transition-transform"
                   >
                     <div
-                      className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
+                      className={`pointer-events-none w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
                       style={{ background: t.bg }}
                     >
                       <Icon size={24} strokeWidth={2} color="#fff" />
@@ -780,7 +820,7 @@ export default function BrandsPage() {
                         </span>
                       )}
                     </div>
-                    <span className={`text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
+                    <span className={`pointer-events-none text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
                       {t.label}
                       {locked && <span className="ml-1 text-[10px] font-normal" style={{ color: "#71717A" }}>·已鎖定</span>}
                     </span>
@@ -867,10 +907,12 @@ export default function BrandsPage() {
                 color={isLocked ? "default" : "success"}
                 variant={isLocked ? "flat" : "solid"}
                 onPress={() => handleLockToggle(category as "positioning" | "copy" | "visual")}
-                startContent={<FontAwesomeIcon icon={isLocked ? faLockOpen : faLock} />}
                 isLoading={lockTabMut?.isPending || unlockTabMut?.isPending}
               >
-                {isLocked ? "解鎖" : `🔒 鎖定${tabLabel}`}
+                {/* CJ 2026-05-08: 只要出現一個 icon — kept the left circle
+                    icon at line ~875, removed the duplicate startContent
+                    icon from this button. */}
+                {isLocked ? "解鎖" : `鎖定${tabLabel}`}
               </Button>
             </div>
           </div>
@@ -2538,44 +2580,10 @@ function PositioningTopRow({
         )}
       </div>
 
-      {/* Wide lock bar (CJ 2026-05-08: 右側的鎖定定位，留下長橫 bar) */}
-      <div
-        className="rounded-xl border px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap"
-        style={{
-          background: locked ? "#ECFDF5" : "#F9FAFB",
-          borderColor: locked ? "#A7F3D0" : "#E5E7EB",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: locked ? "#10B981" : "#E5E7EB" }}
-          >
-            <FontAwesomeIcon icon={locked ? faLock : faLockOpen} style={{ color: locked ? "#fff" : "#6B7280", fontSize: 12 }} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-default-900">
-              定位 {locked ? "已鎖定" : "尚未鎖定"}
-            </div>
-            <div className="text-xs text-default-500">
-              {locked
-                ? "全平台 (30s/60s/100s/Theater) 都用這份做為單一真相"
-                : "鎖定後：編輯欄變唯讀，全平台用這份為單一真相"}
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={onLockToggle}
-          className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full transition shrink-0 ${
-            locked
-              ? "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm"
-          }`}
-        >
-          <FontAwesomeIcon icon={locked ? faLockOpen : faLock} className="text-[11px]" />
-          {locked ? "解鎖定位" : "鎖定定位"}
-        </button>
-      </div>
+      {/* CJ 2026-05-08: removed duplicate wide lock bar from inside
+          PositioningTopRow — the legacy lock bar above the body
+          (BrandsPage.tsx:856) already covers all 3 tabs. The
+          onLockToggle prop is kept for API compatibility but unused. */}
     </>
   );
 }

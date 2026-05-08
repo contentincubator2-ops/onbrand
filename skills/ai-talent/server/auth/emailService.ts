@@ -1,6 +1,12 @@
 /**
- * emailService.ts — Email sending service using SendGrid
- * Handles email verification and password reset emails.
+ * emailService.ts — dual-provider email (Resend OR SendGrid).
+ *
+ * 2026-05-08 (P0-A fix): previous version called sgMail.setApiKey()
+ * with EITHER key, but SendGrid SDK rejects Resend keys → all sends
+ * silent-failed. Now we detect by key prefix:
+ *   - RESEND_API_KEY (starts with "re_") → use Resend REST API
+ *   - SENDGRID_API_KEY (starts with "SG.") → use @sendgrid/mail
+ * If both are set, Resend wins (preferred provider for trial).
  */
 
 import sgMail from "@sendgrid/mail";
@@ -11,15 +17,42 @@ type EmailData = {
   html: string;
 };
 
-/**
- * Initialize SendGrid with API key from environment
- */
+type Provider = "resend" | "sendgrid" | "none";
+
+function detectProvider(): Provider {
+  if (process.env.RESEND_API_KEY?.startsWith("re_")) return "resend";
+  if (process.env.SENDGRID_API_KEY?.startsWith("SG.")) return "sendgrid";
+  return "none";
+}
+
+let _sgInitialized = false;
 function initSendGrid() {
-  const apiKey = process.env.SENDGRID_API_KEY || process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing SENDGRID_API_KEY or RESEND_API_KEY environment variable");
-  }
+  if (_sgInitialized) return;
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) throw new Error("Missing SENDGRID_API_KEY");
   sgMail.setApiKey(apiKey);
+  _sgInitialized = true;
+}
+
+async function sendViaResend(data: EmailData, fromAddr: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY!;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from:    fromAddr,
+      to:      data.to,
+      subject: data.subject,
+      html:    data.html,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Resend ${res.status}: ${text.slice(0, 240)}`);
+  }
 }
 
 /**
@@ -39,20 +72,28 @@ function maskEmail(addr: string): string {
 }
 
 export async function sendEmail(data: EmailData): Promise<void> {
-  try {
-    initSendGrid();
+  const fromAddr = process.env.EMAIL_FROM || "noreply@sowork.ai";
+  const provider = detectProvider();
 
-    await sgMail.send({
-      to: data.to,
-      from: process.env.EMAIL_FROM || "noreply@sowork.ai",
-      subject: data.subject,
-      html: data.html,
-    });
+  try {
+    if (provider === "resend") {
+      await sendViaResend(data, fromAddr);
+    } else if (provider === "sendgrid") {
+      initSendGrid();
+      await sgMail.send({
+        to: data.to,
+        from: fromAddr,
+        subject: data.subject,
+        html: data.html,
+      });
+    } else {
+      throw new Error("No email provider configured (set RESEND_API_KEY or SENDGRID_API_KEY)");
+    }
 
     // SEC: don't log raw email — only masked form
-    console.log(`[email] Sent email to ${maskEmail(data.to)}: ${data.subject}`);
+    console.log(`[email] Sent via ${provider} to ${maskEmail(data.to)}: ${data.subject}`);
   } catch (error) {
-    console.error("[email] Failed to send email:", error);
+    console.error(`[email] Failed to send via ${provider}:`, error);
     throw new Error("Failed to send email");
   }
 }

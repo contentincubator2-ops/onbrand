@@ -21,19 +21,24 @@ const ASSET_KEYS_COPY = [
 ] as const;
 type CopyAssetKey = typeof ASSET_KEYS_COPY[number];
 
+// 2026-05-08 (CJ feedback): asset prompts now FORCE industry-specific
+// output. Previous version got generic SaaS terms (AI / ROI / KPI /
+// CRM / B2B / SOP / MVP / UX) when generating for 桂冠營養研究室
+// (food brand). Each prompt now explicitly bans common-business terms
+// when the brand isn't actually in tech / SaaS.
 const ASSET_SPEC: Record<CopyAssetKey, { ask: string; shape: "text" | "items" | "pairs"; n?: number }> = {
-  voice:              { ask: "請用 80-150 字描述這個品牌的整體語氣方向（正式/口語/幽默/溫暖等綜合判斷），讓寫文案的人能掌握『品牌講話的感覺』。", shape: "text" },
-  voice_principles:   { ask: "請列 6-10 條 Do/Don't 規則（每條一行）。具體可操作，例如『寫【家人都笑了】而不是【顧客好評如潮】』。", shape: "items", n: 8 },
-  preferred_terms:    { ask: "請列 8-15 個這個品牌應該『鼓勵使用』的詞。要符合品牌語氣 + 在地語感（繁體中文）。", shape: "items", n: 12 },
-  banned_words:       { ask: "請列 8-15 個應該『避免使用』的詞 — 包含空話、誇大用語、產業常見的爛詞。", shape: "items", n: 12 },
-  term_substitutions: { ask: "請列 6-10 對『不要說 X，改說 Y』的對照組（X=爛說法、Y=品牌建議說法）。", shape: "pairs", n: 8 },
-  branded_terms:      { ask: "依據品牌定位，列 5-8 個值得『品牌化』的專用詞彙（自家用語 / 註冊概念）。", shape: "items", n: 6 },
-  product_naming:     { ask: "請寫 100-200 字的產品命名規範（中英對照規則、格式統一、是否帶版本號等）。", shape: "text" },
-  abbreviations:      { ask: "請列 6-10 對縮寫對照（縮寫 → 全稱），跟產業 + 品牌相關。", shape: "pairs", n: 8 },
-  cta_library:        { ask: "請列 8 個符合品牌語氣的 CTA（行動句），不要套話。涵蓋導購/留言/分享/收藏/詢問等不同意圖。", shape: "items", n: 8 },
-  hook_library:       { ask: "請列 8 個符合品牌語氣的開場 Hook 句型（不要寫具體案例，是可重用的模板）。", shape: "items", n: 8 },
-  ai_prompts:         { ask: "請列 5 個常用的 AI prompt（每條完整可貼上的 system prompt 或 instruction），符合品牌口吻 + 產業情境。", shape: "items", n: 5 },
-  templates_copy:     { ask: "請列 5 個文案範本標題（標題 + 一句說明），常用情境（活動文 / 公告 / EDM / 道歉 / 感謝）。", shape: "items", n: 5 },
+  voice:              { ask: "請用 80-150 字描述這個品牌的整體語氣方向（正式/口語/幽默/溫暖等綜合判斷），讓寫文案的人能掌握『品牌講話的感覺』。**必須對應這個品牌真實的產業 / 受眾**（不要用通用商業語彙）。", shape: "text" },
+  voice_principles:   { ask: "請列 6-10 條 Do/Don't 規則（每條一行）。具體可操作，例如『寫【家人都笑了】而不是【顧客好評如潮】』。**規則必須具體呼應這個品牌的產業細節**（食品/建設/金融/遊戲社群 各自規則差很多）。", shape: "items", n: 8 },
+  preferred_terms:    { ask: "請列 8-15 個這個品牌應該『鼓勵使用』的詞。**必須是這個品牌實際產業會用的詞**（例：食品品牌 → 『鎖鮮 / 真材實料 / 一口飽滿』；建設品牌 → 『臨棟 / 氣口 / 採光』；遊戲社群 → 『訓練師 / 寶可夢 / 出沒點』）。**禁止輸出『AI / 數位化 / 創新 / 賦能』這類萬用商業詞**。", shape: "items", n: 12 },
+  banned_words:       { ask: "請列 8-15 個應該『避免使用』的詞 — 包含空話、誇大用語、產業常見的爛詞。**列出的詞必須是這個品牌會誤用的具體爛詞**（不要只列『最好』『第一』『卓越』這種所有產業都該避免的）。", shape: "items", n: 12 },
+  term_substitutions: { ask: "請列 6-10 對『不要說 X，改說 Y』的對照組（X=爛說法、Y=品牌建議說法）。**Y 必須使用這個品牌實際產業的語感**，例如食品『美味』改『一口爆汁』、遊戲社群『稀有』改『爆率超低』。", shape: "pairs", n: 8 },
+  branded_terms:      { ask: "依據品牌定位，列 5-8 個值得『品牌化』的專用詞彙（自家用語 / 註冊概念）。**這些必須能在這個品牌的官網 / FB 內容裡找到呼應**，不是憑空編。", shape: "items", n: 6 },
+  product_naming:     { ask: "請寫 100-200 字的產品命名規範（中英對照規則、格式統一、是否帶版本號等）。**必須對應實際產品線**（食品有口味 / 包裝；建設有建案名 / 戶型；遊戲有活動名 / 道具）。", shape: "text" },
+  abbreviations:      { ask: "請列 6-10 對縮寫對照（縮寫 → 全稱），**必須是這個品牌實際會用到的產業縮寫**。例：食品 → SKU / FDA / HACCP / 食安；建設 → SRC / RC / 公設 / 預售；遊戲社群 → PvP / IV / CP / EX raid。**禁止輸出 AI / ROI / KPI / CRM / B2B / SOP / MVP / UX 這種萬用 SaaS 縮寫**，除非品牌真的是 SaaS / 顧問業。", shape: "pairs", n: 8 },
+  cta_library:        { ask: "請列 8 個符合品牌語氣的 CTA（行動句），不要套話。涵蓋導購/留言/分享/收藏/詢問等不同意圖。**句子必須帶該品牌產業的語感**（不要寫『立即下單』這種通用詞，要寫像『今晚冰箱備一包』『下班路上順手帶一盒』這種有畫面的）。", shape: "items", n: 8 },
+  hook_library:       { ask: "請列 8 個符合品牌語氣的開場 Hook 句型（不要寫具體案例，是可重用的模板）。**模板裡的場景占位符必須符合該品牌實際使用情境**（食品 → 廚房 / 餐桌；建設 → 看屋 / 通勤；遊戲社群 → 寶可夢站 / 道館）。", shape: "items", n: 8 },
+  ai_prompts:         { ask: "請列 5 個常用的 AI prompt（每條完整可貼上的 system prompt 或 instruction），**必須具體指明該品牌產業 + 受眾 + 禁忌**，不要寫『請寫一篇有溫度的貼文』這種空洞 prompt。", shape: "items", n: 5 },
+  templates_copy:     { ask: "請列 5 個文案範本標題（標題 + 一句說明），**情境須對應該品牌真實會發生的事件**（食品 → 中元節限定 / 母親節伴手禮；建設 → 公開銷售記者會 / 公設啟用；遊戲社群 → 社群日資訊 / 突發 raid 通知）。", shape: "items", n: 5 },
 };
 
 function formatHintFor(shape: "text" | "items" | "pairs", n?: number): string {
@@ -104,11 +109,19 @@ ${spec.ask}
 ${formatHintFor(spec.shape, spec.n)}
 直接輸出 JSON 物件，**第一個字元就是 {**。不要前綴「以下是…」、不要 markdown code fence、不要解釋。
 
-【產出原則】
-${hasReal
-  ? "- 下方提供了品牌的官網 / 社群實際內容，**必須**以該內容為準推斷產業 / 受眾 / 語氣，不要用品牌名字猜產業。\n- 如果真實內容跟訓練印象不符，以真實內容為準。"
-  : "- 目前沒抓到品牌的官網 / 社群實際內容。請根據品牌名 + 描述 + 產業常識，產出合理草案 — 寧可寫一份用戶可以審閱修改的版本，也不要回拒或留空。"
+【產出原則 — 最重要】
+1. 先從品牌名 + 描述 + 知識庫 + 真實內容 **判斷產業類型**：
+   - 食品 / 餐飲：用『鎖鮮 / 一口爆汁 / 食材 / 風味 / 廚房』這類語感
+   - 建設 / 房地產：用『臨棟 / 公設 / 採光 / 動線 / 建案』這類語感
+   - 遊戲 / 社群：用『訓練師 / 爆率 / 道館 / 出沒點 / 突發』這類語感
+   - 美妝 / 保養：用『質地 / 上臉 / 肌況 / 顯色 / 抗氧』這類語感
+   - 金融 / SaaS：才能用『ROI / KPI / CRM / B2B』這類詞
+2. **絕對禁止**對非 SaaS 品牌輸出『AI / 數位轉型 / 賦能 / 創新驅動 / ROI / KPI / CRM / SOP / MVP / UX / B2B』這類萬用商業詞 — 這是用戶 #1 抱怨點。
+3. ${hasReal
+  ? "下方提供了品牌的官網 / 社群實際內容，**必須**以該內容為準推斷產業 / 受眾 / 語氣。"
+  : "下方資料有限，但仍要根據品牌名稱 + 描述 + 產業常識**精準推斷產業**。寧可少寫幾條真正貼合的，也不要塞通用詞充數。"
 }
+4. 如果真的判斷不出產業，回傳空陣列 / 空物件，**不要編造跟品牌無關的內容**。
 ${args.brandPrefix}${args.realContent}${args.knowledgeBlock}`;
 
   try {

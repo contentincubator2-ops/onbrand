@@ -14,6 +14,8 @@ import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
 import AddEntityModal, { type AddEntityTab } from "../../components/AddEntityModal";
 import PositioningNotificationCenter from "../../components/PositioningNotificationCenter";
 import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
+import PricingInfoModal from "../../components/PricingInfoModal";
+import { showToastGlobal } from "../../../components/ui/Toast";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -1686,17 +1688,73 @@ function AccountPopup({ onLogout, onClose }: {
   setScope?: (s: ScopeState) => void;
   brands?: any[];
 }) {
-  const [subPanel, setSubPanel] = React.useState<"account" | "team" | null>(null);
+  // 2026-05-08 (CJ): all menu items previously had `action: () => {}` —
+  // dead buttons. Wired to real handlers / external links / coming-soon
+  // toasts so trial users don't hit silent no-ops.
+  const navigate = useNavigate();
+  const [pricingOpen, setPricingOpen] = React.useState(false);
 
-  // Menu rows — mirrors Canva exactly
+  // 2026-05-08: real user info via REST /api/auth/me (auth uses Express,
+  // not trpc — same endpoint RequireAuthV2 hits).
+  const [me, setMe] = React.useState<{ name?: string; email?: string } | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
+        if (!r.ok || cancelled) return;
+        const d = await r.json();
+        if (!cancelled) setMe(d?.user ?? null);
+      } catch {/* silent */}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const userName = me?.name ?? "使用者";
+  const userEmail = me?.email ?? "—";
+
+  // Real wallet balance for the menu badge
+  const balanceQuery = (trpc as any).credits?.getBalance?.useQuery?.(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const totalCredits = (balanceQuery?.data as any)?.totalAvailable ?? null;
+
+  const comingSoon = (label: string) => {
+    showToastGlobal(`「${label}」即將推出`, "info");
+    onClose();
+  };
+
   const menuItems = [
-    { icon: faGear,             label: "設定",              arrow: false, badge: null,    danger: false, action: () => {} },
-    { icon: faCircleHalfStroke, label: "主題",              arrow: true,  badge: null,    danger: false, action: () => {} },
-    { icon: faCircleInfo,       label: "說明和資源",         arrow: true,  badge: null,    danger: false, action: () => {} },
-    { icon: faBorderAll,        label: "進階工具",           arrow: true,  badge: "測試版", danger: false, action: () => {} },
-    { icon: faBriefcase,        label: "方案和定價",         arrow: false, badge: null,    danger: false, action: () => {} },
-    { icon: faDisplay,          label: "取得 SoWork 應用程式", arrow: false, badge: null,  danger: false, action: () => {} },
-    { icon: faRightFromBracket, label: "從所有帳號登出",     arrow: false, badge: null,    danger: true,  action: onLogout },
+    {
+      icon: faGear, label: "設定", arrow: false, badge: null, danger: false,
+      // 2026-05-08: route to Brands settings sheet (closest existing settings UX)
+      action: () => { navigate("/brands"); onClose(); },
+    },
+    {
+      icon: faCircleHalfStroke, label: "主題", arrow: false, badge: "即將推出", danger: false,
+      action: () => comingSoon("主題（深淺色）"),
+    },
+    {
+      icon: faCircleInfo, label: "說明和資源", arrow: false, badge: null, danger: false,
+      // External support email
+      action: () => { window.location.href = "mailto:cj@sowork.ai?subject=Marketing%20OS%20%E6%94%AF%E6%8F%B4"; },
+    },
+    {
+      icon: faBorderAll, label: "進階工具", arrow: false, badge: "即將推出", danger: false,
+      action: () => comingSoon("進階工具"),
+    },
+    {
+      icon: faBriefcase, label: "方案和定價", arrow: false, badge: null, danger: false,
+      // Opens informational pricing modal (no Stripe — contact-sales)
+      action: () => { setPricingOpen(true); },
+    },
+    {
+      icon: faDisplay, label: "取得 SoWork 應用程式", arrow: false, badge: "即將推出", danger: false,
+      action: () => comingSoon("桌面應用程式"),
+    },
+    {
+      icon: faRightFromBracket, label: "從所有帳號登出", arrow: false, badge: null, danger: true,
+      action: onLogout,
+    },
   ];
 
   return (
@@ -1704,6 +1762,9 @@ function AccountPopup({ onLogout, onClose }: {
       position: "fixed", left: ICON_W + 8, bottom: 12, zIndex: 50,
       display: "flex", alignItems: "flex-end", gap: 8,
     }}>
+      {/* Pricing modal mounted at root so it overlays everything */}
+      <PricingInfoModal isOpen={pricingOpen} onClose={() => setPricingOpen(false)} />
+
       {/* ── Main card ── */}
       <div style={{
         width: 360,
@@ -1716,60 +1777,55 @@ function AccountPopup({ onLogout, onClose }: {
         transformOrigin: "bottom left",
       }}>
 
-        {/* ① 帳號 */}
+        {/* ① 帳號 — 2026-05-08: real user data from /api/auth/me, no
+            sub-panel toggle (was fake hardcoded list of accounts). */}
         <div style={{ padding: "8px 8px 4px" }}>
           <SectionLabel>帳號</SectionLabel>
-          <PopupRow
-            onClick={() => setSubPanel(v => v === "account" ? null : "account")}
-            active={subPanel === "account"}
-          >
-            <div style={{ position: "relative", flexShrink: 0 }}>
-              <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold" }} />
-              <span style={{
-                position: "absolute", bottom: -2, right: -2,
-                width: 18, height: 18, borderRadius: "50%",
-                background: "#f3f4f6", border: "1.5px solid #fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 9, color: "#6b7280",
-              }}>📷</span>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px" }}>
+            <Avatar
+              name={userName.slice(0, 1).toUpperCase()}
+              size="md" radius="full" color="primary"
+              classNames={{ name: "font-bold" }}
+            />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>SoWork</p>
-              <p style={{ fontSize: 12, color: "#9ca3af" }}>sowork@sowork.tw</p>
-            </div>
-            <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />
-          </PopupRow>
-        </div>
-
-        <Divider />
-
-        {/* ② 團隊 — mirrors Canva "Team" section */}
-        <div style={{ padding: "4px 8px" }}>
-          <SectionLabel>團隊</SectionLabel>
-          <PopupRow
-            onClick={() => setSubPanel(v => v === "team" ? null : "team")}
-            active={subPanel === "team"}
-          >
-            <div style={{
-              width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-              background: "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: 15, fontWeight: 800,
-            }}>S的</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>SoWork 的團隊</p>
-              <p style={{ fontSize: 12, color: "#9ca3af", display: "flex", alignItems: "center", gap: 4 }}>
-                團隊版
-                <span style={{ fontSize: 10 }}>•</span>
-                <FontAwesomeIcon icon={faUserGroup} style={{ fontSize: 10 }} />
-                5
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {userName}
+              </p>
+              <p style={{ fontSize: 12, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {userEmail}
               </p>
             </div>
-            <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />
-          </PopupRow>
+          </div>
         </div>
 
         <Divider />
+
+        {/* ② Credits 餘額 — real wallet data; clicking opens 方案和定價 */}
+        {totalCredits != null && (
+          <>
+            <div style={{ padding: "4px 8px" }}>
+              <SectionLabel>點數</SectionLabel>
+              <PopupRow onClick={() => setPricingOpen(true)}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff",
+                }}>
+                  <FontAwesomeIcon icon={faBriefcase} style={{ fontSize: 14 }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>
+                    {Number(totalCredits).toLocaleString()} credits
+                  </p>
+                  <p style={{ fontSize: 12, color: "#9ca3af" }}>點此看方案</p>
+                </div>
+                <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />
+              </PopupRow>
+            </div>
+            <Divider />
+          </>
+        )}
 
         {/* ③ Menu */}
         <div style={{ padding: "4px 8px 8px" }}>
@@ -1793,19 +1849,8 @@ function AccountPopup({ onLogout, onClose }: {
         </div>
       </div>
 
-      {/* ── Sub-panel ── */}
-      {subPanel && (
-        <div style={{
-          width: 300, borderRadius: 16, border: "1px solid #e5e7eb", background: "#fff",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
-          overflow: "hidden", maxHeight: 500, display: "flex", flexDirection: "column",
-          animation: "notifPopIn 0.15s cubic-bezier(0.34,1.56,0.64,1) forwards",
-          transformOrigin: "bottom left",
-        }}>
-          {subPanel === "account" && <AccountSubPanel />}
-          {subPanel === "team"    && <TeamSubPanel />}
-        </div>
-      )}
+      {/* 2026-05-08: removed sub-panel (was fake hardcoded account/team
+          lists). Real account info now lives directly in the main card. */}
     </div>
   );
 }

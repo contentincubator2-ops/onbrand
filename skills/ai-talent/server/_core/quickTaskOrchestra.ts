@@ -21,6 +21,8 @@ import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } 
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext } from "./brandContext";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
+import { getBrandRealContent } from "./brandRealContent";
+import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMaster";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
@@ -212,10 +214,19 @@ async function callOneVariant(args: {
       `且與其他段呼應、不重複內容。\n`
     : "";
 
+  // 2026-05-08 (CJ — sowork-ai-v2 study): inject the per-market master
+  // persona BEFORE task-specific rules. Was: thin "為品牌寫一篇 FB
+  // 短貼文" → output reads generic. Now: full 10-year-veteran 台灣社群
+  // master with cultural element bank + ban list, then platform guide,
+  // THEN task-specific systemPrompt. 3 layers of grounding.
+  const platformCode = (template.outputDefaults?.platform ?? "facebook") as PlatformCode;
+  const masterBlock = getCopywritingMasterPrompt({ market: "zh-TW", platform: platformCode });
+
   const system =
+    masterBlock + "\n\n" +
     `# 你的角色 / 寫作風格參考\n` +
     captionPersona +
-    `\n# 任務說明\n` +
+    `\n# 任務說明（特定任務規範 — 蓋過上方平台通則）\n` +
     filledSystemPrompt +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
@@ -694,11 +705,17 @@ export async function runOrchestra(args: {
         }
         return null;
       })(),
-      // Brand context + knowledge base merged (knowledge appended after).
+      // Brand context + knowledge base + REAL public content merged.
+      // brandRealContent (website + social via Perplexity) is the strongest
+      // grounding signal — without it AI hallucinates industry from brand
+      // name (e.g. 桂冠營養研究室 → 美妝). 2026-05-08 (CJ direction).
       Promise.all([
         buildBrandContext(args.brandId).catch(() => ""),
         args.brandId ? loadBrandKnowledgeForPrompt(args.brandId).catch(() => "") : Promise.resolve(""),
-      ]).then(([prefix, knowledge]) => prefix + (knowledge || "")),
+        args.brandId
+          ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
+          : Promise.resolve(""),
+      ]).then(([prefix, knowledge, real]) => prefix + (knowledge || "") + (real || "")),
       // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
       // viral (default) / festivals (calendar tasks) / trending (時事改寫) / news.
       isResearchTier

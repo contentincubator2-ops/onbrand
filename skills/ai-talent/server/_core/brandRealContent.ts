@@ -86,13 +86,14 @@ export interface BrandRealContent {
   sources: string[];     // human-readable list of what was used
 }
 
-/** Pull website + socialLinks from brands row. */
+/** Pull website + socialLinks + name + industry + description from brands row. */
 async function loadBrandUrls(brandId: number): Promise<{
-  name: string; website: string | null; socialLinks: Record<string, string> | null;
+  name: string; industry: string | null; description: string | null;
+  website: string | null; socialLinks: Record<string, string> | null;
 } | null> {
   try {
     const [rows]: any = await localPool.execute(
-      `SELECT name, website, socialLinks FROM brands WHERE id = ? LIMIT 1`,
+      `SELECT name, industry, description, website, socialLinks FROM brands WHERE id = ? LIMIT 1`,
       [brandId],
     );
     const row = (rows as any[])[0];
@@ -101,9 +102,42 @@ async function loadBrandUrls(brandId: number): Promise<{
     if (typeof social === "string") { try { social = JSON.parse(social); } catch { social = null; } }
     return {
       name: String(row.name ?? ""),
+      industry: row.industry ?? null,
+      description: row.description ?? null,
       website: row.website ?? null,
       socialLinks: (social && typeof social === "object") ? social : null,
     };
+  } catch { return null; }
+}
+
+/** Use Perplexity to scout the brand by name when no URLs are available
+ *  or all URL fetches returned empty. Many Taiwan brands (桂冠 / 復華 /
+ *  寶可夢台灣社群) have heavy bot-blocking on their main sites; Perplexity's
+ *  web index has them via news / forums / wiki / cached pages. */
+async function scoutBrandByName(brandName: string, industry?: string | null): Promise<string | null> {
+  try {
+    const q = `${brandName} ${industry ?? ""} 公司簡介 產品 品牌定位`.trim();
+    const items = await Promise.race([
+      perplexityScout.fetch({
+        brandId: 0,
+        brandName,
+        industry: industry ?? undefined,
+        keywords: [q, `${brandName} 是什麼公司`, `${brandName} 主要產品`],
+        competitors: [],
+        industryTags: industry ? [industry] : [],
+        days: 365,
+        limit: 5,
+        loadCred: async () => null,
+      } as any),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), PERPLEXITY_TIMEOUT_MS)),
+    ]);
+    if (!items || !Array.isArray(items) || items.length === 0) return null;
+    const lines = items.slice(0, 5).map((it: any, i: number) => {
+      const title = String(it.title ?? "").slice(0, 120);
+      const excerpt = String(it.content ?? "").slice(0, 320).replace(/\s+/g, " ");
+      return `${i + 1}. ${title}\n   ${excerpt}`;
+    });
+    return `【品牌情報（Perplexity 搜尋 — 透過 wiki / 新聞 / 論壇間接抓取）】\n${lines.join("\n")}`;
   } catch { return null; }
 }
 
@@ -170,6 +204,19 @@ export async function getBrandRealContent(
       if (!r) continue;
       blocks.push(r.block);
       sources.push(r.label);
+    }
+  }
+
+  // 2026-05-08 (CJ): if website + socials all returned empty (or weren't
+  // configured at all), still try to ground via Perplexity brand-name
+  // scout. Catches brands where website blocks bots (桂冠 / 復華) or
+  // user hasn't filled the connector tile yet. Prevents AI fallback to
+  // generic SaaS jargon for non-tech brands.
+  if (blocks.length === 0) {
+    const scoutBlock = await scoutBrandByName(brand.name, brand.industry);
+    if (scoutBlock) {
+      blocks.push(scoutBlock);
+      sources.push("Perplexity 品牌情報");
     }
   }
 
