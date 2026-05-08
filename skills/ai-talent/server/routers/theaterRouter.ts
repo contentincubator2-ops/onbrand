@@ -15,6 +15,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getBrandPositioningById } from "../positioningBridge";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
+import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywritingMaster";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -620,7 +621,17 @@ ${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
 ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
         : "";
 
-      const sys = `你是台灣本地市場的社群文案，熟悉繁體中文使用者的閱讀習慣。
+      // 2026-05-08: prepend master persona (sowork-ai-v2 inspired) so the
+      // LLM grounds in cultural context BEFORE task-specific rules.
+      const masterBlock = getCopywritingMasterPrompt({
+        market: "zh-TW",
+        platform: input.platform as PlatformCode,
+      });
+
+      const sys = `${masterBlock}
+
+# 本次貼文寫作
+
 為以下品牌寫一則 ${input.platform} 貼文。
 
 品牌：${input.brandTagline ?? "（請從 USP 反推主張）"}
