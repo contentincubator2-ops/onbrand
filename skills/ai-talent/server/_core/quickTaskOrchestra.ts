@@ -115,15 +115,27 @@ export interface OrchestraResult {
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-export async function loadAgent(id: number | null | undefined): Promise<{ meta: AgentMeta | null; persona: string }> {
-  if (!id) return { meta: null, persona: "" };
+/** Map agent.aiModel string → ModelProvider used by callModel.
+ *  Only 3 providers are confirmed working (probe 2026-05-08):
+ *  qwen / zhipu / azure-foundry (Kimi-K2.5). Others fall back to qwen. */
+function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
+  if (!aiModel) return "qwen";
+  const m = aiModel.toLowerCase();
+  if (m.includes("qwen")) return "qwen";
+  if (m.includes("kimi")) return "azure-foundry";
+  if (m.includes("glm") || m.includes("zhipu")) return "zhipu";
+  return "qwen"; // safe default — qwen is most reliable
+}
+
+export async function loadAgent(id: number | null | undefined): Promise<{ meta: AgentMeta | null; persona: string; aiModel: string | null }> {
+  if (!id) return { meta: null, persona: "", aiModel: null };
   try {
     const [rows]: any = await localPool.execute(
-      `SELECT id, name, title, bio, specialty, methodology, taskSystemPrompt, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+      `SELECT id, name, title, bio, specialty, methodology, taskSystemPrompt, aiModel, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
       [id],
     );
     const a = (rows as any[])?.[0];
-    if (!a) return { meta: null, persona: "" };
+    if (!a) return { meta: null, persona: "", aiModel: null };
     // taskSystemPrompt is the agent's full role manual (200-500w). When
     // present it dominates — it IS the writing instruction set. bio /
     // specialty / methodology become identity flavor.
@@ -140,8 +152,9 @@ export async function loadAgent(id: number | null | undefined): Promise<{ meta: 
     return {
       meta: { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null },
       persona,
+      aiModel: a.aiModel ?? null,
     };
-  } catch { return { meta: null, persona: "" }; }
+  } catch { return { meta: null, persona: "", aiModel: null }; }
 }
 
 function tryParseJson(text: string): any {
@@ -177,10 +190,12 @@ async function callOneVariant(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  /** Agent's aiModel field — maps to provider (qwen/Kimi/glm). null = use template.preferredModel */
+  agentAiModel?: string | null;
   /** Strategist anchor (multi-post / narrativeArc tasks) — injected before user msg */
   strategistAnchor?: string;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
-  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, strategistAnchor } = args;
+  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor } = args;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
   const filledSystemPrompt = template.systemPrompt.replace(/\{label\}/g, label);
@@ -258,8 +273,13 @@ async function callOneVariant(args: {
     brandSection +
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
 
-  const provider: ModelProvider =
-    template.preferredModel === "any" ? "qwen" : (template.preferredModel as any);
+  // Provider selection priority:
+  //   1. Agent's aiModel (from JSON-assigned real-person agent) → maps to qwen/Kimi/glm
+  //   2. Template's preferredModel (per-task hardcoded)
+  //   3. qwen as final default
+  const provider: ModelProvider = agentAiModel
+    ? aiModelToProvider(agentAiModel)
+    : (template.preferredModel === "any" ? "qwen" : (template.preferredModel as any));
 
   // First attempt
   let attempt = 0;
@@ -307,6 +327,7 @@ async function callCaptionWriter(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  agentAiModel?: string | null;
   strategistAnchor?: string;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
@@ -843,6 +864,7 @@ export async function runOrchestra(args: {
         template: args.template,
         config: args.config,
         captionPersona: captionLoad.persona,
+        agentAiModel: captionLoad.aiModel, // ← drives provider selection (qwen/Kimi/glm)
         brandPrefix,
         urlContext,
         userMsg,
