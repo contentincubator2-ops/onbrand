@@ -1,0 +1,832 @@
+{
+  "generatedAt": "2026-05-08T16:41:55.125Z",
+  "poolSize": 3010,
+  "slotCount": 498,
+  "uniqueAgents": 498,
+  "avgThickness": 998,
+  "minThickness": 401,
+  "assignments": {
+    "fb-30-caption-short": {
+      "lead": 60021,
+      "imageDirector": 220894
+    },
+    "fb-30-pure-text-hook": {
+      "lead": 60022,
+      "imageDirector": 220896
+    },
+    "fb-30-link-caption": {
+      "lead": 60024,
+      "imageDirector": 220890
+    },
+    "fb-30-comment-reply": {
+      "lead": 180162
+    },
+    "fb-30-ad-headline": {
+      "lead": 60027
+    },
+    "fb-30-ad-primary": {
+      "lead": 60025
+    },
+    "fb-30-ad-cta": {
+      "lead": 60026
+    },
+    "fb-30-ad-description": {
+      "lead": 60028
+    },
+    "fb-30-pinned-short": {
+      "lead": 180149,
+      "imageDirector": 220892
+    },
+    "fb-30-story-text": {
+      "lead": 180145,
+      "imageDirector": 220887
+    },
+    "fb-30-live-title": {
+      "lead": 180141,
+      "imageDirector": 220889
+    },
+    "fb-30-hashtag-set": {
+      "lead": 180155
+    },
+    "fb-30-countdown-1day": {
+      "lead": 30020,
+      "imageDirector": 180158
+    },
+    "ig-30-caption-short": {
+      "lead": 180146,
+      "imageDirector": 220883
+    },
+    "ig-30-pure-text-hook": {
+      "lead": 30016,
+      "imageDirector": 220885
+    },
+    "ig-30-reel-hook": {
+      "lead": 180170,
+      "imageDirector": 220886
+    },
+    "ig-30-reel-script-full": {
+      "lead": 180142,
+      "imageDirector": 220888
+    },
+    "ig-30-story-text": {
+      "lead": 30002,
+      "imageDirector": 220884
+    },
+    "ig-30-carousel-structure": {
+      "lead": 30018,
+      "imageDirector": 220893
+    },
+    "ig-30-bio-rewrite": {
+      "lead": 180620
+    },
+    "ig-30-hashtag-set": {
+      "lead": 224079
+    },
+    "ig-30-comment-reply": {
+      "lead": 224084
+    },
+    "ig-30-dm-script": {
+      "lead": 224114
+    },
+    "ig-30-live-opening": {
+      "lead": 224059,
+      "imageDirector": 220895
+    },
+    "ig-30-story-repost-strategy": {
+      "lead": 224054,
+      "imageDirector": 220891
+    },
+    "ig-30-threads-cross-post": {
+      "lead": 60041
+    },
+    "yt-30-title-strategies": {
+      "lead": 60032,
+      "imageDirector": 220924
+    },
+    "yt-30-thumbnail-text": {
+      "lead": 30011,
+      "imageDirector": 180539
+    },
+    "yt-30-description-seo": {
+      "lead": 60030
+    },
+    "yt-30-chapter-timeline": {
+      "lead": 60034
+    },
+    "yt-30-shorts-script": {
+      "lead": 60029,
+      "imageDirector": 180527
+    },
+    "yt-30-opening-hook": {
+      "lead": 60033,
+      "imageDirector": 180449
+    },
+    "yt-30-end-cta": {
+      "lead": 60031
+    },
+    "yt-30-comment-reply": {
+      "lead": 30007
+    },
+    "yt-30-pinned-comment": {
+      "lead": 30014
+    },
+    "yt-30-community-post": {
+      "lead": 30004
+    },
+    "tt-30-opening-hook": {
+      "lead": 220510,
+      "imageDirector": 180165
+    },
+    "tt-30-full-script": {
+      "lead": 220508,
+      "imageDirector": 180455
+    },
+    "tt-30-caption-rhythm": {
+      "lead": 220507
+    },
+    "tt-30-bio-rewrite": {
+      "lead": 220509
+    },
+    "tt-30-hashtag-set": {
+      "lead": 220506
+    },
+    "tt-30-caption-description": {
+      "lead": 180167
+    },
+    "tt-30-duet-angle": {
+      "lead": 180287
+    },
+    "tt-30-trend-remix": {
+      "lead": 220949
+    },
+    "tt-30-comment-reply": {
+      "lead": 180233
+    },
+    "tt-30-live-opening": {
+      "lead": 180191,
+      "imageDirector": 60055
+    },
+    "li-30-insight-post": {
+      "lead": 180199,
+      "imageDirector": 223966
+    },
+    "li-30-hook-3": {
+      "lead": 180203
+    },
+    "li-30-article-opener": {
+      "lead": 180204,
+      "imageDirector": 224092
+    },
+    "li-30-poll": {
+      "lead": 223923
+    },
+    "li-30-event-invite": {
+      "lead": 223800,
+      "imageDirector": 222311
+    },
+    "li-30-dm-intro": {
+      "lead": 223633
+    },
+    "li-30-comment": {
+      "lead": 223022
+    },
+    "li-30-headline": {
+      "lead": 60060
+    },
+    "li-30-newsletter": {
+      "lead": 222682,
+      "imageDirector": 224067
+    },
+    "li-30-document": {
+      "lead": 222308,
+      "imageDirector": 224167
+    },
+    "em-30-subject-line": {
+      "lead": 223824
+    },
+    "em-30-preview-text": {
+      "lead": 223453
+    },
+    "em-30-welcome": {
+      "lead": 30017,
+      "imageDirector": 223314
+    },
+    "em-30-promo": {
+      "lead": 222886,
+      "imageDirector": 223421
+    },
+    "em-30-drip": {
+      "lead": 223880
+    },
+    "em-30-abandoned-cart": {
+      "lead": 223482
+    },
+    "em-30-re-engagement": {
+      "lead": 223870
+    },
+    "em-30-event-invite": {
+      "lead": 223249,
+      "imageDirector": 222800
+    },
+    "em-30-cold-email": {
+      "lead": 222489
+    },
+    "em-30-transactional": {
+      "lead": 222807
+    },
+    "pr-30-headline": {
+      "lead": 180193
+    },
+    "pr-30-subhead": {
+      "lead": 60051
+    },
+    "pr-30-lead-paragraph": {
+      "lead": 30008
+    },
+    "pr-30-ceo-quote": {
+      "lead": 60048
+    },
+    "pr-30-boilerplate": {
+      "lead": 60050
+    },
+    "pr-30-fact-sheet": {
+      "lead": 60047
+    },
+    "pr-30-media-pitch": {
+      "lead": 180175
+    },
+    "pr-30-spokesperson-qa": {
+      "lead": 180567
+    },
+    "pr-30-launch-social": {
+      "lead": 60049
+    },
+    "br-30-tagline": {
+      "lead": 211482
+    },
+    "br-30-value-prop": {
+      "lead": 180797
+    },
+    "br-30-brand-voice": {
+      "lead": 221479
+    },
+    "br-30-archetype": {
+      "lead": 221019
+    },
+    "br-30-positioning": {
+      "lead": 221234
+    },
+    "br-30-elevator-pitch": {
+      "lead": 221150
+    },
+    "br-30-manifesto": {
+      "lead": 180285
+    },
+    "br-30-forbidden-words": {
+      "lead": 180249
+    },
+    "br-30-naming": {
+      "lead": 180171
+    },
+    "br-30-competitor-map": {
+      "lead": 180565
+    },
+    "rs-30-interview-guide": {
+      "lead": 30006
+    },
+    "rs-30-persona-draft": {
+      "lead": 30003
+    },
+    "rs-30-survey": {
+      "lead": 60002
+    },
+    "rs-30-journey-map": {
+      "lead": 180437
+    },
+    "rs-30-competitive-interview": {
+      "lead": 220349
+    },
+    "rs-30-jtbd-guide": {
+      "lead": 180461
+    },
+    "rs-30-synthesis-template": {
+      "lead": 180479
+    },
+    "rs-30-consent-form": {
+      "lead": 180515
+    },
+    "rs-30-usability-script": {
+      "lead": 180491
+    },
+    "rs-30-screener": {
+      "lead": 180521
+    },
+    "fb-60-single-full": {
+      "lead": 224089,
+      "imageDirector": 180144,
+      "replyWriter": 180157,
+      "timingAdvisor": 30019,
+      "followupWriter": 222990
+    },
+    "fb-60-link-full": {
+      "lead": 224179,
+      "imageDirector": 180467,
+      "replyWriter": 222400,
+      "timingAdvisor": 180552,
+      "followupWriter": 222646
+    },
+    "fb-60-album-4": {
+      "lead": 224094,
+      "imageDirector": 180533,
+      "strategist": 180628,
+      "replyWriter": 223476,
+      "timingAdvisor": 222451,
+      "followupWriter": 223783
+    },
+    "fb-60-carousel-5": {
+      "lead": 224154,
+      "imageDirector": 180485,
+      "strategist": 180303,
+      "replyWriter": 222787,
+      "timingAdvisor": 223086,
+      "followupWriter": 223359
+    },
+    "fb-60-countdown-5day": {
+      "lead": 180151,
+      "imageDirector": 180473,
+      "strategist": 180159,
+      "replyWriter": 223510,
+      "timingAdvisor": 180154,
+      "followupWriter": 222491
+    },
+    "fb-60-launch-kit": {
+      "lead": 224159,
+      "imageDirector": 224069,
+      "strategist": 222641,
+      "replyWriter": 223515,
+      "timingAdvisor": 223090,
+      "followupWriter": 222817
+    },
+    "fb-60-live-suite": {
+      "lead": 224184,
+      "imageDirector": 60064,
+      "strategist": 222960,
+      "replyWriter": 222525,
+      "timingAdvisor": 223141,
+      "followupWriter": 222724
+    },
+    "fb-60-pinned-suite": {
+      "lead": 224099,
+      "imageDirector": 220901,
+      "replyWriter": 222954,
+      "timingAdvisor": 222468,
+      "followupWriter": 223305
+    },
+    "fb-60-serial-3": {
+      "lead": 224064,
+      "imageDirector": 220903,
+      "strategist": 222752,
+      "replyWriter": 223247,
+      "timingAdvisor": 222589,
+      "followupWriter": 223329
+    },
+    "fb-60-viral-rewrite": {
+      "lead": 224139,
+      "imageDirector": 223963,
+      "strategist": 223881,
+      "specialty": 180643,
+      "replyWriter": 222841,
+      "timingAdvisor": 222836,
+      "followupWriter": 223918,
+      "compareTable": 60066
+    },
+    "fb-60-trend-rewrite": {
+      "lead": 224104,
+      "imageDirector": 223973,
+      "strategist": 222405,
+      "specialty": 180658,
+      "replyWriter": 223919,
+      "timingAdvisor": 222962,
+      "followupWriter": 222543,
+      "trendTimingAdvisor": 180034
+    },
+    "fb-60-testimonial-rewrite": {
+      "lead": 224189,
+      "imageDirector": 223974,
+      "strategist": 223053,
+      "specialty": 180803,
+      "replyWriter": 223522,
+      "timingAdvisor": 223429,
+      "followupWriter": 222922,
+      "legalAssistant": 180855
+    },
+    "fb-60-ad-pack-3": {
+      "lead": 224164,
+      "imageDirector": 223976,
+      "replyWriter": 222902,
+      "timingAdvisor": 223679,
+      "followupWriter": 222635
+    },
+    "ig-60-feed-full": {
+      "lead": 224109,
+      "imageDirector": 223972,
+      "replyWriter": 223027,
+      "timingAdvisor": 222883,
+      "followupWriter": 222660
+    },
+    "ig-60-reel-full": {
+      "lead": 224169,
+      "imageDirector": 223962,
+      "replyWriter": 223037,
+      "timingAdvisor": 223648,
+      "followupWriter": 223478
+    },
+    "ig-60-carousel-7": {
+      "lead": 224194,
+      "imageDirector": 223967,
+      "strategist": 222342,
+      "replyWriter": 180163,
+      "timingAdvisor": 180152,
+      "followupWriter": 222995
+    },
+    "ig-60-story-3frame": {
+      "lead": 224074,
+      "imageDirector": 220897,
+      "replyWriter": 220919,
+      "timingAdvisor": 180148,
+      "followupWriter": 222978
+    },
+    "ig-60-countdown-5day": {
+      "lead": 224129,
+      "imageDirector": 223970,
+      "strategist": 222341,
+      "replyWriter": 220581,
+      "timingAdvisor": 180164,
+      "followupWriter": 222596
+    },
+    "ig-60-highlight-suite": {
+      "lead": 224134,
+      "imageDirector": 223964,
+      "replyWriter": 220582,
+      "timingAdvisor": 180161,
+      "followupWriter": 222645
+    },
+    "ig-60-live-suite": {
+      "lead": 224199,
+      "imageDirector": 223968,
+      "strategist": 222338,
+      "replyWriter": 223867,
+      "timingAdvisor": 180607,
+      "followupWriter": 223420
+    },
+    "ig-60-serial-3": {
+      "lead": 224174,
+      "imageDirector": 220899,
+      "strategist": 222340,
+      "replyWriter": 223182,
+      "timingAdvisor": 180595,
+      "followupWriter": 222725
+    },
+    "ig-60-viral-rewrite": {
+      "lead": 224119,
+      "imageDirector": 223969,
+      "strategist": 223093,
+      "specialty": 180559,
+      "replyWriter": 222921,
+      "timingAdvisor": 180629,
+      "followupWriter": 222513,
+      "compareTable": 220530
+    },
+    "ig-60-testimonial-rewrite": {
+      "lead": 60020,
+      "imageDirector": 223971,
+      "strategist": 223599,
+      "specialty": 180605,
+      "replyWriter": 222985,
+      "timingAdvisor": 180621,
+      "followupWriter": 222914,
+      "legalAssistant": 180630
+    },
+    "yt-60-video-package": {
+      "lead": 60001,
+      "imageDirector": 223998,
+      "replyWriter": 222711,
+      "timingAdvisor": 222896,
+      "followupWriter": 223695
+    },
+    "yt-60-shorts-script": {
+      "lead": 180166,
+      "imageDirector": 223261,
+      "strategist": 180304,
+      "replyWriter": 222474,
+      "timingAdvisor": 222937,
+      "followupWriter": 223256
+    },
+    "yt-60-thumbnail-suite": {
+      "lead": 223993,
+      "imageDirector": 223740,
+      "replyWriter": 223304,
+      "timingAdvisor": 222429,
+      "followupWriter": 223101
+    },
+    "yt-60-series-3ep": {
+      "lead": 223995,
+      "imageDirector": 220900,
+      "strategist": 223992,
+      "replyWriter": 223834,
+      "timingAdvisor": 220971,
+      "followupWriter": 222749
+    },
+    "yt-60-community-post": {
+      "lead": 223996,
+      "imageDirector": 223789,
+      "replyWriter": 180143,
+      "timingAdvisor": 224001,
+      "followupWriter": 222763
+    },
+    "yt-60-viral-rewrite": {
+      "lead": 224003,
+      "imageDirector": 222560,
+      "strategist": 223994,
+      "specialty": 180782,
+      "replyWriter": 223452,
+      "timingAdvisor": 224005,
+      "followupWriter": 223682,
+      "compareTable": 90036
+    },
+    "tt-60-foryou-full": {
+      "lead": 180215,
+      "imageDirector": 223741,
+      "replyWriter": 222686,
+      "timingAdvisor": 222918,
+      "followupWriter": 222983
+    },
+    "tt-60-series-3": {
+      "lead": 60058,
+      "imageDirector": 222539,
+      "strategist": 180292,
+      "replyWriter": 223803,
+      "timingAdvisor": 223776,
+      "followupWriter": 222723
+    },
+    "tt-60-viral-rewrite": {
+      "lead": 180572,
+      "imageDirector": 223465,
+      "strategist": 90002,
+      "specialty": 222760,
+      "replyWriter": 222668,
+      "timingAdvisor": 222396,
+      "followupWriter": 222931,
+      "compareTable": 223663
+    },
+    "li-60-thought-leader": {
+      "lead": 180172,
+      "imageDirector": 224117,
+      "replyWriter": 223555,
+      "timingAdvisor": 222893,
+      "followupWriter": 223862
+    },
+    "li-60-newsletter": {
+      "lead": 224011,
+      "imageDirector": 224070,
+      "replyWriter": 222349,
+      "timingAdvisor": 223175,
+      "followupWriter": 222499
+    },
+    "li-60-case-study": {
+      "lead": 222943,
+      "imageDirector": 224192,
+      "specialty": 223368,
+      "replyWriter": 223656,
+      "timingAdvisor": 223038,
+      "followupWriter": 222917,
+      "legalAssistant": 180729
+    },
+    "em-60-newsletter-full": {
+      "lead": 222734,
+      "imageDirector": 223389,
+      "replyWriter": 223096,
+      "timingAdvisor": 222475,
+      "followupWriter": 222402
+    },
+    "em-60-promo-sequence": {
+      "lead": 222957,
+      "imageDirector": 223686,
+      "strategist": 223927,
+      "replyWriter": 223280,
+      "timingAdvisor": 223081,
+      "followupWriter": 223098
+    },
+    "em-60-onboarding-3": {
+      "lead": 223571,
+      "imageDirector": 222597,
+      "strategist": 222796,
+      "replyWriter": 223145,
+      "timingAdvisor": 223399,
+      "followupWriter": 223139
+    },
+    "pr-60-news-release-full": {
+      "lead": 211478,
+      "imageDirector": 180200,
+      "replyWriter": 222424,
+      "timingAdvisor": 220918,
+      "followupWriter": 223208
+    },
+    "br-60-tagline-suite": {
+      "lead": 180509,
+      "imageDirector": 221013,
+      "strategist": 30005,
+      "replyWriter": 180867,
+      "timingAdvisor": 60010,
+      "followupWriter": 180828
+    },
+    "br-60-value-prop": {
+      "lead": 180545,
+      "imageDirector": 221228,
+      "strategist": 30009,
+      "replyWriter": 180668,
+      "timingAdvisor": 220372,
+      "followupWriter": 224090
+    },
+    "br-60-brand-voice": {
+      "lead": 180443,
+      "imageDirector": 223975,
+      "replyWriter": 60070,
+      "timingAdvisor": 224115,
+      "followupWriter": 224095
+    },
+    "rs-60-interview-guide": {
+      "lead": 180608,
+      "imageDirector": 220599,
+      "replyWriter": 180894
+    },
+    "rs-60-persona-suite": {
+      "lead": 180503,
+      "imageDirector": 220600,
+      "replyWriter": 224080
+    },
+    "rs-60-jtbd-suite": {
+      "lead": 180431,
+      "imageDirector": 220591,
+      "replyWriter": 224085
+    },
+    "fb-100-30day-calendar": {
+      "lead": 224144,
+      "imageDirector": 222339,
+      "strategist": 223259,
+      "replyWriter": 223781,
+      "timingAdvisor": 180571,
+      "followupWriter": 222612
+    },
+    "fb-100-14day-countdown": {
+      "lead": 224124,
+      "imageDirector": 223042,
+      "strategist": 223673,
+      "replyWriter": 222518,
+      "timingAdvisor": 223437,
+      "followupWriter": 223262
+    },
+    "fb-100-launch-toolkit": {
+      "lead": 224149,
+      "imageDirector": 222688,
+      "strategist": 222848,
+      "replyWriter": 223133,
+      "timingAdvisor": 222856,
+      "followupWriter": 222938
+    },
+    "fb-100-livestream-9seg": {
+      "lead": 60017,
+      "imageDirector": 223798,
+      "strategist": 222649,
+      "replyWriter": 222834,
+      "timingAdvisor": 222981,
+      "followupWriter": 180019
+    },
+    "fb-100-crisis-playbook": {
+      "lead": 60014,
+      "strategist": 223565,
+      "specialty": 90066,
+      "replyWriter": 222378,
+      "timingAdvisor": 222455,
+      "followupWriter": 180024,
+      "legalAssistant": 180591
+    },
+    "ig-100-30day-calendar": {
+      "lead": 60008,
+      "imageDirector": 220592,
+      "strategist": 223291,
+      "replyWriter": 223690,
+      "timingAdvisor": 220379,
+      "followupWriter": 60040
+    },
+    "ig-100-reel-series-6": {
+      "lead": 223788,
+      "imageDirector": 220926,
+      "strategist": 180153,
+      "replyWriter": 223720,
+      "timingAdvisor": 220369,
+      "followupWriter": 180089
+    },
+    "ig-100-account-reposition": {
+      "lead": 223236,
+      "imageDirector": 220908,
+      "strategist": 180147,
+      "replyWriter": 222829,
+      "timingAdvisor": 222901,
+      "followupWriter": 180094
+    },
+    "yt-100-series-6ep": {
+      "lead": 224006,
+      "imageDirector": 223107,
+      "strategist": 223997,
+      "replyWriter": 223917,
+      "timingAdvisor": 60015,
+      "followupWriter": 180008
+    },
+    "yt-100-quarterly-strategy": {
+      "lead": 224002,
+      "imageDirector": 222371,
+      "strategist": 223999,
+      "replyWriter": 222786,
+      "timingAdvisor": 222368,
+      "followupWriter": 180078
+    },
+    "yt-100-premiere-kit": {
+      "lead": 224004,
+      "imageDirector": 222425,
+      "strategist": 224000,
+      "replyWriter": 222894,
+      "timingAdvisor": 222533,
+      "followupWriter": 223311
+    },
+    "tt-100-30day-foryou": {
+      "lead": 180622,
+      "imageDirector": 222608,
+      "strategist": 180633,
+      "replyWriter": 222850,
+      "timingAdvisor": 223635,
+      "followupWriter": 223275
+    },
+    "tt-100-trend-week": {
+      "lead": 180553,
+      "imageDirector": 223122,
+      "replyWriter": 222805,
+      "timingAdvisor": 223567,
+      "followupWriter": 222392
+    },
+    "li-100-30day-thought-leadership": {
+      "lead": 222940,
+      "imageDirector": 224142,
+      "replyWriter": 223569,
+      "timingAdvisor": 223051,
+      "followupWriter": 223049
+    },
+    "li-100-newsletter-quarterly": {
+      "lead": 222571,
+      "imageDirector": 222662,
+      "strategist": 224096,
+      "replyWriter": 223204,
+      "timingAdvisor": 223069,
+      "followupWriter": 223288
+    },
+    "em-100-4week-nurture": {
+      "lead": 222464,
+      "imageDirector": 223135,
+      "strategist": 222811,
+      "replyWriter": 223466,
+      "timingAdvisor": 223434,
+      "followupWriter": 223010
+    },
+    "em-100-launch-sequence": {
+      "lead": 222915,
+      "imageDirector": 223210,
+      "strategist": 222654,
+      "replyWriter": 223322,
+      "timingAdvisor": 223013,
+      "followupWriter": 224056
+    },
+    "pr-100-launch-toolkit": {
+      "lead": 60038,
+      "replyWriter": 222973
+    },
+    "br-100-reposition-toolkit": {
+      "lead": 60035,
+      "imageDirector": 60037,
+      "strategist": 223378,
+      "replyWriter": 222828
+    },
+    "br-100-voice-playbook": {
+      "lead": 223676,
+      "imageDirector": 220923,
+      "replyWriter": 223417
+    },
+    "rs-100-discovery-sprint": {
+      "lead": 60036,
+      "replyWriter": 223668
+    },
+    "rs-100-competitor-mapping": {
+      "lead": 180623,
+      "replyWriter": 223084
+    }
+  }
+}
