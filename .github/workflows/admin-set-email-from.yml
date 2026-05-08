@@ -1,0 +1,67 @@
+name: Admin — Set EMAIL_FROM in prod .env
+
+# 2026-05-08: quick toggle for the EMAIL_FROM env var without touching
+# anything else. Use cases:
+#   - Temp set to onboarding@resend.dev (Resend's verified test sender)
+#     while the sowork.ai domain DNS is still pending verification.
+#   - Switch back to noreply@sowork.ai once domain is verified.
+#
+# Safe to re-run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      email_from:
+        description: "EMAIL_FROM value (e.g. onboarding@resend.dev or noreply@sowork.ai)"
+        required: true
+        default: "onboarding@resend.dev"
+
+jobs:
+  set-email-from:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update .env on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          NEW_VAL: ${{ inputs.email_from }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: NEW_VAL
+          script: |
+            set -e
+            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "❌ .env not found at $ENV_FILE"; exit 1
+            fi
+
+            # Basic email-shape check
+            case "$NEW_VAL" in
+              *@*.*) ;;
+              *) echo "❌ value '$NEW_VAL' doesn't look like an email"; exit 1 ;;
+            esac
+
+            if grep -qE "^EMAIL_FROM=" "$ENV_FILE"; then
+              awk -v val="$NEW_VAL" '
+                /^EMAIL_FROM=/ { print "EMAIL_FROM=" val; next }
+                { print }
+              ' "$ENV_FILE" > "${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "$ENV_FILE"
+              echo "  ✓ updated EMAIL_FROM"
+            else
+              echo "EMAIL_FROM=$NEW_VAL" >> "$ENV_FILE"
+              echo "  ✓ appended EMAIL_FROM"
+            fi
+
+            v=$(grep -E "^EMAIL_FROM=" "$ENV_FILE" | head -1 | cut -d= -f2-)
+            echo "  EMAIL_FROM = $v"
+
+            echo ""
+            echo "── Restarting marketing-os ──"
+            pm2 restart marketing-os --update-env 2>&1 | tail -3
+            sleep 3
+            curl -s -o /dev/null -w "Health: HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
+            echo ""
+            echo "✓ Done."
