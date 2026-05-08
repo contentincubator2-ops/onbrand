@@ -15,6 +15,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getBrandPositioningById } from "../positioningBridge";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
+import { getBrandRealContent } from "../_core/brandRealContent";
 import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywritingMaster";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
@@ -573,9 +574,12 @@ ${platformAsks}
       photoTags: z.array(z.string()).max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const [brandRules, knowledgeBlock] = await Promise.all([
+      const [brandRules, knowledgeBlock, realContent] = await Promise.all([
         loadBrandRules(input.brandId, ctx.user.id),
         loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+        // Real public content (website + social via Perplexity) — strongest
+        // grounding signal; prevents AI from hallucinating industry from name.
+        getBrandRealContent(input.brandId).then(r => r.context).catch(() => ""),
       ]);
       const allRules = [...brandRules, ...(input.adhocRules ?? [])].filter(Boolean);
       const rulesInstruction = allRules.length > 0
@@ -639,7 +643,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}
+${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。

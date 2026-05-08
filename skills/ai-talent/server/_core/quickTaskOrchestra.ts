@@ -21,6 +21,7 @@ import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } 
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext } from "./brandContext";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
+import { getBrandRealContent } from "./brandRealContent";
 import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMaster";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
@@ -704,11 +705,17 @@ export async function runOrchestra(args: {
         }
         return null;
       })(),
-      // Brand context + knowledge base merged (knowledge appended after).
+      // Brand context + knowledge base + REAL public content merged.
+      // brandRealContent (website + social via Perplexity) is the strongest
+      // grounding signal — without it AI hallucinates industry from brand
+      // name (e.g. 桂冠營養研究室 → 美妝). 2026-05-08 (CJ direction).
       Promise.all([
         buildBrandContext(args.brandId).catch(() => ""),
         args.brandId ? loadBrandKnowledgeForPrompt(args.brandId).catch(() => "") : Promise.resolve(""),
-      ]).then(([prefix, knowledge]) => prefix + (knowledge || "")),
+        args.brandId
+          ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
+          : Promise.resolve(""),
+      ]).then(([prefix, knowledge, real]) => prefix + (knowledge || "") + (real || "")),
       // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
       // viral (default) / festivals (calendar tasks) / trending (時事改寫) / news.
       isResearchTier
