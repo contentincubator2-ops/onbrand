@@ -33,12 +33,14 @@ import type { MockupVariant } from "../lib/inferMockup";
 import { EntityStats } from "../components/EntityStats";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { StagePipelineView } from "../components/quickTask/StagePipelineView";
+import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import { faPalette, faPenNib, faFilm, faWandMagicSparkles, faSliders, faTerminal, faImage, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 // Lucide outline icons — Notion-style (CJ direction 2026-05-06).
 // Toolbar uses these instead of FontAwesome solid for cleaner, more modern feel.
 import {
   Pencil, Image as LucideImage, Video, Wand2, MessageCircle,
   Save, Sliders as LucideSliders, Copy, Sparkles,
+  RotateCcw, X as LucideX,
 } from "lucide-react";
 
 const CARD_PALETTES = [
@@ -747,21 +749,24 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
       <Modal
         isOpen={!!activeTask}
         onClose={closeTask}
-        // 2026-05-08 (CJ): mockup 放到最大、白底全部拿掉。
-        // size full + transparent body lets the mockup fill the viewport;
-        // header / footer kept as compact strips with translucent bg so
-        // they don't visually dominate the asset.
-        size="full"
+        // 2026-05-08 (CJ): two-mode modal.
+        // !output (input + running): Notion-style centered card, white bg
+        //   (size 2xl, regular padding, header/footer visible for control).
+        // output (mockup): full-screen transparent, header / footer hidden,
+        //   all controls (關閉 / 重做 / 複製) live INSIDE the floating toolbar
+        //   on top of the mockup. Background is blur backdrop only.
+        size={output ? "full" : "2xl"}
         scrollBehavior="inside"
         backdrop="blur"
         classNames={{
-          base: "max-h-screen bg-transparent shadow-none",
-          wrapper: "p-0",
-          body: "py-0 px-0 bg-transparent",
-          footer: "border-t border-white/20 bg-black/20 backdrop-blur sticky bottom-0 py-2 px-4",
-          header: "py-2 px-3 bg-black/20 backdrop-blur border-b border-white/20",
-          closeButton: "text-white hover:bg-white/10",
+          base: output ? "max-h-screen bg-transparent shadow-none" : "max-h-[90vh]",
+          wrapper: output ? "p-0" : undefined,
+          body: output ? "py-0 px-0 bg-transparent" : "py-3 px-4",
+          footer: output ? "hidden" : "border-t border-default-100 bg-white py-2 px-4",
+          header: output ? "hidden" : "py-2 px-3 bg-white border-b border-default-100",
+          closeButton: output ? "hidden" : "text-default-400 hover:bg-default-100",
         }}
+        hideCloseButton={!!output}
       >
         <ModalContent>
           {activeTask && (
@@ -814,54 +819,36 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       </div>
                     )}
 
-                    {/* Countdown progress (only while running) */}
-                    {running && (
-                      <div className="mt-4 space-y-2">
-                        <div className="flex items-center justify-between text-tiny">
-                          <span>
-                            <FontAwesomeIcon icon={faClock} className="mr-1" />
-                            {(tickMs / 1000).toFixed(1)}s / {expectedSec}s
-                          </span>
-                          <span className="text-default-500">
-                            {tickMs < expectedSec * 1000 ? "請稍候…" : `已超出預估，繼續中`}
-                          </span>
-                        </div>
-                        <Progress
-                          size="sm"
-                          color={tickMs < expectedSec * 1000 ? "primary" : "warning"}
-                          value={progressPct}
-                        />
-                        {/* 30s tier: simple spinner. 60s/100s: live team grid. */}
-                        {tier === "30s" && (
-                          <div className="text-center pt-2">
-                            <Spinner size="sm" />
-                            <p className="text-tiny text-default-500 mt-1">
-                              {activeTask.agent?.name ?? "Agent"} 正在寫…
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {/* 2026-05-08 (CJ): unified running view across tiers —
+                        small Notion-style card with concentric-ring agent
+                        avatar that rotates through the team (60s/100s). The
+                        previous separate paths (30s spinner / 60s 100s pipeline
+                        grid) made the small modal feel inconsistent. */}
+                    {running && (() => {
+                      const stagesNow =
+                        orchestraStages && orchestraStages.length > 0
+                          ? orchestraStages
+                          : synthesizeStages(tickMs, tier);
+                      const elapsedText = `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
+                      const accent = tierAccent(tier);
 
-                    {/* 60s/100s tier — Live multi-agent collaboration view.
-                        While running: synthesize stages from elapsed time so user
-                        sees the pipeline kick in immediately (real stage timestamps
-                        only arrive when orchestra completes — no streaming yet).
-                        After complete: swap to real orchestra stages. */}
-                    {(tier === "60s" || tier === "100s") && (running || (orchestraStages && orchestraStages.length > 0)) && (
-                      <div className="mt-4">
-                        <StagePipelineView
-                          stages={
-                            orchestraStages && orchestraStages.length > 0
-                              ? orchestraStages
-                              : synthesizeStages(tickMs, tier)
-                          }
-                          captionAgent={agentMeta ?? activeTask.agent ?? null}
-                          imageAgent={imageAgentMeta}
-                          tier={tier}
+                      // Build agent roster: caption_writer first, then
+                      // image_director (60s+), then specialty (100s).
+                      const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
+                      const cap = agentMeta ?? activeTask.agent;
+                      if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: "撰寫文案" });
+                      if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: "視覺方向" });
+
+                      return (
+                        <RunningAgentCarousel
+                          agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: "處理中" }]}
+                          stages={stagesNow}
+                          accentColor={accent}
+                          progressPct={progressPct}
+                          elapsedText={elapsedText}
                         />
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {errorMsg && (
                       <Card className="bg-warning-50 border border-warning-200 mt-4">
@@ -886,6 +873,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                     latencyMs={latencyMs}
                     agentMeta={agentMeta}
                     imageAgentMeta={imageAgentMeta}
+                    onClose={closeTask}
+                    onRedo={() => { setOutput(null); setPrimaryAnswer(primaryAnswer); }}
                     orchestraStages={orchestraStages}
                     fetchedUrl={fetchedUrl}
                     errorMsg={errorMsg}
@@ -1031,6 +1020,7 @@ function SavePanel({ slide, accent, onClose }: {
 function OutputCarousel({
   output, activeTask, pageTier, brandName, brandId, brandLogoUrl, onBrandLogoUpdated,
   mockupVariant, latencyMs, agentMeta, imageAgentMeta, orchestraStages, fetchedUrl, errorMsg,
+  onClose, onRedo,
 }: {
   output: any;
   activeTask: FBTaskCard;
@@ -1050,6 +1040,9 @@ function OutputCarousel({
   orchestraStages?: any[] | null;
   fetchedUrl: { url: string; title: string | null; chars: number; og?: { image: string | null; title: string | null; description: string | null; site_name: string | null; domain: string } } | null;
   errorMsg: string | null;
+  /** 2026-05-08: close + redo controls relocated from ModalFooter into the floating toolbar. */
+  onClose?: () => void;
+  onRedo?: () => void;
 }) {
   // Build the slide list. Plan B (orchestra) returns variants[] already as
   // the authoritative slide list — no separate "main"; first variant IS the
@@ -1265,7 +1258,8 @@ function OutputCarousel({
       onClick={onPress}
       disabled={disabled}
       title={label}
-      className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center transition relative ${
+      // 2026-05-08 (CJ): toolbar 縮一半 — 40px → 28px button + smaller icon.
+      className={`w-7 h-7 rounded-lg flex items-center justify-center transition relative ${
         disabled ? "opacity-30 cursor-not-allowed"
           : active ? "shadow-md text-white scale-105"
           : "text-default-600 hover:bg-default-100 hover:scale-105"
@@ -1273,9 +1267,9 @@ function OutputCarousel({
       style={active && !disabled ? { background: `linear-gradient(135deg, ${tierAccent(pageTier)}, ${tierAccent(pageTier)}cc)` } : undefined}
     >
       {LucideIcon ? (
-        <LucideIcon size={18} strokeWidth={1.8} />
+        <LucideIcon size={14} strokeWidth={1.8} />
       ) : (
-        <FontAwesomeIcon icon={icon} className="text-medium" />
+        <FontAwesomeIcon icon={icon} className="text-tiny" />
       )}
     </button>
   );
@@ -1300,8 +1294,11 @@ function OutputCarousel({
           Group C (看細節): 視覺方向 / QA / Production
           ── divider ──
           Group D (拿走): 複製 / 儲存到專案  */}
+      {/* 2026-05-08 (CJ): toolbar 縮一半 — px 2→1, py 1.5→0.5; ToolBtn
+          inner sizing trimmed (handled by ToolBtn comp css). 關閉 / 重做
+          now live in this toolbar (Group E) instead of ModalFooter. */}
       <div className="sticky top-1 z-30 flex justify-center pointer-events-none mb-1">
-        <div className="pointer-events-auto inline-flex items-center gap-0.5 bg-white border border-default-200 rounded-full shadow-lg px-2 py-1.5">
+        <div className="pointer-events-auto inline-flex items-center gap-0.5 bg-white border border-default-200 rounded-full shadow-lg px-1.5 py-1">
           {/* GROUP A: 修改 / 生產 */}
           {slide?.caption && (
             <ToolBtn lucide={Pencil} label="編輯文案" active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
@@ -1339,12 +1336,12 @@ function OutputCarousel({
                       <button
                         onClick={() => setOpenAgentPopover(isOpen ? null : a.id)}
                         title={`${a.name} · ${a.role}`}
-                        className={`w-9 h-9 rounded-full overflow-hidden transition flex items-center justify-center ${
+                        className={`w-7 h-7 rounded-full overflow-hidden transition flex items-center justify-center ${
                           isOpen ? "ring-2 scale-105" : "hover:scale-105 ring-1 ring-default-200"
                         }`}
                         style={isOpen ? { borderColor: tierAccent(pageTier), boxShadow: `0 0 0 2px ${tierAccent(pageTier)}` } : undefined}
                       >
-                        <Avatar src={a.avatarUrl || dicebear(a.name)} size="sm" className="w-9 h-9" />
+                        <Avatar src={a.avatarUrl || dicebear(a.name)} size="sm" className="w-7 h-7" />
                       </button>
                       {isOpen && (
                         <div
@@ -1377,7 +1374,7 @@ function OutputCarousel({
                   <button
                     onClick={() => toggleTool("details")}
                     title={`還有 ${overflowCount} 位 agent，點開看完整協作流程`}
-                    className="w-9 h-9 rounded-full bg-default-100 text-default-600 text-tiny font-bold hover:bg-default-200 transition flex items-center justify-center"
+                    className="w-7 h-7 rounded-full bg-default-100 text-default-600 text-[10px] font-bold hover:bg-default-200 transition flex items-center justify-center"
                   >
                     +{overflowCount}
                   </button>
@@ -1399,6 +1396,16 @@ function OutputCarousel({
             onPress={() => { if (slide?.caption) navigator.clipboard.writeText(slide.caption); }} />
           <ToolBtn lucide={Save} label="儲存 / 加到專案" active={activeTool === "save"}
             onPress={() => toggleTool("save")} />
+
+          {/* GROUP E (2026-05-08): 重做 + 關閉 — relocated from ModalFooter
+              so the mockup background has zero buttons.  */}
+          {(onRedo || onClose) && <span className="w-px h-5 bg-default-200 mx-1" />}
+          {onRedo && (
+            <ToolBtn lucide={RotateCcw} label="重做（保留問題、重新產出）" onPress={onRedo} />
+          )}
+          {onClose && (
+            <ToolBtn lucide={LucideX} label="關閉" onPress={onClose} />
+          )}
         </div>
       </div>
 
