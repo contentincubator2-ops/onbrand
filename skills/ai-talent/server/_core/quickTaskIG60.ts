@@ -37,7 +37,7 @@ export const IG_60S_TASKS: FBTaskTemplate[] = [
     postType: "feed",
     label: "IG 單篇完整貼文",
     description: "5 variants + 5 真生圖 + hashtag + 留言模板 + 發文時段",
-    agent_id: 180166, // Iris Liang
+    agent_id: 224071, // Khai Ming Ng — Email & CRM Strategist B2B SaaS SG (1212 char)
     skill_slug: "instagram-copywriting",
     primary_question: "今天這篇 IG 貼文要講什麼？",
     primary_input: { key: "topic", placeholder: "例：新品上市、客戶分享、幕後花絮", type: "textarea" },
@@ -59,7 +59,7 @@ ${IG_TONE}`,
     postType: "reel",
     label: "IG Reel 完整腳本",
     description: "Strategist 規劃 Hook-Hold-Payoff + 完整腳本 + 9:16 視覺",
-    agent_id: 60029, // Siyu Lin
+    agent_id: 224196, // Paolo Domingo — Email & CRM Strategist B2B SaaS PH (1181 char)
     skill_slug: "short-video-scriptwriter",
     primary_question: "這支 Reel 主題 / 賣點？",
     primary_input: { key: "topic", placeholder: "例：30 秒教學 / 開箱 / 反差展示", type: "textarea" },
@@ -198,7 +198,7 @@ ${IG_TONE}`,
     postType: "feed",
     label: "IG 3 篇連載敘事",
     description: "Strategist 設計 3 集弧 + 3 篇有勾連的連載貼文",
-    agent_id: 60068, // Yizhen Lai (Brand Story Copy)
+    agent_id: 224086, // Stephanie Wong — Email & CRM Strategist Beauty MY (1282 char)
     skill_slug: "social-copy",
     primary_question: "想連載講什麼故事？",
     primary_input: { key: "story_topic", placeholder: "客戶轉型 / 團隊成長 / 產品歷程", type: "textarea" },

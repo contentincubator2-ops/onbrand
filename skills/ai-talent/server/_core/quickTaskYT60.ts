@@ -16,7 +16,7 @@ export const YT_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "video",
     label: "YT 影片完整 caption 包",
     description: "Title + description + chapters + 5 個替代 title + 縮圖風格",
-    agent_id: 24, // Janet Chang
+    agent_id: 224000, // Yu-Chia Chen — YouTube Marketing Strategist 食品飲料 (~1000 char)
     skill_slug: "youtube-content",
     primary_question: "影片主題 / 賣點？",
     primary_input: { key: "topic", placeholder: "例：教學 / 開箱 / 評測", type: "textarea" },

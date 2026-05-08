@@ -107,7 +107,7 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "feed",
     label: "LI Thought Leadership 完整貼文",
     description: "Strategist 設計觀點 + 800 字深度文 + 配圖",
-    agent_id: 30018, skill_slug: "linkedin-b2b",
+    agent_id: 224167, skill_slug: "linkedin-b2b", // Budi Santoso — Meta Ads Specialist B2B SaaS ID (1172 char)
     primary_question: "想分享什麼 B2B 觀點？",
     primary_input: { key: "topic", placeholder: "例：AI 工具用 6 個月的 3 個體悟", type: "textarea" },
     inputs: [{ key: "topic", label: "觀點主題", type: "textarea", required: true }],
@@ -183,7 +183,7 @@ export const EMAIL_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "edm",
     label: "Email Newsletter 完整一期",
     description: "Strategist 設計結構 + 主旨 + 引言 + 3 段內容 + CTA + 預覽文字",
-    agent_id: 30017, skill_slug: "email-marketing",
+    agent_id: 224101, skill_slug: "email-marketing", // Faisal Rahman — Email & CRM Strategist F&B MY (1230 char)
     primary_question: "本期 newsletter 主題？",
     primary_input: { key: "topic", placeholder: "本期想跟訂閱者說什麼", type: "textarea" },
     inputs: [{ key: "topic", label: "Newsletter 主題", type: "textarea", required: true }],
@@ -256,7 +256,7 @@ export const PR_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "press-release",
     label: "新聞稿完整版",
     description: "標題 + 副標 + 5W1H 導語 + 3 段內文 + 公司簡介 + 媒體聯絡",
-    agent_id: 60036, skill_slug: "pr-writing",
+    agent_id: 222504, skill_slug: "pr-writing", // Hsin-Jung Chiang — PR Strategist 醫材 (482 char)
     primary_question: "新聞主題？",
     primary_input: { key: "topic", placeholder: "新品發表 / 募資成功 / 重大合作", type: "textarea" },
     inputs: [{ key: "topic", label: "新聞主題", type: "textarea", required: true }],
@@ -290,7 +290,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "品牌 Tagline 5 種版本",
     description: "Strategist 定原型 + 5 個 tagline 候選 + 應用情境",
-    agent_id: 60037, skill_slug: "brand-strategy",
+    agent_id: 223253, skill_slug: "brand-strategy", // Hsin-Jung Wang — PR Strategist 醫材 (483 char)
     primary_question: "品牌精神 / 核心差異？",
     primary_input: { key: "spirit", placeholder: "品牌精神、信念、做什麼", type: "textarea" },
     inputs: [{ key: "spirit", label: "品牌精神", type: "textarea", required: true }],
@@ -363,7 +363,7 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "用戶訪談大綱完整版",
     description: "Strategist 設計研究問題 + 開放式問題 + 探查 prompt",
-    agent_id: 60038, skill_slug: "user-research",
+    agent_id: 223755, skill_slug: "user-research", // Chih-Hao Hsieh — PR Strategist 電商/DTC (476 char)
     primary_question: "想了解用戶什麼？",
     primary_input: { key: "research_goal", placeholder: "研究目標 / 想驗證的假設", type: "textarea" },
     inputs: [{ key: "research_goal", label: "研究目標", type: "textarea", required: true }],

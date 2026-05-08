@@ -136,7 +136,7 @@ ${FB60_TONE}`,
     postType: "feed",
     label: "FB 5 天倒數系列",
     description: "Strategist 設計倒數弧 + 5 天 5 篇平行寫作 + 各自配圖",
-    agent_id: 180159, // Claire Hsu
+    agent_id: 224056, // Priya Nair — Email & CRM Strategist Health SG (1253 char)
     skill_slug: "social-media-manager",
     primary_question: "活動名稱是？",
     primary_input: { key: "event_name", placeholder: "例：週年慶 / 新品上市 / 限時優惠", type: "text" },
@@ -316,7 +316,7 @@ ${FB60_TONE}`,
     postType: "feed",
     label: "FB 客戶見證改寫文",
     description: "Kurt Chen 找見證結構 + Yawen Ma 改寫敘事 + Jason Evans 法務檢核",
-    agent_id: 60031, // Yawen Ma
+    agent_id: 224156, // Qory Andini — Email & CRM Strategist Health ID (1227 char)
     skill_slug: "fb-copywriting",
     primary_question: "貼上原始客戶見證 / 訪談 / 評價",
     primary_input: { key: "testimonial_source", placeholder: "客戶原話、訪談逐字、評論截圖文字", type: "textarea" },

@@ -159,7 +159,7 @@ image_style_direction.summary 給縮圖風格（9:16）。`,
     postType: "watch",
     label: "YT 開場 hook（前 15 秒）",
     description: "口播 + 字幕 + 鏡頭",
-    agent_id: 30014, // Nina Liu — YouTube Script Creator
+    agent_id: 224007, // YouTube Marketing Strategist 跨產業 (~1000 char)
     skill_slug: "youtube-publisher",
     primary_question: "影片網址或主題",
     primary_input: { key: "topic_or_url", placeholder: "https://youtu.be/...  或  影片主題", type: "textarea" },

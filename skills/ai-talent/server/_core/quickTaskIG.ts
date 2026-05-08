@@ -112,7 +112,7 @@ caption 結構（每變體）：
     postType: "story",
     label: "IG Story 文案 + sticker 建議",
     description: "9:16 主標 + 內文 + 推薦 sticker",
-    agent_id: 60068, // Yizhen Lai — Brand Story Copy
+    agent_id: 224081, // Amir Farouk — Email & CRM Strategist Health MY (1290 char)
     skill_slug: "brand-story",
     primary_question: "今天的 Story 想說什麼？",
     primary_input: { key: "topic", placeholder: "例：幕後 / 限時優惠 / 提問 / 投票", type: "textarea" },

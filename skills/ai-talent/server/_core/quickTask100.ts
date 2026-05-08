@@ -51,7 +51,7 @@ export const FB_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "feed",
     label: "FB 14 天倒數活動",
     description: "14 天倒數 + 每天獨立 hook + 中段轉折 + 高潮收束 + scout 抓節慶/時事",
-    agent_id: 180159, // Claire Hsu
+    agent_id: 224116, // Hoàng Thị Mai — Email & CRM Strategist eCommerce VN (1251 char)
     skill_slug: "fb-countdown-series",
     primary_question: "活動名稱 + 主要 hook？",
     primary_input: { key: "event_name", placeholder: "例：母親節限時優惠 / 新品上市", type: "text" },
@@ -136,7 +136,7 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "feed",
     label: "IG 30 天內容月曆",
     description: "30 天 feed/reel/story 配比 + 每篇 hook + hashtag 策略 + 真實爆款參考",
-    agent_id: 180166, // Iris Liang
+    agent_id: 224067, // Yong Qi Chua — Meta Ads Specialist B2B SaaS SG (1199 char)
     skill_slug: "instagram-strategy",
     primary_question: "本月主題？",
     primary_input: { key: "monthly_focus", placeholder: "本月主推", type: "textarea" },
@@ -151,7 +151,7 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "reel",
     label: "IG Reel 6 集系列",
     description: "Strategist 設計 6 集弧 + 每集完整腳本（hook + hold + payoff）+ 縮圖 brief",
-    agent_id: 60029, // Siyu Lin
+    agent_id: 224121, // Dinh Van Nam — Email & CRM Strategist B2B SaaS VN (1157 char)
     skill_slug: "short-video-scriptwriter",
     primary_question: "6 集系列主題？",
     primary_input: { key: "series_topic", placeholder: "教學系列 / 故事系列", type: "textarea" },
@@ -186,7 +186,7 @@ export const YT_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "video",
     label: "YT 6 集系列完整製作包",
     description: "6 集 title + description 800-1200 字 + 縮圖 brief 各 3 種 + community 配套",
-    agent_id: 24, // Janet Chang
+    agent_id: 224005, // Pin-Chen Lin — YouTube Marketing Strategist 金融科技 (~1000 char)
     skill_slug: "youtube-content",
     primary_question: "6 集系列主題？",
     primary_input: { key: "series_topic", placeholder: "教學/故事/評測 系列主題", type: "textarea" },
@@ -264,7 +264,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "feed",
     label: "LI 30 天 Thought-Leadership 月曆",
     description: "30 天 = 10 觀點 / 10 案例 / 10 趨勢預測 + scout 抓即時節慶",
-    agent_id: 30018, skill_slug: "linkedin-b2b",
+    agent_id: 224171, skill_slug: "linkedin-b2b", // Purnama Sari — Email & CRM Strategist B2B SaaS ID (1184 char)
     primary_question: "這個月想立什麼專業 image？",
     primary_input: { key: "expertise_area", placeholder: "AI / 領導力 / SaaS 等", type: "textarea" },
     inputs: [{ key: "expertise_area", label: "專業領域", type: "textarea", required: true }],
@@ -292,7 +292,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "edm",
     label: "Email 4 週 Onboarding Nurture",
     description: "4 週 8-12 封 emails + 行為觸發分支 + scout 抓即時節慶",
-    agent_id: 30017, skill_slug: "email-marketing",
+    agent_id: 224161, skill_slug: "email-marketing", // Xenia Anggraini — Email & CRM Strategist Beauty ID (1229 char)
     primary_question: "新訂閱者最該知道什麼？",
     primary_input: { key: "value_prop", placeholder: "核心價值 + onboarding 目標", type: "textarea" },
     inputs: [{ key: "value_prop", label: "核心價值", type: "textarea", required: true }],
@@ -320,7 +320,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: "PR 完整 Launch 媒體 Toolkit",
     description: "新聞稿 + Q&A + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points",
-    agent_id: 60036, skill_slug: "pr-writing",
+    agent_id: 223197, skill_slug: "pr-writing", // Yi-Wen Wu — PR Strategist B2B SaaS (476 char)
     primary_question: "Launch 主題？",
     primary_input: { key: "launch_topic", placeholder: "新品 / 募資 / 重大合作", type: "textarea" },
     inputs: [{ key: "launch_topic", label: "Launch 主題", type: "textarea", required: true }],
@@ -335,7 +335,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: "Brand 完整重新定位 Toolkit",
     description: "Positioning + Tagline 套 + Voice guide + Visual direction + 應用範例",
-    agent_id: 60037, skill_slug: "brand-strategy",
+    agent_id: 222665, skill_slug: "brand-strategy", // Chih-Ming Yang — PR Strategist 電商/DTC (477 char)
     primary_question: "想轉到什麼定位？",
     primary_input: { key: "new_position", placeholder: "新定位方向", type: "textarea" },
     inputs: [{ key: "new_position", label: "新定位", type: "textarea", required: true }],
@@ -363,7 +363,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: "User Research 5 天 Discovery Sprint",
     description: "訪綱 + 5 personas + JTBD map + insights synthesis + 行動建議",
-    agent_id: 60038, skill_slug: "user-research",
+    agent_id: 222638, skill_slug: "user-research", // Chun-Chieh Hung — PR Strategist 製藥/醫藥 (470 char)
     primary_question: "想了解用戶什麼？",
     primary_input: { key: "research_goal", placeholder: "研究目標 / 假設", type: "textarea" },
     inputs: [{ key: "research_goal", label: "研究目標", type: "textarea", required: true }],
@@ -449,7 +449,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
     captionMinChars: 80, captionMaxChars: 200,
-    strategistAgentId: 60031, // Yawen Ma — Brand Short Video Scriptwriter Beauty (787 char)
+    strategistAgentId: 224091, // Nurul Huda — Email & CRM Strategist eCommerce MY (1250 char)
     postLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
     scoutKind: "viral",
     extras: { ...fb100Common.extras, postsCount: 9 },
