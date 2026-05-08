@@ -30,7 +30,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
-            "cd /opt/marketing-os/app/skills/ai-talent && bun run scripts/generate-agent-assignments.ts"
+            'export PATH="$HOME/.bun/bin:$HOME/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; which bun || ls -la $HOME/.bun/bin/ 2>/dev/null; cd /opt/marketing-os/app/skills/ai-talent && $HOME/.bun/bin/bun run scripts/generate-agent-assignments.ts'
 
       - name: Pull generated JSON back to runner
         run: |
