@@ -77,7 +77,7 @@ ${FB_TONE_SUFFIX}
     postType: "feed",
     label: "FB 純文字 hook 3 種",
     description: "3 種不同口吻的開場 hook，自動接上你原本的貼文內容",
-    agent_id: 239183,             // Aiden Hsu — hook-writing
+    agent_id: 239022,             // Morgan Tsai — VP Jab-Jab-Jab Strategy（Gary Vee hook 大師）
     skill_slug: "hook-writing",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會幫你寫 5 種不同口吻的開場接上去",
     primary_input: { key: "article_body", placeholder: "貼上完整的貼文內文（hook 會接在最前面）", type: "textarea" },
@@ -122,7 +122,7 @@ ${FB_TONE_SUFFIX}`,
     postType: "comment",
     label: "FB 留言回覆（一般）",
     description: "正面 / 中性留言的品牌回覆",
-    agent_id: 60021,              // Tina Ji — Social Copywriter, brand voice
+    agent_id: 239185,             // Brian Chou — Crisis Communications Specialist（回覆語氣專家）
     skill_slug: "social-copy",
     primary_question: "貼上原始用戶留言，或留言所在的貼文連結",
     primary_input: { key: "user_comment", placeholder: "用戶說了什麼？整段留言貼進來", type: "textarea" },
@@ -147,7 +147,7 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     postType: "ad",
     label: "FB 廣告 Headline 5 種",
     description: "5 種切角的廣告標題（25 字內），直接複製到 Ads Manager 用",
-    agent_id: 239183,             // Aiden Hsu
+    agent_id: 239023,             // Ellis Yeh — VP Breakthrough Advertising（Eugene Schwartz headline 大師）
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告主推什麼？產品 / 賣點 / 受眾簡述",
     primary_input: { key: "product_focus", placeholder: "例：母親節健力餐高蛋白系列，給沒時間煮飯的職業媽媽", type: "textarea" },
@@ -172,7 +172,7 @@ caption 欄位放這 5 個 headline（編號 1-5，每個一行）。${FB_TONE_S
     postType: "ad",
     label: "FB 廣告 Primary Text 5 種",
     description: "5 種口吻的廣告主內文（80-150 字），對應不同受眾心理",
-    agent_id: 60021,              // Tina Ji
+    agent_id: 239027,             // Ellis Liu — VP $100M Offers（Hormozi value-stack 文案）
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告的主題 / 產品 / 受眾？",
     primary_input: { key: "topic", placeholder: "例：健力餐母親節組合，職業媽媽 35-50 歲", type: "textarea" },
@@ -192,7 +192,7 @@ caption 欄位放這 5 個 headline（編號 1-5，每個一行）。${FB_TONE_S
     postType: "ad",
     label: "FB 廣告 CTA 5 種",
     description: "5 個 CTA 按鈕文字 + 每個 CTA 的搭配情境建議",
-    agent_id: 239183,             // Aiden Hsu
+    agent_id: 239024,             // Emerson Huang — VP Customer Value Optimization（funnel CTA）
     skill_slug: "fb-ad-copy",
     primary_question: "想引導用戶做什麼動作？（購買 / 加入會員 / 預約 / 試用）",
     primary_input: { key: "goal", placeholder: "例：希望用戶點到產品頁加入購物車", type: "text" },
@@ -212,7 +212,7 @@ caption 欄位用清單格式：「① CTA 文字 — 適合：（情境）」�
     postType: "ad",
     label: "FB 連結廣告 Description 5 種",
     description: "連結廣告下方 description（30 字內），5 種切入角度",
-    agent_id: 60021,              // Tina Ji
+    agent_id: 239031,             // Emerson Lai — VP Mass Control Strategy（直效回應）
     skill_slug: "fb-ad-copy",
     primary_question: "連結要導向哪？產品頁 / 活動頁 / 文章 / app 下載？",
     primary_input: { key: "link_purpose", placeholder: "例：導到健力餐 14 包組合產品頁", type: "textarea" },
@@ -232,7 +232,7 @@ caption 欄位放 5 個編號 description（每行一個）。${FB_TONE_SUFFIX}`
     postType: "pinned",
     label: "FB 釘選貼文短文案",
     description: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」",
-    agent_id: 239183,             // Aiden Hsu — brand voice + atomized-content
+    agent_id: 239030,             // Blair Chen — VP FB Traffic System Strategy（釘選定位專家）
     skill_slug: "fb-copywriting",
     primary_question: "想讓第一次來粉專的人，3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼值得追蹤", type: "textarea" },
@@ -294,7 +294,7 @@ output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"�
     postType: "feed",
     label: "FB hashtag 建議組",
     description: "10-15 個分層 hashtag（核心 / 中型 / 長尾）",
-    agent_id: 60021,              // Tina Ji — social copywriter
+    agent_id: 220583,             // Hsin-Yi Weng — IG/FB Marketing Specialist（hashtag 在地化）
     skill_slug: "fb-best-practices",
     primary_question: "貼文主題或品牌產業是？",
     primary_input: { key: "topic", placeholder: "例：手沖咖啡 / B2B SaaS / 母嬰用品", type: "textarea" },
