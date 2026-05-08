@@ -901,10 +901,12 @@ export default function BrandsPage() {
                 color={isLocked ? "default" : "success"}
                 variant={isLocked ? "flat" : "solid"}
                 onPress={() => handleLockToggle(category as "positioning" | "copy" | "visual")}
-                startContent={<FontAwesomeIcon icon={isLocked ? faLockOpen : faLock} />}
                 isLoading={lockTabMut?.isPending || unlockTabMut?.isPending}
               >
-                {isLocked ? "解鎖" : `🔒 鎖定${tabLabel}`}
+                {/* CJ 2026-05-08: 只要出現一個 icon — kept the left circle
+                    icon at line ~875, removed the duplicate startContent
+                    icon from this button. */}
+                {isLocked ? "解鎖" : `鎖定${tabLabel}`}
               </Button>
             </div>
           </div>
@@ -2572,44 +2574,10 @@ function PositioningTopRow({
         )}
       </div>
 
-      {/* Wide lock bar (CJ 2026-05-08: 右側的鎖定定位，留下長橫 bar) */}
-      <div
-        className="rounded-xl border px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap"
-        style={{
-          background: locked ? "#ECFDF5" : "#F9FAFB",
-          borderColor: locked ? "#A7F3D0" : "#E5E7EB",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: locked ? "#10B981" : "#E5E7EB" }}
-          >
-            <FontAwesomeIcon icon={locked ? faLock : faLockOpen} style={{ color: locked ? "#fff" : "#6B7280", fontSize: 12 }} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-default-900">
-              定位 {locked ? "已鎖定" : "尚未鎖定"}
-            </div>
-            <div className="text-xs text-default-500">
-              {locked
-                ? "全平台 (30s/60s/100s/Theater) 都用這份做為單一真相"
-                : "鎖定後：編輯欄變唯讀，全平台用這份為單一真相"}
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={onLockToggle}
-          className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full transition shrink-0 ${
-            locked
-              ? "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm"
-          }`}
-        >
-          <FontAwesomeIcon icon={locked ? faLockOpen : faLock} className="text-[11px]" />
-          {locked ? "解鎖定位" : "鎖定定位"}
-        </button>
-      </div>
+      {/* CJ 2026-05-08: removed duplicate wide lock bar from inside
+          PositioningTopRow — the legacy lock bar above the body
+          (BrandsPage.tsx:856) already covers all 3 tabs. The
+          onLockToggle prop is kept for API compatibility but unused. */}
     </>
   );
 }
