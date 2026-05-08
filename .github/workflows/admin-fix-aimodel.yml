@@ -1,0 +1,75 @@
+name: Admin — Fix aiModel field to supported models only
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db"
+
+            echo "=== Before fix ==="
+            $MYSQL -e "SELECT IFNULL(NULLIF(aiModel,''),'(empty)') AS m, COUNT(*) AS n FROM agents GROUP BY m ORDER BY n DESC LIMIT 50;" -t
+
+            echo ""
+            echo "=== Applying mapping ==="
+
+            # Mapping rationale:
+            #   qwen3-32b           ← Llama/Mistral/Phi/Gemma/Kimi-Thinking/vision/coder/MAI/Ministral
+            #                         (general Chinese workhorse, qwen provider)
+            #   claude-haiku-4-5    ← grok-3/Kimi (faster azure-position)
+            #   gpt-4.1-mini        ← o3/o3-mini/o4-mini/o3-deep-research (azure-foundry)
+            #   claude-sonnet-4-6   ← perplexity/sonar-*/anthropic/claude-3.7
+            #   DeepSeek-V3.2       ← MAI-DS-R1 (azure-northcentral)
+
+            # → qwen3-32b
+            $MYSQL -e "UPDATE agents SET aiModel='qwen3-32b' WHERE aiModel LIKE '%mistral%' OR aiModel LIKE '%mistralai%' OR aiModel LIKE '%Mistral%' OR aiModel LIKE '%Llama%' OR aiModel LIKE '%llama%' OR aiModel LIKE '%Phi-%' OR aiModel LIKE 'google/gemma%' OR aiModel LIKE '%-vl-%' OR aiModel LIKE '%-coder%' OR aiModel = 'Kimi-K2-Thinking' OR aiModel = 'Ministral-3B' OR aiModel IS NULL OR aiModel = '';"
+
+            # → claude-haiku-4-5 (fast, replaces grok)
+            $MYSQL -e "UPDATE agents SET aiModel='claude-haiku-4-5' WHERE aiModel LIKE 'grok-%' OR aiModel LIKE '%grok%';"
+
+            # → gpt-4.1-mini (replaces openai o-series)
+            $MYSQL -e "UPDATE agents SET aiModel='gpt-4.1-mini' WHERE aiModel LIKE 'o3%' OR aiModel LIKE 'o4%' OR aiModel = 'gpt-5';"
+
+            # → claude-sonnet-4-6 (replaces perplexity research + claude-3.7)
+            $MYSQL -e "UPDATE agents SET aiModel='claude-sonnet-4-6' WHERE aiModel LIKE 'perplexity/%' OR aiModel LIKE '%claude-3.7%' OR aiModel LIKE 'anthropic/%';"
+
+            # → DeepSeek-V3.2 (consolidate DeepSeek variants)
+            $MYSQL -e "UPDATE agents SET aiModel='DeepSeek-V3.2' WHERE aiModel = 'MAI-DS-R1' OR aiModel = 'DeepSeek-R1' OR aiModel = 'DeepSeek-R1-0528' OR aiModel = 'DeepSeek-V3.1';"
+
+            # → claude-haiku-4-5 (consolidate haiku variants — drop date suffix)
+            $MYSQL -e "UPDATE agents SET aiModel='claude-haiku-4-5' WHERE aiModel = 'claude-haiku-4-5-20251001';"
+
+            # → claude-sonnet-4-6 (consolidate sonnet variants)
+            $MYSQL -e "UPDATE agents SET aiModel='claude-sonnet-4-6' WHERE aiModel = 'claude-sonnet-4-5-20250929';"
+
+            # → claude-opus-4-6 (consolidate opus variants)
+            $MYSQL -e "UPDATE agents SET aiModel='claude-opus-4-6' WHERE aiModel = 'claude-opus-4-1-20250805';"
+
+            # → gpt-4.1 / gpt-4.1-mini (already supported, leave)
+            # → qwen3-32b / claude-haiku-4-5 / claude-sonnet-4-6 / claude-opus-4-6 / DeepSeek-V3.2 / gpt-4.1 / gpt-4o-mini / Phi-4-3 / mistral-small-2503 (legacy keepers)
+
+            # Anything else not whitelisted → qwen3-32b
+            $MYSQL -e "
+              UPDATE agents SET aiModel='qwen3-32b'
+              WHERE aiModel NOT IN (
+                'qwen3-32b','claude-haiku-4-5','claude-sonnet-4-6','claude-opus-4-6',
+                'DeepSeek-V3.2','gpt-4.1','gpt-4.1-mini','gpt-4o-mini'
+              );
+            "
+
+            echo ""
+            echo "=== After fix ==="
+            $MYSQL -t -e "SELECT IFNULL(NULLIF(aiModel,''),'(empty)') AS m, COUNT(*) AS n FROM agents GROUP BY m ORDER BY n DESC;"
