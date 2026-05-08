@@ -43,7 +43,7 @@ ${FB_TONE_SUFFIX}
     postType: "feed",
     label: "IG hook 3 種（搭配你的原文）",
     description: "3 種不同口吻 hook，自動接你原本的貼文內容",
-    agent_id: 229985, // 許怡君 — Hook Copywriter – Instagram × 科技
+    agent_id: 222311, // Ming-Han Zhou — Brand Strategist B2B SaaS & SEA (1621 char persona)
     skill_slug: "hook-copywriter",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會寫不同口吻的 IG 開場接上去",
     primary_input: { key: "article_body", placeholder: "貼上完整的貼文內文（hook 會接在最前面）", type: "textarea" },

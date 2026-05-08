@@ -132,7 +132,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["教學版", "反差版", "揭密版", "節奏版", "懸念版"],
     captionMinChars: 300, captionMaxChars: 500,
-    strategistAgentId: 180030, // Kevin Lin
+    strategistAgentId: 60033, // Yawen Yeh — E-commerce Short Video Scriptwriter (845 char)
     extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
   },
   "yt-60-thumbnail-suite": {
@@ -147,7 +147,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
     variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 350, captionMaxChars: 700,
-    strategistAgentId: 220863, // Nelson Chen
+    strategistAgentId: 30014, // Nina Liu — YouTube Script Creator (1929 char)
     postLabels: ["第 1 集", "第 2 集", "第 3 集"],
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
@@ -163,8 +163,8 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 350, captionMaxChars: 700,
-    strategistAgentId: 180142, // Kevin Liu
-    specialtyAgentId: 180606, // Jessica Garcia — Director, Global Marketing & Advertising Legal
+    strategistAgentId: 180158, // Oliver Fang — Social Media Analytics Specialist (1697 char)
+    specialtyAgentId: 180591, // Samantha Anderson — General Counsel (2199 char)
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 };

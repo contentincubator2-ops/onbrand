@@ -56,7 +56,7 @@ export const FB_30S_TASKS: FBTaskTemplate[] = [
     postType: "feed",
     label: "FB 短貼文 caption",
     description: "100-200 字單張圖文 caption，含 1 句 hook + 1 個 CTA",
-    agent_id: 239183,             // Aiden Hsu — fb-brief-writer
+    agent_id: 30020,              // Iris Yi — Social Media Manager (2001 char persona)
     skill_slug: "fb-copywriting",
     primary_question: "今天這篇貼文要講什麼？可以貼網址（會自動讀取）、原文、或主題描述",
     primary_input: { key: "topic", placeholder: "例：https://your-blog.com/article  /  春季新品上市  /  母親節活動", type: "textarea" },
@@ -77,7 +77,7 @@ ${FB_TONE_SUFFIX}
     postType: "feed",
     label: "FB 純文字 hook 3 種",
     description: "3 種不同口吻的開場 hook，自動接上你原本的貼文內容",
-    agent_id: 239022,             // Morgan Tsai — VP Jab-Jab-Jab Strategy（Gary Vee hook 大師）
+    agent_id: 224079,             // Kavitha Nair — Social Media Strategist (1191 char)
     skill_slug: "hook-writing",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會幫你寫 5 種不同口吻的開場接上去",
     primary_input: { key: "article_body", placeholder: "貼上完整的貼文內文（hook 會接在最前面）", type: "textarea" },
@@ -122,7 +122,7 @@ ${FB_TONE_SUFFIX}`,
     postType: "comment",
     label: "FB 留言回覆（一般）",
     description: "正面 / 中性留言的品牌回覆",
-    agent_id: 239185,             // Brian Chou — Crisis Communications Specialist（回覆語氣專家）
+    agent_id: 222206,             // Huang Zi-Hao — Crisis PR Specialist (1080 char persona)
     skill_slug: "social-copy",
     primary_question: "貼上原始用戶留言，或留言所在的貼文連結",
     primary_input: { key: "user_comment", placeholder: "用戶說了什麼？整段留言貼進來", type: "textarea" },
@@ -172,7 +172,7 @@ caption 欄位放這 5 個 headline（編號 1-5，每個一行）。${FB_TONE_S
     postType: "ad",
     label: "FB 廣告 Primary Text 5 種",
     description: "5 種口吻的廣告主內文（80-150 字），對應不同受眾心理",
-    agent_id: 239027,             // Ellis Liu — VP $100M Offers（Hormozi value-stack 文案）
+    agent_id: 224114,             // Bùi Thị Thu — Social Media Strategist eCommerce (1160 char)
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告的主題 / 產品 / 受眾？",
     primary_input: { key: "topic", placeholder: "例：健力餐母親節組合，職業媽媽 35-50 歲", type: "textarea" },
@@ -212,7 +212,7 @@ caption 欄位用清單格式：「① CTA 文字 — 適合：（情境）」�
     postType: "ad",
     label: "FB 連結廣告 Description 5 種",
     description: "連結廣告下方 description（30 字內），5 種切入角度",
-    agent_id: 239031,             // Emerson Lai — VP Mass Control Strategy（直效回應）
+    agent_id: 224054,             // Mei Xin Ho — Social Media Strategist Health SG (1148 char)
     skill_slug: "fb-ad-copy",
     primary_question: "連結要導向哪？產品頁 / 活動頁 / 文章 / app 下載？",
     primary_input: { key: "link_purpose", placeholder: "例：導到健力餐 14 包組合產品頁", type: "textarea" },
@@ -232,7 +232,7 @@ caption 欄位放 5 個編號 description（每行一個）。${FB_TONE_SUFFIX}`
     postType: "pinned",
     label: "FB 釘選貼文短文案",
     description: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」",
-    agent_id: 239030,             // Blair Chen — VP FB Traffic System Strategy（釘選定位專家）
+    agent_id: 224089,             // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
     skill_slug: "fb-copywriting",
     primary_question: "想讓第一次來粉專的人，3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼值得追蹤", type: "textarea" },
@@ -273,7 +273,7 @@ output: caption 放完整 Story 文（30-60 字，會疊在圖片上） / title 
     postType: "feed", // pre-live announcement post is feed-shaped
     label: "FB 直播標題 + 預告短文",
     description: "直播開始前 1-2 小時的預告 caption",
-    agent_id: 40,                 // Vicky Feng — Live Stream Host (Plan B, 2026-05-05)
+    agent_id: 180150,             // Brian Lin — Influencer Marketing Manager (live promotion expert)
     skill_slug: "social-copy",
     primary_question: "今天的直播要講什麼？",
     primary_input: { key: "live_topic", placeholder: "例：產品試用、新品發表、Q&A", type: "text" },
@@ -430,7 +430,7 @@ export interface OrchestraConfig {
   scoutKind?: "viral" | "festivals" | "trending" | "news";
 }
 
-const MANDY_ID = 239184;     // FB Visual Direction Lead — caption-short 主場
+const MANDY_ID = 220887;     // Claire Chen — Brand Visual Designer (977 char persona, was Mandy 199)
 // 2026-05-08 (CJ direction): every FB-30s task gets its own image director.
 // All from existing mos_db pool with bio 400+ chars; no new agents.
 const RITA_ID    = 220862;   // Rita Chen — Brand Narrative Editor

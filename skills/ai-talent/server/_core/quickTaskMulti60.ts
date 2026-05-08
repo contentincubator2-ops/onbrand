@@ -84,7 +84,7 @@ export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 300, captionMaxChars: 450,
-    strategistAgentId: 220863, postLabels: ["第 1 集", "第 2 集", "第 3 集"],
+    strategistAgentId: 30007, postLabels: ["第 1 集", "第 2 集", "第 3 集"], // Chloe Chen — Short Video Strategy PM (2036 char)
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "tt-60-viral-rewrite": {
@@ -92,7 +92,7 @@ export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 300, captionMaxChars: 500,
-    strategistAgentId: 180142, specialtyAgentId: 180643, // Amanda Adams — Chief Legal Officer
+    strategistAgentId: 180151, specialtyAgentId: 180643, // Lisa Chang — Social Media Analyst (1715) + Amanda Adams — Chief Legal
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 };
@@ -235,7 +235,7 @@ export const EMAIL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["預告", "開賣", "最後機會"],
     captionMinChars: 300, captionMaxChars: 500,
-    strategistAgentId: 60007, postLabels: ["預告", "開賣", "最後機會"],
+    strategistAgentId: 222209, postLabels: ["預告", "開賣", "最後機會"], // Chang Hui-Wen — Email Automation Strategist (1324 char)
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "em-60-onboarding-3": {

@@ -487,7 +487,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["預告 1", "預告 2", "當日", "事後"],
     captionMinChars: 150,
     captionMaxChars: 250,
-    strategistAgentId: 31, // Eric Lin — Event Marketing
+    strategistAgentId: 30008, // Ryan Lee — Media & PR Strategy PM (2175 char)
     postLabels: ["預告 1", "預告 2", "當日", "事後"],
     extras: {
       postsCount: 4, narrativeArc: true,
@@ -507,7 +507,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "精華回顧"],
     captionMinChars: 80,
     captionMaxChars: 200,
-    strategistAgentId: 232765, // Live Engagement Specialist
+    strategistAgentId: 60032, // Kevin Gong — F&B Short Video Scriptwriter (1010 char, live-stream-friendly)
     postLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "精華回顧"],
     extras: {
       postsCount: 6, narrativeArc: true,

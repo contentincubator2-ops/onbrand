@@ -419,7 +419,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     captionMinChars: 600, captionMaxChars: 1200,
-    strategistAgentId: 60007, // Ryan Yu
+    strategistAgentId: 224094, // Jing Yi Lim — Social Media Strategist B2B SaaS MY (1143 char)
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     scoutKind: "festivals", // 月曆 → 抓即時節慶
     extras: { ...fb100Common.extras, postsCount: 4 },
@@ -449,7 +449,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
     captionMinChars: 80, captionMaxChars: 200,
-    strategistAgentId: 232765,
+    strategistAgentId: 60031, // Yawen Ma — Brand Short Video Scriptwriter Beauty (787 char)
     postLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
     scoutKind: "viral",
     extras: { ...fb100Common.extras, postsCount: 9 },
@@ -460,7 +460,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["偵測警示", "第一份聲明", "24h 更新", "48h 更新", "72h 更新", "1 週 follow-up", "媒體 talking points"],
     captionMinChars: 200, captionMaxChars: 400,
     strategistAgentId: 90011,
-    specialtyAgentId: 180592, // Emma Anderson — Legal Director (crisis claims review)
+    specialtyAgentId: 180630, // Shirley Sanchez — Global Affairs & General Counsel (2355 char)
     postLabels: ["偵測警示", "第一份聲明", "24h 更新", "48h 更新", "72h 更新", "1 週 follow-up", "媒體 talking points"],
     scoutKind: "trending", // 危機處理 → 抓即時相關新聞
     extras: { ...fb100Common.extras, postsCount: 7, legalAssistant: true, narrativeArc: true },
@@ -493,7 +493,7 @@ export const IG_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", fluxSize: "portrait_9_16",
     variantLabels: ["第 1 集", "第 2 集", "第 3 集", "第 4 集", "第 5 集", "第 6 集"],
     captionMinChars: 250, captionMaxChars: 500,
-    strategistAgentId: 220863,
+    strategistAgentId: 180162, // Jason Peng — Social Media Copywriter (1440 char)
     postLabels: ["第 1 集", "第 2 集", "第 3 集", "第 4 集", "第 5 集", "第 6 集"],
     scoutKind: "viral",
     extras: { ...ig100Common.extras, postsCount: 6 },
@@ -503,7 +503,7 @@ export const IG_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["新 Bio", "Highlight 套組", "Launch Post 1-3", "Launch Post 4-6", "Launch Post 7-9"],
     captionMinChars: 250, captionMaxChars: 500,
-    strategistAgentId: 180142,
+    strategistAgentId: 60005, // Aaron Pei — B2B Tech Brand Marketing (1181 char)
     postLabels: ["新 Bio", "Highlight 套組", "Launch Post 1-3", "Launch Post 4-6", "Launch Post 7-9"],
     scoutKind: "viral",
     extras: { ...ig100Common.extras, postsCount: 5 },
@@ -526,7 +526,7 @@ export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["EP1", "EP2", "EP3", "EP4", "EP5", "EP6"],
     captionMinChars: 500, captionMaxChars: 1000,
-    strategistAgentId: 90025, // Jane Ng — General Manager, Brand Guidance
+    strategistAgentId: 90002, // Darren Freeman — Creative Excellence Director (2348 char)
     postLabels: ["EP1", "EP2", "EP3", "EP4", "EP5", "EP6"],
     scoutKind: "viral",
     extras: { ...yt100Common.extras, postsCount: 6 },
@@ -536,7 +536,7 @@ export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["內容支柱", "12 影片 title", "Community 月曆", "Competitor 分析", "即時趨勢報告"],
     captionMinChars: 300, captionMaxChars: 600,
-    strategistAgentId: 180030,
+    strategistAgentId: 30004, // Kevin Lin — YouTube Strategy PM (2315 char)
     postLabels: ["內容支柱", "12 影片 title", "Community 月曆", "Competitor 分析", "即時趨勢報告"],
     scoutKind: "news", // 季度策略 → 抓產業最新
     extras: { ...yt100Common.extras, postsCount: 5 },
@@ -546,7 +546,7 @@ export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["Trailer 腳本", "Community 倒數 ×5", "直播配套", "精華剪輯指南"],
     captionMinChars: 200, captionMaxChars: 400,
-    strategistAgentId: 90027, // Jayati Basu — Ad Effectiveness & Pack Design Lead, APAC
+    strategistAgentId: 90022, // Andy Gallagher — Head of Creative & Media (1464 char)
     postLabels: ["Trailer 腳本", "Community 倒數 ×5", "直播配套", "精華剪輯指南"],
     scoutKind: "viral",
     extras: { ...yt100Common.extras, postsCount: 4 },
@@ -566,7 +566,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     captionMinChars: 300, captionMaxChars: 700,
-    strategistAgentId: 90021, // Doreen Wang — CEO, Greater China
+    strategistAgentId: 90015, // Sonia Belgacem — Global Client Service Manager, Creative Excellence (1547 char)
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     scoutKind: "festivals",
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },

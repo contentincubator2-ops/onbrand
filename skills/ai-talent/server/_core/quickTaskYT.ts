@@ -48,7 +48,7 @@ ${YT_TONE_SUFFIX}
     postType: "video-card",
     label: "YT 縮圖文案 + 視覺 brief",
     description: "縮圖大字（5-8 字）+ 整體視覺風格方向",
-    agent_id: 36, // Nina Yeh — YouTube Scriptwriter
+    agent_id: 30014, // Nina Liu — YouTube Script Creator (1929 char persona)
     skill_slug: "youtube-publisher",
     primary_question: "貼影片網址或描述影片主題",
     primary_input: { key: "topic_or_url", placeholder: "https://youtu.be/...  或  影片主題", type: "textarea" },
@@ -98,7 +98,7 @@ caption 結構：
     postType: "watch",
     label: "YT 章節時間軸（自動切章節）⭐",
     description: "貼影片網址 → 自動從 transcript 切章節時間戳",
-    agent_id: 180268, // Kevin Chiang — extract-youtube-transcript ⭐
+    agent_id: 223993, // Pin-Chen Yang — YouTube Marketing Strategist 醫材 (1033 char)
     skill_slug: "extract-youtube-transcript",
     primary_question: "貼 YouTube 影片網址（系統會自動抓字幕）",
     primary_input: { key: "url", placeholder: "https://youtu.be/...", type: "text" },

@@ -286,7 +286,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["教學式", "清單式", "故事式", "對比式", "金句式"],
     captionMinChars: 150, captionMaxChars: 250,
-    strategistAgentId: 180030, // Kevin Lin
+    strategistAgentId: 222308, // Hsin-Yi Wu — Email Marketing & CRM Strategist (1415 char)
     extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
   },
 
@@ -304,7 +304,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["Day 5", "Day 4", "Day 3", "Day 2", "Day 1"],
     captionMinChars: 80, captionMaxChars: 130,
-    strategistAgentId: 60007, // Ryan Yu
+    strategistAgentId: 224084, // Michelle Lim — Social Media Strategist Beauty MY (1178 char)
     postLabels: ["Day 5", "Day 4", "Day 3", "Day 2", "Day 1"],
     extras: { postsCount: 5, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
@@ -323,7 +323,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["預告", "開場宣告", "高潮亮點", "結尾 CTA", "精華回顧"],
     captionMinChars: 80, captionMaxChars: 200,
-    strategistAgentId: 232765, // Live Engagement Specialist
+    strategistAgentId: 60034, // Ethan Tsai — Travel Short Video Scriptwriter (942 char)
     postLabels: ["預告", "開場宣告", "高潮亮點", "結尾 CTA", "精華回顧"],
     extras: { postsCount: 5, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
@@ -333,7 +333,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 150, captionMaxChars: 250,
-    strategistAgentId: 220863, // Nelson Chen
+    strategistAgentId: 30020, // Iris Yi — Social Media Manager (2001 char)
     postLabels: ["第 1 集", "第 2 集", "第 3 集"],
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
@@ -343,7 +343,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 150, captionMaxChars: 300,
-    strategistAgentId: 180142, // Kevin Liu — Social Listening
+    strategistAgentId: 180155, // Grace Liao — Social Media Advertising Specialist (1594 char)
     specialtyAgentId: 180605,  // Jason Lee — SVP & General Counsel (compare/claims review)
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
