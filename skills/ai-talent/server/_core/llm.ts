@@ -178,16 +178,16 @@ const PROVIDER_CONFIG: Record<
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
 
-  // Resource 2: sowork-ai-position-resource (cognitiveservices endpoint)
-  //   Models: claude-sonnet-4-6, claude-haiku-4-5, gpt-5.4-pro, gpt-5.4-nano,
-  //           cohere-command-a, FLUX.1-Kontext-pro,
-  //           gpt-image-1/1-mini/1.5/2, gpt-4o-mini-tts, gpt-4o-transcribe,
-  //           gpt-audio-1.5, whisper
+  // Resource 2: sowork-ai-position-resource (services.ai.azure.com)
+  //   2026-05-08 (CJ): correct endpoint is services.ai.azure.com NOT
+  //   cognitiveservices.azure.com, and uses Anthropic-style /anthropic/v1/messages
+  //   API (NOT OpenAI-compat /chat/completions). Models claude-sonnet-4-6,
+  //   claude-haiku-4-5 — both confirmed via /anthropic/v1/messages.
   //   Key: AZURE_POSITION_API_KEY  Endpoint: AZURE_POSITION_ENDPOINT
   "azure-position": {
     baseUrl:      (ENV as any).AZURE_POSITION_ENDPOINT
-      ? `${((ENV as any).AZURE_POSITION_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://sowork-ai-position-resource.cognitiveservices.azure.com/openai/v1",
+      ? `${((ENV as any).AZURE_POSITION_ENDPOINT as string).replace(/\/$/, "")}/anthropic/v1`
+      : "https://sowork-ai-position-resource.services.ai.azure.com/anthropic/v1",
     defaultModel: (ENV as any).AZURE_POSITION_MODEL || "claude-sonnet-4-6",
     getKey:       () => (ENV as any).AZURE_POSITION_API_KEY ?? "",
   },
@@ -607,13 +607,64 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Since we no longer use OpenRouter, remap any of those to the active provider's defaultModel.
   let model = params.model ?? config.defaultModel;
   const looksLikeProviderPrefixed = model.includes("/") || /^(claude|anthropic|google|gemini|meta|mistral)/i.test(model);
-  if (looksLikeProviderPrefixed) {
+  if (looksLikeProviderPrefixed && providerKey !== "anthropic" && providerKey !== "azure-position") {
     model = config.defaultModel;
   }
   // Azure Foundry: when the caller didn't pin a model, pick by message language.
   if (providerKey === "azure-foundry" && !params.model) {
     model = pickAzureModelForMessages(params.messages);
   }
+
+  // ─ Anthropic-shape providers: native /messages API ────────────────────
+  // Both anthropic-direct (api.anthropic.com) and azure-position
+  // (services.ai.azure.com/anthropic) use Anthropic's /v1/messages shape:
+  //   request:  { system, messages: [{role,content}], model, max_tokens }
+  //   headers:  x-api-key + anthropic-version
+  //   response: { content: [{type:"text",text:"..."}] }
+  if (providerKey === "anthropic" || providerKey === "azure-position") {
+    const anthropicMessages: Array<{ role: string; content: string }> = [];
+    let systemPrompt = "";
+    for (const m of params.messages) {
+      const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+      if (m.role === "system") systemPrompt += (systemPrompt ? "\n\n" : "") + text;
+      else anthropicMessages.push({ role: m.role, content: text });
+    }
+    const anthropicPayload: Record<string, unknown> = {
+      model,
+      max_tokens: params.maxTokens ?? params.max_tokens ?? 4096,
+      messages: anthropicMessages,
+    };
+    if (systemPrompt) anthropicPayload.system = systemPrompt;
+
+    const apiUrl = `${config.baseUrl}/messages`;
+    const r = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(anthropicPayload),
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(`LLM invoke failed (${providerKey}): ${r.status} – ${txt.slice(0, 400)}`);
+    }
+    const j: any = await r.json();
+    const text = (j.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+    // Convert to OpenAI-compat shape so callers don't care about provider
+    return {
+      id: j.id ?? "",
+      model: j.model ?? model,
+      choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: j.stop_reason ?? "stop" }],
+      usage: {
+        prompt_tokens: j.usage?.input_tokens ?? 0,
+        completion_tokens: j.usage?.output_tokens ?? 0,
+        total_tokens: (j.usage?.input_tokens ?? 0) + (j.usage?.output_tokens ?? 0),
+      },
+    } as any;
+  }
+
   const apiUrl = `${config.baseUrl}/chat/completions`;
 
   const {

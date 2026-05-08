@@ -1,0 +1,43 @@
+name: Admin — Fix AZURE_POSITION_ENDPOINT to services.ai.azure.com
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            # Update endpoint (was cognitiveservices.azure.com — gives 404)
+            NEW="https://sowork-ai-position-resource.services.ai.azure.com"
+            if grep -q "^AZURE_POSITION_ENDPOINT=" .env; then
+              awk -v new="$NEW" 'BEGIN{FS=OFS="="} /^AZURE_POSITION_ENDPOINT=/{$0="AZURE_POSITION_ENDPOINT="new} 1' .env > .env.new
+              mv .env.new .env
+            else
+              echo "AZURE_POSITION_ENDPOINT=$NEW" >> .env
+            fi
+            echo "Updated:"
+            grep "^AZURE_POSITION_ENDPOINT=" .env
+
+            # Restart pm2 to pick up env
+            pm2 restart marketing-os --update-env || pm2 restart all --update-env
+            sleep 2
+            pm2 status | head -10
+
+            echo ""
+            echo "── Verify new endpoint works ──"
+            set -a; source .env; set +a
+            curl -s -o /tmp/v.txt -w "HTTP %{http_code} (%{time_total}s)\n" --max-time 30 \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: $AZURE_POSITION_API_KEY" \
+              -H "anthropic-version: 2023-06-01" \
+              "$AZURE_POSITION_ENDPOINT/anthropic/v1/messages" \
+              -d '{"model":"claude-haiku-4-5","max_tokens":20,"messages":[{"role":"user","content":"hi"}]}'
+            cat /tmp/v.txt | head -c 600; echo
