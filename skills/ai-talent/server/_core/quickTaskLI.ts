@@ -30,7 +30,7 @@ ${LI_TONE}`,
     tier: "30s", postType: "feed",
     label: "LI hook 3 種（吸引滑停）",
     description: "前 1-2 句鉤子（決定看不看下去）",
-    agent_id: 229905, skill_slug: "hook-copywriter",
+    agent_id: 60005, skill_slug: "hook-copywriter", // Aaron Pei — B2B Tech Brand Marketing (1181 char)
     primary_question: "貼文主題？",
     primary_input: { key: "topic", placeholder: "例：B2B SaaS 行銷成本優化", type: "textarea" },
     inputs: [{ key: "topic", label: "主題", type: "textarea", required: true }],

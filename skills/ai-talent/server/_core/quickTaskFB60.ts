@@ -28,7 +28,7 @@ export const FB60_UNIVERSAL = {
   replyAgentId: 180163,     // Helen Sung
   schedulerAgentId: 30003,  // David Wang
   followupAgentId: 60012,   // Sophie Ho
-  imageDirectorId: 239184,  // Mandy Cheng
+  imageDirectorId: 220887,  // Claire Chen — Brand Visual Designer (977 char)
 } as const;
 
 const FB60_TONE = `
@@ -46,7 +46,7 @@ export const FB_60S_TASKS_V2: FBTaskTemplate[] = [
     postType: "feed",
     label: "FB 單篇完整貼文",
     description: "5 variants + 5 真生圖 + 留言模板 + 發文時段 + 24h 跟進",
-    agent_id: 239183, // Aiden Hsu
+    agent_id: 222211, // Hsieh Jia-Rong — Meta Ads Creative Strategist (1322 char)
     skill_slug: "fb-copywriting",
     primary_question: "今天這篇貼文要講什麼？",
     primary_input: { key: "topic", placeholder: "例：春季新品 / 客戶感謝 / 產品 lifestyle", type: "textarea" },
@@ -114,7 +114,7 @@ ${FB60_TONE}`,
     postType: "carousel",
     label: "FB Carousel 5 卡輪播",
     description: "Hook-Build-Turn-Payoff-CTA + Strategist 結構 + 5 卡敘事",
-    agent_id: 224294, // Tyler Brooks (Short-Form)
+    agent_id: 224061, // Xiu Yi Chen — Email & CRM Strategist Beauty SG (1250 char)
     skill_slug: "social-copy",
     primary_question: "輪播主題是什麼？",
     primary_input: { key: "topic", placeholder: "輪播 5 卡要傳達的主題", type: "textarea" },
@@ -190,7 +190,7 @@ ${FB60_TONE}`,
     postType: "feed",
     label: "FB 直播完整配套 (6 段)",
     description: "預告 / 開場 / 3 爆點 / 精華回顧 6 篇平行",
-    agent_id: 40, // Vicky Feng
+    agent_id: 30009, // Amy Huang — Event Marketing Strategy PM
     skill_slug: "social-copy",
     primary_question: "這次直播主題？",
     primary_input: { key: "live_topic", placeholder: "例：產品試用 / 新品發表 / Q&A", type: "text" },
@@ -218,7 +218,7 @@ ${FB60_TONE}`,
     postType: "pinned",
     label: "FB 釘選 + 3 配套",
     description: "釘選主貼文 + 3 種補充配套（FAQ / about / 案例）",
-    agent_id: 239030, // Blair Chen — VP FB Traffic System Strategy
+    agent_id: 224059, // Rui Xuan Teo — Social Media Strategist Beauty SG (1149 char)
     skill_slug: "fb-copywriting",
     primary_question: "想讓新訪客 3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼追蹤", type: "textarea" },
@@ -344,7 +344,7 @@ ${FB60_TONE}`,
     tier: "60s", postType: "ad",
     label: "FB 廣告完整包 A/B/C",
     description: "3 個獨立廣告（情感 / 理性 / 反差切角），每個含完整 caption + 3 張配圖風格",
-    agent_id: 239027, // Ellis Liu — VP $100M Offers
+    agent_id: 224179, // Lorenzo Dela Rosa — Social Media Strategist Health PH (1145 char)
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告的主推產品 / 受眾 / 賣點？",
     primary_input: { key: "campaign", placeholder: "例：母親節健力餐高蛋白組合，職業媽媽 35-50 歲", type: "textarea" },
@@ -371,7 +371,7 @@ caption 欄位整合輸出格式：
 // orchestra automatically when tier === "60s" + extras populated.
 // imageDirectorId = Mandy Cheng (239184) for every task.
 
-const MANDY    = 239184;  // Mandy Cheng (主場 single-full)
+const MANDY    = 220887;  // Claire Chen — Brand Visual Designer (977 char, was Mandy 199)
 // 2026-05-08 (CJ direction): per-task unique image directors for FB 60s
 const FB60_DIR_LUKE   = 220734; // Luke Hsu — Quantitative Research Designer
 const FB60_DIR_REINA  = 220736; // Reina Yang — Quantitative Research Designer

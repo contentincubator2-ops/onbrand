@@ -82,7 +82,7 @@ ${IG_TONE}`,
     postType: "carousel",
     label: "IG Carousel 7 卡輪播",
     description: "Strategist 規劃敘事弧 + 7 卡內容 + 統一視覺基調",
-    agent_id: 224294, // Tyler Brooks
+    agent_id: 224159, // Lukman Hakim — Social Media Strategist Beauty ID (1135 char)
     skill_slug: "carousel-copywriter",
     primary_question: "輪播主題？",
     primary_input: { key: "topic", placeholder: "教學 / 清單 / 故事 / 對比 etc.", type: "textarea" },

@@ -135,7 +135,7 @@ caption 結構（每變體）— 用換行分段：
     postType: "carousel",
     label: "IG Carousel 10 頁結構",
     description: "1 標題頁 + 8 內容頁 + 1 CTA 頁，每頁文字",
-    agent_id: 224294, // Tyler Brooks — Short-Form Marketing Copywriter
+    agent_id: 224094, // Jing Yi Lim — Social Media Strategist B2B SaaS MY (1143 char)
     skill_slug: "short-form-copywriting",
     primary_question: "想做什麼主題的 carousel？（教學 / 清單 / 反差 / 故事）",
     primary_input: { key: "topic", placeholder: "例：5 個被低估的 IG 演算法技巧 / 我從 0 學設計的 3 個錯誤", type: "textarea" },

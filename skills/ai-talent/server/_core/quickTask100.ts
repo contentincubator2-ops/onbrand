@@ -31,7 +31,7 @@ export const FB_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "feed",
     label: "FB 30 天內容月曆",
     description: "30 天每日貼文大綱 + 內容支柱配比 + 真實爆款參考 + scout 抓即時節慶",
-    agent_id: 239183, // Aiden Hsu
+    agent_id: 224089, // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
     skill_slug: "content-calendar",
     primary_question: "本月主推 / 主題？",
     primary_input: { key: "monthly_focus", placeholder: "例：母親節檔 / 新品上市 / 品牌週年", type: "textarea" },
@@ -93,7 +93,7 @@ ${TONE_100}`,
     tier: "100s", postType: "feed",
     label: "FB 直播完整 9 段配套",
     description: "預告 + 開場 + 5 爆點 + 結尾 + 精華回顧 + reel 剪輯指南",
-    agent_id: 40, // Vicky Feng
+    agent_id: 224154, // Dewi Rahayu — Social Media Strategist Health ID (1135 char)
     skill_slug: "social-copy",
     primary_question: "直播主題 + 重點？",
     primary_input: { key: "live_topic", placeholder: "Q&A / 新品試用 / 直播試吃", type: "text" },
@@ -390,7 +390,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
 
 // ─── Orchestra configs ──────────────────────────────────────────────────
 // Image directors per channel
-const MANDY = 239184, NANCY = 180170, NINA = 180157, ANNA = 180165;
+const MANDY = 220887, NANCY = 180170, NINA = 180157, ANNA = 180165; // Mandy → Claire Chen (977 char)
 const ZEYU = 60071, NATHAN = 60062, BR_IMG = 60030, RS_IMG = 24;
 // 2026-05-08: per-task unique image directors for 100s tier
 const TT100_IMG2 = 220896; // Brian Chen — Digital Experience Designer
