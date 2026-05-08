@@ -42,7 +42,7 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
         )}
         {liveCaption && (
           <div className="absolute top-12 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2 max-h-[55%] overflow-y-auto pr-12">
-            <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
+            <p className="text-sm text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
           </div>
         )}
         <div className="absolute right-2 bottom-24 z-10 flex flex-col items-center gap-4">
@@ -110,7 +110,7 @@ export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
             <Button variant="bordered" size="sm" radius="md">傳訊息</Button>
           </div>
           {liveCaption ? (
-            <p className="text-tiny text-default-700 whitespace-pre-line leading-relaxed pt-1">{liveCaption}</p>
+            <p className="text-sm text-default-700 whitespace-pre-line leading-relaxed pt-1">{liveCaption}</p>
           ) : (
             <p className="text-tiny text-default-500 pt-1">{brandName ?? "Your Brand"} · 點擊查看簡介</p>
           )}
@@ -235,7 +235,7 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         {liveCaption && (
           <div className="absolute top-12 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto">
             <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">開場腳本</p>
-            <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
+            <p className="text-sm text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
           </div>
         )}
         {/* Floating gift animations */}

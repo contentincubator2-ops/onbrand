@@ -606,6 +606,15 @@ export default function TheaterPage() {
   // Brain bar state
   const [running, setRunning] = useState(false);
   const [station, setStation] = useState<BrainStation | null>(null);
+  // 2026-05-08 (CJ test report #2): track run start so we can show
+  // elapsed + ETA. Per-cell wall is ~6-8s; total = cells × 7s.
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [tickNow, setTickNow] = useState<number>(Date.now());
+  React.useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setTickNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [running]);
 
   // Build the station script when run starts
   const startRun = async () => {
@@ -620,6 +629,7 @@ export default function TheaterPage() {
     }
 
     setRunning(true);
+    setRunStartedAt(Date.now());
 
     // Reset all cells
     const fresh = new Map<CellKey, CellState>();
@@ -1178,16 +1188,43 @@ export default function TheaterPage() {
               >
                 {cells.size > 0 ? "重新企劃" : "開始企劃"}
               </Button>
-            ) : (
-              <Button
-                color="danger"
-                variant="flat"
-                onPress={() => { stopRef.current = true; stopRun(); }}
-                startContent={<X size={14} strokeWidth={2} />}
-              >
-                停止
-              </Button>
-            )}
+            ) : (() => {
+              // 2026-05-08 (CJ test report #2): live elapsed + ETA + done/total
+              const total = cells.size;
+              let done = 0;
+              cells.forEach((c) => { if (c.status === "done" || c.status === "failed") done++; });
+              const elapsedMs = runStartedAt ? tickNow - runStartedAt : 0;
+              const elapsedSec = Math.floor(elapsedMs / 1000);
+              // Per-cell budget ~7s; with parallelism factor 2, total ≈ ceil(total/2) * 7s
+              const expectedTotalSec = Math.ceil(total / 2) * 7;
+              const remainingSec = Math.max(0, expectedTotalSec - elapsedSec);
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+              return (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-col items-end">
+                    <div className="text-[11px] text-default-600 tabular-nums">
+                      {done}/{total} · {Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, "0")}
+                      {" / "}
+                      ~{Math.floor(expectedTotalSec / 60)}:{String(expectedTotalSec % 60).padStart(2, "0")}
+                      {remainingSec > 0 && elapsedSec < expectedTotalSec && (
+                        <span className="text-default-400 ml-1">（剩 {remainingSec}s）</span>
+                      )}
+                    </div>
+                    <div className="w-32 h-1 bg-default-200 rounded-full overflow-hidden mt-1">
+                      <div className="h-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                  <Button
+                    color="danger"
+                    variant="flat"
+                    onPress={() => { stopRef.current = true; stopRun(); }}
+                    startContent={<X size={14} strokeWidth={2} />}
+                  >
+                    停止
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
         </div>
 

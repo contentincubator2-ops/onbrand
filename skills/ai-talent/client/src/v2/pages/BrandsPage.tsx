@@ -796,11 +796,17 @@ export default function BrandsPage() {
                 return (
                   <button
                     key={t.v}
+                    type="button"
                     onClick={() => setCategory(t.v)}
-                    className="flex flex-col items-center gap-1.5 shrink-0 transition hover:scale-105 cursor-pointer relative"
+                    /* 2026-05-08 (CJ feedback #4): label was unreliable as a
+                       click target because hover-scale on the parent shifted
+                       hit-box mid-click. pointer-events-none on the inner
+                       children + explicit type="button" + hover handled by
+                       a sibling style prevents the issue. */
+                    className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer relative px-1 py-1 hover:scale-105 transition-transform"
                   >
                     <div
-                      className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
+                      className={`pointer-events-none w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
                       style={{ background: t.bg }}
                     >
                       <Icon size={24} strokeWidth={2} color="#fff" />
@@ -814,7 +820,7 @@ export default function BrandsPage() {
                         </span>
                       )}
                     </div>
-                    <span className={`text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
+                    <span className={`pointer-events-none text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
                       {t.label}
                       {locked && <span className="ml-1 text-[10px] font-normal" style={{ color: "#71717A" }}>·已鎖定</span>}
                     </span>

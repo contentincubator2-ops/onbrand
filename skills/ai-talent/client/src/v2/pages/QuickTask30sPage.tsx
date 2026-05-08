@@ -12,6 +12,8 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { showToastGlobal } from "../../components/ui/Toast";
+import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Avatar, Badge, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
@@ -245,6 +247,29 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     : { data: null, refetch: () => {} };
   const brandLogoUrl: string | null = (brandQuery.data as any)?.logoUrl ?? null;
 
+  // 2026-05-08 (CJ test report #3): probe brand text-asset emptiness so
+  // we can prompt the user to fill them on first task run. Without
+  // voice / banned_words / preferred_terms etc., the AI has no real
+  // grounding for tone — first-time output ends up generic.
+  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
+    { brandId: brandId ?? 0, productId: null, eventId: null },
+    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
+  );
+  const brandAssetsForCheck: Record<string, any> =
+    ((scopeActiveQuery?.data as any)?.brand?.positioning?._assets ?? {}) as Record<string, any>;
+  const textAssetsEmpty = useMemo(() => {
+    const v = (assetKey: string): boolean => {
+      const a = brandAssetsForCheck[assetKey];
+      if (!a) return true;
+      if (typeof a.text === "string" && a.text.trim()) return false;
+      if (Array.isArray(a.items) && a.items.some((x: any) => typeof x === "string" && x.trim())) return false;
+      if (Array.isArray(a.pairs) && a.pairs.some((p: any) => p?.from?.trim() && p?.to?.trim())) return false;
+      return true;
+    };
+    // Treat as "empty" if all four core voice assets are blank
+    return v("voice") && v("voice_principles") && v("preferred_terms") && v("banned_words");
+  }, [brandAssetsForCheck]);
+
   const [channel, setChannel] = useState<Channel>("facebook");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -304,12 +329,18 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
       });
     }
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+      // 2026-05-08 (CJ test report #1): synonym-aware search.
+      // 「活動公告」 → matches "FB 短貼文 caption" / "FB 活動 launch kit"
+      // 「TikTok 文案」 → matches all TikTok caption tasks
+      // 「IG 貼文」 → matches IG caption (not just IG→Threads 改寫)
       list = list.filter((t) =>
-        t.label.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
-        (t.agent?.name ?? "").toLowerCase().includes(q) ||
-        (t.skill_slug ?? "").toLowerCase().includes(q),
+        matchTaskWithSynonyms({
+          query: searchQuery,
+          label: t.label,
+          description: t.description ?? "",
+          agentName: t.agent?.name,
+          skillSlug: t.skill_slug ?? undefined,
+        }),
       );
     }
     return list;
@@ -505,6 +536,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const handleCopy = () => {
     if (!output?.caption) return;
     navigator.clipboard.writeText(output.caption);
+    showToastGlobal("已複製到剪貼簿", "success");
   };
 
   const mockupVariant: MockupVariant | null = useMemo(() => {
@@ -815,6 +847,29 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               <ModalBody>
                 {!output ? (
                   <>
+                    {/* 2026-05-08 (CJ test report #3): prompt user to set
+                        brand voice/words BEFORE running, so output isn't
+                        generic. Only shows when all 4 core text assets
+                        (voice / principles / preferred / banned) are empty. */}
+                    {textAssetsEmpty && brandId && (
+                      <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
+                        <span className="text-base leading-none mt-0.5">💡</span>
+                        <div className="flex-1 leading-relaxed">
+                          <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
+                          {" "}先到{" "}
+                          <a
+                            href={`/brands?b=${brandId}&cat=copy`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline font-medium hover:text-amber-700"
+                          >
+                            品牌 → 文字
+                          </a>
+                          {" "}按「自動填寫」設好口吻 / 禁用詞，AI 產出會明顯貼合品牌語氣（不填也能跑，但結果會比較通用）。
+                        </div>
+                      </div>
+                    )}
+
                     {/* Primary question */}
                     {activeTask.primary_input && (
                       <div className="space-y-2">
@@ -1412,7 +1467,12 @@ function OutputCarousel({
           <span className="w-px h-5 bg-default-200 mx-1" />
           {/* GROUP D: 拿走 */}
           <ToolBtn lucide={Copy} label="複製文案"
-            onPress={() => { if (slide?.caption) navigator.clipboard.writeText(slide.caption); }} />
+            onPress={() => {
+              if (slide?.caption) {
+                navigator.clipboard.writeText(slide.caption);
+                showToastGlobal("已複製到剪貼簿", "success");
+              }
+            }} />
           <ToolBtn lucide={Save} label="儲存 / 加到專案" active={activeTool === "save"}
             onPress={() => toggleTool("save")} />
 
