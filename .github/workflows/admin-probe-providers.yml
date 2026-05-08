@@ -158,8 +158,19 @@ jobs:
             # ── Azure: sowork-ai-position-resource (claude-sonnet-4-6, gpt-5.4-pro) ──
             AZ_POS_KEY=$(get_key AZURE_POSITION_API_KEY)
             AZ_POS_EP=$(get_key AZURE_POSITION_ENDPOINT)
-            AZ_POS_EP="${AZ_POS_EP:-https://sowork-ai-position-resource.cognitiveservices.azure.com}"
-            probe_openai_compat "azure-position (claude)" "${AZ_POS_EP%/}/openai/v1" "claude-sonnet-4-6" "$AZ_POS_KEY" "api-key"
+            AZ_POS_EP="${AZ_POS_EP:-https://sowork-ai-position-resource.services.ai.azure.com}"
+            # azure-position uses Anthropic /v1/messages shape (NOT OpenAI-compat)
+            if [ -n "$AZ_POS_KEY" ]; then
+              POS_HTTP=$(curl -s -o /tmp/probe_out.txt -w "%{http_code}" \
+                -X POST "${AZ_POS_EP%/}/anthropic/v1/messages" \
+                -H "Content-Type: application/json" \
+                -H "x-api-key: $AZ_POS_KEY" \
+                -H "anthropic-version: 2023-06-01" \
+                --max-time 15 \
+                --data '{"model":"claude-haiku-4-5","max_tokens":20,"messages":[{"role":"user","content":"hi"}]}' || echo "000")
+              [ "$POS_HTTP" = "200" ] && POS_W="YES" || POS_W="NO "
+              printf "%-22s | %-3s | %-6s | %s\n" "azure-position (claude)" "YES" "$POS_HTTP" "$POS_W"
+            fi
 
             # ── Azure: proj-claude-sweden-resource (claude variants) ───────────
             AZ_CL_KEY=$(get_key AZURE_CLAUDE_SWEDEN_API_KEY)
@@ -171,7 +182,17 @@ jobs:
             AZ_NC_KEY=$(get_key AZURE_NORTHCENTRAL_API_KEY)
             AZ_NC_EP=$(get_key AZURE_NORTHCENTRAL_ENDPOINT)
             AZ_NC_EP="${AZ_NC_EP:-https://cjwan-mnykipqt-northcentralus.cognitiveservices.azure.com}"
-            probe_openai_compat "azure-northcentral (DS)" "${AZ_NC_EP%/}/openai/v1" "DeepSeek-V3.2" "$AZ_NC_KEY" "api-key"
+            # azure-northcentral uses /openai/deployments/{model}/chat/completions?api-version
+            if [ -n "$AZ_NC_KEY" ]; then
+              NC_HTTP=$(curl -s -o /tmp/probe_out.txt -w "%{http_code}" \
+                -X POST "${AZ_NC_EP%/}/openai/deployments/DeepSeek-V3.2/chat/completions?api-version=2024-10-21" \
+                -H "Content-Type: application/json" \
+                -H "api-key: $AZ_NC_KEY" \
+                --max-time 30 \
+                --data '{"messages":[{"role":"user","content":"hi"}],"max_tokens":10}' || echo "000")
+              [ "$NC_HTTP" = "200" ] && NC_W="YES" || NC_W="NO "
+              printf "%-22s | %-3s | %-6s | %s\n" "azure-northcentral (DS)" "YES" "$NC_HTTP" "$NC_W"
+            fi
 
             # ── Azure: cjwan-mnynpm8k-canadacentral (transcribe) ──────────────
             AZ_CA_KEY=$(get_key AZURE_CANADA_API_KEY)
