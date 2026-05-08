@@ -41,3 +41,4 @@ skills/ai-talent/scripts/squad-classification-draft.csv
 # SSH keys — NEVER commit
 *.pem
 *.key
+test-results/
