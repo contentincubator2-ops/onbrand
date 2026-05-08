@@ -218,7 +218,7 @@ ${FB60_TONE}`,
     postType: "pinned",
     label: "FB 釘選 + 3 配套",
     description: "釘選主貼文 + 3 種補充配套（FAQ / about / 案例）",
-    agent_id: 239183, // Aiden Hsu
+    agent_id: 239030, // Blair Chen — VP FB Traffic System Strategy
     skill_slug: "fb-copywriting",
     primary_question: "想讓新訪客 3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼追蹤", type: "textarea" },
@@ -344,7 +344,7 @@ ${FB60_TONE}`,
     tier: "60s", postType: "ad",
     label: "FB 廣告完整包 A/B/C",
     description: "3 個獨立廣告（情感 / 理性 / 反差切角），每個含完整 caption + 3 張配圖風格",
-    agent_id: 60021, // Tina Ji
+    agent_id: 239027, // Ellis Liu — VP $100M Offers
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告的主推產品 / 受眾 / 賣點？",
     primary_input: { key: "campaign", placeholder: "例：母親節健力餐高蛋白組合，職業媽媽 35-50 歲", type: "textarea" },

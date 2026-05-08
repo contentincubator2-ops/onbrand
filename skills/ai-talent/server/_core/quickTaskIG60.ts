@@ -118,7 +118,7 @@ ${IG_TONE}`,
     postType: "feed",
     label: "IG 5 天倒數系列",
     description: "Strategist 設計倒數弧 + 5 天 5 篇平行寫作 + 各自配圖",
-    agent_id: 180166, // Iris Liang
+    agent_id: 220584, // Ying-Chen Yu — IG/FB Marketing Specialist (vibe-marketing)
     skill_slug: "instagram-copywriting",
     primary_question: "倒數什麼活動？",
     primary_input: { key: "event_name", placeholder: "例：新品 / 週年慶 / 直播", type: "text" },

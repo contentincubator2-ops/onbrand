@@ -40,7 +40,7 @@ ${TONE("TikTok")}`,
     tier: "60s", postType: "foryou",
     label: "TikTok 3 集系列",
     description: "Strategist 設計 3 集弧 + 3 集腳本連貫",
-    agent_id: 30011, skill_slug: "short-video-script",
+    agent_id: 220506, skill_slug: "short-video-script", // Po-Hung Chen — Short-form Video Producer
     primary_question: "想做 3 集系列講什麼？",
     primary_input: { key: "story_topic", placeholder: "教學系列 / 故事系列", type: "textarea" },
     inputs: [{ key: "story_topic", label: "系列主題", type: "textarea", required: true }],
@@ -54,7 +54,7 @@ ${TONE("TikTok")}`,
     tier: "60s", postType: "foryou",
     label: "TikTok 爆款改寫",
     description: "Strategist 找原爆款結構 + 改寫品牌版 + 對照表",
-    agent_id: 30011, skill_slug: "short-video-script",
+    agent_id: 220508, skill_slug: "short-video-script", // Cheng-Han Lee — Short-form Video Producer Tech
     primary_question: "貼上爆款影片連結 / 主題",
     primary_input: { key: "viral_source", placeholder: "原爆款 TikTok 影片 / 主題", type: "textarea" },
     inputs: [
@@ -116,7 +116,7 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "newsletter",
     label: "LI Newsletter 一期",
     description: "Strategist 設計目錄 + 完整 newsletter（標題 + 引言 + 3 段 + CTA）",
-    agent_id: 30018, skill_slug: "linkedin-b2b",
+    agent_id: 180203, skill_slug: "linkedin-b2b", // Penny Lee — LinkedIn Authority Builder
     primary_question: "本期主題？",
     primary_input: { key: "topic", placeholder: "本期 newsletter 想講什麼", type: "textarea" },
     inputs: [{ key: "topic", label: "Newsletter 主題", type: "textarea", required: true }],
@@ -129,7 +129,7 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "feed",
     label: "LI 客戶案例改寫",
     description: "Strategist 找見證結構 + 改寫敘事 + 法務檢核",
-    agent_id: 30018, skill_slug: "linkedin-b2b",
+    agent_id: 60011, skill_slug: "linkedin-b2b", // Vincent Chu — PR Strategist (Tech Brand)
     primary_question: "貼上客戶案例 / 訪談",
     primary_input: { key: "testimonial_source", placeholder: "原始案例 / 訪談內容", type: "textarea" },
     inputs: [
@@ -190,7 +190,7 @@ export const EMAIL_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "edm",
     label: "Email 促銷序列 (3 封)",
     description: "Strategist 設計促銷弧 + 3 封郵件（預告 / 開賣 / 最後機會）",
-    agent_id: 30017, skill_slug: "email-marketing",
+    agent_id: 60012, skill_slug: "email-marketing", // Sophie Ho — Email CRM
     primary_question: "促銷活動？",
     primary_input: { key: "campaign", placeholder: "活動名稱 + 優惠", type: "textarea" },
     inputs: [{ key: "campaign", label: "活動", type: "textarea", required: true }],
@@ -204,7 +204,7 @@ ${TONE("Email")}`,
     tier: "60s", postType: "edm",
     label: "Email Onboarding 3 封",
     description: "新訂閱者前 3 封歡迎序列（D0 / D3 / D7）",
-    agent_id: 30017, skill_slug: "email-marketing",
+    agent_id: 60060, skill_slug: "email-marketing", // Zeyu Hsu — B2B Newsletter Copywriter
     primary_question: "你的服務 / 產品給新訂閱者的價值？",
     primary_input: { key: "value_prop", placeholder: "新訂閱者最該知道什麼", type: "textarea" },
     inputs: [{ key: "value_prop", label: "核心價值", type: "textarea", required: true }],
@@ -294,7 +294,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "Value Proposition 完整改寫",
     description: "Strategist 找競品差異 + 5 種 value prop 版本",
-    agent_id: 60037, skill_slug: "brand-strategy",
+    agent_id: 60035, skill_slug: "brand-strategy", // Yizhen Lin — Tech Brand PR Writer
     primary_question: "品牌 / 產品做什麼？",
     primary_input: { key: "product", placeholder: "產品 / 服務描述", type: "textarea" },
     inputs: [{ key: "product", label: "產品 / 服務", type: "textarea", required: true }],
@@ -308,7 +308,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "Brand Voice Guideline",
     description: "5 種品牌語氣樣本 + Do / Don't 對照",
-    agent_id: 60037, skill_slug: "brand-strategy",
+    agent_id: 32, skill_slug: "brand-strategy", // Fiona Hsu — Copywriter (deep specialty)
     primary_question: "想塑造什麼樣的品牌語氣？",
     primary_input: { key: "voice_direction", placeholder: "例：專業但親切、年輕但不浮誇", type: "textarea" },
     inputs: [{ key: "voice_direction", label: "語氣方向", type: "textarea", required: true }],
@@ -367,7 +367,7 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "用戶 Persona 5 張組",
     description: "5 種主要 persona 名片（demo + psycho + 痛點 + 渠道）",
-    agent_id: 60038, skill_slug: "user-research",
+    agent_id: 90004, skill_slug: "user-research", // Darren Chiu — Research Director, Consumer Insights
     primary_question: "你的產品 / 服務？",
     primary_input: { key: "product", placeholder: "產品 / 服務描述", type: "textarea" },
     inputs: [{ key: "product", label: "產品 / 服務", type: "textarea", required: true }],
@@ -381,7 +381,7 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "Jobs-to-be-Done 5 種",
     description: "5 個 JTBD 陳述 + 觸發情境 + 競爭對手",
-    agent_id: 60038, skill_slug: "user-research",
+    agent_id: 90005, skill_slug: "user-research", // Christine Hung — Senior Research Manager
     primary_question: "用戶在什麼情境會用到你？",
     primary_input: { key: "context", placeholder: "用戶情境描述", type: "textarea" },
     inputs: [{ key: "context", label: "用戶情境", type: "textarea", required: true }],

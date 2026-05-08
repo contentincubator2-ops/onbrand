@@ -250,7 +250,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "foryou",
     label: "TikTok 1 週追熱點完整套組",
     description: "7 天每天 1 個 trend + 品牌 hook + 3 種 hook 變化 + sound 建議",
-    agent_id: 30011, skill_slug: "short-video-script",
+    agent_id: 220507, skill_slug: "short-video-script", // Pin-Yen Liu — Short-form Video Producer Beauty
     primary_question: "想搭哪類熱點？",
     primary_input: { key: "trend_focus", placeholder: "節日 / meme / 新聞", type: "textarea" },
     inputs: [{ key: "trend_focus", label: "熱點類型", type: "textarea", required: true }],
@@ -278,7 +278,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "newsletter",
     label: "LI 季度 Newsletter 4 期",
     description: "季度 4 期 newsletter 完整內容 + 訂閱成長策略",
-    agent_id: 30018, skill_slug: "linkedin-b2b",
+    agent_id: 220164, skill_slug: "linkedin-b2b", // Sophia Hsu — Digital Transformation Consultant
     primary_question: "newsletter 季度大主題？",
     primary_input: { key: "quarter_topic", placeholder: "本季想串什麼主題", type: "textarea" },
     inputs: [{ key: "quarter_topic", label: "季度主題", type: "textarea", required: true }],
@@ -306,7 +306,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "edm",
     label: "Email 產品上線完整自動化 Sequence",
     description: "預告 ×2 / 上線 / 提醒 ×2 / 最後機會 / 後續 follow-up = 7 封",
-    agent_id: 30017, skill_slug: "email-marketing",
+    agent_id: 60061, skill_slug: "email-marketing", // Yahan Tsai — Retail E-commerce Newsletter Copywriter
     primary_question: "產品名稱 + 賣點？",
     primary_input: { key: "product", placeholder: "產品名 + 主要賣點", type: "textarea" },
     inputs: [{ key: "product", label: "產品", type: "textarea", required: true }],
@@ -349,7 +349,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: "Brand Voice 完整 Playbook",
     description: "8 個應用情境 + Do/Don't 詳細 + 5 個範例 + 跨平台 voice 適配",
-    agent_id: 60037, skill_slug: "brand-strategy",
+    agent_id: 26, skill_slug: "brand-strategy", // Emma Wu — Meta Ads Strategist (specialty 4338 chars)
     primary_question: "想塑造什麼語氣？",
     primary_input: { key: "voice_direction", placeholder: "語氣方向", type: "textarea" },
     inputs: [{ key: "voice_direction", label: "語氣方向", type: "textarea", required: true }],
@@ -377,7 +377,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: "User Research 競品研究完整地圖",
     description: "5-10 競品分析 + 定位 map + opportunity gaps + 推薦策略",
-    agent_id: 60038, skill_slug: "user-research",
+    agent_id: 90006, skill_slug: "user-research", // Steven Chen — Research Manager, Consumer Insights
     primary_question: "你的領域？",
     primary_input: { key: "category", placeholder: "產品類別 / 市場", type: "textarea" },
     inputs: [{ key: "category", label: "領域", type: "textarea", required: true }],
