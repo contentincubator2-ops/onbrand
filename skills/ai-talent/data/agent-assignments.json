@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-05-08T16:41:55.125Z",
+  "generatedAt": "2026-05-08T17:41:42.966Z",
   "poolSize": 3010,
-  "slotCount": 498,
-  "uniqueAgents": 498,
-  "avgThickness": 998,
+  "slotCount": 506,
+  "uniqueAgents": 506,
+  "avgThickness": 994,
   "minThickness": 401,
   "assignments": {
     "fb-30-caption-short": {
@@ -509,48 +509,48 @@
     },
     "yt-60-video-package": {
       "lead": 60001,
-      "imageDirector": 223998,
+      "imageDirector": 223261,
       "replyWriter": 222711,
-      "timingAdvisor": 222896,
+      "timingAdvisor": 222937,
       "followupWriter": 223695
     },
     "yt-60-shorts-script": {
       "lead": 180166,
-      "imageDirector": 223261,
+      "imageDirector": 223740,
       "strategist": 180304,
-      "replyWriter": 222474,
-      "timingAdvisor": 222937,
+      "replyWriter": 223304,
+      "timingAdvisor": 222429,
       "followupWriter": 223256
     },
     "yt-60-thumbnail-suite": {
       "lead": 223993,
-      "imageDirector": 223740,
-      "replyWriter": 223304,
-      "timingAdvisor": 222429,
+      "imageDirector": 223789,
+      "replyWriter": 223834,
+      "timingAdvisor": 220971,
       "followupWriter": 223101
     },
     "yt-60-series-3ep": {
       "lead": 223995,
       "imageDirector": 220900,
       "strategist": 223992,
-      "replyWriter": 223834,
-      "timingAdvisor": 220971,
+      "replyWriter": 223452,
+      "timingAdvisor": 224001,
       "followupWriter": 222749
     },
     "yt-60-community-post": {
       "lead": 223996,
-      "imageDirector": 223789,
+      "imageDirector": 222560,
       "replyWriter": 180143,
-      "timingAdvisor": 224001,
+      "timingAdvisor": 224005,
       "followupWriter": 222763
     },
     "yt-60-viral-rewrite": {
       "lead": 224003,
-      "imageDirector": 222560,
+      "imageDirector": 223107,
       "strategist": 223994,
       "specialty": 180782,
-      "replyWriter": 223452,
-      "timingAdvisor": 224005,
+      "replyWriter": 223917,
+      "timingAdvisor": 60015,
       "followupWriter": 223682,
       "compareTable": 90036
     },
@@ -737,26 +737,26 @@
     },
     "yt-100-series-6ep": {
       "lead": 224006,
-      "imageDirector": 223107,
+      "imageDirector": 222371,
       "strategist": 223997,
-      "replyWriter": 223917,
-      "timingAdvisor": 60015,
+      "replyWriter": 222786,
+      "timingAdvisor": 222368,
       "followupWriter": 180008
     },
     "yt-100-quarterly-strategy": {
       "lead": 224002,
-      "imageDirector": 222371,
+      "imageDirector": 222425,
       "strategist": 223999,
-      "replyWriter": 222786,
-      "timingAdvisor": 222368,
+      "replyWriter": 222894,
+      "timingAdvisor": 222533,
       "followupWriter": 180078
     },
     "yt-100-premiere-kit": {
       "lead": 224004,
-      "imageDirector": 222425,
+      "imageDirector": 222474,
       "strategist": 224000,
-      "replyWriter": 222894,
-      "timingAdvisor": 222533,
+      "replyWriter": 222896,
+      "timingAdvisor": 220405,
       "followupWriter": 223311
     },
     "tt-100-30day-foryou": {
@@ -827,6 +827,30 @@
     "rs-100-competitor-mapping": {
       "lead": 180623,
       "replyWriter": 223084
+    },
+    "theater-cell-facebook": {
+      "lead": 60056
+    },
+    "theater-cell-instagram": {
+      "lead": 220505
+    },
+    "theater-cell-youtube": {
+      "lead": 223998
+    },
+    "theater-cell-threads": {
+      "lead": 220502
+    },
+    "theater-cell-line": {
+      "lead": 220503
+    },
+    "theater-cell-blog": {
+      "lead": 220504
+    },
+    "media-image-gen": {
+      "imageDirector": 180912
+    },
+    "media-video-gen": {
+      "videoDirector": 220921
     }
   }
 }
