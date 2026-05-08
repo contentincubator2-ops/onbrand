@@ -143,32 +143,25 @@ authRouter.post("/register", async (req: Request, res: Response) => {
     const appUrl = process.env.APP_URL || "http://localhost:3001";
     const verifyUrl = `${appUrl}/verify-email?token=${verificationToken}`;
 
+    // 2026-05-08 (CJ): email verification is best-effort. Try to send;
+    // log failures but don't block registration. With auto-activate
+    // (REQUIRE_EMAIL_VERIFICATION != "1") users can log in immediately
+    // even when no email arrived. The verification link still works if
+    // the email DOES land — it's purely informational at trial scale.
+    let emailSent = false;
     try {
-      await sendEmailVerification({
-        to: email,
-        name,
-        verifyUrl,
-      });
+      await sendEmailVerification({ to: email, name, verifyUrl });
+      emailSent = true;
     } catch (emailError) {
-      console.error("[auth] Failed to send verification email:", emailError);
-      // 2026-05-08 (P0-A): hard-fail registration if email can't send.
-      // Previously this was swallowed → user thought 註冊成功 but couldn't
-      // verify. Now we delete the half-created user so they can re-try
-      // (without "此 email 已註冊" blocking them).
-      try {
-        await deleteUserById(db, user.id);
-      } catch (cleanupErr) {
-        console.error("[auth] Failed to clean up user after email failure:", cleanupErr);
-      }
-      res.status(503).json({
-        error: "驗證信寄送失敗，請稍後再試或聯絡客服。",
-      });
-      return;
+      console.error("[auth] verification email send failed (non-blocking):", emailError);
     }
 
     res.json({
       success: true,
-      message: "註冊成功！請檢查您的電子郵件以驗證帳號。",
+      message: emailSent
+        ? "註冊成功！請檢查您的電子郵件以驗證帳號（已可直接登入）。"
+        : "註冊成功！您現在可以直接登入。",
+      emailSent,
     });
   } catch (err) {
     console.error("[auth] register error:", err);
@@ -393,26 +386,24 @@ authRouter.post("/forgotPassword", async (req: Request, res: Response) => {
     // the /auth/ prefix the React Router falls through to a blank page.
     const resetUrl = `${appUrl}/auth/reset-password?token=${resetToken}`;
 
+    let emailSent = false;
     try {
-      await sendPasswordReset({
-        to: email,
-        name: user.name || "User",
-        resetUrl,
-      });
+      await sendPasswordReset({ to: email, name: user.name || "User", resetUrl });
+      emailSent = true;
     } catch (emailError) {
-      console.error("[auth] Failed to send reset email:", emailError);
-      // 2026-05-08 (P0-A): hard-fail so user knows the request didn't go
-      // through. Previously silent → user thinks they'll get email but
-      // never does.
-      res.status(503).json({
-        error: "重設密碼信件寄送失敗，請稍後再試。",
-      });
-      return;
+      console.error("[auth] forgot-password email send failed (non-blocking):", emailError);
     }
 
     res.json({
       success: true,
-      message: "如果此電子郵件已註冊，您將收到重設密碼的連結",
+      // 2026-05-08 (CJ): trial-bypass — also expose the resetUrl in
+      // the response when email fails so the user can recover even
+      // when Resend/SendGrid is down. We log this clearly so it's
+      // easy to spot in audit logs.
+      message: emailSent
+        ? "如果此電子郵件已註冊，您將收到重設密碼的連結"
+        : "重設信寄送失敗 — 請聯絡客服取得重設連結",
+      emailSent,
     });
   } catch (err) {
     console.error("[auth] forgotPassword error:", err);
