@@ -11,7 +11,17 @@
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 
-const NANCY = 180170; // Nancy Yeh — IG Visual Direction Lead
+const NANCY = 180170; // Nancy Yeh — IG Visual Direction Lead (主場 feed-full)
+// 2026-05-08 (CJ direction): per-task unique image directors for IG 60s
+const IG60_DIR_ANGEL  = 220866; // Angel Chen — Brand Narrative Editor
+const IG60_DIR_OWEN   = 220868; // Owen Chen — Brand Narrative Editor
+const IG60_DIR_RITA   = 220862; // Rita Chen — Brand Narrative Editor
+const IG60_DIR_KAREN  = 220864; // Karen Chen — Brand Narrative Editor
+const IG60_DIR_NELSON = 220863; // Nelson Chen — Brand Narrative Editor
+const IG60_DIR_TODD   = 220730; // Todd Huang — Decision Design Consultant
+const IG60_DIR_DAWN   = 220725; // Dawn Su — Decision Design Consultant
+const IG60_DIR_BRIAN  = 220727; // Brian Yeh — Decision Design Consultant
+const IG60_DIR_PENNY  = 220724; // Penny Huang — Decision Design Consultant
 
 const IG_TONE = `
 語氣要求：自然像朋友、有 IG-native 的呼吸感。不要罐頭口吻。
@@ -264,7 +274,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-reel-full": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_ANGEL,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["教學版", "故事版", "反差版", "節奏版", "懸念版"],
     captionMinChars: 200, captionMaxChars: 400,
@@ -272,7 +282,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-carousel-7": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_OWEN,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["教學式", "清單式", "故事式", "對比式", "金句式"],
     captionMinChars: 150, captionMaxChars: 250,
@@ -281,7 +291,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-story-3frame": {
-    variants: 3, images: 3, runImageGen: true, imageDirectorId: NANCY,
+    variants: 3, images: 3, runImageGen: true, imageDirectorId: IG60_DIR_RITA,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["前情鋪陳", "重點揭曉", "CTA 收束"],
     captionMinChars: 30, captionMaxChars: 60,
@@ -290,7 +300,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-countdown-5day": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_KAREN,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["Day 5", "Day 4", "Day 3", "Day 2", "Day 1"],
     captionMinChars: 80, captionMaxChars: 130,
@@ -300,7 +310,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-highlight-suite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_NELSON,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
     variantLabels: ["About", "商品", "FAQ", "客評", "案例"],
     captionMinChars: 30, captionMaxChars: 60,
@@ -309,7 +319,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-live-suite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_TODD,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["預告", "開場宣告", "高潮亮點", "結尾 CTA", "精華回顧"],
     captionMinChars: 80, captionMaxChars: 200,
@@ -319,7 +329,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-serial-3": {
-    variants: 3, images: 3, runImageGen: true, imageDirectorId: NANCY,
+    variants: 3, images: 3, runImageGen: true, imageDirectorId: IG60_DIR_DAWN,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 150, captionMaxChars: 250,
@@ -329,7 +339,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-viral-rewrite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_BRIAN,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 150, captionMaxChars: 300,
@@ -339,7 +349,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   "ig-60-testimonial-rewrite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_PENNY,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 150, captionMaxChars: 250,

@@ -371,7 +371,20 @@ caption 欄位整合輸出格式：
 // orchestra automatically when tier === "60s" + extras populated.
 // imageDirectorId = Mandy Cheng (239184) for every task.
 
-const MANDY = 239184;
+const MANDY    = 239184;  // Mandy Cheng (主場 single-full)
+// 2026-05-08 (CJ direction): per-task unique image directors for FB 60s
+const FB60_DIR_LUKE   = 220734; // Luke Hsu — Quantitative Research Designer
+const FB60_DIR_REINA  = 220736; // Reina Yang — Quantitative Research Designer
+const FB60_DIR_BLAKE  = 220737; // Blake Yeh — Quantitative Research Designer
+const FB60_DIR_RUTH   = 220739; // Ruth Chou — Quantitative Research Designer
+const FB60_DIR_UMA    = 220740; // Uma Tsai — Quantitative Research Designer
+const FB60_DIR_JUSTIN = 220756; // Justin Huang — Insights Storyteller
+const FB60_DIR_PAUL   = 220757; // Paul Hsu — Insights Storyteller
+const FB60_DIR_FRED   = 220758; // Fred Hung — Insights Storyteller
+const FB60_DIR_CHLOE_Y= 220759; // Chloe Yang — Insights Storyteller
+const FB60_DIR_WENDY  = 220760; // Wendy Cheng — Insights Storyteller
+const FB60_DIR_LYDIA  = 220723; // Lydia Tsai — Decision Design Consultant
+const FB60_DIR_DREW   = 220726; // Drew Chen — Decision Design Consultant
 
 export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 1. 單篇完整貼文
@@ -394,7 +407,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5,
     images: 5,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_LUKE,
     aspectRatio: "1.91:1",
     fluxSize: "landscape_4_3",
     imageQualitySteps: 4,
@@ -409,7 +422,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5,
     images: 5,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_REINA,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -428,7 +441,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5,
     images: 5,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_BLAKE,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -447,7 +460,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5,
     images: 5,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_RUTH,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -467,7 +480,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 4,
     images: 4,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_UMA,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -487,7 +500,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 6,
     images: 6,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_JUSTIN,
     aspectRatio: "16:9",
     fluxSize: "landscape_16_9",
     imageQualitySteps: 4,
@@ -507,7 +520,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 4,
     images: 4,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_PAUL,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 8,
@@ -526,7 +539,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 3,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_FRED,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -546,7 +559,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5,
     images: 5,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_CHLOE_Y,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -566,7 +579,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5,
     images: 5,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_WENDY,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -586,7 +599,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5,
     images: 5,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_LYDIA,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
@@ -606,7 +619,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 3,
     runImageGen: true,
-    imageDirectorId: MANDY,
+    imageDirectorId: FB60_DIR_DREW,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
