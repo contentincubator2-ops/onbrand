@@ -13,27 +13,40 @@ name: Admin — Write RESEND_API_KEY to prod .env
 
 on:
   workflow_dispatch:
+    inputs:
+      resend_key_override:
+        description: "Optional: paste Resend key here for one-shot use (otherwise reads secrets.RESEND_API_KEY)"
+        required: false
+        default: ""
 
 jobs:
   write-resend-key:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify secret exists
+      - name: Resolve key value (input or secret)
+        id: resolve
+        env:
+          INPUT_KEY: ${{ inputs.resend_key_override }}
+          SECRET_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
-          if [ -z "${{ secrets.RESEND_API_KEY }}" ]; then
-            echo "❌ RESEND_API_KEY secret not set."
-            echo ""
-            echo "Add it at: Settings → Secrets and variables → Actions → New repository secret"
-            echo "  Name:  RESEND_API_KEY"
-            echo "  Value: re_xxxxx (your key from resend.com)"
+          # Prefer input override; fall back to secret. NEVER echo the value.
+          if [ -n "$INPUT_KEY" ]; then
+            echo "Using workflow input override (length: $(printf '%s' "$INPUT_KEY" | wc -c) chars)"
+            echo "::add-mask::$INPUT_KEY"
+            echo "key_present=1" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SECRET_KEY" ]; then
+            echo "Using secrets.RESEND_API_KEY (length: $(printf '%s' "$SECRET_KEY" | wc -c) chars)"
+            echo "key_present=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "❌ no key provided. Either add secrets.RESEND_API_KEY or paste resend_key_override input."
             exit 1
           fi
-          echo "✓ RESEND_API_KEY secret present (length: $(echo -n "${{ secrets.RESEND_API_KEY }}" | wc -c) chars)"
 
       - name: Write to prod .env via SSH
+        if: steps.resolve.outputs.key_present == '1'
         uses: appleboy/ssh-action@v1.0.3
         env:
-          KEY_VALUE: ${{ secrets.RESEND_API_KEY }}
+          KEY_VALUE: ${{ inputs.resend_key_override != '' && inputs.resend_key_override || secrets.RESEND_API_KEY }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
