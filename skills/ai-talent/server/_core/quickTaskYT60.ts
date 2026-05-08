@@ -31,7 +31,7 @@ ${YT_TONE}`,
     tier: "60s", postType: "shorts",
     label: "YT Shorts 完整腳本",
     description: "Strategist 規劃結構 + 60 秒腳本 + 縮圖 brief",
-    agent_id: 36, // Nina Yeh
+    agent_id: 223996, // Yu-Ting Su — YouTube Marketing Strategist B2B SaaS (1025 char)
     skill_slug: "shorts-scriptwriter",
     primary_question: "Shorts 主題？",
     primary_input: { key: "topic", placeholder: "教學 / 反差 / 揭密", type: "textarea" },

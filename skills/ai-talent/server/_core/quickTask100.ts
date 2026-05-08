@@ -112,7 +112,7 @@ ${TONE_100}`,
     tier: "100s", postType: "comment",
     label: "FB 完整危機公關劇本",
     description: "偵測 + 第一份聲明 + 中期更新 ×3 + 後期 follow-up + 內部 talking points",
-    agent_id: 239185, // Brian Chou
+    agent_id: 222204, // Chen Jing-Yi — Senior Press Release Writer (1040 char)
     skill_slug: "crisis-communication",
     primary_question: "事件 / 危機內容？",
     primary_input: { key: "incident", placeholder: "完整描述事件 + 已知事實", type: "textarea" },
@@ -217,7 +217,7 @@ ${TONE_100}`,
     tier: "100s", postType: "premiere",
     label: "YT Premiere 完整 kit",
     description: "預告影片 + 倒數 community 貼文 + 直播配套 + 精華剪輯指南",
-    agent_id: 36, // Nina Yeh
+    agent_id: 223995, // Pei-Hsuan Liu — YouTube Marketing Strategist 電商/DTC (1025 char)
     skill_slug: "shorts-scriptwriter",
     primary_question: "Premiere 主題？",
     primary_input: { key: "premiere_topic", placeholder: "首播主題", type: "textarea" },
@@ -439,7 +439,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
     captionMinChars: 150, captionMaxChars: 300,
-    strategistAgentId: 31, // Eric Lin
+    strategistAgentId: 60002, // Ethan Chiang — DTC E-commerce Brand Strategist
     postLabels: ["預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
     scoutKind: "viral", // 看同類 launch 通常用什麼 hook
     extras: { ...fb100Common.extras, postsCount: 8 },
