@@ -326,7 +326,15 @@ caption 結構（每變體）：
 
 // ─── Plan B Orchestra config ────────────────────────────────────────────────
 
-const NANCY_ID = 180170; // Nancy Yeh — Social Media Visual Designer (≠ Mandy)
+const NANCY_ID  = 180170; // Nancy Yeh — Social Media Visual Designer (caption-short 主場)
+// 2026-05-08: per-task unique image directors (was 1 shared by 8 IG tasks)
+const NELSON_ID = 220863; // Nelson Chen — Brand Narrative Editor
+const YAHUI_ID  = 220540; // Ya-Hui Yuan — Client Proposal & Pitch Specialist
+const REED_ID   = 220752; // Reed Lee — Insights Storyteller
+const SEAN_ID   = 220753; // Sean Wu — Insights Storyteller
+const KURT_ID   = 220754; // Kurt Chen — Insights Storyteller
+const DALE_ID   = 220755; // Dale Yu — Insights Storyteller
+const RACHEL_ID = 220913; // Rachel Lin — Senior UX/UI Designer
 
 export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-30-caption-short": {
@@ -337,31 +345,31 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "ig-30-pure-text-hook": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    imageDirectorId: NELSON_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["反問式", "數字式", "反差式"],
     captionMinChars: 30, captionMaxChars: 60,
   },
   "ig-30-reel-hook": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    imageDirectorId: YAHUI_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["懸念開場", "反差開場", "直接挑釁"],
     captionMinChars: 30, captionMaxChars: 80,
   },
   "ig-30-reel-script-full": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    imageDirectorId: REED_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["教學型", "故事型", "反差型"],
     captionMinChars: 200, captionMaxChars: 600,
   },
   "ig-30-story-text": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    imageDirectorId: SEAN_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["驚奇式", "提問式", "幕後式"],
     captionMinChars: 30, captionMaxChars: 80,
   },
   "ig-30-carousel-structure": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    imageDirectorId: KURT_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["教學清單型", "故事型", "反差型"],
     captionMinChars: 400, captionMaxChars: 1500,
   },
@@ -391,13 +399,13 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "ig-30-live-opening": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
+    imageDirectorId: DALE_ID, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
     variantLabels: ["懸念式", "互動式", "直球式"],
     captionMinChars: 100, captionMaxChars: 300,
   },
   "ig-30-story-repost-strategy": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    imageDirectorId: RACHEL_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["精選封面型", "Feed 改編型", "後續限動型"],
     captionMinChars: 100, captionMaxChars: 400,
   },

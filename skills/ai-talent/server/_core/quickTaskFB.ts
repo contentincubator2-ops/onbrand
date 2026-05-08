@@ -430,7 +430,15 @@ export interface OrchestraConfig {
   scoutKind?: "viral" | "festivals" | "trending" | "news";
 }
 
-const MANDY_ID = 239184; // FB Visual Direction Lead
+const MANDY_ID = 239184;     // FB Visual Direction Lead — caption-short 主場
+// 2026-05-08 (CJ direction): every FB-30s task gets its own image director.
+// All from existing mos_db pool with bio 400+ chars; no new agents.
+const RITA_ID    = 220862;   // Rita Chen — Brand Narrative Editor
+const KAREN_ID   = 220864;   // Karen Chen — Brand Narrative Editor
+const ANGEL_ID   = 220866;   // Angel Chen — Brand Narrative Editor
+const OWEN_ID    = 220868;   // Owen Chen — Brand Narrative Editor
+const YUTING_ID  = 220535;   // Yu-Ting Tien — Creative Production Manager
+const JAKE_ID    = 220751;   // Jake Chou — Insights Storyteller
 
 // 2026-05-05 v2: variants 3 across the board, runImageGen=false for 30s.
 // Image briefs are still written by Mandy so users see direction text inside
@@ -453,7 +461,7 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 3,
     runImageGen: false,
-    imageDirectorId: MANDY_ID,
+    imageDirectorId: RITA_ID,
     aspectRatio: "1.91:1",
     fluxSize: "landscape_4_3",
     imageQualitySteps: 4,
@@ -465,7 +473,7 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 1, // alt cover only (in case OG image is bad)
     runImageGen: false,
-    imageDirectorId: MANDY_ID,
+    imageDirectorId: KAREN_ID,
     aspectRatio: "1.91:1",
     fluxSize: "landscape_4_3",
     imageQualitySteps: 4,
@@ -539,7 +547,7 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 3,
     runImageGen: false,
-    imageDirectorId: MANDY_ID,
+    imageDirectorId: ANGEL_ID,
     aspectRatio: "1.91:1",
     fluxSize: "landscape_4_3",
     imageQualitySteps: 8,
@@ -551,7 +559,7 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 3,
     runImageGen: false,
-    imageDirectorId: MANDY_ID,
+    imageDirectorId: OWEN_ID,
     aspectRatio: "9:16",
     fluxSize: "portrait_9_16",
     imageQualitySteps: 4,
@@ -563,7 +571,7 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 3,
     runImageGen: false,
-    imageDirectorId: MANDY_ID,
+    imageDirectorId: YUTING_ID,
     aspectRatio: "16:9",
     fluxSize: "landscape_16_9",
     imageQualitySteps: 4,
@@ -587,7 +595,7 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3,
     images: 3,
     runImageGen: false,
-    imageDirectorId: MANDY_ID,
+    imageDirectorId: JAKE_ID,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
