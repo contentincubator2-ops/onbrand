@@ -6,25 +6,46 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: appleboy/ssh-action@v1.0.3
+      - uses: actions/checkout@v4
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 300s
-          script: |
-            set -e
-            cd /opt/marketing-os/skills/ai-talent
-            git pull --rebase origin main
-            echo "── Running generate-agent-assignments.ts ──"
-            bun run scripts/generate-agent-assignments.ts
-            echo ""
-            echo "── data/agent-assignments.json head ──"
-            head -30 data/agent-assignments.json
-            echo ""
-            echo "── Committing JSON ──"
-            git add data/agent-assignments.json
-            git -c user.email='deploy@marketing-os' -c user.name='admin-bot' \
-              commit -m 'Generate agent-assignments.json (deterministic 1:1 B+ pool)' || echo "nothing to commit"
-            git push origin main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Push latest script to VM
+        run: |
+          rsync -az \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            skills/ai-talent/scripts/generate-agent-assignments.ts \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/marketing-os/app/skills/ai-talent/scripts/"
+
+      - name: Run generator on VM (DB available)
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            "cd /opt/marketing-os/app/skills/ai-talent && bun run scripts/generate-agent-assignments.ts"
+
+      - name: Pull generated JSON back to runner
+        run: |
+          mkdir -p skills/ai-talent/data
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/marketing-os/app/skills/ai-talent/data/agent-assignments.json" \
+            skills/ai-talent/data/agent-assignments.json
+          echo "── Generated JSON header ──"
+          head -20 skills/ai-talent/data/agent-assignments.json
+
+      - name: Commit + push JSON
+        run: |
+          git config user.email 'deploy@marketing-os'
+          git config user.name 'admin-bot'
+          git add skills/ai-talent/data/agent-assignments.json
+          git diff --cached --stat
+          git commit -m 'Generate agent-assignments.json (deterministic B+ pool 1:1)' || echo "no changes"
+          git push origin main
