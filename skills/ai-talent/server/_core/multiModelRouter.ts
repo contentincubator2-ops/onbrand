@@ -91,11 +91,14 @@ export function detectTaskType(content: string): TaskType {
 
 // ─── Provider selection ───────────────────────────────────────────────────────
 
-// Probe results 2026-05-04 (post key-restore):
-//   WORKING (200): qwen, zhipu, azure-foundry/Kimi-K2.5, gemini-native, tavily
-//   PENDING KEY:   azure-position (claude-sonnet-4-6), azure-northcentral (DeepSeek)
-//   NOT OAI-COMPAT: anthropic (404 — /messages API, not /chat/completions)
-//   BROKEN: openai (401), perplexity (401 quota), cohere (401), gemini-oai-compat (400)
+// Probe results 2026-05-08 (post endpoint+API-shape fix):
+//   WORKING (200): qwen, zhipu, azure-foundry/Kimi-K2.5, azure-position
+//                  (claude-sonnet/haiku via /anthropic/v1/messages),
+//                  azure-northcentral (DeepSeek-V3.2/R1 via /openai/deployments/.../chat/completions
+//                  with api-version=2024-10-21), anthropic-direct (api.anthropic.com),
+//                  gemini-native (search only via perplexityScout)
+//   BROKEN: azure-foundry/gpt-4o (404), azure-claude-sweden (400),
+//           openai (401), perplexity (401), cohere (401), gemini-oai-compat (400)
 //
 // Priority strategy:
 //   creative/analysis → claude-sonnet-4-6 (azure-position) when key available

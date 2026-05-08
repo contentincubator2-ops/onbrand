@@ -1,0 +1,53 @@
+name: Admin — Redistribute aiModel across 5 working providers
+
+on:
+  workflow_dispatch:
+
+jobs:
+  redistribute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db"
+
+            echo "=== Targets (5 confirmed-working providers) ==="
+            echo "  qwen3-32b           → qwen (workhorse zh)"
+            echo "  Kimi-K2.5           → azure-foundry"
+            echo "  glm-4-flash         → zhipu"
+            echo "  claude-haiku-4-5    → azure-position (fast claude)"
+            echo "  claude-sonnet-4-6   → azure-position (premium claude)"
+            echo "  DeepSeek-V3.2       → azure-northcentral"
+            echo ""
+
+            echo "=== Before ==="
+            $MYSQL -t -e "SELECT aiModel, COUNT(*) FROM agents GROUP BY aiModel ORDER BY COUNT(*) DESC;"
+
+            # Re-distribute the entire pool of 16,102 across 6 working models
+            # Strategy: use deterministic hash of agent.id to keep stable assignment
+            $MYSQL -e "
+              UPDATE agents SET aiModel = ELT((id MOD 6) + 1,
+                'qwen3-32b',
+                'Kimi-K2.5',
+                'glm-4-flash',
+                'claude-haiku-4-5',
+                'claude-sonnet-4-6',
+                'DeepSeek-V3.2'
+              );
+            "
+
+            echo ""
+            echo "=== After ==="
+            $MYSQL -t -e "SELECT aiModel, COUNT(*) FROM agents GROUP BY aiModel ORDER BY COUNT(*) DESC;"
+
+            echo ""
+            echo "=== Distribution among 506 ASSIGNED agents ==="
+            cd /opt/marketing-os/app/skills/ai-talent
+            IDS=$(node -e "const d=require('./data/agent-assignments.json'); const ids=new Set(); for(const t of Object.values(d.assignments)) for(const v of Object.values(t)) ids.add(v); console.log([...ids].join(','));")
+            $MYSQL -t -e "SELECT aiModel, COUNT(*) AS n FROM agents WHERE id IN ($IDS) GROUP BY aiModel ORDER BY n DESC;"

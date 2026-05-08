@@ -665,7 +665,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     } as any;
   }
 
-  const apiUrl = `${config.baseUrl}/chat/completions`;
+  // Azure Northcentral (DeepSeek): per-deployment path + api-version query.
+  // Probe 2026-05-08 confirmed this pattern works (DeepSeek-V3.2 200 OK 1.5s).
+  // The /openai/v1/chat/completions pattern times out for this resource.
+  const apiUrl = providerKey === "azure-northcentral"
+    ? `${(((ENV as any).AZURE_NORTHCENTRAL_ENDPOINT as string) ?? "https://cjwan-mnykipqt-northcentralus.cognitiveservices.azure.com").replace(/\/$/, "")}/openai/deployments/${encodeURIComponent(model)}/chat/completions?api-version=2024-10-21`
+    : `${config.baseUrl}/chat/completions`;
 
   const {
     messages,
@@ -708,10 +713,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   adaptPayloadForModel(payload, model);
 
-  // Azure Foundry uses api-key header, others use Bearer token
-  const authHeaders: Record<string, string> = providerKey === "azure-foundry"
-    ? { "api-key": apiKey }
-    : { authorization: `Bearer ${apiKey}` };
+  // Azure providers use api-key header, others use Bearer token
+  const authHeaders: Record<string, string> =
+    (providerKey === "azure-foundry" || providerKey === "azure-northcentral" || providerKey === "azure-claude" || providerKey === "azure-canada")
+      ? { "api-key": apiKey }
+      : { authorization: `Bearer ${apiKey}` };
 
   const response = await fetch(apiUrl, {
     method: "POST",

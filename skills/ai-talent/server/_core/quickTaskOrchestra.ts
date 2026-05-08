@@ -116,15 +116,18 @@ export interface OrchestraResult {
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Map agent.aiModel string → ModelProvider used by callModel.
- *  Only 3 providers are confirmed working (probe 2026-05-08):
- *  qwen / zhipu / azure-foundry (Kimi-K2.5). Others fall back to qwen. */
+ *  Working providers (probe 2026-05-08 after endpoint+shape fixes):
+ *  qwen / zhipu / azure-foundry (Kimi) / azure-position (claude-haiku/sonnet)
+ *  / azure-northcentral (DeepSeek-V3.2/R1). Others fall back to qwen. */
 function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
   if (!aiModel) return "qwen";
   const m = aiModel.toLowerCase();
   if (m.includes("qwen")) return "qwen";
   if (m.includes("kimi")) return "azure-foundry";
   if (m.includes("glm") || m.includes("zhipu")) return "zhipu";
-  return "qwen"; // safe default — qwen is most reliable
+  if (m.includes("claude")) return "azure-position"; // claude-haiku/sonnet/opus
+  if (m.includes("deepseek")) return "azure-northcentral";
+  return "qwen"; // safe default
 }
 
 export async function loadAgent(id: number | null | undefined): Promise<{ meta: AgentMeta | null; persona: string; aiModel: string | null }> {
