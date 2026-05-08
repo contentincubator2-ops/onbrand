@@ -344,7 +344,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 150, captionMaxChars: 300,
     strategistAgentId: 180142, // Kevin Liu — Social Listening
-    specialtyAgentId: 220504,  // Cheng-Tse Liao — Compare Editor
+    specialtyAgentId: 180605,  // Jason Lee — SVP & General Counsel (compare/claims review)
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
@@ -354,7 +354,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 150, captionMaxChars: 250,
     strategistAgentId: 220754, // Kurt Chen
-    specialtyAgentId: 180855,  // Jason Evans — Risk & Compliance
+    specialtyAgentId: 180559,  // Deborah Williams — VP & Chief Legal Officer
     extras: { legalAssistant: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 };

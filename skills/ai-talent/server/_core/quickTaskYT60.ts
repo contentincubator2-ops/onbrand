@@ -164,7 +164,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 180142, // Kevin Liu
-    specialtyAgentId: 220504, // Cheng-Tse Liao
+    specialtyAgentId: 180606, // Jessica Garcia — Director, Global Marketing & Advertising Legal
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 };

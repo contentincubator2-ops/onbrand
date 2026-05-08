@@ -92,7 +92,7 @@ export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 300, captionMaxChars: 500,
-    strategistAgentId: 180142, specialtyAgentId: 220504,
+    strategistAgentId: 180142, specialtyAgentId: 180643, // Amanda Adams — Chief Legal Officer
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 };
@@ -168,7 +168,7 @@ export const LI_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 250, captionMaxChars: 500,
-    specialtyAgentId: 180855,
+    specialtyAgentId: 180657, // Michael Adams — EVP & Chief Legal Officer
     extras: { legalAssistant: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 };
@@ -243,7 +243,7 @@ export const EMAIL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["D0 歡迎", "D3 教學", "D7 邀請"],
     captionMinChars: 300, captionMaxChars: 500,
-    strategistAgentId: 220863, postLabels: ["D0 歡迎", "D3 教學", "D7 邀請"],
+    strategistAgentId: 180005, postLabels: ["D0 歡迎", "D3 教學", "D7 邀請"], // David Lee — Content Strategy Director
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 };
@@ -333,7 +333,7 @@ export const BRAND_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["英雄式", "智者式", "創造者式", "照顧者式", "反叛者式"],
     captionMinChars: 50, captionMaxChars: 200,
-    strategistAgentId: 180142,
+    strategistAgentId: 60001, // Vivian Shen — Omnichannel Marketing Strategist
     extras: { replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "br-60-value-prop": {
@@ -341,7 +341,7 @@ export const BRAND_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["問題導向", "解法導向", "結果導向", "對比導向", "情感導向"],
     captionMinChars: 100, captionMaxChars: 200,
-    strategistAgentId: 180142,
+    strategistAgentId: 60003, // Marcus Han — Media & Brand Integration Strategist
     extras: { replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "br-60-brand-voice": {
