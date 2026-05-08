@@ -22,6 +22,7 @@ import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListen
 import { buildBrandPrefix as buildBrandContext } from "./brandContext";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "./brandRealContent";
+import { resolveAgentId } from "./agentAssignments";
 import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMaster";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
@@ -695,9 +696,18 @@ export async function runOrchestra(args: {
         : args.template.id?.startsWith("pr-") ? "press"
         : "facebook");
 
+    // 2026-05-08: resolve agent IDs from JSON assignments (B+ pool, 498
+    // unique agents). Falls back to hardcoded template values if JSON
+    // missing the assignment. Single map lookup, no DB query, no timeout.
+    const taskId = args.template.id;
+    const resolvedLeadId      = resolveAgentId(taskId, "lead",          args.template.agent_id);
+    const resolvedImageDirId  = resolveAgentId(taskId, "imageDirector", args.config.imageDirectorId);
+    const resolvedStrategistId = resolveAgentId(taskId, "strategist",   args.config.strategistAgentId);
+    const resolvedSpecialtyId  = resolveAgentId(taskId, "specialty",    args.config.specialtyAgentId);
+
     const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns] = await Promise.all([
-      loadAgent(args.template.agent_id),
-      loadAgent(args.config.imageDirectorId),
+      loadAgent(resolvedLeadId),
+      loadAgent(resolvedImageDirId),
       ytUrlInput
         ? (async () => { try { return await fetchYouTubeContext(ytUrlInput); } catch { return null; } })()
         : Promise.resolve(null),
@@ -789,12 +799,12 @@ export async function runOrchestra(args: {
     let strategistMeta: AgentMeta | null = null;
     const useStrategist =
       (tier === "60s" || tier === "100s") &&
-      !!args.config.strategistAgentId &&
+      !!resolvedStrategistId &&
       !!args.config.extras?.narrativeArc;
     if (useStrategist) {
       const stStrat = stage("strategist", "Strategist 規劃系列敘事弧");
       try {
-        const stratLoad = await loadAgent(args.config.strategistAgentId);
+        const stratLoad = await loadAgent(resolvedStrategistId);
         strategistMeta = stratLoad.meta;
         const labels = (args.config.postLabels && args.config.postLabels.length > 0)
           ? args.config.postLabels
@@ -919,11 +929,11 @@ export async function runOrchestra(args: {
     let specialtyPersona = "";
     const useSpecialty =
       (tier === "60s" || tier === "100s") &&
-      !!args.config.specialtyAgentId &&
+      !!resolvedSpecialtyId &&
       !!extrasCfg &&
       (extrasCfg.compareTable || extrasCfg.timingAdvisor || extrasCfg.legalAssistant);
     if (useSpecialty) {
-      const specLoad = await loadAgent(args.config.specialtyAgentId);
+      const specLoad = await loadAgent(resolvedSpecialtyId);
       specialtyMeta = specLoad.meta;
       specialtyPersona = specLoad.persona;
     }
