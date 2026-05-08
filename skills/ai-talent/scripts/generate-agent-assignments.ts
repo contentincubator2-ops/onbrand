@@ -21,8 +21,14 @@
  */
 import "dotenv/config";
 import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import mysql from "mysql2/promise";
+
+const __dirnameSafe = (() => {
+  try { return dirname(fileURLToPath(import.meta.url)); }
+  catch { return process.cwd() + "/scripts"; }
+})();
 
 // ── Task slot inventory ──────────────────────────────────────────────────
 //
@@ -260,8 +266,8 @@ async function main() {
     minThickness: minThick,
     assignments,
   };
-  const outPath = join(__dirname, "..", "data", "agent-assignments.json");
-  mkdirSync(join(__dirname, "..", "data"), { recursive: true });
+  const outPath = join(__dirnameSafe, "..", "data", "agent-assignments.json");
+  mkdirSync(join(__dirnameSafe, "..", "data"), { recursive: true });
   writeFileSync(outPath, JSON.stringify(out, null, 2));
   console.log(`[5/5] Written → ${outPath}`);
 
