@@ -1,0 +1,20 @@
+{
+  "name": "marketing-os-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright e2e + light stress tests for marketing-os.sowork.ai",
+  "scripts": {
+    "test": "playwright test",
+    "test:auth": "playwright test specs/auth.spec.ts",
+    "test:brand": "playwright test specs/brand.spec.ts",
+    "test:positioning": "playwright test specs/positioning.spec.ts",
+    "test:article": "playwright test specs/article.spec.ts",
+    "test:stress": "playwright test specs/stress.spec.ts --workers=1",
+    "test:concurrent-llm": "playwright test specs/concurrent-llm.spec.ts --workers=1",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "typescript": "^5.6.3"
+  }
+}
