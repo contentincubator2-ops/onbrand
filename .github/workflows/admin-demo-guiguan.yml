@@ -1,0 +1,28 @@
+name: Admin — Live demo (桂冠營養研究室 fb-30-caption-short)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Push demo script + JSON to VM
+        run: |
+          rsync -az -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            skills/ai-talent/scripts/demo-guiguan.ts \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/marketing-os/app/skills/ai-talent/scripts/"
+
+      - name: Run demo
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" \
+            'cd /opt/marketing-os/app/skills/ai-talent && set -a && source .env && set +a && npx tsx scripts/demo-guiguan.ts'
