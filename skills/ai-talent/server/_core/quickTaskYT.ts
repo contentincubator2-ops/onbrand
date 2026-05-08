@@ -285,7 +285,11 @@ YT Community 受眾比一般 IG 投入 — 可以用比較深度的內容（不�
 
 // ─── Plan B Orchestra config ────────────────────────────────────────────────
 
-const YU_CHENG_ID = 210220; // Yu-Cheng Chang — Senior Motion Graphics Designer (YT thumbnail dir)
+const YU_CHENG_ID = 210220; // Yu-Cheng Chang — Senior Motion Graphics Designer (YT 主場)
+// 2026-05-08: per-task unique image directors for YT
+const YT_DIR_ERIC = 220731; // Eric Wu — Quantitative Research Designer
+const YT_DIR_IRIS = 220732; // Iris Hung — Quantitative Research Designer
+const YT_DIR_ROSS = 220733; // Ross Chou — Quantitative Research Designer
 
 export const YT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-30-title-strategies": {
@@ -296,7 +300,7 @@ export const YT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "yt-30-thumbnail-text": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YU_CHENG_ID, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
+    imageDirectorId: YT_DIR_ERIC, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
     variantLabels: ["大字震撼型", "人臉表情型", "對比拼貼型"],
     captionMinChars: 100, captionMaxChars: 400,
   },
@@ -314,13 +318,13 @@ export const YT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "yt-30-shorts-script": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YU_CHENG_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    imageDirectorId: YT_DIR_IRIS, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["教學型", "故事型", "反差型"],
     captionMinChars: 300, captionMaxChars: 1000,
   },
   "yt-30-opening-hook": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YU_CHENG_ID, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
+    imageDirectorId: YT_DIR_ROSS, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
     variantLabels: ["懸念式", "數字 / 反差", "直球觀點"],
     captionMinChars: 150, captionMaxChars: 700,
   },

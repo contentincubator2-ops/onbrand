@@ -161,18 +161,22 @@ ${LI_TONE}`,
   },
 ];
 
-const ZEYU_ID = 60071;
+const ZEYU_ID      = 60071;  // Zeyu Yang (主場 insight-post)
+const LI_DIR_TODD  = 220730; // Todd Huang — Decision Design Consultant
+const LI_DIR_DAWN  = 220725; // Dawn Su — Decision Design Consultant
+const LI_DIR_GLEN  = 220729; // Glen Liu — Decision Design Consultant
+const LI_DIR_TONY  = 220728; // Tony Chiang — Decision Design Consultant
 export const LI_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "li-30-insight-post":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: ZEYU_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["反共識", "數據驅動", "個人故事"], captionMinChars: 150, captionMaxChars: 350 },
   "li-30-hook-3":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["反共識", "數據反差", "個人故事"], captionMinChars: 30, captionMaxChars: 80 },
-  "li-30-article-opener": { variants: 3, images: 3, runImageGen: false, imageDirectorId: ZEYU_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["場景式", "個人連結", "重點預告"], captionMinChars: 150, captionMaxChars: 300 },
+  "li-30-article-opener": { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_TODD, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["場景式", "個人連結", "重點預告"], captionMinChars: 150, captionMaxChars: 300 },
   "li-30-poll":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["策略選擇", "經驗分歧", "未來預測"], captionMinChars: 80, captionMaxChars: 200 },
-  "li-30-event-invite":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: ZEYU_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["專業敘述", "故事邀請", "稀缺感"], captionMinChars: 120, captionMaxChars: 300 },
+  "li-30-event-invite":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_DAWN, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["專業敘述", "故事邀請", "稀缺感"], captionMinChars: 120, captionMaxChars: 300 },
   "li-30-dm-intro":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["求教式", "共同點", "價值交換"], captionMinChars: 80, captionMaxChars: 150 },
   "li-30-comment":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["補充經驗", "不同觀點", "提問擴展"], captionMinChars: 50, captionMaxChars: 150 },
   "li-30-headline":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["職稱+價值", "結果型", "個性型"], captionMinChars: 30, captionMaxChars: 120 },
-  "li-30-newsletter":     { variants: 3, images: 3, runImageGen: false, imageDirectorId: ZEYU_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["數據驅動", "故事性", "問題式"], captionMinChars: 150, captionMaxChars: 300 },
-  "li-30-document":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: ZEYU_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4, variantLabels: ["教學清單型", "故事型", "反差型"], captionMinChars: 400, captionMaxChars: 1500 },
+  "li-30-newsletter":     { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_GLEN, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["數據驅動", "故事性", "問題式"], captionMinChars: 150, captionMaxChars: 300 },
+  "li-30-document":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_TONY, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4, variantLabels: ["教學清單型", "故事型", "反差型"], captionMinChars: 400, captionMaxChars: 1500 },
 };
 
 export function getLIOrchestraConfig(taskId: string): OrchestraConfig | null {

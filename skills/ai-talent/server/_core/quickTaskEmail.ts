@@ -161,16 +161,18 @@ ${EMAIL_TONE}`,
   },
 ];
 
-const NATHAN_ID = 60062;
+const NATHAN_ID    = 60062;  // Nathan Lu (主場 welcome email)
+const EM_DIR_VERA  = 220738; // Vera Hsieh — Quantitative Research Designer
+const EM_DIR_NORA  = 220735; // Nora Yang — Quantitative Research Designer
 export const EMAIL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "em-30-subject-line":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["好奇心", "數字反差", "個人化"], captionMinChars: 10, captionMaxChars: 30 },
   "em-30-preview-text":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["懸念延伸", "補充資訊", "個人化"], captionMinChars: 30, captionMaxChars: 80 },
   "em-30-welcome":        { variants: 3, images: 3, runImageGen: false, imageDirectorId: NATHAN_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["熱情擁抱", "理性說明", "故事開場"], captionMinChars: 200, captionMaxChars: 500 },
-  "em-30-promo":          { variants: 3, images: 3, runImageGen: false, imageDirectorId: NATHAN_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["稀缺感", "價值論證", "故事感"], captionMinChars: 200, captionMaxChars: 400 },
+  "em-30-promo":          { variants: 3, images: 3, runImageGen: false, imageDirectorId: EM_DIR_VERA, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["稀缺感", "價值論證", "故事感"], captionMinChars: 200, captionMaxChars: 400 },
   "em-30-drip":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["教學式", "故事式", "提問式"], captionMinChars: 200, captionMaxChars: 500 },
   "em-30-abandoned-cart": { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["提醒式", "限時誘因", "解惑式"], captionMinChars: 150, captionMaxChars: 300 },
   "em-30-re-engagement":  { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["朋友召喚", "新進展", "好處導向"], captionMinChars: 200, captionMaxChars: 350 },
-  "em-30-event-invite":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: NATHAN_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["專業敘述", "故事感", "稀缺感"], captionMinChars: 200, captionMaxChars: 450 },
+  "em-30-event-invite":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: EM_DIR_NORA, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["專業敘述", "故事感", "稀缺感"], captionMinChars: 200, captionMaxChars: 450 },
   "em-30-cold-email":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共同點切入", "問題切入", "價值交換"], captionMinChars: 80, captionMaxChars: 200 },
   "em-30-transactional":  { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["精簡型", "完整型", "貼心型"], captionMinChars: 150, captionMaxChars: 300 },
 };
