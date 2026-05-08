@@ -392,6 +392,11 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
 // Image directors per channel
 const MANDY = 239184, NANCY = 180170, NINA = 180157, ANNA = 180165;
 const ZEYU = 60071, NATHAN = 60062, BR_IMG = 60030, RS_IMG = 24;
+// 2026-05-08: per-task unique image directors for 100s tier
+const TT100_IMG2 = 220896; // Brian Chen — Digital Experience Designer
+const LI100_IMG2 = 210018; // Zach Ko — AI Design Thinking Consultant (IDEO)
+const EM100_IMG2 = 210019; // Sophia Liao — AI Digital Experience Strategist (McKinsey)
+const BR100_IMG2 = 39;     // Tom Hsu — Marketing Designer
 
 const fb100Common = {
   runImageGen: true, imageDirectorId: MANDY,
@@ -567,7 +572,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "tt-100-trend-week": {
-    variants: 7, images: 7, runImageGen: true, imageDirectorId: ANNA,
+    variants: 7, images: 7, runImageGen: true, imageDirectorId: TT100_IMG2,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
     captionMinChars: 200, captionMaxChars: 400,
@@ -585,7 +590,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 4, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "li-100-newsletter-quarterly": {
-    variants: 4, images: 4, runImageGen: true, imageDirectorId: ZEYU,
+    variants: 4, images: 4, runImageGen: true, imageDirectorId: LI100_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["第 1 期", "第 2 期", "第 3 期", "第 4 期"],
     captionMinChars: 400, captionMaxChars: 800,
@@ -605,7 +610,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "em-100-launch-sequence": {
-    variants: 7, images: 7, runImageGen: true, imageDirectorId: NATHAN,
+    variants: 7, images: 7, runImageGen: true, imageDirectorId: EM100_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
     captionMinChars: 200, captionMaxChars: 400,
@@ -635,7 +640,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 5, narrativeArc: true, replyTemplates: 3 },
   },
   "br-100-voice-playbook": {
-    variants: 4, images: 4, runImageGen: true, imageDirectorId: BR_IMG,
+    variants: 4, images: 4, runImageGen: true, imageDirectorId: BR100_IMG2,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["8 應用情境", "Do/Don't", "5 範例", "跨平台適配"],
     captionMinChars: 400, captionMaxChars: 700,

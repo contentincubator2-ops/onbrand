@@ -17,8 +17,11 @@ import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 
 const TONE = (channel: string) => `語氣要求：自然、貼合 ${channel} 平台 native 風格、不要罐頭。`;
 
+// 2026-05-08: per-task unique image directors across all Multi60 platforms
 // ─── TikTok 60s ─────────────────────────────────────────────────────────
-const TT_IMG = 180165; // Anna Tseng
+const TT_IMG  = 180165; // Anna Tseng (主場 foryou-full)
+const TT_IMG2 = 220890; // Evan Chen — Digital Experience Designer
+const TT_IMG3 = 220891; // Emma Chen — Digital Experience Designer
 export const TT_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "tt-60-foryou-full",
@@ -77,7 +80,7 @@ export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "tt-60-series-3": {
-    variants: 3, images: 3, runImageGen: true, imageDirectorId: TT_IMG,
+    variants: 3, images: 3, runImageGen: true, imageDirectorId: TT_IMG2,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 300, captionMaxChars: 450,
@@ -85,7 +88,7 @@ export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "tt-60-viral-rewrite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: TT_IMG,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: TT_IMG3,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 300, captionMaxChars: 500,
@@ -95,7 +98,9 @@ export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 };
 
 // ─── LinkedIn 60s ───────────────────────────────────────────────────────
-const LI_IMG = 60071; // Zeyu Yang
+const LI_IMG  = 60071;  // Zeyu Yang (主場 thought-leader)
+const LI_IMG2 = 220892; // Justin Chen — Digital Experience Designer
+const LI_IMG3 = 220893; // Vera Chen — Digital Experience Designer
 export const LI_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "li-60-thought-leader",
@@ -152,14 +157,14 @@ export const LI_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "li-60-newsletter": {
-    variants: 3, images: 3, runImageGen: true, imageDirectorId: LI_IMG,
+    variants: 3, images: 3, runImageGen: true, imageDirectorId: LI_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["教學版", "觀點版", "趨勢版"],
     captionMinChars: 400, captionMaxChars: 700,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "li-60-case-study": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: LI_IMG,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: LI_IMG3,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 250, captionMaxChars: 500,
@@ -169,7 +174,9 @@ export const LI_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 };
 
 // ─── Email 60s ──────────────────────────────────────────────────────────
-const EM_IMG = 60062; // Nathan Lu
+const EM_IMG  = 60062;  // Nathan Lu (主場 newsletter-full)
+const EM_IMG2 = 220894; // David Chen — Digital Experience Designer
+const EM_IMG3 = 220895; // Winnie Chen — Digital Experience Designer
 export const EMAIL_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "em-60-newsletter-full",
@@ -224,7 +231,7 @@ export const EMAIL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "em-60-promo-sequence": {
-    variants: 3, images: 3, runImageGen: true, imageDirectorId: EM_IMG,
+    variants: 3, images: 3, runImageGen: true, imageDirectorId: EM_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["預告", "開賣", "最後機會"],
     captionMinChars: 300, captionMaxChars: 500,
@@ -232,7 +239,7 @@ export const EMAIL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "em-60-onboarding-3": {
-    variants: 3, images: 3, runImageGen: true, imageDirectorId: EM_IMG,
+    variants: 3, images: 3, runImageGen: true, imageDirectorId: EM_IMG3,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["D0 歡迎", "D3 教學", "D7 邀請"],
     captionMinChars: 300, captionMaxChars: 500,
@@ -274,7 +281,9 @@ export const PR_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 };
 
 // ─── Brand Positioning 60s ──────────────────────────────────────────────
-const BR_IMG = 60030; // Boyu Hsu (repurposed)
+const BR_IMG  = 60030;  // Boyu Hsu (主場 tagline)
+const BR_IMG2 = 210015; // Tina Shih — AI SaaS Landing Page Designer (Webflow)
+const BR_IMG3 = 210017; // Jessica Chiu — AI UI/UX Designer (Figma)
 export const BRAND_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "br-60-tagline-suite",
@@ -328,7 +337,7 @@ export const BRAND_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "br-60-value-prop": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG2,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["問題導向", "解法導向", "結果導向", "對比導向", "情感導向"],
     captionMinChars: 100, captionMaxChars: 200,
@@ -336,7 +345,7 @@ export const BRAND_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "br-60-brand-voice": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG3,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["專業版", "親切版", "簡潔版", "故事版", "幽默版"],
     captionMinChars: 100, captionMaxChars: 200,
@@ -345,7 +354,9 @@ export const BRAND_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 };
 
 // ─── User Research 60s ──────────────────────────────────────────────────
-const RS_IMG = 24; // Janet Chang (repurposed)
+const RS_IMG  = 24;     // Janet Chang (主場 interview-guide)
+const RS_IMG2 = 210004; // Hannah Wu — AI Customer Service Bot Designer
+const RS_IMG3 = 210005; // Jenny Huang — AI Digital Platform Customer Service Manager
 export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "rs-60-interview-guide",
@@ -401,14 +412,14 @@ export const RESEARCH_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { replyTemplates: 3, postingTime: false, followupPost: false },
   },
   "rs-60-persona-suite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: RS_IMG,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: RS_IMG2,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["主要使用者", "次要使用者", "決策者", "影響者", "邊緣使用者"],
     captionMinChars: 300, captionMaxChars: 500,
     extras: { replyTemplates: 3, postingTime: false, followupPost: false },
   },
   "rs-60-jtbd-suite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: RS_IMG,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: RS_IMG3,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["功能性 Job", "情感性 Job", "社交性 Job", "替代性 Job", "意外性 Job"],
     captionMinChars: 80, captionMaxChars: 150,
