@@ -1,0 +1,98 @@
+name: Admin — Write RESEND_API_KEY to prod .env
+
+# 2026-05-08: write Resend API key into prod .env so registration /
+# forgot-password emails actually send. Reads from GitHub secret
+# `RESEND_API_KEY` so the value is never logged or visible in the
+# workflow run history.
+#
+# Pre-req: in GitHub repo Settings → Secrets and variables → Actions,
+# add a Repository Secret named exactly  RESEND_API_KEY  with value
+# starting with "re_...".  Then run this workflow once.
+#
+# Safe to re-run.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  write-resend-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify secret exists
+        run: |
+          if [ -z "${{ secrets.RESEND_API_KEY }}" ]; then
+            echo "❌ RESEND_API_KEY secret not set."
+            echo ""
+            echo "Add it at: Settings → Secrets and variables → Actions → New repository secret"
+            echo "  Name:  RESEND_API_KEY"
+            echo "  Value: re_xxxxx (your key from resend.com)"
+            exit 1
+          fi
+          echo "✓ RESEND_API_KEY secret present (length: $(echo -n "${{ secrets.RESEND_API_KEY }}" | wc -c) chars)"
+
+      - name: Write to prod .env via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          KEY_VALUE: ${{ secrets.RESEND_API_KEY }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: KEY_VALUE
+          script: |
+            set -e
+            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "❌ .env not found at $ENV_FILE"
+              exit 1
+            fi
+
+            # Upsert RESEND_API_KEY without printing the value
+            if grep -qE "^RESEND_API_KEY=" "$ENV_FILE"; then
+              # Use a temp file to avoid sed escaping issues with special chars
+              awk -v val="$KEY_VALUE" '
+                /^RESEND_API_KEY=/ { print "RESEND_API_KEY=" val; next }
+                { print }
+              ' "$ENV_FILE" > "${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "$ENV_FILE"
+              echo "✓ updated RESEND_API_KEY"
+            else
+              echo "RESEND_API_KEY=$KEY_VALUE" >> "$ENV_FILE"
+              echo "✓ appended RESEND_API_KEY"
+            fi
+
+            # Also ensure EMAIL_FROM + APP_URL are set (P0-A requirement)
+            upsert_kv() {
+              local k="$1"; local v="$2"
+              if grep -qE "^${k}=" "$ENV_FILE" 2>/dev/null; then
+                sed -i "s|^${k}=.*|${k}=${v}|" "$ENV_FILE"
+              else
+                echo "${k}=${v}" >> "$ENV_FILE"
+              fi
+            }
+            upsert_kv "EMAIL_FROM" "noreply@sowork.ai"
+            upsert_kv "APP_URL"    "https://marketing-os.sowork.ai"
+
+            # Verify (without printing secret value)
+            echo ""
+            echo "── Verify (no secret values printed) ──"
+            for k in EMAIL_FROM APP_URL; do
+              v=$(grep -E "^${k}=" "$ENV_FILE" | head -1 | cut -d= -f2-)
+              echo "  $k = $v"
+            done
+            if grep -qE "^RESEND_API_KEY=re_" "$ENV_FILE"; then
+              echo "  RESEND_API_KEY = (set, format ok)"
+            else
+              echo "  ⚠ RESEND_API_KEY format unexpected — should start with re_"
+            fi
+
+            # Restart so PM2 picks up the new env
+            echo ""
+            echo "── Restarting marketing-os ──"
+            pm2 restart marketing-os --update-env 2>&1 | tail -5
+            sleep 3
+            curl -s -o /dev/null -w "Health endpoint: HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
+
+            echo ""
+            echo "✓ Done. Test by registering a fresh email on /auth/register."

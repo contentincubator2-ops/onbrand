@@ -33,6 +33,7 @@ import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import BrandSettingsSheet from "../components/positioning/BrandSettingsSheet";
+import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import { EntityStats } from "../components/EntityStats";
@@ -107,6 +108,12 @@ export default function BrandsPage() {
   const [testPanelOpen, setTestPanelOpen] = useState(false);
   // Settings sheet (right-drawer with 連結 / 視覺 / AI 指令 / 危險區)
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 2026-05-08: onboarding wizard for first-time users (no brands yet).
+  // Auto-opens once when the user lands here with zero brands; flag
+  // is per-session in localStorage so they don't get re-prompted on
+  // every refresh after dismissing.
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // (effect to auto-open is declared further down once scopeBrands is defined)
   const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"connector"|"visual"|"ai"|"danger">("connector");
   const [onboardingHint, setOnboardingHint] = useState<string | undefined>(undefined);
 
@@ -201,6 +208,17 @@ export default function BrandsPage() {
     ? (trpc as any).scope.options.useQuery(undefined, { refetchOnWindowFocus: false })
     : { data: null };
   const scopeBrands = ((scopeOptionsQuery.data as any)?.brands as any[]) ?? brands;
+
+  // 2026-05-08: auto-open onboarding wizard for first-time users (0
+  // brands), unless they previously dismissed it.
+  React.useEffect(() => {
+    if (scopeOptionsQuery?.isLoading) return;
+    const dismissedKey = "sowork.onboarding.dismissed";
+    if (scopeBrands.length === 0 && !localStorage.getItem(dismissedKey)) {
+      setOnboardingOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeBrands.length, scopeOptionsQuery?.isLoading]);
 
   // Build sub-nav from positioning schema + brand-only asset list.
   // Each segment becomes its own sub-nav entry (id = "seg:<segmentId>"),
@@ -660,36 +678,52 @@ export default function BrandsPage() {
         onboardingHint={onboardingHint}
       />
 
-      {/* 2026-05-08 (P1-1): empty state — user has zero brands.
-          Show a friendly CTA instead of broken hero with no scope. */}
+      {/* 2026-05-08: empty state — first-time user has zero brands.
+          Auto-opens the BrandOnboardingWizard (4-step guided flow).
+          Behind the wizard we keep a soft welcome screen so the page
+          doesn't look broken if user dismisses the wizard mid-way. */}
       {scopeBrands.length === 0 && (
-        <div className="min-h-[60vh] flex items-center justify-center px-6">
-          <div className="max-w-[480px] text-center">
-            <div
-              className="mx-auto mb-5 flex items-center justify-center"
-              style={{
-                width: 72, height: 72, borderRadius: 18,
-                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-                boxShadow: "0 10px 30px rgba(124,58,237,0.32)",
-              }}
-            >
-              <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 28 }} />
+        <>
+          <BrandOnboardingWizard
+            isOpen={onboardingOpen}
+            onClose={() => {
+              setOnboardingOpen(false);
+              try { localStorage.setItem("sowork.onboarding.dismissed", "1"); } catch {}
+            }}
+            onComplete={() => {
+              setOnboardingOpen(false);
+              try { localStorage.setItem("sowork.onboarding.dismissed", "1"); } catch {}
+              utils.scope?.options?.invalidate?.();
+              utils.brand?.listByMember?.invalidate?.();
+            }}
+          />
+          <div className="min-h-[60vh] flex items-center justify-center px-6">
+            <div className="max-w-[480px] text-center">
+              <div
+                className="mx-auto mb-5 flex items-center justify-center"
+                style={{
+                  width: 72, height: 72, borderRadius: 18,
+                  background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                  boxShadow: "0 10px 30px rgba(124,58,237,0.32)",
+                }}
+              >
+                <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 28 }} />
+              </div>
+              <h1 className="text-2xl font-semibold text-default-900 mb-2">歡迎使用 Marketing OS</h1>
+              <p className="text-sm text-default-500 mb-6 leading-relaxed">
+                先建立你的第一個品牌就能開始 — 系統會自動分析定位、設定文字 / 視覺 / AI 指令。
+              </p>
+              <button
+                onClick={() => setOnboardingOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm shadow-md hover:shadow-lg transition"
+                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366F1 100%)" }}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+                開始引導
+              </button>
             </div>
-            <h1 className="text-2xl font-semibold text-default-900 mb-2">建立你的第一個品牌</h1>
-            <p className="text-sm text-default-500 mb-6 leading-relaxed">
-              品牌是 Marketing OS 的根 — 定位 / 文字 / 視覺 / 知識 / AI 指令庫都掛在品牌底下。
-              建立後系統會自動執行 14 步定位分析，幾分鐘內就能開始產內容。
-            </p>
-            <button
-              onClick={() => setAddModal({ open: true, tab: "brand" })}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm shadow-md hover:shadow-lg transition"
-              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366F1 100%)" }}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              建立第一個品牌
-            </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* ─── Hero — /30s-style centered axis (CJ feedback 2026-05-07) ───

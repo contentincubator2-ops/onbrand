@@ -211,11 +211,30 @@ class TierPageErrorBoundary extends React.Component<
 
 function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const ctx = useOutletContext<ShellOutletCtx>();
+  const navigate = (window as any).__rrNavigate ?? null;  // fallback only
   const brandId = (ctx?.brandId as number | null) ?? null;
   const brandName = useMemo(() => {
     const list = (ctx?.brands as any[]) ?? [];
     return list.find((b) => b?.id === brandId)?.name ?? null;
   }, [ctx, brandId]);
+
+  // 2026-05-08: first-time user redirect — if user has zero brands,
+  // bounce to /brands so the BrandOnboardingWizard can take over. Without
+  // this they'd land on /30s with no brand selected and a useless empty
+  // task catalog.
+  React.useEffect(() => {
+    const brands = (ctx?.brands as any[]) ?? [];
+    if (brands.length === 0) {
+      // Avoid redirect loop if scope.options is still loading (brands===[])
+      // by using a short delay + checking we're not already on /brands.
+      const t = setTimeout(() => {
+        if (window.location.pathname !== "/brands") {
+          window.location.href = "/brands";
+        }
+      }, 600);
+      return () => clearTimeout(t);
+    }
+  }, [ctx?.brands]);
   // Pull the active brand row to access logoUrl. Refetched every 30s so a
   // freshly-saved FB logo shows up without a full page reload.
   const brandQuery = (trpc as any).brand?.get?.useQuery
