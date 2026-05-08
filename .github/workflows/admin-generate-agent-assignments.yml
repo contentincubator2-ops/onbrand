@@ -3,6 +3,9 @@ name: Admin — Generate agent-assignments.json (offline, deterministic)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
