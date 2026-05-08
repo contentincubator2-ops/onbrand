@@ -659,6 +659,21 @@ async function main() {
       console.log("[migrate] agents.modelStack: already exists, skipped");
     }
 
+    // ── 9a-bis. taskSystemPrompt — thick per-role operating manual (CJ 2026-05-08)
+    // Each agent gets a 200-500w role-specific prompt: formulas, structure,
+    // banlist, examples. Read by loadAgent() in quickTaskOrchestra and
+    // prepended to every LLM call routed through the agent.
+    const [agentSysPromptCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agents' AND COLUMN_NAME = 'taskSystemPrompt'
+    `) as any;
+    if ((agentSysPromptCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE agents ADD COLUMN taskSystemPrompt TEXT NULL`);
+      console.log("[migrate] agents.taskSystemPrompt: added");
+    } else {
+      console.log("[migrate] agents.taskSystemPrompt: already exists, skipped");
+    }
+
     // ── 9b. preferredModelTags — drives the squad-runner media picker ─────────
     // When a step's outputKind is image|video, the runner asks mediaModels.ts
     // `modelsForTag()` for each tag in this array and pre-selects the union as

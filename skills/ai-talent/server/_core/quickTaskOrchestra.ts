@@ -118,16 +118,23 @@ async function loadAgent(id: number | null | undefined): Promise<{ meta: AgentMe
   if (!id) return { meta: null, persona: "" };
   try {
     const [rows]: any = await localPool.execute(
-      `SELECT id, name, title, bio, specialty, methodology, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+      `SELECT id, name, title, bio, specialty, methodology, taskSystemPrompt, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
       [id],
     );
     const a = (rows as any[])?.[0];
     if (!a) return { meta: null, persona: "" };
+    // taskSystemPrompt is the agent's full role manual (200-500w). When
+    // present it dominates — it IS the writing instruction set. bio /
+    // specialty / methodology become identity flavor.
+    const taskBlock = a.taskSystemPrompt
+      ? `\n# 你的工作守則（必讀，違反等於失敗）\n${a.taskSystemPrompt}\n`
+      : "";
     const persona =
       `你是 ${a.name}，${a.title}。\n` +
       (a.bio ? `背景：${a.bio}\n` : "") +
       (a.specialty ? `專長：${a.specialty}\n` : "") +
       (a.methodology ? `方法論：${a.methodology}\n` : "") +
+      taskBlock +
       `用你的口氣寫，不要寫得像通用 AI。\n\n`;
     return {
       meta: { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null },

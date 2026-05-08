@@ -77,6 +77,14 @@ export const agents = mysqlTable("agents", {
   industries: text("industries"),
   experienceDetail: text("experienceDetail"),
   methodology: text("methodology"),
+  /**
+   * 2026-05-08 (CJ direction): per-role thick system prompt — the agent's
+   * actual writing manual (formulas / structure / banlist / examples).
+   * Read by loadAgent() and prepended to every LLM call this agent runs.
+   * 200-500 words ideal; the role-specific operating layer between the
+   * market master persona and the per-task systemPrompt.
+   */
+  taskSystemPrompt: text("taskSystemPrompt"),
   // Creator / UGC fields
   creatorUserId: int("creatorUserId"),   // null = platform-owned agent
   reviewStatus: mysqlEnum("reviewStatus", ["pending", "approved", "rejected"]).default("approved"),
