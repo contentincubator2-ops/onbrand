@@ -17,6 +17,8 @@ import { getBrandPositioningById } from "../positioningBridge";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import { getBrandRealContent } from "../_core/brandRealContent";
 import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywritingMaster";
+import { resolveAgentId } from "../_core/agentAssignments";
+import { loadAgent } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -632,7 +634,14 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
         platform: input.platform as PlatformCode,
       });
 
-      const sys = `${masterBlock}
+      // 2026-05-08: also inject the platform-specific theater agent's persona
+      // (B+, ≥400 char real-person modeled). One DB read, cached after first
+      // hit. Falls back gracefully if assignment missing.
+      const theaterAgentId = resolveAgentId(`theater-cell-${input.platform}`, "lead", null);
+      const theaterPersonaLoad = theaterAgentId ? await loadAgent(theaterAgentId).catch(() => ({ persona: "" })) : { persona: "" };
+      const theaterPersona = theaterPersonaLoad.persona ? `\n# 你的角色（per-platform 真人模擬 agent）\n${theaterPersonaLoad.persona}\n` : "";
+
+      const sys = `${masterBlock}${theaterPersona}
 
 # 本次貼文寫作
 

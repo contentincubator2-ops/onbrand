@@ -115,7 +115,7 @@ export interface OrchestraResult {
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-async function loadAgent(id: number | null | undefined): Promise<{ meta: AgentMeta | null; persona: string }> {
+export async function loadAgent(id: number | null | undefined): Promise<{ meta: AgentMeta | null; persona: string }> {
   if (!id) return { meta: null, persona: "" };
   try {
     const [rows]: any = await localPool.execute(
@@ -410,9 +410,11 @@ async function callImageDirector(args: {
 // Each extra is its own tiny LLM call (qwen, ~10s budget). Failures are
 // non-fatal — the variant ships without that extra and UI shows "—".
 
-async function callReplyTemplates(args: { caption: string; channel: string; n: number }): Promise<Array<{ userSays: string; yourReply: string }>> {
-  const { caption, channel, n } = args;
+async function callReplyTemplates(args: { caption: string; channel: string; n: number; persona?: string }): Promise<Array<{ userSays: string; yourReply: string }>> {
+  const { caption, channel, n, persona } = args;
+  const personaPrefix = persona ? `${persona}\n` : "";
   const system =
+    personaPrefix +
     `你是社群留言策劃師。基於下面這篇即將發出的 ${channel} 貼文，預測 ${n} 種最可能的用戶留言（從正面到質疑都涵蓋），並寫出對應的品牌回覆。\n\n` +
     `每一組：用戶可能會說的話（30 字內，自然口吻）+ 品牌怎麼回（30-60 字，有溫度不罐頭）。\n\n` +
     `輸出嚴格 JSON 陣列：[{"userSays":"...","yourReply":"..."}, ...]\n` +
@@ -435,9 +437,11 @@ async function callReplyTemplates(args: { caption: string; channel: string; n: n
   } catch { return []; }
 }
 
-async function callPostingTime(args: { caption: string; channel: string }): Promise<string> {
-  const { caption, channel } = args;
+async function callPostingTime(args: { caption: string; channel: string; persona?: string }): Promise<string> {
+  const { caption, channel, persona } = args;
+  const personaPrefix = persona ? `${persona}\n` : "";
   const system =
+    personaPrefix +
     `根據下面這篇 ${channel} 貼文的主題、語氣、對象，推薦 1 個最佳發文時段。\n` +
     `回答格式：「週X HH:MM-HH:MM｜理由（30 字內）」。例：「週四 19:00-21:00｜下班通勤後滑社群高峰，貼文輕鬆題材剛好接住」\n` +
     `不要列多個選項，只給最推薦的 1 個。`;
@@ -454,9 +458,11 @@ async function callPostingTime(args: { caption: string; channel: string }): Prom
   } catch { return ""; }
 }
 
-async function callFollowupPost(args: { caption: string; channel: string }): Promise<string> {
-  const { caption, channel } = args;
+async function callFollowupPost(args: { caption: string; channel: string; persona?: string }): Promise<string> {
+  const { caption, channel, persona } = args;
+  const personaPrefix = persona ? `${persona}\n` : "";
   const system =
+    personaPrefix +
     `這是即將發到 ${channel} 的主貼文。請寫一篇 24 小時後的追蹤貼文（80-150 字），延伸主貼文的對話：\n` +
     `- 不要重複主貼文重點\n- 可以是補充細節、回答留言常見問題、或下集預告\n- 語氣連貫\n` +
     `直接給追蹤貼文文字（不要加 prefix 像 "Day 2:"）。`;
@@ -937,6 +943,21 @@ export async function runOrchestra(args: {
       specialtyMeta = specLoad.meta;
       specialtyPersona = specLoad.persona;
     }
+    // 2026-05-08: pre-load extras helper personas (one DB read each, before
+    // variant fanout) so each variant's helper LLM call gets the agent's
+    // real-person persona prepended. JSON-driven, zero runtime resolution.
+    let replyPersona = "", timingPersona = "", followupPersona = "";
+    if ((tier === "60s" || tier === "100s") && extrasCfg) {
+      const replyId    = resolveAgentId(taskId, "replyWriter",    null);
+      const timingId   = resolveAgentId(taskId, "timingAdvisor",  null);
+      const followupId = resolveAgentId(taskId, "followupWriter", null);
+      const [r1, r2, r3] = await Promise.all([
+        replyId    ? loadAgent(replyId).then(x => x.persona).catch(() => "") : Promise.resolve(""),
+        timingId   ? loadAgent(timingId).then(x => x.persona).catch(() => "") : Promise.resolve(""),
+        followupId ? loadAgent(followupId).then(x => x.persona).catch(() => "") : Promise.resolve(""),
+      ]);
+      replyPersona = r1; timingPersona = r2; followupPersona = r3;
+    }
     if ((tier === "60s" || tier === "100s") && extrasCfg) {
       const stExtras = stage("extras", "撰寫留言模板 / 發文時段 / 追蹤貼文" + (useSpecialty ? " / 專業檢核" : ""));
       try {
@@ -950,10 +971,10 @@ export async function runOrchestra(args: {
             const consent = (args.inputs["consent_status"] ?? "").toString();
             const subResults = await Promise.all([
               extrasCfg.replyTemplates && extrasCfg.replyTemplates > 0
-                ? callReplyTemplates({ caption: v.caption, channel, n: extrasCfg.replyTemplates })
+                ? callReplyTemplates({ caption: v.caption, channel, n: extrasCfg.replyTemplates, persona: replyPersona })
                 : Promise.resolve([] as Array<{ userSays: string; yourReply: string }>),
-              extrasCfg.postingTime ? callPostingTime({ caption: v.caption, channel }) : Promise.resolve(""),
-              extrasCfg.followupPost ? callFollowupPost({ caption: v.caption, channel }) : Promise.resolve(""),
+              extrasCfg.postingTime ? callPostingTime({ caption: v.caption, channel, persona: timingPersona }) : Promise.resolve(""),
+              extrasCfg.followupPost ? callFollowupPost({ caption: v.caption, channel, persona: followupPersona }) : Promise.resolve(""),
               extrasCfg.compareTable && useSpecialty
                 ? callCompareTable({ caption: v.caption, viralSource: viralSrc, persona: specialtyPersona })
                 : Promise.resolve(""),
