@@ -28,7 +28,7 @@ export const TT_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "foryou",
     label: "TikTok ForYou 完整影片包",
     description: "Hook + hold + payoff 完整 60 秒腳本 + 5 變體",
-    agent_id: 30011, skill_slug: "short-video-script",
+    agent_id: 210001, skill_slug: "short-video-script", // Jason Tsai — AI Customer Service Strategy Director (1767 char)
     primary_question: "這支 TikTok 主題？",
     primary_input: { key: "topic", placeholder: "教學 / 反差 / 揭密 / 開箱", type: "textarea" },
     inputs: [{ key: "topic", label: "影片主題", type: "textarea", required: true }],

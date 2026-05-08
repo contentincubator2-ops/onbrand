@@ -24,7 +24,7 @@ import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 
 // Universal team IDs (used by orchestra; no need to repeat per-task)
 export const FB60_UNIVERSAL = {
-  hashtagAgentId: 30005,    // Emma Zhang
+  hashtagAgentId: 30012,    // Mia Su — Meta Ads Specialist (2034 char)
   replyAgentId: 180163,     // Helen Sung
   schedulerAgentId: 30003,  // David Wang
   followupAgentId: 60012,   // Sophie Ho
@@ -162,7 +162,7 @@ ${FB60_TONE}`,
     postType: "event",
     label: "FB 活動 launch kit (4 篇)",
     description: "Eric Lin 設計 launch arc + 預告×2 / 當日 / 事後 4 篇平行",
-    agent_id: 30002, // Sarah Liu
+    agent_id: 30016, // Grace Lin — Brand Copywriter (2308 char)
     skill_slug: "fb-copywriting",
     primary_question: "活動名稱 + 日期？",
     primary_input: { key: "event_name", placeholder: "例：5/20 線上發表會", type: "text" },

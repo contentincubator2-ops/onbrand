@@ -73,7 +73,7 @@ ${TONE_100}`,
     tier: "100s", postType: "event",
     label: "FB 完整 Launch Toolkit (8 篇)",
     description: "預告 ×3 / 當日 / 即時 ×2 / 事後 / 跨平台 IG 改寫 + scout 抓節慶/時事",
-    agent_id: 30002, // Sarah Liu
+    agent_id: 30015, // Tom Chang — KOL Word-of-Mouth Marketing Exec (2274 char)
     skill_slug: "fb-copywriting",
     primary_question: "活動名稱 + 日期 + 重點？",
     primary_input: { key: "event_name", placeholder: "例：5/20 線上發表會", type: "text" },
@@ -166,7 +166,7 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "profile",
     label: "IG 帳號重新定位完整套組",
     description: "新 bio + 9 個 highlight 主題 + 9 篇 launch posts + visual direction",
-    agent_id: 30005, // Emma Zhang
+    agent_id: 180003, // David Lin — Google Ads Specialist (1745 char)
     skill_slug: "instagram-strategy",
     primary_question: "想重新定位的方向？",
     primary_input: { key: "new_direction", placeholder: "想轉成什麼方向 / 受眾", type: "textarea" },
@@ -201,7 +201,7 @@ export const YT_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "video",
     label: "YT 季度頻道策略",
     description: "12 個 video title + 內容支柱 + community 月曆 + competitor 分析",
-    agent_id: 30013, // Eric Chen
+    agent_id: 224001, // Yun-Hsuan Chen — YouTube Marketing Strategist 服飾時尚 (~1019 char)
     skill_slug: "youtube-strategy",
     primary_question: "頻道方向 / 受眾？",
     primary_input: { key: "channel_focus", placeholder: "頻道主題與目標受眾", type: "textarea" },
@@ -236,7 +236,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "foryou",
     label: "TikTok 30 天 ForYou 配方",
     description: "30 天每天 1 支腳本 + trend 對應 + sound 建議 + scout 抓節慶/時事",
-    agent_id: 30011, skill_slug: "short-video-script",
+    agent_id: 210011, skill_slug: "short-video-script", // Wendy Lu — AI Email List Nurturing (1926 char)
     primary_question: "本月想衝什麼方向？",
     primary_input: { key: "monthly_theme", placeholder: "教學 / 反差 / 開箱 為主", type: "textarea" },
     inputs: [{ key: "monthly_theme", label: "本月方向", type: "textarea", required: true }],
@@ -536,7 +536,7 @@ export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["內容支柱", "12 影片 title", "Community 月曆", "Competitor 分析", "即時趨勢報告"],
     captionMinChars: 300, captionMaxChars: 600,
-    strategistAgentId: 30004, // Kevin Lin — YouTube Strategy PM (2315 char)
+    strategistAgentId: 30001, // Alex Chen — AI Growth Hacker CMO (1831 char)
     postLabels: ["內容支柱", "12 影片 title", "Community 月曆", "Competitor 分析", "即時趨勢報告"],
     scoutKind: "news", // 季度策略 → 抓產業最新
     extras: { ...yt100Common.extras, postsCount: 5 },

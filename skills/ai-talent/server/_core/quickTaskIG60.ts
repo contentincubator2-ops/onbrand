@@ -152,7 +152,7 @@ ${IG_TONE}`,
     postType: "profile",
     label: "IG Profile Highlight 5 組封面 + 內容",
     description: "5 個精選封面（about / 商品 / FAQ / 客評 / 案例）+ 視覺一致",
-    agent_id: 30005, // Emma Zhang
+    agent_id: 180196, // Kevin Liao — Product Marketing Manager (1750 char)
     skill_slug: "instagram-strategy",
     primary_question: "想凸顯什麼樣的精選？",
     primary_input: { key: "highlight_focus", placeholder: "例：產品介紹 / 創辦故事 / 客戶見證", type: "textarea" },
