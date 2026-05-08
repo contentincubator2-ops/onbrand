@@ -1,0 +1,39 @@
+name: Admin — Show assigned agent personas (preview)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ids_csv:
+        description: 'Agent IDs to preview'
+        required: true
+        type: string
+
+jobs:
+  show:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: IDS_CSV
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db --silent"
+            for id in $(echo "${IDS_CSV}" | tr ',' ' '); do
+              echo "==================== ID: $id ===================="
+              $MYSQL -e "SELECT CONCAT('Name: ', name, ' | Title: ', title, ' | Skill: ', primarySkill) FROM mos_db.agents WHERE id=$id;"
+              echo "--- bio ---"
+              $MYSQL -e "SELECT bio FROM mos_db.agents WHERE id=$id;"
+              echo "--- specialty ---"
+              $MYSQL -e "SELECT specialty FROM mos_db.agents WHERE id=$id;"
+              echo "--- methodology ---"
+              $MYSQL -e "SELECT methodology FROM mos_db.agents WHERE id=$id;"
+              echo "--- experienceDetail (preview 800) ---"
+              $MYSQL -e "SELECT LEFT(experienceDetail, 800) FROM mos_db.agents WHERE id=$id;"
+              echo ""
+            done
+        env:
+          IDS_CSV: ${{ inputs.ids_csv }}
