@@ -1,0 +1,37 @@
+name: Admin — Find unused thick agents (≥600 char, not yet assigned)
+
+on:
+  workflow_dispatch:
+    inputs:
+      excluded_csv:
+        description: 'CSV of currently-assigned agent IDs to exclude'
+        required: true
+        type: string
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: EXCLUDED_CSV
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQLT="mysql -h localhost -u mos_user mos_db -t"
+            EXCL="${EXCLUDED_CSV}"
+            THICK="(CHAR_LENGTH(IFNULL(bio,''))+CHAR_LENGTH(IFNULL(specialty,''))+CHAR_LENGTH(IFNULL(methodology,''))+CHAR_LENGTH(IFNULL(experienceDetail,'')))"
+
+            echo "=== Top 100 unused thick agents (≥600 char), grouped by skill area ==="
+            $MYSQLT -e "
+              SELECT id, name, title, primarySkill, $THICK AS total
+              FROM agents
+              WHERE isAvailable=1 AND reviewStatus='approved'
+                AND id NOT IN ($EXCL)
+                AND $THICK >= 600
+              ORDER BY $THICK DESC LIMIT 100"
+        env:
+          EXCLUDED_CSV: ${{ inputs.excluded_csv }}
