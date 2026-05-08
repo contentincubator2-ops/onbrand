@@ -1,0 +1,46 @@
+name: Admin — Audit aiModel field on assigned agents
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQLT="mysql -h localhost -u mos_user mos_db -t"
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            # Extract all assigned agent IDs from JSON
+            IDS=$(node -e "const d=require('./data/agent-assignments.json'); const ids=new Set(); for(const t of Object.values(d.assignments)) for(const v of Object.values(t)) ids.add(v); console.log([...ids].join(','));")
+            echo "Assigned agents: $(echo $IDS | tr ',' '\n' | wc -l)"
+
+            echo ""
+            echo "=== aiModel distribution among assigned agents ==="
+            $MYSQLT -e "
+              SELECT IFNULL(NULLIF(aiModel,''),'(empty)') AS aiModel, COUNT(*) AS n
+              FROM agents WHERE id IN ($IDS)
+              GROUP BY aiModel ORDER BY n DESC"
+
+            echo ""
+            echo "=== Empty / NULL aiModel agents (need fixing) ==="
+            $MYSQLT -e "
+              SELECT id, name, title FROM agents
+              WHERE id IN ($IDS) AND (aiModel IS NULL OR aiModel = '' OR aiModel = 'gpt-5')
+              LIMIT 20"
+
+            echo ""
+            echo "=== modelStack JSON column (if populated) ==="
+            $MYSQLT -e "
+              SELECT
+                SUM(CASE WHEN modelStack IS NULL OR modelStack='null' THEN 1 ELSE 0 END) AS no_stack,
+                SUM(CASE WHEN modelStack IS NOT NULL AND modelStack <> 'null' THEN 1 ELSE 0 END) AS has_stack
+              FROM agents WHERE id IN ($IDS)"
