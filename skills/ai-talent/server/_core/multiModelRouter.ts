@@ -105,15 +105,20 @@ export function detectTaskType(content: string): TaskType {
 //   coding            → DeepSeek-R1 (azure-northcentral) when key available
 //   chinese/general   → qwen (native Chinese LLM) first
 //   fallback chain    → qwen → zhipu → azure-foundry (all confirmed working)
+// 2026-05-09 (CJ direction「乾淨一條路」): qwen key is invalid (401),
+// azure-position key is missing → fallback chain was broken for half the
+// channels. Anthropic direct is confirmed working (curl 0.6s) and now
+// enabled. Promoted to FIRST in every chain so all tasks have a working
+// provider on attempt #1.
 const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
   //                  best choice          ↓ fallbacks ────────────────────────────────────
-  chinese_content:  ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
-  creative_writing: ["azure-position",    "azure-claude","qwen",           "azure-foundry"],
-  search_realtime:  ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
-  analysis:         ["azure-position",    "azure-claude","qwen",           "azure-foundry"],
-  classification:   ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
-  coding:           ["azure-northcentral","azure-foundry","qwen",          "zhipu"],
-  general:          ["qwen",              "zhipu",      "azure-foundry",  "azure-position"],
+  chinese_content:  ["anthropic",         "azure-foundry","azure-position","zhipu",  "qwen"],
+  creative_writing: ["anthropic",         "azure-position","azure-claude","azure-foundry","qwen"],
+  search_realtime:  ["anthropic",         "zhipu",      "azure-foundry",  "azure-position","qwen"],
+  analysis:         ["anthropic",         "azure-position","azure-claude","azure-foundry","qwen"],
+  classification:   ["anthropic",         "zhipu",      "azure-foundry",  "azure-position","qwen"],
+  coding:           ["anthropic",         "azure-northcentral","azure-foundry","zhipu","qwen"],
+  general:          ["anthropic",         "zhipu",      "azure-foundry",  "azure-position","qwen"],
 };
 
 // Best model to use for each provider when called by this router
@@ -133,7 +138,7 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
   cohere:             "command-r-plus",
   openai:             "gpt-4o-mini",
   forge:              "gemini-2.5-flash",
-  anthropic:          "claude-sonnet-4-6",
+  anthropic:          "claude-haiku-4-5-20251001",  // 2026-05-09: only confirmed-deployed model
   gemini:             "gemini-2.5-flash",
   hermes:             "hermes",
 };
@@ -152,8 +157,9 @@ function getAvailabilityMap(): Record<ModelProvider, boolean> {
     "azure-claude":       !!(ENV as any).AZURE_CLAUDE_SWEDEN_API_KEY,
     "azure-northcentral": !!(ENV as any).AZURE_NORTHCENTRAL_API_KEY,
     "azure-canada":       !!(ENV as any).AZURE_CANADA_API_KEY,
-    // Force-disabled: confirmed broken or not OpenAI-compat via invokeLLM
-    anthropic:           false,   // 404 — uses /messages not /chat/completions
+    // 2026-05-09: anthropic re-enabled — invokeLLM gained dedicated /v1/messages
+    // path. Confirmed working: curl claude-haiku-4-5-20251001 → 200 in 0.6s.
+    anthropic:           !!(ENV as any).ANTHROPIC_API_KEY,
     openai:              false,   // 401 — key expired
     perplexity:          false,   // 401 — all 5 keys quota exhausted
     google:              false,   // gemini-oai-compat 400; native works in perplexityScout
