@@ -1,0 +1,49 @@
+name: Admin — Debug live LLM call (post-pm2-restart)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "════════ pm2 status (uptime confirms fresh start) ════════"
+            pm2 status | grep marketing-os
+
+            echo ""
+            echo "════════ Latest 100 lines of pm2 log filtered for LLM/orchestra/caption ════════"
+            pm2 logs marketing-os --lines 200 --nostream --raw 2>&1 | grep -iE "caption|orchestra|llmRouter|multiModelRouter|anthropic|qwen|provider|失敗|aborted|timeout|recordTaskRun|invokeLLM" | tail -50
+
+            echo ""
+            echo "════════ Test multiModelRouter directly ════════"
+            cat > /tmp/probe-mm.ts <<'EOF'
+            // Probe what multiModelRouter actually selects after restart
+            // (loaded from compiled /opt path so we exercise pm2's source).
+            import { selectModel, callModel } from "/opt/marketing-os/app/skills/ai-talent/server/_core/multiModelRouter";
+            console.log("Selected for chinese_content:", selectModel("chinese_content"));
+            console.log("Selected for creative_writing:", selectModel("creative_writing"));
+            console.log("");
+            console.log("Direct callModel test (anthropic, claude-haiku-4-5-20251001):");
+            try {
+              const r = await callModel(
+                [{ role: "user", content: "用繁體中文說 5 個字：你好世界" }],
+                "creative_writing",
+              );
+              console.log("  provider:", r.provider, " model:", r.model);
+              console.log("  content:", r.content.slice(0, 100));
+            } catch (e: any) {
+              console.log("  ERROR:", e?.message ?? e);
+            }
+            EOF
+            cd client
+            export $(grep -v '^#' /opt/marketing-os/app/skills/ai-talent/.env | grep -v '^$' | xargs -d '\n')
+            npx tsx /tmp/probe-mm.ts 2>&1 | tail -25
