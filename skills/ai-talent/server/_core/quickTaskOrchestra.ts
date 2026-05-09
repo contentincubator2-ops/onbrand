@@ -290,17 +290,67 @@ async function callOneVariant(args: {
     : (template.preferredModel === "any" ? "qwen" : (template.preferredModel as any));
   const explicitModel: string | undefined = agentAiModel || undefined;
 
-  // First attempt
+  // 2026-05-09 (CJ direction「掃描 ai provider + agent model 匹配」):
+  // Resilient parse. LLM sometimes returns valid Chinese caption but in a
+  // shape tryParseJson can't extract (e.g. nested object, plain text without
+  // braces, "caption" key in different language). Fall through 3 layers:
+  //   L1: strict JSON with .caption field (preferred)
+  //   L2: any object with a string field that looks like the caption
+  //   L3: raw text (strip code fences) if it's substantial Chinese/English
+  //       — better to ship usable copy than fail the variant entirely.
+  const extractCaption = (raw: string, parsed: any): { caption: string; hashtags?: string[] } => {
+    // L1: standard shape
+    if (typeof parsed?.caption === "string" && parsed.caption.trim().length > 0) {
+      return {
+        caption: parsed.caption.trim(),
+        hashtags: Array.isArray(parsed?.hashtags) ? parsed.hashtags.slice(0, 15).map(String) : undefined,
+      };
+    }
+    // L2: alternate keys (LLM sometimes uses "content", "text", "post", "貼文")
+    if (parsed && typeof parsed === "object") {
+      for (const key of ["content", "text", "post", "貼文", "文案", "body"]) {
+        if (typeof parsed[key] === "string" && parsed[key].trim().length > 0) {
+          return { caption: parsed[key].trim(), hashtags: Array.isArray(parsed?.hashtags) ? parsed.hashtags.slice(0, 15).map(String) : undefined };
+        }
+      }
+      // Array shape: take first string field
+      if (Array.isArray(parsed) && parsed[0]) {
+        const first = parsed[0];
+        if (typeof first === "string" && first.trim().length > 0) return { caption: first.trim() };
+        if (typeof first?.caption === "string") return { caption: first.caption.trim() };
+      }
+    }
+    // L3: raw text fallback. Strip code fences + JSON-y noise. If at least
+    // 30 chars of substantive text remain, ship it.
+    const cleaned = (raw ?? "")
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .replace(/^\s*\{[\s\S]*?"caption"\s*:\s*"/i, "") // strip leading {"caption":"
+      .replace(/"\s*[,}][\s\S]*$/, "")                 // strip trailing
+      .trim();
+    if (cleaned.length >= 30 && cleaned.length <= 2000 && /[一-鿿]|[A-Za-z]{10,}/.test(cleaned)) {
+      console.warn(`[callOneVariant] L3 raw-text fallback for ${label} (${cleaned.length} chars)`);
+      return { caption: cleaned };
+    }
+    return { caption: "" };
+  };
+
   let attempt = 0;
   let lastErr: any = null;
+  let lastRaw = ""; // for diagnostics
   while (attempt < 2) {
     attempt++;
     try {
+      // 2nd attempt: append explicit reminder to user msg, lowering model
+      // creativity and forcing strict JSON.
+      const userMsgWithReminder = attempt === 2
+        ? `${userMsg}\n\n[REMINDER] 上次回應沒給可解析的 caption。請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。`
+        : userMsg;
       const r = await Promise.race([
         callModel(
           [
             { role: "system", content: system },
-            { role: "user", content: userMsg },
+            { role: "user", content: userMsgWithReminder },
           ],
           undefined,
           provider,
@@ -308,23 +358,18 @@ async function callOneVariant(args: {
         ),
         timeoutPromise<never>(LLM_BUDGET_MS, `caption[${label}]`),
       ]);
-      const parsed = tryParseJson(r.content);
-      const caption =
-        typeof (parsed as any)?.caption === "string" ? (parsed as any).caption.trim() : "";
-      if (caption.length > 0) {
-        return {
-          label,
-          caption,
-          hashtags: Array.isArray((parsed as any)?.hashtags)
-            ? (parsed as any).hashtags.slice(0, 15).map(String)
-            : undefined,
-        };
+      lastRaw = r.content ?? "";
+      const parsed = tryParseJson(lastRaw);
+      const out = extractCaption(lastRaw, parsed);
+      if (out.caption.length > 0) {
+        return { label, caption: out.caption, hashtags: out.hashtags };
       }
-      lastErr = new Error(`empty caption for ${label}`);
+      lastErr = new Error(`empty caption for ${label} — raw[0:200]: ${lastRaw.slice(0, 200)}`);
+      console.warn(`[callOneVariant] attempt ${attempt} failed for ${label} (raw len=${lastRaw.length}): ${lastRaw.slice(0, 300)}`);
     } catch (e) {
       lastErr = e;
+      console.warn(`[callOneVariant] attempt ${attempt} threw for ${label}:`, (e as Error)?.message);
     }
-    // brief backoff before retry
     if (attempt < 2) await new Promise((r) => setTimeout(r, 250));
   }
   throw lastErr ?? new Error(`caption[${label}] exhausted retries`);
