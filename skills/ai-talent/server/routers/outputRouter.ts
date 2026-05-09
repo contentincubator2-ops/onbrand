@@ -140,10 +140,10 @@ export const outputRouter = router({
       ].join("\r\n");
 
       // Mark output as scheduled in DB
-      await db.update(missionOutputs).set({
-        status: "scheduled",
-        scheduledAt: start,
-      }).where(eq(missionOutputs.id, input.id));
+      await localPool.execute(
+        `UPDATE mission_outputs SET status = 'scheduled', scheduledAt = ?, updatedAt = NOW() WHERE id = ?`,
+        [start, input.id],
+      );
 
       return { ics, scheduledAt: start.toISOString(), filename: `sowork-post-${input.id}.ics` };
     }),
@@ -181,7 +181,10 @@ export const outputRouter = router({
       const newContent = Array.isArray(parsed)
         ? JSON.stringify(arrSrc, null, 2)
         : JSON.stringify({ ...parsed, variants: arrSrc }, null, 2);
-      await db.update(missionOutputs).set({ content: newContent }).where(eq(missionOutputs.id, input.id));
+      await localPool.execute(
+        `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
+        [newContent, input.id],
+      );
       return { ok: true, variantIndex: input.variantIndex };
     }),
 

@@ -69,19 +69,31 @@ export const publishRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此 variant 沒有 caption 可發布" });
       }
 
-      // Fire to Pipedream webhook
+      // 2026-05-09: Pipedream workflow expects {page_id, message} per CJ's
+      // setup. Defaults to brand's saved FB Page ID; falls back to a global
+      // env DEFAULT_FB_PAGE_ID for trial. Send the same name format the
+      // workflow's "Facebook Pages → Create Post" step references.
+      const pageId = input.pageId
+        ?? (ENV as any).DEFAULT_FB_PAGE_ID
+        ?? null;
+      if (!pageId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "缺 FB Page ID。請在 publish.toFacebook input 帶 pageId，或設 DEFAULT_FB_PAGE_ID env",
+        });
+      }
       const payload = {
-        secret: secret ?? null,
-        outputId: input.outputId,
-        variantIndex: input.variantIndex,
-        brandId: row.brandId,
-        userId: ctx.user.id,
-        pageId: input.pageId ?? null,
-        caption,
-        // Pipedream workflow's "Connect Account → Facebook" step needs to
-        // know which user's connected token to use. We pass userId as the
-        // Connect external_user_id so Pipedream resolves the right account.
-        connect_external_user_id: String(ctx.user.id),
+        page_id: pageId,
+        message: caption,
+        // Diagnostics — Pipedream workflow can ignore these but they help
+        // for support / dedupe / audit if Pipedream's logs are needed.
+        _meta: {
+          secret: secret ?? null,
+          outputId: input.outputId,
+          variantIndex: input.variantIndex,
+          brandId: row.brandId,
+          userId: ctx.user.id,
+        },
       };
 
       const t0 = Date.now();

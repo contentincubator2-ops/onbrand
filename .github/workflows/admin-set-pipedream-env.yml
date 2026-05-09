@@ -1,0 +1,57 @@
+name: Admin — Set Pipedream FB webhook + DEFAULT_FB_PAGE_ID
+
+on:
+  workflow_dispatch:
+    inputs:
+      page_id:
+        description: 'Default Facebook Page ID (numeric, the page you OAuthed in Pipedream)'
+        required: false
+        default: ''
+
+jobs:
+  setenv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: PAGE_ID
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            # Pipedream webhook URL CJ created (locked in via this workflow,
+            # rotate by re-running with edits).
+            WEBHOOK="https://eoe4c67tsvzzley.m.pipedream.net"
+
+            echo "════════ BEFORE ════════"
+            grep -E "^(PIPEDREAM_FB_PUBLISH_WEBHOOK|DEFAULT_FB_PAGE_ID)=" .env || echo "(none set)"
+
+            sed -i '/^PIPEDREAM_FB_PUBLISH_WEBHOOK=/d' .env
+            echo "PIPEDREAM_FB_PUBLISH_WEBHOOK=$WEBHOOK" >> .env
+
+            if [ -n "$PAGE_ID" ]; then
+              sed -i '/^DEFAULT_FB_PAGE_ID=/d' .env
+              echo "DEFAULT_FB_PAGE_ID=$PAGE_ID" >> .env
+            fi
+
+            echo ""
+            echo "════════ AFTER ════════"
+            grep -E "^(PIPEDREAM_FB_PUBLISH_WEBHOOK|DEFAULT_FB_PAGE_ID)=" .env
+
+            echo ""
+            echo "════════ pm2 restart with new env ════════"
+            pm2 restart marketing-os --update-env
+            sleep 3
+            pm2 status | grep marketing-os
+
+            echo ""
+            echo "════════ Smoke test the webhook directly ════════"
+            curl --max-time 15 -sS -X POST "$WEBHOOK" \
+              -H "Content-Type: application/json" \
+              -d '{"page_id":"PROBE_TEST","message":"webhook smoke test from VM"}' \
+              -w "\nHTTP %{http_code} time %{time_total}s\n" | head -c 500
+        env:
+          PAGE_ID: ${{ inputs.page_id }}
