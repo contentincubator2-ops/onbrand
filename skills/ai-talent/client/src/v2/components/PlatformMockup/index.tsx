@@ -50,6 +50,7 @@ import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
 import { WebLanding, WebBlog, WebProduct } from "./web";
 import { PressRelease, DeckMockup } from "./press";
 import { GenericMockup } from "./generic";
+import { ProposalCover, ProposalSpec, ResearchDoc, PersonaCard } from "./proposal";
 import { XHSNote, XHSVideo, XHSSearch } from "./xiaohongshu";
 import { ThreadsPost, ThreadsThread } from "./threads";
 import { PinterestPin, PinterestBoard, PinterestStoryPin } from "./pinterest";
@@ -168,6 +169,12 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
 
     // ── Generic ───────────────────────────────────────────────────────
     case "generic:generic": return <GenericMockup {...f} />;
+
+    // ── Proposal-style for Brand + Research tasks (2026-05-09) ──────
+    case "generic:proposal-cover": return <ProposalCover {...f} />;
+    case "generic:proposal-spec":  return <ProposalSpec  {...f} />;
+    case "generic:research-doc":   return <ResearchDoc   {...f} />;
+    case "generic:persona-card":   return <PersonaCard   {...f} />;
 
     // Defensive: unknown variant → honest placeholder
     default: return <UnsupportedVariantPlaceholder variant={variant} {...f} />;

@@ -141,11 +141,33 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
-  // Infer mockup variant. Priority: mission.workspace (more reliable —
-  // tracks origin tier file) > output.platform (often defaults to 'other'
-  // when output_type is 'post' for non-FB tasks).
+  // Infer mockup variant. Priority: taskId pattern (Brand/Research →
+  // proposal-style) > mission.workspace > output.platform.
   const mockupVariant: MockupVariant | null = useMemo(() => {
     if (!data) return null;
+
+    // 2026-05-09: Brand + Research tasks use proposal-style mockups.
+    const taskId = data.mission?.taskId ?? "";
+    if (taskId.startsWith("br-") || taskId.startsWith("rs-")) {
+      // Cover-style — single big statement
+      const coverIds = ["br-30-tagline", "br-30-positioning", "br-30-elevator-pitch", "br-30-manifesto"];
+      // Persona / journey — character-card style
+      const personaIds = ["rs-30-persona-draft", "rs-30-journey-map", "rs-30-competitive-interview", "rs-30-synthesis-template"];
+      // Research document — structured form
+      const researchDocIds = [
+        "rs-30-interview-guide", "rs-30-survey", "rs-30-jtbd-guide",
+        "rs-30-usability-script", "rs-30-screener", "rs-30-consent-form",
+      ];
+      // Default Brand → spec sheet
+      const format =
+        coverIds.includes(taskId) ? "proposal-cover" :
+        personaIds.includes(taskId) ? "persona-card" :
+        researchDocIds.includes(taskId) ? "research-doc" :
+        taskId.startsWith("rs-") ? "research-doc" :
+        "proposal-spec";
+      return { platform: "generic" as any, format: format as any, label: `generic:${format}` };
+    }
+
     const workspaceMap: Record<string, string> = {
       facebook: "facebook", instagram: "instagram", linkedin: "linkedin",
       youtube: "youtube", tiktok: "tiktok", threads: "threads",
