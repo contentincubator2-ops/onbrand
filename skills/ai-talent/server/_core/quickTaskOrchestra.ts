@@ -27,9 +27,12 @@ import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMast
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
-const HARD_BUDGET_MS  = 20_000; // 30s tier
-const HARD_BUDGET_60S = 50_000; // 60s tier (5 variants + QA)
-const HARD_BUDGET_100S= 100_000;// 100s tier (scout + video)
+// 2026-05-09: 20s was too aggressive — LI/PR (heavier prompts, larger
+// brand context) blew past it consistently. 35s is the practical ceiling
+// since nginx upstream timeout is 60s and we want margin.
+const HARD_BUDGET_MS  = 35_000; // 30s tier
+const HARD_BUDGET_60S = 60_000; // 60s tier (5 variants + QA)
+const HARD_BUDGET_100S= 110_000;// 100s tier (scout + video)
 const PER_IMAGE_MS    = 10_000;
 const LLM_BUDGET_MS   = 10_000;
 const QA_BUDGET_MS    = 12_000;
