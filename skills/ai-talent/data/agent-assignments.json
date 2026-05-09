@@ -1,22 +1,22 @@
 {
-  "generatedAt": "2026-05-08T17:44:40.073Z",
+  "generatedAt": "2026-05-09T06:41:07.980Z",
   "poolSize": 3010,
-  "slotCount": 506,
-  "uniqueAgents": 506,
-  "avgThickness": 994,
+  "slotCount": 640,
+  "uniqueAgents": 640,
+  "avgThickness": 1006,
   "minThickness": 401,
   "assignments": {
     "fb-30-caption-short": {
       "lead": 60021,
-      "imageDirector": 220894
+      "imageDirector": 220887
     },
     "fb-30-pure-text-hook": {
       "lead": 60022,
-      "imageDirector": 220896
+      "imageDirector": 220889
     },
     "fb-30-link-caption": {
       "lead": 60024,
-      "imageDirector": 220890
+      "imageDirector": 220883
     },
     "fb-30-comment-reply": {
       "lead": 180162
@@ -35,46 +35,46 @@
     },
     "fb-30-pinned-short": {
       "lead": 180149,
-      "imageDirector": 220892
+      "imageDirector": 220885
     },
     "fb-30-story-text": {
       "lead": 180145,
-      "imageDirector": 220887
+      "imageDirector": 220886
     },
     "fb-30-live-title": {
       "lead": 180141,
-      "imageDirector": 220889
+      "imageDirector": 220888
     },
     "fb-30-hashtag-set": {
       "lead": 180155
     },
     "fb-30-countdown-1day": {
       "lead": 30020,
-      "imageDirector": 180158
+      "imageDirector": 220884
     },
     "ig-30-caption-short": {
       "lead": 180146,
-      "imageDirector": 220883
+      "imageDirector": 220893
     },
     "ig-30-pure-text-hook": {
       "lead": 30016,
-      "imageDirector": 220885
+      "imageDirector": 220895
     },
     "ig-30-reel-hook": {
       "lead": 180170,
-      "imageDirector": 220886
+      "imageDirector": 220891
     },
     "ig-30-reel-script-full": {
       "lead": 180142,
-      "imageDirector": 220888
+      "imageDirector": 220924
     },
     "ig-30-story-text": {
       "lead": 30002,
-      "imageDirector": 220884
+      "imageDirector": 180144
     },
     "ig-30-carousel-structure": {
       "lead": 30018,
-      "imageDirector": 220893
+      "imageDirector": 223963
     },
     "ig-30-bio-rewrite": {
       "lead": 180620
@@ -90,22 +90,22 @@
     },
     "ig-30-live-opening": {
       "lead": 224059,
-      "imageDirector": 220895
+      "imageDirector": 223966
     },
     "ig-30-story-repost-strategy": {
       "lead": 224054,
-      "imageDirector": 220891
+      "imageDirector": 223973
     },
     "ig-30-threads-cross-post": {
       "lead": 60041
     },
     "yt-30-title-strategies": {
       "lead": 60032,
-      "imageDirector": 220924
+      "imageDirector": 223261
     },
     "yt-30-thumbnail-text": {
       "lead": 30011,
-      "imageDirector": 180539
+      "imageDirector": 180216
     },
     "yt-30-description-seo": {
       "lead": 60030
@@ -115,11 +115,11 @@
     },
     "yt-30-shorts-script": {
       "lead": 60029,
-      "imageDirector": 180527
+      "imageDirector": 223740
     },
     "yt-30-opening-hook": {
       "lead": 60033,
-      "imageDirector": 180449
+      "imageDirector": 223789
     },
     "yt-30-end-cta": {
       "lead": 60031
@@ -139,7 +139,7 @@
     },
     "tt-30-full-script": {
       "lead": 220508,
-      "imageDirector": 180455
+      "imageDirector": 60055
     },
     "tt-30-caption-rhythm": {
       "lead": 220507
@@ -164,25 +164,25 @@
     },
     "tt-30-live-opening": {
       "lead": 180191,
-      "imageDirector": 60055
+      "imageDirector": 223741
     },
     "li-30-insight-post": {
       "lead": 180199,
-      "imageDirector": 223966
+      "imageDirector": 224092
     },
     "li-30-hook-3": {
       "lead": 180203
     },
     "li-30-article-opener": {
       "lead": 180204,
-      "imageDirector": 224092
+      "imageDirector": 222311
     },
     "li-30-poll": {
       "lead": 223923
     },
     "li-30-event-invite": {
       "lead": 223800,
-      "imageDirector": 222311
+      "imageDirector": 224067
     },
     "li-30-dm-intro": {
       "lead": 223633
@@ -195,11 +195,11 @@
     },
     "li-30-newsletter": {
       "lead": 222682,
-      "imageDirector": 224067
+      "imageDirector": 224167
     },
     "li-30-document": {
       "lead": 222308,
-      "imageDirector": 224167
+      "imageDirector": 224117
     },
     "em-30-subject-line": {
       "lead": 223824
@@ -271,7 +271,8 @@
       "lead": 221479
     },
     "br-30-archetype": {
-      "lead": 221019
+      "lead": 221019,
+      "imageDirector": 223974
     },
     "br-30-positioning": {
       "lead": 221234
@@ -295,7 +296,8 @@
       "lead": 30006
     },
     "rs-30-persona-draft": {
-      "lead": 30003
+      "lead": 30003,
+      "imageDirector": 223976
     },
     "rs-30-survey": {
       "lead": 60002
@@ -323,284 +325,284 @@
     },
     "fb-60-single-full": {
       "lead": 224089,
-      "imageDirector": 180144,
+      "imageDirector": 224069,
       "replyWriter": 180157,
       "timingAdvisor": 30019,
-      "followupWriter": 222990
+      "followupWriter": 180591
     },
     "fb-60-link-full": {
       "lead": 224179,
-      "imageDirector": 180467,
-      "replyWriter": 222400,
+      "imageDirector": 60064,
+      "replyWriter": 223027,
       "timingAdvisor": 180552,
-      "followupWriter": 222646
+      "followupWriter": 180642
     },
     "fb-60-album-4": {
       "lead": 224094,
-      "imageDirector": 180533,
+      "imageDirector": 223972,
       "strategist": 180628,
-      "replyWriter": 223476,
-      "timingAdvisor": 222451,
-      "followupWriter": 223783
+      "replyWriter": 180163,
+      "timingAdvisor": 180096,
+      "followupWriter": 180618
     },
     "fb-60-carousel-5": {
       "lead": 224154,
-      "imageDirector": 180485,
+      "imageDirector": 223962,
       "strategist": 180303,
-      "replyWriter": 222787,
-      "timingAdvisor": 223086,
-      "followupWriter": 223359
+      "replyWriter": 220581,
+      "timingAdvisor": 222725,
+      "followupWriter": 180568
     },
     "fb-60-countdown-5day": {
       "lead": 180151,
-      "imageDirector": 180473,
+      "imageDirector": 180154,
       "strategist": 180159,
-      "replyWriter": 223510,
-      "timingAdvisor": 180154,
-      "followupWriter": 222491
+      "replyWriter": 220582,
+      "timingAdvisor": 222513,
+      "followupWriter": 180631
     },
     "fb-60-launch-kit": {
       "lead": 224159,
-      "imageDirector": 224069,
-      "strategist": 222641,
-      "replyWriter": 223515,
-      "timingAdvisor": 223090,
-      "followupWriter": 222817
+      "imageDirector": 223967,
+      "strategist": 222405,
+      "replyWriter": 223679,
+      "timingAdvisor": 222914,
+      "followupWriter": 180603
     },
     "fb-60-live-suite": {
       "lead": 224184,
-      "imageDirector": 60064,
-      "strategist": 222960,
-      "replyWriter": 222525,
-      "timingAdvisor": 223141,
-      "followupWriter": 222724
+      "imageDirector": 223970,
+      "strategist": 223053,
+      "replyWriter": 222883,
+      "timingAdvisor": 222612,
+      "followupWriter": 180564
     },
     "fb-60-pinned-suite": {
       "lead": 224099,
       "imageDirector": 220901,
-      "replyWriter": 222954,
-      "timingAdvisor": 222468,
-      "followupWriter": 223305
+      "replyWriter": 223648,
+      "timingAdvisor": 223060,
+      "followupWriter": 180587
     },
     "fb-60-serial-3": {
       "lead": 224064,
       "imageDirector": 220903,
-      "strategist": 222752,
-      "replyWriter": 223247,
-      "timingAdvisor": 222589,
-      "followupWriter": 223329
+      "strategist": 222342,
+      "replyWriter": 180148,
+      "timingAdvisor": 223224,
+      "followupWriter": 180616
     },
     "fb-60-viral-rewrite": {
       "lead": 224139,
-      "imageDirector": 223963,
-      "strategist": 223881,
+      "imageDirector": 223964,
+      "strategist": 222341,
       "specialty": 180643,
-      "replyWriter": 222841,
-      "timingAdvisor": 222836,
-      "followupWriter": 223918,
+      "replyWriter": 180164,
+      "timingAdvisor": 223401,
+      "followupWriter": 180575,
       "compareTable": 60066
     },
     "fb-60-trend-rewrite": {
       "lead": 224104,
-      "imageDirector": 223973,
-      "strategist": 222405,
+      "imageDirector": 223968,
+      "strategist": 222338,
       "specialty": 180658,
-      "replyWriter": 223919,
-      "timingAdvisor": 222962,
-      "followupWriter": 222543,
-      "trendTimingAdvisor": 180034
+      "replyWriter": 180161,
+      "timingAdvisor": 210134,
+      "followupWriter": 180604,
+      "trendTimingAdvisor": 220397
     },
     "fb-60-testimonial-rewrite": {
       "lead": 224189,
-      "imageDirector": 223974,
-      "strategist": 223053,
+      "imageDirector": 223969,
+      "strategist": 222340,
       "specialty": 180803,
-      "replyWriter": 223522,
-      "timingAdvisor": 223429,
-      "followupWriter": 222922,
-      "legalAssistant": 180855
+      "replyWriter": 180595,
+      "timingAdvisor": 220584,
+      "followupWriter": 30013,
+      "legalAssistant": 180729
     },
     "fb-60-ad-pack-3": {
       "lead": 224164,
-      "imageDirector": 223976,
-      "replyWriter": 222902,
-      "timingAdvisor": 223679,
-      "followupWriter": 222635
+      "imageDirector": 223971,
+      "replyWriter": 180629,
+      "timingAdvisor": 180185,
+      "followupWriter": 180637
     },
     "ig-60-feed-full": {
       "lead": 224109,
-      "imageDirector": 223972,
-      "replyWriter": 223027,
-      "timingAdvisor": 222883,
-      "followupWriter": 222660
+      "imageDirector": 223975,
+      "replyWriter": 180571,
+      "timingAdvisor": 180221,
+      "followupWriter": 60040
     },
     "ig-60-reel-full": {
       "lead": 224169,
-      "imageDirector": 223962,
-      "replyWriter": 223037,
-      "timingAdvisor": 223648,
-      "followupWriter": 223478
+      "imageDirector": 220599,
+      "replyWriter": 220379,
+      "timingAdvisor": 180257,
+      "followupWriter": 30012
     },
     "ig-60-carousel-7": {
       "lead": 224194,
-      "imageDirector": 223967,
-      "strategist": 222342,
-      "replyWriter": 180163,
-      "timingAdvisor": 180152,
-      "followupWriter": 222995
+      "imageDirector": 220600,
+      "strategist": 223093,
+      "replyWriter": 220369,
+      "timingAdvisor": 180281,
+      "followupWriter": 180599
     },
     "ig-60-story-3frame": {
       "lead": 224074,
       "imageDirector": 220897,
-      "replyWriter": 220919,
-      "timingAdvisor": 180148,
-      "followupWriter": 222978
+      "replyWriter": 180143,
+      "timingAdvisor": 180182,
+      "followupWriter": 180793
     },
     "ig-60-countdown-5day": {
       "lead": 224129,
-      "imageDirector": 223970,
-      "strategist": 222341,
-      "replyWriter": 220581,
-      "timingAdvisor": 180164,
-      "followupWriter": 222596
+      "imageDirector": 220591,
+      "strategist": 223599,
+      "replyWriter": 222543,
+      "timingAdvisor": 180251,
+      "followupWriter": 180761
     },
     "ig-60-highlight-suite": {
       "lead": 224134,
-      "imageDirector": 223964,
-      "replyWriter": 220582,
-      "timingAdvisor": 180161,
-      "followupWriter": 222645
+      "imageDirector": 220592,
+      "replyWriter": 180019,
+      "timingAdvisor": 180275,
+      "followupWriter": 60039
     },
     "ig-60-live-suite": {
       "lead": 224199,
-      "imageDirector": 223968,
-      "strategist": 222338,
-      "replyWriter": 223867,
-      "timingAdvisor": 180607,
-      "followupWriter": 223420
+      "imageDirector": 220926,
+      "strategist": 223259,
+      "replyWriter": 180024,
+      "timingAdvisor": 180209,
+      "followupWriter": 220329
     },
     "ig-60-serial-3": {
       "lead": 224174,
       "imageDirector": 220899,
-      "strategist": 222340,
-      "replyWriter": 223182,
-      "timingAdvisor": 180595,
-      "followupWriter": 222725
+      "strategist": 223673,
+      "replyWriter": 180089,
+      "timingAdvisor": 180206,
+      "followupWriter": 220389
     },
     "ig-60-viral-rewrite": {
       "lead": 224119,
-      "imageDirector": 223969,
-      "strategist": 223093,
-      "specialty": 180559,
-      "replyWriter": 222921,
-      "timingAdvisor": 180629,
-      "followupWriter": 222513,
+      "imageDirector": 220908,
+      "strategist": 222848,
+      "specialty": 180605,
+      "replyWriter": 180094,
+      "timingAdvisor": 180245,
+      "followupWriter": 220309,
       "compareTable": 220530
     },
     "ig-60-testimonial-rewrite": {
       "lead": 60020,
-      "imageDirector": 223971,
-      "strategist": 223599,
-      "specialty": 180605,
-      "replyWriter": 222985,
-      "timingAdvisor": 180621,
-      "followupWriter": 222914,
-      "legalAssistant": 180630
+      "imageDirector": 220910,
+      "strategist": 222649,
+      "specialty": 180855,
+      "replyWriter": 222922,
+      "timingAdvisor": 180269,
+      "followupWriter": 220399,
+      "legalAssistant": 180906
     },
     "yt-60-video-package": {
       "lead": 60001,
-      "imageDirector": 223261,
+      "imageDirector": 222560,
       "replyWriter": 222711,
-      "timingAdvisor": 222937,
+      "timingAdvisor": 222429,
       "followupWriter": 223695
     },
     "yt-60-shorts-script": {
       "lead": 180166,
-      "imageDirector": 223740,
+      "imageDirector": 223107,
       "strategist": 180304,
-      "replyWriter": 223304,
-      "timingAdvisor": 222429,
+      "replyWriter": 223917,
+      "timingAdvisor": 220971,
       "followupWriter": 223256
     },
     "yt-60-thumbnail-suite": {
       "lead": 223993,
-      "imageDirector": 223789,
-      "replyWriter": 223834,
-      "timingAdvisor": 220971,
+      "imageDirector": 222371,
+      "replyWriter": 222786,
+      "timingAdvisor": 222368,
       "followupWriter": 223101
     },
     "yt-60-series-3ep": {
       "lead": 223995,
       "imageDirector": 220900,
       "strategist": 223992,
-      "replyWriter": 223452,
-      "timingAdvisor": 224001,
+      "replyWriter": 222894,
+      "timingAdvisor": 222533,
       "followupWriter": 222749
     },
     "yt-60-community-post": {
       "lead": 223996,
-      "imageDirector": 222560,
-      "replyWriter": 180143,
-      "timingAdvisor": 224005,
+      "imageDirector": 222425,
+      "replyWriter": 222896,
+      "timingAdvisor": 220405,
       "followupWriter": 222763
     },
     "yt-60-viral-rewrite": {
       "lead": 224003,
-      "imageDirector": 223107,
+      "imageDirector": 222474,
       "strategist": 223994,
       "specialty": 180782,
-      "replyWriter": 223917,
-      "timingAdvisor": 60015,
+      "replyWriter": 222937,
+      "timingAdvisor": 220475,
       "followupWriter": 223682,
       "compareTable": 90036
     },
     "tt-60-foryou-full": {
       "lead": 180215,
-      "imageDirector": 223741,
-      "replyWriter": 222686,
-      "timingAdvisor": 222918,
-      "followupWriter": 222983
-    },
-    "tt-60-series-3": {
-      "lead": 60058,
       "imageDirector": 222539,
-      "strategist": 180292,
       "replyWriter": 223803,
       "timingAdvisor": 223776,
       "followupWriter": 222723
     },
-    "tt-60-viral-rewrite": {
-      "lead": 180572,
+    "tt-60-series-3": {
+      "lead": 60058,
       "imageDirector": 223465,
-      "strategist": 90002,
-      "specialty": 222760,
+      "strategist": 180292,
       "replyWriter": 222668,
       "timingAdvisor": 222396,
-      "followupWriter": 222931,
-      "compareTable": 223663
+      "followupWriter": 222931
+    },
+    "tt-60-viral-rewrite": {
+      "lead": 180572,
+      "imageDirector": 222608,
+      "strategist": 90002,
+      "specialty": 222686,
+      "replyWriter": 222850,
+      "timingAdvisor": 223635,
+      "followupWriter": 223275,
+      "compareTable": 222720
     },
     "li-60-thought-leader": {
       "lead": 180172,
-      "imageDirector": 224117,
-      "replyWriter": 223555,
+      "imageDirector": 224070,
+      "replyWriter": 222349,
       "timingAdvisor": 222893,
       "followupWriter": 223862
     },
     "li-60-newsletter": {
       "lead": 224011,
-      "imageDirector": 224070,
-      "replyWriter": 222349,
+      "imageDirector": 224192,
+      "replyWriter": 223656,
       "timingAdvisor": 223175,
       "followupWriter": 222499
     },
     "li-60-case-study": {
       "lead": 222943,
-      "imageDirector": 224192,
-      "specialty": 223368,
-      "replyWriter": 223656,
+      "imageDirector": 224142,
+      "specialty": 223555,
+      "replyWriter": 223569,
       "timingAdvisor": 223038,
       "followupWriter": 222917,
-      "legalAssistant": 180729
+      "legalAssistant": 223981
     },
     "em-60-newsletter-full": {
       "lead": 222734,
@@ -630,160 +632,160 @@
       "imageDirector": 180200,
       "replyWriter": 222424,
       "timingAdvisor": 220918,
-      "followupWriter": 223208
+      "followupWriter": 222652
     },
     "br-60-tagline-suite": {
       "lead": 180509,
-      "imageDirector": 221013,
-      "strategist": 30005,
-      "replyWriter": 180867,
-      "timingAdvisor": 60010,
-      "followupWriter": 180828
+      "imageDirector": 180867,
+      "strategist": 180296,
+      "replyWriter": 180668,
+      "timingAdvisor": 220372,
+      "followupWriter": 224095
     },
     "br-60-value-prop": {
       "lead": 180545,
-      "imageDirector": 221228,
-      "strategist": 30009,
-      "replyWriter": 180668,
-      "timingAdvisor": 220372,
-      "followupWriter": 224090
+      "imageDirector": 220904,
+      "strategist": 180299,
+      "replyWriter": 180894,
+      "timingAdvisor": 224115,
+      "followupWriter": 224100
     },
     "br-60-brand-voice": {
       "lead": 180443,
-      "imageDirector": 223975,
+      "imageDirector": 220906,
       "replyWriter": 60070,
-      "timingAdvisor": 224115,
-      "followupWriter": 224095
+      "timingAdvisor": 224090,
+      "followupWriter": 224055
     },
     "rs-60-interview-guide": {
       "lead": 180608,
-      "imageDirector": 220599,
-      "replyWriter": 180894
+      "imageDirector": 220923,
+      "replyWriter": 224080
     },
     "rs-60-persona-suite": {
       "lead": 180503,
-      "imageDirector": 220600,
-      "replyWriter": 224080
+      "imageDirector": 220925,
+      "replyWriter": 224085
     },
     "rs-60-jtbd-suite": {
       "lead": 180431,
-      "imageDirector": 220591,
-      "replyWriter": 224085
+      "imageDirector": 220902,
+      "replyWriter": 180828
     },
     "fb-100-30day-calendar": {
       "lead": 224144,
       "imageDirector": 222339,
-      "strategist": 223259,
-      "replyWriter": 223781,
-      "timingAdvisor": 180571,
-      "followupWriter": 222612
+      "strategist": 223565,
+      "replyWriter": 222635,
+      "timingAdvisor": 180227,
+      "followupWriter": 220319
     },
     "fb-100-14day-countdown": {
       "lead": 224124,
-      "imageDirector": 223042,
-      "strategist": 223673,
-      "replyWriter": 222518,
-      "timingAdvisor": 223437,
-      "followupWriter": 223262
+      "imageDirector": 222834,
+      "strategist": 223291,
+      "replyWriter": 222660,
+      "timingAdvisor": 180263,
+      "followupWriter": 220359
     },
     "fb-100-launch-toolkit": {
       "lead": 224149,
-      "imageDirector": 222688,
-      "strategist": 222848,
-      "replyWriter": 223133,
-      "timingAdvisor": 222856,
-      "followupWriter": 222938
+      "imageDirector": 222378,
+      "strategist": 180153,
+      "replyWriter": 223478,
+      "timingAdvisor": 180409,
+      "followupWriter": 180649
     },
     "fb-100-livestream-9seg": {
       "lead": 60017,
-      "imageDirector": 223798,
-      "strategist": 222649,
-      "replyWriter": 222834,
-      "timingAdvisor": 222981,
-      "followupWriter": 180019
+      "imageDirector": 223690,
+      "strategist": 180147,
+      "replyWriter": 180034,
+      "timingAdvisor": 180570,
+      "followupWriter": 220307
     },
     "fb-100-crisis-playbook": {
       "lead": 60014,
-      "strategist": 223565,
+      "strategist": 180152,
       "specialty": 90066,
-      "replyWriter": 222378,
-      "timingAdvisor": 222455,
-      "followupWriter": 180024,
-      "legalAssistant": 180591
+      "replyWriter": 180104,
+      "timingAdvisor": 180630,
+      "followupWriter": 220347,
+      "legalAssistant": 180854
     },
     "ig-100-30day-calendar": {
       "lead": 60008,
-      "imageDirector": 220592,
-      "strategist": 223291,
-      "replyWriter": 223690,
-      "timingAdvisor": 220379,
-      "followupWriter": 60040
+      "imageDirector": 220898,
+      "strategist": 211523,
+      "replyWriter": 222995,
+      "timingAdvisor": 30015,
+      "followupWriter": 220377
     },
     "ig-100-reel-series-6": {
       "lead": 223788,
-      "imageDirector": 220926,
-      "strategist": 180153,
-      "replyWriter": 223720,
-      "timingAdvisor": 220369,
-      "followupWriter": 180089
+      "imageDirector": 220907,
+      "strategist": 220919,
+      "replyWriter": 222978,
+      "timingAdvisor": 180569,
+      "followupWriter": 220327
     },
     "ig-100-account-reposition": {
       "lead": 223236,
-      "imageDirector": 220908,
-      "strategist": 180147,
-      "replyWriter": 222829,
-      "timingAdvisor": 222901,
-      "followupWriter": 180094
+      "imageDirector": 220909,
+      "strategist": 223437,
+      "replyWriter": 222596,
+      "timingAdvisor": 220392,
+      "followupWriter": 220367
     },
     "yt-100-series-6ep": {
       "lead": 224006,
-      "imageDirector": 222371,
+      "imageDirector": 223304,
       "strategist": 223997,
-      "replyWriter": 222786,
-      "timingAdvisor": 222368,
+      "replyWriter": 224001,
+      "timingAdvisor": 220435,
       "followupWriter": 180008
     },
     "yt-100-quarterly-strategy": {
       "lead": 224002,
-      "imageDirector": 222425,
+      "imageDirector": 223834,
       "strategist": 223999,
-      "replyWriter": 222894,
-      "timingAdvisor": 222533,
+      "replyWriter": 224005,
+      "timingAdvisor": 220425,
       "followupWriter": 180078
     },
     "yt-100-premiere-kit": {
       "lead": 224004,
-      "imageDirector": 222474,
+      "imageDirector": 223452,
       "strategist": 224000,
-      "replyWriter": 222896,
-      "timingAdvisor": 220405,
+      "replyWriter": 60015,
+      "timingAdvisor": 220445,
       "followupWriter": 223311
     },
     "tt-100-30day-foryou": {
       "lead": 180622,
-      "imageDirector": 222608,
-      "strategist": 180633,
-      "replyWriter": 222850,
-      "timingAdvisor": 223635,
-      "followupWriter": 223275
-    },
-    "tt-100-trend-week": {
-      "lead": 180553,
       "imageDirector": 223122,
+      "strategist": 180633,
       "replyWriter": 222805,
       "timingAdvisor": 223567,
       "followupWriter": 222392
     },
+    "tt-100-trend-week": {
+      "lead": 180553,
+      "imageDirector": 222760,
+      "replyWriter": 222918,
+      "timingAdvisor": 222983,
+      "followupWriter": 223663
+    },
     "li-100-30day-thought-leadership": {
       "lead": 222940,
-      "imageDirector": 224142,
-      "replyWriter": 223569,
+      "imageDirector": 222662,
+      "replyWriter": 223084,
       "timingAdvisor": 223051,
       "followupWriter": 223049
     },
     "li-100-newsletter-quarterly": {
       "lead": 222571,
-      "imageDirector": 222662,
+      "imageDirector": 223368,
       "strategist": 224096,
       "replyWriter": 223204,
       "timingAdvisor": 223069,
@@ -817,7 +819,7 @@
     },
     "br-100-voice-playbook": {
       "lead": 223676,
-      "imageDirector": 220923,
+      "imageDirector": 220593,
       "replyWriter": 223417
     },
     "rs-100-discovery-sprint": {
@@ -826,7 +828,7 @@
     },
     "rs-100-competitor-mapping": {
       "lead": 180623,
-      "replyWriter": 223084
+      "replyWriter": 223208
     },
     "theater-cell-facebook": {
       "lead": 60056
@@ -845,6 +847,222 @@
     },
     "theater-cell-blog": {
       "lead": 220504
+    },
+    "squad-fb-100-monthly-calendar": {
+      "lead": 223042,
+      "imageDirector": 223720,
+      "strategist": 222856,
+      "specialty": 90056,
+      "replyWriter": 222645,
+      "compareTable": 220527
+    },
+    "squad-fb-100-monthly-calendar-promo": {
+      "lead": 222688,
+      "imageDirector": 222829,
+      "strategist": 222981,
+      "specialty": 90060,
+      "replyWriter": 180014,
+      "compareTable": 220528
+    },
+    "squad-fb-100-event-launch": {
+      "lead": 180158,
+      "imageDirector": 222451,
+      "strategist": 222455,
+      "specialty": 222954,
+      "replyWriter": 180016,
+      "compareTable": 220529
+    },
+    "squad-fb-100-countdown-series": {
+      "lead": 223798,
+      "imageDirector": 223086,
+      "strategist": 222901,
+      "specialty": 223247,
+      "replyWriter": 180021,
+      "compareTable": 220526
+    },
+    "squad-fb-100-account-reposition": {
+      "lead": 223881,
+      "imageDirector": 222468,
+      "strategist": 180635,
+      "specialty": 223037,
+      "replyWriter": 220583,
+      "compareTable": 180701
+    },
+    "squad-fb-100-quarterly-strategy": {
+      "lead": 223867,
+      "imageDirector": 223090,
+      "strategist": 223262,
+      "specialty": 222589,
+      "replyWriter": 180029,
+      "compareTable": 90057
+    },
+    "squad-fb-100-monthly-analytics": {
+      "lead": 223182,
+      "imageDirector": 180607,
+      "strategist": 222990,
+      "specialty": 180621,
+      "replyWriter": 180497,
+      "compareTable": 220317
+    },
+    "squad-fb-100-carousel-cvo": {
+      "lead": 222921,
+      "imageDirector": 223141,
+      "strategist": 222646,
+      "specialty": 222841,
+      "replyWriter": 180084,
+      "compareTable": 90044
+    },
+    "squad-fb-100-offer-first": {
+      "lead": 222641,
+      "imageDirector": 223510,
+      "strategist": 223783,
+      "specialty": 223919,
+      "replyWriter": 180086,
+      "compareTable": 220339
+    },
+    "squad-fb-100-magnetic-marketing": {
+      "lead": 222400,
+      "imageDirector": 223515,
+      "strategist": 180231,
+      "specialty": 222836,
+      "replyWriter": 210032,
+      "compareTable": 220485
+    },
+    "squad-fb-100-mass-control": {
+      "lead": 222985,
+      "imageDirector": 222525,
+      "strategist": 223359,
+      "specialty": 223522,
+      "replyWriter": 180091,
+      "compareTable": 220387
+    },
+    "squad-ig-100-monthly-calendar": {
+      "lead": 223476,
+      "imageDirector": 220905,
+      "strategist": 222491,
+      "specialty": 220982,
+      "replyWriter": 180099,
+      "compareTable": 222881
+    },
+    "squad-ig-100-youtility": {
+      "lead": 223781,
+      "imageDirector": 220596,
+      "strategist": 222817,
+      "specialty": 180714,
+      "replyWriter": 180031,
+      "compareTable": 222460
+    },
+    "squad-ig-100-visual-story": {
+      "lead": 222518,
+      "imageDirector": 220595,
+      "strategist": 222724,
+      "specialty": 180890,
+      "replyWriter": 180101,
+      "compareTable": 222766
+    },
+    "squad-ig-100-live-first": {
+      "lead": 223133,
+      "imageDirector": 220594,
+      "strategist": 223305,
+      "specialty": 180935,
+      "replyWriter": 223420,
+      "compareTable": 223120
+    },
+    "squad-ig-100-document": {
+      "lead": 222787,
+      "imageDirector": 220572,
+      "strategist": 223329,
+      "specialty": 222962,
+      "replyWriter": 180011,
+      "compareTable": 90052
+    },
+    "squad-ig-100-radical-transparency": {
+      "lead": 222960,
+      "imageDirector": 220571,
+      "strategist": 223918,
+      "specialty": 223429,
+      "replyWriter": 180026,
+      "compareTable": 180022
+    },
+    "squad-ig-100-save-worthy": {
+      "lead": 222752,
+      "imageDirector": 180559,
+      "strategist": 222938,
+      "specialty": 222902,
+      "replyWriter": 180081,
+      "compareTable": 180092
+    },
+    "positioning-brand-marketInsight": {
+      "lead": 30009
+    },
+    "positioning-brand-targetAudience": {
+      "lead": 180539
+    },
+    "positioning-brand-competitorAnalysis": {
+      "lead": 180527
+    },
+    "positioning-brand-brandOrigin": {
+      "lead": 180449
+    },
+    "positioning-brand-brandValues": {
+      "lead": 180455
+    },
+    "positioning-brand-differentiation": {
+      "lead": 221013
+    },
+    "positioning-brand-valueProposition": {
+      "lead": 221228
+    },
+    "positioning-brand-brandPersonality": {
+      "lead": 180467
+    },
+    "positioning-brand-messagingStrategy": {
+      "lead": 180533
+    },
+    "positioning-brand-taglineCreative": {
+      "lead": 180485
+    },
+    "positioning-brand-channelStrategy": {
+      "lead": 180473
+    },
+    "positioning-brand-brandActivation": {
+      "lead": 30005
+    },
+    "positioning-brand-goldenCircleRefine": {
+      "lead": 60005
+    },
+    "positioning-brand-executiveSummary": {
+      "lead": 180880
+    },
+    "positioning-product-marketFit": {
+      "lead": 220894
+    },
+    "positioning-product-targetUser": {
+      "lead": 220896
+    },
+    "positioning-product-valueProp": {
+      "lead": 220890
+    },
+    "positioning-product-productDifferentiation": {
+      "lead": 220892
+    },
+    "positioning-product-productMessaging": {
+      "lead": 220396
+    },
+    "positioning-product-gtmSummary": {
+      "lead": 60019
+    },
+    "positioning-event-audienceBrief": {
+      "lead": 220323
+    },
+    "positioning-event-valueHook": {
+      "lead": 60006
+    },
+    "positioning-event-eventMessaging": {
+      "lead": 60080
+    },
+    "positioning-event-callouts": {
+      "lead": 60010
     },
     "media-image-gen": {
       "imageDirector": 180912
