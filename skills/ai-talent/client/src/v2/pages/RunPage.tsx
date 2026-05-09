@@ -16,7 +16,7 @@
  *   🪄 重生  🎚️ 設定  📋 複製  💾 存
  *   ↻ 重跑  ✕ 關閉
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Avatar, Button, Card, CardBody, Chip, Spinner, Textarea, Tooltip,
@@ -72,6 +72,8 @@ export default function RunPage() {
   /** AI chat history per variant. */
   const [chatHistory, setChatHistory] = useState<Array<{ role: "user"|"assistant"; content: string }>>([]);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
+  /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
+  const [imagePrompt, setImagePrompt] = useState<string>("");
 
   const utils = trpc.useUtils();
   const updateMut = trpc.output.updateVariantCaption.useMutation({
@@ -111,6 +113,37 @@ export default function RunPage() {
       utils.output.getById.invalidate({ id });
     },
   });
+  // 2026-05-09 (P3): regen single variant
+  const regenMut = (trpc as any).quickTask?.regenerateVariant?.useMutation
+    ? (trpc as any).quickTask.regenerateVariant.useMutation({
+        onSuccess: () => {
+          showToastGlobal("已重生此變體 ✓");
+          utils.output.getById.invalidate({ id });
+          setOverrides({});
+        },
+        onError: (e: any) => showToastGlobal(`重生失敗：${e?.message ?? e}`),
+      })
+    : { mutate: () => {}, isPending: false };
+  // 2026-05-09 (P4): image regen pipeline
+  const updateImageMut = (trpc as any).output?.updateVariantImage?.useMutation
+    ? (trpc as any).output.updateVariantImage.useMutation({
+        onSuccess: () => utils.output.getById.invalidate({ id }),
+      })
+    : null;
+  const imageGenMut = (trpc as any).image?.generate?.useMutation
+    ? (trpc as any).image.generate.useMutation({
+        onSuccess: (r: any) => {
+          const url = r?.imageUrl ?? r?.url ?? r?.publicUrl;
+          if (url && updateImageMut) {
+            updateImageMut.mutate({ id, variantIndex: activeIdx, imageUrl: url, style: imagePrompt.slice(0, 480) });
+            showToastGlobal("已產圖 ✓");
+          } else {
+            showToastGlobal("產圖完成但沒拿到 URL，請檢查 image API 回傳");
+          }
+        },
+        onError: (e: any) => showToastGlobal(`產圖失敗：${e?.message ?? e}`),
+      })
+    : { mutate: () => {}, isPending: false };
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState("");
@@ -140,6 +173,14 @@ export default function RunPage() {
     const ov = overrides[activeIdx];
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
+
+  // P4: pre-fill image prompt from current variant's imageStyle when
+  // mode switches to image OR active variant changes.
+  useEffect(() => {
+    if (mode === "image" && slide?.imageStyle) {
+      setImagePrompt(slide.imageStyle);
+    }
+  }, [mode, activeIdx, slide?.imageStyle]);
 
   // 2026-05-09 (CJ direction「只留一個 mockup 路徑」): 一律渲染 mockup，
   // 不再 block on missing taskId. Inference falls through 3 layers:
@@ -331,7 +372,12 @@ export default function RunPage() {
                   onClick={() => { setMode("agent"); setFocusedAgent("caption"); }}
                   className={`w-7 h-7 rounded-full overflow-hidden ring-1 transition ${mode==="agent" && focusedAgent==="caption" ? "ring-secondary ring-2" : "ring-default-200 hover:ring-secondary"}`}
                 >
-                  <Avatar src={`https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(data.metadata?.captionAgent ?? "Caption")}`} className="w-7 h-7" />
+                  {(() => {
+                    const ca: any = data.metadata?.captionAgent;
+                    const name = typeof ca === "object" ? ca?.name : ca;
+                    const av = typeof ca === "object" ? ca?.avatarUrl : null;
+                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Caption")}`} className="w-7 h-7" />;
+                  })()}
                 </button>
               </Tooltip>
               <Tooltip content="視覺 agent — 看思考過程">
@@ -339,7 +385,12 @@ export default function RunPage() {
                   onClick={() => { setMode("agent"); setFocusedAgent("image"); }}
                   className={`w-7 h-7 rounded-full overflow-hidden ring-1 transition ${mode==="agent" && focusedAgent==="image" ? "ring-secondary ring-2" : "ring-default-200 hover:ring-secondary"}`}
                 >
-                  <Avatar src={`https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(data.metadata?.imageAgent ?? "Visual")}`} className="w-7 h-7" />
+                  {(() => {
+                    const ia: any = data.metadata?.imageAgent;
+                    const name = typeof ia === "object" ? ia?.name : ia;
+                    const av = typeof ia === "object" ? ia?.avatarUrl : null;
+                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Visual")}`} className="w-7 h-7" />;
+                  })()}
                 </button>
               </Tooltip>
               <Divider />
@@ -488,70 +539,174 @@ export default function RunPage() {
               {mode === "image" && (
                 <>
                   <p className="text-tiny font-semibold">改配圖</p>
-                  <p className="text-[11px] text-default-500">
-                    當前風格：{slide?.imageStyle || "(無 brief)"}
-                  </p>
-                  <Button variant="flat" fullWidth>重新產圖</Button>
-                  <Button variant="flat" fullWidth>換風格方向</Button>
+                  <Textarea
+                    label="圖片 prompt（可調整）"
+                    value={imagePrompt}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    minRows={3}
+                    maxRows={6}
+                    description="會帶入品牌視覺脈絡（顏色、風格、調性）"
+                  />
+                  {slide?.imageUrl && (
+                    <div className="rounded-lg overflow-hidden border border-default-200">
+                      <img src={slide.imageUrl} alt="current" className="w-full h-auto" />
+                      <p className="text-[10px] text-default-500 px-2 py-1">當前圖片</p>
+                    </div>
+                  )}
+                  <Button
+                    color="secondary" fullWidth
+                    isLoading={imageGenMut.isPending}
+                    isDisabled={imageGenMut.isPending || !imagePrompt.trim() || !data.brand?.id}
+                    onPress={() => {
+                      if (!data.brand?.id) {
+                        showToastGlobal("此 run 沒有綁定品牌，無法產圖");
+                        return;
+                      }
+                      imageGenMut.mutate({
+                        brandId: data.brand.id,
+                        prompt: imagePrompt,
+                        channel: (mockupVariant?.platform ?? "facebook") as any,
+                      });
+                    }}
+                  >
+                    {imageGenMut.isPending ? "產圖中…（約 15-30s）" : "立即產圖"}
+                  </Button>
+                  {!data.brand?.id && (
+                    <p className="text-[10px] text-warning-700">⚠ 此 run 沒有 brand，請先綁品牌再產圖</p>
+                  )}
                 </>
               )}
               {mode === "video" && (
                 <>
-                  <p className="text-tiny font-semibold">影片版本</p>
-                  <p className="text-[11px] text-default-500">尚未產出影片</p>
-                  <Button variant="flat" fullWidth>從這篇生影片</Button>
+                  <p className="text-tiny font-semibold">從這篇生影片</p>
+                  <p className="text-[11px] text-default-500 leading-relaxed">
+                    影片產出走 Hailuo / Seedance pipeline（10-30 秒短片，文字描述 → 影片）。
+                  </p>
+                  <Button
+                    variant="flat" fullWidth
+                    isDisabled
+                    onPress={() => navigate(`/100s?b=${data.brand?.id ?? ""}&from-output=${id}`)}
+                  >
+                    開影片任務（即將推出）
+                  </Button>
+                  <p className="text-[10px] text-default-400">
+                    將跳轉到 100s 影片任務並帶入這篇文案作為腳本起點。
+                  </p>
                 </>
               )}
-              {mode === "agent" && (
-                <>
-                  <p className="text-tiny font-semibold flex items-center gap-2">
-                    <Avatar
-                      src={`https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(focusedAgent==="image" ? (data.metadata?.imageAgent ?? "Visual") : (data.metadata?.captionAgent ?? "Caption"))}`}
-                      className="w-7 h-7"
-                    />
-                    {focusedAgent === "image"
-                      ? `${data.metadata?.imageAgent ?? "視覺 agent"} — 思考過程`
-                      : `${data.metadata?.captionAgent ?? "撰寫 agent"} — 思考過程`}
-                  </p>
-                  <div className="bg-default-50 rounded-lg p-2.5 text-[11px] leading-relaxed space-y-2 max-h-72 overflow-y-auto">
-                    {focusedAgent === "image" ? (
-                      <>
-                        <p className="font-semibold">配圖風格 brief：</p>
-                        <p className="whitespace-pre-wrap text-default-800">
-                          {slide?.imageStyle || "（這個任務沒有配圖 brief）"}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-semibold">寫作流程：</p>
-                        <ol className="list-decimal pl-4 space-y-1 text-default-700">
-                          <li>讀品牌 persona + 任務 brief</li>
-                          <li>套用市場語氣 master + agent 自身方法論</li>
-                          <li>產 {variants.length} 個變體（{variants.map(v => v.label).filter(Boolean).slice(0,3).join(" / ")}{variants.length > 3 ? "..." : ""}）</li>
-                          <li>QA 檢查每個 variant 結構 / 字數 / hashtag</li>
+              {mode === "agent" && (() => {
+                // 2026-05-09 (P2): real agent timeline from persisted metadata.
+                // captionAgent/imageAgent are now full {id,name,title,avatarUrl}
+                // (was string). Stages = orchestra timeline. Backward compat for
+                // legacy outputs where metadata only has agent name as string.
+                const md: any = data.metadata ?? {};
+                const captionAg = typeof md.captionAgent === "object" ? md.captionAgent : (md.captionAgent ? { name: md.captionAgent } : null);
+                const imageAg = typeof md.imageAgent === "object" ? md.imageAgent : (md.imageAgent ? { name: md.imageAgent } : null);
+                const focusedAg = focusedAgent === "image" ? imageAg : captionAg;
+                const focusedAgName = focusedAg?.name ?? (focusedAgent === "image" ? "視覺 agent" : "撰寫 agent");
+                const focusedAgTitle = focusedAg?.title ?? "";
+                const stages: Array<{key: string; label: string; status: string; startedAt?: number; completedAt?: number}> = Array.isArray(md.stages) ? md.stages : [];
+                const totalMs = md.latencyMs ?? 0;
+                return (
+                  <>
+                    <p className="text-tiny font-semibold flex items-center gap-2">
+                      <Avatar
+                        src={focusedAg?.avatarUrl || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(focusedAgName)}`}
+                        className="w-7 h-7"
+                      />
+                      <span className="flex flex-col leading-tight">
+                        <span>{focusedAgName}</span>
+                        {focusedAgTitle && <span className="text-[10px] text-default-400 font-normal">{focusedAgTitle}</span>}
+                      </span>
+                    </p>
+                    {/* Real orchestra stage timeline */}
+                    {stages.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] text-default-500 font-medium">執行流程（總耗時 {(totalMs/1000).toFixed(1)}s）</p>
+                        <ol className="space-y-1">
+                          {stages.map((s, i) => {
+                            const dur = (s.completedAt ?? 0) - (s.startedAt ?? 0);
+                            const statusColor =
+                              s.status === "done" ? "text-success" :
+                              s.status === "failed" ? "text-danger" :
+                              s.status === "running" ? "text-warning" : "text-default-400";
+                            const dot =
+                              s.status === "done" ? "●" :
+                              s.status === "failed" ? "✕" :
+                              s.status === "running" ? "◌" : "○";
+                            return (
+                              <li key={i} className="flex items-start gap-2 text-[11px] leading-tight py-1 border-b border-default-100 last:border-0">
+                                <span className={`${statusColor} font-mono text-sm leading-none mt-0.5`}>{dot}</span>
+                                <span className="flex-1 min-w-0">
+                                  <span className="block text-default-800">{s.label}</span>
+                                  <span className="block text-[10px] text-default-400 font-mono">
+                                    {s.status === "done" && dur > 0 ? `${(dur/1000).toFixed(1)}s` : s.status}
+                                  </span>
+                                </span>
+                              </li>
+                            );
+                          })}
                         </ol>
-                        <p className="font-semibold mt-2">本變體輸出：</p>
-                        <p className="whitespace-pre-wrap text-default-800">
-                          {(slide?.caption ?? "").slice(0, 400)}{(slide?.caption?.length ?? 0) > 400 ? "…" : ""}
-                        </p>
-                      </>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-default-500 italic">這筆紀錄沒有 stage timeline（舊版產出）</p>
                     )}
-                  </div>
-                  <p className="text-[10px] text-default-400 leading-relaxed">
-                    💡 進階 agent 思考紀錄（推理 token / 重試紀錄 / 工具呼叫）即將推出。
-                  </p>
-                </>
-              )}
+                    {/* Per-agent contextual content */}
+                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] leading-relaxed space-y-1.5 max-h-56 overflow-y-auto">
+                      {focusedAgent === "image" ? (
+                        <>
+                          <p className="font-semibold">本變體配圖 brief：</p>
+                          <p className="whitespace-pre-wrap text-default-800">
+                            {slide?.imageStyle || "（這個任務沒有配圖 brief）"}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold">本變體文案：</p>
+                          <p className="whitespace-pre-wrap text-default-800">
+                            {(slide?.caption ?? "").slice(0, 400)}{(slide?.caption?.length ?? 0) > 400 ? "…" : ""}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    {md.fetchedUrl && (
+                      <p className="text-[10px] text-default-500">
+                        🔗 抓取參考：<a href={md.fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{md.fetchedUrl}</a>
+                      </p>
+                    )}
+                    {Array.isArray(md.errors) && md.errors.length > 0 && (
+                      <div className="bg-danger-50 border border-danger-200 rounded p-2 text-[10px] text-danger-700">
+                        ⚠ {md.errors.slice(0, 2).join(" · ")}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {mode === "regen" && (
                 <>
                   <p className="text-tiny font-semibold">重生這段文案</p>
                   <p className="text-[11px] text-default-500 leading-relaxed">
-                    讓同一位 agent 重新寫一次當前 variant（保留品牌 + 任務設定）。
+                    讓同一位 agent 重新寫一次當前 variant「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。
                   </p>
-                  <Button color="secondary" fullWidth isDisabled>立即重生（即將推出）</Button>
+                  <Button
+                    color="secondary"
+                    fullWidth
+                    isLoading={regenMut.isPending}
+                    isDisabled={regenMut.isPending}
+                    onPress={() => {
+                      regenMut.mutate({ outputId: id, variantIndex: activeIdx });
+                    }}
+                  >
+                    {regenMut.isPending ? "重生中…" : "立即重生這個變體"}
+                  </Button>
                   <p className="text-[10px] text-default-400">
-                    將呼叫 {data.metadata?.captionAgent ?? "撰寫 agent"} 重新產出當前變體，原版會自動歸檔。
+                    將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫 agent"} 重新產出 variant {activeIdx + 1}。
                   </p>
+                  {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
+                    <p className="text-[10px] text-default-500">
+                      📚 已重生 {data.metadata.archivedVariants.length} 次（歷史保留）
+                    </p>
+                  )}
                 </>
               )}
               {mode === "settings" && (
@@ -562,8 +717,8 @@ export default function RunPage() {
                     <div className="flex justify-between"><span>Tier</span><span>{data.mission?.tier ?? "—"}</span></div>
                     <div className="flex justify-between"><span>變體數</span><span>{variants.length}</span></div>
                     <div className="flex justify-between"><span>產出延遲</span><span>{data.metadata?.latencyMs ? `${(data.metadata.latencyMs/1000).toFixed(1)}s` : "—"}</span></div>
-                    <div className="flex justify-between"><span>撰寫 agent</span><span>{data.metadata?.captionAgent ?? "—"}</span></div>
-                    <div className="flex justify-between"><span>視覺 agent</span><span>{data.metadata?.imageAgent ?? "—"}</span></div>
+                    <div className="flex justify-between"><span>撰寫 agent</span><span>{(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "—"}</span></div>
+                    <div className="flex justify-between"><span>視覺 agent</span><span>{(typeof data.metadata?.imageAgent === "object" ? data.metadata.imageAgent?.name : data.metadata?.imageAgent) ?? "—"}</span></div>
                   </div>
                 </>
               )}
@@ -573,9 +728,11 @@ export default function RunPage() {
           <Card>
             <CardBody className="space-y-2">
               <p className="text-tiny font-semibold">發布到</p>
-              <Button color="primary" fullWidth startContent={<FontAwesomeIcon icon={faRocket} />} isDisabled>
-                直接發 Facebook（需綁 Meta Token）
-              </Button>
+              <Tooltip content="P5: 需要先在 Meta Developer Portal 註冊 App、申請 pages_manage_posts 權限、把 Page Access Token 存進 DB。預計獨立任務上線。" placement="left">
+                <Button color="primary" fullWidth startContent={<FontAwesomeIcon icon={faRocket} />} isDisabled>
+                  直接發 Facebook（需 Meta App + Page Token）
+                </Button>
+              </Tooltip>
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
@@ -593,13 +750,9 @@ export default function RunPage() {
                 isLoading={statusMut.isPending}
                 onPress={() => statusMut.mutate({ id, status: "approved" })}
               >{data.status === "approved" ? "✓ 已存 Mission" : "存到 Mission"}</Button>
-              <Button
-                variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}
-                onPress={onCopy}
-              >
-                {copied ? "已複製" : "複製文字"}
-              </Button>
+              {/* 2026-05-09 (CJ): removed 複製文字 here — duplicates the
+                  toolbar 📋 複製文案 button. Keep only 複製此頁網址 (different
+                  function: shares the run URL, not the caption). */}
               <Button
                 variant="light" fullWidth size="sm"
                 startContent={<FontAwesomeIcon icon={faShare} />}

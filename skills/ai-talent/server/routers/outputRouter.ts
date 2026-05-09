@@ -188,6 +188,47 @@ export const outputRouter = router({
     }),
 
   /**
+   * 2026-05-09 (P4): write a regenerated image URL back to a variant's
+   * image slot. Used after RunPage's 改圖 button calls image.generate and
+   * gets a URL — we persist so reload shows the new image.
+   */
+  updateVariantImage: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      variantIndex: z.number().min(0),
+      imageUrl: z.string().url().max(2000),
+      style: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT o.content
+         FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+         WHERE o.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new Error("Output not found");
+      let parsed: any;
+      try { parsed = JSON.parse(row.content); }
+      catch { parsed = [{ label: "主版本", caption: row.content }]; }
+      const arr = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+      if (input.variantIndex >= arr.length) throw new Error("variant index out of range");
+      arr[input.variantIndex] = {
+        ...arr[input.variantIndex],
+        image: { ...(arr[input.variantIndex].image ?? {}), url: input.imageUrl, status: "ready", style: input.style ?? arr[input.variantIndex].image?.style ?? null },
+        imageUrl: input.imageUrl,
+        imageStatus: "ready",
+      };
+      const newContent = Array.isArray(parsed) ? JSON.stringify(arr, null, 2) : JSON.stringify({ ...parsed, variants: arr }, null, 2);
+      await localPool.execute(
+        `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
+        [newContent, input.id],
+      );
+      return { ok: true, variantIndex: input.variantIndex };
+    }),
+
+  /**
    * 2026-05-09 (CJ direction): list recent task runs for the current
    * user × brand × tier. Powers the collapsible sidebar on 30s/60s/100s
    * pages — quick access to "what I just ran for this brand".

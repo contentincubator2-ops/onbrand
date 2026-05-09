@@ -1465,6 +1465,98 @@ export const quickTaskRouter = router({
       });
     }),
 
+  /**
+   * 2026-05-09 (P3): regenerate a single variant of an existing output.
+   * Fetches the original output's metadata.taskId + inputs, re-runs ONE
+   * variant through the same orchestra path, replaces that variant in the
+   * stored content. Original variant goes into metadata.archivedVariants
+   * for history.
+   */
+  regenerateVariant: protectedProcedure
+    .input(z.object({
+      outputId: z.number().int().positive(),
+      variantIndex: z.number().int().min(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT o.id, o.content, o.metadata, o.missionId,
+                m.userId AS mission_user_id, m.brandId AS mission_brand_id,
+                JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS taskId,
+                JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier'))   AS tier
+         FROM mission_outputs o
+         LEFT JOIN missions m ON m.id = o.missionId
+         WHERE o.id = ? AND m.userId = ? LIMIT 1`,
+        [input.outputId, userId],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new Error("output not found or no permission");
+      const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
+      const taskId = row.taskId;
+      const inputs = md.inputs ?? {};
+      if (!taskId) throw new Error("此 output 沒有 taskId metadata，無法重生");
+
+      const template =
+        FB_30S_TASKS.find((t) => t.id === taskId) ??
+        IG_30S_TASKS.find((t) => t.id === taskId) ??
+        YT_30S_TASKS.find((t) => t.id === taskId) ??
+        TT_30S_TASKS.find((t) => t.id === taskId) ??
+        LI_30S_TASKS.find((t) => t.id === taskId) ??
+        EMAIL_30S_TASKS.find((t) => t.id === taskId) ??
+        PR_30S_TASKS.find((t) => t.id === taskId) ??
+        BRAND_30S_TASKS.find((t) => t.id === taskId) ??
+        RESEARCH_30S_TASKS.find((t) => t.id === taskId);
+      if (!template) throw new Error(`未知 task: ${taskId}`);
+
+      const { getOrchestraConfig } = await import("../_core/quickTaskFB");
+      const fullConfig =
+        getOrchestraConfig(taskId) ??
+        getIGOrchestraConfig(taskId) ??
+        getYTOrchestraConfig(taskId) ??
+        getTTOrchestraConfig(taskId) ??
+        getLIOrchestraConfig(taskId) ??
+        getEmailOrchestraConfig(taskId) ??
+        getPROrchestraConfig(taskId) ??
+        getBrandOrchestraConfig(taskId) ??
+        getResearchOrchestraConfig(taskId);
+      if (!fullConfig) throw new Error(`no orchestra config for ${taskId}`);
+
+      // Override config to produce ONE variant only — use the same label
+      // as the slot we're replacing, so the regenerated voice matches.
+      const existingVariants: any[] = (() => {
+        try { const p = JSON.parse(row.content); return Array.isArray(p) ? p : (p.variants ?? []); }
+        catch { return []; }
+      })();
+      const targetLabel = existingVariants[input.variantIndex]?.label ?? fullConfig.variantLabels[input.variantIndex] ?? `版本 ${input.variantIndex + 1}`;
+      const singleConfig = { ...fullConfig, variants: 1, images: 0, runImageGen: false, variantLabels: [targetLabel] };
+
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+      const r = await runOrchestra({
+        template, config: singleConfig, inputs, brandId: row.mission_brand_id ?? undefined, userId, tier: "30s",
+      });
+      const newVariant = r.variants?.[0];
+      if (!newVariant?.caption) throw new Error("重生失敗，agent 沒回傳內容");
+
+      // Replace the variant + archive the old one
+      const archived = Array.isArray(md.archivedVariants) ? md.archivedVariants : [];
+      archived.push({
+        archivedAt: new Date().toISOString(),
+        index: input.variantIndex,
+        variant: existingVariants[input.variantIndex],
+      });
+      existingVariants[input.variantIndex] = newVariant;
+      const newContent = JSON.stringify(existingVariants, null, 2);
+      const newMetadata = JSON.stringify({ ...md, archivedVariants: archived, lastRegenAt: new Date().toISOString() });
+
+      await localPool.execute(
+        `UPDATE mission_outputs SET content = ?, metadata = ?, version = version + 1, updatedAt = NOW() WHERE id = ?`,
+        [newContent, newMetadata, input.outputId],
+      );
+
+      return { ok: true, variantIndex: input.variantIndex, newCaption: newVariant.caption };
+    }),
+
   runQuick: protectedProcedure
     .input(
       z.object({

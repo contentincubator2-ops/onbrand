@@ -1170,8 +1170,15 @@ export async function runOrchestra(args: {
           content: JSON.stringify(result.variants, null, 2),
           metadata: {
             latencyMs: result.totalLatencyMs,
-            captionAgent: result.captionAgent?.name,
-            imageAgent: result.imageAgent?.name,
+            // 2026-05-09 (P2 — agent thinking panel): persist FULL agent
+            // objects (id/name/title/avatarUrl) + stages + fetchedUrl so
+            // /run/:id can render the agent workflow without reconstructing.
+            captionAgent: result.captionAgent ?? null,
+            imageAgent: result.imageAgent ?? null,
+            stages: result.stages ?? [],
+            fetchedUrl: result.fetchedUrl ?? null,
+            errors: result.errors ?? [],
+            ok: result.ok ?? true,
             variantCount: result.variants.length,
             // 2026-05-09 (CJ): persist inputs so /run/:id 重跑同任務 can
             // navigate back to the task with the user's prior answers
