@@ -141,15 +141,15 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
-  // Infer mockup variant. taskId prefix is the most reliable signal —
-  // works even on old DB rows where workspace='other' / platform='other'.
-  // Priority: taskId pattern > mission.workspace > output.platform.
-  const mockupVariant: MockupVariant | null = useMemo(() => {
-    if (!data) return null;
+  // 2026-05-09 (CJ direction「只留一個 mockup 路徑」): 一律渲染 mockup，
+  // 不再 block on missing taskId. Inference falls through 3 layers:
+  //   1. metadata.taskId (rich — distinguishes ad/reel/story/carousel)
+  //   2. output.platform + output.outputType (always present from DB)
+  //   3. generic:feed (last resort — never errors out)
+  const mockupVariant: MockupVariant = useMemo(() => {
+    const taskId = data?.mission?.taskId ?? "";
 
-    const taskId = data.mission?.taskId ?? "";
-
-    // ── Brand + Research → proposal-style ──
+    // ── Layer 1: Brand + Research (proposal-style mockups) ──
     if (taskId.startsWith("br-") || taskId.startsWith("rs-")) {
       const coverIds = ["br-30-tagline", "br-30-positioning", "br-30-elevator-pitch", "br-30-manifesto"];
       const personaIds = ["rs-30-persona-draft", "rs-30-journey-map", "rs-30-competitive-interview", "rs-30-synthesis-template"];
@@ -166,60 +166,59 @@ export default function RunPage() {
       return { platform: "generic" as any, format: format as any, label: `generic:${format}` };
     }
 
-    // ── Map taskId prefix → platform (most reliable for old runs) ──
+    // ── Layer 1: taskId prefix → platform/format (richest mapping) ──
     const idPrefixMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
       li: "linkedin", em: "email", pr: "press",
     };
-    const idPrefix = taskId.split("-")[0];
-
-    // ── Map taskId pattern → format (postType detection from task name) ──
     const formatFromTaskId = (id: string): string => {
-      // FB
       if (id.includes("ad-")) return "ad";
-      if (id.includes("comment-reply") || id.includes("comment")) return "comment";
+      if (id.includes("comment")) return "comment";
       if (id.includes("pinned")) return "pinned";
       if (id.includes("story")) return "story";
       if (id.includes("reel")) return "reel";
       if (id.includes("carousel")) return "carousel";
       if (id.includes("bio") || id.includes("profile")) return "profile";
       if (id.includes("live")) return "live";
-      // YT
       if (id.includes("thumbnail")) return "video-card";
       if (id.includes("shorts")) return "shorts";
       if (id.includes("community")) return "community";
       if (id.startsWith("yt-")) return "watch";
-      // LI
       if (id.includes("article")) return "article";
       if (id.includes("newsletter")) return "newsletter";
       if (id.includes("poll")) return "poll";
       if (id.includes("document")) return "document";
-      // TT
       if (id.startsWith("tt-")) return "foryou";
-      // Email
       if (id.startsWith("em-")) return "edm";
-      // PR
       if (id.startsWith("pr-")) return "press-release";
-      // Default for fb/ig
       return "feed";
     };
 
-    const workspaceMap: Record<string, string> = {
-      facebook: "facebook", instagram: "instagram", linkedin: "linkedin",
-      youtube: "youtube", tiktok: "tiktok", threads: "threads",
-      line: "line", email: "email", press: "press",
+    if (taskId) {
+      const idPrefix = taskId.split("-")[0];
+      const platform = idPrefixMap[idPrefix];
+      if (platform) {
+        const format = formatFromTaskId(taskId);
+        return { platform: platform as any, format: format as any, label: `${platform}:${format}` };
+      }
+    }
+
+    // ── Layer 2: output.platform + outputType (DB columns, always present) ──
+    // mission_outputs.platform is the enum (facebook/instagram/.../other)
+    // mission_outputs.outputType maps to a sensible mockup format.
+    const outputTypeToFormat: Record<string, string> = {
+      post: "feed", story: "story", reel: "reel",
+      ad_copy: "ad", email_html: "edm", slide: "carousel",
+      script: "watch", product_desc: "feed", report: "research-doc",
     };
-    const ws = data.mission?.workspace as string | undefined;
+    const platformFromOutput = data?.platform && data.platform !== "other" ? data.platform : null;
+    const formatFromOutput = outputTypeToFormat[data?.outputType ?? ""] ?? "feed";
+    if (platformFromOutput) {
+      return { platform: platformFromOutput as any, format: formatFromOutput as any, label: `${platformFromOutput}:${formatFromOutput}` };
+    }
 
-    const platform = (
-      idPrefixMap[idPrefix]
-      ?? workspaceMap[ws ?? ""]
-      ?? (data.platform && data.platform !== "other" ? data.platform : null)
-      ?? "generic"
-    ) as any;
-    const format = formatFromTaskId(taskId) as any;
-
-    return { platform, format, label: `${platform}:${format}` };
+    // ── Layer 3: generic feed (last resort — caption still renders) ──
+    return { platform: "generic" as any, format: formatFromOutput as any, label: `generic:${formatFromOutput}` };
   }, [data]);
 
   if (!id || isNaN(id)) {
@@ -236,29 +235,9 @@ export default function RunPage() {
       </div>
     );
   }
-  // 2026-05-09 cleanup (CJ direction「乾淨一條路」): if metadata.taskId
-  // is missing, this run was persisted by an old/buggy code path. Show
-  // a loud error rather than papering over with generic:feed mockup.
-  if (!data.mission?.taskId) {
-    return (
-      <div className="p-12 flex flex-col items-center gap-4 max-w-xl mx-auto">
-        <div className="bg-danger-50 border-2 border-danger-300 rounded-lg p-6 w-full">
-          <h3 className="text-danger-700 font-bold mb-2">⚠️ 此 run 缺少 taskId</h3>
-          <p className="text-sm text-default-700 mb-3">
-            這筆紀錄沒有 metadata.taskId，所以無法判斷該用哪個 mockup 樣板。
-            這是舊版 recordTaskRun 的殘留資料 — 新跑的任務都會正確寫入。
-          </p>
-          <p className="text-tiny text-default-500 font-mono">
-            output.id = {data.id} · mission.id = {data.mission?.id ?? "?"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="flat" onPress={() => navigate("/30s")}>跑一個新的 30s 任務</Button>
-          <Button variant="light" onPress={() => navigate(-1)}>返回</Button>
-        </div>
-      </div>
-    );
-  }
+  // 2026-05-09 (CJ direction「我們只要留一個 mockup 模板，根除引用舊樣板的」):
+  // No more red error blocking. mockupVariant always resolves to a usable
+  // template via 3-layer fallback (taskId → output.platform → generic).
 
   const onCopy = async () => {
     try {
