@@ -1592,38 +1592,9 @@ function OutputCarousel({
           {/* Variant label removed per CJ — redundant with bottom thumbnail strip
               showing active variant. Keep modal clean (Canva pattern). */}
 
-          {/* Inline edit textarea — only shows when ✏️ tool active (Canva pattern) */}
-          {activeTool === "edit" && slide?.caption && (
-            <div className="w-full max-w-[640px] mt-3 rounded-2xl border-2 bg-white shadow-md p-3 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200"
-                 style={{ borderColor: tierAccent(pageTier) }}>
-              <div className="flex items-center justify-between">
-                <span className="text-tiny font-semibold text-default-700 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faPenNib} style={{ color: tierAccent(pageTier) }} />
-                  直接編輯（mockup 即時更新）
-                </span>
-                <div className="flex items-center gap-2">
-                  {isEdited && (
-                    <button
-                      onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
-                      className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
-                    >
-                      還原 AI 原版
-                    </button>
-                  )}
-                  <button onClick={() => setActiveTool(null)} className="text-default-400 hover:text-default-600">
-                    <FontAwesomeIcon icon={faXmark} className="text-tiny" />
-                  </button>
-                </div>
-              </div>
-              <Textarea
-                value={slide.caption}
-                onValueChange={(v) => setEdits((e) => ({ ...e, [idx]: v }))}
-                minRows={4}
-                maxRows={10}
-                classNames={{ input: "text-small leading-relaxed font-sans" }}
-              />
-            </div>
-          )}
+          {/* 2026-05-09 (CJ direction): "直接編輯" panel was previously
+              docked below the mockup — moved to right-side panel
+              (alongside other tool panels) for consistent UX. */}
 
           {/* Brand logo hint moved to floating bottom-right when applicable —
               keeps main canvas clean (Canva pattern: no nag banners). */}
@@ -1639,12 +1610,15 @@ function OutputCarousel({
           )}
         </div>
 
-        {/* ── RIGHT CONTEXTUAL PANEL — slides in only when a tool is active ── */}
-        {activeTool && activeTool !== "edit" && (
+        {/* ── RIGHT CONTEXTUAL PANEL — slides in when ANY tool is active ──
+            2026-05-09 (CJ direction): edit panel now lives here too
+            (was previously inline-below-mockup which was inconsistent UX). */}
+        {activeTool && (
           <div className="w-72 shrink-0 max-h-[calc(92vh-220px)] overflow-y-auto pr-1 space-y-2 animate-in slide-in-from-right-2 fade-in duration-200">
             {/* Panel header with close button */}
             <div className="sticky top-0 bg-white pb-2 flex items-center justify-between border-b border-default-100 z-10">
               <span className="text-tiny font-bold tracking-wider uppercase" style={{ color: tierAccent(pageTier) }}>
+                {activeTool === "edit" && "✏️ 直接編輯"}
                 {activeTool === "style" && "🎨 AI 生圖"}
                 {activeTool === "video" && "🎬 AI 影片生成"}
                 {activeTool === "prompt" && "🪄 視覺方向 / hashtag"}
@@ -1656,6 +1630,30 @@ function OutputCarousel({
                 <FontAwesomeIcon icon={faXmark} className="text-tiny" />
               </button>
             </div>
+
+            {/* EDIT panel — direct caption textarea (mockup updates live) */}
+            {activeTool === "edit" && slide?.caption && (
+              <div className="space-y-2">
+                <p className="text-[10px] text-default-500 leading-relaxed">
+                  在這裡改文字，左邊 mockup 會即時跟著變。改好就直接複製或存到 Mission。
+                </p>
+                <Textarea
+                  value={slide.caption}
+                  onValueChange={(v) => setEdits((e) => ({ ...e, [idx]: v }))}
+                  minRows={6}
+                  maxRows={20}
+                  classNames={{ input: "text-small leading-relaxed font-sans" }}
+                />
+                {isEdited && (
+                  <button
+                    onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
+                    className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
+                  >
+                    還原 AI 原版
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* STYLE panel — 3-step image gen flow: brief → confirm prompt → generate */}
             {activeTool === "style" && (
