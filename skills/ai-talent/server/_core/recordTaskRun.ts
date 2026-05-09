@@ -74,11 +74,13 @@ async function ensureMission(args: {
     const existing = (rows as any[])[0];
     if (existing?.id) return Number(existing.id);
 
-    // Create new mission
+    // Create new mission. status enum is (inactive/active/completed/archived) —
+    // 2026-05-09 fix: was 'pending' which isn't in the enum → Data truncated
+    // → ensureMission silently failed → no outputId → /run navigation broke.
     const [r]: any = await localPool.execute(
       `INSERT INTO missions
          (userId, brandId, workspace, title, description, status, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, 'pending', NOW(), NOW())`,
+       VALUES (?, ?, ?, ?, ?, 'active', NOW(), NOW())`,
       [args.userId, args.brandId, args.workspace, args.taskLabel, `${tag} ${args.tier} 任務`],
     );
     const id = Number(r?.insertId ?? 0);
