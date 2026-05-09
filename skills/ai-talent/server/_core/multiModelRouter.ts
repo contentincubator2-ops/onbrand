@@ -197,7 +197,12 @@ export function selectModel(taskType: TaskType): { provider: ModelProvider; mode
 export async function callModel(
   messages: MultiModelMessage[],
   taskType?: TaskType,
-  preferredProvider?: ModelProvider
+  preferredProvider?: ModelProvider,
+  /** 2026-05-09: explicit model override. When set, this is the model
+   *  string passed to invokeLLM (e.g. "claude-haiku-4-5" not the
+   *  provider's DEFAULT_MODELS). Used by orchestra to honor each
+   *  agent's specific aiModel value. */
+  preferredModel?: string,
 ): Promise<{ content: string; provider: ModelProvider; model: string }> {
   const availability = getAvailabilityMap();
 
@@ -207,7 +212,7 @@ export async function callModel(
   if (preferredProvider) {
     if (availability[preferredProvider]) {
       provider = preferredProvider;
-      model = DEFAULT_MODELS[provider];
+      model = preferredModel ?? DEFAULT_MODELS[provider];
     } else {
       const type = taskType ?? detectTaskType(messages.map(m => m.content).join(" "));
       provider = selectProvider(type);

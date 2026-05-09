@@ -276,13 +276,16 @@ async function callOneVariant(args: {
     brandSection +
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
 
-  // Provider selection priority:
-  //   1. Agent's aiModel (from JSON-assigned real-person agent) → maps to qwen/Kimi/glm
-  //   2. Template's preferredModel (per-task hardcoded)
+  // Provider + model selection priority:
+  //   1. Agent's aiModel (from JSON-assigned real-person agent) — uses both
+  //      provider mapping AND the exact model string (so claude-haiku stays
+  //      claude-haiku, not silently downgraded to claude-sonnet via DEFAULT)
+  //   2. Template's preferredModel (per-task hardcoded provider only)
   //   3. qwen as final default
   const provider: ModelProvider = agentAiModel
     ? aiModelToProvider(agentAiModel)
     : (template.preferredModel === "any" ? "qwen" : (template.preferredModel as any));
+  const explicitModel: string | undefined = agentAiModel || undefined;
 
   // First attempt
   let attempt = 0;
@@ -298,6 +301,7 @@ async function callOneVariant(args: {
           ],
           undefined,
           provider,
+          explicitModel,
         ),
         timeoutPromise<never>(LLM_BUDGET_MS, `caption[${label}]`),
       ]);
