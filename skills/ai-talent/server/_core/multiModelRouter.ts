@@ -148,9 +148,11 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
  */
 function getAvailabilityMap(): Record<ModelProvider, boolean> {
   return {
-    // Confirmed working (probed 2026-05-04)
-    qwen:                 !!ENV.QWEN_API_KEY,
-    zhipu:                !!ENV.ZHIPU_API_KEY,
+    // 2026-05-09: qwen key is invalid (HTTP 401 on direct curl), zhipu
+    // not verified working. Disabled until keys re-issued. Until then,
+    // anthropic carries everything.
+    qwen:                 false,  // !!ENV.QWEN_API_KEY — key invalid
+    zhipu:                false,  // !!ENV.ZHIPU_API_KEY — not verified
     "azure-foundry":      !!(ENV as any).AZURE_FOUNDRY_API_KEY,
     // Newly added Azure resources (keys written 2026-05-04)
     "azure-position":     !!(ENV as any).AZURE_POSITION_API_KEY,
