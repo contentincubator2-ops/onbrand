@@ -1131,7 +1131,13 @@ export async function runOrchestra(args: {
     // navigate to /run/:outputId immediately after run completes
     // (Phase 2 route-based architecture). Non-fatal: failure here
     // doesn't break the user-facing response.
-    if (args.userId && result.ok && result.variants.length > 0) {
+    //
+    // 2026-05-09 (CJ feedback): persist even on partial failure (ok=false)
+    // when at least 1 variant has caption. Partial output is still useful
+    // — user wants to see the other variants AND keep nav consistent
+    // (always go to /run/:id). Filtering on result.ok hid valid runs.
+    const hasUsableVariant = result.variants.some((v) => (v.caption ?? "").trim().length > 0);
+    if (args.userId && hasUsableVariant) {
       try {
         const { recordTaskRun } = await import("./recordTaskRun");
         const firstImage = result.variants.find((v) => v.image?.url)?.image?.url ?? null;

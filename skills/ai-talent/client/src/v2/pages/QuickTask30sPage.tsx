@@ -533,16 +533,16 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           })),
         };
         // 2026-05-09 (CJ Phase 2): ALL tiers navigate to /run/:outputId
-        // for output viewing. Modal stays only for the intake form
-        // (主問題輸入). Once orchestra returns, jump to /run where the
-        // global ShellLayout (left rail + tier history) is visible.
-        if (r.ok && (r as any).outputId) {
+        // for output viewing — even on partial failure (some variants
+        // generated, others timed out). Modal stays only for intake +
+        // running. /run page shows ShellLayout's left rail.
+        if ((r as any).outputId) {
           closeTask();
           navigate(`/run/${(r as any).outputId}`);
           return;
         }
-        // Fallback: orchestra failed or didn't persist — show in-modal
-        // so user sees what happened (rare path).
+        // Fallback: nothing persisted (no usable variant) — show
+        // in-modal so user sees what happened.
         setOutput(transformedOutput);
         setLatencyMs(r.totalLatencyMs);
         setAgentMeta(r.captionAgent ?? null);
