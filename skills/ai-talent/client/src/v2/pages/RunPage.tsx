@@ -130,6 +130,25 @@ export default function RunPage() {
         onSuccess: () => utils.output.getById.invalidate({ id }),
       })
     : null;
+  // 2026-05-09 (P5 — CJ「use pipedream for OAuth」): publish to FB via
+  // Pipedream Connect. Server hits a Pipedream webhook; Pipedream's
+  // workflow handles Meta OAuth/token, calls Graph API, returns post_id.
+  const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
+    ? (trpc as any).publish.toFacebook.useMutation({
+        onSuccess: (r: any) => {
+          showToastGlobal(r.permalink ? `已發布 ✓ ${r.permalink}` : "已發布到 Facebook ✓");
+          utils.output.getById.invalidate({ id });
+        },
+        onError: (e: any) => {
+          // PRECONDITION_FAILED → onboarding hint; others → raw message
+          if (String(e?.message ?? "").includes("Pipedream") && String(e?.message ?? "").includes("未設定")) {
+            showToastGlobal("FB 發布尚未設定 Pipedream webhook，請先設好 PIPEDREAM_FB_PUBLISH_WEBHOOK env");
+          } else {
+            showToastGlobal(`FB 發布失敗：${e?.message ?? e}`);
+          }
+        },
+      })
+    : { mutate: () => {}, isPending: false };
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
         onSuccess: (r: any) => {
@@ -728,11 +747,18 @@ export default function RunPage() {
           <Card>
             <CardBody className="space-y-2">
               <p className="text-tiny font-semibold">發布到</p>
-              <Tooltip content="P5: 需要先在 Meta Developer Portal 註冊 App、申請 pages_manage_posts 權限、把 Page Access Token 存進 DB。預計獨立任務上線。" placement="left">
-                <Button color="primary" fullWidth startContent={<FontAwesomeIcon icon={faRocket} />} isDisabled>
-                  直接發 Facebook（需 Meta App + Page Token）
-                </Button>
-              </Tooltip>
+              <Button
+                color="primary" fullWidth
+                startContent={<FontAwesomeIcon icon={faRocket} />}
+                isLoading={fbPublishMut.isPending}
+                isDisabled={fbPublishMut.isPending}
+                onPress={() => {
+                  if (!confirm("確定要把這個 variant 發到 Facebook？發布後會直接出現在你的 FB 粉專。")) return;
+                  fbPublishMut.mutate({ outputId: id, variantIndex: activeIdx });
+                }}
+              >
+                {fbPublishMut.isPending ? "發布中…" : "直接發 Facebook"}
+              </Button>
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
