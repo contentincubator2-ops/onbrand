@@ -42,19 +42,18 @@ export const outputRouter = router({
       note: z.string().max(2000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new Error("DB not available");
-      // Verify ownership + load output
-      const rows = await db.execute(sql`
-        SELECT o.title, o.content, o.platform, m.title AS missionTitle, b.name AS brandName
-        FROM mission_outputs o
-        JOIN missions m ON m.id = o.missionId
-        LEFT JOIN brands b ON b.id = m.brandId
-        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
-        LIMIT 1
-      `);
-      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
-      const row = Array.isArray(arr) ? arr[0] : arr;
+      // 2026-05-09 cleanup: localPool (drizzle.execute row shape was buggy).
+      const { default: localPool } = await import("../localDb");
+      const [rowsRaw]: any = await localPool.execute(
+        `SELECT o.title, o.content, o.platform, m.title AS missionTitle, b.name AS brandName
+         FROM mission_outputs o
+         JOIN missions m ON m.id = o.missionId
+         LEFT JOIN brands b ON b.id = m.brandId
+         WHERE o.id = ? AND m.userId = ?
+         LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
       if (!row) throw new Error("Output not found");
       let caption = "";
       try {
@@ -99,18 +98,18 @@ export const outputRouter = router({
       durationMinutes: z.number().min(5).max(480).default(30),
     }))
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new Error("DB not available");
-      const rows = await db.execute(sql`
-        SELECT o.title, o.content, m.title AS missionTitle, b.name AS brandName
-        FROM mission_outputs o
-        JOIN missions m ON m.id = o.missionId
-        LEFT JOIN brands b ON b.id = m.brandId
-        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
-        LIMIT 1
-      `);
-      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
-      const row = Array.isArray(arr) ? arr[0] : arr;
+      // 2026-05-09 cleanup: localPool (drizzle.execute row shape was buggy).
+      const { default: localPool } = await import("../localDb");
+      const [rowsRaw]: any = await localPool.execute(
+        `SELECT o.title, o.content, m.title AS missionTitle, b.name AS brandName
+         FROM mission_outputs o
+         JOIN missions m ON m.id = o.missionId
+         LEFT JOIN brands b ON b.id = m.brandId
+         WHERE o.id = ? AND m.userId = ?
+         LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
       if (!row) throw new Error("Output not found");
       let caption = "";
       try {
@@ -162,17 +161,16 @@ export const outputRouter = router({
       caption: z.string().max(8000),
     }))
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new Error("DB not available");
-      // Fetch + verify ownership
-      const rows = await db.execute(sql`
-        SELECT o.content FROM mission_outputs o
-        JOIN missions m ON m.id = o.missionId
-        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
-        LIMIT 1
-      `);
-      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
-      const row = Array.isArray(arr) ? arr[0] : arr;
+      // 2026-05-09 cleanup: localPool (drizzle.execute row shape was buggy).
+      const { default: localPool } = await import("../localDb");
+      const [rowsRaw]: any = await localPool.execute(
+        `SELECT o.content FROM mission_outputs o
+         JOIN missions m ON m.id = o.missionId
+         WHERE o.id = ? AND m.userId = ?
+         LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
       if (!row) throw new Error("Output not found");
       let parsed: any;
       try { parsed = JSON.parse(row.content); }
@@ -240,33 +238,32 @@ export const outputRouter = router({
       limit: z.number().min(1).max(50).default(15),
     }))
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return [];
-      const brandClause = input.brandId
-        ? sql`AND m.brandId = ${input.brandId}`
-        : sql`AND m.brandId IS NULL`;
-      // tier is in mission_outputs.metadata.tier (JSON), filter via
-      // JSON_EXTRACT for compatibility with MySQL 5.7+.
-      const tierClause = input.tier
-        ? sql`AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) = ${input.tier}`
-        : sql``;
-      const rows = await db.execute(sql`
-        SELECT
-          o.id, o.title, o.platform, o.outputType, o.status, o.createdAt,
-          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) AS tier,
-          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS taskId,
-          m.title AS missionTitle,
-          m.workspace AS workspace,
-          m.brandId AS brandId
-        FROM mission_outputs o
-        JOIN missions m ON m.id = o.missionId
-        WHERE m.userId = ${ctx.user.id}
-          ${brandClause}
-          ${tierClause}
-        ORDER BY o.createdAt DESC
-        LIMIT ${input.limit}
-      `);
-      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
+      // 2026-05-09 cleanup: localPool (drizzle.execute shape was buggy).
+      const { default: localPool } = await import("../localDb");
+      const params: any[] = [ctx.user.id];
+      let brandSql = `AND m.brandId IS NULL`;
+      if (input.brandId) { brandSql = `AND m.brandId = ?`; params.push(input.brandId); }
+      let tierSql = ``;
+      if (input.tier) { tierSql = `AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) = ?`; params.push(input.tier); }
+      params.push(input.limit);
+      const [rowsRaw]: any = await localPool.execute(
+        `SELECT
+           o.id, o.title, o.platform, o.outputType, o.status, o.createdAt,
+           JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) AS tier,
+           JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS taskId,
+           m.title AS missionTitle,
+           m.workspace AS workspace,
+           m.brandId AS brandId
+         FROM mission_outputs o
+         JOIN missions m ON m.id = o.missionId
+         WHERE m.userId = ?
+           ${brandSql}
+           ${tierSql}
+         ORDER BY o.createdAt DESC
+         LIMIT ?`,
+        params,
+      );
+      const arr: any[] = Array.isArray(rowsRaw) ? rowsRaw : [];
       return arr.map((r: any) => ({
         id: r.id,
         title: r.title,
