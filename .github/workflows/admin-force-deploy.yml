@@ -1,4 +1,4 @@
-name: Admin — Force rebuild + restart on VM
+name: Admin — Force rebuild + restart on VM (rsync, no VM git)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,33 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout latest source
+        uses: actions/checkout@v4
+
+      - name: Set up SSH for rsync
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Rsync source to VM
+        run: |
+          # Sync skills/ai-talent/ source (server + client + scripts + drizzle)
+          # Exclude node_modules, public (built artifact), .env (server-managed)
+          rsync -avz --delete \
+            --exclude='node_modules' \
+            --exclude='public' \
+            --exclude='public.bak' \
+            --exclude='.env' \
+            --exclude='dist' \
+            --exclude='.git' \
+            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+            ./skills/ai-talent/ \
+            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/marketing-os/app/skills/ai-talent/
+
+      - name: Build + restart on VM
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
@@ -17,16 +43,6 @@ jobs:
             set -e
             cd /opt/marketing-os/app/skills/ai-talent
 
-            echo "════════ BEFORE ════════"
-            echo "── pm2 ──"
-            pm2 status | grep marketing-os || echo "(no marketing-os)"
-            echo "── public bundle hash ──"
-            ls -la public/ 2>/dev/null | grep -E "index.*js" | head -3 || echo "(public/ empty or missing)"
-            echo ""
-            echo "── client/ folder check ──"
-            ls -la client/ 2>/dev/null | head -5
-            echo ""
-
             echo "════════ BACKUP public ════════"
             rm -rf public.bak 2>/dev/null
             [ -d public ] && cp -r public public.bak
@@ -34,16 +50,11 @@ jobs:
             echo ""
             echo "════════ REBUILD CLIENT (vite writes to ../public) ════════"
             cd client
-            echo "── npm install (production deps) ──"
             npm install --no-audit --no-fund --silent 2>&1 | tail -5
-            echo "── git pull origin main (sync source) ──"
-            cd /opt/marketing-os/app && git pull origin main 2>&1 | tail -5
-            cd /opt/marketing-os/app/skills/ai-talent/client
-            echo "── vite build ──"
             npm run build 2>&1 | tail -20
             cd ..
             echo "── public/ after build ──"
-            ls -la public/ | grep "index.*js" | head -3
+            ls -la public/assets/ | grep "index.*js" | head -3
 
             echo ""
             echo "════════ RESTART pm2 ════════"
@@ -52,10 +63,13 @@ jobs:
             pm2 status | grep marketing-os
 
             echo ""
-            echo "════════ VERIFY new code in bundle ════════"
+            echo "════════ VERIFY new code in main bundle ════════"
             for B in public/assets/index-*.js; do
-              echo "── $B ($(stat -c%s "$B") bytes) ──"
-              echo "  metadata.taskId 缺失:    $(grep -c 'metadata.taskId' "$B" 2>/dev/null || echo 0)"
-              echo "  乾淨一條路:              $(grep -c '乾淨一條路' "$B" 2>/dev/null || echo 0)"
-              echo "  此 run 缺少 taskId:      $(grep -c '此 run 缺少 taskId' "$B" 2>/dev/null || echo 0)"
+              S=$(stat -c%s "$B")
+              if [ $S -gt 1000000 ]; then
+                echo "── $B ($S bytes) ──"
+                echo "  outputTypeToFormat (3-layer fallback): $(grep -c 'outputTypeToFormat' "$B" 2>/dev/null || echo 0)"
+                echo "  no-task chip (should be 1):             $(grep -c 'no-task' "$B" 2>/dev/null || echo 0)"
+                echo "  L1 brand+research check:                $(grep -c 'proposal-cover' "$B" 2>/dev/null || echo 0)"
+              fi
             done
