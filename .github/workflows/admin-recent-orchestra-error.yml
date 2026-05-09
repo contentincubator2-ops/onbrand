@@ -1,0 +1,66 @@
+name: Admin — Find recent orchestra error specifically
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "════════ Both pm2 logs combined, last 1000 lines, only relevant ════════"
+            OUT_LOG=$(pm2 info marketing-os 2>&1 | grep "out log" | awk '{print $5}')
+            ERR_LOG=$(pm2 info marketing-os 2>&1 | grep "err log" | awk '{print $5}')
+            echo "OUT: $OUT_LOG"
+            echo "ERR: $ERR_LOG"
+            echo ""
+            echo "── ERR log (last 60) ──"
+            [ -f "$ERR_LOG" ] && tail -60 "$ERR_LOG" || echo "(empty)"
+            echo ""
+            echo "── OUT log filtered (last 1000 lines, anthropic / caption / orchestra / error / 失敗 / Anthropic / invokeLLM / multiModelRouter) ──"
+            [ -f "$OUT_LOG" ] && tail -1000 "$OUT_LOG" | grep -iE "anthropic|caption|orchestra|invokeLLM|multiModelRouter|provider|aborted|timeout|失敗|outputId|recordTaskRun|error.*LLM|Anthropic [0-9]|HTTP [4-9]" | tail -60
+
+            echo ""
+            echo "════════ Test full HTTP simulate fb-30-link-caption (the failing task) ════════"
+            COOKIE='session=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxOTkiLCJvcGVuSWQiOiJoUGRNTXBNOWpNRDdEUXZBR19QUk9TYi1zRGw4bFRmYyIsImlhdCI6MTc3Nzk0Nzk3MywiZXhwIjoxODA5NDgzOTczfQ.ffZWP9Ajog__s5xC4e8fuFjruX1zm89Trg42Ayw4BCA'
+            BODY='{"0":{"taskId":"fb-30-link-caption","inputs":{"link_url":"https://pinkwalk.canceraway.org.tw/joininfo.php"},"brandId":2832}}'
+            curl -sS --max-time 60 -X POST \
+              "http://localhost:3101/trpc/quickTask.runOrchestra?batch=1" \
+              -H "Content-Type: application/json" \
+              -H "Cookie: $COOKIE" \
+              -d "$BODY" \
+              -w "\n══ HTTP %{http_code} time %{time_total}s ══\n" \
+              -o /tmp/r.txt 2>&1
+            echo "── response (head 800B) ──"
+            head -c 800 /tmp/r.txt
+            echo ""
+            echo ""
+            echo "── response | grep variants ──"
+            python3 -c "
+            import sys, json
+            try:
+                d = json.load(open('/tmp/r.txt'))
+                r = d[0].get('result',{}).get('data') if 'result' in d[0] else None
+                e = d[0].get('error') if 'error' in d[0] else None
+                if r:
+                    print('outputId:', r.get('outputId'))
+                    print('ok:', r.get('ok'))
+                    print('errors:', r.get('errors'))
+                    print('variants count:', len(r.get('variants', [])))
+                    for v in r.get('variants', []):
+                        cap = (v.get('caption') or '').strip()
+                        print(f'  - {v.get(\"label\")}: caption_len={len(cap)}')
+                if e:
+                    print('SERVER ERROR:', e)
+            except Exception as ex:
+                print('parse error:', ex)
+                print(open('/tmp/r.txt').read()[:1500])
+            "
