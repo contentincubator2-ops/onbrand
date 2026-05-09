@@ -1,0 +1,31 @@
+name: Admin — Check mission 344 owner + output 63 user resolution
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, userId, brandId, workspace, LEFT(description, 60) AS description, status
+              FROM missions
+              WHERE id IN (344, 376)
+            \G"
+            echo ""
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT o.id AS output_id, o.missionId, m.userId AS mission_owner
+              FROM mission_outputs o
+              LEFT JOIN missions m ON m.id = o.missionId
+              WHERE o.id IN (60, 61, 62, 63)
+            "
+            echo ""
+            echo "Cookie userId = 199. If mission_owner != 199, that's why getById returns null."
