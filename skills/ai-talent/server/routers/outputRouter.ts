@@ -249,18 +249,12 @@ export const outputRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return null;
-      // Plain SQL because we need a left-join across mission + brand
-      // missions schema doesn't have tier/taskId columns; they're encoded
-      // in description as "[task:<taskId>] <tier> 任務" by recordTaskRun.
-      // metadata.taskId / metadata.tier are the canonical source.
-      // 2026-05-09: extract taskId/tier via JSON_UNQUOTE(JSON_EXTRACT...)
-      // directly in SQL so we don't depend on driver's metadata column shape
-      // (mysql2 sometimes returns JSON as parsed object, sometimes as string,
-      // sometimes as Buffer — extracting in SQL bypasses all that).
-      const rows = await db.execute(sql`
-        SELECT o.*,
+      // 2026-05-09 (CJ direction「乾淨一條路」): drizzle's db.execute returns
+      // shape that varies by version — was eating rows silently. Switched to
+      // localPool (mysql2/promise) directly, same pattern recordTaskRun uses.
+      const { default: localPool } = await import("../localDb");
+      const [rowsRaw]: any = await localPool.execute(
+        `SELECT o.*,
           m.id AS mission_id,
           m.title AS mission_title,
           m.description AS mission_description,
@@ -275,11 +269,11 @@ export const outputRouter = router({
         FROM mission_outputs o
         LEFT JOIN missions m ON m.id = o.missionId
         LEFT JOIN brands b ON b.id = m.brandId
-        WHERE o.id = ${input.id} AND (m.userId = ${ctx.user.id} OR m.userId IS NULL)
-        LIMIT 1
-      `);
-      const rowsArr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
-      const row = Array.isArray(rowsArr) ? rowsArr[0] : (rowsArr as any);
+        WHERE o.id = ? AND (m.userId = ? OR m.userId IS NULL)
+        LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
       if (!row) return null;
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
       // SQL extracted values are the canonical source — string or null.
