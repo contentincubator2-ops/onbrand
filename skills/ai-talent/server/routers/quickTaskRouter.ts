@@ -1172,7 +1172,8 @@ export const quickTaskRouter = router({
       topic:     z.string().max(2000).default(""),
       brandId:   z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
       const startedAt = Date.now();
       // 1. Load squad + agents + steps
       const [sqRows]: any = await localPool.execute(
@@ -1307,6 +1308,38 @@ export const quickTaskRouter = router({
         }
       }
 
+      const ok = variants.some((v) => v.caption.length > 0);
+
+      // 2026-05-09 (CJ Phase 2): persist squad runs too so client can
+      // navigate to /run/:outputId (consistent with orchestra path).
+      let outputId: number | null = null;
+      let missionId: number | null = null;
+      if (ok) {
+        try {
+          const { recordTaskRun } = await import("../_core/recordTaskRun");
+          const persisted = await recordTaskRun({
+            userId,
+            brandId: input.brandId ?? null,
+            workspace: "facebook", // squad 100s default — could be inferred from squad
+            taskId: input.squadSlug,
+            taskLabel: squad.name ?? input.squadSlug,
+            tier: "100s",
+            title: variants[0]?.caption?.slice(0, 80) || squad.name,
+            content: JSON.stringify(variants, null, 2),
+            metadata: {
+              latencyMs: Date.now() - startedAt,
+              squadSlug: input.squadSlug,
+              variantCount: variants.length,
+              inputs: { topic: input.topic ?? "" },
+            },
+          });
+          outputId = persisted.outputId;
+          missionId = persisted.missionId;
+        } catch (e) {
+          console.warn("[runSquadAuto] recordTaskRun failed:", (e as Error).message);
+        }
+      }
+
       return {
         taskId: input.squadSlug,
         totalLatencyMs: Date.now() - startedAt,
@@ -1315,8 +1348,10 @@ export const quickTaskRouter = router({
         imageAgent: null,
         variants,
         stages,
-        ok: variants.some((v) => v.caption.length > 0),
+        ok,
         errors,
+        outputId,
+        missionId,
       };
     }),
 

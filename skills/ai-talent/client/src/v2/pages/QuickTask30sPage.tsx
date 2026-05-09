@@ -455,6 +455,13 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               agent: v.agent ?? null,
             })),
           };
+          // 2026-05-09 (CJ Phase 2): squad runs also navigate to /run
+          // for consistent UX. Modal stays only for intake + countdown.
+          if ((r as any).outputId) {
+            closeTask();
+            navigate(`/run/${(r as any).outputId}`);
+            return;
+          }
           setOutput(transformedOutput);
           setLatencyMs(r.totalLatencyMs);
           setAgentMeta(r.captionAgent ?? null);
