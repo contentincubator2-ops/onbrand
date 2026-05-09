@@ -27,21 +27,23 @@ jobs:
             ls -la client/ 2>/dev/null | head -5
             echo ""
 
-            echo "════════ REBUILD CLIENT ════════"
+            echo "════════ BACKUP public ════════"
+            rm -rf public.bak 2>/dev/null
+            [ -d public ] && cp -r public public.bak
+
+            echo ""
+            echo "════════ REBUILD CLIENT (vite writes to ../public) ════════"
             cd client
             echo "── npm install (production deps) ──"
             npm install --no-audit --no-fund --silent 2>&1 | tail -5
+            echo "── git pull origin main (sync source) ──"
+            cd /opt/marketing-os/app && git pull origin main 2>&1 | tail -5
+            cd /opt/marketing-os/app/skills/ai-talent/client
             echo "── vite build ──"
             npm run build 2>&1 | tail -20
             cd ..
-
-            echo ""
-            echo "════════ SWAP public ════════"
-            ls -la client/dist/ | head -5
-            rm -rf public.bak 2>/dev/null
-            [ -d public ] && mv public public.bak
-            cp -r client/dist public
-            ls -la public/ | grep "index.*js" | head -1
+            echo "── public/ after build ──"
+            ls -la public/ | grep "index.*js" | head -3
 
             echo ""
             echo "════════ RESTART pm2 ════════"
@@ -51,9 +53,9 @@ jobs:
 
             echo ""
             echo "════════ VERIFY new code in bundle ════════"
-            BUNDLE=$(ls public/index*.js | head -1)
-            echo "Bundle: $BUNDLE"
-            echo "── grep for new code markers ──"
-            grep -c "idPrefixMap" "$BUNDLE" 2>/dev/null || echo "0 idPrefixMap (BAD)"
-            grep -c "proposal-cover" "$BUNDLE" 2>/dev/null || echo "0 proposal-cover (BAD)"
-            grep -c "formatFromTaskId" "$BUNDLE" 2>/dev/null || echo "0 formatFromTaskId (BAD)"
+            for B in public/assets/index-*.js; do
+              echo "── $B ($(stat -c%s "$B") bytes) ──"
+              echo "  metadata.taskId 缺失:    $(grep -c 'metadata.taskId' "$B" 2>/dev/null || echo 0)"
+              echo "  乾淨一條路:              $(grep -c '乾淨一條路' "$B" 2>/dev/null || echo 0)"
+              echo "  此 run 缺少 taskId:      $(grep -c '此 run 缺少 taskId' "$B" 2>/dev/null || echo 0)"
+            done
