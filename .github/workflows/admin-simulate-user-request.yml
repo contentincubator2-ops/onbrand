@@ -33,9 +33,10 @@ jobs:
               -H "Cookie: $COOKIE" \
               -d "$BODY" \
               -w "\n\n══ HTTP %{http_code} time %{time_total}s ══\n" \
-              2>&1 | tee /tmp/orchestra-resp.txt | head -c 3000
+              -o /tmp/orchestra-resp.txt 2>&1
+            echo "── full response body ──"
+            cat /tmp/orchestra-resp.txt | head -c 4000
             echo ""
-            echo "(response truncated to 3000 bytes)"
 
             echo ""
             echo "════════ pm2 log lines AFTER mark ════════"
