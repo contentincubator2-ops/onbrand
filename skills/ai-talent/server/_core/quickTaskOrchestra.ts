@@ -27,14 +27,19 @@ import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMast
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
-// 2026-05-09: 20s was too aggressive — LI/PR (heavier prompts, larger
-// brand context) blew past it consistently. 35s is the practical ceiling
-// since nginx upstream timeout is 60s and we want margin.
-const HARD_BUDGET_MS  = 35_000; // 30s tier
-const HARD_BUDGET_60S = 60_000; // 60s tier (5 variants + QA)
-const HARD_BUDGET_100S= 110_000;// 100s tier (scout + video)
+// 2026-05-09: 35s wasn't enough margin for retry path. Now 50s so a
+// failed variant (20s × 2 retries = 40s) plus brief stage still fits
+// before nginx 60s upstream timeout. Cloudflare/nginx headers sized
+// to support this.
+const HARD_BUDGET_MS  = 50_000; // 30s tier
+const HARD_BUDGET_60S = 75_000; // 60s tier (5 variants + QA)
+const HARD_BUDGET_100S= 120_000;// 100s tier (scout + video)
 const PER_IMAGE_MS    = 10_000;
-const LLM_BUDGET_MS   = 10_000;
+// 2026-05-09: bumped 10s → 20s. PR/RS tasks with heavy system prompts
+// (master persona + brand context + tone + 5W1H structure) genuinely
+// take 12-18s on anthropic-haiku. 10s caused systematic timeouts on PR.
+// Pair with HARD_BUDGET_MS=50s so retry path (20s × 2 = 40s) fits.
+const LLM_BUDGET_MS   = 20_000;
 const QA_BUDGET_MS    = 12_000;
 
 export type OrchestraTier = "30s" | "60s" | "100s";
