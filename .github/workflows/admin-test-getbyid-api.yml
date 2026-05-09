@@ -1,0 +1,66 @@
+name: Admin — Hit getById tRPC endpoint to see actual response
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "════════ Find a valid auth cookie for CJ ════════"
+            export MYSQL_PWD="mos_secure_2026"
+            # No auth context here, but tRPC procedure is protected.
+            # Instead, run a node one-shot that imports outputRouter directly.
+
+            echo "════════ Direct import + invoke getById resolver ════════"
+            cat > /tmp/test-getbyid.ts <<'EOF'
+            import { getDb } from "../app/skills/ai-talent/server/db";
+            import { sql } from "drizzle-orm";
+
+            async function main() {
+              const db = await getDb();
+              if (!db) { console.error("no db"); return; }
+              for (const id of [60, 61, 62]) {
+                const rows = await db.execute(sql`
+                  SELECT o.*,
+                    m.id AS mission_id,
+                    m.workspace AS mission_workspace,
+                    JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS extracted_task_id,
+                    JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier'))   AS extracted_tier
+                  FROM mission_outputs o
+                  LEFT JOIN missions m ON m.id = o.missionId
+                  WHERE o.id = ${id}
+                  LIMIT 1
+                `);
+                const arr: any = Array.isArray(rows) ? rows : (rows as any)[0] ?? [];
+                const row = Array.isArray(arr) ? arr[0] : arr;
+                console.log(`── output ${id} ──`);
+                console.log("  row.id:", row?.id);
+                console.log("  row.platform:", row?.platform);
+                console.log("  row.outputType:", row?.outputType);
+                console.log("  row.extracted_task_id:", row?.extracted_task_id);
+                console.log("  row.extracted_tier:", row?.extracted_tier);
+                console.log("  row.metadata typeof:", typeof row?.metadata);
+                if (typeof row?.metadata === "string") {
+                  console.log("  row.metadata first 80:", row.metadata.slice(0, 80));
+                } else {
+                  console.log("  row.metadata is object, .taskId:", row?.metadata?.taskId);
+                }
+                console.log("  row.mission_workspace:", row?.mission_workspace);
+              }
+              process.exit(0);
+            }
+            main().catch(e => { console.error(e); process.exit(1); });
+            EOF
+            cd /opt
+            export $(grep -v '^#' /opt/marketing-os/app/skills/ai-talent/.env | grep -v '^$' | xargs -d '\n')
+            npx tsx /tmp/test-getbyid.ts 2>&1 | tail -40
