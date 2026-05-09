@@ -1,0 +1,51 @@
+name: Admin — Debug pr-30-headline (capture raw LLM response)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            # Mark log boundary
+            BEFORE_LINE_COUNT=$(pm2 logs marketing-os --lines 1 --nostream --raw 2>&1 | wc -l)
+
+            echo "════════ Trigger pr-30-headline simulate ════════"
+            COOKIE='session=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxOTkiLCJvcGVuSWQiOiJoUGRNTXBNOWpNRDdEUXZBR19QUk9TYi1zRGw4bFRmYyIsImlhdCI6MTc3Nzk0Nzk3MywiZXhwIjoxODA5NDgzOTczfQ.ffZWP9Ajog__s5xC4e8fuFjruX1zm89Trg42Ayw4BCA'
+            BODY='{"0":{"taskId":"pr-30-headline","inputs":{"event":"桂冠營養研究室於 2026 年 5 月 9 日花博公園粉紅健走活動設置應援站，提供健力湯試喝，目標推廣營養補給概念。"},"brandId":2832}}'
+            curl -sS --max-time 60 -X POST \
+              "http://localhost:3101/trpc/quickTask.runOrchestra?batch=1" \
+              -H "Content-Type: application/json" \
+              -H "Cookie: $COOKIE" \
+              -d "$BODY" \
+              -w "\n══ HTTP %{http_code} time %{time_total}s ══\n" \
+              -o /tmp/r.txt 2>&1
+            echo ""
+            python3 -c "
+            import sys, json
+            d = json.load(open('/tmp/r.txt'))
+            r = d[0].get('result',{}).get('data') if 'result' in d[0] else None
+            e = d[0].get('error') if 'error' in d[0] else None
+            if r:
+                print('outputId:', r.get('outputId'))
+                print('errors:', r.get('errors'))
+                for v in r.get('variants', []):
+                    cap = (v.get('caption') or '').strip()
+                    print(f'  - {v.get(\"label\")}: caption_len={len(cap)}')
+                    if cap: print(f'    head: {cap[:100]}')
+            if e: print('SERVER ERROR:', e)
+            "
+
+            echo ""
+            echo "════════ Fresh pm2 logs from this run (look for callOneVariant warns) ════════"
+            sleep 2
+            pm2 logs marketing-os --lines 200 --nostream --raw 2>&1 | grep -E "callOneVariant|caption\[|variant.*失敗|Anthropic |HTTP [4-9]|error.*pr-30" | tail -30
