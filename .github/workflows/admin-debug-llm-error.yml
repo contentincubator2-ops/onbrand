@@ -1,0 +1,33 @@
+name: Admin — Debug LLM error in pm2 logs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            echo "════════ Recent pm2 logs (last 200 lines, errors only) ════════"
+            pm2 logs marketing-os --lines 200 --nostream --raw 2>&1 | grep -iE "caption|error|failed|llm|provider|api|timeout|429|401|403|500|503" | tail -60
+
+            echo ""
+            echo "════════ Env state for LLM keys ════════"
+            cd /opt/marketing-os/app/skills/ai-talent
+            grep -E "^(QWEN|KIMI|GLM|ZHIPU|GROQ|DEEPSEEK|ANTHROPIC|OPENAI|AZURE)_" .env 2>/dev/null | sed 's/=.*/=<set>/' | head -20
+
+            echo ""
+            echo "════════ Recent caption_writer agent in DB ════════"
+            export MYSQL_PWD="mos_secure_2026"
+            mysql -h localhost -u mos_user mos_db -BN -e "
+              SELECT id, name, aiModel, isActive
+              FROM agents
+              WHERE name LIKE '%caption%' OR name LIKE '%文案%'
+              ORDER BY id DESC LIMIT 5;
+            "
