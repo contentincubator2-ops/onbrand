@@ -1151,6 +1151,10 @@ export async function runOrchestra(args: {
             captionAgent: result.captionAgent?.name,
             imageAgent: result.imageAgent?.name,
             variantCount: result.variants.length,
+            // 2026-05-09 (CJ): persist inputs so /run/:id 重跑同任務 can
+            // navigate back to the task with the user's prior answers
+            // pre-filled (no need to re-type 主問題 input).
+            inputs: args.inputs ?? {},
           },
           thumbnailUrl: firstImage,
         });

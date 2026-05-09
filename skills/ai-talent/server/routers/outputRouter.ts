@@ -31,6 +31,44 @@ export const outputRouter = router({
     }),
 
   /**
+   * 2026-05-09 (CJ direction): persist edited caption back. Used by
+   * RunPage's direct-edit + AI-chat-revise flows. Variant content is
+   * stored as JSON in mission_outputs.content, so update means parsing,
+   * mutating the right variant index, and writing back.
+   */
+  updateVariantCaption: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      variantIndex: z.number().min(0),
+      caption: z.string().max(8000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      // Fetch + verify ownership
+      const rows = await db.execute(sql`
+        SELECT o.content FROM mission_outputs o
+        JOIN missions m ON m.id = o.missionId
+        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
+        LIMIT 1
+      `);
+      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
+      const row = Array.isArray(arr) ? arr[0] : arr;
+      if (!row) throw new Error("Output not found");
+      let parsed: any;
+      try { parsed = JSON.parse(row.content); }
+      catch { parsed = [{ label: "主版本", caption: row.content }]; }
+      const arrSrc = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+      if (input.variantIndex >= arrSrc.length) throw new Error("Variant index out of range");
+      arrSrc[input.variantIndex] = { ...arrSrc[input.variantIndex], caption: input.caption };
+      const newContent = Array.isArray(parsed)
+        ? JSON.stringify(arrSrc, null, 2)
+        : JSON.stringify({ ...parsed, variants: arrSrc }, null, 2);
+      await db.update(missionOutputs).set({ content: newContent }).where(eq(missionOutputs.id, input.id));
+      return { ok: true, variantIndex: input.variantIndex };
+    }),
+
+  /**
    * 2026-05-09 (CJ direction): list recent task runs for the current
    * user × brand × tier. Powers the collapsible sidebar on 30s/60s/100s
    * pages — quick access to "what I just ran for this brand".

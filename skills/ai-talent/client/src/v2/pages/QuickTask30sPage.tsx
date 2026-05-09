@@ -10,7 +10,7 @@
  *  - Tab "30 秒" (default) + future filter for EDM / IG when those tiers ship
  */
 import React, { useMemo, useState, useEffect } from "react";
-import { useOutletContext, useNavigate } from "react-router-dom";
+import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
@@ -296,6 +296,36 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     ? (trpc as any).quickTask.listFB.useQuery(undefined, { refetchOnWindowFocus: false })
     : { data: [] };
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
+
+  // 2026-05-09 (CJ direction): rerun-same-task. /run/:outputId 上點重跑
+  // 會 navigate 過來帶 ?rerun=<outputId>。我們撈該 run 的 metadata.inputs
+  // + mission.taskId，自動開對應 task modal 並 prefill 主問題輸入。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rerunId = Number(searchParams.get("rerun") ?? "0");
+  const rerunQuery = (trpc as any).output?.getById?.useQuery
+    ? (trpc as any).output.getById.useQuery(
+        { id: rerunId },
+        { enabled: rerunId > 0, staleTime: 60_000 },
+      )
+    : { data: null };
+  useEffect(() => {
+    if (!rerunId || !rerunQuery.data || allTasks.length === 0) return;
+    const r = rerunQuery.data;
+    const taskId = r.mission?.taskId;
+    if (!taskId) return;
+    const t = allTasks.find((x: FBTaskCard) => x.id === taskId);
+    if (!t) return;
+    // Prefill primary input from saved inputs (e.g. inputs.topic)
+    const inputs = (r.metadata?.inputs ?? {}) as Record<string, string>;
+    const primaryKey = (t as any).primary_input?.key ?? "topic";
+    const prior = inputs[primaryKey] ?? Object.values(inputs)[0] ?? "";
+    setActiveTask(t);
+    setPrimaryAnswer(typeof prior === "string" ? prior : "");
+    // Clear param so refresh doesn't re-trigger
+    const next = new URLSearchParams(searchParams);
+    next.delete("rerun");
+    setSearchParams(next, { replace: true });
+  }, [rerunId, rerunQuery.data, allTasks]);
 
   // 30s tier: simple/quick tasks (3 variants, no extras).
   // 60s tier: production-package multi-agent (5 variants + extras + QA).

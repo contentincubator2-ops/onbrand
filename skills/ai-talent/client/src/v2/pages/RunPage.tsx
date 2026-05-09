@@ -35,6 +35,7 @@ import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
+import { TRPCClientError } from "@trpc/client";
 
 type Mode = "edit" | "chat" | "image" | "video";
 
@@ -61,9 +62,26 @@ export default function RunPage() {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [mode, setMode] = useState<Mode>("chat");
-  const [editText, setEditText] = useState("");
+  const [editText, setEditText] = useState<string | null>(null);
   const [chatPrompt, setChatPrompt] = useState("");
   const [copied, setCopied] = useState(false);
+  /** Local override for variants — applied after save, mockup updates live. */
+  const [overrides, setOverrides] = useState<Record<number, { caption: string }>>({});
+  /** AI chat history per variant. */
+  const [chatHistory, setChatHistory] = useState<Array<{ role: "user"|"assistant"; content: string }>>([]);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
+
+  const utils = trpc.useUtils();
+  const updateMut = trpc.output.updateVariantCaption.useMutation({
+    onSuccess: () => {
+      showToastGlobal("已儲存");
+      utils.output.getById.invalidate({ id });
+    },
+    onError: (e) => showToastGlobal(`儲存失敗：${e.message}`),
+  });
+  const refineMut = (trpc as any).quickTask?.refineCaption?.useMutation
+    ? (trpc as any).quickTask.refineCaption.useMutation()
+    : null;
 
   const variants: VariantData[] = useMemo(() => {
     if (!data) return [];
@@ -75,7 +93,13 @@ export default function RunPage() {
     return [{ label: "主版本", caption: data.content || "" }];
   }, [data]);
 
-  const slide = variants[activeIdx];
+  // Apply local overrides so mockup reflects unsaved edits in real time
+  const slide = useMemo(() => {
+    const base = variants[activeIdx];
+    if (!base) return base;
+    const ov = overrides[activeIdx];
+    return ov ? { ...base, caption: ov.caption } : base;
+  }, [variants, activeIdx, overrides]);
 
   // Infer mockup variant from platform + outputType
   const mockupVariant: MockupVariant | null = useMemo(() => {
@@ -136,8 +160,16 @@ export default function RunPage() {
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : "default"}>
           {data.status}
         </Chip>
-        <Tooltip content="重跑這個任務">
-          <Button isIconOnly variant="light" size="sm" aria-label="重跑">
+        <Tooltip content="重跑同任務（自動填回上次的輸入）">
+          <Button
+            isIconOnly variant="light" size="sm" aria-label="重跑"
+            onPress={() => {
+              const tier = data.mission?.tier ?? "30s";
+              const taskId = data.mission?.taskId;
+              if (!taskId) { showToastGlobal("找不到原任務 ID"); return; }
+              navigate(`/${tier}?rerun=${id}`);
+            }}
+          >
             <FontAwesomeIcon icon={faRotateRight} />
           </Button>
         </Tooltip>
@@ -223,13 +255,70 @@ export default function RunPage() {
                   <p className="text-[11px] text-default-500 leading-relaxed">
                     告訴 agent 你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦砍第二段」。
                   </p>
+                  {chatHistory.length > 0 && (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto bg-default-50 rounded-lg p-2">
+                      {chatHistory.slice(-4).map((m, i) => (
+                        <div key={i} className={`text-[11px] leading-relaxed ${m.role==="user" ? "text-default-900" : "text-secondary"}`}>
+                          <span className="font-semibold mr-1">{m.role==="user"?"你":"AI"}：</span>
+                          {m.content.slice(0, 180)}{m.content.length > 180 ? "…" : ""}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <Textarea
                     placeholder="說明你想怎麼改…"
                     value={chatPrompt}
                     onChange={(e) => setChatPrompt(e.target.value)}
-                    minRows={4}
+                    minRows={3}
                   />
-                  <Button color="secondary" fullWidth>送出修改</Button>
+                  {aiPreview && (
+                    <div className="text-[11px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
+                      <p className="font-semibold text-secondary-700">AI 改寫預覽</p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-default-800 max-h-32 overflow-y-auto">{aiPreview}</p>
+                      <div className="flex gap-1.5 pt-1">
+                        <Button size="sm" color="secondary"
+                          isDisabled={updateMut.isPending}
+                          onPress={() => {
+                            setOverrides(o => ({ ...o, [activeIdx]: { caption: aiPreview } }));
+                            updateMut.mutate({ id, variantIndex: activeIdx, caption: aiPreview });
+                            setAiPreview(null);
+                          }}
+                        >採用</Button>
+                        <Button size="sm" variant="flat" onPress={() => setAiPreview(null)}>放棄</Button>
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    color="secondary" fullWidth
+                    isDisabled={!chatPrompt.trim() || !refineMut || refineMut.isPending}
+                    isLoading={refineMut?.isPending}
+                    onPress={async () => {
+                      if (!refineMut) { showToastGlobal("AI 改寫服務暫不可用"); return; }
+                      try {
+                        const r = await refineMut.mutateAsync({
+                          currentCaption: slide?.caption ?? "",
+                          userFeedback: chatPrompt,
+                          brandId: data.mission?.brandId ?? undefined,
+                          history: chatHistory,
+                        });
+                        if (r.ok) {
+                          setChatHistory(h => [
+                            ...h,
+                            { role: "user", content: chatPrompt },
+                            { role: "assistant", content: r.explanation || "(已改寫)" },
+                          ]);
+                          setAiPreview(r.rewritten);
+                          setChatPrompt("");
+                        } else {
+                          showToastGlobal(`AI 改寫失敗：${r.error ?? "未知錯誤"}`);
+                        }
+                      } catch (e: any) {
+                        showToastGlobal(`錯誤：${e.message ?? String(e)}`);
+                      }
+                    }}
+                  >
+                    送出修改
+                  </Button>
                 </>
               )}
               {mode === "edit" && (
@@ -239,11 +328,34 @@ export default function RunPage() {
                     在這裡改文字，左邊 mockup 即時更新。
                   </p>
                   <Textarea
-                    value={editText || slide?.caption || ""}
-                    onChange={(e) => setEditText(e.target.value)}
+                    value={editText ?? slide?.caption ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEditText(v);
+                      // Live preview in mockup
+                      setOverrides(o => ({ ...o, [activeIdx]: { caption: v } }));
+                    }}
                     minRows={10}
                   />
-                  <Button color="secondary" fullWidth>儲存修改</Button>
+                  <div className="flex gap-1.5">
+                    <Button
+                      color="secondary" fullWidth
+                      isDisabled={editText == null || editText === (variants[activeIdx]?.caption ?? "") || updateMut.isPending}
+                      isLoading={updateMut.isPending}
+                      onPress={() => {
+                        if (editText == null) return;
+                        updateMut.mutate({ id, variantIndex: activeIdx, caption: editText });
+                      }}
+                    >儲存修改</Button>
+                    <Button
+                      variant="flat"
+                      isDisabled={editText == null}
+                      onPress={() => {
+                        setEditText(null);
+                        setOverrides(o => { const n = { ...o }; delete n[activeIdx]; return n; });
+                      }}
+                    >還原</Button>
+                  </div>
                 </>
               )}
               {mode === "image" && (
