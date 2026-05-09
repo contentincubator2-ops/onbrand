@@ -24,7 +24,8 @@ jobs:
 
             echo ""
             echo "════════ POST /trpc/quickTask.runOrchestra (fb-30-caption-short) ════════"
-            BODY='{"0":{"json":{"taskId":"fb-30-caption-short","inputs":{"topic":"粉紅健走 5/9 花博公園 健力湯試喝"},"brandId":2832}}}'
+            # No superjson on server → raw input directly under index key
+            BODY='{"0":{"taskId":"fb-30-caption-short","inputs":{"topic":"粉紅健走 5/9 花博公園 健力湯試喝"},"brandId":2832}}'
 
             curl -sS --max-time 120 \
               -X POST \
