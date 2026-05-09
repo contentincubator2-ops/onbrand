@@ -257,6 +257,11 @@ export default function RunPage() {
         <p className="text-tiny text-default-500 truncate flex-1">
           {data.title || data.mission?.taskLabel || "(無標題)"}
         </p>
+        {/* DEBUG (2026-05-09): show mockup variant + taskId so we can trace
+            which mockup is being chosen. Remove after verification. */}
+        <Chip size="sm" variant="flat" className="font-mono text-[10px]">
+          {mockupVariant ? `${mockupVariant.platform}:${mockupVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
+        </Chip>
         {data.mission?.tier && <Chip size="sm" variant="flat" color="secondary">{data.mission.tier}</Chip>}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
           {data.status}
