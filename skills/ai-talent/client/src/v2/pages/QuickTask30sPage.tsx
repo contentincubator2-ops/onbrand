@@ -532,6 +532,17 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             extras: v.extras ?? null,
           })),
         };
+        // 2026-05-09 (CJ Phase 2): ALL tiers navigate to /run/:outputId
+        // for output viewing. Modal stays only for the intake form
+        // (主問題輸入). Once orchestra returns, jump to /run where the
+        // global ShellLayout (left rail + tier history) is visible.
+        if (r.ok && (r as any).outputId) {
+          closeTask();
+          navigate(`/run/${(r as any).outputId}`);
+          return;
+        }
+        // Fallback: orchestra failed or didn't persist — show in-modal
+        // so user sees what happened (rare path).
         setOutput(transformedOutput);
         setLatencyMs(r.totalLatencyMs);
         setAgentMeta(r.captionAgent ?? null);
@@ -540,13 +551,6 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         setFetchedUrl(r.fetchedUrl ?? null);
         if (!r.ok) {
           setErrorMsg(`Orchestra 部分階段失敗：${(r.errors ?? []).slice(0, 1).join("")}`);
-        }
-        // 2026-05-09 (CJ Phase 2): 60s/100s tier output uses route-based
-        // workspace, NOT modal. Navigate to /run/:outputId once persisted.
-        // 30s stays in modal (30 秒看完，不需要 route 工作台).
-        if (r.ok && (tier === "60s" || tier === "100s") && (r as any).outputId) {
-          closeTask();
-          navigate(`/run/${(r as any).outputId}`);
         }
         return;
       }
