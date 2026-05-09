@@ -276,9 +276,10 @@ export const outputRouter = router({
       const row = Array.isArray(rowsArr) ? rowsArr[0] : (rowsArr as any);
       if (!row) return null;
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
-      // Parse taskId from description tag pattern "[task:fb-30-x]"
-      const taskMatch = String(row.mission_description ?? "").match(/\[task:([^\]]+)\]/);
-      const taskId = md.taskId ?? taskMatch?.[1] ?? null;
+      // 2026-05-09 cleanup: metadata.taskId is the ONLY source of truth.
+      // No description regex fallback — if taskId missing, that's a
+      // recordTaskRun bug and we want it to surface, not be papered over.
+      const taskId = md.taskId ?? null;
       const tier = md.tier ?? null;
       return {
         id: row.id,

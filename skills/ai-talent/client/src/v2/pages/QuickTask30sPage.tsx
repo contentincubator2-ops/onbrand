@@ -455,20 +455,13 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           };
           // 2026-05-09 (CJ Phase 2): squad runs also navigate to /run
           // for consistent UX. Modal stays only for intake + countdown.
+          // 2026-05-09 cleanup: ONE path. outputId required.
           if ((r as any).outputId) {
             closeTask();
             navigate(`/run/${(r as any).outputId}`);
             return;
           }
-          setOutput(transformedOutput);
-          setLatencyMs(r.totalLatencyMs);
-          setAgentMeta(r.captionAgent ?? null);
-          setImageAgentMeta(null);
-          setOrchestraStages(r.stages ?? null);
-          setFetchedUrl(null);
-          if (!r.ok) {
-            setErrorMsg(`Squad 部分步驟失敗：${(r.errors ?? []).slice(0, 1).join("")}`);
-          }
+          setErrorMsg("Squad 執行成功但 outputId 未回傳（recordTaskRun 失敗），請重試或回報。");
           return;
         }
         setErrorMsg("Squad 自動執行 mutation 暫不可用");
@@ -537,40 +530,25 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             extras: v.extras ?? null,
           })),
         };
-        // 2026-05-09 (CJ Phase 2): ALL tiers navigate to /run/:outputId
-        // for output viewing — even on partial failure (some variants
-        // generated, others timed out). Modal stays only for intake +
-        // running. /run page shows ShellLayout's left rail.
+        // 2026-05-09 cleanup (CJ direction「乾淨一條路」):
+        // ONE path — orchestra returns outputId → navigate to /run.
+        // No setOutput fallback, no in-modal mockup. If outputId is
+        // missing, that's a recordTaskRun bug — surface it loudly.
         if ((r as any).outputId) {
           closeTask();
           navigate(`/run/${(r as any).outputId}`);
           return;
         }
-        // Fallback: nothing persisted (no usable variant) — show
-        // in-modal so user sees what happened.
-        setOutput(transformedOutput);
-        setLatencyMs(r.totalLatencyMs);
-        setAgentMeta(r.captionAgent ?? null);
-        setImageAgentMeta(r.imageAgent ?? null);
-        setOrchestraStages(r.stages ?? null);
-        setFetchedUrl(r.fetchedUrl ?? null);
-        if (!r.ok) {
-          setErrorMsg(`Orchestra 部分階段失敗：${(r.errors ?? []).slice(0, 1).join("")}`);
-        }
+        setErrorMsg(
+          (r.errors && r.errors.length > 0)
+            ? `Orchestra 失敗：${r.errors.slice(0, 1).join("")}`
+            : "Orchestra 完成但 outputId 未回傳（recordTaskRun 失敗）。請重試。"
+        );
         return;
       }
-      const r = await runQuickMut.mutateAsync({
-        taskId: activeTask.id,
-        inputs: { [inputKey]: primaryAnswer },
-        brandId: brandId ?? undefined,
-      });
-      setOutput(r.output);
-      setLatencyMs(r.latencyMs);
-      setAgentMeta(r.agent ?? null);
-      setFetchedUrl(r.fetchedUrl ?? null);
-      if (!r.ok) {
-        setErrorMsg(`部分欄位 LLM 輸出格式有差異，UI 已盡量呈現：${(r.validationErrors ?? []).slice(0, 1).join("")}`);
-      }
+      // 2026-05-09 cleanup: legacy runQuickMut path removed. All tiers
+      // route through orchestra → /run/:outputId.
+      setErrorMsg("此任務沒有對應的 orchestra mutation，請聯絡開發。");
     } catch (e: any) {
       setErrorMsg(e?.message ?? String(e));
     } finally {
@@ -842,33 +820,22 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           )}
         </div>
 
-      {/* ─── Modal: primary question + countdown + live mockup result ─── */}
+      {/* ─── Modal: intake question + running countdown ONLY.
+          2026-05-09 cleanup (CJ「乾淨一條路」): output viewing moved
+          permanently to /run/:outputId. Modal is just the intake gate. */}
       <Modal
         isOpen={!!activeTask}
         onClose={closeTask}
-        // 2026-05-08 (CJ): two-mode modal.
-        // !output (input + running): Notion-style centered card, white bg
-        //   (size 2xl, regular padding, header/footer visible for control).
-        // output (mockup): full-screen transparent, header / footer hidden,
-        //   all controls (關閉 / 重做 / 複製) live INSIDE the floating toolbar
-        //   on top of the mockup. Background is blur backdrop only.
-        size={output ? "full" : "2xl"}
+        size="2xl"
         scrollBehavior="inside"
         backdrop="blur"
-        // 2026-05-09 (CJ): mockup canvas redesign — solid neutral background
-        // (was bg-transparent which let the running agent carousel bleed
-        // through the mockup, looking visually noisy). Now follows the
-        // reference design: clean gray canvas with white mockup card +
-        // floating contextual toolbars (like a confirm-dialog overlay).
         classNames={{
-          base: output ? "max-h-screen bg-default-50 shadow-none" : "max-h-[90vh]",
-          wrapper: output ? "p-0" : undefined,
-          body: output ? "py-0 px-0 bg-default-50" : "py-3 px-4",
-          footer: output ? "hidden" : "border-t border-default-100 bg-white py-2 px-4",
-          header: output ? "hidden" : "py-2 px-3 bg-white border-b border-default-100",
-          closeButton: output ? "hidden" : "text-default-400 hover:bg-default-100",
+          base: "max-h-[90vh]",
+          body: "py-3 px-4",
+          footer: "border-t border-default-100 bg-white py-2 px-4",
+          header: "py-2 px-3 bg-white border-b border-default-100",
+          closeButton: "text-default-400 hover:bg-default-100",
         }}
-        hideCloseButton={!!output}
       >
         <ModalContent>
           {activeTask && (
@@ -896,8 +863,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                 </span>
               </ModalHeader>
               <ModalBody>
-                {!output ? (
-                  <>
+                {/* 2026-05-09 cleanup: only intake mode; output viewing at /run/:outputId */}
+                <>
                     {/* 2026-05-08 (CJ test report #3): prompt user to set
                         brand voice/words BEFORE running, so output isn't
                         generic. Only shows when all 4 core text assets
@@ -980,72 +947,21 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                         <CardBody className="text-warning-800 text-small">{errorMsg}</CardBody>
                       </Card>
                     )}
-                  </>
-                ) : (
-                  /* Output: variants as swipeable mockup carousel.
-                     The "main" caption is variant[0] (or the top-level caption
-                     if no variants). Use chevron arrows to swipe between.
-                     Style direction lives INSIDE each mockup's image slot. */
-                  <OutputCarousel
-                    output={output}
-                    activeTask={activeTask}
-                    pageTier={tier}
-                    brandName={brandName}
-                    brandId={brandId}
-                    brandLogoUrl={brandLogoUrl}
-                    onBrandLogoUpdated={() => brandQuery.refetch?.()}
-                    mockupVariant={mockupVariant}
-                    latencyMs={latencyMs}
-                    agentMeta={agentMeta}
-                    imageAgentMeta={imageAgentMeta}
-                    onClose={closeTask}
-                    onRedo={() => { setOutput(null); setPrimaryAnswer(primaryAnswer); }}
-                    orchestraStages={orchestraStages}
-                    fetchedUrl={fetchedUrl}
-                    errorMsg={errorMsg}
-                  />
-                )}
+                </>
               </ModalBody>
               <ModalFooter>
-                {!output ? (
-                  <>
-                    <Button variant="light" onPress={closeTask} startContent={<FontAwesomeIcon icon={faXmark} />}>
-                      取消
-                    </Button>
-                    <Button
-                      color="primary"
-                      onPress={handleRun}
-                      isLoading={running}
-                      isDisabled={running}
-                      startContent={!running && <FontAwesomeIcon icon={faPaperPlane} />}
-                    >
-                      {running ? "生成中…" : "立即產出"}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="light" onPress={closeTask}>關閉</Button>
-                    <Button
-                      variant="flat"
-                      onPress={() => { setOutput(null); setPrimaryAnswer(primaryAnswer); }}
-                      startContent={<FontAwesomeIcon icon={faRotateRight} />}
-                      className="hover:scale-[1.02] transition"
-                    >
-                      重做
-                    </Button>
-                    <Button
-                      onPress={handleCopy}
-                      startContent={<FontAwesomeIcon icon={faClipboard} />}
-                      className="font-semibold hover:scale-[1.02] transition"
-                      style={{
-                        background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}dd)`,
-                        color: "white",
-                      }}
-                    >
-                      複製全文
-                    </Button>
-                  </>
-                )}
+                <Button variant="light" onPress={closeTask} startContent={<FontAwesomeIcon icon={faXmark} />}>
+                  取消
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleRun}
+                  isLoading={running}
+                  isDisabled={running}
+                  startContent={!running && <FontAwesomeIcon icon={faPaperPlane} />}
+                >
+                  {running ? "生成中…" : "立即產出"}
+                </Button>
               </ModalFooter>
             </>
           )}

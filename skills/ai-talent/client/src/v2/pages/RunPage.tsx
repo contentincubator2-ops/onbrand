@@ -236,6 +236,29 @@ export default function RunPage() {
       </div>
     );
   }
+  // 2026-05-09 cleanup (CJ direction「乾淨一條路」): if metadata.taskId
+  // is missing, this run was persisted by an old/buggy code path. Show
+  // a loud error rather than papering over with generic:feed mockup.
+  if (!data.mission?.taskId) {
+    return (
+      <div className="p-12 flex flex-col items-center gap-4 max-w-xl mx-auto">
+        <div className="bg-danger-50 border-2 border-danger-300 rounded-lg p-6 w-full">
+          <h3 className="text-danger-700 font-bold mb-2">⚠️ 此 run 缺少 taskId</h3>
+          <p className="text-sm text-default-700 mb-3">
+            這筆紀錄沒有 metadata.taskId，所以無法判斷該用哪個 mockup 樣板。
+            這是舊版 recordTaskRun 的殘留資料 — 新跑的任務都會正確寫入。
+          </p>
+          <p className="text-tiny text-default-500 font-mono">
+            output.id = {data.id} · mission.id = {data.mission?.id ?? "?"}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="flat" onPress={() => navigate("/30s")}>跑一個新的 30s 任務</Button>
+          <Button variant="light" onPress={() => navigate(-1)}>返回</Button>
+        </div>
+      </div>
+    );
+  }
 
   const onCopy = async () => {
     try {
