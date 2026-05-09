@@ -1,0 +1,30 @@
+name: Admin — Quick pm2 status + ping
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            pm2 status | grep marketing-os
+            echo ""
+            echo "── /api/health ──"
+            curl -sS --max-time 5 http://localhost:3101/api/health -w "\nHTTP %{http_code}\n"
+            echo ""
+            echo "── tRPC ping ──"
+            COOKIE='session=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxOTkiLCJvcGVuSWQiOiJoUGRNTXBNOWpNRDdEUXZBR19QUk9TYi1zRGw4bFRmYyIsImlhdCI6MTc3Nzk0Nzk3MywiZXhwIjoxODA5NDgzOTczfQ.ffZWP9Ajog__s5xC4e8fuFjruX1zm89Trg42Ayw4BCA'
+            curl -sS --max-time 5 -X POST "http://localhost:3101/trpc/quickTask.runOrchestra?batch=1" \
+              -H "Content-Type: application/json" -H "Cookie: $COOKIE" \
+              -d '{"0":{"taskId":"fb-30-caption-short","inputs":{"topic":"ping"},"brandId":2832}}' \
+              -w "\nHTTP %{http_code} time %{time_total}s\n" | head -c 800
+            echo ""
+            echo "── pm2 last 30 lines ──"
+            pm2 logs marketing-os --lines 30 --nostream --raw 2>&1 | tail -30
