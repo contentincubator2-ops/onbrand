@@ -68,6 +68,10 @@ export default function ShellLayout() {
 
   const brandsQuery = trpc.brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false });
   const brands = (brandsQuery.data as any[]) ?? [];
+  // 2026-05-09 (CJ): expose loading state so child pages can avoid
+  // premature 'no brands' redirects (was causing reload-from-anywhere
+  // to bounce to /brands).
+  const brandsLoaded = brandsQuery.isFetched;
 
   const [brandId, setBrandIdState] = React.useState<number | null>(() => {
     try { return Number(localStorage.getItem("sowork.selectedBrandId")) || null; }
@@ -173,7 +177,7 @@ export default function ShellLayout() {
 
       {/* Main content */}
       <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
-        <Outlet context={{ brandId, setBrandId, brands, scope, setScope }} />
+        <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
       </div>
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}
@@ -2122,6 +2126,7 @@ export interface ShellOutletCtx {
   brandId: number | null;
   setBrandId: (id: number | null) => void;
   brands: any[];
+  brandsLoaded: boolean;
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
 }

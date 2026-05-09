@@ -53,10 +53,14 @@ export const positioningJobsRouter = router({
   start: protectedProcedure
     .input(z.object({
       entityKind: entityKindSchema,
-      entityId: z.number().int().positive(),
+      // 2026-05-09: accept 0 (placeholder when brandId not yet loaded)
+      // and short-circuit in resolver. Was .positive() which threw
+      // Zod errors during initial mount before enabled guard kicked in.
+      entityId: z.number().int().min(0),
       lang: z.enum(["zh-TW", "en"]).default("zh-TW"),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.entityId === 0) return { ok: false as const, error: "no entity selected" };
       const userId = ctx.user!.id;
       const ent = await loadEntity(input.entityKind, input.entityId, userId);
       if (!ent) {
@@ -89,9 +93,13 @@ export const positioningJobsRouter = router({
   runInterim: protectedProcedure
     .input(z.object({
       entityKind: entityKindSchema,
-      entityId: z.number().int().positive(),
+      // 2026-05-09: accept 0 (placeholder when brandId not yet loaded)
+      // and short-circuit in resolver. Was .positive() which threw
+      // Zod errors during initial mount before enabled guard kicked in.
+      entityId: z.number().int().min(0),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.entityId === 0) return { ok: false as const, error: "no entity selected" };
       const userId = ctx.user!.id;
       const ent = await loadEntity(input.entityKind, input.entityId, userId);
       if (!ent) return { ok: false as const, error: `${input.entityKind} not found` };
@@ -112,9 +120,13 @@ export const positioningJobsRouter = router({
   getCurrent: protectedProcedure
     .input(z.object({
       entityKind: entityKindSchema,
-      entityId: z.number().int().positive(),
+      // 2026-05-09: accept 0 (placeholder when brandId not yet loaded)
+      // and short-circuit in resolver. Was .positive() which threw
+      // Zod errors during initial mount before enabled guard kicked in.
+      entityId: z.number().int().min(0),
     }))
     .query(async ({ ctx, input }) => {
+      if (input.entityId === 0) return null;
       const userId = ctx.user!.id;
       const table = input.entityKind === "brand" ? "brands"
                   : input.entityKind === "product" ? "products" : "events";
@@ -298,9 +310,13 @@ ${fullCtx.block}${real.context}${knowledgeBlock}`;
   getStatus: protectedProcedure
     .input(z.object({
       entityKind: entityKindSchema,
-      entityId: z.number().int().positive(),
+      // 2026-05-09: accept 0 (placeholder when brandId not yet loaded)
+      // and short-circuit in resolver. Was .positive() which threw
+      // Zod errors during initial mount before enabled guard kicked in.
+      entityId: z.number().int().min(0),
     }))
     .query(async ({ ctx, input }) => {
+      if (input.entityId === 0) return null;
       const userId = ctx.user!.id;
       return await getPositioningJob(input.entityKind, input.entityId, userId);
     }),
