@@ -809,10 +809,15 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         size={output ? "full" : "2xl"}
         scrollBehavior="inside"
         backdrop="blur"
+        // 2026-05-09 (CJ): mockup canvas redesign — solid neutral background
+        // (was bg-transparent which let the running agent carousel bleed
+        // through the mockup, looking visually noisy). Now follows the
+        // reference design: clean gray canvas with white mockup card +
+        // floating contextual toolbars (like a confirm-dialog overlay).
         classNames={{
-          base: output ? "max-h-screen bg-transparent shadow-none" : "max-h-[90vh]",
+          base: output ? "max-h-screen bg-default-50 shadow-none" : "max-h-[90vh]",
           wrapper: output ? "p-0" : undefined,
-          body: output ? "py-0 px-0 bg-transparent" : "py-3 px-4",
+          body: output ? "py-0 px-0 bg-default-50" : "py-3 px-4",
           footer: output ? "hidden" : "border-t border-default-100 bg-white py-2 px-4",
           header: output ? "hidden" : "py-2 px-3 bg-white border-b border-default-100",
           closeButton: output ? "hidden" : "text-default-400 hover:bg-default-100",
@@ -1513,20 +1518,17 @@ function OutputCarousel({
                 )}
               </button>
             )}
-            {/* 2026-05-08 (CJ): mockup 放到最大、白底拿掉。
-                Canvas now stretches to ~95% of viewport width when tool
-                pane is closed, transparent background so the mockup
-                phone-frame is the visual anchor (not a white card). */}
-            <div className="flex-1 min-w-0 flex justify-center">
+            {/* 2026-05-09 (CJ): mockup container redesign — clean white
+                elevated card on neutral gray canvas (Goldrush Business
+                Settings reference). Drops the transparent style that
+                let the running carousel bleed through. */}
+            <div className="flex-1 min-w-0 flex justify-center py-6">
               {mockupVariant && (
                 <div
                   className={`w-full ${activeTool ? "max-w-[900px]" : "max-w-[1280px]"} transition-all`}
                 >
                   <div
-                    className="rounded-2xl overflow-hidden"
-                    style={{
-                      background: "transparent",
-                    }}
+                    className="rounded-2xl overflow-hidden bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] ring-1 ring-black/5"
                   >
                   <PlatformMockup
                     // Inject the active variant label into the mockup's variantLabel
