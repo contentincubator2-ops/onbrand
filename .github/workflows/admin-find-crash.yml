@@ -1,0 +1,37 @@
+name: Admin — Find pm2 crash log
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            echo "════════ pm2 process restart count ════════"
+            pm2 status | grep marketing-os
+
+            echo ""
+            echo "════════ pm2 error log path ════════"
+            pm2 info marketing-os 2>&1 | grep -E "out log|err log|exec interpreter|exec mode" | head -10
+
+            echo ""
+            echo "════════ Tail last 80 lines of pm2 ERROR log ════════"
+            ERR_LOG=$(pm2 info marketing-os 2>&1 | grep "err log" | awk '{print $5}')
+            if [ -n "$ERR_LOG" ] && [ -f "$ERR_LOG" ]; then
+              echo "Reading: $ERR_LOG"
+              tail -80 "$ERR_LOG"
+            fi
+
+            echo ""
+            echo "════════ Tail last 60 lines of pm2 OUT log (post 16:40) ════════"
+            OUT_LOG=$(pm2 info marketing-os 2>&1 | grep "out log" | awk '{print $5}')
+            if [ -n "$OUT_LOG" ] && [ -f "$OUT_LOG" ]; then
+              tail -60 "$OUT_LOG"
+            fi
