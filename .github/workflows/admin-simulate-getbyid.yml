@@ -1,0 +1,57 @@
+name: Admin — Simulate GET /trpc/output.getById for output 63
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            COOKIE='session=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxOTkiLCJvcGVuSWQiOiJoUGRNTXBNOWpNRDdEUXZBR19QUk9TYi1zRGw4bFRmYyIsImlhdCI6MTc3Nzk0Nzk3MywiZXhwIjoxODA5NDgzOTczfQ.ffZWP9Ajog__s5xC4e8fuFjruX1zm89Trg42Ayw4BCA'
+
+            for ID in 60 61 62 63; do
+              echo "════════ GET /trpc/output.getById id=$ID ════════"
+              # tRPC GET batch query: ?batch=1&input={"0":{"id":63}}
+              INPUT_ENC=$(printf '{"0":{"id":%d}}' "$ID" | jq -sRr @uri)
+              curl -sS --max-time 15 \
+                -X GET \
+                "http://localhost:3101/trpc/output.getById?batch=1&input=$INPUT_ENC" \
+                -H "Cookie: $COOKIE" \
+                -w "\n══ HTTP %{http_code} time %{time_total}s ══\n" \
+                -o /tmp/r.txt 2>&1
+              echo "── response ──"
+              # Pretty print the relevant fields
+              cat /tmp/r.txt | python3 -c "
+            import sys, json
+            try:
+                arr = json.load(sys.stdin)
+                d = arr[0].get('result', {}).get('data')
+                if d is None:
+                    print('  data: null')
+                else:
+                    print(f'  id:                {d.get(\"id\")}')
+                    print(f'  platform:          {d.get(\"platform\")}')
+                    print(f'  outputType:        {d.get(\"outputType\")}')
+                    m = d.get('mission') or {}
+                    print(f'  mission.id:        {m.get(\"id\")}')
+                    print(f'  mission.taskId:    {m.get(\"taskId\")}')
+                    print(f'  mission.tier:      {m.get(\"tier\")}')
+                    print(f'  mission.workspace: {m.get(\"workspace\")}')
+                    md = d.get('metadata') or {}
+                    if isinstance(md, dict):
+                        print(f'  metadata.taskId:   {md.get(\"taskId\")}')
+                    else:
+                        print(f'  metadata typeof:   {type(md).__name__}')
+            except Exception as e:
+                print(f'  PARSE ERROR: {e}')
+                print(open(\"/tmp/r.txt\").read()[:500])
+            "
+              echo ""
+            done
