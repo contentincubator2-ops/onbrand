@@ -1,0 +1,59 @@
+name: Admin — Force rebuild + restart on VM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          script: |
+            set -e
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "════════ BEFORE ════════"
+            echo "── pm2 ──"
+            pm2 status | grep marketing-os || echo "(no marketing-os)"
+            echo "── public bundle hash ──"
+            ls -la public/ 2>/dev/null | grep -E "index.*js" | head -3 || echo "(public/ empty or missing)"
+            echo ""
+            echo "── client/ folder check ──"
+            ls -la client/ 2>/dev/null | head -5
+            echo ""
+
+            echo "════════ REBUILD CLIENT ════════"
+            cd client
+            echo "── npm install (production deps) ──"
+            npm install --no-audit --no-fund --silent 2>&1 | tail -5
+            echo "── vite build ──"
+            npm run build 2>&1 | tail -20
+            cd ..
+
+            echo ""
+            echo "════════ SWAP public ════════"
+            ls -la client/dist/ | head -5
+            rm -rf public.bak 2>/dev/null
+            [ -d public ] && mv public public.bak
+            cp -r client/dist public
+            ls -la public/ | grep "index.*js" | head -1
+
+            echo ""
+            echo "════════ RESTART pm2 ════════"
+            pm2 restart marketing-os --update-env
+            sleep 3
+            pm2 status | grep marketing-os
+
+            echo ""
+            echo "════════ VERIFY new code in bundle ════════"
+            BUNDLE=$(ls public/index*.js | head -1)
+            echo "Bundle: $BUNDLE"
+            echo "── grep for new code markers ──"
+            grep -c "idPrefixMap" "$BUNDLE" 2>/dev/null || echo "0 idPrefixMap (BAD)"
+            grep -c "proposal-cover" "$BUNDLE" 2>/dev/null || echo "0 proposal-cover (BAD)"
+            grep -c "formatFromTaskId" "$BUNDLE" 2>/dev/null || echo "0 formatFromTaskId (BAD)"
