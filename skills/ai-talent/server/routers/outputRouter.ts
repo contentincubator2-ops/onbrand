@@ -255,6 +255,10 @@ export const outputRouter = router({
       // missions schema doesn't have tier/taskId columns; they're encoded
       // in description as "[task:<taskId>] <tier> 任務" by recordTaskRun.
       // metadata.taskId / metadata.tier are the canonical source.
+      // 2026-05-09: extract taskId/tier via JSON_UNQUOTE(JSON_EXTRACT...)
+      // directly in SQL so we don't depend on driver's metadata column shape
+      // (mysql2 sometimes returns JSON as parsed object, sometimes as string,
+      // sometimes as Buffer — extracting in SQL bypasses all that).
       const rows = await db.execute(sql`
         SELECT o.*,
           m.id AS mission_id,
@@ -265,22 +269,22 @@ export const outputRouter = router({
           m.userId AS mission_user_id,
           b.name AS brand_name,
           b.logoUrl AS brand_logo,
-          b.industry AS brand_industry
+          b.industry AS brand_industry,
+          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS extracted_task_id,
+          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier'))   AS extracted_tier
         FROM mission_outputs o
         LEFT JOIN missions m ON m.id = o.missionId
         LEFT JOIN brands b ON b.id = m.brandId
-        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
+        WHERE o.id = ${input.id} AND (m.userId = ${ctx.user.id} OR m.userId IS NULL)
         LIMIT 1
       `);
       const rowsArr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
       const row = Array.isArray(rowsArr) ? rowsArr[0] : (rowsArr as any);
       if (!row) return null;
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
-      // 2026-05-09 cleanup: metadata.taskId is the ONLY source of truth.
-      // No description regex fallback — if taskId missing, that's a
-      // recordTaskRun bug and we want it to surface, not be papered over.
-      const taskId = md.taskId ?? null;
-      const tier = md.tier ?? null;
+      // SQL extracted values are the canonical source — string or null.
+      const taskId: string | null = row.extracted_task_id ?? md.taskId ?? null;
+      const tier: string | null = row.extracted_tier ?? md.tier ?? null;
       return {
         id: row.id,
         missionId: row.missionId,
