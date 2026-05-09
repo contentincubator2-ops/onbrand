@@ -1,0 +1,33 @@
+name: Admin — Grep pm2 logs for actual anthropic error
+
+on:
+  workflow_dispatch:
+
+jobs:
+  grep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "════════ Last 500 pm2 lines, around recent runOrchestra ════════"
+            pm2 logs marketing-os --lines 500 --nostream --raw 2>&1 | tail -200
+
+            echo ""
+            echo "════════ Direct anthropic curl with same key + model ════════"
+            ANTHROPIC_KEY=$(grep -E "^ANTHROPIC_API_KEY=" .env | head -1 | cut -d'=' -f2-)
+            ANTHROPIC_MODEL=$(grep -E "^ANTHROPIC_MODEL=" .env | head -1 | cut -d'=' -f2-)
+            echo "ANTHROPIC_MODEL from .env: $ANTHROPIC_MODEL"
+            echo ""
+            curl --max-time 30 -s -w "\n\nHTTP %{http_code} time %{time_total}s\n" \
+              https://api.anthropic.com/v1/messages \
+              -H "x-api-key: $ANTHROPIC_KEY" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "content-type: application/json" \
+              -d "{\"model\":\"$ANTHROPIC_MODEL\",\"max_tokens\":200,\"system\":\"你是 FB 文案寫手。\",\"messages\":[{\"role\":\"user\",\"content\":\"用繁體中文寫一句話介紹粉紅健走活動\"}]}" 2>&1 | tail -10
