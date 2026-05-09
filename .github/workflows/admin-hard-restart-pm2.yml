@@ -1,0 +1,60 @@
+name: Admin — HARD restart pm2 (kill + start, no cache)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "════════ pm2 logs (last 100, before restart) ════════"
+            pm2 logs marketing-os --lines 100 --nostream --raw 2>&1 | grep -iE "outputRouter|getById|extracted_task_id|caption|orchestra|error|recordTaskRun" | tail -30
+
+            echo ""
+            echo "════════ Hard restart ════════"
+            pm2 delete marketing-os 2>&1 || true
+            sleep 2
+            # Recreate from ecosystem or saved process
+            pm2 resurrect 2>&1 || true
+            sleep 2
+            pm2 status
+
+            echo ""
+            echo "════════ If still no marketing-os, start manually ════════"
+            if ! pm2 status | grep -q marketing-os; then
+              cd /opt/marketing-os/app/skills/ai-talent
+              # Find the start script
+              if [ -f ecosystem.config.cjs ]; then
+                pm2 start ecosystem.config.cjs --only marketing-os 2>&1 | tail -5
+              elif [ -f ecosystem.config.js ]; then
+                pm2 start ecosystem.config.js --only marketing-os 2>&1 | tail -5
+              else
+                # Direct start with tsx
+                pm2 start "npx tsx server/index.ts" --name marketing-os --update-env 2>&1 | tail -5
+              fi
+              pm2 save 2>&1 | tail -2
+            fi
+
+            echo ""
+            echo "════════ pm2 status after start ════════"
+            sleep 4
+            pm2 status
+
+            echo ""
+            echo "════════ Check the live server actually loads new outputRouter ════════"
+            curl -s -o /dev/null -w "HTTP %{http_code} time %{time_total}s\n" http://localhost:3101/api/health || echo "(no /api/health route)"
+            curl -s -o /dev/null -w "HTTP %{http_code} time %{time_total}s\n" http://localhost:3101/ | head -1
+
+            echo ""
+            echo "════════ Fresh logs after restart ════════"
+            sleep 3
+            pm2 logs marketing-os --lines 30 --nostream --raw 2>&1 | tail -30
