@@ -1,0 +1,55 @@
+name: Admin — Inspect output 60 + 61 specifically
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQL="mysql -h localhost -u mos_user mos_db"
+
+            for ID in 60 61; do
+              echo "════════ output id=$ID ════════"
+              $MYSQL -e "
+                SELECT
+                  o.id, o.missionId, o.platform, o.outputType, o.title,
+                  CHAR_LENGTH(o.content) AS content_len,
+                  CHAR_LENGTH(o.metadata) AS meta_len,
+                  JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '\$.taskId')) AS task_id,
+                  JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '\$.tier'))   AS tier,
+                  o.createdAt
+                FROM mission_outputs o
+                WHERE o.id = $ID \G"
+              echo "── content (first 300 chars) ──"
+              $MYSQL -BN -e "SELECT LEFT(content, 300) FROM mission_outputs WHERE id=$ID"
+              echo ""
+              echo "── full metadata ──"
+              $MYSQL -BN -e "SELECT metadata FROM mission_outputs WHERE id=$ID" | head -c 1500
+              echo ""
+              echo ""
+            done
+
+            echo "════════ pm2 logs around recent FB caption run ════════"
+            pm2 logs marketing-os --lines 60 --nostream --raw 2>&1 | grep -iE "fb-30-caption|recordTaskRun|outputId|orchestra|caption" | tail -25
+
+            echo ""
+            echo "════════ Live RunPage bundle has new code? ════════"
+            cd /opt/marketing-os/app/skills/ai-talent
+            for B in public/assets/index-*.js; do
+              S=$(stat -c%s "$B")
+              if [ $S -gt 1000000 ]; then
+                echo "$B ($S bytes)"
+                echo "  red error gone (no '此 run 缺少'): $(grep -c '此 run 缺少' "$B" 2>/dev/null || echo 0) (expect 0)"
+                echo "  3-layer fallback (outputTypeToFormat): $(grep -c 'outputTypeToFormat' "$B" 2>/dev/null || echo 0) (expect 1+)"
+                echo "  no-task debug chip:                   $(grep -c 'no-task' "$B" 2>/dev/null || echo 0)"
+              fi
+            done
