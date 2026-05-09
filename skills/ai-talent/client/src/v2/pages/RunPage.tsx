@@ -1,23 +1,23 @@
 /**
  * RunPage — independent route /run/:outputId
  *
- * Phase 2 architecture (CJ direction 2026-05-09): replace modal-based
- * output viewing with a route-based workspace. URL is shareable, browser
- * back works, and the page is sized for actual work (5–15 min sessions),
- * not 30-second glance.
+ * Lives INSIDE ShellLayout (left rail + collapsible panel come from
+ * the shell). The page itself renders 2 inner columns:
+ *   [CENTER] mockup big card with toolbar
+ *   [RIGHT]  contextual mode panel + publish actions
  *
- * Layout: 3-column
- *   [LEFT rail]   variant nav (情感版 / 理性版 / 數據版)
- *   [CENTER]      mockup big card (the visual anchor)
- *   [RIGHT panel] mode-switching contextual tools + publish actions
+ * The variant nav (情感版/理性版/數據版) that was a 3rd column is now
+ * inline horizontal chips above the mockup — frees space for the
+ * mockup to be as wide as possible (CJ feedback: '中間 mockup 都太
+ * 小，被背景吃掉').
  *
- * Toolbar (top of mockup) holds the 11 functions CJ wanted preserved:
+ * Toolbar holds the 11 functions CJ wanted preserved:
  *   ✏️ 編輯  💬 對話  🖼️ 圖  📹 影  👥 agent×2
  *   🪄 重生  🎚️ 設定  📋 複製  💾 存
  *   ↻ 重跑  ✕ 關閉
  */
 import React, { useMemo, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Avatar, Button, Card, CardBody, Chip, Spinner, Textarea, Tooltip,
 } from "@heroui/react";
@@ -94,24 +94,14 @@ export default function RunPage() {
   }, [data]);
 
   if (!id || isNaN(id)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-default-500">
-        無效的 run ID
-      </div>
-    );
+    return <div className="p-12 text-center text-default-500">無效的 run ID</div>;
   }
-
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <div className="p-12 flex justify-center"><Spinner size="lg" /></div>;
   }
-
   if (error || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-default-500">
+      <div className="p-12 flex flex-col items-center gap-3 text-default-500">
         <p>找不到這個 run（可能已被移除或無權限）</p>
         <Button variant="flat" onPress={() => navigate(-1)}>返回</Button>
       </div>
@@ -128,79 +118,62 @@ export default function RunPage() {
   };
 
   return (
-    <div className="min-h-screen bg-default-50">
-      {/* ─── HEADER STRIP ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-default-200">
-        <div className="max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-3">
-          <Button
-            isIconOnly variant="light" size="sm"
-            onPress={() => navigate(-1)}
-            aria-label="返回"
-          >
-            <FontAwesomeIcon icon={faChevronLeft} />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <p className="text-tiny text-default-500 truncate">
-              {data.brand?.name ?? "未綁定品牌"} · {data.mission?.workspace ?? "—"}
-            </p>
-            <h1 className="text-small font-medium truncate">
-              {data.title || data.mission?.taskLabel || "(無標題)"}
-            </h1>
-          </div>
-          {data.mission?.tier && (
-            <Chip size="sm" variant="flat" color="secondary">{data.mission.tier}</Chip>
-          )}
-          <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : "default"}>
-            {data.status}
-          </Chip>
-          <Tooltip content="重跑這個任務">
-            <Button isIconOnly variant="light" size="sm" aria-label="重跑">
-              <FontAwesomeIcon icon={faRotateRight} />
-            </Button>
-          </Tooltip>
-          <Tooltip content="關閉">
-            <Button isIconOnly variant="light" size="sm" onPress={() => navigate(-1)} aria-label="關閉">
-              <FontAwesomeIcon icon={faXmark} />
-            </Button>
-          </Tooltip>
-        </div>
-      </header>
-
-      {/* ─── MAIN 3-COL LAYOUT ────────────────────────────────────────── */}
-      <main className="max-w-[1600px] mx-auto grid grid-cols-[160px_1fr_360px] gap-4 px-4 py-4">
-        {/* LEFT: Variant rail */}
-        <aside className="space-y-2">
-          <p className="text-tiny font-semibold text-default-600 px-2 pt-1">
-            版本（{variants.length}）
+    <div className="px-4 py-3 max-w-[1500px] mx-auto">
+      {/* ─── Inline header strip ─────────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-3">
+        <Button isIconOnly variant="light" size="sm" onPress={() => navigate(-1)} aria-label="返回">
+          <FontAwesomeIcon icon={faChevronLeft} />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <p className="text-tiny text-default-500 truncate">
+            {data.brand?.name ?? "未綁定品牌"} · {data.mission?.workspace ?? "—"}
           </p>
+          <h1 className="text-small font-medium truncate">
+            {data.title || data.mission?.taskLabel || "(無標題)"}
+          </h1>
+        </div>
+        {data.mission?.tier && <Chip size="sm" variant="flat" color="secondary">{data.mission.tier}</Chip>}
+        <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : "default"}>
+          {data.status}
+        </Chip>
+        <Tooltip content="重跑這個任務">
+          <Button isIconOnly variant="light" size="sm" aria-label="重跑">
+            <FontAwesomeIcon icon={faRotateRight} />
+          </Button>
+        </Tooltip>
+      </div>
+
+      {/* ─── Variant pills (horizontal) ─────────────────────────────── */}
+      {variants.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          <span className="text-[10px] text-default-500 mr-1">版本：</span>
           {variants.map((v, i) => (
             <button
               key={i}
               onClick={() => setActiveIdx(i)}
-              className={`w-full text-left rounded-xl px-3 py-2.5 transition border ${
+              className={`px-3 py-1 rounded-full text-tiny transition border ${
                 i === activeIdx
-                  ? "bg-white border-secondary shadow-sm"
-                  : "bg-default-100/50 border-transparent hover:bg-white"
+                  ? "bg-secondary text-white border-secondary"
+                  : "bg-white text-default-700 border-default-200 hover:border-secondary"
               }`}
             >
-              <p className="text-tiny font-semibold truncate">{v.label}</p>
-              <p className="text-[10px] text-default-500 mt-0.5 line-clamp-2 leading-tight">
-                {v.caption?.slice(0, 60) || "(無內容)"}
-              </p>
+              {v.label}
             </button>
           ))}
-        </aside>
+        </div>
+      )}
 
-        {/* CENTER: Mockup big card with toolbar */}
+      {/* ─── 2-COL: mockup big + right panel ─────────────────────────── */}
+      <div className="grid grid-cols-[1fr_320px] gap-4 items-start">
+        {/* CENTER */}
         <section className="min-w-0 flex flex-col gap-3">
-          {/* Toolbar (CJ wanted all 11 preserved, grouped) */}
+          {/* Toolbar */}
           <div className="flex items-center gap-1 bg-white rounded-xl border border-default-200 px-2 py-1.5 shadow-sm">
-            <ToolbarBtn icon={Pencil}        label="編輯文字"  active={mode==="edit"}  onClick={() => setMode("edit")} />
-            <ToolbarBtn icon={MessageCircle} label="跟 agent 對話" active={mode==="chat"} onClick={() => setMode("chat")} />
-            <ToolbarBtn icon={LucideImage}   label="改圖"      active={mode==="image"} onClick={() => setMode("image")} />
-            <ToolbarBtn icon={Video}         label="改影片"    active={mode==="video"} onClick={() => setMode("video")} />
+            <ToolbarBtn icon={Pencil}        label="編輯文字"      active={mode==="edit"}  onClick={() => setMode("edit")} />
+            <ToolbarBtn icon={MessageCircle} label="跟 agent 對話" active={mode==="chat"}  onClick={() => setMode("chat")} />
+            <ToolbarBtn icon={LucideImage}   label="改圖"          active={mode==="image"} onClick={() => setMode("image")} />
+            <ToolbarBtn icon={Video}         label="改影片"        active={mode==="video"} onClick={() => setMode("video")} />
             <Divider />
-            {/* Agent shortcuts (placeholders — wire to actual agents from output.metadata) */}
             <Tooltip content="撰寫 agent">
               <button className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-default-200 hover:ring-secondary transition">
                 <Avatar src={`https://api.dicebear.com/9.x/notionists/svg?seed=Tina`} className="w-7 h-7" />
@@ -212,11 +185,13 @@ export default function RunPage() {
               </button>
             </Tooltip>
             <Divider />
-            <ToolbarBtn icon={Wand2}          label="重生這段" />
-            <ToolbarBtn icon={LucideSliders}  label="參數" />
+            <ToolbarBtn icon={Wand2}         label="重生這段" />
+            <ToolbarBtn icon={LucideSliders} label="參數" />
             <Divider />
-            <ToolbarBtn icon={LucideCopy}     label="複製"  onClick={onCopy} highlight={copied} />
-            <ToolbarBtn icon={Save}           label="存到 Mission" />
+            <ToolbarBtn icon={LucideCopy}    label="複製" onClick={onCopy} highlight={copied} />
+            <ToolbarBtn icon={Save}          label="存到 Mission" />
+            <div className="ml-auto" />
+            <ToolbarBtn icon={Pencil} label="關閉" onClick={() => navigate(-1)} />
           </div>
 
           {/* Mockup big white card */}
@@ -238,16 +213,15 @@ export default function RunPage() {
           </div>
         </section>
 
-        {/* RIGHT: Contextual mode panel + publish actions */}
-        <aside className="space-y-3">
-          {/* Mode panel */}
+        {/* RIGHT: mode panel + publish actions */}
+        <aside className="space-y-3 sticky top-2 self-start">
           <Card>
             <CardBody className="space-y-3">
               {mode === "chat" && (
                 <>
                   <p className="text-tiny font-semibold">跟 agent 改文案</p>
                   <p className="text-[11px] text-default-500 leading-relaxed">
-                    告訴 agent 你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦，砍第二段」、「加點媽媽節情緒」。
+                    告訴 agent 你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦砍第二段」。
                   </p>
                   <Textarea
                     placeholder="說明你想怎麼改…"
@@ -261,6 +235,9 @@ export default function RunPage() {
               {mode === "edit" && (
                 <>
                   <p className="text-tiny font-semibold">直接編輯</p>
+                  <p className="text-[10px] text-default-500">
+                    在這裡改文字，左邊 mockup 即時更新。
+                  </p>
                   <Textarea
                     value={editText || slide?.caption || ""}
                     onChange={(e) => setEditText(e.target.value)}
@@ -289,53 +266,30 @@ export default function RunPage() {
             </CardBody>
           </Card>
 
-          {/* Publish actions — JTBD primary */}
           <Card>
             <CardBody className="space-y-2">
               <p className="text-tiny font-semibold">發布到</p>
-              <Button
-                color="primary"
-                fullWidth
-                startContent={<FontAwesomeIcon icon={faRocket} />}
-                isDisabled
-              >
+              <Button color="primary" fullWidth startContent={<FontAwesomeIcon icon={faRocket} />} isDisabled>
                 直接發 Facebook（即將推出）
               </Button>
-              <Button
-                variant="flat"
-                fullWidth
-                startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
-                isDisabled
-              >
+              <Button variant="flat" fullWidth startContent={<FontAwesomeIcon icon={faCalendarPlus} />} isDisabled>
                 排程到日曆（即將推出）
               </Button>
-              <Button
-                variant="flat"
-                fullWidth
-                startContent={<FontAwesomeIcon icon={faEnvelope} />}
-                isDisabled
-              >
+              <Button variant="flat" fullWidth startContent={<FontAwesomeIcon icon={faEnvelope} />} isDisabled>
                 寄給團隊（即將推出）
               </Button>
-              <Button
-                variant="flat"
-                fullWidth
-                startContent={<FontAwesomeIcon icon={faFolderPlus} />}
-              >
+              <Button variant="flat" fullWidth startContent={<FontAwesomeIcon icon={faFolderPlus} />}>
                 存到 Mission
               </Button>
               <Button
-                variant="flat"
-                fullWidth
+                variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}
                 onPress={onCopy}
               >
                 {copied ? "已複製" : "複製文字"}
               </Button>
               <Button
-                variant="light"
-                fullWidth
-                size="sm"
+                variant="light" fullWidth size="sm"
                 startContent={<FontAwesomeIcon icon={faShare} />}
                 onPress={() => {
                   navigator.clipboard.writeText(window.location.href);
@@ -347,7 +301,7 @@ export default function RunPage() {
             </CardBody>
           </Card>
         </aside>
-      </main>
+      </div>
     </div>
   );
 }

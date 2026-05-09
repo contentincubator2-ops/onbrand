@@ -1009,18 +1009,38 @@ function SlidePanel({
   const isProjects  = currentPath.startsWith("/projects");
   const isTemplates = currentPath.startsWith("/templates");
   const isBrands    = currentPath.startsWith("/brands");
-  // 2026-05-09 (CJ direction): on tier pages (/30s /60s /100s), the
-  // sidebar shows the brand's recent task runs in this tier — clicking
-  // a row navigates to /run/:outputId (route-based workspace).
+  // 2026-05-09 (CJ direction): on tier pages (/30s /60s /100s) AND
+  // /run/:outputId, the sidebar shows the brand's recent task runs
+  // in this tier. Click a row → /run/:outputId.
   const tierMatch = currentPath.match(/^\/(30s|60s|100s)\b/);
+  const runMatch = currentPath.match(/^\/run\/(\d+)/);
   const isTier = !!tierMatch;
+  const isRun = !!runMatch;
   const currentTier = tierMatch?.[1] as ("30s"|"60s"|"100s"|undefined);
 
-  // Recent runs query — only fires when on a tier page with a brand
+  // For /run/:id pages, fetch the run to get its tier (so sidebar shows
+  // the same tier's history). Cheap — already cached if user came from
+  // RunPage navigation.
+  const runOutputId = runMatch ? Number(runMatch[1]) : null;
+  const runQuery = (trpc as any).output?.getById?.useQuery
+    ? (trpc as any).output.getById.useQuery(
+        { id: runOutputId ?? 0 },
+        { enabled: isRun && !!runOutputId, staleTime: 60_000 },
+      )
+    : { data: null };
+  const inferredTier = runQuery.data?.mission?.tier as ("30s"|"60s"|"100s"|undefined);
+  const inferredBrandId = runQuery.data?.mission?.brandId ?? null;
+
+  // Effective context: tier page uses URL tier + shell brand;
+  // run page uses run's tier + run's brand
+  const effTier = currentTier ?? inferredTier;
+  const effBrandId = isRun ? inferredBrandId : brandId;
+  const showTierHistory = (isTier || isRun) && !!effTier;
+
   const recentRunsQuery = (trpc as any).output?.recent?.useQuery
     ? (trpc as any).output.recent.useQuery(
-        { brandId, tier: currentTier, limit: 25 },
-        { enabled: isTier && brandId != null && !!currentTier, staleTime: 30_000 },
+        { brandId: effBrandId, tier: effTier, limit: 25 },
+        { enabled: showTierHistory && effBrandId != null, staleTime: 30_000 },
       )
     : { data: [] };
   const recentRuns: any[] = (recentRunsQuery.data as any[]) ?? [];
@@ -1346,10 +1366,12 @@ function SlidePanel({
         </>
       )}
 
-      {/* ── Tier pages (/30s, /60s, /100s) — recent task runs for current brand × tier ──
+      {/* ── Tier + Run pages — recent task runs for current brand × tier ──
           2026-05-09 (CJ direction): "側邊欄沿用收合側邊欄，展示內容換成
-          隸屬該主題於該功能的歷史任務，點選後就會到該頁面" */}
-      {isTier && (
+          隸屬該主題於該功能的歷史任務，點選後就會到該頁面"
+          Triggers on /30s, /60s, /100s, AND /run/:outputId (which infers
+          tier from the run itself). */}
+      {showTierHistory && (
         <>
           <PlanInviteButtons onNavigate={onNavigate} />
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
@@ -1357,34 +1379,38 @@ function SlidePanel({
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 14px 6px" }}>
             <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#A8A29E" }} />
             <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {currentTier} 歷史任務
+              {effTier} 歷史任務
             </span>
           </div>
-          {brandId == null ? (
+          {effBrandId == null ? (
             <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.5 }}>
-              選擇品牌後顯示這個品牌在 {currentTier} 跑過的任務。
+              選擇品牌後顯示這個品牌在 {effTier} 跑過的任務。
             </p>
           ) : (
             <p style={{ fontSize: 11, color: "#A8A29E", padding: "0 14px 6px", lineHeight: 1.4 }}>
-              {brands.find((b: any) => b.id === brandId)?.name ?? "目前品牌"} · {currentTier}
+              {brands.find((b: any) => b.id === effBrandId)?.name ?? runQuery.data?.brand?.name ?? "目前品牌"} · {effTier}
             </p>
           )}
           <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
             {recentRunsQuery.isLoading ? (
               <p style={{ fontSize: 11, color: "#A8A29E", padding: "8px 14px", textAlign: "center" }}>讀取中…</p>
-            ) : recentRuns.length === 0 && brandId != null ? (
+            ) : recentRuns.length === 0 && effBrandId != null ? (
               <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.6 }}>
-                這個品牌還沒有 {currentTier} 任務紀錄。<br/>
+                這個品牌還沒有 {effTier} 任務紀錄。<br/>
                 跑第一個任務後會出現在這裡。
               </p>
             ) : (
-              recentRuns.map((r: any) => (
-                <PanelRow key={r.id}
-                  initial={(r.title ?? r.taskId ?? "T").slice(0, 1).toUpperCase()}
-                  initialBg="#FFF7ED" initialColor="#F97316"
-                  label={r.title || r.taskId || "(無標題)"}
-                  onClick={() => onNavigate(`/run/${r.id}`)} />
-              ))
+              recentRuns.map((r: any) => {
+                const isCurrent = isRun && r.id === runOutputId;
+                return (
+                  <PanelRow key={r.id}
+                    initial={(r.title ?? r.taskId ?? "T").slice(0, 1).toUpperCase()}
+                    initialBg={isCurrent ? "#EDE9FE" : "#FFF7ED"}
+                    initialColor={isCurrent ? "#6366F1" : "#F97316"}
+                    label={r.title || r.taskId || "(無標題)"}
+                    onClick={() => onNavigate(`/run/${r.id}`)} />
+                );
+              })
             )}
           </div>
           <TrashButton onNavigate={onNavigate} />
@@ -1392,7 +1418,7 @@ function SlidePanel({
       )}
 
       {/* ── Other pages — generic home-style panel ── */}
-      {!isHome && !isProjects && !isTemplates && !isBrands && !isTier && (
+      {!isHome && !isProjects && !isTemplates && !isBrands && !showTierHistory && (
         <>
           <PlanInviteButtons onNavigate={onNavigate} />
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
