@@ -38,7 +38,7 @@ import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import { TRPCClientError } from "@trpc/client";
 
-type Mode = "edit" | "chat" | "image" | "video";
+type Mode = "edit" | "chat" | "image" | "video" | "agent" | "regen" | "settings" | "publish";
 
 interface VariantData {
   label: string;
@@ -63,6 +63,7 @@ export default function RunPage() {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [mode, setMode] = useState<Mode>("chat");
+  const [focusedAgent, setFocusedAgent] = useState<"caption"|"image"|null>(null);
   const [editText, setEditText] = useState<string | null>(null);
   const [chatPrompt, setChatPrompt] = useState("");
   const [copied, setCopied] = useState(false);
@@ -226,60 +227,10 @@ export default function RunPage() {
         </div>
       )}
 
-      {/* ─── 2-COL: mockup big + right panel ─────────────────────────── */}
-      <div className="grid grid-cols-[1fr_320px] gap-4 items-start">
-        {/* CENTER */}
+      {/* ─── 2-COL: mockup big (no toolbar) + right tool panel ──────── */}
+      <div className="grid grid-cols-[1fr_360px] gap-4 items-start">
+        {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
-          {/* Toolbar */}
-          <div className="flex items-center gap-1 bg-white rounded-xl border border-default-200 px-2 py-1.5 shadow-sm">
-            <ToolbarBtn icon={Pencil}        label="編輯文字"      active={mode==="edit"}  onClick={() => setMode("edit")} />
-            <ToolbarBtn icon={MessageCircle} label="跟 agent 對話" active={mode==="chat"}  onClick={() => setMode("chat")} />
-            <ToolbarBtn icon={LucideImage}   label="改圖"          active={mode==="image"} onClick={() => setMode("image")} />
-            <ToolbarBtn icon={Video}         label="改影片"        active={mode==="video"} onClick={() => setMode("video")} />
-            <Divider />
-            <Tooltip content="撰寫 agent">
-              <button className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-default-200 hover:ring-secondary transition">
-                <Avatar src={`https://api.dicebear.com/9.x/notionists/svg?seed=Tina`} className="w-7 h-7" />
-              </button>
-            </Tooltip>
-            <Tooltip content="視覺 agent">
-              <button className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-default-200 hover:ring-secondary transition">
-                <Avatar src={`https://api.dicebear.com/9.x/notionists/svg?seed=Mandy`} className="w-7 h-7" />
-              </button>
-            </Tooltip>
-            <Divider />
-            <ToolbarBtn icon={Wand2}         label="重生這段" />
-            <ToolbarBtn icon={LucideSliders} label="參數" />
-            <Divider />
-            <ToolbarBtn icon={LucideCopy}    label="複製" onClick={onCopy} highlight={copied} />
-            <ToolbarBtn icon={Save}          label="存到 Mission" />
-            <div className="ml-auto" />
-            <Tooltip content="重跑同任務（帶上次輸入）" placement="bottom">
-              <button
-                onClick={() => {
-                  const tier = data.mission?.tier ?? "30s";
-                  const taskId = data.mission?.taskId;
-                  if (!taskId) { showToastGlobal("找不到原任務 ID"); return; }
-                  navigate(`/${tier}?rerun=${id}`);
-                }}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
-                aria-label="重跑"
-              >
-                <FontAwesomeIcon icon={faRotateRight} className="text-tiny" />
-              </button>
-            </Tooltip>
-            <Tooltip content="返回" placement="bottom">
-              <button
-                onClick={() => navigate(-1)}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
-                aria-label="返回"
-              >
-                <FontAwesomeIcon icon={faXmark} className="text-tiny" />
-              </button>
-            </Tooltip>
-          </div>
-
-          {/* Mockup big white card */}
           <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
             {mockupVariant && slide && (
               <PlatformMockup
@@ -298,8 +249,68 @@ export default function RunPage() {
           </div>
         </section>
 
-        {/* RIGHT: mode panel + publish actions */}
+        {/* RIGHT: toolbar (top) + mode panel + publish actions
+            CJ direction 2026-05-09: 'toolbar 一道右方對話窗上面，當用戶選擇
+            不同按鍵，在顯示出該功能' — toolbar is the tab bar for the panel */}
         <aside className="space-y-3 sticky top-2 self-start">
+          {/* Toolbar — clicking a button switches mode + the panel below
+              expands to show that tool. */}
+          <div className="bg-white rounded-xl border border-default-200 shadow-sm">
+            <div className="flex items-center gap-0.5 px-2 py-1.5 flex-wrap">
+              <ToolbarBtn icon={Pencil}        label="直接編輯"      active={mode==="edit"}  onClick={() => setMode("edit")} />
+              <ToolbarBtn icon={MessageCircle} label="跟 agent 對話" active={mode==="chat"}  onClick={() => setMode("chat")} />
+              <ToolbarBtn icon={LucideImage}   label="改圖"          active={mode==="image"} onClick={() => setMode("image")} />
+              <ToolbarBtn icon={Video}         label="改影片"        active={mode==="video"} onClick={() => setMode("video")} />
+              <Divider />
+              {/* Agent avatars — click to see that agent's thinking */}
+              <Tooltip content="撰寫 agent — 看思考過程">
+                <button
+                  onClick={() => { setMode("agent"); setFocusedAgent("caption"); }}
+                  className={`w-7 h-7 rounded-full overflow-hidden ring-1 transition ${mode==="agent" && focusedAgent==="caption" ? "ring-secondary ring-2" : "ring-default-200 hover:ring-secondary"}`}
+                >
+                  <Avatar src={`https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(data.metadata?.captionAgent ?? "Caption")}`} className="w-7 h-7" />
+                </button>
+              </Tooltip>
+              <Tooltip content="視覺 agent — 看思考過程">
+                <button
+                  onClick={() => { setMode("agent"); setFocusedAgent("image"); }}
+                  className={`w-7 h-7 rounded-full overflow-hidden ring-1 transition ${mode==="agent" && focusedAgent==="image" ? "ring-secondary ring-2" : "ring-default-200 hover:ring-secondary"}`}
+                >
+                  <Avatar src={`https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(data.metadata?.imageAgent ?? "Visual")}`} className="w-7 h-7" />
+                </button>
+              </Tooltip>
+              <Divider />
+              <ToolbarBtn icon={Wand2}         label="重生這段"       active={mode==="regen"}    onClick={() => setMode("regen")} />
+              <ToolbarBtn icon={LucideSliders} label="參數"           active={mode==="settings"} onClick={() => setMode("settings")} />
+              <Divider />
+              <ToolbarBtn icon={LucideCopy}    label="複製文案"       onClick={onCopy} highlight={copied} />
+              <ToolbarBtn icon={Save}          label="存到 Mission" active={mode==="publish"} onClick={() => setMode("publish")} />
+              <Divider />
+              <Tooltip content="重跑同任務" placement="bottom">
+                <button
+                  onClick={() => {
+                    const tier = data.mission?.tier ?? "30s";
+                    const taskId = data.mission?.taskId;
+                    if (!taskId) { showToastGlobal("找不到原任務 ID"); return; }
+                    navigate(`/${tier}?rerun=${id}`);
+                  }}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
+                  aria-label="重跑"
+                >
+                  <FontAwesomeIcon icon={faRotateRight} className="text-tiny" />
+                </button>
+              </Tooltip>
+              <Tooltip content="返回" placement="bottom">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
+                  aria-label="返回"
+                >
+                  <FontAwesomeIcon icon={faXmark} className="text-tiny" />
+                </button>
+              </Tooltip>
+            </div>
+          </div>
           <Card>
             <CardBody className="space-y-3">
               {mode === "chat" && (
@@ -426,6 +437,71 @@ export default function RunPage() {
                   <p className="text-tiny font-semibold">影片版本</p>
                   <p className="text-[11px] text-default-500">尚未產出影片</p>
                   <Button variant="flat" fullWidth>從這篇生影片</Button>
+                </>
+              )}
+              {mode === "agent" && (
+                <>
+                  <p className="text-tiny font-semibold flex items-center gap-2">
+                    <Avatar
+                      src={`https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(focusedAgent==="image" ? (data.metadata?.imageAgent ?? "Visual") : (data.metadata?.captionAgent ?? "Caption"))}`}
+                      className="w-7 h-7"
+                    />
+                    {focusedAgent === "image"
+                      ? `${data.metadata?.imageAgent ?? "視覺 agent"} — 思考過程`
+                      : `${data.metadata?.captionAgent ?? "撰寫 agent"} — 思考過程`}
+                  </p>
+                  <div className="bg-default-50 rounded-lg p-2.5 text-[11px] leading-relaxed space-y-2 max-h-72 overflow-y-auto">
+                    {focusedAgent === "image" ? (
+                      <>
+                        <p className="font-semibold">配圖風格 brief：</p>
+                        <p className="whitespace-pre-wrap text-default-800">
+                          {slide?.imageStyle || "（這個任務沒有配圖 brief）"}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold">寫作流程：</p>
+                        <ol className="list-decimal pl-4 space-y-1 text-default-700">
+                          <li>讀品牌 persona + 任務 brief</li>
+                          <li>套用市場語氣 master + agent 自身方法論</li>
+                          <li>產 {variants.length} 個變體（{variants.map(v => v.label).filter(Boolean).slice(0,3).join(" / ")}{variants.length > 3 ? "..." : ""}）</li>
+                          <li>QA 檢查每個 variant 結構 / 字數 / hashtag</li>
+                        </ol>
+                        <p className="font-semibold mt-2">本變體輸出：</p>
+                        <p className="whitespace-pre-wrap text-default-800">
+                          {(slide?.caption ?? "").slice(0, 400)}{(slide?.caption?.length ?? 0) > 400 ? "…" : ""}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-default-400 leading-relaxed">
+                    💡 進階 agent 思考紀錄（推理 token / 重試紀錄 / 工具呼叫）即將推出。
+                  </p>
+                </>
+              )}
+              {mode === "regen" && (
+                <>
+                  <p className="text-tiny font-semibold">重生這段文案</p>
+                  <p className="text-[11px] text-default-500 leading-relaxed">
+                    讓同一位 agent 重新寫一次當前 variant（保留品牌 + 任務設定）。
+                  </p>
+                  <Button color="secondary" fullWidth isDisabled>立即重生（即將推出）</Button>
+                  <p className="text-[10px] text-default-400">
+                    將呼叫 {data.metadata?.captionAgent ?? "撰寫 agent"} 重新產出當前變體，原版會自動歸檔。
+                  </p>
+                </>
+              )}
+              {mode === "settings" && (
+                <>
+                  <p className="text-tiny font-semibold">參數設定</p>
+                  <div className="text-[11px] space-y-1.5 text-default-700">
+                    <div className="flex justify-between"><span>任務</span><span className="font-mono text-tiny">{data.mission?.taskId ?? "—"}</span></div>
+                    <div className="flex justify-between"><span>Tier</span><span>{data.mission?.tier ?? "—"}</span></div>
+                    <div className="flex justify-between"><span>變體數</span><span>{variants.length}</span></div>
+                    <div className="flex justify-between"><span>產出延遲</span><span>{data.metadata?.latencyMs ? `${(data.metadata.latencyMs/1000).toFixed(1)}s` : "—"}</span></div>
+                    <div className="flex justify-between"><span>撰寫 agent</span><span>{data.metadata?.captionAgent ?? "—"}</span></div>
+                    <div className="flex justify-between"><span>視覺 agent</span><span>{data.metadata?.imageAgent ?? "—"}</span></div>
+                  </div>
                 </>
               )}
             </CardBody>
