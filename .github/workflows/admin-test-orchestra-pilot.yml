@@ -1,0 +1,39 @@
+name: Admin — Test orchestra (pilot 1/channel)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'pilot (10 tasks) or full (~90 tasks)'
+        required: true
+        default: 'pilot'
+        type: choice
+        options:
+          - pilot
+          - full
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3000s
+          envs: TEST_MODE
+          script: |
+            set +e
+            cd /opt/marketing-os/app/skills/ai-talent
+            git -C /opt/marketing-os/app pull origin main 2>&1 | tail -3
+
+            echo "════════ Running test-orchestra-all.ts ${TEST_MODE} ════════"
+            export $(grep -v '^#' .env | grep -v '^$' | xargs -d '\n')
+            npx tsx scripts/test-orchestra-all.ts ${TEST_MODE} 2>&1
+            EXIT_CODE=$?
+            echo ""
+            echo "════════ Exit code: $EXIT_CODE ════════"
+            exit $EXIT_CODE
+        env:
+          TEST_MODE: ${{ inputs.mode }}
