@@ -140,18 +140,27 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
-  // Infer mockup variant from platform + outputType
+  // Infer mockup variant. Priority: mission.workspace (more reliable —
+  // tracks origin tier file) > output.platform (often defaults to 'other'
+  // when output_type is 'post' for non-FB tasks).
   const mockupVariant: MockupVariant | null = useMemo(() => {
     if (!data) return null;
+    const workspaceMap: Record<string, string> = {
+      facebook: "facebook", instagram: "instagram", linkedin: "linkedin",
+      youtube: "youtube", tiktok: "tiktok", threads: "threads",
+      line: "line", email: "email", press: "press",
+      brand: "generic", audience: "generic", theater: "generic",
+    };
     const platformMap: Record<string, string> = {
       facebook: "facebook", instagram: "instagram", linkedin: "linkedin",
-      youtube: "youtube", email: "email", press: "generic", other: "generic",
+      youtube: "youtube", email: "email", press: "press", other: "generic",
     };
     const formatMap: Record<string, string> = {
       post: "feed", story: "story", reel: "reel", ad_copy: "ad",
       email_html: "edm", script: "watch", report: "generic",
     };
-    const platform = (platformMap[data.platform ?? "other"] ?? "generic") as any;
+    const ws = data.mission?.workspace as string | undefined;
+    const platform = (workspaceMap[ws ?? ""] ?? platformMap[data.platform ?? "other"] ?? "generic") as any;
     const format = (formatMap[data.outputType ?? "post"] ?? "feed") as any;
     return { platform, format, label: `${platform}:${format}` };
   }, [data]);
@@ -182,36 +191,19 @@ export default function RunPage() {
 
   return (
     <div className="px-4 py-3 max-w-[1500px] mx-auto">
-      {/* ─── Inline header strip ─────────────────────────────────────── */}
-      <div className="flex items-center gap-2 mb-3">
-        <Button isIconOnly variant="light" size="sm" onPress={() => navigate(-1)} aria-label="返回">
-          <FontAwesomeIcon icon={faChevronLeft} />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <p className="text-tiny text-default-500 truncate">
-            {data.brand?.name ?? "未綁定品牌"} · {data.mission?.workspace ?? "—"}
-          </p>
-          <h1 className="text-small font-medium truncate">
-            {data.title || data.mission?.taskLabel || "(無標題)"}
-          </h1>
-        </div>
+      {/* Header removed 2026-05-09 (CJ): was overlapping with ShellLayout's
+          global brand picker. ShellLayout already shows the current brand
+          + tier nav. Tier chip + 重跑 + 關閉 moved into the toolbar below. */}
+
+      {/* ─── Task label + status row (slim, non-overlapping) ────────── */}
+      <div className="flex items-center gap-2 mb-3 px-1">
+        <p className="text-tiny text-default-500 truncate flex-1">
+          {data.title || data.mission?.taskLabel || "(無標題)"}
+        </p>
         {data.mission?.tier && <Chip size="sm" variant="flat" color="secondary">{data.mission.tier}</Chip>}
-        <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : "default"}>
+        <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
           {data.status}
         </Chip>
-        <Tooltip content="重跑同任務（自動填回上次的輸入）">
-          <Button
-            isIconOnly variant="light" size="sm" aria-label="重跑"
-            onPress={() => {
-              const tier = data.mission?.tier ?? "30s";
-              const taskId = data.mission?.taskId;
-              if (!taskId) { showToastGlobal("找不到原任務 ID"); return; }
-              navigate(`/${tier}?rerun=${id}`);
-            }}
-          >
-            <FontAwesomeIcon icon={faRotateRight} />
-          </Button>
-        </Tooltip>
       </div>
 
       {/* ─── Variant pills (horizontal) ─────────────────────────────── */}
@@ -262,7 +254,29 @@ export default function RunPage() {
             <ToolbarBtn icon={LucideCopy}    label="複製" onClick={onCopy} highlight={copied} />
             <ToolbarBtn icon={Save}          label="存到 Mission" />
             <div className="ml-auto" />
-            <ToolbarBtn icon={Pencil} label="關閉" onClick={() => navigate(-1)} />
+            <Tooltip content="重跑同任務（帶上次輸入）" placement="bottom">
+              <button
+                onClick={() => {
+                  const tier = data.mission?.tier ?? "30s";
+                  const taskId = data.mission?.taskId;
+                  if (!taskId) { showToastGlobal("找不到原任務 ID"); return; }
+                  navigate(`/${tier}?rerun=${id}`);
+                }}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
+                aria-label="重跑"
+              >
+                <FontAwesomeIcon icon={faRotateRight} className="text-tiny" />
+              </button>
+            </Tooltip>
+            <Tooltip content="返回" placement="bottom">
+              <button
+                onClick={() => navigate(-1)}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
+                aria-label="返回"
+              >
+                <FontAwesomeIcon icon={faXmark} className="text-tiny" />
+              </button>
+            </Tooltip>
           </div>
 
           {/* Mockup big white card */}
