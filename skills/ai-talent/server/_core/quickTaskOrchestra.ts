@@ -1127,14 +1127,17 @@ export async function runOrchestra(args: {
     ]);
 
     // Auto-record to mission_outputs so /projects shows this run.
-    // Non-fatal: failure here doesn't break the user-facing response.
+    // 2026-05-09 (CJ direction): bubble outputId up so client can
+    // navigate to /run/:outputId immediately after run completes
+    // (Phase 2 route-based architecture). Non-fatal: failure here
+    // doesn't break the user-facing response.
     if (args.userId && result.ok && result.variants.length > 0) {
       try {
         const { recordTaskRun } = await import("./recordTaskRun");
         const firstImage = result.variants.find((v) => v.image?.url)?.image?.url ?? null;
         const channel = String((args.template as any).channel ?? "other");
         const tierStr = (tier as "30s" | "60s" | "100s");
-        await recordTaskRun({
+        const persisted = await recordTaskRun({
           userId: args.userId,
           brandId: args.brandId ?? null,
           workspace: channel,
@@ -1151,6 +1154,8 @@ export async function runOrchestra(args: {
           },
           thumbnailUrl: firstImage,
         });
+        (result as any).outputId = persisted.outputId;
+        (result as any).missionId = persisted.missionId;
       } catch (e) {
         console.warn("[runOrchestra] recordTaskRun failed:", (e as Error).message);
       }

@@ -30,6 +30,133 @@ export const outputRouter = router({
         .orderBy(desc(missionOutputs.createdAt));
     }),
 
+  /**
+   * 2026-05-09 (CJ direction): list recent task runs for the current
+   * user × brand × tier. Powers the collapsible sidebar on 30s/60s/100s
+   * pages — quick access to "what I just ran for this brand".
+   */
+  recent: protectedProcedure
+    .input(z.object({
+      brandId: z.number().nullable().optional(),
+      tier: z.enum(["30s", "60s", "100s"]).optional(),
+      limit: z.number().min(1).max(50).default(15),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const brandClause = input.brandId
+        ? sql`AND m.brandId = ${input.brandId}`
+        : sql`AND m.brandId IS NULL`;
+      // tier is in mission_outputs.metadata.tier (JSON), filter via
+      // JSON_EXTRACT for compatibility with MySQL 5.7+.
+      const tierClause = input.tier
+        ? sql`AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) = ${input.tier}`
+        : sql``;
+      const rows = await db.execute(sql`
+        SELECT
+          o.id, o.title, o.platform, o.outputType, o.status, o.createdAt,
+          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) AS tier,
+          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS taskId,
+          m.title AS missionTitle,
+          m.workspace AS workspace,
+          m.brandId AS brandId
+        FROM mission_outputs o
+        JOIN missions m ON m.id = o.missionId
+        WHERE m.userId = ${ctx.user.id}
+          ${brandClause}
+          ${tierClause}
+        ORDER BY o.createdAt DESC
+        LIMIT ${input.limit}
+      `);
+      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
+      return arr.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        platform: r.platform,
+        outputType: r.outputType,
+        status: r.status,
+        createdAt: r.createdAt,
+        tier: r.tier,
+        taskId: r.taskId,
+        missionTitle: r.missionTitle,
+        workspace: r.workspace,
+        brandId: r.brandId,
+      }));
+    }),
+
+  /**
+   * 2026-05-09 (CJ direction): get a single run by id, with mission +
+   * brand context attached. Powers the new /run/:outputId page (Phase 2
+   * route-based architecture, replacing modal for 60s/100s viewing).
+   */
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      // Plain SQL because we need a left-join across mission + brand
+      // missions schema doesn't have tier/taskId columns; they're encoded
+      // in description as "[task:<taskId>] <tier> 任務" by recordTaskRun.
+      // metadata.taskId / metadata.tier are the canonical source.
+      const rows = await db.execute(sql`
+        SELECT o.*,
+          m.id AS mission_id,
+          m.title AS mission_title,
+          m.description AS mission_description,
+          m.workspace AS mission_workspace,
+          m.brandId AS mission_brand_id,
+          m.userId AS mission_user_id,
+          b.name AS brand_name,
+          b.logoUrl AS brand_logo,
+          b.industry AS brand_industry
+        FROM mission_outputs o
+        LEFT JOIN missions m ON m.id = o.missionId
+        LEFT JOIN brands b ON b.id = m.brandId
+        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
+        LIMIT 1
+      `);
+      const rowsArr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
+      const row = Array.isArray(rowsArr) ? rowsArr[0] : (rowsArr as any);
+      if (!row) return null;
+      const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
+      // Parse taskId from description tag pattern "[task:fb-30-x]"
+      const taskMatch = String(row.mission_description ?? "").match(/\[task:([^\]]+)\]/);
+      const taskId = md.taskId ?? taskMatch?.[1] ?? null;
+      const tier = md.tier ?? null;
+      return {
+        id: row.id,
+        missionId: row.missionId,
+        platform: row.platform,
+        outputType: row.outputType,
+        title: row.title,
+        content: row.content,
+        metadata: md,
+        previewHtml: row.previewHtml,
+        status: row.status,
+        version: row.version,
+        scheduledAt: row.scheduledAt,
+        publishedAt: row.publishedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        mission: {
+          id: row.mission_id,
+          title: row.mission_title,
+          description: row.mission_description,
+          tier,
+          taskId,
+          taskLabel: row.mission_title,
+          workspace: row.mission_workspace,
+          brandId: row.mission_brand_id,
+        },
+        brand: row.brand_name ? {
+          id: row.mission_brand_id,
+          name: row.brand_name,
+          logoUrl: row.brand_logo,
+          industry: row.brand_industry,
+        } : null,
+      };
+    }),
+
   confirm: protectedProcedure
     .input(z.object({
       missionId: z.number(),

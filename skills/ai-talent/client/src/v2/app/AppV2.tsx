@@ -41,6 +41,7 @@ import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
 import QuickTask30sPage from "../pages/QuickTask30sPage";
+import RunPage from "../pages/RunPage";
 import BoardroomPage from "../pages/BoardroomPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
 import TheaterPage from "../pages/TheaterPage";
@@ -146,6 +147,10 @@ export default function AppV2() {
           <Route path="/30s" element={<QuickTask30sPage tier="30s" />} />
           <Route path="/60s" element={<QuickTask30sPage tier="60s" />} />
           <Route path="/100s" element={<QuickTask30sPage tier="100s" />} />
+          {/* 2026-05-09 (CJ): Phase 2 route-based output workspace.
+              Replaces modal-based viewing for 60s/100s tasks. URL is
+              shareable, browser back works, can multi-tab compare. */}
+          <Route path="/run/:outputId" element={<RunPage />} />
           <Route path="/90s" element={<Navigate to="/100s" replace />} />
           <Route path="/squads" element={<MissionsHome />} />
           <Route path="/quicktask" element={<Navigate to="/30s" replace />} />

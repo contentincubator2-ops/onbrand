@@ -1009,6 +1009,21 @@ function SlidePanel({
   const isProjects  = currentPath.startsWith("/projects");
   const isTemplates = currentPath.startsWith("/templates");
   const isBrands    = currentPath.startsWith("/brands");
+  // 2026-05-09 (CJ direction): on tier pages (/30s /60s /100s), the
+  // sidebar shows the brand's recent task runs in this tier — clicking
+  // a row navigates to /run/:outputId (route-based workspace).
+  const tierMatch = currentPath.match(/^\/(30s|60s|100s)\b/);
+  const isTier = !!tierMatch;
+  const currentTier = tierMatch?.[1] as ("30s"|"60s"|"100s"|undefined);
+
+  // Recent runs query — only fires when on a tier page with a brand
+  const recentRunsQuery = (trpc as any).output?.recent?.useQuery
+    ? (trpc as any).output.recent.useQuery(
+        { brandId, tier: currentTier, limit: 25 },
+        { enabled: isTier && brandId != null && !!currentTier, staleTime: 30_000 },
+      )
+    : { data: [] };
+  const recentRuns: any[] = (recentRunsQuery.data as any[]) ?? [];
 
   // URL-based sub-nav detection
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
@@ -1331,8 +1346,53 @@ function SlidePanel({
         </>
       )}
 
+      {/* ── Tier pages (/30s, /60s, /100s) — recent task runs for current brand × tier ──
+          2026-05-09 (CJ direction): "側邊欄沿用收合側邊欄，展示內容換成
+          隸屬該主題於該功能的歷史任務，點選後就會到該頁面" */}
+      {isTier && (
+        <>
+          <PlanInviteButtons onNavigate={onNavigate} />
+          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
+          {/* Header showing current tier + brand context */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 14px 6px" }}>
+            <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#A8A29E" }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              {currentTier} 歷史任務
+            </span>
+          </div>
+          {brandId == null ? (
+            <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.5 }}>
+              選擇品牌後顯示這個品牌在 {currentTier} 跑過的任務。
+            </p>
+          ) : (
+            <p style={{ fontSize: 11, color: "#A8A29E", padding: "0 14px 6px", lineHeight: 1.4 }}>
+              {brands.find((b: any) => b.id === brandId)?.name ?? "目前品牌"} · {currentTier}
+            </p>
+          )}
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
+            {recentRunsQuery.isLoading ? (
+              <p style={{ fontSize: 11, color: "#A8A29E", padding: "8px 14px", textAlign: "center" }}>讀取中…</p>
+            ) : recentRuns.length === 0 && brandId != null ? (
+              <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.6 }}>
+                這個品牌還沒有 {currentTier} 任務紀錄。<br/>
+                跑第一個任務後會出現在這裡。
+              </p>
+            ) : (
+              recentRuns.map((r: any) => (
+                <PanelRow key={r.id}
+                  initial={(r.title ?? r.taskId ?? "T").slice(0, 1).toUpperCase()}
+                  initialBg="#FFF7ED" initialColor="#F97316"
+                  label={r.title || r.taskId || "(無標題)"}
+                  onClick={() => onNavigate(`/run/${r.id}`)} />
+              ))
+            )}
+          </div>
+          <TrashButton onNavigate={onNavigate} />
+        </>
+      )}
+
       {/* ── Other pages — generic home-style panel ── */}
-      {!isHome && !isProjects && !isTemplates && !isBrands && (
+      {!isHome && !isProjects && !isTemplates && !isBrands && !isTier && (
         <>
           <PlanInviteButtons onNavigate={onNavigate} />
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />

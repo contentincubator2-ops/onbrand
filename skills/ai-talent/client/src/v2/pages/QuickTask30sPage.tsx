@@ -10,7 +10,7 @@
  *  - Tab "30 秒" (default) + future filter for EDM / IG when those tiers ship
  */
 import React, { useMemo, useState, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
@@ -213,7 +213,7 @@ class TierPageErrorBoundary extends React.Component<
 
 function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const ctx = useOutletContext<ShellOutletCtx>();
-  const navigate = (window as any).__rrNavigate ?? null;  // fallback only
+  const navigate = useNavigate();
   const brandId = (ctx?.brandId as number | null) ?? null;
   const brandName = useMemo(() => {
     const list = (ctx?.brands as any[]) ?? [];
@@ -510,6 +510,13 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         setFetchedUrl(r.fetchedUrl ?? null);
         if (!r.ok) {
           setErrorMsg(`Orchestra 部分階段失敗：${(r.errors ?? []).slice(0, 1).join("")}`);
+        }
+        // 2026-05-09 (CJ Phase 2): 60s/100s tier output uses route-based
+        // workspace, NOT modal. Navigate to /run/:outputId once persisted.
+        // 30s stays in modal (30 秒看完，不需要 route 工作台).
+        if (r.ok && (tier === "60s" || tier === "100s") && (r as any).outputId) {
+          closeTask();
+          navigate(`/run/${(r as any).outputId}`);
         }
         return;
       }
