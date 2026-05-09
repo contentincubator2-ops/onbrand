@@ -1141,7 +1141,20 @@ export async function runOrchestra(args: {
       try {
         const { recordTaskRun } = await import("./recordTaskRun");
         const firstImage = result.variants.find((v) => v.image?.url)?.image?.url ?? null;
-        const channel = String((args.template as any).channel ?? "other");
+        // 2026-05-09 (CJ fix): templates have no .channel field — pull
+        // platform from outputDefaults (which IS set). Fallback to
+        // taskId prefix (fb-* / ig-* / yt-* / ...). 'other' is last resort.
+        const idPrefix = (args.template.id ?? "").split("-")[0] ?? "";
+        const idChannelMap: Record<string, string> = {
+          fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+          li: "linkedin", em: "email", pr: "press", br: "brand", rs: "audience",
+        };
+        const channel = String(
+          (args.template as any).channel
+            ?? args.template.outputDefaults?.platform
+            ?? idChannelMap[idPrefix]
+            ?? "other"
+        );
         const tierStr = (tier as "30s" | "60s" | "100s");
         const persisted = await recordTaskRun({
           userId: args.userId,

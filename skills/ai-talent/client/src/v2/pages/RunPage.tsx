@@ -141,24 +141,22 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
-  // Infer mockup variant. Priority: taskId pattern (Brand/Research →
-  // proposal-style) > mission.workspace > output.platform.
+  // Infer mockup variant. taskId prefix is the most reliable signal —
+  // works even on old DB rows where workspace='other' / platform='other'.
+  // Priority: taskId pattern > mission.workspace > output.platform.
   const mockupVariant: MockupVariant | null = useMemo(() => {
     if (!data) return null;
 
-    // 2026-05-09: Brand + Research tasks use proposal-style mockups.
     const taskId = data.mission?.taskId ?? "";
+
+    // ── Brand + Research → proposal-style ──
     if (taskId.startsWith("br-") || taskId.startsWith("rs-")) {
-      // Cover-style — single big statement
       const coverIds = ["br-30-tagline", "br-30-positioning", "br-30-elevator-pitch", "br-30-manifesto"];
-      // Persona / journey — character-card style
       const personaIds = ["rs-30-persona-draft", "rs-30-journey-map", "rs-30-competitive-interview", "rs-30-synthesis-template"];
-      // Research document — structured form
       const researchDocIds = [
         "rs-30-interview-guide", "rs-30-survey", "rs-30-jtbd-guide",
         "rs-30-usability-script", "rs-30-screener", "rs-30-consent-form",
       ];
-      // Default Brand → spec sheet
       const format =
         coverIds.includes(taskId) ? "proposal-cover" :
         personaIds.includes(taskId) ? "persona-card" :
@@ -168,23 +166,59 @@ export default function RunPage() {
       return { platform: "generic" as any, format: format as any, label: `generic:${format}` };
     }
 
+    // ── Map taskId prefix → platform (most reliable for old runs) ──
+    const idPrefixMap: Record<string, string> = {
+      fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+      li: "linkedin", em: "email", pr: "press",
+    };
+    const idPrefix = taskId.split("-")[0];
+
+    // ── Map taskId pattern → format (postType detection from task name) ──
+    const formatFromTaskId = (id: string): string => {
+      // FB
+      if (id.includes("ad-")) return "ad";
+      if (id.includes("comment-reply") || id.includes("comment")) return "comment";
+      if (id.includes("pinned")) return "pinned";
+      if (id.includes("story")) return "story";
+      if (id.includes("reel")) return "reel";
+      if (id.includes("carousel")) return "carousel";
+      if (id.includes("bio") || id.includes("profile")) return "profile";
+      if (id.includes("live")) return "live";
+      // YT
+      if (id.includes("thumbnail")) return "video-card";
+      if (id.includes("shorts")) return "shorts";
+      if (id.includes("community")) return "community";
+      if (id.startsWith("yt-")) return "watch";
+      // LI
+      if (id.includes("article")) return "article";
+      if (id.includes("newsletter")) return "newsletter";
+      if (id.includes("poll")) return "poll";
+      if (id.includes("document")) return "document";
+      // TT
+      if (id.startsWith("tt-")) return "foryou";
+      // Email
+      if (id.startsWith("em-")) return "edm";
+      // PR
+      if (id.startsWith("pr-")) return "press-release";
+      // Default for fb/ig
+      return "feed";
+    };
+
     const workspaceMap: Record<string, string> = {
       facebook: "facebook", instagram: "instagram", linkedin: "linkedin",
       youtube: "youtube", tiktok: "tiktok", threads: "threads",
       line: "line", email: "email", press: "press",
-      brand: "generic", audience: "generic", theater: "generic",
-    };
-    const platformMap: Record<string, string> = {
-      facebook: "facebook", instagram: "instagram", linkedin: "linkedin",
-      youtube: "youtube", email: "email", press: "press", other: "generic",
-    };
-    const formatMap: Record<string, string> = {
-      post: "feed", story: "story", reel: "reel", ad_copy: "ad",
-      email_html: "edm", script: "watch", report: "generic",
     };
     const ws = data.mission?.workspace as string | undefined;
-    const platform = (workspaceMap[ws ?? ""] ?? platformMap[data.platform ?? "other"] ?? "generic") as any;
-    const format = (formatMap[data.outputType ?? "post"] ?? "feed") as any;
+
+    const platform = (
+      idPrefixMap[idPrefix]
+      ?? workspaceMap[ws ?? ""]
+      ?? (data.platform && data.platform !== "other" ? data.platform : null)
+      ?? "generic"
+    ) as any;
+    const format = formatFromTaskId(taskId) as any;
+
     return { platform, format, label: `${platform}:${format}` };
   }, [data]);
 
