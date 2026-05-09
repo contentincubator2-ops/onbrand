@@ -32,13 +32,17 @@ jobs:
 
             echo ""
             echo "════════ STEP 3: Verify bundle has new code ════════"
-            BUNDLE=$(ls public/assets/index-*.js | head -1)
-            echo "Bundle: $BUNDLE"
-            echo "── New code markers ──"
-            grep -c "idPrefixMap" "$BUNDLE" 2>/dev/null || echo "0 idPrefixMap"
-            grep -c "proposal-cover" "$BUNDLE" 2>/dev/null || echo "0 proposal-cover"
-            grep -c "formatFromTaskId" "$BUNDLE" 2>/dev/null || echo "0 formatFromTaskId"
-            grep -c "ProposalCover\|ResearchDoc" "$BUNDLE" 2>/dev/null || echo "0 components"
+            echo "── ALL bundle files (main is the largest) ──"
+            ls -la public/assets/index-*.js
+            echo ""
+            for BUNDLE in public/assets/index-*.js; do
+              SIZE=$(stat -c%s "$BUNDLE")
+              echo "── ${BUNDLE} (${SIZE} bytes) ──"
+              echo "  proposal-cover: $(grep -c 'proposal-cover' "$BUNDLE" 2>/dev/null || echo 0)"
+              echo "  research-doc:   $(grep -c 'research-doc' "$BUNDLE" 2>/dev/null || echo 0)"
+              echo "  PROPOSAL · :    $(grep -c 'PROPOSAL ·' "$BUNDLE" 2>/dev/null || echo 0)"
+              echo "  fb-30-ad:       $(grep -c 'fb-30-ad' "$BUNDLE" 2>/dev/null || echo 0)"
+            done
 
             echo ""
             echo "════════ STEP 4: Restart pm2 ════════"
