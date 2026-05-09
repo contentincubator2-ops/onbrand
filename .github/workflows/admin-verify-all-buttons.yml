@@ -19,12 +19,12 @@ jobs:
             BASE='http://localhost:3101/trpc'
 
             HIT() {
-              local METHOD=$1; local PATH=$2; local BODY=$3
+              local METHOD=$1; local PROC=$2; local BODY=$3
               if [ "$METHOD" = "GET" ]; then
                 local INPUT_ENC=$(printf '%s' "$BODY" | jq -sRr @uri)
-                curl -sS --max-time 60 -X GET "$BASE/$PATH?batch=1&input=$INPUT_ENC" -H "Cookie: $COOKIE"
+                curl -sS --max-time 90 -X GET "$BASE/$PROC?batch=1&input=$INPUT_ENC" -H "Cookie: $COOKIE"
               else
-                curl -sS --max-time 60 -X POST "$BASE/$PATH?batch=1" -H "Cookie: $COOKIE" -H "Content-Type: application/json" -d "$BODY"
+                curl -sS --max-time 90 -X POST "$BASE/$PROC?batch=1" -H "Cookie: $COOKIE" -H "Content-Type: application/json" -d "$BODY"
               fi
             }
 
