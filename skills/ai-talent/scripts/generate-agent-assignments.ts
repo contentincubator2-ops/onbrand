@@ -222,7 +222,43 @@ async function main() {
   slots.push({ taskId: "media-image-gen", role: "imageDirector", hint: "image gen prompt engineer + art direction", platform: "generic" });
   slots.push({ taskId: "media-video-gen", role: "videoDirector", hint: "video gen prompt engineer + cinematic direction", platform: "generic" });
 
-  console.log(`    → ${slots.length} slots`);
+  // 2026-05-09 (CJ direction): 企劃室補完 — Squad missions + positioning
+  // steps assigned through JSON. Each squad mission exposes per-step
+  // assigned agent slots so the planning room can show distinct agents
+  // for every step.
+  try {
+    const { ALL_100S_SQUADS } = await import("../server/_core/quickTask100Squads");
+    for (const sq of ALL_100S_SQUADS) {
+      const platform = (sq as any).platform ?? inferPlatformFromTaskId(sq.id);
+      const hint = `${sq.label ?? ""} ${sq.methodology ?? ""}`;
+      // 6 step slots per squad (lead + 5 specialists)
+      const stepRoles = ["lead", "imageDirector", "strategist", "specialty", "replyWriter", "compareTable"];
+      for (const role of stepRoles) {
+        slots.push({ taskId: `squad-${sq.id}`, role, hint, platform });
+      }
+    }
+    console.log(`    → +${ALL_100S_SQUADS.length * 6} squad slots`);
+  } catch (e) {
+    console.warn(`    ⚠ squad import failed: ${(e as Error).message}`);
+  }
+
+  // Positioning workflow steps (brand / product / event = ~24 steps total)
+  try {
+    const { buildBrandPositioningSteps, buildProductPositioningSteps, buildEventPositioningSteps } = await import("../server/_core/positioningSteps");
+    const allPosSteps = [
+      ...buildBrandPositioningSteps({}).map((s: any) => ({ id: s.id, kind: "brand", platform: "generic" })),
+      ...buildProductPositioningSteps({}).map((s: any) => ({ id: s.id, kind: "product", platform: "generic" })),
+      ...buildEventPositioningSteps({}).map((s: any) => ({ id: s.id, kind: "event", platform: "generic" })),
+    ];
+    for (const ps of allPosSteps) {
+      slots.push({ taskId: `positioning-${ps.kind}-${ps.id}`, role: "lead", hint: `positioning step ${ps.id}`, platform: ps.platform });
+    }
+    console.log(`    → +${allPosSteps.length} positioning step slots`);
+  } catch (e) {
+    console.warn(`    ⚠ positioning import failed: ${(e as Error).message}`);
+  }
+
+  console.log(`    → ${slots.length} slots total`);
 
   // ── Greedy 1:1 assignment ──────────────────────────────────────────
   // Process slots in priority order: lead first (most important), then

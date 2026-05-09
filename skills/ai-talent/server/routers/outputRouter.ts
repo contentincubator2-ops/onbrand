@@ -31,6 +31,125 @@ export const outputRouter = router({
     }),
 
   /**
+   * 2026-05-09 (Phase 2.1 publish): send caption to a list of email
+   * recipients (team review). Uses existing emailService.
+   */
+  emailToTeam: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      variantIndex: z.number().min(0),
+      recipients: z.array(z.string().email()).min(1).max(10),
+      note: z.string().max(2000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      // Verify ownership + load output
+      const rows = await db.execute(sql`
+        SELECT o.title, o.content, o.platform, m.title AS missionTitle, b.name AS brandName
+        FROM mission_outputs o
+        JOIN missions m ON m.id = o.missionId
+        LEFT JOIN brands b ON b.id = m.brandId
+        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
+        LIMIT 1
+      `);
+      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
+      const row = Array.isArray(arr) ? arr[0] : arr;
+      if (!row) throw new Error("Output not found");
+      let caption = "";
+      try {
+        const parsed = JSON.parse(row.content);
+        const arrSrc = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+        caption = arrSrc[input.variantIndex]?.caption ?? "";
+      } catch { caption = row.content; }
+
+      const { sendEmail } = await import("../auth/emailService");
+      const subject = `[${row.brandName ?? "Marketing-OS"}] ${row.missionTitle ?? row.title ?? "貼文 review"}`;
+      const html = `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h2 style="color:#1A1A18;font-size:18px;margin:0 0 8px">${row.brandName ?? ""} · ${row.platform ?? ""} 貼文 review</h2>
+          <p style="color:#666;font-size:13px;margin:0 0 20px">${row.missionTitle ?? ""}</p>
+          ${input.note ? `<div style="background:#FFF7ED;border-left:3px solid #F97316;padding:12px 16px;margin-bottom:20px;border-radius:4px"><p style="margin:0;color:#1A1A18;font-size:14px;line-height:1.6">${input.note.replace(/\n/g,"<br>")}</p></div>` : ""}
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;font-size:14px;line-height:1.7;white-space:pre-wrap">${caption}</div>
+          <p style="color:#9ca3af;font-size:11px;margin:20px 0 0">由 SoWork Marketing OS 寄出</p>
+        </div>
+      `;
+      const failures: string[] = [];
+      for (const to of input.recipients) {
+        try { await sendEmail({ to, subject, html }); }
+        catch (e: any) { failures.push(`${to}: ${e?.message ?? e}`); }
+      }
+      return {
+        ok: failures.length === 0,
+        sentCount: input.recipients.length - failures.length,
+        failures,
+      };
+    }),
+
+  /**
+   * 2026-05-09 (Phase 2.1 publish): generate iCalendar (.ics) data for
+   * scheduled posting. Returns the .ics body so client downloads it.
+   * No OAuth needed — user can drag .ics into any calendar app.
+   */
+  scheduleIcs: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      variantIndex: z.number().min(0),
+      scheduledAt: z.string(), // ISO8601
+      durationMinutes: z.number().min(5).max(480).default(30),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const rows = await db.execute(sql`
+        SELECT o.title, o.content, m.title AS missionTitle, b.name AS brandName
+        FROM mission_outputs o
+        JOIN missions m ON m.id = o.missionId
+        LEFT JOIN brands b ON b.id = m.brandId
+        WHERE o.id = ${input.id} AND m.userId = ${ctx.user.id}
+        LIMIT 1
+      `);
+      const arr: any[] = Array.isArray(rows) ? rows : ((rows as any)[0] ?? []);
+      const row = Array.isArray(arr) ? arr[0] : arr;
+      if (!row) throw new Error("Output not found");
+      let caption = "";
+      try {
+        const parsed = JSON.parse(row.content);
+        const arrSrc = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+        caption = arrSrc[input.variantIndex]?.caption ?? "";
+      } catch { caption = row.content; }
+
+      const start = new Date(input.scheduledAt);
+      const end = new Date(start.getTime() + input.durationMinutes * 60_000);
+      const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+      const escape = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+      const uid = `output-${input.id}-${input.variantIndex}@sowork.ai`;
+      const summary = `📤 發布：${row.brandName ?? ""} · ${row.missionTitle ?? "貼文"}`;
+      const ics = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//SoWork//Marketing-OS//EN",
+        "BEGIN:VEVENT",
+        `UID:${uid}`,
+        `DTSTAMP:${fmt(new Date())}`,
+        `DTSTART:${fmt(start)}`,
+        `DTEND:${fmt(end)}`,
+        `SUMMARY:${escape(summary)}`,
+        `DESCRIPTION:${escape(caption)}`,
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n");
+
+      // Mark output as scheduled in DB
+      await db.update(missionOutputs).set({
+        status: "scheduled",
+        scheduledAt: start,
+      }).where(eq(missionOutputs.id, input.id));
+
+      return { ics, scheduledAt: start.toISOString(), filename: `sowork-post-${input.id}.ics` };
+    }),
+
+  /**
    * 2026-05-09 (CJ direction): persist edited caption back. Used by
    * RunPage's direct-edit + AI-chat-revise flows. Variant content is
    * stored as JSON in mission_outputs.content, so update means parsing,

@@ -20,6 +20,7 @@ import React, { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Avatar, Button, Card, CardBody, Chip, Spinner, Textarea, Tooltip,
+  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -82,6 +83,44 @@ export default function RunPage() {
   const refineMut = (trpc as any).quickTask?.refineCaption?.useMutation
     ? (trpc as any).quickTask.refineCaption.useMutation()
     : null;
+  const emailMut = trpc.output.emailToTeam.useMutation({
+    onSuccess: (r) => {
+      if (r.ok) showToastGlobal(`已寄給 ${r.sentCount} 位收件人`);
+      else showToastGlobal(`部分寄送失敗：${r.failures.join("; ")}`);
+    },
+    onError: (e) => showToastGlobal(`寄送失敗：${e.message}`),
+  });
+  const scheduleMut = trpc.output.scheduleIcs.useMutation({
+    onSuccess: (r) => {
+      // Trigger .ics download
+      const blob = new Blob([r.ics], { type: "text/calendar;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = r.filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToastGlobal("已產生 .ics — 拖進日曆 App 即可");
+      utils.output.getById.invalidate({ id });
+    },
+    onError: (e) => showToastGlobal(`排程失敗：${e.message}`),
+  });
+  const statusMut = trpc.output.updateStatus.useMutation({
+    onSuccess: () => {
+      showToastGlobal("已存到 Mission");
+      utils.output.getById.invalidate({ id });
+    },
+  });
+
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailRecipients, setEmailRecipients] = useState("");
+  const [emailNote, setEmailNote] = useState("");
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState(() => {
+    const d = new Date();
+    d.setHours(d.getHours() + 24);
+    d.setMinutes(0, 0, 0);
+    return d.toISOString().slice(0, 16); // local datetime-local format
+  });
 
   const variants: VariantData[] = useMemo(() => {
     if (!data) return [];
@@ -382,17 +421,25 @@ export default function RunPage() {
             <CardBody className="space-y-2">
               <p className="text-tiny font-semibold">發布到</p>
               <Button color="primary" fullWidth startContent={<FontAwesomeIcon icon={faRocket} />} isDisabled>
-                直接發 Facebook（即將推出）
+                直接發 Facebook（需綁 Meta Token）
               </Button>
-              <Button variant="flat" fullWidth startContent={<FontAwesomeIcon icon={faCalendarPlus} />} isDisabled>
-                排程到日曆（即將推出）
-              </Button>
-              <Button variant="flat" fullWidth startContent={<FontAwesomeIcon icon={faEnvelope} />} isDisabled>
-                寄給團隊（即將推出）
-              </Button>
-              <Button variant="flat" fullWidth startContent={<FontAwesomeIcon icon={faFolderPlus} />}>
-                存到 Mission
-              </Button>
+              <Button
+                variant="flat" fullWidth
+                startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
+                onPress={() => setScheduleDialogOpen(true)}
+              >排程到日曆（.ics）</Button>
+              <Button
+                variant="flat" fullWidth
+                startContent={<FontAwesomeIcon icon={faEnvelope} />}
+                onPress={() => setEmailDialogOpen(true)}
+              >寄給團隊</Button>
+              <Button
+                variant="flat" fullWidth
+                startContent={<FontAwesomeIcon icon={faFolderPlus} />}
+                isDisabled={data.status === "approved" || statusMut.isPending}
+                isLoading={statusMut.isPending}
+                onPress={() => statusMut.mutate({ id, status: "approved" })}
+              >{data.status === "approved" ? "✓ 已存 Mission" : "存到 Mission"}</Button>
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}
@@ -414,6 +461,82 @@ export default function RunPage() {
           </Card>
         </aside>
       </div>
+
+      {/* ── EMAIL DIALOG ────────────────────────────────────────────── */}
+      <Modal isOpen={emailDialogOpen} onClose={() => setEmailDialogOpen(false)} size="md">
+        <ModalContent>
+          <ModalHeader className="text-base">寄給團隊 review</ModalHeader>
+          <ModalBody className="space-y-3">
+            <Input
+              label="收件人 email（用逗號分隔多個）"
+              placeholder="cj@sowork.ai, anna@client.com"
+              value={emailRecipients}
+              onChange={(e) => setEmailRecipients(e.target.value)}
+            />
+            <Textarea
+              label="附加訊息（可選）"
+              placeholder="請幫我看一下這版本的 hook 是否打到目標族群"
+              value={emailNote}
+              onChange={(e) => setEmailNote(e.target.value)}
+              minRows={3}
+            />
+            <p className="text-tiny text-default-500">寄出時會附上完整 caption + 品牌資訊。</p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setEmailDialogOpen(false)}>取消</Button>
+            <Button
+              color="primary"
+              isLoading={emailMut.isPending}
+              isDisabled={!emailRecipients.trim()}
+              onPress={() => {
+                const recipients = emailRecipients.split(",").map(s => s.trim()).filter(Boolean);
+                if (recipients.length === 0) return;
+                emailMut.mutate({
+                  id, variantIndex: activeIdx,
+                  recipients, note: emailNote || undefined,
+                }, {
+                  onSuccess: () => setEmailDialogOpen(false),
+                });
+              }}
+            >寄出</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* ── SCHEDULE DIALOG ─────────────────────────────────────────── */}
+      <Modal isOpen={scheduleDialogOpen} onClose={() => setScheduleDialogOpen(false)} size="sm">
+        <ModalContent>
+          <ModalHeader className="text-base">排程發布時間</ModalHeader>
+          <ModalBody className="space-y-3">
+            <Input
+              type="datetime-local"
+              label="發布時間"
+              value={scheduleAt}
+              onChange={(e) => setScheduleAt(e.target.value)}
+            />
+            <p className="text-tiny text-default-500">
+              產生 .ics 檔下載 — 拖進 Google Calendar / Outlook / Apple Calendar 即可。
+              這個 run 也會在系統內標記為「已排程」。
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setScheduleDialogOpen(false)}>取消</Button>
+            <Button
+              color="primary"
+              isLoading={scheduleMut.isPending}
+              onPress={() => {
+                scheduleMut.mutate({
+                  id, variantIndex: activeIdx,
+                  scheduledAt: new Date(scheduleAt).toISOString(),
+                  durationMinutes: 30,
+                }, {
+                  onSuccess: () => setScheduleDialogOpen(false),
+                });
+              }}
+            >下載 .ics</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
