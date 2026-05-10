@@ -613,7 +613,15 @@ export default function RunPage() {
                       imageGenMut.mutate({
                         brandId: data.brand.id,
                         prompt: imagePrompt,
-                        channel: (mockupVariant?.platform ?? "facebook") as any,
+                        // image.generate expects short codes: fb / ig / linkedin / youtube / tiktok / threads / line / email / press
+                        channel: (
+                          mockupVariant?.platform === "facebook"  ? "fb" :
+                          mockupVariant?.platform === "instagram" ? "ig" :
+                          mockupVariant?.platform === "linkedin"  ? "linkedin" :
+                          mockupVariant?.platform === "youtube"   ? "youtube" :
+                          mockupVariant?.platform === "tiktok"    ? "tiktok" :
+                          "fb"
+                        ) as any,
                       });
                     }}
                   >

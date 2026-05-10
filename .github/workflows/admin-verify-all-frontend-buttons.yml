@@ -43,7 +43,7 @@ jobs:
             export MYSQL_PWD="mos_secure_2026"
 
             echo "════════ A. Tier home pages → list-task endpoints ════════"
-            P "task.list (30s catalog)" "$(HIT GET 'taskCatalog.list' '{"0":{"tier":"30s"}}')"
+            P "taskCatalog.listForPicker (tier home grid)" "$(HIT GET 'taskCatalog.listForPicker' '{"0":{}}')"
 
             echo ""
             echo "════════ B. Create output (intake modal → 立即產出) ════════"
@@ -57,13 +57,13 @@ jobs:
 
             P "✏️ Edit save (output.updateVariantCaption)" "$(HIT POST output.updateVariantCaption "{\"0\":{\"id\":$OUT_ID,\"variantIndex\":0,\"caption\":\"驗收測試覆寫\"}}")"
 
-            P "💬 Chat refine (quickTask.refineCaption)" "$(HIT POST quickTask.refineCaption "{\"0\":{\"originalCaption\":\"原貼文內容\",\"prompt\":\"改成更短\",\"taskId\":\"fb-30-caption-short\",\"brandId\":2832}}")"
+            P "💬 Chat refine (quickTask.refineCaption)" "$(HIT POST quickTask.refineCaption "{\"0\":{\"currentCaption\":\"原貼文內容\",\"userFeedback\":\"改成更短\",\"brandId\":2832,\"history\":[]}}")"
 
             P "🪄 Regen variant (quickTask.regenerateVariant)" "$(HIT POST quickTask.regenerateVariant "{\"0\":{\"outputId\":$OUT_ID,\"variantIndex\":0}}")"
 
             echo ""
             echo "════════ D. 🖼️ Image gen (image.generate → output.updateVariantImage) ════════"
-            IMG_RESP=$(HIT POST image.generate '{"0":{"brandId":2832,"prompt":"溫暖的家庭餐桌風格，自然光，粉紅色系","channel":"facebook"}}')
+            IMG_RESP=$(HIT POST image.generate '{"0":{"brandId":2832,"prompt":"溫暖的家庭餐桌風格，自然光，粉紅色系","channel":"fb"}}')
             IMG_URL=$(echo "$IMG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); r=d[0].get('result',{}).get('data',{}); print(r.get('url') or r.get('imageUrl') or '')" 2>/dev/null)
             echo "  image.generate URL: ${IMG_URL:0:80}"
             if [ -n "$IMG_URL" ]; then
@@ -108,7 +108,7 @@ jobs:
             echo ""
             echo "════════ H. Tier task lists ════════"
 
-            P "30s tasks (FB list)" "$(HIT GET 'taskCatalog.list' '{"0":{"tier":"30s","channel":"facebook"}}')"
+            P "taskCatalog.listCategoriesForPicker" "$(HIT GET 'taskCatalog.listCategoriesForPicker' '{"0":{}}')"
 
             echo ""
             echo "════════ I. Final state summary ════════"
