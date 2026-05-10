@@ -29,40 +29,51 @@ export interface CastMember {
   platform: TheaterPlatform | null; // null for chief / qa
 }
 
-/** Platform display metadata + the canonical mockup variant for Theater cells. */
+/** Platform display metadata + the canonical mockup variant for Theater cells.
+ *
+ * 2026-05-10 (CJ direction「icon 要該社群平台或 NOTION B&W」):
+ * - `iconKey` references FontAwesome brand icons (faFacebook, faInstagram...)
+ *   so the platform IS recognizable by its real logo SHAPE.
+ * - Component renders icon in neutral B&W (text-neutral-700/900) rather
+ *   than the brand color, so it fits Notion-style monochrome aesthetic.
+ * - `accent` kept for places that genuinely need brand color (e.g. mockup
+ *   internals where users expect FB blue).
+ * - `emoji` removed — replaced everywhere with FontAwesome brand icon.
+ */
 export const PLATFORM_META: Record<
   TheaterPlatform,
   {
     label: string;
     short: string;
     accent: string;
-    emoji: string;
+    /** FontAwesome brand-icon name — reverse-lookup in TheaterPage to actual import */
+    iconKey: "facebook" | "instagram" | "youtube" | "threads" | "line" | "blog";
     /** PlatformMockup variant key — see PlatformMockup/index.tsx switch. */
     mockup: { platform: string; format: string; label: string };
   }
 > = {
   facebook:  {
-    label: "Facebook", short: "FB", accent: "#1877F2", emoji: "📘",
+    label: "Facebook", short: "FB", accent: "#1877F2", iconKey: "facebook",
     mockup: { platform: "facebook", format: "feed", label: "Facebook 貼文" },
   },
   instagram: {
-    label: "Instagram", short: "IG", accent: "#E1306C", emoji: "📸",
+    label: "Instagram", short: "IG", accent: "#E1306C", iconKey: "instagram",
     mockup: { platform: "instagram", format: "feed", label: "Instagram 貼文" },
   },
   youtube:   {
-    label: "YouTube", short: "YT", accent: "#FF0000", emoji: "▶️",
+    label: "YouTube", short: "YT", accent: "#FF0000", iconKey: "youtube",
     mockup: { platform: "youtube", format: "video-card", label: "YouTube 影片卡" },
   },
   threads:   {
-    label: "Threads", short: "Threads", accent: "#000000", emoji: "🧵",
+    label: "Threads", short: "Threads", accent: "#000000", iconKey: "threads",
     mockup: { platform: "threads", format: "post", label: "Threads 貼文" },
   },
   line:      {
-    label: "LINE", short: "LINE", accent: "#06C755", emoji: "💬",
+    label: "LINE", short: "LINE", accent: "#06C755", iconKey: "line",
     mockup: { platform: "line", format: "broadcast", label: "LINE 廣播" },
   },
   blog:      {
-    label: "Blog 長文", short: "Blog", accent: "#F97316", emoji: "📝",
+    label: "Blog 長文", short: "Blog", accent: "#F97316", iconKey: "blog",
     mockup: { platform: "web", format: "blog", label: "Web Blog" },
   },
 };

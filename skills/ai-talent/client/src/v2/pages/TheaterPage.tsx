@@ -35,6 +35,32 @@ import {
   Pencil,
   Flag,
 } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faFacebook,
+  faInstagram,
+  faYoutube,
+  faThreads,
+  faLine,
+  faBloggerB,
+} from "@fortawesome/free-brands-svg-icons";
+
+/** 2026-05-10 (CJ「icon 要該社群平台 or NOTION B&W」): map iconKey to
+ *  the actual platform brand glyph. Renderer always paints in neutral
+ *  text color so platform shape is recognizable but palette stays B&W. */
+const PLATFORM_ICON_MAP: Record<string, any> = {
+  facebook:  faFacebook,
+  instagram: faInstagram,
+  youtube:   faYoutube,
+  threads:   faThreads,
+  line:      faLine,
+  blog:      faBloggerB,
+};
+function PlatformIcon({ platformKey, className }: { platformKey: string; className?: string }) {
+  const icon = PLATFORM_ICON_MAP[platformKey];
+  if (!icon) return null;
+  return <FontAwesomeIcon icon={icon} className={className ?? "text-neutral-700"} />;
+}
 import {
   THEATER_CAST,
   PLATFORM_META,
@@ -116,7 +142,9 @@ function BrainBar({
     return () => clearInterval(id);
   }, [thought]);
 
-  const accent = member.platform ? PLATFORM_META[member.platform].accent : "#6366f1";
+  // 2026-05-10 (CJ B&W): brain bar uses neutral palette regardless of
+  // platform. Was tinting bg + shadow with brand color.
+  const accent = "#171717"; // neutral-900
   const roleLabel = {
     chief:  "總策畫",
     lead:   member.platform ? `${PLATFORM_META[member.platform].label} Lead` : "Lead",
@@ -250,11 +278,17 @@ function PlatformCell({
 
   return (
     <div className="relative flex flex-col">
-      {/* status chip — floats top-right of mockup */}
+      {/* status chip — floats top-right of mockup. 2026-05-10 (CJ B&W):
+          neutral palette by default; only state-failed uses red. */}
       {(hasContent || state.status === "queued") && (
         <span
-          className="absolute top-2 right-2 z-10 px-2 py-0.5 text-[10px] font-medium rounded-full text-white shadow-sm"
-          style={{ background: meta.accent }}
+          className={`absolute top-2 right-2 z-10 px-2 py-0.5 text-[10px] font-medium rounded-full shadow-sm ${
+            state.status === "failed"
+              ? "bg-red-600 text-white"
+              : state.status === "done"
+              ? "bg-neutral-900 text-white"
+              : "bg-white text-neutral-700 border border-neutral-300"
+          }`}
         >
           {statusLabel}
         </span>
@@ -325,7 +359,7 @@ function PlatformCell({
           className="bg-neutral-50 rounded-lg flex flex-col items-center gap-2 justify-center text-center px-3"
           style={{ minHeight: 200, border: "1px dashed #d4d4d4" }}
         >
-          <span className="text-2xl opacity-30">{meta.emoji}</span>
+          <PlatformIcon platformKey={meta.iconKey} className="text-2xl text-neutral-400" />
           <p className="text-[10px] text-neutral-400">
             {isIdle ? `${meta.short} · 等候接棒…` : "—"}
           </p>
@@ -1252,16 +1286,13 @@ export default function TheaterPage() {
                   )
                 }
                 disabled={running}
-                className="px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition"
-                style={{
-                  background: on ? meta.accent : "white",
-                  color: on ? "white" : "#525252",
-                  border: `1.5px solid ${on ? meta.accent : "#e5e5e5"}`,
-                  fontWeight: on ? 600 : 500,
-                  opacity: running ? 0.7 : 1,
-                }}
+                className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition border ${
+                  on
+                    ? "bg-neutral-900 text-white border-neutral-900 font-semibold"
+                    : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 font-medium"
+                } ${running ? "opacity-70" : ""}`}
               >
-                <span>{meta.emoji}</span>
+                <PlatformIcon platformKey={meta.iconKey} className={on ? "text-white" : "text-neutral-700"} />
                 <span>{meta.label}</span>
                 {on && <Check size={12} strokeWidth={2.5} />}
               </button>
@@ -1636,10 +1667,8 @@ export default function TheaterPage() {
                 <Avatar src={avatarOf(m) ?? undefined} size="sm" className="w-5 h-5" />
                 <span className="text-[11px] text-neutral-700 font-medium">{m.name}</span>
                 {m.platform && (
-                  <span
-                    className="text-[9px] px-1 rounded"
-                    style={{ background: `${PLATFORM_META[m.platform].accent}22`, color: PLATFORM_META[m.platform].accent }}
-                  >
+                  <span className="text-[9px] px-1 rounded bg-neutral-100 text-neutral-700 flex items-center gap-1">
+                    <PlatformIcon platformKey={PLATFORM_META[m.platform].iconKey} className="text-neutral-700" />
                     {PLATFORM_META[m.platform].short}
                   </span>
                 )}
