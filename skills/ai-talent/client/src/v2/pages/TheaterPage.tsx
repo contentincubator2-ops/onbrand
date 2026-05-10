@@ -1356,12 +1356,10 @@ export default function TheaterPage() {
             <p className="text-neutral-500 text-sm">請先在左上角選擇品牌</p>
           </div>
         ) : (
-          {/* 2026-05-10 (CJ feedback「5/13 整天消失」根因): 舊版 column-count
-              masonry 把 (day × platform) cells flatten 後重新 pack 成 N 個 CSS
-              column，造成 5/13 的 cells 視覺上被插到別 column 的尾巴 → 整欄看
-              起來空白。改成 day-grid：每個 day 自己一個欄位，platform cells 在
-              欄位內垂直 stack。每天永遠看得到，filter 掉某個 platform 也只是
-              那欄變短而不是整天消失。 */}
+          // 2026-05-10 (CJ「5/13 整天消失」根因): 舊版 column-count masonry 把
+          // (day × platform) cells flatten 後重新 pack 成 N 個 CSS column，造成
+          // 5/13 cells 視覺上被插到別 column 尾巴 → 整欄看起來空白。改成 day-grid：
+          // 每個 day 自己一欄，platform cells 在欄位內垂直 stack。
           <div className="grid gap-3" style={{
             gridTemplateColumns: `repeat(${days.length}, minmax(260px, 1fr))`,
             overflowX: "auto",
