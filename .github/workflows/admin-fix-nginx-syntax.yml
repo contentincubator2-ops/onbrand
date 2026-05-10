@@ -1,0 +1,27 @@
+name: Admin — Fix nginx syntax error line 105
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            FILE=/etc/nginx/sites-enabled/marketing-os
+            echo "── Lines around the problem ──"
+            sudo sed -n '95,115p' $FILE
+
+            echo ""
+            echo "── Latest pre-cutover backup ──"
+            ls -t /etc/nginx/sites-available/marketing-os.bak* 2>/dev/null | head -3
+
+            echo ""
+            echo "── Current nginx -t ──"
+            sudo nginx -t 2>&1 | head -10
