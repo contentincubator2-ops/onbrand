@@ -1350,6 +1350,46 @@ async function main() {
     `);
     console.log("[migrate] user_achievements: OK");
 
+    // ─── 2026-05-10 (CJ「成就獎勵系統」): rewards infrastructure ─────
+    // users.quotaBonus  — JSON {image_gen:30, video_gen:2, brands:1, trial_extend_days:3}
+    //                      added to baseline plan quota when checking limits
+    // users.featureFlags — JSON {schedule_reminder_beta:true, brand_style_export:true,
+    //                            founding_member:true, early_access:true}
+    await ensureCol("users", "quotaBonus",   "JSON NULL");
+    await ensureCol("users", "featureFlags", "JSON NULL");
+
+    // user_route_rewards — track which routes have been granted to avoid double-grant
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS user_route_rewards (
+        userId       INT          NOT NULL,
+        route        VARCHAR(32)  NOT NULL,
+        rewardJson   JSON         NULL,        -- snapshot of what was granted
+        grantedAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (userId, route),
+        INDEX idx_urr_user (userId, grantedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] user_route_rewards: OK");
+
+    // promo_codes — discount tokens issued by achievement system or marketing
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS promo_codes (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        code            VARCHAR(32)  NOT NULL UNIQUE,
+        userId          INT          NULL,            -- NULL = available to anyone, else owner
+        kind            VARCHAR(32)  NOT NULL,        -- first_month_pct | annual_pct
+        discountPct     INT          NOT NULL,        -- 10 = 10% off
+        source          VARCHAR(32)  NOT NULL,        -- achievement_route_upgrade | achievement_finale | manual
+        expiresAt       DATETIME(3)  NULL,
+        usedAt          DATETIME(3)  NULL,
+        invoiceId       INT          NULL,
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_promo_user (userId),
+        INDEX idx_promo_used (usedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] promo_codes: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

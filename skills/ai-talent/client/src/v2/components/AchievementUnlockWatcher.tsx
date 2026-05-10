@@ -22,6 +22,14 @@ function saveSeen(s: Set<string>) {
   try { localStorage.setItem(SEEN_KEY, JSON.stringify([...s])); } catch {}
 }
 
+function routeChinese(route: string): string {
+  return ({
+    onboarding: "入門", explore: "探索", visual: "視覺",
+    planning: "規劃", integration: "整合", publish: "發布",
+    upgrade: "升級",
+  } as Record<string, string>)[route] ?? route;
+}
+
 export default function AchievementUnlockWatcher() {
   const evalMut = (trpc as any).achievements?.evaluate?.useMutation
     ? (trpc as any).achievements.evaluate.useMutation()
@@ -39,22 +47,42 @@ export default function AchievementUnlockWatcher() {
       if (now - lastRunRef.current < 30_000) return;
       lastRunRef.current = now;
       try {
-        const fresh = await evalMut.mutateAsync({});
-        if (!fresh || !Array.isArray(fresh) || fresh.length === 0) return;
+        const r = await evalMut.mutateAsync({});
+        if (!r) return;
         const seen = seenRef.current;
+        let toastIdx = 0;
+        const stagger = (msg: string) => {
+          setTimeout(() => {
+            if (!stopped) showToastGlobal(msg, "success" as any);
+          }, 350 * toastIdx);
+          toastIdx++;
+        };
+
+        // 1) Per-achievement unlocks
+        const fresh: any[] = r.newAchievements ?? [];
         for (const a of fresh) {
           if (seen.has(a.code)) continue;
           seen.add(a.code);
-          // Stagger toasts so multiple unlocks don't pile on instantly
-          setTimeout(() => {
-            if (!stopped) {
-              showToastGlobal(
-                `🎉 解鎖成就「${a.title}」 +${a.points} 點`,
-                "success" as any,
-              );
-            }
-          }, 300 * fresh.indexOf(a));
+          stagger(`🎉 解鎖成就「${a.title}」 +${a.points} 點`);
         }
+
+        // 2) Route completions — bigger celebration, list rewards
+        const grants: any[] = r.routeGrants ?? [];
+        for (const g of grants) {
+          const grantKey = `route:${g.route}`;
+          if (seen.has(grantKey)) continue;
+          seen.add(grantKey);
+          const rewardLabels = (g.rewards ?? []).map((rw: any) => rw.label).join(" · ");
+          stagger(`🌟 完成路線「${routeChinese(g.route)}」獎勵：${rewardLabels}`);
+        }
+
+        // 3) Finale — all 18 unlocked
+        if (r.finaleGrant && !seen.has("finale")) {
+          seen.add("finale");
+          const labels = (r.finaleGrant.rewards ?? []).map((rw: any) => rw.label).join(" · ");
+          stagger(`🏆 全 18 成就達成！Drop Founding User · ${labels}`);
+        }
+
         saveSeen(seen);
       } catch {/* swallow */}
     };

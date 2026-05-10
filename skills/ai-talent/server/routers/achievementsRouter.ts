@@ -82,15 +82,40 @@ export const achievementsRouter = router({
       };
     }),
 
-  /** Run evaluator + record any new unlocks. Returns the freshly unlocked
-   *  achievement objects so frontend can toast them. */
+  /** Run evaluator + record unlocks + grant route/finale rewards.
+   *  Returns BOTH fresh unlock objects and any newly granted route rewards
+   *  so frontend can show celebratory toasts/modals. */
   evaluate: protectedProcedure
     .mutation(async ({ ctx }) => {
-      const fresh = await evaluateAndRecord(ctx.user!.id);
-      return fresh.map((code) => {
+      const r = await evaluateAndRecord(ctx.user!.id);
+      const newAchievements = r.freshUnlocks.map((code) => {
         const a = ACHIEVEMENTS.find((x) => x.code === code);
         return a ? { code, title: a.title, description: a.description, points: a.points, icon: a.icon } : null;
       }).filter(Boolean);
+      return {
+        newAchievements,
+        routeGrants: r.routeGrants,    // [{ route, rewards: Reward[], appliedMeta: [{reward, meta}] }]
+        finaleGrant: r.finaleGrant,    // { rewards, appliedMeta } | null
+      };
+    }),
+
+  /** List user's promo codes (for /settings/account → invoices block + 升級頁 input). */
+  listPromoCodes: protectedProcedure
+    .query(async ({ ctx }) => {
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT id, code, kind, discountPct, expiresAt, usedAt, source, createdAt
+         FROM promo_codes WHERE userId = ? ORDER BY id DESC`,
+        [ctx.user!.id],
+      );
+      return rows;
+    }),
+
+  /** User's accumulated quota bonus + feature flags */
+  getBonuses: protectedProcedure
+    .query(async ({ ctx }) => {
+      const { getUserBonuses } = await import("../_core/achievementRewards");
+      return getUserBonuses(ctx.user!.id);
     }),
 
   /** Mark an unlock as "seen" so we don't re-toast it. Optional polish. */

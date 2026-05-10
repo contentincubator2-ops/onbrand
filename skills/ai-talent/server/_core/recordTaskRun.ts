@@ -134,8 +134,9 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
       await localPool.execute(`UPDATE missions SET updatedAt = NOW() WHERE id = ?`, [missionId]);
     } catch {/* non-fatal */}
 
-    // 2026-05-10: kick achievement evaluator (non-blocking, fire-and-forget).
-    // Fresh unlocks bubble up next time client calls achievements.evaluate.
+    // 2026-05-10: fire-and-forget achievement evaluator + reward grant.
+    // Fresh unlocks + reward grants bubble up next time client polls
+    // achievements.evaluate (every 90s + on focus). Doesn't block task return.
     Promise.resolve().then(async () => {
       try {
         const { evaluateAndRecord } = await import("./achievements");

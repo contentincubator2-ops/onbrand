@@ -408,8 +408,24 @@ export async function recordUnlocks(userId: number, codes: string[]): Promise<st
   return fresh;
 }
 
-/** Convenience: evaluate + record + return fresh unlocks. */
-export async function evaluateAndRecord(userId: number): Promise<string[]> {
+/** Convenience: evaluate + record + grant route/finale rewards.
+ *  Returns fresh unlock codes + any newly granted route rewards + finale. */
+export async function evaluateAndRecord(userId: number): Promise<{
+  freshUnlocks: string[];
+  routeGrants: any[];
+  finaleGrant: any;
+}> {
   const should = await evaluateUserState(userId);
-  return recordUnlocks(userId, should);
+  const freshUnlocks = await recordUnlocks(userId, should);
+
+  // Grant any newly-completed route rewards + finale (18/18)
+  const { grantRouteRewards } = await import("./achievementRewards");
+  const allUnlocked = new Set(should);
+  const { newlyGrantedRoutes, finaleGranted } = await grantRouteRewards(userId, allUnlocked);
+
+  return {
+    freshUnlocks,
+    routeGrants: newlyGrantedRoutes,
+    finaleGrant: finaleGranted,
+  };
 }

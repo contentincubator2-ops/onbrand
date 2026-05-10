@@ -11,8 +11,25 @@ import {
   Sparkles, Building2, Zap, LayoutGrid, MessageCircle, RefreshCw,
   Image, Video, Calendar, Layers, Flag, Pencil, Send,
   CalendarPlus, Mail, FolderCheck, Award, Crown, Lock,
-  CheckCircle2, ChevronLeft, ChevronRight,
+  CheckCircle2, ChevronLeft, ChevronRight, Gift, Trophy,
 } from "lucide-react";
+
+/** Mini reward catalog — must mirror server/_core/achievementRewards.ts */
+const ROUTE_REWARDS_DISPLAY: Record<string, string[]> = {
+  onboarding:  ["額外 1 個品牌位（試用期間）"],
+  explore:     ["額外 30 張 AI 圖（試用期間）"],
+  visual:      ["額外 2 支 AI 影片（試用期間）"],
+  planning:    ["解鎖「自動排程提醒」beta"],
+  integration: ["解鎖「品牌風格匯出 PDF」"],
+  publish:     ["試用期延長 3 天"],
+  upgrade:     ["首月 9 折券（30 天內兌換）"],
+};
+const FINALE_REWARDS_DISPLAY = [
+  "Drop Founding User 永久徽章",
+  "首月 9 折券（重複領）",
+  "年繳再折 7%（60 天內兌換）",
+  "新功能搶先體驗",
+];
 
 const ICON_MAP: Record<string, any> = {
   Sparkles, Building2, Zap, LayoutGrid, MessageCircle, RefreshCw,
@@ -118,6 +135,39 @@ export default function AchievementsPage() {
           )}
         </div>
 
+        {/* Finale ribbon — show what's at the end of the journey */}
+        <div className={`rounded-xl p-6 mb-6 border-2 ${
+          progress?.unlockedCount === progress?.totalCount
+            ? "border-neutral-900 bg-neutral-900 text-white"
+            : "border-dashed border-neutral-300 bg-white"
+        }`}>
+          <div className="flex items-start gap-3">
+            <Trophy size={28} className={progress?.unlockedCount === progress?.totalCount ? "text-amber-300" : "text-neutral-400"} />
+            <div className="flex-1">
+              <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${
+                progress?.unlockedCount === progress?.totalCount ? "text-amber-300" : "text-neutral-500"
+              }`}>
+                完成全 18 個成就
+              </p>
+              <h3 className={`text-lg font-bold mb-2 ${
+                progress?.unlockedCount === progress?.totalCount ? "text-white" : "text-neutral-900"
+              }`}>
+                Drop Founding User · 終極獎勵
+              </h3>
+              <ul className={`text-sm space-y-1 ${
+                progress?.unlockedCount === progress?.totalCount ? "text-neutral-100" : "text-neutral-700"
+              }`}>
+                {FINALE_REWARDS_DISPLAY.map((reward, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <span className={progress?.unlockedCount === progress?.totalCount ? "text-amber-300" : "text-neutral-400"}>✦</span>
+                    {reward}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Routes */}
         {ROUTE_ORDER.map((routeKey) => {
           const items = grouped[routeKey];
@@ -126,18 +176,37 @@ export default function AchievementsPage() {
           const stats = progress?.byRoute?.[routeKey];
           return (
             <div key={routeKey} className="bg-white border border-neutral-200 rounded-xl p-6 mb-4">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-start justify-between mb-3">
                 <div>
                   <p className="text-xs text-neutral-400 font-mono">{meta?.dayHint}</p>
                   <h2 className="text-lg font-bold text-neutral-900">{meta?.label}</h2>
                   <p className="text-xs text-neutral-500">{meta?.subtitle}</p>
                 </div>
                 {stats && (
-                  <span className="text-sm font-semibold text-neutral-700">
+                  <span className="text-sm font-semibold text-neutral-700 flex-shrink-0">
                     {stats.unlocked} / {stats.total}
                   </span>
                 )}
               </div>
+
+              {/* Reward badge — shows what user will earn for completing this route */}
+              {ROUTE_REWARDS_DISPLAY[routeKey] && (
+                <div className={`mb-4 px-3 py-2 rounded-lg border flex items-start gap-2 ${
+                  stats?.unlocked === stats?.total
+                    ? "bg-neutral-900 border-neutral-900 text-white"
+                    : "bg-neutral-50 border-neutral-200 text-neutral-700"
+                }`}>
+                  <Gift size={14} className="mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 text-xs">
+                    <p className="font-semibold">
+                      {stats?.unlocked === stats?.total ? "已領獎勵：" : "完成可獲得："}
+                    </p>
+                    <p className="opacity-90">
+                      {ROUTE_REWARDS_DISPLAY[routeKey].join(" · ")}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {items.map((a) => (
