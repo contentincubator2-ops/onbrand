@@ -1,0 +1,54 @@
+name: Admin — Bump nginx upstream timeout to 150s (kill HTML 504 errors)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            # Find the nginx config for marketing-os.sowork.ai
+            CONFIG=$(sudo grep -lr "marketing-os.sowork.ai" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -1)
+            if [ -z "$CONFIG" ]; then
+              echo "✗ Could not find nginx config — checking common locations:"
+              sudo ls -la /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null
+              exit 1
+            fi
+            echo "Config: $CONFIG"
+
+            echo ""
+            echo "── BEFORE: timeout-related directives ──"
+            sudo grep -E "proxy_(read|connect|send)_timeout|client_(body|header)_timeout" "$CONFIG" || echo "(none set, using nginx defaults of 60s)"
+
+            # Backup
+            sudo cp "$CONFIG" "${CONFIG}.bak.$(date +%s)"
+
+            # Inject timeouts inside each `location /` block that has proxy_pass.
+            # Strategy: if proxy_read_timeout already exists, replace; else add after proxy_pass.
+            if sudo grep -q "proxy_read_timeout" "$CONFIG"; then
+              sudo sed -i 's/proxy_read_timeout .*;/proxy_read_timeout 150s;/g' "$CONFIG"
+              sudo sed -i 's/proxy_send_timeout .*;/proxy_send_timeout 150s;/g' "$CONFIG"
+              sudo sed -i 's/proxy_connect_timeout .*;/proxy_connect_timeout 30s;/g' "$CONFIG"
+            else
+              # Add after every proxy_pass line
+              sudo sed -i '/proxy_pass /a\        proxy_read_timeout 150s;\n        proxy_send_timeout 150s;\n        proxy_connect_timeout 30s;' "$CONFIG"
+            fi
+
+            echo ""
+            echo "── AFTER: timeout-related directives ──"
+            sudo grep -E "proxy_(read|connect|send)_timeout|client_(body|header)_timeout" "$CONFIG"
+
+            echo ""
+            echo "── nginx -t ──"
+            sudo nginx -t
+
+            echo ""
+            echo "── reload nginx ──"
+            sudo nginx -s reload && echo "reloaded ✓"

@@ -37,6 +37,18 @@ export async function buildBrandPrefix(
     const db = await getDb();
     if (!db) return "";
 
+    // 2026-05-09 (CJ audit): also pull LOCKED brand attributes from brands
+    // table (tagline, positioningSummary, positioningReport.archetype) so
+    // 30s/60s tasks auto-use the brand's confirmed identity without the
+    // user re-typing them every run.
+    const { default: localPool } = await import("../localDb");
+    const [brandRowsRaw]: any = await localPool.execute(
+      `SELECT name, tagline, positioningSummary, positioningReport, positioningStatus
+       FROM brands WHERE id = ? LIMIT 1`,
+      [brandId],
+    );
+    const brandRow = Array.isArray(brandRowsRaw) ? brandRowsRaw[0] : null;
+
     const [rows] = (await db.execute(
       sql`SELECT category, title, content
           FROM brand_brain
@@ -45,18 +57,39 @@ export async function buildBrandPrefix(
           LIMIT 8`
     )) as any;
 
-    if (!rows || rows.length === 0) {
+    const brandLocked: string[] = [];
+    if (brandRow?.tagline) brandLocked.push(`【已鎖定 Tagline】${brandRow.tagline}`);
+    if (brandRow?.positioningSummary) brandLocked.push(`【已鎖定定位摘要】${brandRow.positioningSummary}`);
+    // positioningReport is JSON. Try to extract archetype if present.
+    if (brandRow?.positioningReport) {
+      try {
+        const rep = typeof brandRow.positioningReport === "string"
+          ? JSON.parse(brandRow.positioningReport)
+          : brandRow.positioningReport;
+        const arch = rep?.archetype ?? rep?.brandArchetype ?? rep?.archetypePrimary;
+        if (arch) brandLocked.push(`【已鎖定 Archetype】${typeof arch === "string" ? arch : JSON.stringify(arch).slice(0, 200)}`);
+        const why = rep?.why ?? rep?.WHY;
+        if (why) brandLocked.push(`【WHY】${String(why).slice(0, 200)}`);
+        const how = rep?.how ?? rep?.HOW;
+        if (how) brandLocked.push(`【HOW】${String(how).slice(0, 200)}`);
+      } catch { /* non-fatal */ }
+    }
+
+    if ((!rows || rows.length === 0) && brandLocked.length === 0) {
       CACHE.set(brandId, { prefix: "", expiresAt: Date.now() + TTL_MS });
       return "";
     }
 
-    const prefix =
-      "\n\n[品牌大腦摘要 — 所有產出都要符合下面的定位、語氣與守則]\n" +
-      rows
-        .map(
-          (r: any) => `- 【${r.category}】${r.title}：${r.content}`
-        )
-        .join("\n");
+    const lockedSection = brandLocked.length > 0
+      ? "\n[品牌已鎖定屬性 — 最高優先級，所有產出都要符合]\n" + brandLocked.map(l => `- ${l}`).join("\n") + "\n"
+      : "";
+
+    const brainSection = rows && rows.length > 0
+      ? "[品牌大腦摘要 — 補充定位 / 語氣 / 守則]\n" +
+        rows.map((r: any) => `- 【${r.category}】${r.title}：${r.content}`).join("\n")
+      : "";
+
+    const prefix = "\n\n" + lockedSection + brainSection;
 
     CACHE.set(brandId, { prefix, expiresAt: Date.now() + TTL_MS });
     return prefix;

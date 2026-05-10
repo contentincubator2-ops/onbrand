@@ -13,15 +13,24 @@ export const BRAND_30S_TASKS: FBTaskTemplate[] = [
   {
     id: "br-30-tagline",
     tier: "30s", postType: "generic",
-    label: "Tagline 5 種候選",
-    description: "品牌核心一句話",
+    label: "Tagline 5 種候選（功能/情感/反差/智慧/行動）",
+    description: "品牌核心一句話 — 5 個短 tagline 候選",
     agent_id: 220869, skill_slug: "tagline-creative",
     primary_question: "你的品牌做什麼？想被誰記得？",
     primary_input: { key: "context", placeholder: "業務 + 受眾 + 想傳達的核心感受", type: "textarea" },
     inputs: [{ key: "context", label: "品牌 + 感受", type: "textarea", required: true }],
-    systemPrompt: `產出 tagline 候選。每變體 1 種角度（功能 / 情感 / 反差）。
-規則：5-10 字、有節奏、不抽象、避免"領先"/"極致"等空話。${BRAND_TONE}`,
-    preferredModel: "qwen", maxTokens: 350,
+    // 2026-05-09 (CJ audit): was producing 段落 not 短 tagline. Force
+    // strict short output + 5 variants matching the 5 angles in label.
+    systemPrompt: `產出 1 個 tagline（不是段落、不是貼文、不要解釋）。
+**嚴格字數規則：6-15 個字（含標點），絕對不超過 18 字。**
+**禁用詞：領先、極致、卓越、頂尖、唯一、最佳、第一、無與倫比、業界、創新（這些是空話）。**
+要有節奏感、可朗讀、能讓人在 2 秒內記住。
+輸出範例（這是格式參考，不是內容範本）：
+  ✓ "科學有溫度，營養也有味"（11 字）
+  ✓ "吃對了，全家都更好"（8 字）
+  ✗ "我們致力於提供業界領先的營養解決方案"（廢話 + 太長）
+${BRAND_TONE}`,
+    preferredModel: "qwen", maxTokens: 60,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
@@ -160,7 +169,9 @@ ${BRAND_TONE}`,
 
 const YATING_ID = 220872;
 export const BRAND_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "br-30-tagline":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["功能訴求", "情感訴求", "反差訴求"], captionMinChars: 50, captionMaxChars: 200 },
+  // 2026-05-09 audit fix: 5 variants (was 3) to match label「5 種候選」, +
+  // strict 6-15 char range to force tagline-shape output, not paragraphs.
+  "br-30-tagline":          { variants: 5, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["功能訴求", "情感訴求", "反差訴求", "智慧訴求", "行動訴求"], captionMinChars: 6, captionMaxChars: 18 },
   "br-30-value-prop":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["We help...", "X 不再 Y", "唯一 X"], captionMinChars: 50, captionMaxChars: 200 },
   "br-30-brand-voice":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["專業派", "親民派", "玩味派"], captionMinChars: 200, captionMaxChars: 500 },
   "br-30-archetype":        { variants: 3, images: 3, runImageGen: false, imageDirectorId: YATING_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4, variantLabels: ["Hero/Magician 類", "Sage/Caregiver 類", "Outlaw/Jester 類"], captionMinChars: 300, captionMaxChars: 700 },

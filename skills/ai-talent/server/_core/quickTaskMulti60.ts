@@ -294,7 +294,14 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     primary_question: "品牌精神 / 核心差異？",
     primary_input: { key: "spirit", placeholder: "品牌精神、信念、做什麼", type: "textarea" },
     inputs: [{ key: "spirit", label: "品牌精神", type: "textarea", required: true }],
-    systemPrompt: `產出品牌 tagline（每變體 1 個 12 字內 tagline + 50 字應用情境）。${TONE("Brand")}`,
+    // 2026-05-09 (CJ audit): 強制兩段格式 — tagline 嚴格 12 字內 + 應用情境
+    // 50 字解釋。原 prompt 太鬆 → LLM 直接寫整段貼文，看不到 tagline。
+    systemPrompt: `每變體必須輸出兩段，用 \`||\` 分隔：
+第一段：tagline 本身，**6-12 個字**，可朗讀有節奏（不超過 14 字）
+第二段：應用情境 50 字內，說明這 tagline 用在哪裡 / 給誰看
+範例：
+  "科學不在實驗室，在你家餐桌||給家裡有小孩、重視食安的媽媽，IG 限動或實體傳單"
+禁止：寫整篇文案、業界領先這種空話、超過 14 字的句子。${TONE("Brand")}`,
     preferredModel: "qwen", maxTokens: 700,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },

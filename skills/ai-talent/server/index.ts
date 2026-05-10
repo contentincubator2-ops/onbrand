@@ -405,6 +405,45 @@ async function backfillMissionResources(): Promise<void> {
   }
 }
 
+// 2026-05-09 (CJ direction「根除 HTML/JSON 錯誤」):
+//   Express's default 404/500 page is HTML. tRPC middleware itself ALWAYS
+//   returns JSON, but if a request doesn't match any route OR an unhandled
+//   exception bubbles up past tRPC, the client gets HTML and parses it as
+//   JSON → "Unexpected token '<'..." error. Adding a JSON-only catch-all
+//   for /trpc + /api paths ensures the client never sees HTML for those.
+//   Static / boardroom / covers paths still return HTML (intentional).
+app.use("/trpc", (_req, res) => {
+  res.status(404).json({ error: { code: "NOT_FOUND", message: "tRPC procedure not found" } });
+});
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: { code: "NOT_FOUND", message: "API endpoint not found" } });
+});
+// Global error handler — last middleware. Catches anything not handled by
+// tRPC's onError or route-level try/catch. Always returns JSON so the
+// client's `JSON.parse` never sees HTML.
+app.use((err: any, req: any, res: any, _next: any) => {
+  console.error("[express] Unhandled error:", {
+    method: req.method,
+    url: req.url,
+    name: err?.name,
+    message: err?.message,
+    stack: err?.stack?.split("\n").slice(0, 5).join("\n"),
+  });
+  if (res.headersSent) return;
+  // For /trpc and /api routes, ALWAYS JSON. For others, plaintext.
+  const isJsonPath = req.path?.startsWith("/trpc") || req.path?.startsWith("/api");
+  if (isJsonPath) {
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: err?.message ?? "unknown server error",
+      },
+    });
+  } else {
+    res.status(500).type("text/plain").send(`server error: ${err?.message ?? "unknown"}`);
+  }
+});
+
 const server = app.listen(PORT, async () => {
   console.log(`[server] sowork-enterprise listening on port ${PORT}`);
   console.log(`[server] health: http://localhost:${PORT}/health`);
@@ -421,6 +460,13 @@ const server = app.listen(PORT, async () => {
   // Backfill mission resources for existing missions (fire-and-forget)
   backfillMissionResources();
 });
+
+// 2026-05-09: bump server timeouts so heavy orchestra calls (60s tier
+// with 5 variants + image gen) don't get killed mid-flight. Pair with
+// nginx proxy_read_timeout 150s (set via admin-set-nginx-timeout workflow).
+server.timeout = 140_000;          // 140s for entire request
+server.keepAliveTimeout = 65_000;  // > nginx's default keep-alive
+server.headersTimeout = 145_000;   // must be > server.timeout per Node docs
 
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {
