@@ -112,48 +112,46 @@ async function generateScript(input: VideoJobInput): Promise<VideoScript> {
   };
 }
 
-// ─── Step 2: Hailuo T2V (replaced disabled Seedance 2026-05-10) ─────────
+// ─── Step 2: PiAPI Kling v2-master (CJ direction「PiAPI or Atlas Cloud」) ─
 //
-// fal.ai removed 2026-05-05 (billing dispute), Seedance disabled. CJ direction:
-// route through hailuo/t2v via existing mediaGen pipeline. Each scene
-// becomes one short clip (~6s); composeVideo stitches scenes via Creatomate.
+// Replaced disabled Seedance + Hailuo (key invalid 2049) with piapi/kling-v2.
+// PiAPI key already in use for image gen (flux-schnell), so video reuses
+// same subscription. Each scene = one 5s Kling clip; composeVideo stitches
+// via Creatomate (or single-scene fallback if Creatomate not configured).
 async function generateScene(scene: SceneScript, platform: string): Promise<string> {
   const { dispatchGenerate, checkJob } = await import("../_core/mediaGen");
   const isVertical = platform === "instagram" || platform === "tiktok";
-  // Hailuo prompt: scene.visual is the visual description; scene.narration
-  // gives context. Keep prompt concise (under 800 chars) per MiniMax docs.
   const prompt = `${scene.visual}\n\nMood: ${scene.narration.slice(0, 200)}`;
 
-  // 1) Submit
-  const submit = await dispatchGenerate("hailuo/t2v", {
+  // 1) Submit to PiAPI Kling v2-master
+  const submit = await dispatchGenerate("piapi/kling-v2-master", {
     prompt: prompt.slice(0, 800),
     aspectRatio: (isVertical ? "9:16" : "16:9") as any,
-    brandId: 0, // no brand context needed for scene clips
+    brandId: 0,
   });
 
   if (submit.status === "ready" && submit.url) return submit.url;
   if (submit.status === "failed") {
-    throw new Error(`Hailuo submit failed: ${submit.errorMsg ?? "unknown"}`);
+    throw new Error(`Kling submit failed: ${submit.errorMsg ?? "unknown"}`);
   }
   if (submit.status !== "submitted" || !submit.taskId) {
-    throw new Error(`Unexpected hailuo submit response: ${JSON.stringify(submit).slice(0, 200)}`);
+    throw new Error(`Unexpected Kling submit: ${JSON.stringify(submit).slice(0, 200)}`);
   }
 
-  // 2) Poll until ready (Hailuo t2v typically takes 60-180s)
+  // 2) Poll (Kling v2-master pro mode typically 90-180s per 5s clip)
   const taskId = submit.taskId;
   const startedAt = Date.now();
   const POLL_INTERVAL_MS = 10_000;
-  const MAX_POLL_MS = 6 * 60_000; // 6 min hard cap per scene
+  const MAX_POLL_MS = 8 * 60_000;
   while (Date.now() - startedAt < MAX_POLL_MS) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    const r = await checkJob("hailuo/t2v", taskId);
+    const r = await checkJob("piapi/kling-v2-master", taskId);
     if (r.status === "ready" && r.url) return r.url;
     if (r.status === "failed") {
-      throw new Error(`Hailuo poll failed: ${r.errorMsg ?? "unknown"}`);
+      throw new Error(`Kling poll failed: ${r.errorMsg ?? "unknown"}`);
     }
-    // status === "submitted" → keep polling
   }
-  throw new Error(`Hailuo t2v timeout after ${MAX_POLL_MS / 1000}s for task ${taskId}`);
+  throw new Error(`Kling v2 timeout after ${MAX_POLL_MS / 1000}s for task ${taskId}`);
 }
 
 // ─── Step 3: ElevenLabs TTS ──────────────────────────────────────────────────
