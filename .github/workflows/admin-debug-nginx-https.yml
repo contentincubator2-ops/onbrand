@@ -1,0 +1,32 @@
+name: Admin — Debug nginx HTTPS server blocks
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            echo "════════ sites-enabled (whats actually loaded) ════════"
+            sudo ls -la /etc/nginx/sites-enabled/
+            echo ""
+
+            echo "════════ all server_name lines, all enabled files ════════"
+            for f in /etc/nginx/sites-enabled/*; do
+              [ -f "$f" -o -L "$f" ] || continue
+              # Resolve symlinks
+              REAL=$(readlink -f "$f")
+              echo "── $f -> $REAL ──"
+              sudo grep -nE "server_name|listen|ssl_certificate[ \t]" "$REAL" 2>/dev/null | head -15
+              echo ""
+            done
+
+            echo "════════ Identify default_server (this catches unmatched SNI) ════════"
+            sudo grep -rn "default_server" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -10
