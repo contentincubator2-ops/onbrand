@@ -316,13 +316,16 @@ output: hashtags 陣列（不要含 # 前綴），caption 放 1 句使用建議�
     description: "倒數 N 天的單篇推文（系列中的一篇）",
     agent_id: 180159,             // Claire Hsu — fb-countdown-series lead
     skill_slug: "social-media-manager",
-    primary_question: "活動名稱 + 還剩幾天？",
-    primary_input: { key: "event_name", placeholder: "例：週年慶 / 新品上市 / 限時優惠", type: "text" },
+    // 2026-05-10 (CJ audit B-01 fix): 原本 inputs 有 2 個 required 欄位
+    // (event_name + days_left)，但 UI 只 render primary_input 那一個 →
+    // 後端 validation 永遠失敗。改成單一 textarea 讓用戶一起輸入。
+    primary_question: "活動名稱 + 還剩幾天？（一起寫）",
+    primary_input: { key: "event_context", placeholder: "例：週年慶剩 3 天 / 新品上市倒數 7 天", type: "textarea" },
     inputs: [
-      { key: "event_name", label: "活動名稱", type: "text", required: true },
-      { key: "days_left", label: "剩幾天", type: "text", required: true, placeholder: "3" },
+      { key: "event_context", label: "活動 + 倒數天數", type: "textarea", required: true },
     ],
     systemPrompt: `產出 FB 活動倒數系列其中一篇（80-130 字）。
+從用戶輸入解析「活動名稱」+「剩幾天」自動套用。
 規則：① 開頭凸顯天數（用數字 + emoji） ② 中間放 1 個尚未公開的小細節 / 倒數獨家 ③ 最後 CTA。
 不要每天都用一樣的 "倒數X天" 結構，要有變化。
 配圖 style_direction.summary 給 1 句倒數視覺風格。`,
